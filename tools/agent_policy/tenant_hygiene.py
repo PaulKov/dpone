@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -13,9 +14,9 @@ import sys
 import tarfile
 import zipfile
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, BinaryIO, NoReturn
+from typing import Any, BinaryIO, NoReturn, Protocol
 
 SCHEMA, TENANT_CODE = "dpone.tenant-hygiene.v1", "DPONE_HYGIENE_TENANT_DEFAULT"
 FULL_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
@@ -41,13 +42,13 @@ class HygieneReport:
     findings: tuple[Finding, ...]
 
 
-@dataclass(frozen=True, slots=True)
-class _Policy:
-    matcher: re.Pattern[bytes] = field(repr=False)
-    overlap: int = field(repr=False)
+class _Policy(Protocol):
+    overlap: int
+    full_member: bool
 
-    def matches(self, value: bytes) -> bool:
-        return self.matcher.search(value) is not None
+    def matches(self, value: bytes) -> bool: ...
+
+    def scan(self, stream: BinaryIO, size: int, chunk_size: int) -> tuple[bool, bytes]: ...
 
 
 class _Unable(Exception):
@@ -110,13 +111,16 @@ def _load_policy(path: Path) -> _Policy:
         if len(payload) > MAX_POLICY_BYTES or not _unchanged(stream, path, identity):
             raise _Unable("DPONE_HYGIENE_POLICY_INVALID", "$POLICY")
     try:
-        values = [line.encode() for line in payload.decode().splitlines() if line]
-    except UnicodeError as exc:
+        name = "dpone_tenant_hygiene_policy"
+        spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name("tenant_hygiene_policy.py"))
+        if spec is None or spec.loader is None:
+            raise ValueError
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+        return module.parse_policy(payload)
+    except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
         raise _Unable("DPONE_HYGIENE_POLICY_INVALID", "$POLICY") from exc
-    unique = tuple(dict.fromkeys(values))
-    if not unique:
-        raise _Unable("DPONE_HYGIENE_POLICY_INVALID", "$POLICY")
-    return _Policy(re.compile(b"|".join(re.escape(item) for item in unique)), max(map(len, unique)) - 1)
 
 
 def _path(raw: bytes, policy: _Policy, *, source: bool = False, directory: bool = False) -> tuple[str | None, str]:
@@ -227,20 +231,7 @@ def evaluate_source(*, root: Path, commit_sha: str, policy_path: Path) -> Hygien
 
 
 def _stream_matches(stream: BinaryIO, size: int, policy: _Policy) -> tuple[bool, bool]:
-    read = 0
-    tail = b""
-    prefix = b""
-    matched = False
-    while chunk := stream.read(READ_CHUNK_BYTES):
-        read += len(chunk)
-        if read > size:
-            raise ValueError
-        candidate = tail + chunk
-        matched = matched or policy.matches(candidate)
-        tail = candidate[-policy.overlap :] if policy.overlap else b""
-        prefix = (prefix + chunk)[:512]
-    if read != size:
-        raise ValueError
+    matched, prefix = policy.scan(stream, size, READ_CHUNK_BYTES)
     magic = prefix.startswith((b"PK\x03\x04", b"\x1f\x8b", b"BZh", b"\xfd7zXZ\x00", b"7z\xbc\xaf'\x1c"))
     return matched, magic or prefix[257:262] == b"ustar"
 

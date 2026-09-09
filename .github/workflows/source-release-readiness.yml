@@ -1,5 +1,7 @@
 name: Source release readiness
 
+# Manual source/archive certification; policy contents stay inside the scan step.
+
 on:
   workflow_dispatch:
 
