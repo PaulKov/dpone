@@ -22,7 +22,9 @@ from dpone.contracts.dbt_release_workload_binding import (
     release_digest,
     release_mapping,
     release_object,
+    release_text,
     require_dbt_workflow_dag,
+    runtime_payload_member,
 )
 from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V2
 from dpone.contracts.dbt_runtime_release_binding import (
@@ -218,6 +220,23 @@ class DbtSourcePlan:
             or set(workloads) != set(self.artifacts.workloads)
         ):
             raise DbtDevEvidenceReleaseError("DAGs do not cover each release workload exactly once")
+
+    @staticmethod
+    def transfer_manifest_bytes(pack: Mapping[str, object], workload_id: str) -> bytes:
+        """Require transfer ownership before exposing bounded embedded manifest bytes."""
+        if "runtime_payload_ids" in pack:
+            raise DbtDevEvidenceReleaseError("transfer pack cannot own dbt runtime sources")
+        workload = release_mapping(pack.get("workload"), "transfer workload")
+        expected_path = f"_dbt/manifests/{workload_id}.yaml"
+        if release_text(workload.get("manifest"), "transfer manifest path") != expected_path:
+            raise DbtDevEvidenceReleaseError("transfer manifest path differs from its workload identity")
+        return runtime_payload_member(
+            pack,
+            expected_path=expected_path,
+            max_archive_bytes=8 * 1024 * 1024,
+            max_member_bytes=1024 * 1024,
+            label="transfer manifest",
+        )
 
     def observe_transfer(
         self, workload_id: str, manifest: Mapping[str, object], *, owner: tuple[str, str]

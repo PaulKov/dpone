@@ -14,7 +14,7 @@ from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V1, DBT_RUNTIM
 
 @pytest.mark.parametrize("wire", [DBT_RUNTIME_WIRE_V1, DBT_RUNTIME_WIRE_V2])
 def test_runtime_wire_comes_from_validated_producer(wire: str) -> None:
-    release = {"producer": {"dpone_version": "0.74.28", "wire_contract": wire}}
+    release = {"schema": "dpone.release-set.v2", "producer": {"dpone_version": "0.74.28", "wire_contract": wire}}
     assert dbt_release_runtime_wire_contract(release) == wire
     assert dbt_release_producer_violation(release, expected_wire_contract=wire) is None
 
@@ -50,3 +50,12 @@ def test_reader_and_activation_share_explicit_workspace_classification(wire, wor
 def test_unknown_wire_is_not_an_implicit_legacy_or_workspace(wire):
     with pytest.raises(ValueError, match="unsupported"):
         is_workspace_dbt_wire(wire)
+
+
+@pytest.mark.parametrize("schema", [None, "dpone.release-set.v1", "unknown"])
+def test_wire_v2_requires_explicit_workspace_schema(schema):
+    release = {"producer": {"dpone_version": "0.74.28", "wire_contract": DBT_RUNTIME_WIRE_V2}}
+    if schema is not None:
+        release["schema"] = schema
+    with pytest.raises(ValueError):
+        dbt_release_runtime_wire_contract(release)

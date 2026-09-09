@@ -171,6 +171,7 @@ def _consume_stable_descriptor(
     if max_bytes is not None and before.st_size > max_bytes:
         raise ConfinedFileError("file_too_large", "Project file exceeds its byte limit.")
     byte_count = 0
+    digest = hashlib.sha256()
     remaining = before.st_size + 1 if max_bytes is None else max_bytes + 1
     while remaining > 0:
         read_size = min(64 * 1024, remaining)
@@ -178,6 +179,7 @@ def _consume_stable_descriptor(
         if not chunk:
             break
         consumer(chunk)
+        digest.update(chunk)
         byte_count += len(chunk)
         remaining -= len(chunk)
     after = os.fstat(descriptor)
@@ -187,7 +189,33 @@ def _consume_stable_descriptor(
         raise ConfinedFileError("source_changed", "Project file changed while it was read.")
     if max_bytes is not None and byte_count > max_bytes:
         raise ConfinedFileError("file_too_large", "Project file exceeds its byte limit.")
+    _verify_descriptor_content(descriptor, after_identity, digest.digest())
     return after_identity
+
+
+def _verify_descriptor_content(descriptor: int, identity: ConfinedFileIdentity, expected_digest: bytes) -> None:
+    """Compare bounded reread bytes when filesystem timestamps may be coarse.
+
+    This checks content consistency across two passes through the held file;
+    it cannot certify absence of every transient or subsequent mutation.
+    """
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    digest = hashlib.sha256()
+    byte_count = 0
+    remaining = identity.size + 1
+    while remaining > 0:
+        chunk = _read_chunk(descriptor, min(64 * 1024, remaining))
+        if not chunk:
+            break
+        digest.update(chunk)
+        byte_count += len(chunk)
+        remaining -= len(chunk)
+    if (
+        byte_count != identity.size
+        or digest.digest() != expected_digest
+        or ConfinedFileIdentity.from_stat(os.fstat(descriptor)) != identity
+    ):
+        raise ConfinedFileError("source_changed", "Project file changed while it was read.")
 
 
 def _read_chunk(descriptor: int, size: int) -> bytes:

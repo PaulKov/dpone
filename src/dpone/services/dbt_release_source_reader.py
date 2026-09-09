@@ -9,7 +9,6 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from dpone.contracts.dbt_contract_validation import DbtPublishingError
-from dpone.contracts.dbt_release_workload_binding import runtime_payload_member
 from dpone.contracts.dbt_source_inventory import MAX_DBT_SOURCE_INVENTORY_BYTES, DbtSourceInventory
 from dpone.contracts.dbt_source_inventory_binding import (
     DbtReleaseSources as DbtReleaseSources,
@@ -27,7 +26,6 @@ from dpone.services.dbt_release_workflow_reader import (
     DbtDevEvidenceReleaseError,
     read_dbt_workflow_dags,
     read_dbt_workload_pack,
-    release_mapping,
     release_object,
     release_text,
 )
@@ -39,8 +37,6 @@ if TYPE_CHECKING:
 
 _MAX_RELEASE_BYTES = 8 * 1024 * 1024
 _MAX_PROJECT_CONFIG_BYTES = 1024 * 1024
-_MAX_TRANSFER_ARCHIVE_BYTES = 8 * 1024 * 1024
-_MAX_TRANSFER_MANIFEST_BYTES = 1024 * 1024
 
 
 class DbtReleaseSourceReader:
@@ -191,21 +187,7 @@ class DbtReleaseSourceReader:
 
     @staticmethod
     def _transfer_manifest(pack: Mapping[str, object], workload_id: str) -> Mapping[str, object]:
-        if "runtime_payload_ids" in pack:
-            raise DbtDevEvidenceReleaseError("transfer pack cannot own dbt runtime sources")
-        workload = release_mapping(pack.get("workload"), "transfer workload")
-        expected_path = f"_dbt/manifests/{workload_id}.yaml"
-        if release_text(workload.get("manifest"), "transfer manifest path") != expected_path:
-            raise DbtDevEvidenceReleaseError("transfer manifest path differs from its workload identity")
-        manifest = load_bounded_yaml(
-            runtime_payload_member(
-                pack,
-                expected_path=expected_path,
-                max_archive_bytes=_MAX_TRANSFER_ARCHIVE_BYTES,
-                max_member_bytes=_MAX_TRANSFER_MANIFEST_BYTES,
-                label="transfer manifest",
-            )
-        )
+        manifest = load_bounded_yaml(DbtSourcePlan.transfer_manifest_bytes(pack, workload_id))
         if not isinstance(manifest, Mapping):
             raise DbtDevEvidenceReleaseError("transfer manifest must be an object")
         return manifest

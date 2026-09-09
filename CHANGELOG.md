@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Native compact publication now reports storage failures safely, distinguishes
+  uncertain durability from immutable conflicts, and re-synchronizes retained
+  releases on identical retries.
+
+### Fixed
+
+- Reject torn confined-file reads even when a same-size write leaves identical
+  filesystem timestamps, using bounded content verification on the held descriptor.
+- Deliver complete multi-project dbt wire-v2 compile trees through compact
+  materialization without losing producer, source or selection authority.
+  Preserve ordered workload payload references through deployment projection and
+  the Airflow provider; validate the derived release before immutable publication.
+  Legacy wire-v1 support and workspace activation restrictions remain unchanged.
+  See the [compact workspace delivery guide](docs/dbt-compact-delivery.md).
+
 ## 0.74.33 - 2026-09-02
 
 ### Added

@@ -31,7 +31,9 @@ def test_object_storage_lifecycle_render_cli_outputs_prefix_scoped_rule(capsys) 
 
 
 def test_object_storage_budget_cli_uses_local_inventory(capsys, tmp_path: Path) -> None:
-    object_path = tmp_path / "store" / "s3" / "example-data-bucket" / "dpone-stage" / "prod" / "mart" / "table" / "run-1"
+    object_path = (
+        tmp_path / "store" / "s3" / "example-data-bucket" / "dpone-stage" / "prod" / "mart" / "table" / "run-1"
+    )
     object_path.mkdir(parents=True)
     (object_path / "chunk.parquet").write_bytes(b"x" * 10)
 

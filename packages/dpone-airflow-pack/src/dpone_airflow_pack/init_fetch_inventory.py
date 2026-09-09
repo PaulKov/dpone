@@ -158,7 +158,9 @@ def _runtime_payload_id_list(
         raise field_invalid("workload_packs[].runtime_payload_ids contains duplicates", path)
     if set(result) - known_ids:
         raise field_invalid("workload references an absent runtime payload", path)
-    return tuple(sorted(result))
+    # References are an ordered execution contract, not an inventory set.
+    # In particular dbt wire v2 requires project/manifest/selection order.
+    return result
 
 
 __all__ = ["parse_runtime_payloads", "parse_workload_packs"]

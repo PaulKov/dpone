@@ -1,0 +1,370 @@
+{
+  "accepted": false,
+  "evaluated_head": "7d5282a516c05ac636d1b7996a4af57bc46de0df",
+  "historical_ancestry": "UNVERIFIED",
+  "next_action": "Commit the candidate and run the ordinary exact-head module-size gate.",
+  "previous_ledger_sha256": "0858ac904defebd34c5b8fc94d886da802c78d81565aa286747b660dfd7b821f",
+  "public_ledger_sha256": "0858ac904defebd34c5b8fc94d886da802c78d81565aa286747b660dfd7b821f",
+  "public_root": "f8c6a4a5e75d167829c05f65d5d3033acb193878",
+  "schema": "dpone.public-module-debt-adoption.v1",
+  "sources": [
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 399,
+      "max_sloc": 354,
+      "path": "src/dpone/commands/airflow_desired_state_publish_cmd.py",
+      "source_sha256": "dbdaf81774f8674f63c2901bbfa9b4cfe60dc52db9008662308515e01a903967"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 395,
+      "max_sloc": 357,
+      "path": "src/dpone/commands/airflow_self_service_cmd.py",
+      "source_sha256": "0656558f333b04f0a7ac00a24e4ef57a8fa2871337d8524d7c39fa60511b6f62"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 449,
+      "max_sloc": 384,
+      "path": "src/dpone/commands/airflow_self_service_rendering.py",
+      "source_sha256": "7b8810236a3e4abda6366c3e903e12dbe2a448a985cb3672ba334f2e0b3d8f74"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 427,
+      "max_sloc": 392,
+      "path": "src/dpone/commands/dbt_promotion_cmd.py",
+      "source_sha256": "234692ad483a07b984716af0daf22223558df06fd678645d315c02a83d0429b2"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 383,
+      "max_sloc": 354,
+      "path": "src/dpone/commands/dbt_publish_cmd.py",
+      "source_sha256": "26de632f1865228403c62af3e1ce687e9262a94d465a97c7c38a332ff4e6a998"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 389,
+      "max_sloc": 358,
+      "path": "src/dpone/commands/init_parser.py",
+      "source_sha256": "9a363ccfbccc9b828a8f39050fd53e6bd2e668b8fa38fd591f6f95fc8be66fd8"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 387,
+      "max_sloc": 359,
+      "path": "src/dpone/commands/run_safe_sample_cmd.py",
+      "source_sha256": "5986eab2de10683adf1c3e8f307b2dc37b9d242eaf8b336731918389217fad74"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 409,
+      "max_sloc": 372,
+      "path": "src/dpone/contracts/dbt_sqlserver_graph_policy.py",
+      "source_sha256": "8c74847b814c688812cf7ebb305ec714a231d9cf83b0518366078ebe2740f746"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 424,
+      "max_sloc": 378,
+      "path": "src/dpone/contracts/dbt_sqlserver_graph_rules.py",
+      "source_sha256": "2062c3963565dee951a910a5b431a67df7e8187b301b6f2e1714d7f94ac911d2"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 410,
+      "max_sloc": 364,
+      "path": "src/dpone/contracts/dbt_sqlserver_macro_authority.py",
+      "source_sha256": "d3811a8adc885e1511d557f115831403be5e8a31484d2e4c37de6e34c809af39"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 416,
+      "max_sloc": 354,
+      "path": "src/dpone/gitops/airflow_asset_cross_dag.py",
+      "source_sha256": "a3f9880ff6ba52dc122a00f188ee8374500f138cd3af0b833fb5b38a8f45e093"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 377,
+      "max_sloc": 356,
+      "path": "src/dpone/gitops/airflow_compact_pack.py",
+      "source_sha256": "1b6503027dd054279f3e9ad93eb9a114f4645ecd04e18da37d8c44259612e5a5"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 426,
+      "max_sloc": 376,
+      "path": "src/dpone/gitops/airflow_connection_bridge_plan.py",
+      "source_sha256": "779249f9b11181fda519b37bab2b695335b78b32ff732dc3f75e61141f89a0ce"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 434,
+      "max_sloc": 373,
+      "path": "src/dpone/gitops/airflow_dag_spec.py",
+      "source_sha256": "aa54cc8219a3f756a4c2a4fb99cda0210c5ae5ab03eb0d088d4437f5dbb6e8e8"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 403,
+      "max_sloc": 364,
+      "path": "src/dpone/gitops/schema_airflow_runtime_init_fetch_contracts.py",
+      "source_sha256": "33dbd21d2207587b53b88c8b5e14bc0b89d5fbde36e60fc17fdf0b1f0a366bb1"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 396,
+      "max_sloc": 367,
+      "path": "src/dpone/gitops/schema_deployment_cache_contracts.py",
+      "source_sha256": "a919b0256ab714037948fbcfcad12ee0035349b11703136c821ffab2e6c0785c"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 401,
+      "max_sloc": 355,
+      "path": "src/dpone/gitops/schema_validation.py",
+      "source_sha256": "77fa905f0fa16c8331d585415b9c2ab12ea2a1d87b03859472bf3db9b54baffd"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 399,
+      "max_sloc": 352,
+      "path": "src/dpone/governance/quality.py",
+      "source_sha256": "900316e823f2ad177eaae3d21e5691e4dc3683a99920b6be2208fbfa340a053b"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 419,
+      "max_sloc": 385,
+      "path": "src/dpone/manifest/authoring.py",
+      "source_sha256": "802a1cd07199f8152d918e30abf79e5393fc6140d7fc68eaf938fc87970d4077"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 394,
+      "max_sloc": 352,
+      "path": "src/dpone/manifest/authoring_migration_io.py",
+      "source_sha256": "5cf5aee7f75dcc12dee54dc62217848a9b43415eb149ca8ca6f1140cdd706e88"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 443,
+      "max_sloc": 387,
+      "path": "src/dpone/manifest/confined_mutations.py",
+      "source_sha256": "437f94d376c96c7571d04aec9bb8b2511196e382afc6e1fc34a42493839aef70"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 419,
+      "max_sloc": 351,
+      "path": "src/dpone/manifest/selection_models.py",
+      "source_sha256": "3c0959d6ea335e41c16605b8f58d9de516c56e0ee1b458df096d2514b145c55f"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 412,
+      "max_sloc": 374,
+      "path": "src/dpone/ops/evidence_chain.py",
+      "source_sha256": "752b02f479c4384c66491f65a6766d088681bd8cc6f2a4fb63ddfb2fda6e730a"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 396,
+      "max_sloc": 363,
+      "path": "src/dpone/readiness/airflow_artifact_delivery.py",
+      "source_sha256": "69e1f2602a5ce0585347c3484d1b41d60bdfbd9584f9994988f87f57dbe2508b"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 401,
+      "max_sloc": 363,
+      "path": "src/dpone/readiness/airflow_authoring_check_service.py",
+      "source_sha256": "556578656d8e3c4e4e403497da8bcefc3559005aa2d6f7078448a2b49a738860"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 375,
+      "max_sloc": 356,
+      "path": "src/dpone/readiness/airflow_pipeline_scaffold.py",
+      "source_sha256": "31ee2a6678711696fc8b4453bc41b37520acb550acda75d3496fc7c600a00d69"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 403,
+      "max_sloc": 376,
+      "path": "src/dpone/readiness/airflow_self_service_application.py",
+      "source_sha256": "19c62f898441892f83ee36bcb010d9689d17cfa51569355d1f5e0e8d79ece842"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 393,
+      "max_sloc": 358,
+      "path": "src/dpone/readiness/capability_discovery_service.py",
+      "source_sha256": "0877099881a499386eab87fd1e557ad37f978bc2d0ba52b0d4835fc7d26ea36f"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 403,
+      "max_sloc": 374,
+      "path": "src/dpone/readiness/project_selection_preview.py",
+      "source_sha256": "6e55902e8a8285fb285d4979ef48354d39aadd23bec063f674a647d80f7f583d"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 388,
+      "max_sloc": 358,
+      "path": "src/dpone/runtime/airflow_artifact_publication.py",
+      "source_sha256": "0d9607c413e980fc55fd31406d3a6030e4f00b92ef3b7a9bf167c9fa90a9e337"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 429,
+      "max_sloc": 373,
+      "path": "src/dpone/runtime/credentials/binding_resolver.py",
+      "source_sha256": "705be3668f974f8bc893a527ad6c69e0b2707b260b8eab629514b7135cb7d00e"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 396,
+      "max_sloc": 356,
+      "path": "src/dpone/runtime/dbt_project_bundle_source.py",
+      "source_sha256": "d234965d1edfa4dcd42898095d574c113cdbb79e7ff6c0d7d46b44414c8a7a41"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 400,
+      "max_sloc": 388,
+      "path": "src/dpone/runtime/deployment_cache_retention_applier.py",
+      "source_sha256": "a10bcf3f6f5f211a21c74339fb2d9662b9f58391e8aa0302b12e87bfd982d94a"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 409,
+      "max_sloc": 384,
+      "path": "src/dpone/runtime/deployment_cache_retention_transaction.py",
+      "source_sha256": "c51d5673e67167872e510e0991c8ed383755aca1a6f66ace2953e4a29b543946"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 387,
+      "max_sloc": 368,
+      "path": "src/dpone/runtime/governance/finalization.py",
+      "source_sha256": "0954eadbce9858b087e56b6dcc9599ea40879b02d905fb979f2ce993f164c9dd"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 391,
+      "max_sloc": 369,
+      "path": "src/dpone/runtime/governance/legacy_acceptance.py",
+      "source_sha256": "993d6223495dbce1f13ae1f5317f525275c11c07477abd8b13189bc76a20872b"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 422,
+      "max_sloc": 372,
+      "path": "src/dpone/runtime/native_transfer.py",
+      "source_sha256": "4a8f68aead4279f2004b0055bf6ca9031c4738410ffb05b8f03751d754d0781b"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 396,
+      "max_sloc": 379,
+      "path": "src/dpone/runtime/normalization/row_emitter.py",
+      "source_sha256": "0c9093edff94c0c2b63e7f1949134e15c5cde7b9b737046df3d0a56668324848"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 421,
+      "max_sloc": 375,
+      "path": "src/dpone/runtime/runtime_init_fetch_ready.py",
+      "source_sha256": "cc630001e6f78d101087fb8602a37cf1ac9b26d9d9c8231984b26c5d2259303c"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 409,
+      "max_sloc": 361,
+      "path": "src/dpone/runtime/runtime_payload_archive.py",
+      "source_sha256": "b3b5c179715aef75318d005ac5bb04a628d1977ba679ad4161a5deae1a12210f"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 393,
+      "max_sloc": 367,
+      "path": "src/dpone/runtime/sources/strategies/mssql/mssql_columnar_provider.py",
+      "source_sha256": "41a1915c0bc09f958ab327847155b0d5acb1119e19c3a46870f4b0b682f315cd"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 446,
+      "max_sloc": 394,
+      "path": "src/dpone/security_redaction.py",
+      "source_sha256": "3138e4888ceb2b8fcdf88292118f1e7a019e57599ff8abf8719913779b93bdad"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 409,
+      "max_sloc": 383,
+      "path": "src/dpone/services/airflow_desired_state.py",
+      "source_sha256": "95f7dadfa83b4144aa75346d6a3fe325ad9614320e065ccbd8192a860bca86d0"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 400,
+      "max_sloc": 366,
+      "path": "src/dpone/services/airflow_desired_state_control.py",
+      "source_sha256": "a2953754dfd8fad800da26f89d813cf9b5532eaa341942bdafe8b0c609c62139"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 384,
+      "max_sloc": 353,
+      "path": "src/dpone/services/airflow_desired_state_reconcile.py",
+      "source_sha256": "1ee9b9db2f6672bccc297800a9b3c14fd5e557198300d64defed05c3f67c5060"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 383,
+      "max_sloc": 357,
+      "path": "src/dpone/services/airflow_runtime_pod_retention.py",
+      "source_sha256": "1e25847413259db1c5375446ef6e94d175d7a589dcaf5b107ab9f7ddd0fcb905"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 393,
+      "max_sloc": 368,
+      "path": "src/dpone/services/dbt_dev_evidence_bundle.py",
+      "source_sha256": "9f1b44e1da84360399f10c57376d4ca9f0f8c10c6bed13ea949f54e48aecdb79"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 394,
+      "max_sloc": 364,
+      "path": "src/dpone/services/readiness.py",
+      "source_sha256": "5579b2f6a3d44068872fb19191145d9c1d87d0130f4a80c07934e1d8a7c717fb"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 449,
+      "max_sloc": 382,
+      "path": "src/dpone/services/safe_sample_policy.py",
+      "source_sha256": "87139ad1f8a01f832e95f3f5c740fb5afc35bba846e5be2494d9220dcd605418"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 423,
+      "max_sloc": 393,
+      "path": "src/dpone/services/schema_type_matrix.py",
+      "source_sha256": "cfee75bebc2743cbc4ee82b7bb273d3371d128bd74bebea1397d096a8071c23c"
+    },
+    {
+      "historical_baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 408,
+      "max_sloc": 352,
+      "path": "src/dpone/type_system/source_sink/profiles.py",
+      "source_sha256": "098e9000c13faf6ff927daf31ad2bebdbde753a02ba6ee83e9951171ae5cf074"
+    }
+  ],
+  "status": "CANDIDATE_WRITTEN"
+}

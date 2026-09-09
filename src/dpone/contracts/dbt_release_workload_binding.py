@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
 from dpone.contracts.dbt_contract_validation import DbtPublishingError, sha256_bytes
 from dpone.contracts.dbt_execution_pack import DbtExecutionPack
+from dpone.contracts.dbt_release_artifact_limits import MAX_DBT_RELEASE_DAG_BYTES, MAX_DBT_RELEASE_PACK_BYTES
 from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V1
 from dpone.contracts.strict_json import StrictJsonError, strict_json_object
 
@@ -29,6 +30,20 @@ _DBT_EXECUTION_PACK_PATH = "runtime/dbt-execution-pack.json"
 
 class DbtDevEvidenceReleaseError(ValueError):
     """The compiled release cannot define trustworthy evidence expectations."""
+
+
+def dbt_release_artifact_read_bound(kind: str) -> int:
+    """Select the closed acquisition bound for a DAG or workload descriptor."""
+    bounds = {"DAG spec": MAX_DBT_RELEASE_DAG_BYTES, "workload pack": MAX_DBT_RELEASE_PACK_BYTES}
+    if kind not in bounds:
+        raise ValueError("unsupported dbt release artifact kind")
+    return bounds[kind]
+
+
+def require_dbt_release_artifact_bytes(descriptor: Mapping[str, object], payload: bytes, *, kind: str) -> None:
+    """Bind each observed payload to its descriptor before interpreting its role."""
+    if len(payload) != descriptor.get("bytes") or sha256_bytes(payload) != descriptor.get("sha256"):
+        raise DbtDevEvidenceReleaseError(f"{kind} descriptor differs from {kind} bytes")
 
 
 def dbt_execution_from_pack(

@@ -5,9 +5,9 @@ mode: solo_maintainer
 purpose: "Keep master protected without requiring impossible self-approval in a one-owner repository."
 
 ruleset:
-  id: 18806829
-  version_id: 47422853
-  updated_at: "2026-08-24T06:50:40.161000Z"
+  id: 22617738
+  version_id: 49106165
+  updated_at: "2026-09-09T06:52:26.800000Z"
   name: protect-master
   target: branch
   enforcement: active

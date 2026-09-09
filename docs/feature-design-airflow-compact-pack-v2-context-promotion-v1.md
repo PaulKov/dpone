@@ -298,3 +298,12 @@ limitations: platform Python DAGs outside gitops domains remain separate modules
 - [x] Tests, evidence, docs, rollout, and rollback are complete.
 - [x] Path ownership and integration plan are conflict-safe.
 - [x] Maintainer instruction ("Do this") + ADR 0010/0027 / self-service gap authorize `APPROVED` for this vertical slice.
+
+## Native workspace wire-v2 extension
+
+The legacy reconcile input and release-v1 bridge described above remain supported.
+The [approved native workspace extension](feature-design-dbt-compact-wire-v2.md)
+also accepts complete canonical workspace compile output. It preserves v2 source
+authority and native deployment-owned connections, regenerates transport identity,
+and rejects partial workspace selection. See the
+[delivery guide](dbt-compact-delivery.md) for the distinct input modes.

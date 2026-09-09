@@ -463,3 +463,22 @@ git diff --exit-code -- docs/module_size_baseline.json
 
 See [Quality tooling](quality-tooling.md) for the broader local gate and
 [ADR 0047](adr/0047-module-size-debt-ratchet.md) for the architecture decision.
+
+## Public snapshot provenance adoption
+
+The public root starts a new Git history. Historical commit identities in its
+imported ledger remain unavailable as ancestry evidence. ADR 0056 authorizes
+one fixed-root, provenance-only adoption; it does not raise caps or extend dates.
+
+```bash
+uv run python -m tools.agent_policy.adopt_public_module_debt \
+  --head-sha "$(git rev-parse HEAD)" --write > adoption.json
+```
+
+The producer verifies exact root ledger/source bytes, preserves every debt
+contract field except `baseline_commit`, and writes with HEAD/byte compare-and-swap.
+Its report retains old commits as `UNVERIFIED` and reports an unaccepted candidate.
+Commit the candidate and run the ordinary exact-head gate. Repeating after that
+commit reports `NO_CHANGE`. Foreign roots, new debt, modified metadata or larger
+caps fail; the original ancestry check remains active for every normal entry.
+See [ADR 0056](adr/0056-public-snapshot-governance-recovery.md).

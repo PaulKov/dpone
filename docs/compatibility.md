@@ -1183,3 +1183,18 @@ required fields or changing the v1 digest subject in place is prohibited.
 - [Connector certification](connector-certification.md)
 - [Production readiness](production-readiness.md)
 - [Release process](release.md)
+
+## Native compact dbt workspace delivery
+
+Compact materialization accepts a complete canonical release-set v2 with explicit
+dbt wire v2. It retains producer/source/selection metadata and exact runtime
+objects, but derives a new release ID for rewritten transport. Regenerate the
+deployment and applicable attestations for that new identity. A native DAG subset
+is rejected; legacy reconcile filtering remains unchanged.
+
+Projection and provider preserve workload payload order. Existing legacy runtime
+order handling remains supported; reordered v2 references are rejected, never
+healed. Release v1 cannot declare dbt wire v2. Native singleton release roots are
+not supported by this new compact mode; existing singleton delivery remains.
+See [compact workspace delivery](dbt-compact-delivery.md) for migration and
+troubleshooting. Production workspace activation remains separately gated.

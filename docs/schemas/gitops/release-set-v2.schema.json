@@ -166,6 +166,22 @@
       ],
       "type": "object"
     },
+    "promotion": {
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "const": "compact_v2_runtime_connection_context"
+        },
+        "schema": {
+          "const": "dpone.compact-pack-release-promotion.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "profile"
+      ],
+      "type": "object"
+    },
     "provenance": {
       "additionalProperties": false,
       "properties": {

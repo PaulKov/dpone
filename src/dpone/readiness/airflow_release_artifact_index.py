@@ -299,7 +299,8 @@ def _runtime_payload_ids(
             "workload runtime_payload_ids must be unique bounded logical ids",
             path=path.as_posix(),
         )
-    return tuple(sorted(result))
+    # Preserve the producer-owned execution order through index projection.
+    return result
 
 
 def _required_release_text(item: Mapping[str, Any], field: str) -> str:

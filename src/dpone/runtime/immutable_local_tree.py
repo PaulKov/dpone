@@ -44,7 +44,7 @@ def materialize_immutable_local_tree(
         parent_parts = allowed_parent.relative_to(root).parts
     except ValueError as exc:
         raise ValueError("immutable tree parent must be inside its configured root") from exc
-    root.mkdir(parents=True, exist_ok=True)
+    _ensure_durable_root(root)
     root_descriptor = os.open(root, _DIRECTORY_FLAGS)
     try:
         _require_path_matches_descriptor(root, root_descriptor, error_path=tree_dir)
@@ -59,6 +59,22 @@ def materialize_immutable_local_tree(
             _require_path_matches_descriptor(root, root_descriptor, error_path=tree_dir)
         finally:
             os.close(root_descriptor)
+
+
+def _ensure_durable_root(root: Path) -> None:
+    """Persist each newly created ancestor; retry also finishes a failed mkdir sync."""
+    try:
+        root.mkdir()
+    except FileNotFoundError:
+        _ensure_durable_root(root.parent)
+        root.mkdir(exist_ok=True)
+    except FileExistsError:
+        pass
+    parent = os.open(root.parent.resolve(strict=True), _DIRECTORY_FLAGS)
+    try:
+        os.fsync(parent)
+    finally:
+        os.close(parent)
 
 
 def materialize_immutable_local_tree_at(
@@ -102,6 +118,7 @@ def _materialize_at(
     try:
         if _entry_exists(parent_descriptor, tree_name):
             _verify_existing_at(parent_descriptor, tree_name, files, tree_dir=tree_dir)
+            _require_parent_durability(parent_descriptor, tree_dir)
             return "no_op"
         os.mkdir(staging_name, mode=0o700, dir_fd=parent_descriptor)
         staging_descriptor = os.open(staging_name, _DIRECTORY_FLAGS, dir_fd=parent_descriptor)
@@ -121,19 +138,24 @@ def _materialize_at(
         except FileExistsError:
             _remove_tree_at(parent_descriptor, staging_name)
             _verify_existing_at(parent_descriptor, tree_name, files, tree_dir=tree_dir)
+            _require_parent_durability(parent_descriptor, tree_dir)
             return "no_op"
-        try:
-            os.fsync(parent_descriptor)
-        except OSError as exc:
-            raise ImmutableLocalTreeDurabilityError(
-                "immutable tree rename completed but parent durability could not be proven",
-                path=tree_dir,
-            ) from exc
+        _require_parent_durability(parent_descriptor, tree_dir)
         return "created"
     except BaseException:
         if _entry_exists(parent_descriptor, staging_name):
             _remove_tree_at(parent_descriptor, staging_name)
         raise
+
+
+def _require_parent_durability(parent_descriptor: int, tree_dir: Path) -> None:
+    """An equal retry must also finish any previously uncertain rename durability."""
+    try:
+        os.fsync(parent_descriptor)
+    except OSError as exc:
+        raise ImmutableLocalTreeDurabilityError(
+            "immutable tree is visible but parent durability could not be proven", path=tree_dir
+        ) from exc
 
 
 def _normalized_files(files: Mapping[str, TreeSource]) -> dict[str, TreeSource]:
@@ -249,6 +271,7 @@ def _open_parent_at(root_descriptor: int, parts: tuple[str, ...], *, create: boo
                     os.mkdir(part, mode=0o700, dir_fd=current)
                 except FileExistsError:
                     pass
+                os.fsync(current)
             child = os.open(part, _DIRECTORY_FLAGS, dir_fd=current)
             os.close(current)
             current = child

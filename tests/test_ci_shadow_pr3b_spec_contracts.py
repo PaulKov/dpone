@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from tools.agent_policy.public_snapshot_history import HistoricalCheck, assert_public_snapshot_continuity
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md"
@@ -260,22 +261,10 @@ def test_pr3b_codeql_profile_is_exact_action_only_yaml() -> None:
         assert forbidden in profile_section
 
 
-def test_pr3b_adr0037_fingerprints_are_reproducible() -> None:
+def test_pr3b_adr0037_imported_profile_fingerprints_are_reproducible() -> None:
     raw = _read(SPEC)
     replacement = _marked_yaml(raw, "pr3b-adr0037-attestor-profile")
-    pr2_projection = _attestor_projection(_git_yaml(PR2_MERGE, ".github/workflows/ci.yml"))
-    base_ci = _git_yaml(DESIGN_BASE, ".github/workflows/ci.yml")
-    source_ci = _git_yaml(ENVELOPE_SOURCE, ".github/workflows/ci.yml")
-    base_projection = _attestor_projection(base_ci)
-    receipt = _git_yaml(DESIGN_BASE, ".github/workflows/agent-pr-receipt.yml")
-    source_receipt = _git_yaml(ENVELOPE_SOURCE, ".github/workflows/agent-pr-receipt.yml")
-
-    assert pr2_projection == base_projection
-    assert _execution_envelope(source_ci, "quality") == _execution_envelope(base_ci, "quality")
-    assert _execution_envelope(source_receipt, "merge-closure") == _execution_envelope(receipt, "merge-closure")
-    assert _canonical_sha256(pr2_projection) == SENSITIVE_SHA256
-    assert _canonical_sha256(_execution_envelope(base_ci, "quality")) == QUALITY_JOB_SHA256
-    assert _canonical_sha256(_execution_envelope(receipt, "merge-closure")) == MERGE_JOB_SHA256
+    assert_public_snapshot_continuity(ROOT, (SPEC.relative_to(ROOT).as_posix(), ADR_0037.relative_to(ROOT).as_posix()))
     assert _canonical_sha256(replacement["producer"]) == GOVERNANCE_PRODUCER_SHA256
     assert _canonical_sha256(replacement["finalizer"]) == GOVERNANCE_FINALIZER_SHA256
     assert replacement["producer"]["permissions"] == {"contents": "read"}
@@ -392,3 +381,26 @@ def test_pr3b_architecture_evidence_docs_and_platform_scope_are_complete() -> No
         assert expected in spec
     for product in ("dlt", "Informatica", "Airbyte", "Fivetran", "Pentaho", "Microsoft SSIS", "gusty"):
         assert product in spec
+
+
+def historical_adr0037_fingerprints() -> None:
+    pr2_projection = _attestor_projection(_git_yaml(PR2_MERGE, ".github/workflows/ci.yml"))
+    base_ci = _git_yaml(DESIGN_BASE, ".github/workflows/ci.yml")
+    source_ci = _git_yaml(ENVELOPE_SOURCE, ".github/workflows/ci.yml")
+    base_projection = _attestor_projection(base_ci)
+    receipt = _git_yaml(DESIGN_BASE, ".github/workflows/agent-pr-receipt.yml")
+    source_receipt = _git_yaml(ENVELOPE_SOURCE, ".github/workflows/agent-pr-receipt.yml")
+
+    assert pr2_projection == base_projection
+    assert _execution_envelope(source_ci, "quality") == _execution_envelope(base_ci, "quality")
+    assert _execution_envelope(source_receipt, "merge-closure") == _execution_envelope(receipt, "merge-closure")
+    assert _canonical_sha256(pr2_projection) == SENSITIVE_SHA256
+    assert _canonical_sha256(_execution_envelope(base_ci, "quality")) == QUALITY_JOB_SHA256
+    assert _canonical_sha256(_execution_envelope(receipt, "merge-closure")) == MERGE_JOB_SHA256
+
+
+HISTORICAL_CHECKS = (
+    HistoricalCheck(
+        "PR3B historical fingerprints", (PR2_MERGE, DESIGN_BASE, ENVELOPE_SOURCE), historical_adr0037_fingerprints
+    ),
+)

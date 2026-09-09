@@ -29,7 +29,11 @@ from dpone.gitops.schema_release_deployment_v3_contracts import (
     airflow_deployment_index_v3_contract,
     deployment_set_v3_contract,
 )
-from dpone.gitops.schema_release_set_promotion import compact_pack_promotion_guards
+from dpone.gitops.schema_release_set_promotion import (
+    COMPACT_PROMOTION_PROFILE,
+    COMPACT_PROMOTION_SCHEMA,
+    compact_pack_promotion_guards,
+)
 from dpone.gitops.schema_runtime_artifact_delivery import (
     runtime_artifact_delivery_schema,
 )
@@ -124,6 +128,15 @@ def release_set_v2_contract() -> GitOpsSchemaContract:
             "selection_authority": {"const": "dbt_cli"},
             "selection_fingerprint": {"$ref": "#/$defs/identity"},
             "artifacts": release_artifacts_v2_schema(),
+            "promotion": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["schema", "profile"],
+                "properties": {
+                    "schema": {"const": COMPACT_PROMOTION_SCHEMA},
+                    "profile": {"const": COMPACT_PROMOTION_PROFILE},
+                },
+            },
             "provenance": _dbt_release_provenance_schema(),
         },
         defs=release_v2_defs(),

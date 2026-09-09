@@ -57,4 +57,6 @@ Architecture Decision Records document important design choices and their conseq
 - [ADR 0054: REST delivery uses a resumable runtime and read-only Airflow triggers (Proposed)](adr/0054-resumable-delivery-runtime-airflow.md)
 - [ADR 0055: REST protocol semantics are platform-owned operation profiles (Proposed)](adr/0055-rest-operation-profile-authority.md)
 
+- [ADR 0056: Public snapshot debt has observable provenance](adr/0056-public-snapshot-governance-recovery.md)
+
 New ADRs should include status, context, decision, consequences, and links to related implementation or documentation.

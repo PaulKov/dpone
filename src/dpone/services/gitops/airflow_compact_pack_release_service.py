@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
+from dpone.contracts.dbt_compact_release import COMPACT_OUTPUT_INVALID
+from dpone.gitops.paths import compact_report_output_is_safe
 from dpone.readiness.airflow_compact_pack_release import (
     CompactPackReleaseReport,
     materialize_compact_pack_release,
@@ -31,15 +33,31 @@ class GitOpsAirflowCompactPackReleaseService:
         pack_root = _resolve_path(repo_root, str(getattr(args, "pack_root")))
         cache_root = _resolve_path(repo_root, str(getattr(args, "cache_root")))
         dag_ids = tuple(str(item) for item in (getattr(args, "dag_id", None) or ()))
-        report = materialize_compact_pack_release(
-            pack_root=pack_root,
-            cache_root=cache_root,
-            xcom_sidecar_image=str(getattr(args, "xcom_sidecar_image") or ""),
-            dag_ids=dag_ids or None,
-            provenance={
-                "repo_root": repo_root.as_posix(),
-            },
-        )
+        if not compact_report_output_is_safe(
+            repo_root, getattr(args, "output", None), pack_root=pack_root, cache_root=cache_root
+        ):
+            report = CompactPackReleaseReport(
+                release_id="",
+                release_dir="",
+                dag_ids=(),
+                workload_ids=(),
+                pack_fingerprints={},
+                connection_projection_mode="",
+                xcom_sidecar_image="",
+                blockers=(
+                    f"{COMPACT_OUTPUT_INVALID}: output must be a confined report file outside input and cache trees",
+                ),
+            )
+        else:
+            report = materialize_compact_pack_release(
+                pack_root=pack_root,
+                cache_root=cache_root,
+                xcom_sidecar_image=str(getattr(args, "xcom_sidecar_image") or ""),
+                dag_ids=dag_ids or None,
+                provenance={
+                    "repo_root": repo_root.as_posix(),
+                },
+            )
         return GitOpsView(
             meta=build_gitops_meta(
                 report.kind,

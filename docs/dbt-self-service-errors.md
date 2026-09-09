@@ -305,3 +305,15 @@ Semantic-refresh compile and proof failures use the stable namespace prefix
 Return to the [dbt integration hub](dbt.md), continue with the
 [operations runbook](dbt-self-service-runbook.md), or review
 [promotion and rollback](dbt-self-service-promotion.md).
+
+## Selection drift after compact delivery
+
+`DPONE_DBT_SELECTION_DRIFT` at the verified launcher can indicate a transport
+identity mismatch, not just a changed dbt selection. Check the verified producer
+wire, release/execution schemas and ordered workload-owned trio. Regenerate the
+complete workspace and derived deployment with compatible components; never edit
+generated JSON or sort v2 references.
+
+`DPONE_COMPACT_PACK_RELEASE_WORKSPACE_INVALID` means the complete native input
+failed validation or a partial DAG selection was requested. Keep the full compile
+tree and omit partial filtering. Follow [compact delivery recovery](dbt-compact-delivery.md#diagnose-and-recover).

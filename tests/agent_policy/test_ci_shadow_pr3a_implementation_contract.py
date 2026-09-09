@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 import yaml
+from tools.agent_policy.public_snapshot_history import HistoricalCheck, assert_public_snapshot_continuity
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = ROOT / "test_artifacts/agent-policy/dpone-ci-shadow-closure-pr3a-ci-hygiene.yml"
@@ -28,13 +29,13 @@ def _git_output(*args: str) -> str:
     ).stdout.strip()
 
 
-def test_pr3a_implementation_contract_binds_merged_approved_base() -> None:
+def test_pr3a_implementation_contract_preserves_imported_approved_base() -> None:
     payload = _payload()
     metadata = SPEC.read_text(encoding="utf-8").split("## Executive summary", maxsplit=1)[0]
 
     assert payload["base_commit"] == BASE
     assert "- Status: APPROVED" in metadata
-    assert _git_output("rev-parse", f"{BASE}:docs/feature-design-ci-shadow-pr3a-ci-hygiene.md") == APPROVED_SPEC_BLOB
+    assert_public_snapshot_continuity(ROOT, (CONTRACT.relative_to(ROOT).as_posix(), SPEC.relative_to(ROOT).as_posix()))
     assert _git_output("hash-object", str(SPEC)) == APPROVED_SPEC_BLOB
     dependencies = payload["dependencies"]
     assert isinstance(dependencies, list)
@@ -138,3 +139,10 @@ def test_pr3a_implementation_contract_requires_fail_closed_evidence() -> None:
     assert any("pinned actionlint 1.7.12" in command for command in checks["broad"])
     assert any("unavailable evidence is UNVERIFIED, never PASS" in command for command in checks["live"])
     assert any("verify-live" in command and "exact approved order" in command for command in checks["live"])
+
+
+def historical_pr3a_approved_base() -> None:
+    assert _git_output("rev-parse", f"{BASE}:docs/feature-design-ci-shadow-pr3a-ci-hygiene.md") == APPROVED_SPEC_BLOB
+
+
+HISTORICAL_CHECKS = (HistoricalCheck("PR3A historical approved base", (BASE,), historical_pr3a_approved_base),)

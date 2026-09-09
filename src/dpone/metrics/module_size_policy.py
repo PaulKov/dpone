@@ -23,6 +23,7 @@ from .module_size_baseline import (
     write_module_size_baseline,
 )
 from .module_size_continuity import baseline_budget_issues, grandfathered_debt_allowed, retired_debt_issues
+from .module_size_public_snapshot import PUBLIC_ROOT, PublicSnapshotDebt
 
 AUDITED_BOOTSTRAP_COMMIT = "e1d93822b47234e940829319cac0dc9678f6906c"
 _ADR_EXCEPTION_SCHEMA = "dpone.module-size-debt-exception.v2"
@@ -114,6 +115,17 @@ def validate_module_size_baseline(
         for entry in (git_context.previous_baseline.entries if git_context and git_context.previous_baseline else ())
     }
     renamed_from = {new: old for old, new in (git_context.exact_renames if git_context else ())}
+    adoption = None
+    if git_context is not None and any(
+        entry.baseline_commit == PUBLIC_ROOT
+        and entry.path in previous
+        and previous[entry.path].baseline_commit != PUBLIC_ROOT
+        for entry in baseline.entries
+    ):
+        try:
+            adoption = PublicSnapshotDebt.load(lambda path: _git_bytes(repo_root, "show", f"{PUBLIC_ROOT}:{path}"))
+        except ModuleSizeBaselineError:
+            issues.append(ModuleSizePolicyIssue("", "Public snapshot adoption inputs cannot be verified"))
     for entry in baseline.entries:
         if trusted_module_paths is not None:
             if entry.path not in trusted_module_paths:
@@ -143,22 +155,29 @@ def validate_module_size_baseline(
             renamed_from=renamed_from,
             rename_only=git_context.rename_only,
         )
+        adopted = adoption is not None and adoption.permits(entry, prior)
         if prior is not None:
             if entry.max_lines > prior.max_lines or entry.max_sloc > prior.max_sloc:
                 issues.append(ModuleSizePolicyIssue(entry.path, "exact baseline caps cannot increase"))
-            if _metadata_changed(entry, prior) and (
-                entry.accepted_adr is None or entry.accepted_adr == prior.accepted_adr
+            if (
+                not adopted
+                and _metadata_changed(entry, prior)
+                and (entry.accepted_adr is None or entry.accepted_adr == prior.accepted_adr)
             ):
                 issues.append(
                     ModuleSizePolicyIssue(entry.path, "debt metadata changed without a newly bound Accepted ADR")
                 )
-        if entry.accepted_adr is None and not grandfathered_debt_allowed(
-            entry,
-            prior=prior,
-            bootstrap_allowed=(git_context.base_has_legacy_baseline and git_context.previous_baseline is None),
-            bootstrap_commit=AUDITED_BOOTSTRAP_COMMIT,
-            bootstrap_base_sha=git_context.base_sha,
-            source_at=lambda commit, path: _git_bytes(repo_root, "show", f"{commit}:{path}").decode("utf-8"),
+        if (
+            entry.accepted_adr is None
+            and not adopted
+            and not grandfathered_debt_allowed(
+                entry,
+                prior=prior,
+                bootstrap_allowed=(git_context.base_has_legacy_baseline and git_context.previous_baseline is None),
+                bootstrap_commit=AUDITED_BOOTSTRAP_COMMIT,
+                bootstrap_base_sha=git_context.base_sha,
+                source_at=lambda commit, path: _git_bytes(repo_root, "show", f"{commit}:{path}").decode("utf-8"),
+            )
         ):
             issues.append(
                 ModuleSizePolicyIssue(

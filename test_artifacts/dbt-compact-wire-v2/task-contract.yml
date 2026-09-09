@@ -1,0 +1,122 @@
+schema_version: 1
+task_id: dbt-compact-wire-v2
+title: Native compact workspace delivery
+goal: Preserve validated multi-project dbt wire v2 through compact delivery to verified
+  launcher
+specification: docs/feature-design-dbt-compact-wire-v2.md
+base_commit: f8c6a4a5e75d167829c05f65d5d3033acb193878
+integrator: integrator
+acceptance_criteria:
+- Approved full-path and negative tests pass without validator bypass
+- Legacy wire-v1 compatibility and activation restrictions remain
+- Required checks and independent review recorded honestly
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - artifacts
+  - Airflow/dbt integration
+  - runtime identity
+  migration_required: true
+owned_paths:
+- src/dpone/manifest/confined_files.py
+- tests/test_confined_file_safety.py
+- src/dpone/contracts/dbt_compact_release.py
+- src/dpone/contracts/dbt_release.py
+- src/dpone/manifest/dbt_compact_release.py
+- src/dpone/ports/dbt_compact_release.py
+- src/dpone/readiness/airflow_compact_pack_release.py
+- src/dpone/app/dbt_promotion_composition.py
+- src/dpone/gitops/schema_release_deployment_contracts.py
+- tests/test_dbt_compact_wire_v2.py
+- tests/dbt_compact_wire_v2_helpers.py
+- docs/feature-design-dbt-compact-wire-v2.md
+- docs/dbt-compact-delivery.md
+- docs/compatibility.md
+- docs/dbt-workspace-authoring.md
+- docs/dbt-self-service-errors.md
+- docs/adr/0052-dbt-workspace-release-source-authority.md
+- docs/feature-design-airflow-compact-pack-v2-context-promotion-v1.md
+- test_artifacts/dbt-compact-wire-v2
+- packages/dpone-airflow-pack/src/dpone_airflow_pack/init_fetch_inventory.py
+- src/dpone/readiness/airflow_release_artifact_index.py
+- src/dpone/commands/gitops/airflow_compact_pack_release_cmd.py
+- docs/schemas/gitops/release-set-v2.schema.json
+- src/dpone/services/gitops/airflow_compact_pack_release_service.py
+- docs/cli-reference.md
+- docs/airflow-pack-provider.md
+- tests/test_dbt_compact_wire_v2_cli.py
+- tests/test_dbt_release_wire_dispatch.py
+- tests/test_dbt_compact_wire_v2_boundaries.py
+- tests/test_airflow_asset_uri_mssql_aip60.py
+- tests/test_airflow_desired_state_authority.py
+- tests/test_airflow_pack_runtime_v3.py
+- tests/test_cli_gitops_workload_catalog.py
+- tests/test_gitops_remote_artifacts.py
+- tests/test_object_storage_retention_cli.py
+- tests/test_oss_code_quality_benchmark.py
+- tests/test_source_materialization.py
+- src/dpone/contracts/dbt_release_workload_binding.py
+- src/dpone/services/dbt_release_workflow_reader.py
+- src/dpone/gitops/paths.py
+- src/dpone/services/dbt_release_source_reader.py
+- src/dpone/contracts/dbt_source_inventory_binding.py
+- src/dpone/runtime/immutable_local_tree.py
+- src/dpone/runtime/immutable_local_release.py
+- src/dpone/readiness/airflow_local_release.py
+- tests/test_dbt_compact_wire_v2_failures.py
+- docker/dbt-compact-tests/Dockerfile
+- docs/feature-design-public-snapshot-ci-recovery.md
+- docs/adr/0056-public-snapshot-governance-recovery.md
+- docs/module-size-ratchet.md
+- docs/module_size_baseline.json
+- .agents/policy/github-branch-protection.yml
+- .agents/policy/github-branch-protection.release-authority.json
+- src/dpone/metrics/module_size_public_snapshot.py
+- src/dpone/metrics/module_size_policy.py
+- tools/agent_policy
+- tests/agent_policy
+- tests/test_module_size_public_snapshot.py
+- tests/test_ci_shadow_pr3b_scope_contracts.py
+- tests/test_ci_shadow_pr3b_spec_contracts.py
+- tests/test_ci_shadow_pr3b_output_amendment_contracts.py
+- docs/adr-index.md
+integrator_owned_paths:
+- CHANGELOG.md
+- mkdocs.yml
+- docs/quality-metrics.md
+read_only_paths:
+- docs/engineering-standards.md
+- docs/import-rules.md
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- .github/workflows
+- CHANGELOG.md
+- mkdocs.yml
+- docs/quality-metrics.md
+shared_file_owner: integrator
+dependencies: []
+required_checks:
+  focused:
+  - uv run pytest tests/test_dbt_compact_wire_v2.py -q
+  broad:
+  - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
+  live: []
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.

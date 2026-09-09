@@ -182,6 +182,38 @@ def render_dbt_promotion_ci_report(
     )
 
 
+def build_dbt_compact_workspace_release_builder():
+    """Compose the native compact path with required source and transport checks."""
+    from dpone_airflow_pack.init_fetch_contract import InitFetchProviderError
+    from dpone_airflow_pack.xcom_sidecar import require_strict_xcom_sidecar_image
+
+    from dpone.gitops.schema_release_set_promotion import COMPACT_PROMOTION_PROFILE, COMPACT_PROMOTION_SCHEMA
+    from dpone.manifest.dbt_compact_release import CompactWorkspaceReleaseBuilder
+    from dpone.readiness.airflow_compact_pack_release_helpers import rewrite_strict_init_fetch_dag_spec
+    from dpone.readiness.dbt_airflow_execution_pack import strict_transfer_pack
+
+    class Rewriter:
+        @staticmethod
+        def pack(value, *, xcom_sidecar_image):
+            if value.get("connection_projection") != {}:
+                raise ValueError("native workspace packs require deployment-owned runtime connections")
+            try:
+                exact_image = require_strict_xcom_sidecar_image({"xcom": {"sidecar_image": xcom_sidecar_image}})
+            except InitFetchProviderError as exc:
+                raise ValueError("native compact sidecar image violates the provider contract") from exc
+            return strict_transfer_pack(value, xcom_sidecar_image=exact_image)
+
+        dag = staticmethod(rewrite_strict_init_fetch_dag_spec)
+
+    return CompactWorkspaceReleaseBuilder(
+        read_file=read_confined_file,
+        capture=build_dbt_release_source_reader(),
+        integrity=DbtReleaseIntegrityService(),
+        rewriter=Rewriter(),
+        promotion={"schema": COMPACT_PROMOTION_SCHEMA, "profile": COMPACT_PROMOTION_PROFILE},
+    )
+
+
 __all__ = [
     "DbtDevEvidenceBundleError",
     "DbtDevEvidenceCampaignError",
