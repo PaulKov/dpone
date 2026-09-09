@@ -63,6 +63,20 @@ owned_paths:
 - src/dpone/readiness/airflow_local_release.py
 - tests/test_dbt_compact_wire_v2_failures.py
 - docker/dbt-compact-tests/Dockerfile
+- docs/feature-design-public-snapshot-ci-recovery.md
+- docs/adr/0056-public-snapshot-governance-recovery.md
+- docs/module-size-ratchet.md
+- docs/module_size_baseline.json
+- .agents/policy/github-branch-protection.yml
+- .agents/policy/github-branch-protection.release-authority.json
+- src/dpone/metrics/module_size_public_snapshot.py
+- src/dpone/metrics/module_size_policy.py
+- tools/agent_policy
+- tests/agent_policy
+- tests/test_module_size_public_snapshot.py
+- tests/test_ci_shadow_pr3b_scope_contracts.py
+- tests/test_ci_shadow_pr3b_spec_contracts.py
+- tests/test_ci_shadow_pr3b_output_amendment_contracts.py
 integrator_owned_paths:
 - CHANGELOG.md
 - mkdocs.yml
