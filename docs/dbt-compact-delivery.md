@@ -156,6 +156,7 @@ models or proves SQL delivery. Missing optional tooling is reported as SKIP.
 
 | Symptom | Meaning | Recovery |
 | --- | --- | --- |
+| `DPONE_COMPACT_PACK_RELEASE_CACHE_INVALID` | Cache overlaps the immutable input tree or cannot be resolved safely | Choose a separate cache directory; a retained input beneath an existing cache remains supported |
 | `DPONE_COMPACT_PACK_RELEASE_WRITE_FAILED` | Storage failed during native publication | Repair storage and retry identical inputs; no success is reported |
 | `DPONE_COMPACT_PACK_RELEASE_DURABILITY_UNCERTAIN` | A complete release is visible, but parent-directory durability is unproven | Retain the visible tree and retry identical inputs after storage recovery; retry verifies bytes and synchronizes the parent |
 | `DPONE_COMPACT_PACK_RELEASE_WORKSPACE_INVALID` | Native metadata, full inventory, source bytes, input mode or selected DAG set failed validation | Recompile the complete workspace with compatible components; keep the whole generated tree and omit partial DAG filtering |

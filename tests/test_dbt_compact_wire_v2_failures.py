@@ -216,3 +216,30 @@ def test_fresh_cache_ancestor_durability_is_required(compiled_workspace, tmp_pat
         assert reached and not report.passed and "SENSITIVE_SENTINEL" not in str(report)
         assert not list(cache.glob("releases/sha256-*"))
     assert materialize(compiled_workspace, cache).passed
+
+
+@pytest.mark.parametrize("relative_cache", [".", "nested-cache"])
+def test_native_cache_cannot_modify_its_source_tree(compiled_workspace, tmp_path, relative_cache):
+    root = tmp_path / "compiled"
+    shutil.copytree(compiled_workspace, root)
+    before = {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    report = materialize(root, root / relative_cache)
+    assert not report.passed and "CACHE_INVALID" in report.blockers[0]
+    assert {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()} == before
+
+
+def test_cache_symlink_cycle_has_safe_report(compiled_workspace, tmp_path):
+    cache = tmp_path / "SENSITIVE_SENTINEL"
+    cache.symlink_to(cache)
+    report = materialize(compiled_workspace, cache)
+    assert not report.passed and "CACHE_INVALID" in report.blockers[0]
+    assert "SENSITIVE_SENTINEL" not in str(report)
+
+
+def test_source_inside_cache_remains_usable(compiled_workspace, tmp_path):
+    cache = tmp_path / "cache"
+    root = cache / "retained-source"
+    shutil.copytree(compiled_workspace, root)
+    before = (root / "release-set.json").read_bytes()
+    assert materialize(root, cache).passed
+    assert (root / "release-set.json").read_bytes() == before

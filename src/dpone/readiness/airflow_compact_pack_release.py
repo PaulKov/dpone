@@ -99,7 +99,12 @@ def _materialize(
     provenance: Mapping[str, Any] | None,
 ) -> CompactPackReleaseReport:
     root = pack_root.absolute()
-    cache = cache_root.resolve()
+    try:
+        cache = cache_root.resolve()
+    except (OSError, RuntimeError) as exc:
+        raise CompactPackReleaseError(
+            "DPONE_COMPACT_PACK_RELEASE_CACHE_INVALID", "cache root cannot be resolved safely"
+        ) from exc
     if (root / "release-set.json").exists() or (root / "release-set.json").is_symlink():
         return _materialize_workspace(root, cache, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
     dag_dir = root / "_dags"
@@ -278,6 +283,10 @@ def _materialize_workspace(
     from dpone.app.dbt_promotion_composition import build_dbt_compact_workspace_release_builder
     from dpone.readiness.airflow_release_schema_validation import validate_release_set_schema
 
+    if cache.is_relative_to(root.resolve()):
+        raise CompactPackReleaseError(
+            "DPONE_COMPACT_PACK_RELEASE_CACHE_INVALID", "cache root must be outside the immutable source tree"
+        )
     try:
         files = build_dbt_compact_workspace_release_builder().build(
             root, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids
