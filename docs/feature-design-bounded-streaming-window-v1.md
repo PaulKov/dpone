@@ -406,7 +406,7 @@ The owner approved the final feature and integration over current master on
 compact wire-v2 and hygiene fixes together with 0.74.35 native BCP contracts.
 The bounded-window decision is ADR 0057; master retains its ADR 0056.
 The earlier receipts above describe their original commits only. Fresh merged
-validation is recorded in PR #3 and local
+validation is recorded in [PR #8](https://github.com/PaulKov/dpone/pull/8) and local
 `test_artifacts/bounded-streaming-master-integration/` artifacts. Package versions
 and released changelog entries are preserved; this integration does not publish
 another version.
