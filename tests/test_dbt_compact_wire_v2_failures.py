@@ -243,3 +243,28 @@ def test_source_inside_cache_remains_usable(compiled_workspace, tmp_path):
     before = (root / "release-set.json").read_bytes()
     assert materialize(root, cache).passed
     assert (root / "release-set.json").read_bytes() == before
+
+
+def test_shared_publication_accepts_parent_alias(tmp_path):
+    from dpone.runtime.immutable_local_release import materialize_immutable_local_release
+
+    real = tmp_path / "real"
+    real.mkdir()
+    alias = tmp_path / "alias"
+    alias.symlink_to(real, target_is_directory=True)
+    release = alias / "cache" / "releases" / "example"
+    assert materialize_immutable_local_release(release, {"file": b"payload"}) == "created"
+    assert materialize_immutable_local_release(release, {"file": b"payload"}) == "no_op"
+    assert (real / "cache" / "releases" / "example" / "file").read_bytes() == b"payload"
+
+
+def test_shared_publication_rejects_root_alias(tmp_path):
+    from dpone.runtime.immutable_local_release import materialize_immutable_local_release
+
+    real = tmp_path / "real"
+    real.mkdir()
+    alias = tmp_path / "alias"
+    alias.symlink_to(real, target_is_directory=True)
+    with pytest.raises(OSError):
+        materialize_immutable_local_release(alias / "releases" / "example", {"file": b"payload"})
+    assert not list(real.iterdir())

@@ -70,7 +70,7 @@ def _ensure_durable_root(root: Path) -> None:
         root.mkdir(exist_ok=True)
     except FileExistsError:
         pass
-    parent = os.open(root.parent, _DIRECTORY_FLAGS)
+    parent = os.open(root.parent.resolve(strict=True), _DIRECTORY_FLAGS)
     try:
         os.fsync(parent)
     finally:
