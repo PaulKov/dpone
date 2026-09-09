@@ -4,10 +4,10 @@ Purpose: plan a correctness fix for maintainers and connector authors, using onl
 public format rules and synthetic bytes. Return to the
 [roadmap](sqlserver-snapshot-roadmap.md). The maintainer authorized the first correctness implementation stage.
 
-- Status: APPROVED; owner: maintainers; issue: none; target release: TBD.
+- Status: APPROVED; owner: maintainers; issue: none; target release: 0.74.35.
 - Last verified: 2026-09-09.
-- Tested commit: `6533c27fbf77c78a00b8013bcf72e2293e281e1f`.
-- Source and optional accelerator declare 0.74.33 in their `pyproject.toml:7`.
+- Historical investigation baseline (before 0.74.35): `6533c27fbf77c78a00b8013bcf72e2293e281e1f`.
+- At that historical baseline, source and optional accelerator declared 0.74.33 in their `pyproject.toml:7`.
   No matching local tag was present. Equivalence to the published distribution
   remains UNVERIFIED; no release artifact was downloaded or executed.
 
