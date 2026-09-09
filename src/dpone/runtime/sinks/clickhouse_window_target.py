@@ -10,8 +10,6 @@ accessible only to the authority owning this target.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from time import monotonic
@@ -27,12 +25,8 @@ from dpone.contracts.bounded_window import (
 )
 from dpone.ports.bounded_window import ExclusiveWindowWriterGuard, WindowBinaryIngest, WindowMetadataStore
 from dpone.runtime.sinks.clickhouse_window_admission import validate_configuration, validate_target
+from dpone.runtime.sinks.clickhouse_window_admission import window_schema_fingerprint as window_schema_fingerprint
 from dpone.runtime.sinks.clickhouse_window_staging import WindowConnector, WindowIO, WindowStaging, identifier
-
-
-def window_schema_fingerprint(schema: Sequence[tuple[str, str]]) -> str:
-    """Canonical v1 hash of ordered physical ClickHouse names and type strings."""
-    return hashlib.sha256(json.dumps([1, list(schema)], separators=(",", ":")).encode()).hexdigest()
 
 
 class ClickHouseWindowTarget:

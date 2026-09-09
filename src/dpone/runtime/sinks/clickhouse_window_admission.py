@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Sequence
 
 from dpone.contracts.bounded_window import WindowContractError
 from dpone.runtime.sinks.clickhouse_window_staging import WindowIO, identifier, literal
+
+
+def window_schema_fingerprint(schema: Sequence[tuple[str, str]]) -> str:
+    """Canonical v1 hash of ordered physical ClickHouse names and type strings."""
+    return hashlib.sha256(json.dumps([1, list(schema)], separators=(",", ":")).encode()).hexdigest()
 
 
 def validate_target(io: WindowIO) -> None:
