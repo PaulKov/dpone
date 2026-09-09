@@ -211,9 +211,9 @@ multiply budgets per project. Nested source files use existing archive confineme
 | `contracts.dbt_runtime_payloads` | Reuse | Explicit-wire ID, descriptor, order and bounds |
 | `contracts.dbt_runtime_release_binding` | Reuse | Detached inventory and per-workload binding |
 | `contracts.dbt_release` | Focused extension if needed | Release-schema/producer/wire compatibility decision |
-| New canonical contract module for compact source planning | New | Pure input classification, retained metadata and rewrite invariants |
+| `contracts.dbt_compact_release.CompactWorkspaceReleasePlan` | New | Pure input classification, detached metadata and rewrite invariants |
 | Confined file reader port/adapter | Reuse | Bounded acquisition without symlink traversal |
-| Canonical manifest compact planner | New if orchestration cannot be reused | Capture, validate and construct a derived native release |
+| `manifest.dbt_compact_release.CompactWorkspaceReleaseBuilder` | New | Capture, validate and construct a derived native release |
 | Existing compact readiness entrypoint | Thin integration | Dispatch native vs legacy without new domain policy |
 | Source/integrity readers and immutable publisher | Reuse | Full-tree verification and publication |
 | Projection/provider/init-fetch/launcher | Focused integration | Preserve and independently verify selected identity |
@@ -222,6 +222,12 @@ Keep policy in `contracts` and canonical planning in `manifest`; inject file I/O
 at the composition root using the existing port. Adapters never import services;
 runtime never imports services/readiness to decide identity. Compatibility entry
 points delegate. Do not add an optional callback that bypasses source validation.
+Shared descriptor byte/bound checks live in `contracts.dbt_release_workload_binding`;
+transfer ownership and embedded-manifest byte extraction live in
+`contracts.dbt_source_inventory_binding`. Readers retain acquisition, provider
+fingerprint validation and YAML decoding. GitOps report destination protection
+lives with existing confined path policy. Annotation-only ports do not introduce
+runtime imports. This preserves all byte limits, messages and reader signatures.
 One integrator owns all writes; no parallel writers are needed initially.
 
 Reject: changing only release schema (loses authority), hardcoded v2 filenames

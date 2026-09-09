@@ -178,7 +178,8 @@ def test_airflow_pack_cli_builds_single_compact_workload_pack(tmp_path: Path, mo
     ].index("dpone run ")
     assert "dpone gitops airflow xcom-from-evidence" in payload["runtime_command"]
     assert (
-        "--runtime-evidence-path .dpone/runs/work-item_account_sales/runtime-evidence.json" in payload["runtime_command"]
+        "--runtime-evidence-path .dpone/runs/work-item_account_sales/runtime-evidence.json"
+        in payload["runtime_command"]
     )
     assert "--stderr-path .dpone/runs/work-item_account_sales/runtime-stderr.log" in payload["runtime_command"]
     assert "runtime-stderr.log" in payload["runtime_command"]

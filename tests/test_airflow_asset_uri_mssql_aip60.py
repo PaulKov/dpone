@@ -93,7 +93,8 @@ def test_mssql_canonical_uri_requires_authority_and_database() -> None:
 
 def test_non_mssql_engines_keep_historical_shape() -> None:
     assert (
-        canonical_table_uri("clickhouse", "Example_Datamarts", "example_customer_mart") == "clickhouse://Example_Datamarts/example_customer_mart"
+        canonical_table_uri("clickhouse", "Example_Datamarts", "example_customer_mart")
+        == "clickhouse://Example_Datamarts/example_customer_mart"
     )
     assert (
         canonical_table_uri(

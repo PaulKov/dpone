@@ -45,6 +45,19 @@ owned_paths:
 - tests/test_dbt_compact_wire_v2_cli.py
 - tests/test_dbt_release_wire_dispatch.py
 - tests/test_dbt_compact_wire_v2_boundaries.py
+- tests/test_airflow_asset_uri_mssql_aip60.py
+- tests/test_airflow_desired_state_authority.py
+- tests/test_airflow_pack_runtime_v3.py
+- tests/test_cli_gitops_workload_catalog.py
+- tests/test_gitops_remote_artifacts.py
+- tests/test_object_storage_retention_cli.py
+- tests/test_oss_code_quality_benchmark.py
+- tests/test_source_materialization.py
+- src/dpone/contracts/dbt_release_workload_binding.py
+- src/dpone/services/dbt_release_workflow_reader.py
+- src/dpone/gitops/paths.py
+- src/dpone/services/dbt_release_source_reader.py
+- src/dpone/contracts/dbt_source_inventory_binding.py
 integrator_owned_paths:
 - CHANGELOG.md
 - mkdocs.yml

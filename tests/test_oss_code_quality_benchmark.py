@@ -2647,7 +2647,9 @@ def test_public_evidence_integrity_builds_claim_ledger_and_score() -> None:
     payload = tool.sanitize_public_payload(
         {
             "generated_at": "2026-06-14T00:00:00+00:00",
-            "projects": [{"spec": {"slug": "dpone", "name": "dpone", "path": "/Users/example-user/data-platform-dpone"}}],
+            "projects": [
+                {"spec": {"slug": "dpone", "name": "dpone", "path": "/Users/example-user/data-platform-dpone"}}
+            ],
             "feature_parity": {"tools": [{"slug": "dpone"}, {"slug": "airbyte"}], "entries": []},
             "closed_core_notes": [{"name": "Fivetran", "url": "https://github.com/fivetran"}],
             "trust_center": {"status": "verified"},

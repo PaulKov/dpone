@@ -42,3 +42,16 @@ __all__ = [
     "confined_repo_path",
     "safe_relative_path",
 ]
+
+
+def compact_report_output_is_safe(repo_root: Path, raw_output: object, *, pack_root: Path, cache_root: Path) -> bool:
+    """A console mirror cannot overwrite a captured input or immutable cache tree."""
+    if not raw_output:
+        return True
+    try:
+        _, destination = confined_repo_file_path(repo_root, str(raw_output), source="--output")
+        if destination.exists() and destination.stat().st_nlink > 1:
+            return False
+        return all(not destination.is_relative_to(root.resolve()) for root in (pack_root, cache_root))
+    except (ValueError, OSError, RuntimeError):
+        return False

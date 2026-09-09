@@ -25,7 +25,9 @@ def test_pack_publisher_writes_immutable_pack_index_and_latest_pointer(tmp_path:
     )
 
     latest = tmp_path / "s3/s3/example-data-bucket/dpone-artifacts/prod/example-workloads/latest/pack-index.json"
-    marker = tmp_path / "s3/s3/example-data-bucket/dpone-artifacts/prod/example-workloads/abc123/airflow/release-marker.json"
+    marker = (
+        tmp_path / "s3/s3/example-data-bucket/dpone-artifacts/prod/example-workloads/abc123/airflow/release-marker.json"
+    )
     assert result["kind"] == "gitops.airflow_pack_publish"
     assert result["passed"] is True
     assert result["pack_count"] == 1

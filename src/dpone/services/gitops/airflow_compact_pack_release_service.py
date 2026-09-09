@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Protocol
 
 from dpone.contracts.dbt_compact_release import COMPACT_OUTPUT_INVALID
-from dpone.manifest.dbt_compact_release import compact_report_output_is_safe
+from dpone.gitops.paths import compact_report_output_is_safe
 from dpone.readiness.airflow_compact_pack_release import (
     CompactPackReleaseReport,
     materialize_compact_pack_release,

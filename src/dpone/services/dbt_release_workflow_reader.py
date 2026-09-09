@@ -4,12 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dpone_airflow_pack.pack_identity import PackIdentityError, parse_pack_json, verify_pack_fingerprint
 
-from dpone.contracts.dbt_contract_validation import sha256_bytes
-from dpone.contracts.dbt_execution_pack import DbtExecutionPack
-from dpone.contracts.dbt_release_artifact_limits import MAX_DBT_RELEASE_DAG_BYTES, MAX_DBT_RELEASE_PACK_BYTES
 from dpone.contracts.dbt_release_workload_binding import (
     DbtDevEvidenceReleaseError as DbtDevEvidenceReleaseError,
 )
@@ -18,7 +16,9 @@ from dpone.contracts.dbt_release_workload_binding import (
 )
 from dpone.contracts.dbt_release_workload_binding import (
     dbt_execution_from_pack,
+    dbt_release_artifact_read_bound,
     decode_dbt_workflow_dag,
+    require_dbt_release_artifact_bytes,
 )
 from dpone.contracts.dbt_release_workload_binding import (
     release_digest as release_digest,
@@ -39,8 +39,8 @@ from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V1
 from dpone.manifest.confined_files import read_confined_file
 from dpone.ports.dbt_release_files import ConfinedReleaseFileReader
 
-_MAX_DAG_SPEC_BYTES = MAX_DBT_RELEASE_DAG_BYTES
-_MAX_WORKLOAD_PACK_BYTES = MAX_DBT_RELEASE_PACK_BYTES
+if TYPE_CHECKING:
+    from dpone.contracts.dbt_execution_pack import DbtExecutionPack
 
 
 def read_dbt_execution_pack(
@@ -71,10 +71,9 @@ def read_dbt_workload_pack(
     pack_bytes = read_file(
         root,
         relative,
-        max_bytes=_MAX_WORKLOAD_PACK_BYTES,
+        max_bytes=dbt_release_artifact_read_bound("workload pack"),
     )
-    if len(pack_bytes) != descriptor.get("bytes") or sha256_bytes(pack_bytes) != descriptor.get("sha256"):
-        raise DbtDevEvidenceReleaseError("workload pack descriptor differs from workload pack bytes")
+    require_dbt_release_artifact_bytes(descriptor, pack_bytes, kind="workload pack")
     try:
         pack = parse_pack_json(pack_bytes)
         fingerprint = verify_pack_fingerprint(pack)
@@ -103,10 +102,9 @@ def read_dbt_workflow_dags(
         payload_bytes = read_file(
             root,
             relative,
-            max_bytes=_MAX_DAG_SPEC_BYTES,
+            max_bytes=dbt_release_artifact_read_bound("DAG spec"),
         )
-        if len(payload_bytes) != descriptor.get("bytes") or sha256_bytes(payload_bytes) != descriptor.get("sha256"):
-            raise DbtDevEvidenceReleaseError("DAG spec descriptor differs from DAG spec bytes")
+        require_dbt_release_artifact_bytes(descriptor, payload_bytes, kind="DAG spec")
         workflow, dag = decode_dbt_workflow_dag(payload_bytes, dag_id=dag_id, workload_packs=workload_packs)
         if workflow in result:
             raise DbtDevEvidenceReleaseError("DAG spec workflow identity is invalid")

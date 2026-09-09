@@ -19,7 +19,9 @@ def _payload() -> dict[str, str]:
     return {
         "schema": "dpone.airflow-desired-state-authority.v1",
         "environment": "dev",
-        "desired_state_uri": ("s3://example-data-bucket/dpone-artifacts/prod/example-workloads/environments/dev/desired-state.json"),
+        "desired_state_uri": (
+            "s3://example-data-bucket/dpone-artifacts/prod/example-workloads/environments/dev/desired-state.json"
+        ),
         "certified_s3_endpoint_url": "https://storage.yandexcloud.net",
         "artifact_registry_uri": ("s3://example-data-bucket/dpone-artifacts/prod/example-workloads/immutable"),
         "artifact_registry_ref": "dpone-artifacts-dev",
@@ -76,7 +78,9 @@ def test_v1_cannot_smuggle_workspace_control_binding(tmp_path: Path) -> None:
         lambda value: value.update({"extra": "value"}),
         lambda value: value.update({"environment": "PROD"}),
         lambda value: value.update({"artifact_registry_uri": "s3://another-bucket/dpone-artifacts/prod"}),
-        lambda value: value.update({"artifact_registry_uri": "s3://example-data-bucket/dpone-artifacts/prod/example-workloads"}),
+        lambda value: value.update(
+            {"artifact_registry_uri": "s3://example-data-bucket/dpone-artifacts/prod/example-workloads"}
+        ),
     ],
 )
 def test_authority_rejects_ambiguous_or_cross_authority_configuration(
