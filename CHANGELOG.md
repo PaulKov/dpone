@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.74.36 - 2026-09-09
+
 - Add opt-in bounded atomic rolling-window Python composition with a PostgreSQL
   shared snapshot, isolated ClickHouse RowBinary staging, fenced local recovery,
   single-generation publication, and explicit capability admission. Existing
