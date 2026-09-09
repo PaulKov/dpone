@@ -152,8 +152,10 @@ nav:
           - Error catalog: dbt-self-service-errors.md
           - Threat model: dbt-self-service-threat-model.md
           - Multi-project release design: feature-design-dbt-multi-project-release.md
+          - Compact wire-v2 delivery design: feature-design-dbt-compact-wire-v2.md
           - Workspace source verification: dbt-workspace-source-verification.md
           - Workspace authoring: dbt-workspace-authoring.md
+          - Compact workspace delivery: dbt-compact-delivery.md
           - Workspace promotion: dbt-workspace-promotion.md
       - Runtime observability: observability.md
       - Data Product SLO and incidents: data-product-slo.md

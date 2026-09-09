@@ -316,6 +316,8 @@ def dbt_release_runtime_wire_contract(release: Mapping[str, object]) -> str:
     wire = producer.get("wire_contract") if isinstance(producer, Mapping) else None
     if not isinstance(wire, str) or dbt_release_producer_violation(release, expected_wire_contract=wire) is not None:
         raise ValueError("dbt runtime release producer identity is invalid")
+    if wire == DBT_RUNTIME_WIRE_V2 and release.get("schema") != "dpone.release-set.v2":
+        raise ValueError("dbt runtime release schema is incompatible with its wire")
     return wire
 
 

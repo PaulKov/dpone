@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+
+- Deliver complete multi-project dbt wire-v2 compile trees through compact
+  materialization without losing producer, source or selection authority.
+  Preserve ordered workload payload references through deployment projection and
+  the Airflow provider; validate the derived release before immutable publication.
+  Legacy wire-v1 support and workspace activation restrictions remain unchanged.
+  See the [compact workspace delivery guide](docs/dbt-compact-delivery.md).
+
 ## 0.74.33 - 2026-09-02
 
 ### Added

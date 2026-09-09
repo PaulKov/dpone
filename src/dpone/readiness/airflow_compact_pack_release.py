@@ -1,9 +1,9 @@
 """Promote compact reconcile packs into an immutable release-set.
 
 Compact packs alone do not deliver verified ``RuntimeConnectionContext``.
-This module applies the closed strict init-fetch rewrite and writes a
-``dpone.release-set.v1`` that ``AirflowDeploymentProjectionService`` can
-consume. It does not invent a second connection authority.
+Legacy reconcile roots use the closed Airflow Connection bridge and release v1.
+Canonical workspace roots preserve complete dbt wire-v2 authority and native
+RuntimeConnectionContext delivery. Both use immutable verified publication.
 
 When any rewritten pack declares ``runtime_payload_ids`` (dbt self-service),
 the matching files under ``pack_root/runtime/`` are required and copied into
@@ -97,8 +97,10 @@ def _materialize(
     dag_ids: Sequence[str] | None,
     provenance: Mapping[str, Any] | None,
 ) -> CompactPackReleaseReport:
-    root = pack_root.resolve()
+    root = pack_root.absolute()
     cache = cache_root.resolve()
+    if (root / "release-set.json").exists() or (root / "release-set.json").is_symlink():
+        return _materialize_workspace(root, cache, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
     dag_dir = root / "_dags"
     if not dag_dir.is_dir():
         raise CompactPackReleaseError(
@@ -266,6 +268,37 @@ def _materialize(
         pack_fingerprints=pack_fingerprints,
         connection_projection_mode="kubernetes_secret_volume",
         xcom_sidecar_image=str(xcom_sidecar_image).strip(),
+    )
+
+
+def _materialize_workspace(
+    root: Path, cache: Path, *, xcom_sidecar_image: str, dag_ids: Sequence[str] | None
+) -> CompactPackReleaseReport:
+    from dpone.app.dbt_promotion_composition import build_dbt_compact_workspace_release_builder
+    from dpone.readiness.airflow_release_schema_validation import validate_release_set_schema
+
+    try:
+        files = build_dbt_compact_workspace_release_builder().build(
+            root, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids
+        )
+        release = json.loads(files["release-set.json"])
+        validate_release_set_schema(release, path=root / "release-set.json")
+    except (ValueError, OSError, TypeError, KeyError, RecursionError) as exc:
+        raise CompactPackReleaseError(
+            "DPONE_COMPACT_PACK_RELEASE_WORKSPACE_INVALID",
+            "native workspace release is invalid, incomplete or incompatible; regenerate the complete workspace with a compatible producer",
+        ) from exc
+    release_id = release["release_id"]
+    release_dir = cache / "releases" / _digest_dir(release_id)
+    materialize_immutable_local_release(release_dir, files)
+    return CompactPackReleaseReport(
+        release_id=release_id,
+        release_dir=release_dir.as_posix(),
+        dag_ids=tuple(item["id"] for item in release["artifacts"]["dag_specs"]),
+        workload_ids=tuple(item["id"] for item in release["artifacts"]["workload_packs"]),
+        pack_fingerprints={item["id"]: item["pack_fingerprint"] for item in release["artifacts"]["workload_packs"]},
+        connection_projection_mode="runtime_connection_context",
+        xcom_sidecar_image=xcom_sidecar_image.strip(),
     )
 
 

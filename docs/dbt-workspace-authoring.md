@@ -250,3 +250,10 @@ checkout or baked into a runtime image on every model change.
 Next: [multi-project design and remaining rollout](feature-design-dbt-multi-project-release.md),
 [source verification](dbt-workspace-source-verification.md), and
 [complete audit-mirror promotion](dbt-workspace-promotion.md).
+
+## Compact delivery after compilation
+
+Use the [compact workspace delivery guide](dbt-compact-delivery.md) to carry the
+complete compile tree through materialization, deployment/index projection,
+provider init-fetch and verified launcher preflight. This does not remove the
+independent workspace activation gate or establish SQL execution evidence.

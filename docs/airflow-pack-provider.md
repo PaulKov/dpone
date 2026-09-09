@@ -1039,3 +1039,11 @@ Use the
 cut over without making the scheduler fetch remote state, then follow
 [Airflow cache sync and recovery](airflow-cache-sync.md#materialize-the-prerequisite)
 for ongoing operation.
+
+## Native compact dbt workspace input
+
+For complete multi-project dbt compile trees, follow
+[compact workspace delivery](dbt-compact-delivery.md). Deployment projection and
+provider parsing preserve each workload's ordered source trio. Inventory sorting
+does not repair malformed v2 references. Launcher preflight remains separate from
+SQL execution and workspace activation authority.

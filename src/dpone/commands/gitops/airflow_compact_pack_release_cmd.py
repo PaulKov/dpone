@@ -10,6 +10,7 @@ from typing import Any, cast
 from dpone.commands.gitops.common import GitOpsOutputContext, write_optional_output
 from dpone.commands.output_json import dumps_json, write_json
 from dpone.commands.output_text import write_text
+from dpone.contracts.dbt_compact_release import COMPACT_OUTPUT_INVALID
 
 # registry.example.test/dockerhub/alpine:3.20 digest (2026-07-21)
 _DEFAULT_XCOM_SIDECAR_IMAGE = (
@@ -28,7 +29,7 @@ def register_release_materialize_parser(subparsers: argparse._SubParsersAction) 
     parser.add_argument(
         "--pack-root",
         default=".dpone/gitops/airflow",
-        help="Repo-relative reconcile output containing packs and _dags/",
+        help="Repo-relative legacy reconcile output or complete workspace wire-v2 compile output",
     )
     parser.add_argument(
         "--cache-root",
@@ -44,7 +45,7 @@ def register_release_materialize_parser(subparsers: argparse._SubParsersAction) 
         "--dag-id",
         action="append",
         default=[],
-        help="Optional dag-spec id filter; repeatable. Default: all dag-specs under pack-root/_dags",
+        help="Repeatable DAG filter. Default: all DAGs. Native workspace input requires the complete set",
     )
     parser.add_argument("--output", help="Optional repo-relative console output mirror path")
     parser.add_argument("--format", choices=("json", "markdown"), default="json", help="Output format")
@@ -59,15 +60,20 @@ def cmd_gitops_airflow_release_materialize(
 ) -> int:
     _ = logger
     view = _service(ctx).materialize_view(args)
+    output = (
+        None
+        if any(str(item).startswith(COMPACT_OUTPUT_INVALID) for item in view.report.blockers)
+        else getattr(args, "output", None)
+    )
     if getattr(args, "format", "json") == "markdown":
         payload = dumps_json(view.to_jsonable())
         rendered = "# Gitops Airflow Compact Pack Release\n\n```json\n" + payload + "\n```\n"
-        write_optional_output(cast(GitOpsOutputContext, ctx), getattr(args, "output", None), rendered)
+        write_optional_output(cast(GitOpsOutputContext, ctx), output, rendered)
         write_text(rendered)
         return view.exit_code
     payload = view.to_jsonable()
     rendered = dumps_json(payload)
-    write_optional_output(cast(GitOpsOutputContext, ctx), getattr(args, "output", None), rendered)
+    write_optional_output(cast(GitOpsOutputContext, ctx), output, rendered)
     write_json(payload)
     return view.exit_code
 

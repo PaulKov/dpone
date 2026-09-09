@@ -228,3 +228,18 @@ See [workspace authoring](../dbt-workspace-authoring.md),
 [source verification](../dbt-workspace-source-verification.md),
 [mirror promotion](../dbt-workspace-promotion.md), and the
 [dbt integration hub](../dbt.md) for current implementation limits.
+
+## Native compact transport amendment
+
+A complete verified workspace release may be transformed by compact delivery
+without changing source authority. Preserve producer, source snapshot, selections,
+runtime payload bytes/descriptors and canonical schemas; rederive changed
+DAG/pack descriptors, release identity and integrity subject. Apply typed compact
+promotion validation to v2. Native connection authority remains deployment-owned
+RuntimeConnectionContext; the legacy Airflow Connection bridge is not inferred.
+
+Both projection and provider preserve the declared trio order. Reject partial
+native DAG selection and foreign workloads outside source closure. Verify the
+full private output before immutable publication. This amendment grants no new
+physical-target activation or certification authority. See the
+[compact delivery specification](../feature-design-dbt-compact-wire-v2.md).
