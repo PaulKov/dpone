@@ -176,6 +176,7 @@ install plus `pip check`.
 These are maintainer/source-readiness checks; do not describe them as checks
 implemented by the external controller. Tenant-hygiene credentials stay within
 their approved CI environment. Do not retrieve secrets to complete an audit.
+Configure the deny list using [Tenant hygiene policy](cicd/tenant-hygiene-policy.md).
 The publisher builds its own archives; a local or source-workflow candidate
 inventory does not prove identity with the controller's bytes. Retain its
 `release-manifest.json` and exact run/artifact identities separately.

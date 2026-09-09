@@ -4,6 +4,10 @@
 
 ## 0.74.34 - 2026-09-09
 
+- Release hygiene policies now support opt-in Unicode case/separator matching,
+  numeric work-item keys and RFC1918 detection while preserving legacy literal
+  policies and non-disclosing reports.
+
 - Native compact publication now reports storage failures safely, distinguishes
   uncertain durability from immutable conflicts, and re-synchronizes retained
   releases on identical retries.
