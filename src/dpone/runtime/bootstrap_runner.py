@@ -31,10 +31,12 @@ class DefaultProcessRunner:
         route_capability_factory: Any | None = None,
         backfill_orchestrator_factory: Any | None = None,
         backfill_state_store_factory: Any | None = None,
+        window_runtime_factory: Any | None = None,
     ) -> None:
         self._route_capability_factory = route_capability_factory
         self._backfill_orchestrator_factory = backfill_orchestrator_factory
         self._backfill_state_store_factory = backfill_state_store_factory
+        self._window_runtime_factory = window_runtime_factory
 
     def run(
         self,
@@ -50,8 +52,27 @@ class DefaultProcessRunner:
         from dpone.runtime.native_transfer import NativeTransferRuntimeService
         from dpone.runtime.route_runtime_factory import RouteCapabilityRuntimeFactory
 
-        process.config.ensure_runtime_bindings()
         run_context = _runtime_context(context, process.config.name)
+        if (getattr(process.config.load_config, "options", None) or {}).get("rolling_window") is not None:
+            if self._window_runtime_factory is None:
+                raise ETLProcessError(
+                    "rolling_window_capability_required: configure a snapshot source and an exclusive-writer "
+                    "target through DefaultProcessRunner(window_runtime_factory=...)"
+                )
+            from dpone.runtime.rolling_window_admission import validate_window_admission
+
+            validate_window_admission(process.config.load_config)
+            result = self._window_runtime_factory(process.config).run(
+                process.config.load_config, owner=run_context.run_id
+            )
+            process.current_state = result
+            if result.status != "success":
+                raise ETLProcessError(f"ETL process {process.config.name} failed: {result.errors}")
+            return result
+        from dpone.runtime.rolling_window_admission import reject_orphan_window_chunking
+
+        reject_orphan_window_chunking(process.config.load_config)
+        process.config.ensure_runtime_bindings()
         native_transfer_runtime_service = NativeTransferRuntimeService(
             checkpoint_store=process.config.partition_checkpoint_store,
         )

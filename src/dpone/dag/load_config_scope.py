@@ -6,6 +6,7 @@ from collections.abc import Mapping, MutableMapping
 from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.portable_relation_scope import PortableScopeContractError, parse_portable_relation_scope
+from dpone.contracts.rolling_window import RollingWindowSpec
 from dpone.dag.errors import DagConfigurationError
 
 if TYPE_CHECKING:
@@ -24,6 +25,23 @@ def resolve_load_scopes(
     source_custom_predicate = source_options.get("custom_predicate")
     sink_custom_predicate = strategy_config.get("custom_predicate")
     portable_scope_raw = strategy_config.get("portable_scope")
+    if "window" in strategy_config:
+        if (
+            strategy_config.get("mode") != "replace"
+            or strategy_config.get("atomicity") != "target_atomic"
+            or source_custom_predicate
+            or sink_custom_predicate
+            or portable_scope_raw is not None
+        ):
+            raise DagConfigurationError(
+                "rolling_window_requires_atomic_replace: no additional custom or portable predicates"
+            )
+        try:
+            options["rolling_window"] = RollingWindowSpec.from_mapping(strategy_config["window"]).to_dict()
+        except ValueError as exc:
+            raise DagConfigurationError(str(exc)) from exc
+    elif "atomicity" in strategy_config:
+        raise DagConfigurationError("rolling_window_required_for_strategy_atomicity")
     try:
         portable_scope = parse_portable_relation_scope(portable_scope_raw) if portable_scope_raw is not None else None
     except PortableScopeContractError as exc:

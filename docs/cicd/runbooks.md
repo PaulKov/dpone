@@ -771,7 +771,7 @@ and do not cover uv preparation or wrapper behavior.
 The expected text shape on the current safe repository is:
 
 ```text
-status=PASS complete=true workflows=39 jobs=85 edges=77 roots=11 routes=210
+status=PASS complete=true workflows=39 jobs=89 edges=82 roots=11 routes=228
 finding_count=0
 runbook=docs/cicd/runbooks.md#semantic-pr-privilege-boundary
 recheck=uv run python tools/agent_policy/workflow_security_privileged.py --root . --format text

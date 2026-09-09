@@ -3,12 +3,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from dpone.runtime.bulk_wire import BulkWirePlanner, BulkWirePolicy
 from dpone.runtime.native_transfer_transport import (
     NativeTransferTransportPolicy,
     SliceTransportPlan,
     StreamCapability,
     TransferTransportResolver,
 )
+from dpone.runtime.typed_stream_limits import TypedStreamLimits
 
 
 class NativeTransferCapabilityPlanner:
@@ -26,11 +28,38 @@ class NativeTransferCapabilityPlanner:
         sink_options: Mapping[str, Any],
         transport: NativeTransferTransportPolicy,
     ) -> SliceTransportPlan:
+        typed_row_stream = False
+        if source_type.lower() == "mssql" and sink_type.lower() == "clickhouse":
+            contract = BulkWirePlanner().plan(
+                source_type=source_type,
+                sink_type=sink_type,
+                schema=(),
+                source_options=source_options,
+                sink_options=sink_options,
+            )
+            wire = BulkWirePolicy.from_options(source_options)
+            export = str(source_options.get("mssql_export_mode", "bcp")).lower()
+            typed_row_stream = (
+                export in {"row_stream", "odbc_row_stream"}
+                and contract.selected_route == "typed_binary_row_stream"
+                and wire.binary_format == "rowbinary"
+                and wire.source_native_format in {"auto", "row_stream", "odbc_row_stream"}
+            )
+            if typed_row_stream:
+                TypedStreamLimits.from_options(source_options, 8192)
         return self._resolver.resolve(
             transport,
-            source=_source_capability(source_type, source_options),
+            source=(
+                StreamCapability.supported("mssql_typed_row_stream")
+                if typed_row_stream
+                else _source_capability(source_type, source_options)
+            ),
             sink=_sink_capability(sink_type, sink_options),
-            codec=_codec_capability(source_type, sink_type, source_options),
+            codec=(
+                StreamCapability.supported("clickhouse_rowbinary_codec")
+                if typed_row_stream
+                else _codec_capability(source_type, sink_type, source_options)
+            ),
         )
 
 

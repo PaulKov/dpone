@@ -84,6 +84,9 @@ def test_only_the_declared_ci_project_sync_steps_become_locked() -> None:
         ("quality", "Install dependencies", "uv sync --locked --all-extras"),
         ("doctor-import-windows", "Install dependencies", "uv sync --locked --all-extras"),
         ("postgres-xmin", "Install dependencies", "uv sync --locked --all-extras"),
+        ("acceptance-plan", "Install dependencies", "uv sync --locked --all-extras"),
+        ("acceptance-contracts", "Install dependencies", "uv sync --locked --all-extras"),
+        ("bounded-window-smoke", "Install dependencies", "uv sync --locked --all-extras"),
     ]
     assert pages_syncs == [("build", "Install docs dependencies", "uv sync --locked")]
     assert _sync_steps(WORKFLOWS / "airflow-pack-compat.yml") == []
@@ -103,6 +106,9 @@ def test_locked_sync_occurrences_are_confined_to_declared_workflow_steps() -> No
         ("ci.yml", "quality", "Install dependencies"),
         ("ci.yml", "doctor-import-windows", "Install dependencies"),
         ("ci.yml", "postgres-xmin", "Install dependencies"),
+        ("ci.yml", "acceptance-plan", "Install dependencies"),
+        ("ci.yml", "acceptance-contracts", "Install dependencies"),
+        ("ci.yml", "bounded-window-smoke", "Install dependencies"),
         ("live-certification.yml", "local-live-certification", "Install dependencies"),
         ("pages.yml", "build", "Install docs dependencies"),
         ("pr-gate-shadow.yml", "static", "Run static shadow route"),

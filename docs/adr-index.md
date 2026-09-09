@@ -58,3 +58,5 @@ Architecture Decision Records document important design choices and their conseq
 - [ADR 0055: REST protocol semantics are platform-owned operation profiles (Proposed)](adr/0055-rest-operation-profile-authority.md)
 
 New ADRs should include status, context, decision, consequences, and links to related implementation or documentation.
+
+- [ADR 0056: Bounded-window publication and recovery authority (Accepted)](adr/0056-bounded-window-atomic-publication.md)

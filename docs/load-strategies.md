@@ -777,3 +777,11 @@ Use this index when you already know your source and target and want a ready man
 - [Postgres XMin](postgres-xmin.md)
 - [Reconciliation and CDC](cdc.md)
 - [Performance guide](performance.md)
+
+## Atomic rolling-window composition
+
+For an opt-in UTC rolling interval, see [Atomic rolling windows](rolling-window.md).
+`sink.strategy.window` requires `mode: replace` and `atomicity: target_atomic`.
+Execution requires injected source consistency and all-writer target authority;
+the default runner refuses the declaration without those capabilities. Legacy
+replace behavior and `state.atomicity` keep their existing meanings.

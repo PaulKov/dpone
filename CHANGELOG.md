@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Add opt-in bounded atomic rolling-window Python composition with a PostgreSQL
+  shared snapshot, isolated ClickHouse RowBinary staging, fenced local recovery,
+  single-generation publication, and explicit capability admission. Existing
+  transport defaults remain unchanged; unsupported writer authority and legacy
+  governance combinations fail before execution. See the rolling-window guide.
+- Correct Decimal alias widths and pre-epoch DateTime64 encoding; byte-bounded
+  typed streams reject oversized rows, shape mismatches, and precision loss.
+- Add impact-aware acceptance plans bound to exact Git revisions and synthetic
+  container smoke receipts while preserving existing mandatory CI gates.
+
 ## 0.74.33 - 2026-09-02
 
 ### Added
