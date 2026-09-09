@@ -149,7 +149,7 @@ def test_version_header_fails_closed(tmp_path: Path, payload: str) -> None:
 
 
 def test_unicode_casefold_expansion(tmp_path: Path) -> None:
-    archive = _wheel(tmp_path / "input.whl", {"module.py": "STRASSE".encode()})
+    archive = _wheel(tmp_path / "input.whl", {"module.py": b"STRASSE"})
     assert hygiene.evaluate_archives(paths=[archive], policy_path=policy(tmp_path, terms=["Straße"])).status == "FAIL"
 
 
