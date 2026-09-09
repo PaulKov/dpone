@@ -1,5 +1,18 @@
 # Compatibility
 
+## Native BCP safety corrections in 0.74.35
+
+Upgrade core and the optional accelerator together. Native provider revision 2
+is required for acceleration; older providers fall back to Python in `auto`
+and fail before file access in `required`. The wire schema version is unchanged.
+Re-export retained artifacts whose physical layouts no longer validate; never
+edit their prefixes or hashes manually. Raw `char NOT NULL` now fails before
+native export because multibyte conversion makes its unprefixed boundary
+ambiguous. Use ODBC row-stream or a governed projection with accurate metadata.
+Decimal precision loss and target calendar/integer overflow now fail explicitly
+instead of silently truncating or clamping values. See the
+[native BCP recovery and validation guide](native-bcp-docker-validation.md).
+
 ## Workload selection v1
 
 `--select` and `--exclude` are additive project-workload options on `check`,

@@ -71,6 +71,7 @@ def capabilities() -> dict[str, Any]:
                 "certified": True,
                 "supported_platforms": ["linux_x86_64", "macos_arm64", "macos_x86_64"],
                 "supported_types": list(SUPPORTED_TYPES),
+                "native_wire_revision": 2,
             }
         ],
     }

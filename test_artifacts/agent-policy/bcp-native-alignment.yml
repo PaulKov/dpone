@@ -1,0 +1,97 @@
+schema_version: 1
+task_id: bcp-native-alignment
+title: Correct native BCP framing
+goal: Preserve exact values and boundaries through both decoder backends
+specification: docs/feature-design-bcp-native-alignment-v1.md
+base_commit: 6533c27fbf77c78a00b8013bcf72e2293e281e1f
+integrator: integrator
+acceptance_criteria:
+- Independent UUID/decimal/numeric fixtures preserve values and row boundaries
+- Invalid lengths and stale layouts fail closed before unsafe read/publication
+- Focused and broad offline gates pass; authorized local Docker codec matrix passes
+- Full publication/checkpoint certification remains UNVERIFIED outside local codec scope
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - native BCP wire decoding
+  - retained artifact validation
+  migration_required: true
+owned_paths:
+- tests/test_native_docker_runner.py
+- src/dpone/runtime/native_acceleration.py
+- packages/dpone-native-accel/src/dpone_native_accel/_provider.py
+- tools/run_native_docker_corners.py
+- docs/native-bcp-docker-validation.md
+- src/dpone/runtime/clickhouse_temporal_encoding.py
+- packages/dpone-native-accel/src/dpone_native_accel/_clickhouse_temporal_encoding.py
+- src/dpone/runtime/sources/strategies/mssql/mssql_queryout_bcp.py
+- tests/integration/mssql/native_docker_support.py
+- tests/integration/mssql/native_docker_cases.py
+- tests/integration/mssql/test_native_docker_corners_live.py
+- src/dpone/runtime/native_wire_mssql.py
+- src/dpone/runtime/native_wire_mssql_framing.py
+- src/dpone/runtime/native_wire_transcoder.py
+- packages/dpone-native-accel/src/dpone_native_accel/_mssql_clickhouse_native.py
+- packages/dpone-native-accel/src/dpone_native_accel/_mssql_native_framing.py
+- tests/test_native_bcp_alignment.py
+- tests/test_native_bcp_framing.py
+- tests/test_native_bcp_decoder.py
+- tests/integration/mssql/test_mssql_clickhouse_native_temporal_matrix_live.py
+- docs/mssql.md
+- docs/feature-design-bcp-native-alignment-v1.md
+- tests/test_native_bcp_type_matrix.py
+- src/dpone/runtime/clickhouse_binary_encoding.py
+- packages/dpone-native-accel/src/dpone_native_accel/_mssql_native_numeric.py
+- tests/test_native_accel_provider.py
+- tests/test_native_acceleration_contracts.py
+integrator_owned_paths:
+- CHANGELOG.md
+read_only_paths:
+- src/dpone/runtime/native_wire_models.py
+- docs/agent-development.md
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- mkdocs.yml
+- .github/workflows
+- CHANGELOG.md
+shared_file_owner: integrator
+dependencies: []
+required_checks:
+  focused:
+  - >-
+    pytest tests/test_native_bcp_alignment.py tests/test_native_bcp_framing.py
+    tests/test_native_bcp_type_matrix.py tests/test_native_bcp_decoder.py
+    tests/test_native_bcp_decoder_native_format.py tests/test_native_bcp_decoder_contracts.py
+    tests/test_native_accel_provider.py tests/test_native_acceleration_contracts.py
+    tests/test_clickhouse_native_encoder.py tests/test_runtime_mssql_clickhouse_native_transfer.py
+    tests/test_tools_mssql_clickhouse_bcp_native_type_certification.py
+  broad:
+  - ruff check .
+  - ruff format --check .
+  - mypy --config-file mypy.ini
+  - dpone docs check-import-rules
+  - dpone docs check-layer-metrics
+  - dpone docs check-module-size
+  - pytest -m "not integration_live"
+  - mkdocs build --strict
+  live:
+  - python tools/run_native_docker_corners.py --output <new-local-output-directory>
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.

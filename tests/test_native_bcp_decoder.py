@@ -8,6 +8,8 @@ from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from dpone.config import LoadConfig
 from dpone.runtime.bulk_wire import BulkWirePlanner
 from dpone.runtime.native_transfer_artifacts import PartitionedTransferPlanArtifact
@@ -145,6 +147,7 @@ def test_mssql_bcp_native_decoder_decodes_supported_golden_row(tmp_path: Path) -
     payload = (
         _int32(7)
         + _nullable_fixed(True, b"\x01")
+        + b"\x13"
         + _decimal("123.45", precision=10, scale=2)
         + _money("12.34")
         + _nullable_var(b"a    ", prefix_width=2)
@@ -152,6 +155,7 @@ def test_mssql_bcp_native_decoder_decodes_supported_golden_row(tmp_path: Path) -
         + _nullable_var("Привет\t\n".encode("utf-16le"), prefix_width=8)
         + _nullable_var(b"ascii\t\n", prefix_width=8)
         + _datetime2(datetime(2026, 6, 22, 13, 14, 15, 123456), scale=7)
+        + b"\x10"
         + uuid.UUID("12345678-1234-5678-9abc-def012345678").bytes_le
     )
     path = tmp_path / "orders.bcp"
@@ -387,3 +391,31 @@ def _datetime2_ticks(value: date, *, ticks: int, scale: int) -> bytes:
 def _datetime(value: date, *, ticks: int) -> bytes:
     days = (value - date(1900, 1, 1)).days
     return days.to_bytes(4, byteorder="little", signed=True) + ticks.to_bytes(4, byteorder="little", signed=True)
+
+
+@pytest.mark.parametrize("execution", ["auto", "pipelined"])
+def test_unprefixed_char_is_rejected_before_any_native_export(tmp_path, monkeypatch, execution):
+    from dpone.runtime.sources.strategies.mssql import mssql_queryout_bcp
+
+    connector = MssqlBcpConnector()
+    factory = MSSQLQueryoutArtifactFactory(connector, Logger(), sink_connector=ClickHouseConnector())
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Unsupported native layout reached transport dispatch")
+
+    monkeypatch.setattr(mssql_queryout_bcp, "artifact_from_export_optimizer", unexpected)
+    monkeypatch.setattr(mssql_queryout_bcp, "_build_queryout_transport", unexpected)
+    config = _load_config(
+        {
+            "runtime": {"storage": {"work_dir": str(tmp_path)}},
+            "native_transfer": {
+                "execution": execution,
+                "wire": {"mode": "typed_binary", "source_native_format": "bcp_native"},
+            },
+            "clickhouse_bulk": {"mode": "http", "ingest_contract": "typed_binary_staging"},
+        }
+    )
+    with pytest.raises(ValueError, match="use_row_stream_or_nullable_projection"):
+        factory.artifact_for_query(config, "SELECT [payload] FROM [dbo].[synthetic]", [("payload", "char(4)")])
+    assert connector.queries == connector.options == []
+    assert not list(tmp_path.iterdir())

@@ -18,7 +18,7 @@ from tests.agent_policy._release_candidate_evidence_stress_helpers import (
 ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY = "PaulKov/dpone"
 COMMIT_SHA = "a" * 40
-RELEASE = "v0.74.34"
+RELEASE = "v0.74.35"
 RUN_ID = 101
 RUN_ATTEMPT = 2
 CHECK_RUN_ID = 201

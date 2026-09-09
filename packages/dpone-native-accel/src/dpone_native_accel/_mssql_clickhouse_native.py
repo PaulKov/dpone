@@ -12,6 +12,10 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, BinaryIO
 
+from ._clickhouse_temporal_encoding import encode_temporal_integer
+from ._mssql_native_framing import read_payload, validate_column, validate_contract, validate_target
+from ._mssql_native_numeric import encode_decimal, encode_numeric
+
 _DAYS_TO_UNIX_EPOCH = (date(1970, 1, 1) - date(1, 1, 1)).days
 _DAYS_TO_SQL_SERVER_EPOCH = (date(1970, 1, 1) - date(1900, 1, 1)).days
 _UNSUPPORTED_COMPLEX_ROOTS = frozenset({"array", "map", "tuple", "nested", "enum8", "enum16", "lowcardinality"})
@@ -29,6 +33,7 @@ class ColumnLayout:
     scale: int | None
     encoding: str
     binary_encoding: str = "none"
+    source_type: str = ""
 
     @classmethod
     def from_contract(
@@ -38,7 +43,10 @@ class ColumnLayout:
         *,
         binary_encoding: str,
     ) -> ColumnLayout:
+        validate_column(raw)
+        validate_target(raw, str(target_type or raw["target_type"]))
         return cls(
+            source_type=str(raw["source_type"]),
             name=str(raw["name"]),
             storage_type=str(raw["storage_type"]).lower(),
             clickhouse_type=str(target_type or raw["target_type"]),
@@ -71,8 +79,17 @@ class MssqlBcpClickHouseNativeBackend:
     @classmethod
     def from_request(cls, request: Mapping[str, Any]) -> MssqlBcpClickHouseNativeBackend:
         contract = _mapping(request.get("native_wire_contract"))
+        validate_contract(contract)
+        if "schema" in request and tuple(tuple(item) for item in request["schema"]) != tuple(
+            (raw["name"], raw["source_type"]) for raw in contract["columns"]
+        ):
+            raise ValueError("native_wire_source_schema_mismatch:re-export_with_matching_schema")
         bulk = _mapping(request.get("bulk_wire_contract"))
         target_schema = tuple((str(name), str(dtype)) for name, dtype in request.get("clickhouse_schema") or ())
+        if target_schema and tuple(name for name, _ in target_schema) != tuple(
+            raw["name"] for raw in contract["columns"]
+        ):
+            raise ValueError("native_wire_invalid_layout:target_columns")
         target_by_position = tuple(dtype for _, dtype in target_schema)
         raw_columns = tuple(_mapping(item) for item in contract.get("columns") or ())
         type_policy = request.get("type_policy")
@@ -104,7 +121,7 @@ class MssqlBcpClickHouseNativeBackend:
                 block = _BlockBuilder(self._columns)
                 estimated_bytes = 0
                 while len(block) < self._block_rows and not _eof(handle):
-                    values = [_read_cell(handle, column) for column in self._columns]
+                    values = [_read_cell(handle, column, index) for index, column in enumerate(self._columns)]
                     estimated_bytes += sum(len(value or b"") + 1 for value in values)
                     block.append(values)
                     if self._block_bytes is not None and estimated_bytes >= self._block_bytes:
@@ -151,16 +168,8 @@ class _BlockBuilder:
         return bytes(payload)
 
 
-def _read_cell(handle: BinaryIO, column: ColumnLayout) -> bytes | None:
-    length = column.fixed_length
-    if column.prefix_width:
-        indicator = int.from_bytes(_read_exact(handle, column.prefix_width), byteorder="little", signed=True)
-        if indicator == -1:
-            return None
-        length = indicator
-    if length is None:
-        raise ValueError(f"native_acceleration_missing_length:{column.name}")
-    return _read_exact(handle, length)
+def _read_cell(handle: BinaryIO, column: ColumnLayout, ordinal: int = 0) -> bytes | None:
+    return read_payload(handle, column, ordinal)
 
 
 def _encode_value(payload: bytes, column: ColumnLayout, clickhouse_type: str) -> bytes:
@@ -171,11 +180,11 @@ def _encode_value(payload: bytes, column: ColumnLayout, clickhouse_type: str) ->
     if storage == "time":
         return _encode_time(payload, column, root)
     if root == "bool":
-        return struct.pack("<B", 1 if payload[0] else 0)
+        return encode_numeric(payload, column, root)
     if root in {"int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "float32", "float64"}:
-        return payload
+        return encode_numeric(payload, column, root)
     if root.startswith("decimal"):
-        return _encode_decimal(payload, column, clickhouse_type)
+        return encode_decimal(payload, column, clickhouse_type)
     if root in {"date", "date32"}:
         return _encode_date(payload, root)
     if root in {"datetime", "datetime64"}:
@@ -183,16 +192,7 @@ def _encode_value(payload: bytes, column: ColumnLayout, clickhouse_type: str) ->
     if root == "uuid":
         return _encode_uuid(payload)
     if root == "string":
-        if storage == "datetimeoffset":
-            value = _datetimeoffset_text(payload, column).encode("ascii")
-        elif storage in {"binary", "varbinary"} and column.binary_encoding == "hex":
-            value = payload.hex().encode("ascii")
-        elif storage in {"binary", "varbinary"} and column.binary_encoding == "base64":
-            value = b64encode(payload)
-        elif storage in {"nvarchar", "nchar"}:
-            value = payload.decode(column.encoding).encode("utf-8")
-        else:
-            value = payload
+        value = _string_payload(payload, column)
         return _var_uint(len(value)) + value
     if root == "fixedstring":
         return _encode_fixed_string(payload, column, clickhouse_type)
@@ -238,34 +238,15 @@ def _default_value(clickhouse_type: str) -> bytes:
     raise ValueError(f"native_acceleration_unsupported_clickhouse_type:{clickhouse_type}")
 
 
-def _encode_decimal(payload: bytes, column: ColumnLayout, clickhouse_type: str) -> bytes:
-    precision, target_scale = _decimal_precision_scale(clickhouse_type)
-    storage = column.storage_type
-    if storage in {"money", "smallmoney"}:
-        scaled = _money_integer(payload) if storage == "money" else struct.unpack("<i", payload)[0]
-    elif storage in {"decimal", "numeric"}:
-        source_scale = int(column.scale if column.scale is not None else payload[1])
-        sign = 1 if payload[2] == 1 else -1
-        magnitude = int.from_bytes(payload[3:], byteorder="little", signed=False)
-        scaled = sign * magnitude
-        if target_scale > source_scale:
-            scaled *= 10 ** (target_scale - source_scale)
-        elif target_scale < source_scale:
-            scaled //= 10 ** (source_scale - target_scale)
-    else:
-        raise ValueError(f"native_acceleration_unsupported_decimal_source:{column.storage_type}")
-    return int(scaled).to_bytes(_decimal_width(precision), byteorder="little", signed=True)
-
-
 def _encode_date(payload: bytes, target_root: str) -> bytes:
     days = int.from_bytes(payload, byteorder="little", signed=False) - _DAYS_TO_UNIX_EPOCH
-    return struct.pack("<i", days) if target_root == "date32" else struct.pack("<H", days)
+    return encode_temporal_integer(days, target_root)
 
 
 def _encode_datetime(payload: bytes, column: ColumnLayout, clickhouse_type: str) -> bytes:
     target_scale = _scale(clickhouse_type) if _root_type(clickhouse_type) == "datetime64" else 0
     ticks = _datetime_ticks(payload, column, target_scale)
-    return struct.pack("<q", ticks) if _root_type(clickhouse_type) == "datetime64" else struct.pack("<I", ticks)
+    return encode_temporal_integer(ticks, _root_type(clickhouse_type), target_scale)
 
 
 def _encode_time(payload: bytes, column: ColumnLayout, target_root: str) -> bytes:
@@ -274,6 +255,9 @@ def _encode_time(payload: bytes, column: ColumnLayout, target_root: str) -> byte
     if target_root == "uint32":
         return struct.pack("<I", ticks // (10**source_scale))
     if target_root == "string":
+        display_scale = _declared_temporal_scale(column)
+        ticks = _rescale_ticks(ticks, source_scale, display_scale)
+        source_scale = display_scale
         seconds, fraction = divmod(ticks, 10**source_scale)
         hours, remainder = divmod(seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -320,7 +304,9 @@ def _datetimeoffset_text(payload: bytes, column: ColumnLayout) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     local_date = date(1970, 1, 1) + timedelta(days=local_days)
-    fractional = f".{fraction:0{source_scale}d}" if source_scale else ""
+    display_scale = _declared_temporal_scale(column)
+    fraction = _rescale_ticks(fraction, source_scale, display_scale)
+    fractional = f".{fraction:0{display_scale}d}" if display_scale else ""
     sign = "+" if offset_minutes >= 0 else "-"
     absolute_offset = abs(offset_minutes)
     offset_hours, offset_remainder = divmod(absolute_offset, 60)
@@ -343,8 +329,27 @@ def _decode_datetimeoffset_payload(payload: bytes, column: ColumnLayout) -> tupl
     return time_ticks, days, offset_minutes, source_scale
 
 
+def _string_payload(payload: bytes, column: ColumnLayout) -> bytes:
+    """Apply the value policy before either variable or fixed string framing."""
+    if column.storage_type == "datetimeoffset":
+        return _datetimeoffset_text(payload, column).encode("ascii")
+    if column.storage_type in {"binary", "varbinary"}:
+        if column.binary_encoding == "hex":
+            return payload.hex().encode("ascii")
+        if column.binary_encoding == "base64":
+            return b64encode(payload)
+    if column.storage_type in {"nvarchar", "nchar"}:
+        return payload.decode(column.encoding).encode("utf-8")
+    return payload
+
+
+def _declared_temporal_scale(column: ColumnLayout) -> int:
+    match = re.search(r"\((\d+)\)", column.source_type)
+    return int(match[1]) if match else 7
+
+
 def _encode_fixed_string(payload: bytes, column: ColumnLayout, clickhouse_type: str) -> bytes:
-    value = payload.decode(column.encoding).encode("utf-8") if column.storage_type in {"nvarchar", "nchar"} else payload
+    value = _string_payload(payload, column)
     length = _fixed_string_length(clickhouse_type)
     if len(value) > length:
         raise ValueError(f"native_acceleration_fixed_string_oversize:{column.name}:{len(value)}:{length}")
@@ -421,13 +426,6 @@ def _var_uint(value: int) -> bytes:
         current >>= 7
     output.append(current)
     return bytes(output)
-
-
-def _read_exact(handle: BinaryIO, length: int) -> bytes:
-    payload = handle.read(length)
-    if len(payload) != length:
-        raise EOFError("native_acceleration_unexpected_eof")
-    return payload
 
 
 def _eof(handle: BinaryIO) -> bool:

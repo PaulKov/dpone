@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+## 0.74.35 - 2026-09-09
+
+### Fixed
+
+- Validate native BCP against real local SQL Server/ClickHouse exports: correct
+  NOT NULL bit prefixes, preserve logical temporal scales while reading physical
+  100ns payloads, and account for native UTF-8 length expansion. Reject ambiguous
+  unprefixed NOT NULL char before export and incompatible old accelerator profiles.
+- Reject out-of-range ClickHouse calendar values before the server can silently
+  clamp them. Add reproducible Docker corner-case checks and a source-bound receipt.
+
+- Correct SQL Server native BCP prefixes for nonnullable `uniqueidentifier`,
+  `decimal`, and `numeric`, and the four-byte representation of `float(1..24)`.
+  Preserve exact decimal/money values independently of Python decimal context.
+  Validate native layouts and field boundaries before Python or accelerated
+  decoding; reject stale artifacts, malformed lengths/values and incompatible
+  source/target column identity instead of silently reinterpreting them.
+- Preserve pre-1970 fractional timestamps using integer epoch arithmetic, and
+  apply hex/base64 binary policies consistently to accelerated `FixedString`.
+- Encode accelerated numeric values at the actual target width and rescale money
+  and decimals exactly. Binary Decimal targets now reject fractional precision
+  loss or precision overflow instead of silently rounding. Regenerate affected
+  BCP artifacts after upgrade; see the [native decoder recovery notes](docs/mssql.md#mssql---clickhouse-bcp-native-decoder).
+
+
 ## 0.74.34 - 2026-09-09
 
 - The PostgreSQL batch example now uses the source identifier present in the

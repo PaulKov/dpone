@@ -181,6 +181,15 @@ class NativeAccelerationRegistry:
                 reason="native_acceleration_backend_uncertified",
             )
 
+        revision = backend.get("native_wire_revision")
+        if type(revision) is not int or revision != 2:
+            return self._blocked_or_fallback(
+                policy=policy,
+                source_format=normalized_source,
+                target_format=normalized_target,
+                reason="native_acceleration_profile_revision_unsupported",
+            )
+
         return NativeAccelerationDecision(
             requested_mode=policy.mode,
             selected_backend=NATIVE_ACCELERATED_BACKEND,
