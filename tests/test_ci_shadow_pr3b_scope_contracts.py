@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 import yaml
 from jsonschema import Draft202012Validator
+from tools.agent_policy.public_snapshot_history import HistoricalCheck, assert_public_snapshot_continuity
 
 ROOT = Path(__file__).resolve().parents[1]
 TASK = ROOT / "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-spec.yml"
@@ -255,7 +256,7 @@ def _minimal_task() -> dict[str, Any]:
     }
 
 
-def test_pr3b_task_contract_uses_the_immutable_base_to_head_diff() -> None:
+def test_pr3b_task_contract_preserves_imported_scope() -> None:
     task = yaml.safe_load(TASK.read_text(encoding="utf-8"))
     assert isinstance(task, dict)
 
@@ -302,15 +303,25 @@ def test_pr3b_task_contract_uses_the_immutable_base_to_head_diff() -> None:
     schema = json.loads(TASK_SCHEMA.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
     Draft202012Validator(schema).validate(task)
+    assert_public_snapshot_continuity(ROOT, (TASK.relative_to(ROOT).as_posix(),))
+
+
+def historical_design_scope() -> None:
+    task = yaml.safe_load(TASK.read_text(encoding="utf-8"))
     _git(ROOT, "merge-base", "--is-ancestor", DESIGN_INTEGRATION, "HEAD")
     _assert_task_scope(task, _committed_changed_paths(ROOT, DESIGN_BASE, DESIGN_INTEGRATION))
 
 
-def test_public_output_amendment_scope_is_exact_from_base_to_head() -> None:
+def test_public_output_amendment_preserves_imported_scope() -> None:
     task = yaml.safe_load(AMENDMENT_TASK.read_text(encoding="utf-8"))
     assert isinstance(task, dict)
     assert task["base_commit"] == DESIGN_INTEGRATION
 
+    assert_public_snapshot_continuity(ROOT, (AMENDMENT_TASK_PATH, AMENDMENT_SPEC_PATH))
+
+
+def historical_amendment_scope() -> None:
+    task = yaml.safe_load(AMENDMENT_TASK.read_text(encoding="utf-8"))
     _assert_amendment_scope_lifecycle(
         ROOT,
         task,
@@ -475,3 +486,9 @@ def test_approved_integration_rejects_two_parent_merge(tmp_path: Path) -> None:
     merge_head = _git(root, "rev-parse", "HEAD")
 
     _assert_amendment_rejected(root, task, merge_head)
+
+
+HISTORICAL_CHECKS = (
+    HistoricalCheck("PR3B design scope", (DESIGN_BASE, DESIGN_INTEGRATION), historical_design_scope),
+    HistoricalCheck("PR3B amendment scope", (DESIGN_INTEGRATION,), historical_amendment_scope),
+)

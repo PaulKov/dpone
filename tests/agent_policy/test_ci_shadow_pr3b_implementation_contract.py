@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from tools.agent_policy.public_snapshot_history import HistoricalCheck, assert_public_snapshot_continuity
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-implementation.yml"
@@ -133,39 +134,20 @@ def _covered(path: str, boundaries: set[str]) -> bool:
     return any(path == boundary or path.startswith(f"{boundary}/") for boundary in boundaries)
 
 
-def test_pr3b_implementation_contract_binds_receipt_proven_approved_base() -> None:
-    payload = _payload()
-    metadata = _git_text(INTEGRATION_COMMIT, SPEC_PATH).split("## Executive summary", maxsplit=1)[0]
-
-    _assert_integration_identity(IMPLEMENTATION_IDENTITY, tip="HEAD")
-    assert payload["base_commit"] == BASE
-    assert _git_output("rev-parse", f"{BASE}^{{commit}}") == BASE
-    assert _git_output("rev-parse", f"{BASE}^") == BASE_PARENT
-    assert _git_output("rev-parse", f"{BASE}^{{tree}}") == BASE_TREE
-    assert _git_output("merge-base", BASE, INTEGRATION_BASE) == BASE
+def _assert_approved_metadata(spec: str) -> None:
+    metadata = spec.split("## Executive summary", maxsplit=1)[0]
     assert metadata.count("- Status: APPROVED") == 1
     assert metadata.count("- Public-output amendment status: APPROVED") == 1
     assert "- Status: RESEARCHED" not in metadata
     assert "- Public-output amendment status: RESEARCHED" not in metadata
-    assert (
-        _git_text(INTEGRATION_COMMIT, SPEC_PATH).count(
-            "[x] Maintainer changed public-output amendment status to `APPROVED` after"
-        )
-        == 1
-    )
+    assert spec.count("[x] Maintainer changed public-output amendment status to `APPROVED` after") == 1
 
-    frozen = {
-        SPEC_PATH: APPROVED_SPEC_BLOB,
-        ADR_PATH: ACCEPTED_ADR_BLOB,
-        "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-spec.yml": DESIGN_TASK_BLOB,
-        "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-public-output-amendment.yml": AMENDMENT_TASK_BLOB,
-        ".github/workflows/agent-pr-receipt.yml": AGENT_RECEIPT_WORKFLOW_BLOB,
-    }
-    for path, blob in frozen.items():
-        assert _git_output("rev-parse", f"{BASE}:{path}") == blob
-        assert _git_output("rev-parse", f"{INTEGRATION_COMMIT}:{path}") == blob
 
-    assert _git_output("rev-parse", f"{INTEGRATION_COMMIT}:{CONTRACT_PATH}") == IMPLEMENTATION_TASK_AT_INTEGRATION_BLOB
+def test_pr3b_implementation_contract_preserves_imported_receipt_binding() -> None:
+    payload = _payload()
+    assert payload["base_commit"] == BASE
+    _assert_approved_metadata((ROOT / SPEC_PATH).read_text(encoding="utf-8"))
+    assert_public_snapshot_continuity(ROOT, (CONTRACT_PATH, SPEC_PATH, ADR_PATH))
     assert _git_output("hash-object", str(CONTRACT)) == RETIRED_IMPLEMENTATION_TASK_BLOB
 
     dependencies = payload["dependencies"]
@@ -231,20 +213,8 @@ def test_pr3b_implementation_contract_has_disjoint_writer_and_integrator_ownersh
     assert all(_covered(path, forbidden) for path in integrator_owned)
 
 
-def test_pr3b_implementation_contract_confines_the_frozen_integration_diff() -> None:
-    payload = _payload()
-    allowed = set(payload["owned_paths"]) | set(payload["integrator_owned_paths"])
-    changed = _changed_paths()
-
-    assert all(_covered(path, allowed) for path in changed)
-    assert not any(path.startswith(("src/", "packages/")) for path in changed)
-    assert {
-        SPEC_PATH,
-        ADR_PATH,
-        ".github/workflows/agent-pr-receipt.yml",
-        "pyproject.toml",
-        "uv.lock",
-    }.isdisjoint(changed)
+def test_pr3b_implementation_contract_preserves_frozen_public_contract() -> None:
+    assert_public_snapshot_continuity(ROOT, (CONTRACT_PATH, SPEC_PATH, ADR_PATH))
 
 
 def test_frozen_scope_survives_adversarial_future_commits(tmp_path: Path) -> None:
@@ -329,3 +299,53 @@ def test_pr3b_implementation_contract_freezes_fail_closed_and_compatibility_gate
     assert "new dependency" in stops
     assert "fixture widening" in stops
     assert "new required check" in stops
+
+
+def historical_pr3b_receipt_approved_base() -> None:
+    _assert_integration_identity(IMPLEMENTATION_IDENTITY, tip="HEAD")
+    assert _git_output("rev-parse", f"{BASE}^{{commit}}") == BASE
+    assert _git_output("rev-parse", f"{BASE}^") == BASE_PARENT
+    assert _git_output("rev-parse", f"{BASE}^{{tree}}") == BASE_TREE
+    assert _git_output("merge-base", BASE, INTEGRATION_BASE) == BASE
+    _assert_approved_metadata(_git_text(INTEGRATION_COMMIT, SPEC_PATH))
+
+    frozen = {
+        SPEC_PATH: APPROVED_SPEC_BLOB,
+        ADR_PATH: ACCEPTED_ADR_BLOB,
+        "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-spec.yml": DESIGN_TASK_BLOB,
+        "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-public-output-amendment.yml": AMENDMENT_TASK_BLOB,
+        ".github/workflows/agent-pr-receipt.yml": AGENT_RECEIPT_WORKFLOW_BLOB,
+    }
+    for path, blob in frozen.items():
+        assert _git_output("rev-parse", f"{BASE}:{path}") == blob
+        assert _git_output("rev-parse", f"{INTEGRATION_COMMIT}:{path}") == blob
+
+    assert _git_output("rev-parse", f"{INTEGRATION_COMMIT}:{CONTRACT_PATH}") == IMPLEMENTATION_TASK_AT_INTEGRATION_BLOB
+
+
+def historical_pr3b_frozen_diff() -> None:
+    payload = _payload()
+    allowed = set(payload["owned_paths"]) | set(payload["integrator_owned_paths"])
+    changed = _changed_paths()
+
+    assert all(_covered(path, allowed) for path in changed)
+    assert not any(path.startswith(("src/", "packages/")) for path in changed)
+    assert {
+        SPEC_PATH,
+        ADR_PATH,
+        ".github/workflows/agent-pr-receipt.yml",
+        "pyproject.toml",
+        "uv.lock",
+    }.isdisjoint(changed)
+
+
+HISTORICAL_CHECKS = (
+    HistoricalCheck(
+        "PR3B historical approved receipt",
+        (BASE, BASE_PARENT, INTEGRATION_BASE, REVIEWED_HEAD, INTEGRATION_COMMIT),
+        historical_pr3b_receipt_approved_base,
+    ),
+    HistoricalCheck(
+        "PR3B historical integration diff", (INTEGRATION_BASE, INTEGRATION_COMMIT), historical_pr3b_frozen_diff
+    ),
+)

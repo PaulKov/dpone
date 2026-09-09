@@ -394,3 +394,57 @@ def test_snapshot_closes_descriptors_before_propagating_internal_failure(
         SnapshotReader(limits=V1_LIMITS).acquire(root)
     assert caught.value is failure
     _assert_closed(opened)
+
+
+def test_notification_evidence_rejects_restored_state_even_when_metadata_matches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _minimal_repository(tmp_path / "repo")
+    lease = SnapshotReader(limits=V1_LIMITS).acquire(root)
+    workflow = root / WORKFLOW_DIRECTORY / "current.yml"
+    original = workflow.read_bytes()
+    workflow.write_bytes(b"temporary")
+    workflow.write_bytes(original)
+    monkeypatch.setattr(snapshot_module, "_revalidation_phase", lambda _state: True)
+    monkeypatch.setattr(snapshot_module, "_tree_revalidates", lambda _state: True)
+    _assert_concurrent(lease.finalize(policy_schema_version=1))
+
+
+def test_finalization_interruption_closes_observer_and_all_descriptors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _minimal_repository(tmp_path / "repo")
+    opened = track_open_descriptors(monkeypatch, snapshot_module)
+    lease = SnapshotReader(limits=V1_LIMITS).acquire(root)
+    assert lease._state is not None
+    observer = lease._state.observer
+
+    def interrupt(_state: object) -> bool:
+        raise KeyboardInterrupt("injected finalization interruption")
+
+    monkeypatch.setattr(snapshot_module, "_revalidation_phase", interrupt)
+    with pytest.raises(KeyboardInterrupt):
+        lease.finalize(policy_schema_version=1)
+    _assert_closed(opened)
+    assert not observer.unchanged()
+
+
+def test_observer_close_failure_still_releases_snapshot_descriptors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _minimal_repository(tmp_path / "repo")
+    opened = track_open_descriptors(monkeypatch, snapshot_module)
+    lease = SnapshotReader(limits=V1_LIMITS).acquire(root)
+    assert lease._state is not None
+    observer = lease._state.observer
+    real_close = observer.close
+
+    def fail_close() -> None:
+        real_close()
+        raise OSError("injected close failure")
+
+    monkeypatch.setattr(observer, "close", fail_close)
+    with pytest.raises(OSError, match="injected close failure"):
+        lease.close()
+    _assert_closed(opened)
+    lease.close()

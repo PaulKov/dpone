@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 import yaml
 from jsonschema import Draft202012Validator
+from tools.agent_policy.public_snapshot_history import HistoricalCheck, assert_public_snapshot_continuity
 
 from tests.ci_shadow_pr3b_report_contract_model import valid_report_shape
 from tests.ci_shadow_pr3b_report_examples import report_example
@@ -133,13 +134,8 @@ def test_public_output_amendment_lifecycle_and_authority_are_exact() -> None:
         )
     )
 
-    assert (
-        _git("rev-parse", f"{AMENDMENT_BASE}:docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md")
-        == APPROVED_SPEC_BLOB
-    )
-    assert _git("rev-parse", f"{AMENDMENT_BASE}:docs/adr/0037-immutable-agent-pr-merge-closure.md") == ACCEPTED_ADR_BLOB
+    assert_public_snapshot_continuity(ROOT, (SPEC.relative_to(ROOT).as_posix(), ADR.relative_to(ROOT).as_posix()))
     assert _git("hash-object", ADR.relative_to(ROOT).as_posix()) == ACCEPTED_ADR_BLOB
-    _git("merge-base", "--is-ancestor", AMENDMENT_BASE, "HEAD")
 
 
 def test_public_output_amendment_is_closed_and_fail_safe() -> None:
@@ -435,3 +431,17 @@ def test_public_output_amendment_task_contract_is_closed() -> None:
     )
     assert any("implementation task or production edit" in item for item in task["stop_conditions"])
     assert any("versioned v2 recovery amendment" in item for item in task["stop_conditions"])
+
+
+def historical_output_amendment_authority() -> None:
+    assert (
+        _git("rev-parse", f"{AMENDMENT_BASE}:docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md")
+        == APPROVED_SPEC_BLOB
+    )
+    assert _git("rev-parse", f"{AMENDMENT_BASE}:docs/adr/0037-immutable-agent-pr-merge-closure.md") == ACCEPTED_ADR_BLOB
+    _git("merge-base", "--is-ancestor", AMENDMENT_BASE, "HEAD")
+
+
+HISTORICAL_CHECKS = (
+    HistoricalCheck("PR3B historical amendment authority", (AMENDMENT_BASE,), historical_output_amendment_authority),
+)

@@ -77,6 +77,7 @@ owned_paths:
 - tests/test_ci_shadow_pr3b_scope_contracts.py
 - tests/test_ci_shadow_pr3b_spec_contracts.py
 - tests/test_ci_shadow_pr3b_output_amendment_contracts.py
+- docs/adr-index.md
 integrator_owned_paths:
 - CHANGELOG.md
 - mkdocs.yml

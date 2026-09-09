@@ -1,0 +1,65 @@
+{
+  "checks": [
+    {
+      "missing_commits": [
+        "c5567128e6e9b847b4b2a023a74ea6d60e7ccd09",
+        "f18298c14af247225758f7fe8901bc8462994dd4"
+      ],
+      "name": "PR3B design scope",
+      "status": "UNVERIFIED"
+    },
+    {
+      "missing_commits": [
+        "f18298c14af247225758f7fe8901bc8462994dd4"
+      ],
+      "name": "PR3B amendment scope",
+      "status": "UNVERIFIED"
+    },
+    {
+      "missing_commits": [
+        "ec0323feba829d547e5f9c2d23acaac5b686f1a4",
+        "c5567128e6e9b847b4b2a023a74ea6d60e7ccd09",
+        "518537e616033ecf86bae96d831b8deb23eb8bca"
+      ],
+      "name": "PR3B historical fingerprints",
+      "status": "UNVERIFIED"
+    },
+    {
+      "missing_commits": [
+        "f18298c14af247225758f7fe8901bc8462994dd4"
+      ],
+      "name": "PR3B historical amendment authority",
+      "status": "UNVERIFIED"
+    },
+    {
+      "missing_commits": [
+        "bc3d56093b4adb2eae94a475f20d5e3e1721b1ec"
+      ],
+      "name": "PR3A historical approved base",
+      "status": "UNVERIFIED"
+    },
+    {
+      "missing_commits": [
+        "b3200e89ef375eeead7213e2c13d7c0fb33ff659",
+        "f18298c14af247225758f7fe8901bc8462994dd4",
+        "4f2b924230ae90eb32a82db9e3510338eafa07ef",
+        "d0fcf7d99d79b85ea5a2681166db59645c50d7ce",
+        "0250d99a6c3b1344aebbe80a54455feda25a730d"
+      ],
+      "name": "PR3B historical approved receipt",
+      "status": "UNVERIFIED"
+    },
+    {
+      "missing_commits": [
+        "4f2b924230ae90eb32a82db9e3510338eafa07ef",
+        "0250d99a6c3b1344aebbe80a54455feda25a730d"
+      ],
+      "name": "PR3B historical integration diff",
+      "status": "UNVERIFIED"
+    }
+  ],
+  "public_root": "f8c6a4a5e75d167829c05f65d5d3033acb193878",
+  "public_tree": "1c23d4021b6f2e8c8d6519f41b86cf4ec14b29df",
+  "scope": "retrospective CI-shadow history; public continuity is not historical proof",
+  "status": "UNVERIFIED"
+}

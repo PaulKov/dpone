@@ -93,3 +93,26 @@ not a competing integration capability. No superiority claim is made.
 Success means ordinary protected merge with truthful public-root provenance,
 unchanged debt caps and no ABA false PASS in the reproduced local scenarios.
 Evidence will be recorded under `test_artifacts/dbt-compact-wire-v2/`.
+
+## Operator commands and observation limits
+
+Run `uv run python -m tools.agent_policy.public_snapshot_history` to request
+retrospective proof explicitly. Exit 0 means PASS, 1 means FAIL, and 2 means
+UNVERIFIED (including missing historical objects). Optimized Python cannot
+suppress its assertions and receive PASS. Ordinary tests instead verify frozen
+public-root contracts and their intervening history; no original historical
+receipt is rewritten.
+
+`rebind_branch_authority` accepts the existing policy/baseline, live ruleset and
+its exact history-version state. It checks that only identity/revision changes,
+validates the candidate pair privately, and publishes both to an immutable
+`--output-directory`. Copy both generated files into the policy directory and
+commit them together; an interrupted copy remains detectably invalid until both
+files are installed. Candidate publication is retryable and never updates the
+live GitHub ruleset.
+
+The workflow reader combines Linux inotify/macOS kqueue events with final bytes,
+metadata and path validation. It rejects queue overflow, watch loss and observer
+failures. Observation ends at final polling; it does not claim detection of all
+remote-filesystem or mmap activity, or mutation after returning. Unsupported
+platform observation cannot create a verified complete snapshot.

@@ -19,6 +19,7 @@ from tools.agent_policy.workflow_privilege_contracts import (
     finding,
     valid_public_text,
 )
+from tools.agent_policy.workflow_privilege_mutation_observer import MutationObserver
 
 _POLICY_PATH = ".agents/policy/workflow-security-privileged.yml"
 _INVALID_CODE_BY_STAGE = {"policy": "PRIVILEGE_INVALID_POLICY", "workflows": "PRIVILEGE_INVALID_WORKFLOW"}
@@ -42,6 +43,7 @@ class _OpenFile(_OpenPath):
 
 @dataclass(slots=True)
 class _LeaseState:
+    observer: MutationObserver
     directory_fds: tuple[int, ...]
     directories: tuple[_OpenPath, ...]
     policy: _OpenFile
@@ -67,6 +69,12 @@ class SnapshotLease:
     def finalize(self, *, policy_schema_version: int | None) -> SnapshotResult:
         """Revalidate acquired descriptors and return the single report identity."""
 
+        try:
+            return self._finalize(policy_schema_version=policy_schema_version)
+        finally:
+            self.close()
+
+    def _finalize(self, *, policy_schema_version: int | None) -> SnapshotResult:
         snapshot = self.snapshot
         revalidates = self._revalidates() if snapshot.complete or snapshot.policy is not None else True
         if not revalidates:
@@ -93,17 +101,29 @@ class SnapshotLease:
     def _revalidates(self) -> bool:
         try:
             state = self._state
-            return state is not None and _revalidation_phase(state) and _tree_revalidates(state)
+            return (
+                state is not None
+                and _revalidation_phase(state)
+                and _tree_revalidates(state)
+                and state.observer.unchanged(policy_only=not self.snapshot.complete)
+            )
         except (OSError, ValueError):
             return False
 
     def close(self) -> None:
         if self._closed:
             return
-        if self._state is not None:
-            _close_descriptors([opened.fd for opened in (self._state.policy, *self._state.workflows)])
-            _close_descriptors(self._state.directory_fds)
         self._closed = True
+        if self._state is not None:
+            try:
+                self._state.observer.close()
+            finally:
+                _close_descriptors(
+                    [
+                        *self._state.directory_fds,
+                        *(opened.fd for opened in (self._state.policy, *self._state.workflows)),
+                    ]
+                )
 
 
 class SnapshotReader:
@@ -117,17 +137,25 @@ class SnapshotReader:
         opened_files: list[_OpenFile] = []
         count, stage = 0, "root"
         policy_state: tuple[int, int, _OpenFile] | None = None
+        observer: MutationObserver | None = None
         try:
-            root_dir = _open_root(root, fds, bindings)
+            observer = MutationObserver()
+            root_dir = _open_root(root, fds, bindings, observer)
             stage = "policy"
-            policy_dir = _open_components(root_dir, (".agents", "policy"), fds, bindings)
+            policy_dir = _open_components(root_dir, (".agents", "policy"), fds, bindings, observer, "policy")
             policy = _open_file(
-                policy_dir.fd, self._policy_name, self._policy_path, self._limits.policy_bytes, "policy_bytes"
+                policy_dir.fd,
+                self._policy_name,
+                self._policy_path,
+                self._limits.policy_bytes,
+                "policy_bytes",
+                observer,
+                "policy",
             )
             opened_files.append(policy)
             policy_state = len(fds), len(bindings), policy
             stage = "workflows"
-            workflow_dir = _open_components(root_dir, (".github", "workflows"), fds, bindings)
+            workflow_dir = _open_components(root_dir, (".github", "workflows"), fds, bindings, observer, "workflows")
             names = _workflow_names(workflow_dir.fd, self._limits.workflow_files)
             count = len(names)
             if not names:
@@ -139,7 +167,7 @@ class SnapshotReader:
                 maximum = min(self._limits.workflow_bytes, remaining)
                 dimension = "workflow_bytes" if maximum == self._limits.workflow_bytes else "total_workflow_bytes"
                 path = f".github/workflows/{name}"
-                opened = _open_file(workflow_dir.fd, name, path, maximum, dimension)
+                opened = _open_file(workflow_dir.fd, name, path, maximum, dimension, observer, "workflows")
                 workflows.append(opened)
                 opened_files.append(opened)
                 total += opened.value.byte_length
@@ -154,10 +182,12 @@ class SnapshotReader:
                 manifest_sha256=manifest,
                 workflow_count=count,
             )
-            state = _LeaseState(tuple(fds), tuple(bindings), policy, tuple(workflows), workflow_dir, names)
+            state = _LeaseState(observer, tuple(fds), tuple(bindings), policy, tuple(workflows), workflow_dir, names)
             return SnapshotLease(snapshot, state)
         except _LimitExceeded as exc:
-            return _incomplete(fds, bindings, opened_files, policy_state, exc.observed or count, exc.dimension)
+            return _incomplete(
+                observer, fds, bindings, opened_files, policy_state, exc.observed or count, exc.dimension
+            )
         except (OSError, ValueError) as exc:
             invalid_code = None if isinstance(exc, _ConcurrentMutation) else _INVALID_CODE_BY_STAGE.get(stage)
             subject = self._policy_path if stage == "policy" else ".github/workflows" if stage == "workflows" else "."
@@ -167,13 +197,18 @@ class SnapshotReader:
                 f"fixed input acquisition failed: {type(exc).__name__.lstrip('_')}",
             )
             retained = policy_state if stage == "workflows" else None
-            return _incomplete(fds, bindings, opened_files, retained, count, failure=failure)
+            return _incomplete(observer, fds, bindings, opened_files, retained, count, failure=failure)
         except BaseException:
-            _close_descriptors([*fds, *(opened.fd for opened in opened_files)])
+            try:
+                if observer is not None:
+                    observer.close()
+            finally:
+                _close_descriptors([*fds, *(opened.fd for opened in opened_files)])
             raise
 
 
 def _incomplete(
+    observer: MutationObserver | None,
     fds: list[int],
     bindings: list[_OpenPath],
     files: list[_OpenFile],
@@ -182,15 +217,21 @@ def _incomplete(
     dimension: str | None = None,
     failure: object = None,
 ) -> SnapshotLease:
-    if policy_state is None:
-        _close_descriptors([*fds, *(opened.fd for opened in files)])
+    if policy_state is None or observer is None:
+        try:
+            if observer is not None:
+                observer.close()
+        finally:
+            _close_descriptors([*fds, *(opened.fd for opened in files)])
         policy, state = None, None
     else:
         fd_count, binding_count, opened_policy = policy_state
         _close_descriptors([opened.fd for opened in files if opened is not opened_policy])
         _close_descriptors(fds[fd_count:])
         policy = opened_policy.value
-        state = _LeaseState(tuple(fds[:fd_count]), tuple(bindings[:binding_count]), opened_policy, (), None, ())
+        state = _LeaseState(
+            observer, tuple(fds[:fd_count]), tuple(bindings[:binding_count]), opened_policy, (), None, ()
+        )
     failures = (
         (failure,)
         if failure
@@ -210,29 +251,39 @@ def _incomplete(
     return SnapshotLease(snapshot, state)
 
 
-def _open_root(path: Path, descriptors: list[int], bindings: list[_OpenPath]) -> _OpenPath:
+def _open_root(path: Path, descriptors: list[int], bindings: list[_OpenPath], observer: MutationObserver) -> _OpenPath:
     components = Path(os.path.abspath(path)).parts[1:]
     if not components:
         raise ValueError("repository root must have a parent binding")
     current_fd = os.open(os.sep, _DIRECTORY_FLAGS)
     descriptors.append(current_fd)
     for component in components:
-        current = _open_child_directory(current_fd, component, descriptors, False)
+        current = _open_child_directory(current_fd, component, descriptors, False, observer, "policy")
         bindings.append(current)
         current_fd = current.fd
     return current
 
 
-def _open_child_directory(parent_fd: int, name: str, descriptors: list[int], track_changes: bool) -> _OpenPath:
+def _open_child_directory(
+    parent_fd: int, name: str, descriptors: list[int], track_changes: bool, observer: MutationObserver, scope: str
+) -> _OpenPath:
     descriptor = os.open(name, _DIRECTORY_FLAGS, dir_fd=parent_fd)
     descriptors.append(descriptor)
+    observer.watch(descriptor, scope=scope, contents=track_changes)
     return _OpenPath(descriptor, parent_fd, name, os.fstat(descriptor), track_changes)
 
 
-def _open_components(root: _OpenPath, names: tuple[str, ...], fds: list[int], bindings: list[_OpenPath]) -> _OpenPath:
+def _open_components(
+    root: _OpenPath,
+    names: tuple[str, ...],
+    fds: list[int],
+    bindings: list[_OpenPath],
+    observer: MutationObserver,
+    scope: str,
+) -> _OpenPath:
     current = root
     for name in names:
-        current = _open_child_directory(current.fd, name, fds, True)
+        current = _open_child_directory(current.fd, name, fds, True, observer, scope)
         bindings.append(current)
     return current
 
@@ -260,9 +311,12 @@ def _workflow_names(directory_fd: int, maximum: int) -> tuple[str, ...]:
     return tuple(sorted(workflow_names, key=lambda item: item.encode("utf-8")))
 
 
-def _open_file(directory_fd: int, name: str, path: str, max_bytes: int, dimension: str) -> _OpenFile:
+def _open_file(
+    directory_fd: int, name: str, path: str, max_bytes: int, dimension: str, observer: MutationObserver, scope: str
+) -> _OpenFile:
     descriptor = os.open(name, _FILE_FLAGS, dir_fd=directory_fd)
     try:
+        observer.watch(descriptor, scope=scope, contents=True)
         metadata = os.fstat(descriptor)
         if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
             raise ValueError(f"not a confined regular file: {path}")
