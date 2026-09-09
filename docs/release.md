@@ -102,9 +102,7 @@ Each of the four PyPI projects must trust this exact tuple:
 | Workflow filename | `pypi-release.yml` |
 | Environment | `pypi` |
 
-Inspect the authenticated PyPI publishing settings and retain dated,
-credential-free evidence for every project. Missing access or an unobserved
-row is `UNVERIFIED`, not `PASS`. Do not restore `dpone/release.yml` or the
+Do not restore `dpone/release.yml` or the
 historical `release-controller.yml` as a second publisher. No API-token
 fallback or `skip-existing` recovery is authorized.
 

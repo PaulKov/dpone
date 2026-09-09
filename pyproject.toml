@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "dpone"
-version = "0.74.33"
+version = "0.74.34"
 description = "Declarative ETL framework for YAML-driven data pipelines"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
@@ -50,7 +50,7 @@ dependencies = [
   "urllib3>=2.7.0",
   "ijson>=3.3.0",
   "jsonschema>=4.23,<5",
-  "dpone-airflow-pack==0.74.33",
+  "dpone-airflow-pack==0.74.34",
 ]
 
 [project.scripts]
@@ -79,7 +79,7 @@ object_storage = [
   "azure-storage-blob>=12.19,<13",
   "google-cloud-storage==3.12.1",
 ]
-accel = ["dpone-native-accel==0.74.33"]
+accel = ["dpone-native-accel==0.74.34"]
 columnar = ["pyarrow>=23.0.1,<26"]
 pandas = ["pandas==2.1.4", "numpy==1.26.4"]
 vault = ["vault-kv-client>=0.1.0,<0.2.0"]
