@@ -168,7 +168,7 @@ def root_type(clickhouse_type: str) -> str:
 
 
 def scale(clickhouse_type: str) -> int:
-    match = re.search(r"\((\d+)", clickhouse_type)
+    match = re.search(r"\(\s*(\d+)", clickhouse_type)
     return min(max(int(match.group(1)), 0), 9) if match else 0
 
 
@@ -222,14 +222,15 @@ def _is_time_source(source_type: str) -> bool:
 
 
 def _datetimeoffset_text(value: datetime, source_type: str) -> str:
-    if value.tzinfo is None or value.utcoffset() is None:
+    offset = value.utcoffset()
+    if value.tzinfo is None or offset is None:
         raise ValueError("MSSQL datetimeoffset text encoding requires an offset-aware value.")
     match = re.search(r"\((\d+)\)", str(source_type))
     source_scale = min(max(int(match.group(1)), 0), 7) if match else 7
     ticks = value.microsecond * 10
     ticks += int(getattr(value, "submicrosecond_100ns", 0))
     fractional = f".{ticks:07d}"[: source_scale + 1] if source_scale else ""
-    offset_minutes = int(value.utcoffset().total_seconds() // 60)
+    offset_minutes = int(offset.total_seconds() // 60)
     sign = "+" if offset_minutes >= 0 else "-"
     offset_hours, offset_remainder = divmod(abs(offset_minutes), 60)
     return f"{value:%Y-%m-%d %H:%M:%S}{fractional} {sign}{offset_hours:02d}:{offset_remainder:02d}"
@@ -263,23 +264,31 @@ def _pack_integer(value: Any, root: str) -> bytes:
 def _encode_decimal(value: Any, clickhouse_type: str) -> bytes:
     precision, decimal_scale = _decimal_precision_scale(clickhouse_type)
     width = 4 if precision <= 9 else 8 if precision <= 18 else 16 if precision <= 38 else 32
-    decimal_value = Decimal(str(value))
+    decimal_value = value if isinstance(value, Decimal) else Decimal(str(value))
+    if not 1 <= precision <= 76 or not 0 <= decimal_scale <= precision:
+        raise ValueError("ClickHouse Decimal precision/scale is invalid")
+    if not decimal_value.is_finite():
+        raise ValueError("ClickHouse Decimal requires a finite value")
+    if decimal_value and decimal_value.adjusted() >= precision - decimal_scale:
+        raise ValueError("clickhouse_binary_decimal_out_of_range: ClickHouse Decimal precision overflow")
     with localcontext() as context:
-        context.prec = max(precision + decimal_scale + 4, len(decimal_value.as_tuple().digits) + decimal_scale + 4)
-        scaled_value = decimal_value.scaleb(decimal_scale)
-        scaled = int(scaled_value.to_integral_value())
-        if scaled_value != scaled:
-            raise ValueError("clickhouse_binary_decimal_precision_loss")
-        if abs(scaled) >= 10**precision:
-            raise ValueError("clickhouse_binary_decimal_out_of_range")
-    return int(scaled).to_bytes(width, byteorder="little", signed=True)
+        context.prec = precision + 2
+        quantum = Decimal(1).scaleb(-decimal_scale)
+        exact = decimal_value.quantize(quantum)
+        if exact != decimal_value:
+            raise ValueError("clickhouse_binary_decimal_precision_loss: ClickHouse Decimal scale would lose precision")
+        scaled = int(exact.scaleb(decimal_scale))
+    return scaled.to_bytes(width, byteorder="little", signed=True)
 
 
 def _decimal_precision_scale(clickhouse_type: str) -> tuple[int, int]:
-    match = re.search(r"\((\d+)\s*,\s*(\d+)\)", clickhouse_type)
-    if not match:
-        return 38, 9
-    return int(match.group(1)), int(match.group(2))
+    generic = re.fullmatch(r"Decimal\(\s*(\d+)\s*,\s*(\d+)\s*\)", clickhouse_type.strip(), re.IGNORECASE)
+    if generic:
+        return int(generic[1]), int(generic[2])
+    alias = re.fullmatch(r"Decimal(32|64|128|256)\(\s*(\d+)\s*\)", clickhouse_type.strip(), re.IGNORECASE)
+    if alias:
+        return {32: 9, 64: 18, 128: 38, 256: 76}[int(alias[1])], int(alias[2])
+    raise ValueError("ClickHouse Decimal declaration requires precision/scale or a supported width alias")
 
 
 def _encode_fixed_string(value: Any, clickhouse_type: str) -> bytes:
@@ -351,3 +360,44 @@ def _bool(value: Any) -> bool:
     if isinstance(value, int | float):
         return bool(value)
     return str(value).strip().lower() in {"1", "true", "t", "yes", "y", "on"}
+
+
+def validate_clickhouse_value_fidelity(value: Any, clickhouse_type: str) -> None:
+    """Reject lossy scalar coercions in opt-in bounded typed streams.
+
+    Legacy unbounded encoders retain their historical integer and timestamp
+    truncation behavior. Decimal declarations and precision use the canonical
+    encoder parser for both paths. The shared temporal encoder also enforces ClickHouse calendar ranges before
+    transmission.
+    """
+    if value is None:
+        return
+    _, inner = unwrap_nullable(clickhouse_type)
+    root = root_type(inner)
+    if root in {"int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64"}:
+        converted = _integer_value(value)
+        if isinstance(value, dt_time) and (value.microsecond or getattr(value, "submicrosecond_100ns", 0)):
+            raise ValueError("ClickHouse integer conversion would lose temporal precision")
+        if isinstance(converted, float | Decimal) and converted != int(converted):
+            raise ValueError("ClickHouse integer conversion would lose precision")
+    if root in {"date", "date32", "datetime", "datetime64"}:
+        dt = _datetime(value)
+        precision = 0
+        if root == "datetime64":
+            match = re.fullmatch(r"DateTime64\(\s*([0-9])(?:\s*,\s*'[^']+')?\s*\)", inner, re.IGNORECASE)
+            if match is None:
+                raise ValueError("ClickHouse DateTime64 precision must be between zero and nine")
+            precision = scale(inner)
+        extra = getattr(value, "submicrosecond_100ns", 0)
+        if isinstance(extra, bool) or not isinstance(extra, int) or not 0 <= extra <= 9:
+            raise ValueError("ClickHouse timestamp submicrosecond precision is invalid")
+        if precision < 6 and dt.microsecond % (10 ** (6 - precision)):
+            raise ValueError("ClickHouse timestamp conversion would lose precision")
+        if precision < 7 and extra:
+            raise ValueError("ClickHouse timestamp conversion would lose precision")
+        if isinstance(value, str):
+            fractional = re.search(r"[T ]\d{2}:\d{2}:\d{2}\.(\d+)", value)
+            if fractional and any(char != "0" for char in fractional[1][min(precision, 6) :]):
+                raise ValueError("ClickHouse timestamp text conversion would lose precision")
+        if root in {"date", "date32"} and (dt.hour or dt.minute or dt.second):
+            raise ValueError("ClickHouse date conversion would lose temporal precision")

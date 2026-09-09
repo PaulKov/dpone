@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 from collections.abc import Callable, Mapping
-from datetime import UTC, datetime  # type: ignore[attr-defined]
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 

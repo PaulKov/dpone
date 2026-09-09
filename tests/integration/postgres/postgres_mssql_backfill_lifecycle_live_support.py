@@ -338,7 +338,7 @@ def open_reviewed_native_crash_process_lane(worker_id: int, payload: Any, operat
                 _wait_for_marker(marker)
                 if payload.crash_mode == _PARENT_SIGKILL:
                     _wait_for_parent_sigkill(payload.events_path, worker_id, chunk_index)
-                raise RuntimeError("reviewed peer stopped after native crash marker")
+                _wait_for_native_exit_shutdown(payload.events_path, worker_id, chunk_index)
             result = production_run(load_config)
             metrics = result.get("reconciliation_metrics") if isinstance(result, Mapping) else None
             _append_native_event(
@@ -353,6 +353,7 @@ def open_reviewed_native_crash_process_lane(worker_id: int, payload: Any, operat
                 if payload.crash_mode == _PARENT_SIGKILL:
                     _append_native_event(payload.events_path, "parent_sigkill_ready", worker_id, chunk_index)
                     _wait_for_parent_sigkill(payload.events_path, worker_id, chunk_index)
+                _disable_deliberate_crash_core_dump()
                 _append_native_event(payload.events_path, "sigsegv_after_receipt", worker_id, chunk_index)
                 os.kill(os.getpid(), signal.SIGSEGV)
             return result
@@ -419,6 +420,33 @@ def _wait_for_parent_sigkill(events_path: str, worker_id: int, chunk_index: int)
         time.sleep(0.05)
     _append_native_event(events_path, "parent_sigkill_timeout", worker_id, chunk_index)
     raise RuntimeError("reviewed parent SIGKILL was not delivered within the bounded deadline")
+
+
+def _wait_for_native_exit_shutdown(events_path: str, worker_id: int, chunk_index: int) -> None:
+    """Leave abort ownership with the supervisor until it observes native exit.
+
+    The receipt marker precedes SIGSEGV delivery and OS process termination.
+    Raising on that marker races the supervisor's peer-drain deadline against
+    the deliberately crashing child. Peers remain before source I/O instead.
+    The existing fixture watchdog still detects a supervisor that never stops.
+    """
+    deadline = time.monotonic() + _PARENT_KILL_DEADLINE_SECONDS
+    while time.monotonic() < deadline:
+        time.sleep(0.05)
+    _append_native_event(events_path, "native_exit_shutdown_timeout", worker_id, chunk_index)
+    raise RuntimeError("reviewed native-exit supervisor did not stop peer within the bounded deadline")
+
+
+def _disable_deliberate_crash_core_dump() -> None:
+    """Disable binary dumps only in the child about to inject SIGSEGV.
+
+    Faulthandler output remains enabled. Preserve the inherited hard limit;
+    kernel crash-dump collection must not control this fixture's exit timing.
+    """
+    import resource
+
+    _, hard_limit = resource.getrlimit(resource.RLIMIT_CORE)
+    resource.setrlimit(resource.RLIMIT_CORE, (0, hard_limit))
 
 
 def _create_crash_marker(path: Path) -> bool:

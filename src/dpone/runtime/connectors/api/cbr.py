@@ -5,12 +5,11 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Iterator
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import requests
 
-from dpone._compat import UTC
 from dpone.runtime.support.cbr_xml_parser import parse_xml_daily, resolve_date_option
 
 

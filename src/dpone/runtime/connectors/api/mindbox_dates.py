@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
-
-from dpone._compat import UTC
 
 
 def build_mindbox_date_body(
