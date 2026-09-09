@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- Reject torn confined-file reads even when a same-size write leaves identical
+  filesystem timestamps, using bounded content verification on the held descriptor.
 - Deliver complete multi-project dbt wire-v2 compile trees through compact
   materialization without losing producer, source or selection authority.
   Preserve ordered workload payload references through deployment projection and

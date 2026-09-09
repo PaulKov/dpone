@@ -178,6 +178,13 @@ schemas, producer and selection metadata. It recomputes changed pack/DAG descrip
 and the release ID, regenerates the checksum subject, then verifies the complete
 private tree again before immutable publication. No validation callback is optional.
 
+Confined source reads compare bounded content passes through the same held file
+descriptor as well as its identity and timestamps. This rejects torn reads when
+filesystem timestamp resolution hides a same-size write, with bounded memory and
+approximately twice the read I/O. A mismatch reports `source_changed`; retry from
+a quiescent source tree. This is a content-consistency check, not a guarantee that
+no transient or subsequent mutation occurred.
+
 The compact marker is a closed optional property of release-set v2; malformed
 explicit markers are rejected. Legacy release-set v1 marker behavior is unchanged.
 The rewritten release needs its own deployment and applicable attestation; input

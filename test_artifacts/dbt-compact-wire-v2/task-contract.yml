@@ -18,6 +18,8 @@ public_contract_impact:
   - runtime identity
   migration_required: true
 owned_paths:
+- src/dpone/manifest/confined_files.py
+- tests/test_confined_file_safety.py
 - src/dpone/contracts/dbt_compact_release.py
 - src/dpone/contracts/dbt_release.py
 - src/dpone/manifest/dbt_compact_release.py
@@ -91,6 +93,7 @@ forbidden_paths:
 - .github/workflows
 - CHANGELOG.md
 - mkdocs.yml
+- docs/quality-metrics.md
 shared_file_owner: integrator
 dependencies: []
 required_checks:
