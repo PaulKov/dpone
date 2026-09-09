@@ -9,6 +9,8 @@ import pytest
 import yaml
 from jsonschema import Draft202012Validator
 
+from tests.agent_policy._ci_shadow_history_fixtures import initialize_repository
+
 ROOT = Path(__file__).resolve().parents[1]
 TASK = ROOT / "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-spec.yml"
 AMENDMENT_TASK = ROOT / "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-public-output-amendment.yml"
@@ -255,7 +257,7 @@ def _minimal_task() -> dict[str, Any]:
     }
 
 
-def test_pr3b_task_contract_uses_the_immutable_base_to_head_diff() -> None:
+def test_pr3b_task_contract_uses_the_immutable_base_to_head_diff(tmp_path: Path) -> None:
     task = yaml.safe_load(TASK.read_text(encoding="utf-8"))
     assert isinstance(task, dict)
 
@@ -302,18 +304,36 @@ def test_pr3b_task_contract_uses_the_immutable_base_to_head_diff() -> None:
     schema = json.loads(TASK_SCHEMA.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
     Draft202012Validator(schema).validate(task)
-    _git(ROOT, "merge-base", "--is-ancestor", DESIGN_INTEGRATION, "HEAD")
-    _assert_task_scope(task, _committed_changed_paths(ROOT, DESIGN_BASE, DESIGN_INTEGRATION))
+    # Retained task metadata is not proof that historical objects exist in a fresh clone.
+    # Exercise its declared scope against actual synthetic commits instead.
+    root = tmp_path / "design-scope"
+    base = initialize_repository(root)
+    declared = set(task["owned_paths"]) | set(task["integrator_owned_paths"])
+    integration = _commit(root, "synthetic declared design", {path: "fixture\n" for path in declared})
+    _commit(root, "synthetic future work", {"future.txt": "outside the frozen scope\n"})
+    _git(root, "merge-base", "--is-ancestor", integration, "HEAD")
+    _assert_task_scope(task, _committed_changed_paths(root, base, integration))
+    with pytest.raises(AssertionError):
+        _assert_task_scope(task, _committed_changed_paths(root, base))
 
 
-def test_public_output_amendment_scope_is_exact_from_base_to_head() -> None:
+def test_public_output_amendment_scope_is_exact_from_base_to_head(tmp_path: Path) -> None:
     task = yaml.safe_load(AMENDMENT_TASK.read_text(encoding="utf-8"))
     assert isinstance(task, dict)
     assert task["base_commit"] == DESIGN_INTEGRATION
 
+    root = tmp_path / "declared-amendment"
+    base = initialize_repository(root)
+    fixture_task = {**task, "base_commit": base}
+    declared = set(task["owned_paths"]) | set(task["integrator_owned_paths"])
+    files = {path: "synthetic amendment scope\n" for path in declared}
+    files[AMENDMENT_SPEC_PATH] = (ROOT / AMENDMENT_SPEC_PATH).read_text(encoding="utf-8")
+    files[AMENDMENT_TASK_PATH] = yaml.safe_dump(fixture_task)
+    _commit(root, "synthetic approved amendment introduction", files)
+    _commit(root, "synthetic unrelated successor", {"future.txt": "unrelated\n"})
     _assert_amendment_scope_lifecycle(
-        ROOT,
-        task,
+        root,
+        fixture_task,
         head="HEAD",
         task_path=AMENDMENT_TASK_PATH,
         spec_path=AMENDMENT_SPEC_PATH,

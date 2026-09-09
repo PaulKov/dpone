@@ -1,7 +1,7 @@
 {
   "policy_path": ".agents/policy/github-branch-protection.yml",
-  "policy_projection_sha256": "64edf0774f3400ef37ee2a452efef46e9eeaf149ae337e35fe78bb17e3eb8376",
-  "policy_sha256": "df93dbe54e31549c6106bfa5911767fff39968e8037393c3b62ca130fbb0d039",
+  "policy_projection_sha256": "3cf417d072b7f41dbc7c915e84cd18bf0fc4e3cdaeb4bb6653a9c30c323c129a",
+  "policy_sha256": "53a6fc0a6e1bc1a944d166128eb233e5b58dc50ebb0951b39ff15be29fa3bc66",
   "privileged_baseline": {
     "bypass_actors": [
       {
@@ -10,8 +10,8 @@
         "bypass_mode": "always"
       }
     ],
-    "updated_at": "2026-08-24T06:50:40.161000Z",
-    "version_id": 47422853
+    "updated_at": "2026-09-09T06:52:26.800000Z",
+    "version_id": 49106165
   },
   "required_check_producers": [
     {
@@ -99,7 +99,7 @@
       "integration_id": 15368
     }
   ],
-  "ruleset_id": 18806829,
+  "ruleset_id": 22617738,
   "ruleset_projection": {
     "conditions": {
       "exclude": [],
@@ -108,7 +108,7 @@
       ]
     },
     "enforcement": "active",
-    "id": 18806829,
+    "id": 22617738,
     "name": "protect-master",
     "required_status_checks": {
       "checks": [
@@ -319,7 +319,7 @@
       }
     ],
     "target": "branch",
-    "updated_at": "2026-08-24T06:50:40.161000Z"
+    "updated_at": "2026-09-09T06:52:26.800000Z"
   },
   "schema": "dpone.release_authority_baseline.v1"
 }

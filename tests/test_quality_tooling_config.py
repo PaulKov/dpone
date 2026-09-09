@@ -52,7 +52,8 @@ def test_ci_binds_module_size_ratchet_to_exact_execution_identity() -> None:
     assert "--baseline docs/module_size_baseline.json" in command
     assert "--base-ref" in command
     assert 'git merge-base "$HEAD_SHA" "origin/$DEFAULT_BRANCH"' in command
-    assert 'git rev-parse "${HEAD_SHA}^"' in command
+    assert 'git rev-parse --verify "${HEAD_SHA}^"' in command
+    assert "ROOT_COMPARISON_UNAVAILABLE" in command
     assert "--head-ref" in command
     assert "github.event.pull_request.base.sha || github.event.before" in module_step["env"]["EVENT_BASE_SHA"]
     assert module_step["env"]["HEAD_SHA"] == exact_head

@@ -384,7 +384,9 @@ def test_mssql_work_table_provider_uses_explicit_work_database_without_moving_so
     create = next(query for query in connector.executed if query.startswith("SELECT [id] INTO"))
     assert create.startswith("SELECT [id] INTO [Example_System].[dbo].[__dpone_snapshot_cross_database]")
     assert f"FROM ({source_query}) AS dpone_src" in create
-    assert snapshot.rewrite_query(["id"]) == ("SELECT [id] FROM [Example_System].[dbo].[__dpone_snapshot_cross_database]")
+    assert snapshot.rewrite_query(["id"]) == (
+        "SELECT [id] FROM [Example_System].[dbo].[__dpone_snapshot_cross_database]"
+    )
     assert snapshot.evidence["work_database"] == "Example_System"
     assert snapshot.evidence["work_schema"] == "dbo"
     assert "DROP TABLE IF EXISTS [Example_System].[dbo].[__dpone_snapshot_old]" in connector.executed

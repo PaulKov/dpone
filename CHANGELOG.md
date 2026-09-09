@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- Restore CI checks after the clean source-history replacement: narrowly
+  reanchor the audited module-size cohort without increasing debt allowances,
+  exercise historical Git invariants in isolated fixtures, and refresh the
+  source repository protection identity. A root-only comparison fails explicitly;
+  enabling CI does not certify a release or restore archived hosted evidence.
+
 ## 0.74.33 - 2026-09-02
 
 ### Added
