@@ -5,6 +5,9 @@ Baseline: `f8c6a4a5e75d167829c05f65d5d3033acb193878`.
 Specification: [native compact delivery](../../docs/feature-design-dbt-compact-wire-v2.md).
 This is an implementation observation, not a route certificate or release receipt.
 
+The subsequent [governance recovery checkpoint](governance-recovery.md) records
+remediation of the blockers below. Original run results remain unchanged.
+
 ## Result
 
 The native path is implemented through workspace compile, compact materialization,

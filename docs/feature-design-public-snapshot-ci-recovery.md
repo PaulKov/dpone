@@ -1,6 +1,6 @@
 # Feature design: Public snapshot CI recovery
 
-- Status: APPROVED
+- Status: IMPLEMENTED
 - Owner: PaulKov
 - Target release: no publication requested
 - Last verified: 2026-09-09
@@ -116,3 +116,7 @@ metadata and path validation. It rejects queue overflow, watch loss and observer
 failures. Observation ends at final polling; it does not claim detection of all
 remote-filesystem or mmap activity, or mutation after returning. Unsupported
 platform observation cannot create a verified complete snapshot.
+
+## Implementation evidence
+
+The approved recovery is implemented; see the [validation checkpoint](../test_artifacts/dbt-compact-wire-v2/governance-recovery.md). `IMPLEMENTED` describes code and scoped verification, not merge readiness or retrospective historical certification. Required GitHub checks and the final owner receipt remain separate acceptance conditions.
