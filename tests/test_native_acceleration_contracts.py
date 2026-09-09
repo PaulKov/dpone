@@ -124,7 +124,7 @@ def test_required_native_acceleration_fails_before_stream_creation(tmp_path: Pat
     with pytest.raises(ValueError, match="native_acceleration_required_unavailable"):
         NativeWireTranscoder(registry=NativeAccelerationRegistry(module_loader=lambda: None)).to_clickhouse_binary(
             artifact,
-            [("id", "int")],
+            [("id", "int nullable")],
         )
 
 
@@ -145,7 +145,7 @@ def test_auto_native_acceleration_falls_back_to_python_reference(tmp_path: Path)
 
     stream = NativeWireTranscoder(registry=NativeAccelerationRegistry(module_loader=lambda: None)).to_clickhouse_binary(
         artifact,
-        [("id", "int")],
+        [("id", "int nullable")],
         clickhouse_schema=[("id", "Int32")],
     )
 
@@ -167,6 +167,7 @@ def test_auto_native_acceleration_falls_back_from_legacy_provider_without_batch_
                     "target_format": "Native",
                     "certified": True,
                     "supported_types": ["int"],
+                    "native_wire_revision": 2,
                 }
             ],
         },
@@ -190,7 +191,7 @@ def test_auto_native_acceleration_falls_back_from_legacy_provider_without_batch_
         registry=NativeAccelerationRegistry(module_loader=lambda: legacy_module)
     ).to_clickhouse_binary(
         artifact,
-        [("id", "int")],
+        [("id", "int nullable")],
         clickhouse_schema=[("id", "Int32")],
     )
 
@@ -227,7 +228,7 @@ def test_auto_native_acceleration_fallback_is_published_to_decision_audit(tmp_pa
             registry=NativeAccelerationRegistry(module_loader=lambda: None)
         ).to_clickhouse_binary(
             artifact,
-            [("id", "int")],
+            [("id", "int nullable")],
             clickhouse_schema=[("id", "Int32")],
         )
 
@@ -258,6 +259,7 @@ def test_auto_native_acceleration_uses_certified_backend_when_available(monkeypa
                     "certified": True,
                     "supported_platforms": ["test"],
                     "supported_types": ["int"],
+                    "native_wire_revision": 2,
                 }
             ],
         },
@@ -289,7 +291,7 @@ def test_auto_native_acceleration_uses_certified_backend_when_available(monkeypa
         registry=NativeAccelerationRegistry(module_loader=lambda: fake_module)
     ).to_clickhouse_binary(
         artifact,
-        [("id", "int")],
+        [("id", "int nullable")],
         clickhouse_schema=[("id", "Int32")],
     )
 
@@ -319,6 +321,7 @@ def test_native_acceleration_rejects_legacy_or_malformed_provider_batches(monkey
                     "certified": True,
                     "supported_platforms": ["test"],
                     "supported_types": ["int"],
+                    "native_wire_revision": 2,
                 }
             ],
         },
@@ -342,7 +345,7 @@ def test_native_acceleration_rejects_legacy_or_malformed_provider_batches(monkey
         registry=NativeAccelerationRegistry(module_loader=lambda: fake_module)
     ).to_clickhouse_binary(
         artifact,
-        [("id", "int")],
+        [("id", "int nullable")],
         clickhouse_schema=[("id", "Int32")],
     )
 
@@ -384,8 +387,8 @@ def test_public_schema_exposes_native_acceleration_policy() -> None:
 def test_project_metadata_exposes_acceleration_extra() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.74.34"
-    assert pyproject["project"]["optional-dependencies"]["accel"] == ["dpone-native-accel==0.74.34"]
+    assert pyproject["project"]["version"] == "0.74.35"
+    assert pyproject["project"]["optional-dependencies"]["accel"] == ["dpone-native-accel==0.74.35"]
 
 
 def test_native_accel_provider_version_matches_distribution_metadata() -> None:
@@ -424,3 +427,51 @@ def _native_artifact(tmp_path: Path, *, source_options: dict) -> SimpleNamespace
         bulk_wire_contract=bulk_wire_contract,
         native_wire_contract=native_contract,
     )
+
+
+@pytest.mark.parametrize("revision", [None, 1, "2", True, 3])
+@pytest.mark.parametrize("mode", ["auto", "required"])
+def test_old_native_provider_cannot_bypass_corrected_profile(tmp_path, revision, mode):
+    backend = {
+        "backend_id": "legacy",
+        "source_format": "mssql-bcp-native",
+        "target_format": "Native",
+        "certified": True,
+        "supported_types": ["int"],
+    }
+    if revision is not None:
+        backend["native_wire_revision"] = revision
+
+    def forbidden(request):
+        pytest.fail("Incompatible provider was invoked")
+
+    module = SimpleNamespace(capabilities=lambda: {"backends": [backend]}, transcode_batches=forbidden)
+    registry = NativeAccelerationRegistry(module_loader=lambda: module)
+    decision = registry.decide(
+        policy=NativeAccelerationPolicy(mode=mode),
+        source_format="mssql-bcp-native",
+        target_format="Native",
+        source_types=["int nullable"],
+    )
+    assert decision.fallback_reason == "native_acceleration_profile_revision_unsupported"
+    artifact = _native_artifact(
+        tmp_path,
+        source_options={
+            "native_transfer": {
+                "wire": {
+                    "mode": "typed_binary",
+                    "source_native_format": "bcp_native",
+                    "binary_format": "native",
+                    "acceleration": {"mode": mode},
+                }
+            }
+        },
+    )
+    if mode == "required":
+        artifact.file_path.unlink()
+        with pytest.raises(ValueError, match="native_acceleration_required_unavailable"):
+            NativeWireTranscoder(registry=registry).to_clickhouse_binary(artifact, [("id", "int nullable")])
+    else:
+        stream = NativeWireTranscoder(registry=registry).to_clickhouse_binary(artifact, [("id", "int nullable")])
+        assert b"".join(stream.iter_bytes())
+        assert stream.native_acceleration_evidence.selected_backend == "python_reference"

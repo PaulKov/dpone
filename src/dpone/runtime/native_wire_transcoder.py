@@ -20,7 +20,8 @@ from dpone.runtime.native_acceleration import (
     NativeAccelerationRegistry,
 )
 from dpone.runtime.native_wire_models import NativeWireEvidence
-from dpone.runtime.native_wire_mssql import MssqlBcpNativeDecoder
+from dpone.runtime.native_wire_mssql import MssqlBcpNativeDecoder, validate_mssql_native_contract
+from dpone.runtime.native_wire_mssql_framing import validate_source_schema, validate_target_schema
 from dpone.runtime.native_wire_transcode_support import (
     attach_stream_contracts,
     build_acceleration_policy,
@@ -44,6 +45,9 @@ class NativeWireTranscoder:
         type_policy: Any | None = None,
     ) -> ByteStreamArtifact:
         contract = artifact.native_wire_contract
+        validate_mssql_native_contract(contract)
+        validate_source_schema(contract.columns, schema)
+        validate_target_schema(contract.columns, clickhouse_schema)
         if contract.target_format == "Native":
             return self.to_clickhouse_native(
                 artifact,
@@ -67,6 +71,9 @@ class NativeWireTranscoder:
         type_policy: Any | None = None,
     ) -> ByteStreamArtifact:
         contract = artifact.native_wire_contract
+        validate_mssql_native_contract(contract)
+        validate_source_schema(contract.columns, schema)
+        validate_target_schema(contract.columns, clickhouse_schema)
         if contract.source_format != "mssql-bcp-native":
             raise ValueError(f"native_wire_unsupported_source_format:{contract.source_format}")
         if contract.target_format != "RowBinary":
@@ -160,6 +167,9 @@ class NativeWireTranscoder:
         type_policy: Any | None = None,
     ) -> ByteStreamArtifact:
         contract = artifact.native_wire_contract
+        validate_mssql_native_contract(contract)
+        validate_source_schema(contract.columns, schema)
+        validate_target_schema(contract.columns, clickhouse_schema)
         if contract.source_format != "mssql-bcp-native":
             raise ValueError(f"native_wire_unsupported_source_format:{contract.source_format}")
         if contract.target_format != "Native":
@@ -287,6 +297,9 @@ class NativeWireTranscoder:
         decision: Any,
     ) -> ByteStreamArtifact:
         contract = artifact.native_wire_contract
+        validate_mssql_native_contract(contract)
+        validate_source_schema(contract.columns, schema)
+        validate_target_schema(contract.columns, clickhouse_schema)
         evidence = NativeWireEvidence(
             source_format=contract.source_format,
             target_format=contract.target_format,

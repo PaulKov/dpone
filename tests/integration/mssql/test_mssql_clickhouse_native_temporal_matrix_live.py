@@ -355,3 +355,102 @@ def _expected_rows() -> list[dict[str, object]]:
             "datetime64_is_null": 1,
         },
     ]
+
+
+def test_native_bcp_nonnullable_uuid_decimal_alignment_live(
+    tmp_path: Path, clickhouse_connector, clickhouse_settings
+) -> None:
+    """Real exporter proof; offline golden bytes never substitute for this gate."""
+    from decimal import Decimal
+
+    mssql = open_mssql_connector()
+    namespace = os.getenv("DPONE_IT_MSSQL_TEST_SCHEMA", "dbo")
+    source_name = f"bcp_alignment_{uuid.uuid4().hex}"
+    quoted_namespace = "[" + namespace.replace("]", "]]") + "]"
+    source = f"{quoted_namespace}.[{source_name}]"
+    target_name = f"bcp_alignment_{uuid.uuid4().hex}"
+    target = f"`{clickhouse_settings.database}`.`{target_name}`"
+    schema = [
+        ("event_id", "int"),
+        ("value_uuid", "uniqueidentifier"),
+        ("value_decimal", "decimal(38,9)"),
+        ("value_numeric", "numeric(10,2)"),
+        ("optional_uuid", "uniqueidentifier nullable"),
+        ("sentinel", "int"),
+    ]
+    ch_schema = [
+        ("event_id", "Int32"),
+        ("value_uuid", "UUID"),
+        ("value_decimal", "Decimal(38,9)"),
+        ("value_numeric", "Decimal(10,2)"),
+        ("optional_uuid", "Nullable(UUID)"),
+        ("sentinel", "Int32"),
+    ]
+    value_uuid = "00112233-4455-6677-8899-aabbccddeeff"
+    decimal_text = "12345678901234567890123456789.123456789"
+    try:
+        mssql.execute_query(
+            f"CREATE TABLE {source} ([event_id] int NOT NULL, [value_uuid] uniqueidentifier NOT NULL, "
+            "[value_decimal] decimal(38,9) NOT NULL, [value_numeric] numeric(10,2) NOT NULL, "
+            "[optional_uuid] uniqueidentifier NULL, [sentinel] int NOT NULL)"
+        )
+        for index, sign in enumerate(("", "-"), 1):
+            mssql.execute_query(
+                f"INSERT INTO {source} VALUES ({index}, '{value_uuid}', "
+                f"CAST('{sign}{decimal_text}' AS decimal(38,9)), "
+                f"CAST('{sign}123.45' AS numeric(10,2)), NULL, 16909060)"
+            )
+        path = tmp_path / "alignment.bcp"
+        assert (
+            mssql.bcp_queryout(
+                f"SELECT {', '.join('[' + name + ']' for name, _ in schema)} FROM {source} ORDER BY [event_id]",
+                str(path),
+                options=BcpOptions(bcp_path=mssql.bcp_path, file_format="native", timeout_seconds=120),
+            )
+            == 2
+        )
+        for mode in ("python", "required"):
+            clickhouse_connector.execute_query(
+                f"CREATE TABLE {target} ("
+                + ", ".join(f"`{name}` {dtype}" for name, dtype in ch_schema)
+                + ") ENGINE=MergeTree ORDER BY event_id"
+            )
+            copy = tmp_path / f"alignment-{mode}.bcp"
+            shutil.copyfile(path, copy)
+            stream = _transcode(
+                copy,
+                schema,
+                ch_schema,
+                acceleration_mode="auto" if mode == "python" else mode,
+                registry=NativeAccelerationRegistry(module_loader=lambda: None)
+                if mode == "python"
+                else NativeAccelerationRegistry(),
+            )
+            runner = ClickHouseHttpBulkRunner(
+                ClickHouseHttpCredentials(
+                    host=clickhouse_settings.host,
+                    port=int(os.getenv("DPONE_IT_CH_HTTP_PORT", "8123")),
+                    database=clickhouse_settings.database,
+                    user=clickhouse_settings.user,
+                    password=clickhouse_settings.password,
+                    secure=clickhouse_settings.secure,
+                ),
+                ClickHouseHttpOptions(input_format="Native"),
+            )
+            runner.insert_stream(target_name, [name for name, _ in ch_schema], stream.iter_bytes())
+            rows = clickhouse_connector.get_records(
+                f"SELECT event_id, toString(value_uuid), value_decimal, value_numeric, optional_uuid, sentinel "
+                f"FROM {target} ORDER BY event_id"
+            )
+            assert [tuple(row) for row in rows] == [
+                (1, value_uuid, Decimal(decimal_text), Decimal("123.45"), None, 16909060),
+                (2, value_uuid, Decimal("-" + decimal_text), Decimal("-123.45"), None, 16909060),
+            ]
+            assert stream.native_acceleration_evidence.selected_backend == (
+                "python_reference" if mode == "python" else "native_accelerated"
+            )
+            clickhouse_connector.execute_query(f"DROP TABLE {target}")
+    finally:
+        clickhouse_connector.execute_query(f"DROP TABLE IF EXISTS {target}")
+        mssql.execute_query(f"DROP TABLE IF EXISTS {source}")
+        mssql.close()

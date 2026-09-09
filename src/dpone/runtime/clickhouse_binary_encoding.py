@@ -13,6 +13,7 @@ from datetime import time as dt_time
 from decimal import Decimal, localcontext
 from typing import Any
 
+from dpone.runtime.clickhouse_temporal_encoding import encode_temporal_integer
 from dpone.runtime.support.type_mapping.mssql_clickhouse import (
     MssqlClickHouseTypeMapper,
     MssqlClickHouseTypePolicy,
@@ -96,13 +97,13 @@ def encode_clickhouse_non_null(
     if root == "uuid":
         return encode_clickhouse_uuid(value)
     if root == "date":
-        return struct.pack("<H", (_date(value) - _EPOCH_DATE).days)
+        return encode_temporal_integer((_date(value) - _EPOCH_DATE).days, root)
     if root == "date32":
-        return struct.pack("<i", (_date(value) - _EPOCH_DATE).days)
+        return encode_temporal_integer((_date(value) - _EPOCH_DATE).days, root)
     if root == "datetime":
-        return struct.pack("<I", _datetime_seconds(value))
+        return encode_temporal_integer(_datetime_seconds(value), root)
     if root == "datetime64":
-        return struct.pack("<q", _datetime64_ticks(value, scale(clickhouse_type)))
+        return encode_temporal_integer(_datetime64_ticks(value, scale(clickhouse_type)), root, scale(clickhouse_type))
     if root.startswith("decimal"):
         return _encode_decimal(value, clickhouse_type)
     raise ValueError(f"ClickHouse binary type is not supported yet: {clickhouse_type!r}.")
@@ -253,7 +254,10 @@ def _pack_integer(value: Any, root: str) -> bytes:
         "int64": "<q",
         "uint64": "<Q",
     }
-    return struct.pack(formats[root], int(value))
+    try:
+        return struct.pack(formats[root], int(value))
+    except struct.error:
+        raise ValueError("clickhouse_binary_numeric_out_of_range") from None
 
 
 def _encode_decimal(value: Any, clickhouse_type: str) -> bytes:
@@ -262,7 +266,12 @@ def _encode_decimal(value: Any, clickhouse_type: str) -> bytes:
     decimal_value = Decimal(str(value))
     with localcontext() as context:
         context.prec = max(precision + decimal_scale + 4, len(decimal_value.as_tuple().digits) + decimal_scale + 4)
-        scaled = int(decimal_value.scaleb(decimal_scale).to_integral_value())
+        scaled_value = decimal_value.scaleb(decimal_scale)
+        scaled = int(scaled_value.to_integral_value())
+        if scaled_value != scaled:
+            raise ValueError("clickhouse_binary_decimal_precision_loss")
+        if abs(scaled) >= 10**precision:
+            raise ValueError("clickhouse_binary_decimal_out_of_range")
     return int(scaled).to_bytes(width, byteorder="little", signed=True)
 
 
@@ -291,7 +300,8 @@ def _fixed_string_length(clickhouse_type: str) -> int:
 
 def _datetime64_ticks(value: Any, clickhouse_scale: int) -> int:
     dt = _datetime(value)
-    seconds = int((dt - _EPOCH_DATETIME).total_seconds())
+    delta = dt - _EPOCH_DATETIME
+    seconds = delta.days * 86400 + delta.seconds
     fractional = (
         dt.microsecond * (10 ** (clickhouse_scale - 6))
         if clickhouse_scale >= 6
@@ -303,7 +313,8 @@ def _datetime64_ticks(value: Any, clickhouse_scale: int) -> int:
 
 
 def _datetime_seconds(value: Any) -> int:
-    return int((_datetime(value) - _EPOCH_DATETIME).total_seconds())
+    delta = _datetime(value) - _EPOCH_DATETIME
+    return delta.days * 86400 + delta.seconds
 
 
 def _datetime(value: Any) -> datetime:

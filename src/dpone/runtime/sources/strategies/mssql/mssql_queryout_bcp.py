@@ -15,6 +15,7 @@ from typing import Any
 
 from dpone.runtime.bulk_options import BulkOptionsResolver
 from dpone.runtime.file_artifacts import FileExportArtifact
+from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
 from dpone.runtime.physical_chunking import PhysicalChunkPolicy
 from dpone.runtime.source_materialization_preparation import guard_source_materialization_preparation
 from dpone.runtime.sources.strategies.mssql.mssql_bcp_native_artifacts import build_mssql_bcp_native_artifact
@@ -54,6 +55,11 @@ def build_bcp_queryout_artifact(
 ) -> Any:
     """Build the BCP-backed queryout artifact for a factory instance."""
 
+    wire = resolve_bulk_wire_contract(load_config, schema, factory.sink_connector)
+    if wire is not None and wire.selected_route == "typed_binary_bcp_native":
+        native = build_mssql_bcp_native_contract(schema=schema, query=query)
+        if native.blockers:
+            raise ValueError("; ".join(native.blockers) + ":use_row_stream_or_nullable_projection")
     physical_chunk_policy = PhysicalChunkPolicy.from_source_options(load_config.options)
     streaming_policy = StreamingTransferPolicy.from_options(load_config.options)
     bounds_query = query

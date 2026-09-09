@@ -17,6 +17,7 @@ from dpone.runtime.native_wire_models import (
     SourceNativeWireContract,
     stable_hash,
 )
+from dpone.runtime.native_wire_mssql_framing import fixed_length, native_prefix_width, read_native_payload, time_length
 from dpone.runtime.support.type_mapping.mssql_clickhouse import MssqlClickHouseTypeMapper, MssqlClickHouseTypePolicy
 
 _SQL_SERVER_EPOCH = date(1900, 1, 1)
@@ -81,6 +82,7 @@ class MssqlBcpNativeDecoder:
             raise ValueError("MssqlBcpNativeDecoder requires mssql-bcp-native source format")
         if contract.blockers:
             raise ValueError("; ".join(contract.blockers))
+        validate_mssql_native_contract(contract)
         self._contract = contract
 
     def iter_rows(self, path: str | Path) -> Iterator[dict[str, Any]]:
@@ -93,8 +95,8 @@ class MssqlBcpNativeDecoder:
 
     def _read_row(self, handle: BinaryIO) -> dict[str, Any]:
         row: dict[str, Any] = {}
-        for column in self._contract.columns:
-            row[column.name] = _read_column(handle, column)
+        for ordinal, column in enumerate(self._contract.columns):
+            row[column.name] = _read_column(handle, column, ordinal)
         return row
 
 
@@ -136,9 +138,14 @@ def _layout(name: str, dtype: str, *, type_mapper: MssqlClickHouseTypeMapper) ->
     root = _root(normalized)
     nullable = _is_nullable(dtype)
     precision, scale = _precision_scale(normalized)
+    if root in {"time", "datetime2", "datetimeoffset"}:
+        time_length(7 if scale is None else scale)
+        scale = 7  # Native BCP uses a physical 100ns payload at every declared scale.
     target_type = type_mapper.resolve_column(str(name), str(dtype)).clickhouse_type
 
-    if root in {"varchar", "nvarchar", "char", "nchar", "varbinary", "binary"}:
+    if root in {"varchar", "nvarchar", "char", "nchar", "varbinary", "binary"} and not (
+        root == "char" and not nullable
+    ):
         max_type = "max" in normalized
         encoding = "utf-16le" if root in {"nvarchar", "nchar"} else "utf-8"
         return NativeWireColumnLayout(
@@ -150,7 +157,7 @@ def _layout(name: str, dtype: str, *, type_mapper: MssqlClickHouseTypeMapper) ->
             prefix_width=8 if max_type else 2,
             encoding=encoding,
         )
-    fixed = _fixed_length(root, precision, scale)
+    fixed = fixed_length(root, scale, precision)
     if fixed is not None:
         return NativeWireColumnLayout(
             name=str(name),
@@ -158,7 +165,7 @@ def _layout(name: str, dtype: str, *, type_mapper: MssqlClickHouseTypeMapper) ->
             target_type=target_type,
             nullable=nullable,
             storage_type=root,
-            prefix_width=1 if nullable else 0,
+            prefix_width=native_prefix_width(root, nullable=nullable),
             fixed_length=fixed,
             precision=precision,
             scale=scale,
@@ -172,17 +179,38 @@ def _layout(name: str, dtype: str, *, type_mapper: MssqlClickHouseTypeMapper) ->
     )
 
 
-def _read_column(handle: BinaryIO, layout: NativeWireColumnLayout) -> Any:
-    length = layout.fixed_length
-    if layout.prefix_width:
-        indicator = int.from_bytes(_read_exact(handle, layout.prefix_width), byteorder="little", signed=True)
-        if indicator == -1:
-            return None
-        length = indicator
-    if length is None:
-        raise ValueError(f"native_wire_missing_length:{layout.name}")
-    payload = _read_exact(handle, length)
-    return _decode_payload(payload, layout)
+def validate_mssql_native_contract(contract: SourceNativeWireContract) -> None:
+    """Reject stale or inconsistent physical metadata before either reader opens a file."""
+    if (
+        contract.schema_version != NATIVE_WIRE_SCHEMA_VERSION
+        or contract.source_system != "mssql"
+        or contract.source_format != "mssql-bcp-native"
+        or contract.blockers
+        or not contract.columns
+    ):
+        raise ValueError("native_wire_invalid_layout:profile_or_columns:re_export_required")
+    names = [column.name for column in contract.columns]
+    if any(not name for name in names) or len(set(names)) != len(names):
+        raise ValueError("native_wire_invalid_layout:column_identity")
+    mapper = MssqlClickHouseTypeMapper(MssqlClickHouseTypePolicy())
+    for ordinal, column in enumerate(contract.columns):
+        expected = _layout(column.name, column.source_type, type_mapper=mapper)
+        fields = ("nullable", "storage_type", "prefix_width", "fixed_length", "precision", "scale", "encoding")
+        if expected.storage_type == "unsupported" or any(
+            type(getattr(column, key)) is not type(getattr(expected, key))
+            or getattr(column, key) != getattr(expected, key)
+            for key in fields
+        ):
+            raise ValueError(f"native_wire_invalid_layout:ordinal={ordinal}:re_export_required")
+    if contract.type_layout_hash != stable_hash(tuple(column.to_dict() for column in contract.columns)):
+        raise ValueError("native_wire_invalid_layout:hash:re_export_required")
+    if contract.schema_hash != stable_hash(tuple((column.name, column.source_type) for column in contract.columns)):
+        raise ValueError("native_wire_invalid_layout:schema_hash:re_export_required")
+
+
+def _read_column(handle: BinaryIO, layout: NativeWireColumnLayout, ordinal: int = 0) -> Any:
+    payload = read_native_payload(handle, layout, ordinal)
+    return None if payload is None else _decode_payload(payload, layout)
 
 
 def _decode_payload(payload: bytes, layout: NativeWireColumnLayout) -> Any:
@@ -200,11 +228,10 @@ def _decode_payload(payload: bytes, layout: NativeWireColumnLayout) -> Any:
     if storage == "real":
         return struct.unpack("<f", payload)[0]
     if storage == "float":
-        return struct.unpack("<d", payload)[0]
+        return struct.unpack("<f" if len(payload) == 4 else "<d", payload)[0]
     if storage in {"money", "smallmoney"}:
-        scale = Decimal("10000")
         value = _decode_money(payload) if storage == "money" else struct.unpack("<i", payload)[0]
-        return Decimal(value) / scale
+        return _scaled_decimal(value, 4)
     if storage in {"decimal", "numeric"}:
         return _decode_decimal(payload, int(layout.scale or 0))
     if storage in {"varchar", "nvarchar", "char", "nchar"}:
@@ -231,14 +258,13 @@ def _decode_payload(payload: bytes, layout: NativeWireColumnLayout) -> Any:
 
 
 def _decode_decimal(payload: bytes, scale: int) -> Decimal:
-    if len(payload) == 19:
-        scale = payload[1]
-        sign = 1 if payload[2] == 1 else -1
-        magnitude = int.from_bytes(payload[3:], byteorder="little", signed=False)
-        return Decimal(sign * magnitude).scaleb(-scale)
-    sign = 1 if payload[0] == 1 else -1
-    magnitude = int.from_bytes(payload[1:], byteorder="little", signed=False)
-    return Decimal(sign * magnitude).scaleb(-scale)
+    # Tuple construction is exact even when the caller's Decimal context has precision 28.
+    magnitude = int.from_bytes(payload[3:], byteorder="little", signed=False)
+    return _scaled_decimal(magnitude * (1 if payload[2] else -1), scale)
+
+
+def _scaled_decimal(value: int, scale: int) -> Decimal:
+    return Decimal((int(value < 0), tuple(map(int, str(abs(value)))), -scale))
 
 
 def _decode_money(payload: bytes) -> int:
@@ -294,48 +320,12 @@ def _decode_datetime(payload: bytes) -> datetime:
     return datetime.combine(_SQL_SERVER_EPOCH + timedelta(days=days), time()) + timedelta(milliseconds=milliseconds)
 
 
-def _fixed_length(root: str, precision: int | None, scale: int | None) -> int | None:
-    fixed = {
-        "bit": 1,
-        "tinyint": 1,
-        "smallint": 2,
-        "int": 4,
-        "bigint": 8,
-        "real": 4,
-        "float": 8,
-        "money": 8,
-        "smallmoney": 4,
-        "date": 3,
-        "datetime": 8,
-        "smalldatetime": 4,
-        "uniqueidentifier": 16,
-    }
-    if root in fixed:
-        return fixed[root]
-    if root == "time":
-        return _time_length(_scale_or_default(scale))
-    if root == "datetime2":
-        return _time_length(_scale_or_default(scale)) + 3
-    if root == "datetimeoffset":
-        return _time_length(_scale_or_default(scale)) + 5
-    if root in {"decimal", "numeric"}:
-        return 19
-    return None
-
-
 def _time_length(scale: int) -> int:
-    return 3 if scale <= 2 else 4 if scale <= 4 else 5
+    return time_length(scale)
 
 
 def _scale_or_default(scale: int | None) -> int:
     return 7 if scale is None else scale
-
-
-def _read_exact(handle: BinaryIO, length: int) -> bytes:
-    payload = handle.read(length)
-    if len(payload) != length:
-        raise EOFError("mssql_bcp_native_unexpected_eof")
-    return payload
 
 
 def _peek_one(handle: BinaryIO) -> bytes:
@@ -362,6 +352,10 @@ def _precision_scale(dtype: str) -> tuple[int | None, int | None]:
     if match:
         return int(match.group(1)), int(match.group(2))
     scale_match = re.search(r"\((\d+)\)", dtype)
+    if _root(dtype) in {"decimal", "numeric"}:
+        return (int(scale_match.group(1)) if scale_match else 18), 0
+    if _root(dtype) == "float" and scale_match:
+        return int(scale_match.group(1)), None
     if _root(dtype) in {"time", "datetime2", "datetimeoffset"} and scale_match:
         return None, int(scale_match.group(1))
     return None, None

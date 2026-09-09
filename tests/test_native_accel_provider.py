@@ -28,6 +28,7 @@ def test_native_accel_provider_declares_certified_mssql_clickhouse_native_backen
     assert backends
     assert backends[0]["backend_id"] == "mssql_bcp_native_to_clickhouse_native"
     assert backends[0]["certified"] is True
+    assert backends[0]["native_wire_revision"] == 2
     assert "int" in backends[0]["supported_types"]
     assert "time" in backends[0]["supported_types"]
     assert "datetimeoffset" in backends[0]["supported_types"]
@@ -221,19 +222,16 @@ def test_native_and_reference_encoders_fail_closed_for_low_cardinality(
     reference_artifact = _text_artifact(tmp_path, "reference-low-cardinality.bcp")
     accelerated_artifact = _text_artifact(tmp_path, "accelerated-low-cardinality.bcp")
 
-    reference = NativeWireTranscoder(
-        registry=NativeAccelerationRegistry(module_loader=lambda: None)
-    ).to_clickhouse_binary(reference_artifact, schema, clickhouse_schema=target_schema)
-    accelerated = NativeWireTranscoder().to_clickhouse_binary(
-        accelerated_artifact,
-        schema,
-        clickhouse_schema=target_schema,
-    )
-
-    with pytest.raises(ValueError, match="LowCardinality Native encoding is not supported"):
-        b"".join(reference.iter_bytes())
-    with pytest.raises(ValueError, match="native_acceleration_unsupported_clickhouse_type"):
-        b"".join(accelerated.iter_bytes())
+    for artifact, registry in (
+        (reference_artifact, NativeAccelerationRegistry(module_loader=lambda: None)),
+        (accelerated_artifact, NativeAccelerationRegistry()),
+    ):
+        with pytest.raises(ValueError, match="native_wire_unsupported_target_mapping"):
+            NativeWireTranscoder(registry=registry).to_clickhouse_binary(
+                artifact,
+                schema,
+                clickhouse_schema=target_schema,
+            )
 
 
 @pytest.mark.parametrize(
@@ -277,7 +275,7 @@ def test_native_accel_provider_rejects_date_and_datetime_out_of_range() -> None:
 
     from dpone_native_accel._mssql_clickhouse_native import ColumnLayout, _encode_date, _encode_datetime
 
-    with pytest.raises(struct.error):
+    with pytest.raises(ValueError, match="temporal_out_of_range"):
         _encode_date(_bcp_date(date(1900, 1, 1)), "date")
 
     payload = _bcp_datetimeoffset(
@@ -297,7 +295,7 @@ def test_native_accel_provider_rejects_date_and_datetime_out_of_range() -> None:
         scale=7,
         encoding="utf-8",
     )
-    with pytest.raises(struct.error):
+    with pytest.raises(ValueError, match="temporal_out_of_range"):
         _encode_datetime(payload, column, "DateTime")
 
 
@@ -523,7 +521,7 @@ def _legacy_temporal_artifact(
                 _bcp_date(date(2026, 6, 22)),
                 (3).to_bytes(1, byteorder="little", signed=True),
                 _bcp_date(source_date),
-                (6).to_bytes(1, byteorder="little", signed=True),
+                (8).to_bytes(1, byteorder="little", signed=True),
                 _bcp_datetime2(source_datetime, scale=0),
                 (8).to_bytes(1, byteorder="little", signed=True),
                 _bcp_datetime2_100ns(source_datetime.replace(microsecond=123456), final_digit=7),
@@ -622,7 +620,7 @@ def _bcp_date(value: date) -> bytes:
 
 def _bcp_datetime2(value: datetime, *, scale: int) -> bytes:
     midnight_ticks = int.from_bytes(_bcp_time(value.time(), scale=scale), byteorder="little", signed=False)
-    time_length = 3 if scale <= 2 else 4 if scale <= 4 else 5
+    time_length = 5
     return midnight_ticks.to_bytes(time_length, byteorder="little", signed=False) + _bcp_date(value.date())
 
 
@@ -650,7 +648,8 @@ def _bcp_time(value: time, *, scale: int) -> bytes:
         ticks = whole_seconds * ticks_per_second + value.microsecond * (10 ** (scale - 6))
     else:
         ticks = whole_seconds * ticks_per_second + value.microsecond // (10 ** (6 - scale))
-    time_length = 3 if scale <= 2 else 4 if scale <= 4 else 5
+    time_length = 5
+    ticks *= 10 ** (7 - scale)
     return ticks.to_bytes(time_length, byteorder="little", signed=False)
 
 

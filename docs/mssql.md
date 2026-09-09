@@ -494,12 +494,63 @@ records a Python reference fallback in `dpone plan` and runtime evidence. Use
 `acceleration.mode: required` when a release route must not run without the
 native provider.
 
-The first certified type set covers primitive numeric, decimal, date/time, text,
+The implemented decoder type set covers primitive numeric, decimal, date/time, text,
 binary, and `uniqueidentifier` columns. `sql_variant`, XML, CLR/UDT, `hierarchyid`,
 `geography`, `geometry`, and legacy `text`/`ntext`/`image` fail closed or fall
 back to another certified route. Unicode-native `bcp -N` is intentionally
 blocked on non-Windows runners; Linux/KPO releases use `-n` plus the native wire
 layout contract.
+
+On the tested Linux exporter, native BCP `bit`, `uniqueidentifier`, `decimal`,
+and `numeric` have a one-byte length
+prefix even when declared `NOT NULL`; nullability alone does not determine the
+layout. `float(1..24)` uses four payload bytes and `float(25..53)` uses eight.
+Decimal and money decoding preserves every digit regardless of the caller's
+Python decimal context. Numeric target widths are encoded explicitly; inexact
+Decimal scale reduction and precision overflow fail instead of rounding.
+Fractional timestamps before 1970 use integer epoch arithmetic. Binary hex/base64
+policies apply before both String and FixedString framing; transformed values
+that exceed a fixed target width fail.
+
+The native reader rejects inconsistent schema/layout hashes, stale physical
+layouts, duplicate/empty columns, invalid NULL indicators, negative or impossible
+lengths, truncation, malformed decimal/text/temporal values and mismatched target
+column order. The supplied source schema must match the artifact’s ordered names
+and types before any file is opened; `native_wire_source_schema_mismatch` requires
+the matching schema or a new export. Failure diagnostics identify the type, ordinal, offset and native
+profile without echoing payload values. A decode failure never seals a successful
+transcode receipt and must not be used to publish a partially populated stage.
+
+| Evidence scope | What is verified | What is not established |
+|---|---|---|
+| Offline type matrix | Independent source/target bytes for every admitted type family, nullability, multirow sentinels, forced Python RowBinary/Native and installed accelerated Native | Actual exporter bytes or server publication |
+| Precision/boundary cases | UUID byte order, decimal precision boundaries, float widths, malformed lengths/values, stale metadata and exact target conversion | A memory/database/log budget |
+| Live route | Requires the exact approved server/BCP/driver/platform, format, types and target configuration | Connector/backend capability alone is not route certification |
+
+Local Docker tests establish physical temporal scale 7 for all declared scales,
+and UTF-8 conversion for the tested native character collations. Raw `char NOT NULL`
+has no prefix and cannot be safely framed from the current schema alone; it is
+rejected before native export. Use ODBC row-stream or a governed projection with
+matching schema. Nullable char remains supported. Date32/DateTime64 values outside
+the target calendar range fail before insertion instead of allowing server clamping.
+
+The accelerated backend must advertise `native_wire_revision: 2`; older providers
+fall back to Python in `auto` and fail admission in `required`. Reproduce the exact
+[Docker type validation](native-bcp-docker-validation.md) and inspect its version-bound
+receipt before extending these results to other exporter/platform combinations.
+The generic Microsoft prefix table is not sufficient to infer every observed
+native byte sequence. No automatic midstream format fallback is performed.
+
+After upgrading, regenerate affected native layout metadata and re-export retained
+artifacts through the supported extraction workflow. Do not patch a layout hash,
+remove prefix bytes or reuse an incompatible spool. Valid compatible layouts
+remain readable; no wire-schema migration is required. A `native_wire_invalid_layout`
+error with `re_export_required` requires new artifacts, not manual metadata edits.
+If a prior attempt may already have published, reconcile its target and evidence
+before retrying. For `native_wire_invalid_length`, `native_wire_invalid_decimal`,
+`native_wire_invalid_temporal` or `native_wire_invalid_text`, keep the original
+failure, inspect the exporter/format contract and re-export only after resolving
+the mismatch. Full live proof remains separate from offline regression success.
 
 For large `FULL_REFRESH` loads, `dpone` uses a staging-first shadow swap. Files are bulk-loaded into a staging table, copied into a shadow target table, and committed with a short metadata rename. Direct target `bcp` and target `TRUNCATE` are intentionally not used as the default production path.
 
