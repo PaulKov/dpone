@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any
-
-from dpone._compat import UTC
 
 
 def resolve_date_option(value: Any) -> date | None:

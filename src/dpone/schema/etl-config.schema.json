@@ -1326,6 +1326,8 @@
               "markdownDescription": "**Только для `mode: replace`**\n\nSQL предикат для DELETE перед INSERT\n\nПримеры:\n- `event_date >= CURRENT_DATE - 7`\n- `status = 'active'`\n- `created_at >= '2025-01-01'`",
               "minLength": 1
             },
+            "window": {"$ref": "#/definitions/rolling_window"},
+            "atomicity": {"const": "target_atomic"},
             "merge_policy": {
               "type": "string",
               "title": "🔁 Merge policy",
@@ -1719,6 +1721,8 @@
             }
           },
           "allOf": [
+            {"if": {"required": ["window"]}, "then": {"required": ["atomicity"], "properties": {"mode": {"const": "replace"}}}},
+            {"if": {"required": ["atomicity"]}, "then": {"required": ["window"]}},
             {
               "if": {
                 "properties": {
@@ -1729,8 +1733,9 @@
               },
               "then": {
                 "oneOf": [
-                  {"required": ["custom_predicate"], "not": {"required": ["portable_scope"]}},
-                  {"required": ["portable_scope"], "not": {"required": ["custom_predicate"]}}
+                  {"required": ["custom_predicate"], "not": {"anyOf": [{"required": ["portable_scope"]}, {"required": ["window"]}]}},
+                  {"required": ["portable_scope"], "not": {"anyOf": [{"required": ["custom_predicate"]}, {"required": ["window"]}]}},
+                  {"required": ["window", "atomicity"], "not": {"anyOf": [{"required": ["custom_predicate"]}, {"required": ["portable_scope"]}]}}
                 ]
               }
             },
@@ -4932,6 +4937,37 @@
     }
   },
   "definitions": {
+    "rolling_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "column",
+        "anchor",
+        "lookback"
+      ],
+      "properties": {
+        "column": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "anchor": {
+          "const": "data_interval_end"
+        },
+        "lookback": {
+          "type": "string",
+          "minLength": 3
+        },
+        "chunk_interval": {
+          "type": "string",
+          "minLength": 3,
+          "default": "P1D"
+        },
+        "timezone": {
+          "const": "UTC",
+          "default": "UTC"
+        }
+      }
+    },
     "portable_scope_literal": {
       "oneOf": [
         {
@@ -6954,6 +6990,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "chunking": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Opt-in atomic rolling-window execution; requires a composed snapshot source and all-writer target authority.",
+          "properties": {
+            "mode": {"const": "bounded_window"},
+            "parallelism": {"type": "integer", "minimum": 1, "maximum": 64},
+            "checkpointing": {"const": "resumable"}
+          }
+        },
         "mode": {
           "type": "string",
           "enum": [

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from dpone._compat import UTC
 from dpone.runtime.connectors.api.openexchangerates import (
     DEFAULT_SYMBOLS,
     normalize_openexchangerates_symbols,

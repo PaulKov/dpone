@@ -5,9 +5,11 @@ from __future__ import annotations
 import http.client
 import os
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import urlencode
+
+from dpone.contracts.bounded_window import WindowContractError
 
 
 @dataclass(frozen=True)
@@ -110,6 +112,21 @@ class ClickHouseHttpBulkRunner:
         if result.status >= 300:
             raise RuntimeError(f"ClickHouse HTTP insert failed with status {result.status}: {redacted_url}\n{body}")
         return result
+
+    def insert_window_stream(
+        self, database: str, table: str, columns: Sequence[str], chunks: Iterable[bytes], query_id: str
+    ) -> ClickHouseHttpResult:
+        """Admit one identified synchronous RowBinary attempt before network I/O.
+
+        Window composition creates an independent runner per attempt. Keep endpoint
+        and transport validation in this adapter, behind WindowBinaryIngest.
+        """
+        if self.options.input_format != "RowBinary" or self.options.settings.get("async_insert", 0):
+            raise WindowContractError("Window inserts require synchronous RowBinary HTTP")
+        if self.credentials.database != database:
+            raise WindowContractError("HTTP runner database identity mismatch")
+        self.options = replace(self.options, query_id=query_id)
+        return self.insert_stream(table, columns, chunks)
 
     def insert_stream(
         self,

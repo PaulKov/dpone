@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- Add opt-in bounded atomic rolling-window Python composition with a PostgreSQL
+  shared snapshot, isolated ClickHouse RowBinary staging, fenced local recovery,
+  single-generation publication, and explicit capability admission. Existing
+  transport defaults remain unchanged; unsupported writer authority and legacy
+  governance combinations fail before execution. See the rolling-window guide.
+- Correct Decimal alias widths and pre-epoch DateTime64 encoding; byte-bounded
+  typed streams reject oversized rows, shape mismatches, and precision loss.
+- Add impact-aware acceptance plans bound to exact Git revisions and synthetic
+  container smoke receipts while preserving existing mandatory CI gates.
+
+### Fixed
+
+- Revalidate ClickHouse target schema and topology under writer exclusion before
+  generation preparation and exchange, preserving intervening schema changes.
+- Fence publication-marker cleanup during recovery and retry durable metadata
+  deletion after a directory-sync failure. Inject target metadata persistence.
+- Remove redundant runtime UTC compatibility hops on the supported Python 3.11+
+  range, preserving the public facade and aligning the type-checker version.
+- Make the intentional native-crash test wait for the actual child exit before
+  peer shutdown; production drain deadlines remain unchanged.
+
 ## 0.74.35 - 2026-09-09
 
 ### Fixed

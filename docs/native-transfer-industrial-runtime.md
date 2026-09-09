@@ -859,3 +859,20 @@ visible and GitOps-friendly:
 | Informatica | Partitioning, pushdown, and cache controls. | Generated SQL visibility and source-risk warning codes. |
 | Pentaho | Batch/commit knobs and temp directory controls. | Per-run isolated workspaces, typed cleanup, and resume-safe staging. |
 | SSIS | Row and byte buffer sizing. | Dual file-count/file-byte limits with adaptive slice feedback. |
+
+## Bounded typed rows and atomic windows
+
+MSSQL typed row streaming uses the existing `source.options.native_transfer.wire`
+configuration: `mode: typed_binary`, `source_native_format: odbc_row_stream`, and
+`binary_format: rowbinary`. Select `source.options.mssql_export_mode:
+odbc_row_stream`, `execution.transport.mode: stream`, and ClickHouse HTTP
+`typed_binary_staging`. Optional `wire.block_bytes` bounds encoded rows and batches;
+`wire.block_rows` bounds batch cardinality. Oversized rows and mismatched shapes
+fail explicitly. These limits do not bound driver allocations or process RSS.
+
+Byte-bounded encoding also rejects fractional integer conversion and timestamp
+precision loss. Decimal alias width/scale and pre-epoch timestamp corrections apply
+to all encoder callers; historical unbounded timestamp truncation remains unchanged.
+This streaming capability does not establish a shared source snapshot or atomic
+window recovery. See [Atomic rolling windows](rolling-window.md) for supported
+source/target capabilities, composition, and recovery restrictions.

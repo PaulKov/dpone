@@ -164,6 +164,7 @@ nav:
       - Data Product Trust Center: data-product-trust-center.md
       - Data Product Remediation Runbooks: data-product-remediation.md
       - Adaptive native transfer: native-transfer-industrial-runtime.md
+      - Atomic rolling windows: rolling-window.md
       - Object storage staging: object-storage-staging.md
       - Supply-chain evidence: supply-chain.md
       - SLSA release self-assessment: supply-chain-slsa.md
@@ -477,6 +478,8 @@ nav:
       - Feature design - agent permission and tool registry: feature-design-agent-permission-tool-registry.md
       - Feature design - immutable Agent PR merge closure: feature-design-agent-pr-merge-closure-receipt.md
       - Feature design - MCP connector onboarding gate: feature-design-mcp-connector-onboarding-gate.md
+      - Feature design - Bounded streaming windows and acceptance: feature-design-bounded-streaming-window-v1.md
+      - Impact-aware acceptance: impact-aware-acceptance.md
       - Feature design - Data Product Trust Center: feature-design-data-product-trust-center-evidence-lake.md
       - Feature design - CI shadow closure and exact-SHA evidence: feature-design-ci-pr-gate-exact-sha-evidence.md
       - Feature design - PR 3A CI hygiene: feature-design-ci-shadow-pr3a-ci-hygiene.md
@@ -601,6 +604,8 @@ nav:
       - ADR 0053 (Proposed): adr/0053-rest-delivery-identity-effect-journal.md
       - ADR 0054 (Proposed): adr/0054-resumable-delivery-runtime-airflow.md
       - ADR 0055 (Proposed): adr/0055-rest-operation-profile-authority.md
+      - ADR 0056: adr/0056-public-snapshot-governance-recovery.md
+      - ADR 0057: adr/0057-bounded-window-atomic-publication.md
 
 extra:
   generator: false

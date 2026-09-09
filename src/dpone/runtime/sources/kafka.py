@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from dpone._compat import UTC
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.kafka.codecs import CodecContext, build_message_codec, infer_schema_from_rows
 from dpone.runtime.kafka.config import KafkaReadMode, KafkaSourceOptions

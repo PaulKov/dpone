@@ -1,41 +1,46 @@
 {
   "snapshot": {
-    "cross_layer_edges": 2405,
-    "cross_layer_ratio": 0.2996138034134795,
+    "cross_layer_edges": 2687,
+    "cross_layer_ratio": 0.29938718662952646,
     "excluded_layers": [
       "dpone.compat"
     ],
-    "internal_edges": 8027,
-    "intra_layer_edges": 5622,
-    "intra_layer_ratio": 0.7003861965865205,
+    "internal_edges": 8975,
+    "intra_layer_edges": 6288,
+    "intra_layer_ratio": 0.7006128133704735,
     "layers": 58,
-    "max_cross_layer_flow": 194,
+    "max_cross_layer_flow": 209,
     "package_name": "dpone",
     "top_cross_layer": [
       {
-        "count": 194,
+        "count": 209,
         "source": "dpone.runtime",
         "target": "dpone.contracts"
       },
       {
-        "count": 106,
-        "source": "dpone.services",
-        "target": "dpone.gitops"
-      },
-      {
-        "count": 99,
-        "source": "dpone.commands",
-        "target": "dpone.services"
-      },
-      {
-        "count": 99,
+        "count": 147,
         "source": "dpone.services",
         "target": "dpone.contracts"
       },
       {
-        "count": 97,
+        "count": 108,
+        "source": "dpone.services",
+        "target": "dpone.gitops"
+      },
+      {
+        "count": 101,
+        "source": "dpone.services",
+        "target": "dpone.ports"
+      },
+      {
+        "count": 100,
         "source": "dpone.adapters",
         "target": "dpone.ports"
+      },
+      {
+        "count": 100,
+        "source": "dpone.commands",
+        "target": "dpone.services"
       },
       {
         "count": 90,
@@ -43,9 +48,9 @@
         "target": "dpone.manifest"
       },
       {
-        "count": 90,
-        "source": "dpone.services",
-        "target": "dpone.ports"
+        "count": 89,
+        "source": "dpone.readiness",
+        "target": "dpone.contracts"
       },
       {
         "count": 84,
@@ -58,19 +63,19 @@
         "target": "dpone.readiness"
       },
       {
-        "count": 78,
-        "source": "dpone.readiness",
+        "count": 71,
+        "source": "dpone.adapters",
         "target": "dpone.contracts"
       },
       {
-        "count": 66,
+        "count": 68,
         "source": "dpone.services",
         "target": "dpone.readiness"
       },
       {
-        "count": 60,
-        "source": "dpone.adapters",
-        "target": "dpone.contracts"
+        "count": 65,
+        "source": "dpone.runtime",
+        "target": "dpone.config"
       },
       {
         "count": 59,
@@ -78,29 +83,24 @@
         "target": "dpone.runtime"
       },
       {
-        "count": 58,
+        "count": 57,
         "source": "dpone.runtime",
-        "target": "dpone.config"
-      },
-      {
-        "count": 48,
-        "source": "dpone.runtime",
-        "target": "dpone.readiness"
+        "target": "dpone.backfill"
       }
     ],
     "top_cross_slice": [
       {
-        "count": 194,
+        "count": 209,
         "source": "dpone.runtime",
         "target": "dpone.contracts"
       },
       {
-        "count": 101,
+        "count": 102,
         "source": "dpone.services.gitops",
         "target": "dpone.gitops"
       },
       {
-        "count": 97,
+        "count": 100,
         "source": "dpone.adapters",
         "target": "dpone.ports"
       },
@@ -110,19 +110,24 @@
         "target": "dpone.manifest"
       },
       {
+        "count": 89,
+        "source": "dpone.readiness",
+        "target": "dpone.contracts"
+      },
+      {
         "count": 84,
         "source": "dpone.readiness",
         "target": "dpone.runtime"
       },
       {
-        "count": 78,
-        "source": "dpone.readiness",
+        "count": 71,
+        "source": "dpone.adapters",
         "target": "dpone.contracts"
       },
       {
-        "count": 60,
-        "source": "dpone.adapters",
-        "target": "dpone.contracts"
+        "count": 65,
+        "source": "dpone.runtime",
+        "target": "dpone.config"
       },
       {
         "count": 59,
@@ -130,39 +135,34 @@
         "target": "dpone.runtime"
       },
       {
-        "count": 58,
+        "count": 57,
         "source": "dpone.runtime",
-        "target": "dpone.config"
+        "target": "dpone.backfill"
       },
       {
-        "count": 48,
+        "count": 55,
         "source": "dpone.runtime",
         "target": "dpone.readiness"
       },
       {
-        "count": 45,
+        "count": 52,
         "source": "dpone.app",
         "target": "dpone.adapters"
       },
       {
-        "count": 39,
+        "count": 46,
         "source": "dpone.runtime",
         "target": "dpone.ports"
+      },
+      {
+        "count": 40,
+        "source": "dpone.ports",
+        "target": "dpone.contracts"
       },
       {
         "count": 39,
         "source": "dpone.services.gitops",
         "target": "dpone.ports"
-      },
-      {
-        "count": 38,
-        "source": "dpone.operations",
-        "target": "dpone.ops"
-      },
-      {
-        "count": 37,
-        "source": "dpone.ports",
-        "target": "dpone.contracts"
       }
     ]
   },
