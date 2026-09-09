@@ -12,7 +12,8 @@ else:
     VaultManager = Any
 
 
-from dpone._compat import UTC
+from datetime import UTC
+
 from dpone.config.env import get_env_code
 from dpone.runtime.connectors.api.base import (
     AbstractAPIConnector,

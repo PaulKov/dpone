@@ -7,9 +7,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dpone.adapters.window_metadata_files import load_metadata, save_metadata
-from dpone.contracts.bounded_window import PublicationStatus, WindowLease, WindowPlan
-from dpone.contracts.process_errors import WindowContractError, WindowOutcomeUnknown
+from dpone.adapters.window_metadata_files import FileWindowMetadataStore
+from dpone.contracts.bounded_window import (
+    PublicationStatus,
+    WindowContractError,
+    WindowLease,
+    WindowOutcomeUnknown,
+    WindowPlan,
+)
 from dpone.runtime.sinks.clickhouse_window_evidence import TypedMultiset
 from dpone.runtime.sinks.clickhouse_window_staging import encoded_rows
 from dpone.runtime.sinks.clickhouse_window_target import ClickHouseWindowTarget, window_schema_fingerprint
@@ -28,6 +33,7 @@ def test_missing_exclusion_is_rejected_before_connector_creation(tmp_path: Path)
         connector_factory=forbidden,
         http_runner_factory=forbidden,
         work_dir=tmp_path,
+        metadata_store=FileWindowMetadataStore(),
         max_encoded_bytes=1024,
         writer_guard=None,
     )
@@ -75,6 +81,7 @@ def build(tmp_path, **kwargs):
         connector_factory=lambda: connector,
         http_runner_factory=MagicMock(),
         work_dir=tmp_path,
+        metadata_store=FileWindowMetadataStore(),
         max_encoded_bytes=128,
         writer_guard=Guard(),
     )
@@ -184,13 +191,13 @@ def test_oversize_row_never_emitted(tmp_path):
 
 def test_metadata_corruption_and_version_rejected(tmp_path):
     path = tmp_path / "receipt.json"
-    assert load_metadata(path) is None
+    assert FileWindowMetadataStore().load(path) is None
     for text in ["{", "[]", '{"version": 2}']:
         path.write_text(text)
         with pytest.raises(WindowContractError):
-            load_metadata(path)
-    save_metadata(path, {"version": 1, "digest": "abc"})
-    assert load_metadata(path) == {"version": 1, "digest": "abc"}
+            FileWindowMetadataStore().load(path)
+    FileWindowMetadataStore().save(path, {"version": 1, "digest": "abc"})
+    assert FileWindowMetadataStore().load(path) == {"version": 1, "digest": "abc"}
 
 
 @pytest.mark.parametrize(
@@ -205,9 +212,9 @@ def test_metadata_corruption_and_version_rejected(tmp_path):
     ],
 )
 def test_publication_uuid_pair_classification(tmp_path, pair, expected):
-    target, plan, _, connector = build(tmp_path)
+    target, plan, lease, connector = build(tmp_path)
     generation = target.io.name(plan, "generation")
-    save_metadata(
+    FileWindowMetadataStore().save(
         target.io.path(generation),
         {
             "version": 1,
@@ -218,7 +225,7 @@ def test_publication_uuid_pair_classification(tmp_path, pair, expected):
         },
     )
     connector.get_records.side_effect = [[(value,)] if value is not None else [] for value in pair]
-    assert target.inspect_publication(plan, generation) == expected
+    assert target.inspect_publication(plan, generation, lease) == expected
     connector.execute_query.assert_not_called()
 
 
@@ -232,14 +239,14 @@ def test_unknown_publication_never_exchanges(tmp_path):
 
 def test_new_run_blocked_by_pending_publication(tmp_path):
     target, plan, _, connector = build(tmp_path)
-    save_metadata(target.io.path(target.io.name_for_target()), {"version": 1, "run_id": "previous"})
+    FileWindowMetadataStore().save(target.io.path(target.io.name_for_target()), {"version": 1, "run_id": "previous"})
     with pytest.raises(WindowContractError, match="unresolved"):
         target.validate(plan)
     connector.get_records.assert_not_called()
 
 
 def test_discard_requires_successful_old_writer_fencing(tmp_path):
-    from dpone.contracts.process_errors import WindowLeaseLost
+    from dpone.contracts.bounded_window import WindowLeaseLost
 
     authority = Guard()
     authority.fence_attempt = MagicMock(side_effect=WindowLeaseLost("stale"))
@@ -250,7 +257,7 @@ def test_discard_requires_successful_old_writer_fencing(tmp_path):
 
 
 def test_stale_lease_cannot_start_a_writer(tmp_path):
-    from dpone.contracts.process_errors import WindowLeaseLost
+    from dpone.contracts.bounded_window import WindowLeaseLost
 
     authority = Guard()
     authority.assert_lease = MagicMock(side_effect=WindowLeaseLost("stale"))
@@ -264,7 +271,7 @@ def test_attempt_receipt_cannot_survive_uuid_replacement(tmp_path):
     target, plan, lease, connector = build(tmp_path)
     chunk = plan.chunks[0]
     name = target.staging.name(plan, chunk, "one")
-    save_metadata(
+    FileWindowMetadataStore().save(
         target.io.path(name),
         {
             "version": 1,
@@ -425,3 +432,77 @@ def test_http_window_admission_binds_query_id(monkeypatch):
     )
     monkeypatch.setattr(runner, "insert_stream", lambda *args: runner.options.query_id)
     assert runner.insert_window_stream("db", "db.staging", ["id"], iter([]), "attempt") == "attempt"
+
+
+def test_metadata_remove_retries_directory_sync_after_unlink(tmp_path, monkeypatch):
+    """An absent file on retry does not prove the previous deletion was durable."""
+    from dpone.adapters import window_metadata_files
+
+    path = tmp_path / "receipt.json"
+    path.write_text('{"version": 1}')
+    sync = MagicMock(side_effect=[OSError("storage unavailable"), None])
+    monkeypatch.setattr(window_metadata_files.os, "fsync", sync)
+    store = FileWindowMetadataStore()
+    with pytest.raises(OSError, match="storage unavailable"):
+        store.remove(path)
+    assert not path.exists()
+    store.remove(path)
+    assert sync.call_count == 2
+    store.remove(tmp_path / "absent-parent" / "absent.json")
+
+
+def test_publication_marker_cleanup_requires_live_non_reentrant_authority(tmp_path):
+    from dpone.contracts.bounded_window import WindowLeaseLost
+
+    class Authority(Guard):
+        held = False
+        expired = False
+
+        @contextmanager
+        def hold(self, lease):
+            assert not self.held
+            if self.expired:
+                raise WindowLeaseLost("expired")
+            self.held = True
+            try:
+                yield
+            finally:
+                self.held = False
+
+    authority = Authority()
+    metadata = MagicMock()
+    target, plan, lease, connector = build(tmp_path, writer_guard=authority, metadata_store=metadata)
+    generation = target.io.name(plan, "generation")
+    record = {
+        "version": 1,
+        "identity": [plan.run_id, target.io.schema_fingerprint, "d.t"],
+        "original_uuid": "old",
+        "generation_uuid": "new",
+    }
+    metadata.load.side_effect = [record, {"run_id": plan.run_id}]
+    metadata.remove.side_effect = lambda path: authority.held or pytest.fail("unfenced metadata mutation")
+    connector.get_records.side_effect = [[("new",)], [("old",)]]
+    # Already-published path must not recursively acquire the injected authority.
+    target.publish(plan, generation, lease)
+    metadata.remove.assert_called_once_with(target.io.path(target.io.name_for_target()))
+    metadata.reset_mock()
+    authority.expired = True
+    with pytest.raises(WindowLeaseLost, match="expired"):
+        target.inspect_publication(plan, generation, lease)
+    metadata.load.assert_not_called()
+    metadata.remove.assert_not_called()
+    authority.expired = False
+    metadata.load.side_effect = [record, {"run_id": "successor"}]
+    connector.get_records.side_effect = [[("new",)], [("old",)]]
+    assert target.inspect_publication(plan, generation, lease) == PublicationStatus.PUBLISHED
+    metadata.remove.assert_not_called()
+
+
+@pytest.mark.parametrize("version", [True, 1.0, "1", None, 0, 2])
+def test_metadata_version_requires_exact_integer_one(tmp_path, version):
+    import json
+
+    path = tmp_path / "invalid-version.json"
+    path.write_text(json.dumps({"version": version}))
+    with pytest.raises(WindowContractError, match="Invalid window receipt"):
+        FileWindowMetadataStore().load(path)

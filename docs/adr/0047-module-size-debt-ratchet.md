@@ -78,6 +78,25 @@ repair; preserving it without exact caps would weaken the gate.
     the evaluated head as its own comparison base merely because the event is a
     manual dispatch.
 
+## Clean source-root continuity
+
+After the approved source-history replacement, the parentless root
+`f8c6a4a5e75d167829c05f65d5d3033acb193878` contains 51 remaining entries
+with exact source caps but unavailable original ancestry. A repository-specific
+producer may reanchor only this frozen cohort to that root. It verifies the
+root identity, baseline and budget digests, original provenance, and exact
+root source measurements. It may tighten or retire debt but cannot introduce
+entries, increase caps, alter metadata or extend deadlines. The verifier
+normalizes only the prior provenance field for that exact root comparison;
+all ordinary ancestry, deadline, metadata and no-growth checks remain active.
+
+This exception does not permit arbitrary rewritten history, a different root,
+changed budgets, missing objects, or self-comparison. A root-only CI dispatch
+cannot certify continuity; the first reviewed successor provides the distinct
+head. Candidate writing returns a non-certifying outcome and requires a
+committed exact-head verification. The v2 public schema and legacy bootstrap
+remain unchanged. See the [migration runbook](../module-size-ratchet.md#clean-root-provenance-migration).
+
 ## Consequences
 
 - Existing warning debt remains visible and cannot grow.

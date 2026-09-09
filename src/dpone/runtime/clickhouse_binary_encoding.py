@@ -8,12 +8,11 @@ import uuid
 from base64 import b64encode
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from datetime import time as dt_time
 from decimal import Decimal, localcontext
 from typing import Any
 
-from dpone._compat import UTC
 from dpone.runtime.support.type_mapping.mssql_clickhouse import (
     MssqlClickHouseTypeMapper,
     MssqlClickHouseTypePolicy,

@@ -9,7 +9,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import urlencode
 
-from dpone.contracts.process_errors import WindowContractError
+from dpone.contracts.bounded_window import WindowContractError
 
 
 @dataclass(frozen=True)

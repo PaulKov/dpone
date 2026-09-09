@@ -11,11 +11,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
-from dpone.adapters.window_metadata_files import load_metadata, save_metadata
-from dpone.contracts.bounded_window import ChunkReceipt, WindowChunk, WindowLease, WindowPlan
-from dpone.contracts.process_errors import WindowContractError, WindowTransientError
-from dpone.ports.clickhouse_window_ingest import WindowBinaryIngest
-from dpone.ports.window_exclusion import ExclusiveWindowWriterGuard
+from dpone.contracts.bounded_window import (
+    ChunkReceipt,
+    WindowChunk,
+    WindowContractError,
+    WindowLease,
+    WindowPlan,
+    WindowTransientError,
+)
+from dpone.ports.bounded_window import ExclusiveWindowWriterGuard, WindowBinaryIngest, WindowMetadataStore
 from dpone.runtime.clickhouse_rowbinary import ClickHouseRowBinaryEncoder
 from dpone.runtime.sinks.clickhouse_window_evidence import TypedMultiset
 
@@ -56,6 +60,7 @@ class WindowIO:
     schema_fingerprint: str
     physical_target: str
     clock: Callable[[], float]
+    metadata_store: WindowMetadataStore
 
     @property
     def guard(self) -> ExclusiveWindowWriterGuard:
@@ -200,7 +205,7 @@ class WindowStaging:
         io = self.io
         io.guard.assert_lease(lease)
         name = self.name(plan, chunk, attempt)
-        metadata = load_metadata(io.path(name))
+        metadata = io.metadata_store.load(io.path(name))
         if metadata is None:
             return None
         if metadata.get("identity") != [
@@ -271,7 +276,7 @@ class WindowStaging:
                 "chunk_start": chunk.start.isoformat(),
                 "chunk_end": chunk.end.isoformat(),
             }
-            save_metadata(io.path(name), metadata)
+            io.metadata_store.save(io.path(name), metadata)
             return ChunkReceipt(chunk.chunk_id, attempt, evidence.count, evidence.digest())
 
     def discard(self, plan: WindowPlan, chunk: WindowChunk, attempt: str, lease: WindowLease) -> None:
@@ -282,7 +287,7 @@ class WindowStaging:
             io.mutate(connector, f"DROP TABLE IF EXISTS {io.qualified(name)} SYNC", lease)
             if io.uuid(connector, name) is not None:
                 raise WindowContractError("Attempt discard not confirmed")
-            io.path(name).unlink(missing_ok=True)
+            io.metadata_store.remove(io.path(name))
 
 
 def encoded_rows(

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from dpone._compat import UTC
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.sources.extract_result import ExtractResult
 from dpone.runtime.sources.strategies.api.base import APIBaseStrategy

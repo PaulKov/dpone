@@ -5,13 +5,11 @@
 """
 
 import re
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytz
-
-from dpone._compat import UTC
 
 
 class TimezoneConverter:

@@ -9,8 +9,13 @@ import pytest
 
 from dpone.adapters.bounded_window_journal import WindowJournal
 from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
-from dpone.contracts.bounded_window import ChunkReceipt, WindowPlan
-from dpone.contracts.process_errors import WindowContractError, WindowOutcomeUnknown, WindowTransientError
+from dpone.contracts.bounded_window import (
+    ChunkReceipt,
+    WindowContractError,
+    WindowOutcomeUnknown,
+    WindowPlan,
+    WindowTransientError,
+)
 from dpone.runtime.bounded_window_execution import BoundedWindowExecutor
 
 
@@ -101,7 +106,7 @@ class Target:
         if self.fail_publish == "after":
             raise WindowTransientError("ack lost")
 
-    def inspect_publication(self, plan, generation):
+    def inspect_publication(self, plan, generation, lease):
         return "published" if self.published else "unknown"
 
 

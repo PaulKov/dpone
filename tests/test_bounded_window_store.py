@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
-from dpone.contracts.process_errors import WindowContractError, WindowLeaseLost
+from dpone.contracts.bounded_window import WindowContractError, WindowLeaseLost
 
 
 def test_cas_and_reopen(tmp_path):

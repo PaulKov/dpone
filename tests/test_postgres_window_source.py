@@ -5,8 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from dpone.contracts.bounded_window import WindowPlan
-from dpone.contracts.process_errors import WindowContractError
+from dpone.contracts.bounded_window import WindowContractError, WindowPlan
 from dpone.runtime.sources.postgres_window_source import PostgresWindowSource
 
 

@@ -205,7 +205,7 @@ class _Target:
         self.exchange_calls += 1
         self.published = True
 
-    def inspect_publication(self, plan, generation):
+    def inspect_publication(self, plan, generation, lease):
         return "published" if self.published else "unknown"
 
 
@@ -219,7 +219,7 @@ def _runtime(tmp_path, *, evidence=None):
     @contextmanager
     def source_factory(window):
         # Source opens only after the target lease has been acquired.
-        from dpone.contracts.process_errors import WindowLeaseLost
+        from dpone.contracts.bounded_window import WindowLeaseLost
 
         with pytest.raises(WindowLeaseLost):
             store.acquire("target", "competing", 30)
@@ -289,7 +289,7 @@ def test_wrapper_success_repeat_never_reopens_source(tmp_path):
 
 
 def test_wrapper_planned_snapshot_change_requires_new_invocation(tmp_path):
-    from dpone.contracts.process_errors import WindowContractError
+    from dpone.contracts.bounded_window import WindowContractError
 
     runtime, _, events, versions, target = _runtime(tmp_path)
     target.crash = True
@@ -302,7 +302,7 @@ def test_wrapper_planned_snapshot_change_requires_new_invocation(tmp_path):
 
 
 def test_wrapper_planned_expired_snapshot_has_explicit_recovery_error(tmp_path):
-    from dpone.contracts.process_errors import WindowContractError
+    from dpone.contracts.bounded_window import WindowContractError
 
     runtime, _, _, _, target = _runtime(tmp_path)
     target.crash = True
@@ -319,7 +319,7 @@ def test_wrapper_planned_expired_snapshot_has_explicit_recovery_error(tmp_path):
 
 
 def test_wrapper_request_change_rejected_before_source(tmp_path):
-    from dpone.contracts.process_errors import WindowContractError
+    from dpone.contracts.bounded_window import WindowContractError
 
     runtime, _, _, _, _ = _runtime(tmp_path)
     runtime.run(_load(), owner="invocation")
@@ -332,8 +332,7 @@ def test_wrapper_request_change_rejected_before_source(tmp_path):
 
 @pytest.mark.parametrize("mutation", ["version", "run_id", "target", "empty_plan", "unknown_field"])
 def test_wrapper_corrupt_invocation_registry_refused(tmp_path, mutation):
-    from dpone.contracts.bounded_window import invocation_fingerprint
-    from dpone.contracts.process_errors import WindowContractError
+    from dpone.contracts.bounded_window import WindowContractError, invocation_fingerprint
 
     runtime, store, _, _, target = _runtime(tmp_path)
     runtime.run(_load(), owner="invocation")
@@ -377,7 +376,7 @@ def test_wrapper_snapshot_close_failure_preserves_primary(tmp_path):
 
 
 def test_wrapper_crash_retries_keep_original_budget(tmp_path):
-    from dpone.contracts.process_errors import WindowContractError
+    from dpone.contracts.bounded_window import WindowContractError
 
     runtime, _, _, _, target = _runtime(tmp_path)
     target.crash = True
@@ -390,7 +389,7 @@ def test_wrapper_crash_retries_keep_original_budget(tmp_path):
 
 
 def test_wrapper_unknown_publication_recovery_never_reopens_source(tmp_path):
-    from dpone.contracts.process_errors import WindowOutcomeUnknown
+    from dpone.contracts.bounded_window import WindowOutcomeUnknown
 
     runtime, _, _, _, target = _runtime(tmp_path)
 
@@ -431,7 +430,7 @@ def test_wrapper_source_state_failure_recovers_without_snapshot(tmp_path):
 
 
 def test_wrapper_expired_source_validation_requires_new_invocation(tmp_path):
-    from dpone.contracts.process_errors import WindowContractError
+    from dpone.contracts.bounded_window import WindowContractError
 
     runtime, _, _, _, target = _runtime(tmp_path)
     target.crash = True

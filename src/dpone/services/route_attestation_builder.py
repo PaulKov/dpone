@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import UTC, datetime  # type: ignore[attr-defined]
+from datetime import UTC, datetime
 from typing import Any
 
 from dpone.contracts.certification_trust import certification_trust

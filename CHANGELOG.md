@@ -12,6 +12,20 @@
 - Add impact-aware acceptance plans bound to exact Git revisions and synthetic
   container smoke receipts while preserving existing mandatory CI gates.
 
+### Fixed
+
+- Fence publication-marker cleanup during recovery and retry durable metadata
+  deletion after a directory-sync failure. Inject target metadata persistence.
+- Remove redundant runtime UTC compatibility hops on the supported Python 3.11+
+  range, preserving the public facade and aligning the type-checker version.
+- Make the intentional native-crash test wait for the actual child exit before
+  peer shutdown; production drain deadlines remain unchanged.
+- Restore CI checks after the clean source-history replacement: narrowly
+  reanchor the audited module-size cohort without increasing debt allowances,
+  exercise historical Git invariants in isolated fixtures, and refresh the
+  source repository protection identity. A root-only comparison fails explicitly;
+  enabling CI does not certify a release or restore archived hosted evidence.
+
 ## 0.74.33 - 2026-09-02
 
 ### Added

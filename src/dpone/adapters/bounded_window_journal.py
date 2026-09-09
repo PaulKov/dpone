@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 
 from dpone.contracts.bounded_window import (
+    WindowContractError,
     WindowLease,
     WindowPlan,
     decode_window_plan,
@@ -16,7 +17,6 @@ from dpone.contracts.bounded_window import (
     invocation_fingerprint,
     validate_window_record,
 )
-from dpone.contracts.process_errors import WindowContractError
 from dpone.ports.bounded_window import WindowStore
 
 

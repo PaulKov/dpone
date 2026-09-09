@@ -319,9 +319,10 @@ changed identity; lease expiry and competing writers; empty replacement;
 outside-window and NULL-window preservation; publication acknowledgment loss;
 evidence failure after publication; and repeat execution after each crash point.
 
-Each implemented case must map to a test identifier and JUnit result. Planned
-window/recovery behavior remains UNVERIFIED until its corresponding code and
-fault-injection tests exist. Existing transport tests are baseline evidence only.
+Each implemented case maps to a test identifier and JUnit result. The bounded
+window and recovery suites include synthetic Docker fault injection. Evidence
+is valid only for the recorded source revision; unexecuted topologies and
+performance comparisons remain UNVERIFIED.
 
 Documentation changes accompany each phase: first-success tutorial, manifest and
 capability reference, developer ports, architecture/ADR, recovery runbook, and

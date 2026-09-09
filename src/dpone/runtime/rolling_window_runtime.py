@@ -13,8 +13,14 @@ from time import monotonic
 from typing import Any, Protocol
 
 from dpone.adapters.bounded_window_journal import WindowInvocationRegistry, WindowJournal
-from dpone.contracts.bounded_window import WindowChunk, WindowLease, WindowPlan, WindowResult, invocation_fingerprint
-from dpone.contracts.process_errors import WindowContractError
+from dpone.contracts.bounded_window import (
+    WindowChunk,
+    WindowContractError,
+    WindowLease,
+    WindowPlan,
+    WindowResult,
+    invocation_fingerprint,
+)
 from dpone.contracts.process_types import ProcessResult
 from dpone.contracts.rolling_window import FrozenRollingWindow, RollingWindowSpec
 from dpone.ports.bounded_window import WindowExecutor, WindowSource, WindowStore

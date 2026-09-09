@@ -18,13 +18,15 @@ from threading import Event, Thread
 from dpone.contracts.bounded_window import (
     ChunkReceipt,
     WindowChunk,
+    WindowContractError,
     WindowLease,
+    WindowOutcomeUnknown,
     WindowPlan,
     WindowResult,
+    WindowTransientError,
     decode_receipt,
     receipt_data,
 )
-from dpone.contracts.process_errors import WindowContractError, WindowOutcomeUnknown, WindowTransientError
 from dpone.ports.bounded_window import WindowProgressJournal, WindowSource, WindowStore, WindowTarget
 
 
@@ -134,15 +136,15 @@ class BoundedWindowExecutor:
             try:
                 self.target.publish(plan, generation, lease)
             except Exception:
-                recover_publication(self.target, plan, generation)
-            recover_publication(self.target, plan, generation)
+                recover_publication(self.target, plan, generation, lease)
+            recover_publication(self.target, plan, generation, lease)
         else:
             persisted_generation = state["generation"]
             if not isinstance(persisted_generation, str) or not persisted_generation:
                 raise WindowContractError("Invalid persisted generation")
             generation = persisted_generation
             receipts = self._load_receipts(plan, state)
-            recover_publication(self.target, plan, generation)
+            recover_publication(self.target, plan, generation, lease)
         self._check(lease, cancelled)
         completed = {"generation": generation, "receipts": [receipt_data(r) for r in receipts]}
         if phase != "succeeded":
@@ -300,7 +302,7 @@ class BoundedWindowExecutor:
         return receipt
 
 
-def recover_publication(target: WindowTarget, plan: WindowPlan, generation: str) -> None:
+def recover_publication(target: WindowTarget, plan: WindowPlan, generation: str, lease: WindowLease) -> None:
     """A prior publishing marker permits reconciliation only, never EXCHANGE replay."""
-    if target.inspect_publication(plan, generation) != "published":
+    if target.inspect_publication(plan, generation, lease) != "published":
         raise WindowOutcomeUnknown("Publication is not proven; inspect target generation before recovery")

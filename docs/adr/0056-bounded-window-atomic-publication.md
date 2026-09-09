@@ -64,9 +64,32 @@ journal factory and the wrapper's invocation store from one durable backend.
 Row allocation preflight belongs to the RowBinary encoder. Typed multiset
 aggregation has no I/O dependency. The sink consumes a binary-ingest port;
 the existing HTTP adapter owns endpoint/format admission and request identity.
-Window failures extend the canonical process-error contract.
+Window failures belong to the bounded-window value contract. The target owns
+its publication lifecycle directly; staging remains a separate collaborator.
+The composition root injects `WindowMetadataStore`; `FileWindowMetadataStore`
+implements atomic replacement and durable removal. Publication inspection takes
+the current lease because reconciling a published UUID also settles its pending
+marker. Marker inspection and removal share all-writer exclusion, including on
+recovery; nested operations do not reacquire a non-reentrant guard.
 
-The implementation remains blocked for merge while hard architecture fitness or
-layer baseline checks fail. This decision does not change their thresholds,
-exclusions, algorithms, or baseline; structural improvements require measured
-validation rather than a new exemption.
+The hard architecture thresholds and import exclusions remain unchanged. Runtime
+uses `datetime.UTC` directly on the supported Python 3.11+ range; the existing
+`dpone._compat.UTC` export remains available to callers. Mypy checks the declared
+minimum supported version. Removing the obsolete compatibility hop reduces
+cross-layer coupling without changing the timestamp object or behavior.
+
+The coarse layer snapshot is refreshed through `check-layer-metrics
+--write-baseline`, as documented in the quality-metrics guide. Its former snapshot
+recorded 8,027 edges, 2,405 cross-layer edges and runtime-to-contracts flow 194.
+The public root already had 8,938 edges, 2,679 cross-layer edges and flow 199.
+The integrated graph has 8,953 edges, 2,680 cross-layer edges and flow 208;
+its cross-layer ratio is 0.299341003 and clustering is 0.181596463.
+
+The nine additional runtime-to-contracts edges are the executor, HTTP adapter,
+admission policy, three interval-runtime model dependencies, staging, target,
+and PostgreSQL source. They consume canonical value/error contracts in the
+allowed direction. This reviewed feature growth resets the coarse trend
+snapshot, not the hard limits, tolerance, exclusions, or module-size debt caps.
+The prior failing snapshot remains in local verification evidence. Baseline
+refresh alone is not proof of improved coupling; the hard graph checks and
+canonical-owner cleanup establish that independently.

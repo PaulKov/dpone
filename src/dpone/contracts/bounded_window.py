@@ -14,7 +14,21 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import cast
 
-from dpone.contracts.process_errors import WindowContractError
+
+class WindowContractError(RuntimeError):
+    """Terminal invalid capability, identity, reconciliation, or state."""
+
+
+class WindowTransientError(RuntimeError):
+    """Adapter-classified transient fault; reconciliation is still mandatory."""
+
+
+class WindowOutcomeUnknown(WindowContractError):
+    """An operation may have committed; automatic replay is forbidden."""
+
+
+class WindowLeaseLost(WindowContractError):
+    """Writer lease expired or was replaced by a newer fencing token."""
 
 
 class PublicationStatus(str, Enum):  # noqa: UP042 - Python 3.10 typing compatibility.

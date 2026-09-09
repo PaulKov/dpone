@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -14,8 +13,7 @@ PARENT = ROOT / "docs/feature-design-ci-pr-gate-exact-sha-evidence.md"
 MKDOCS = ROOT / "mkdocs.yml"
 ADR_0037 = ROOT / "docs/adr/0037-immutable-agent-pr-merge-closure.md"
 DESIGN_BASE = "c5567128e6e9b847b4b2a023a74ea6d60e7ccd09"
-ENVELOPE_SOURCE = "518537e616033ecf86bae96d831b8deb23eb8bca"
-PR2_MERGE = "ec0323feba829d547e5f9c2d23acaac5b686f1a4"
+FROZEN_FIXTURES = ROOT / "tests/fixtures/ci-shadow-pr3b/pre-split"
 SENSITIVE_SHA256 = "55b80fe3c773f0313e07288083403e32a8fa002813e96da8c61953c4fede0679"
 CODEQL_PROFILE_SHA256 = "36a5ff903eab36601bd3cfe3636a53497a9d72cd7ca71ce39ef9c19a8aef3c88"
 QUALITY_JOB_SHA256 = "734cd4a8eb1b6105bff06af68e616108ab03f0b0b7f203eab3e66d5a859c9b32"
@@ -44,15 +42,10 @@ def _marked_yaml(text: str, marker: str) -> dict[str, Any]:
     return parsed
 
 
-def _git_yaml(commit: str, path: str) -> dict[str, Any]:
-    completed = subprocess.run(
-        ["git", "show", f"{commit}:{path}"],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    parsed = yaml.safe_load(completed.stdout)
+def _fixture_yaml(path: str) -> dict[str, Any]:
+    """Read frozen input bytes without claiming historical Git or hosted proof."""
+
+    parsed = yaml.safe_load((FROZEN_FIXTURES / path).read_text(encoding="utf-8"))
     assert isinstance(parsed, dict)
     return parsed
 
@@ -260,20 +253,14 @@ def test_pr3b_codeql_profile_is_exact_action_only_yaml() -> None:
         assert forbidden in profile_section
 
 
-def test_pr3b_adr0037_fingerprints_are_reproducible() -> None:
+def test_pr3b_adr0037_fixture_fingerprints_are_reproducible() -> None:
     raw = _read(SPEC)
     replacement = _marked_yaml(raw, "pr3b-adr0037-attestor-profile")
-    pr2_projection = _attestor_projection(_git_yaml(PR2_MERGE, ".github/workflows/ci.yml"))
-    base_ci = _git_yaml(DESIGN_BASE, ".github/workflows/ci.yml")
-    source_ci = _git_yaml(ENVELOPE_SOURCE, ".github/workflows/ci.yml")
+    base_ci = _fixture_yaml(".github/workflows/ci.yml")
     base_projection = _attestor_projection(base_ci)
-    receipt = _git_yaml(DESIGN_BASE, ".github/workflows/agent-pr-receipt.yml")
-    source_receipt = _git_yaml(ENVELOPE_SOURCE, ".github/workflows/agent-pr-receipt.yml")
+    receipt = _fixture_yaml(".github/workflows/agent-pr-receipt.yml")
 
-    assert pr2_projection == base_projection
-    assert _execution_envelope(source_ci, "quality") == _execution_envelope(base_ci, "quality")
-    assert _execution_envelope(source_receipt, "merge-closure") == _execution_envelope(receipt, "merge-closure")
-    assert _canonical_sha256(pr2_projection) == SENSITIVE_SHA256
+    assert _canonical_sha256(base_projection) == SENSITIVE_SHA256
     assert _canonical_sha256(_execution_envelope(base_ci, "quality")) == QUALITY_JOB_SHA256
     assert _canonical_sha256(_execution_envelope(receipt, "merge-closure")) == MERGE_JOB_SHA256
     assert _canonical_sha256(replacement["producer"]) == GOVERNANCE_PRODUCER_SHA256

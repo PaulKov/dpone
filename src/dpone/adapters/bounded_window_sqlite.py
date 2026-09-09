@@ -12,8 +12,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from dpone.contracts.bounded_window import WindowLease, WindowRecord
-from dpone.contracts.process_errors import WindowContractError, WindowLeaseLost
+from dpone.contracts.bounded_window import WindowContractError, WindowLease, WindowLeaseLost, WindowRecord
 
 
 class SQLiteWindowStore:

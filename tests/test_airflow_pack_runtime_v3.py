@@ -622,7 +622,10 @@ def test_airflow_connection_secret_volume_operator_projects_uri_files_without_en
         "attempt_ref",
         "cleanup_policy",
     }
-    assert projector.events == [("upsert", "airflow-example", published_secret), ("delete", "airflow-example", published_name)]
+    assert projector.events == [
+        ("upsert", "airflow-example", published_secret),
+        ("delete", "airflow-example", published_name),
+    ]
     assert "mssql+pymssql://" not in json.dumps(operator.full_pod_spec)
     assert "clickhouse://user:pwd" not in json.dumps(operator.full_pod_spec)
     built = operator.build_pod_request_obj(context=_airflow_task_context())

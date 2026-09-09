@@ -88,6 +88,7 @@ from pathlib import Path
 from time import sleep, time
 
 from dpone.adapters.bounded_window_journal import WindowJournal
+from dpone.adapters.window_metadata_files import FileWindowMetadataStore
 from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
 from dpone.runtime.bounded_window_execution import BoundedWindowExecutor
 from dpone.runtime.rolling_window_runtime import RollingWindowRuntime
@@ -114,7 +115,8 @@ def build_window_runtime(
         schema=schema, database="analytics", table="events",
         window_column="observed_at", target_id=target_id,
         connector_factory=ch_connect, http_runner_factory=http_runner_factory,
-        work_dir=work_dir, max_encoded_bytes=4 * 1024 * 1024,
+        work_dir=work_dir,
+        metadata_store=FileWindowMetadataStore(), max_encoded_bytes=4 * 1024 * 1024,
         writer_guard=writer_guard,
     )
 

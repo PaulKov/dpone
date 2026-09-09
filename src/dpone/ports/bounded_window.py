@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
-from typing import Protocol
+from collections.abc import Iterable, Iterator, Sequence
+from contextlib import AbstractContextManager
+from pathlib import Path
+from typing import Any, Protocol
 
 from dpone.contracts.bounded_window import (
     ChunkReceipt,
@@ -60,8 +62,8 @@ class WindowTarget(Protocol):
     def publish(self, plan: WindowPlan, generation: str, lease: WindowLease) -> None:
         """Perform one atomic publication; never automatically retry internally."""
 
-    def inspect_publication(self, plan: WindowPlan, generation: str) -> PublicationStatus:
-        """Prove observed generation identity; ambiguity returns unknown."""
+    def inspect_publication(self, plan: WindowPlan, generation: str, lease: WindowLease) -> PublicationStatus:
+        """Reconcile generation and settle markers under fencing; ambiguity returns unknown."""
 
 
 class WindowStore(Protocol):
@@ -105,3 +107,49 @@ class WindowExecutor(Protocol):
 
     def execute_leased(self, plan: WindowPlan, lease: WindowLease) -> WindowResult:
         """Complete or reconcile the immutable plan under caller-owned fencing."""
+
+
+class ExclusiveWindowWriterGuard(Protocol):
+    """Trusted infrastructure boundary covering ALL target and staging writers."""
+
+    def validate(self, target_id: str, physical_target: str) -> None:
+        """Prove exclusive authority for this physical target, or raise."""
+
+    def assert_lease(self, lease: WindowLease) -> None:
+        """Assert live authority and fencing epoch at each mutation boundary."""
+
+    def fence_attempt(self, lease: WindowLease, operation_id: str) -> None:
+        """Stop/join old writers before return; operation_id is the staging table/query ID."""
+
+    def hold(self, lease: WindowLease) -> AbstractContextManager[None]:
+        """Hold backend exclusion through request completion, including lost replies.
+
+        Expiration must stop/join active server writers before a successor enters.
+        assert_lease alone is insufficient to satisfy this lifetime contract.
+        """
+
+
+class WindowBinaryIngest(Protocol):
+    """Validate physical endpoint/format and settle an identified HTTP write."""
+
+    def insert_window_stream(
+        self, database: str, table: str, columns: Sequence[str], chunks: Iterable[bytes], query_id: str
+    ) -> object:
+        """Require synchronous RowBinary, validate database and bind query identity."""
+
+
+class WindowMetadataStore(Protocol):
+    """Durable metadata persistence supplied by the composition root.
+
+    Save atomically replaces a complete record and settles durable storage before
+    returning. Removal is idempotent and durable. Invalid records fail closed.
+    """
+
+    def load(self, path: Path) -> dict[str, Any] | None:
+        """Return a complete version-one record or absent; reject corruption."""
+
+    def save(self, path: Path, value: dict[str, Any]) -> None:
+        """Atomically persist a complete record before acknowledging success."""
+
+    def remove(self, path: Path) -> None:
+        """Durably remove a reconciled record; tolerate absence."""

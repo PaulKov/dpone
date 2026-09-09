@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import subprocess
 from dataclasses import dataclass, replace
@@ -7,6 +8,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from tests.agent_policy._ci_shadow_history_fixtures import commit_files, integration_repository
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-implementation.yml"
@@ -15,20 +17,12 @@ ADR_PATH = "docs/adr/0037-immutable-agent-pr-merge-closure.md"
 CONTRACT = ROOT / CONTRACT_PATH
 
 BASE = "b3200e89ef375eeead7213e2c13d7c0fb33ff659"
-BASE_PARENT = "f18298c14af247225758f7fe8901bc8462994dd4"
-BASE_TREE = "dd63f92532f438d7a72502815d5655ba52d6e11c"
 INTEGRATION_BASE = "4f2b924230ae90eb32a82db9e3510338eafa07ef"
 INTEGRATION_BASE_TREE = "efbb5fc284c58ddf26ab1d64459f7f2e439af6de"
 REVIEWED_HEAD = "d0fcf7d99d79b85ea5a2681166db59645c50d7ce"
 INTEGRATION_COMMIT = "0250d99a6c3b1344aebbe80a54455feda25a730d"
 INTEGRATION_TREE = "6e9eb6485c46933a8d90a00e6f9ffdc4a8599314"
 INTEGRATION_METHOD = "merge"
-APPROVED_SPEC_BLOB = "44816f5e13719e5bb6455b817f2e3295f96ec963"
-ACCEPTED_ADR_BLOB = "04705ee802cae434246c779945691a724c5c8851"
-DESIGN_TASK_BLOB = "46ff48b63710630570ca292fc763117414eb9a8e"
-AMENDMENT_TASK_BLOB = "04c705226ae0c533a85d8f06709ccdbb2933622d"
-AGENT_RECEIPT_WORKFLOW_BLOB = "ba0db5cffbacc77038da9b5d804703bafb2a75f7"
-IMPLEMENTATION_TASK_AT_INTEGRATION_BLOB = "214675700a166e754d2d90a2c7cb5cd60316bfa0"
 RETIRED_IMPLEMENTATION_TASK_BLOB = "ee7a69b5b8ecb23be5bff783df96303a1320c8c8"
 
 MERGE_RECEIPT_RUN_ID = 31777266874
@@ -45,7 +39,7 @@ MERGE_RECEIPT_CHECK_APP_ID = 15368
 
 @dataclass(frozen=True)
 class IntegrationIdentity:
-    """Immutable Git identities that delimit the historical implementation."""
+    """Immutable Git identities that delimit a synthetic implementation."""
 
     base: str
     base_tree: str
@@ -55,23 +49,13 @@ class IntegrationIdentity:
     method: str
 
 
-IMPLEMENTATION_IDENTITY = IntegrationIdentity(
-    base=INTEGRATION_BASE,
-    base_tree=INTEGRATION_BASE_TREE,
-    reviewed_head=REVIEWED_HEAD,
-    integration_commit=INTEGRATION_COMMIT,
-    integration_tree=INTEGRATION_TREE,
-    method=INTEGRATION_METHOD,
-)
-
-
 def _payload() -> dict[str, object]:
     parsed = yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
     assert isinstance(parsed, dict)
     return parsed
 
 
-def _git_output(*args: str, root: Path = ROOT) -> str:
+def _git_output(*args: str, root: Path) -> str:
     return subprocess.run(
         ["git", *args],
         cwd=root,
@@ -82,15 +66,11 @@ def _git_output(*args: str, root: Path = ROOT) -> str:
     ).stdout.strip()
 
 
-def _git_text(commit: str, path: str, *, root: Path = ROOT) -> str:
-    return _git_output("show", f"{commit}:{path}", root=root)
-
-
 def _assert_integration_identity(
     identity: IntegrationIdentity,
     *,
     tip: str,
-    root: Path = ROOT,
+    root: Path,
 ) -> None:
     """Bind a merge or squash integration without consulting ambient diffs."""
 
@@ -112,10 +92,10 @@ def _assert_integration_identity(
 
 
 def _changed_paths(
-    base: str = INTEGRATION_BASE,
-    scope_head: str = INTEGRATION_COMMIT,
+    base: str,
+    scope_head: str,
     *,
-    root: Path = ROOT,
+    root: Path,
 ) -> set[str]:
     output = _git_output(
         "diff",
@@ -133,40 +113,22 @@ def _covered(path: str, boundaries: set[str]) -> bool:
     return any(path == boundary or path.startswith(f"{boundary}/") for boundary in boundaries)
 
 
-def test_pr3b_implementation_contract_binds_receipt_proven_approved_base() -> None:
-    payload = _payload()
-    metadata = _git_text(INTEGRATION_COMMIT, SPEC_PATH).split("## Executive summary", maxsplit=1)[0]
+def test_pr3b_archived_contract_documents_approved_receipt_identity() -> None:
+    """Check retained metadata, not the availability or truth of old hosted receipts."""
 
-    _assert_integration_identity(IMPLEMENTATION_IDENTITY, tip="HEAD")
+    payload = _payload()
+    raw_task = CONTRACT.read_bytes()
+    blob_identity = hashlib.sha1(f"blob {len(raw_task)}\0".encode() + raw_task, usedforsecurity=False).hexdigest()
+    assert blob_identity == RETIRED_IMPLEMENTATION_TASK_BLOB
+    specification = (ROOT / SPEC_PATH).read_text(encoding="utf-8")
+    metadata = specification.split("## Executive summary", maxsplit=1)[0]
+
     assert payload["base_commit"] == BASE
-    assert _git_output("rev-parse", f"{BASE}^{{commit}}") == BASE
-    assert _git_output("rev-parse", f"{BASE}^") == BASE_PARENT
-    assert _git_output("rev-parse", f"{BASE}^{{tree}}") == BASE_TREE
-    assert _git_output("merge-base", BASE, INTEGRATION_BASE) == BASE
     assert metadata.count("- Status: APPROVED") == 1
     assert metadata.count("- Public-output amendment status: APPROVED") == 1
     assert "- Status: RESEARCHED" not in metadata
     assert "- Public-output amendment status: RESEARCHED" not in metadata
-    assert (
-        _git_text(INTEGRATION_COMMIT, SPEC_PATH).count(
-            "[x] Maintainer changed public-output amendment status to `APPROVED` after"
-        )
-        == 1
-    )
-
-    frozen = {
-        SPEC_PATH: APPROVED_SPEC_BLOB,
-        ADR_PATH: ACCEPTED_ADR_BLOB,
-        "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-spec.yml": DESIGN_TASK_BLOB,
-        "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-public-output-amendment.yml": AMENDMENT_TASK_BLOB,
-        ".github/workflows/agent-pr-receipt.yml": AGENT_RECEIPT_WORKFLOW_BLOB,
-    }
-    for path, blob in frozen.items():
-        assert _git_output("rev-parse", f"{BASE}:{path}") == blob
-        assert _git_output("rev-parse", f"{INTEGRATION_COMMIT}:{path}") == blob
-
-    assert _git_output("rev-parse", f"{INTEGRATION_COMMIT}:{CONTRACT_PATH}") == IMPLEMENTATION_TASK_AT_INTEGRATION_BLOB
-    assert _git_output("hash-object", str(CONTRACT)) == RETIRED_IMPLEMENTATION_TASK_BLOB
+    assert specification.count("[x] Maintainer changed public-output amendment status to `APPROVED` after") == 1
 
     dependencies = payload["dependencies"]
     assert isinstance(dependencies, list)
@@ -231,11 +193,42 @@ def test_pr3b_implementation_contract_has_disjoint_writer_and_integrator_ownersh
     assert all(_covered(path, forbidden) for path in integrator_owned)
 
 
-def test_pr3b_implementation_contract_confines_the_frozen_integration_diff() -> None:
+@pytest.mark.parametrize("method", ["merge", "squash"])
+def test_pr3b_synthetic_integration_binds_identity_and_frozen_scope(tmp_path: Path, method: str) -> None:
+    """Exercise the original identity/blob/scope guarantees in a disposable Git DAG."""
+
     payload = _payload()
     allowed = set(payload["owned_paths"]) | set(payload["integrator_owned_paths"])
-    changed = _changed_paths()
+    frozen_paths = (
+        SPEC_PATH,
+        ADR_PATH,
+        "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-spec.yml",
+        "test_artifacts/agent-policy/dpone-ci-shadow-pr3b-public-output-amendment.yml",
+        ".github/workflows/agent-pr-receipt.yml",
+    )
+    root = tmp_path / method
+    history = integration_repository(
+        root,
+        frozen_files={path: (ROOT / path).read_text(encoding="utf-8") for path in frozen_paths},
+        changed_files={"tools/agent_policy/workflow_privilege_service.py": "# Synthetic reviewed implementation.\n"},
+        method=method,
+    )
+    identity = IntegrationIdentity(
+        history.base,
+        history.base_tree,
+        history.reviewed_head,
+        history.integration_commit,
+        history.integration_tree,
+        method,
+    )
+    _assert_integration_identity(identity, tip="HEAD", root=root)
+    assert _git_output("rev-parse", f"{history.base}^", root=root) == history.parent
+    for path, blob in history.frozen_blobs.items():
+        assert _git_output("rev-parse", f"{history.integration_commit}:{path}", root=root) == blob
 
+    changed = _changed_paths(history.base, history.integration_commit, root=root)
+
+    assert changed == {"tools/agent_policy/workflow_privilege_service.py"}
     assert all(_covered(path, allowed) for path in changed)
     assert not any(path.startswith(("src/", "packages/")) for path in changed)
     assert {
@@ -245,6 +238,16 @@ def test_pr3b_implementation_contract_confines_the_frozen_integration_diff() -> 
         "pyproject.toml",
         "uv.lock",
     }.isdisjoint(changed)
+
+    tampered = commit_files(root, "synthetic later authority tamper", {SPEC_PATH: "Status: RESEARCHED\n"})
+    with pytest.raises(AssertionError):
+        assert _git_output("rev-parse", f"{tampered}:{SPEC_PATH}", root=root) == history.frozen_blobs[SPEC_PATH]
+    assert (
+        _git_output("rev-parse", f"{history.integration_commit}:{SPEC_PATH}", root=root)
+        == (history.frozen_blobs[SPEC_PATH])
+    )
+    _assert_integration_identity(identity, tip=tampered, root=root)
+    assert _changed_paths(history.base, history.integration_commit, root=root) == changed
 
 
 def test_frozen_scope_survives_adversarial_future_commits(tmp_path: Path) -> None:

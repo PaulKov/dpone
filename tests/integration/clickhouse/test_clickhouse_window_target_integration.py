@@ -18,8 +18,15 @@ from unittest.mock import patch
 
 import pytest
 
-from dpone.contracts.bounded_window import PublicationStatus, WindowLease, WindowPlan
-from dpone.contracts.process_errors import WindowContractError, WindowOutcomeUnknown, WindowTransientError
+from dpone.adapters.window_metadata_files import FileWindowMetadataStore
+from dpone.contracts.bounded_window import (
+    PublicationStatus,
+    WindowContractError,
+    WindowLease,
+    WindowOutcomeUnknown,
+    WindowPlan,
+    WindowTransientError,
+)
 from dpone.runtime.connectors.clickhouse import ClickHouseConnector
 from dpone.runtime.connectors.clickhouse_http_bulk import (
     ClickHouseHttpBulkRunner,
@@ -104,6 +111,7 @@ def window_target(clickhouse_connector, clickhouse_settings, tmp_path):
         connector_factory=connector,
         http_runner_factory=runner,
         work_dir=tmp_path,
+        metadata_store=FileWindowMetadataStore(),
         max_encoded_bytes=256,
         writer_guard=DisposableDatabaseAuthority(database),
     )
@@ -167,7 +175,7 @@ def test_exact_multiset_window_atomicity_and_restart(window_target, empty):
     # Replaying publication must never exchange back to the old generation.
     restarted.publish(plan, generation, lease)
     assert Counter(read(target)) == Counter(expected)
-    assert restarted.inspect_publication(plan, generation) == PublicationStatus.PUBLISHED
+    assert restarted.inspect_publication(plan, generation, lease) == PublicationStatus.PUBLISHED
 
 
 def test_lost_exchange_reply_is_reconciled_without_second_exchange(window_target):
@@ -325,7 +333,7 @@ def test_intervening_target_write_prevents_stale_generation_publication(window_t
     with pytest.raises(WindowContractError, match="Target changed"):
         target.publish(plan, generation, lease)
     assert Counter(read(target)) == Counter([*initial, added])
-    assert target.inspect_publication(plan, generation) == PublicationStatus.ABSENT
+    assert target.inspect_publication(plan, generation, lease) == PublicationStatus.ABSENT
     # An idempotent prepare may return the stale generation, but must never
     # destructively replace it; publication remains refused on every retry.
     assert target.prepare(plan, receipts, lease) == generation

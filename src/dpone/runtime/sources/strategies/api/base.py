@@ -18,10 +18,9 @@ if TYPE_CHECKING:
 from abc import abstractmethod
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from dpone._compat import UTC
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.sources.strategies.base import SourceStrategy
 from dpone.runtime.streaming_rows import StreamingRowsArtifact

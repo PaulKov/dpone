@@ -23,6 +23,7 @@ from .module_size_baseline import (
     write_module_size_baseline,
 )
 from .module_size_continuity import baseline_budget_issues, grandfathered_debt_allowed, retired_debt_issues
+from .module_size_root_migration import load_root_migration, normalized_root_prior
 
 AUDITED_BOOTSTRAP_COMMIT = "e1d93822b47234e940829319cac0dc9678f6906c"
 _ADR_EXCEPTION_SCHEMA = "dpone.module-size-debt-exception.v2"
@@ -114,6 +115,16 @@ def validate_module_size_baseline(
         for entry in (git_context.previous_baseline.entries if git_context and git_context.previous_baseline else ())
     }
     renamed_from = {new: old for old, new in (git_context.exact_renames if git_context else ())}
+    root_migration = (
+        load_root_migration(
+            repo_root=repo_root,
+            base_sha=git_context.base_sha,
+            head_sha=git_context.head_sha,
+            previous=git_context.previous_baseline,
+        )
+        if git_context is not None
+        else None
+    )
     for entry in baseline.entries:
         if trusted_module_paths is not None:
             if entry.path not in trusted_module_paths:
@@ -143,6 +154,7 @@ def validate_module_size_baseline(
             renamed_from=renamed_from,
             rename_only=git_context.rename_only,
         )
+        prior = normalized_root_prior(entry, prior, root_migration)
         if prior is not None:
             if entry.max_lines > prior.max_lines or entry.max_sloc > prior.max_sloc:
                 issues.append(ModuleSizePolicyIssue(entry.path, "exact baseline caps cannot increase"))

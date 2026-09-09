@@ -159,16 +159,22 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
+          no_comparison_base() {
+            echo "::error::ROOT_COMPARISON_UNAVAILABLE: the ratchet needs a reviewed successor commit and a real ancestor; do not restore retired history or substitute HEAD/empty-tree." >&2
+            exit 2
+          }
           BASE_SHA="$EVENT_BASE_SHA"
           if [ "$EVENT_NAME" = "pull_request" ]; then
             BASE_SHA="$(git merge-base "$HEAD_SHA" "$EVENT_BASE_SHA")"
           elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             BASE_SHA="$(git merge-base "$HEAD_SHA" "origin/$DEFAULT_BRANCH")"
             if [ "$BASE_SHA" = "$HEAD_SHA" ]; then
-              BASE_SHA="$(git rev-parse "${HEAD_SHA}^")"
+              BASE_SHA="$(git rev-parse --verify "${HEAD_SHA}^" 2>/dev/null)" || no_comparison_base
             fi
           fi
-          test -n "$BASE_SHA"
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = 0000000000000000000000000000000000000000 ]; then
+            no_comparison_base
+          fi
           uv run dpone docs check-module-size \
             --baseline docs/module_size_baseline.json \
             --base-ref "$BASE_SHA" \

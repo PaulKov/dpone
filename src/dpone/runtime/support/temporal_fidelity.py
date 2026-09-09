@@ -5,11 +5,10 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from dpone._compat import UTC
 from dpone.contracts.technical_columns import (
     is_offset_minutes_column,
     offset_minutes_column_name,

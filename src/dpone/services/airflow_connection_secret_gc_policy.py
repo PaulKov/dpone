@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import UTC, datetime  # type: ignore[attr-defined]
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from dpone_airflow_pack.connection_names import require_kubernetes_dns_label

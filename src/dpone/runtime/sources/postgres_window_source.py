@@ -15,8 +15,7 @@ import uuid
 from collections.abc import Callable, Iterator, Sequence
 from typing import Any
 
-from dpone.contracts.bounded_window import WindowChunk, WindowPlan
-from dpone.contracts.process_errors import WindowContractError
+from dpone.contracts.bounded_window import WindowChunk, WindowContractError, WindowPlan
 
 
 def _fingerprint(value: object) -> str:
