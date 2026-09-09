@@ -81,6 +81,7 @@ owned_paths:
 integrator_owned_paths:
 - CHANGELOG.md
 - mkdocs.yml
+- docs/quality-metrics.md
 read_only_paths:
 - docs/engineering-standards.md
 - docs/import-rules.md

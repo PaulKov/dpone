@@ -5,51 +5,30 @@ from __future__ import annotations
 import hashlib
 import os
 import stat
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
 from pathlib import Path
 
 from tools.agent_policy.workflow_privilege_contracts import (
     ScanLimits,
     Snapshot,
     SnapshotFile,
-    SnapshotReference,
     SnapshotResult,
     canonical_sha256,
     finding,
     valid_public_text,
 )
 from tools.agent_policy.workflow_privilege_mutation_observer import MutationObserver
+from tools.agent_policy.workflow_privilege_snapshot_state import (
+    _LeaseState,
+    _OpenFile,
+    _OpenPath,
+    finalize_snapshot,
+    snapshot_inventory,
+)
 
 _POLICY_PATH = ".agents/policy/workflow-security-privileged.yml"
 _INVALID_CODE_BY_STAGE = {"policy": "PRIVILEGE_INVALID_POLICY", "workflows": "PRIVILEGE_INVALID_WORKFLOW"}
 _DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 _FILE_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
-
-
-@dataclass(slots=True)
-class _OpenPath:
-    fd: int
-    parent_fd: int
-    name: str
-    metadata: os.stat_result
-    track_changes: bool
-
-
-@dataclass(slots=True)
-class _OpenFile(_OpenPath):
-    value: SnapshotFile
-
-
-@dataclass(slots=True)
-class _LeaseState:
-    observer: MutationObserver
-    directory_fds: tuple[int, ...]
-    directories: tuple[_OpenPath, ...]
-    policy: _OpenFile
-    workflows: tuple[_OpenFile, ...]
-    workflow_directory: _OpenPath | None
-    expected_names: tuple[str, ...]
 
 
 class _LimitExceeded(ValueError):
@@ -77,26 +56,7 @@ class SnapshotLease:
     def _finalize(self, *, policy_schema_version: int | None) -> SnapshotResult:
         snapshot = self.snapshot
         revalidates = self._revalidates() if snapshot.complete or snapshot.policy is not None else True
-        if not revalidates:
-            policy_only = not snapshot.complete
-            mutation = finding(
-                "PRIVILEGE_CONCURRENT_MUTATION",
-                snapshot.policy.path if policy_only and snapshot.policy is not None else ".github/workflows",
-                "policy changed during incomplete workflow acquisition"
-                if policy_only
-                else "policy or workflow inventory changed during acquisition",
-            )
-            snapshot = replace(
-                snapshot,
-                policy=None if policy_only else snapshot.policy,
-                complete=False,
-                manifest_sha256=None,
-                findings=(*snapshot.findings, mutation) if policy_only else (mutation,),
-            )
-        policy_sha = snapshot.policy.sha256 if snapshot.policy else None
-        reference = SnapshotReference(policy_sha, policy_schema_version, snapshot.manifest_sha256, snapshot.complete)
-        self.close()
-        return SnapshotResult(findings=snapshot.findings, snapshot=snapshot, reference=reference)
+        return finalize_snapshot(snapshot, revalidates=revalidates, policy_schema_version=policy_schema_version)
 
     def _revalidates(self) -> bool:
         try:
@@ -432,22 +392,6 @@ def _read_fd(descriptor: int, expected_size: int) -> bytes:
 def _close_descriptors(values: list[int]) -> None:
     for descriptor in reversed(values):
         os.close(descriptor)
-
-
-def snapshot_inventory(
-    snapshot: Snapshot, reference: SnapshotReference, overrides: Mapping[str, object] | None = None
-) -> dict[str, object]:
-    """Project one trusted snapshot/reference identity into report inventory."""
-    value: dict[str, object] = {
-        "complete": reference.complete,
-        "manifest_sha256": reference.manifest_sha256,
-        "workflow_count": snapshot.workflow_count,
-        **dict.fromkeys("job_count edge_count root_count route_count".split(), 0),
-        "overflow_dimensions": list(snapshot.overflow_dimensions),
-    }
-    value.update(overrides or {})
-    value["overflow_dimensions"] = sorted(set(value["overflow_dimensions"]))  # type: ignore[arg-type]
-    return value
 
 
 __all__ = ["SnapshotLease", "SnapshotReader", "snapshot_inventory"]
