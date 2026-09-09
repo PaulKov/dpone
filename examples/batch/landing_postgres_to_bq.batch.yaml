@@ -16,7 +16,7 @@ registry: ../registry/sources.yaml
 # - use naming templates + vars for DRY
 
 vars:
-  src_system: monolite
+  src_system: example_app
   src_database: demo_source
   owner_team: data-platform-team
   owner_contact: data-platform@example.com
