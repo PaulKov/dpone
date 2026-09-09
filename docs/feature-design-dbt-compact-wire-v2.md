@@ -1,8 +1,8 @@
 # Feature design: native compact delivery for dbt workspace wire v2
 
-- Status: APPROVED
+- Status: IMPLEMENTED
 - Owner: repository maintainer; implementation integrator: Codex
-- Issue: [draft implementation PR #2](https://github.com/PaulKov/dpone/pull/2); validation blockers remain
+- Issue: [implementation PR #2](https://github.com/PaulKov/dpone/pull/2)
 - Target release: TBD, through the established release controller
 - Last verified: 2026-09-09
 - Inspected upstream: `f8c6a4a5e75d167829c05f65d5d3033acb193878`
@@ -365,8 +365,8 @@ writers, if later needed, require separate worktrees and disjoint contracts.
 - [x] Current official comparisons and measurable acceptance are scoped.
 - [x] Test, documentation, rollout and ownership plans are present.
 - [x] Maintainer approved implementation in this task on 2026-09-09.
-- [ ] Red full-path test, implementation and green full-path evidence.
-- [ ] Required gates, fresh-context implementation review and upstream PR.
+- [x] Red full-path test, implementation and green full-path evidence.
+- [x] Required gates executed, fresh-context implementation review and upstream PR; historical gate failures recorded separately.
 - [ ] Separately authorized release readiness/publication decision.
 
 ## Implementation clarifications
@@ -382,3 +382,15 @@ immutable publication transaction. These refinements preserve existing authority
 The full-path red test also exposed sorting in both deployment artifact indexing
 and provider inventory parsing. Both now retain input reference order without
 inferring the wire; legacy runtime compatibility order handling remains intact.
+
+Implementation evidence is recorded in
+[`test_artifacts/dbt-compact-wire-v2/validation.md`](../test_artifacts/dbt-compact-wire-v2/validation.md).
+`IMPLEMENTED` describes completed feature behavior and scoped proof; it does not
+claim that unavailable historical repository evidence, live certification or
+release approval has been supplied.
+
+Native publication fault coverage distinguishes pre-publication I/O failure from
+a visible release whose parent durability is uncertain. Identical retries verify
+content and synchronize the parent before success, including concurrent-winner
+retries. The local Docker matrix runs the committed public source with networking
+disabled; fault injection targets I/O, never disables a validator.

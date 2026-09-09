@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
-from dpone.runtime.immutable_local_tree import ImmutableLocalTreeError, materialize_immutable_local_tree
+from dpone.runtime.immutable_local_tree import (
+    ImmutableLocalTreeDurabilityError,
+    ImmutableLocalTreeError,
+    materialize_immutable_local_tree,
+)
 
 
 class ImmutableLocalReleaseError(RuntimeError):
@@ -14,6 +18,10 @@ class ImmutableLocalReleaseError(RuntimeError):
     def __init__(self, message: str, *, path: Path) -> None:
         super().__init__(message)
         self.path = path
+
+
+class ImmutableLocalReleaseDurabilityError(ImmutableLocalReleaseError):
+    """The complete release is visible, but parent durability remains uncertain."""
 
 
 def materialize_immutable_local_release(release_dir: Path, files: Mapping[str, bytes]) -> str:
@@ -29,10 +37,14 @@ def materialize_immutable_local_release(release_dir: Path, files: Mapping[str, b
             allowed_parent=release_dir.parent,
             root=cache_root,
         )
+    except ImmutableLocalTreeDurabilityError as exc:
+        raise ImmutableLocalReleaseDurabilityError(
+            "immutable release is visible but parent durability could not be proven", path=exc.path
+        ) from exc
     except ImmutableLocalTreeError as exc:
         raise ImmutableLocalReleaseError(
             str(exc).replace("immutable tree", "immutable release"), path=exc.path
         ) from exc
 
 
-__all__ = ["ImmutableLocalReleaseError", "materialize_immutable_local_release"]
+__all__ = ["ImmutableLocalReleaseError", "ImmutableLocalReleaseDurabilityError", "materialize_immutable_local_release"]

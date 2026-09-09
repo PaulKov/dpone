@@ -156,6 +156,8 @@ models or proves SQL delivery. Missing optional tooling is reported as SKIP.
 
 | Symptom | Meaning | Recovery |
 | --- | --- | --- |
+| `DPONE_COMPACT_PACK_RELEASE_WRITE_FAILED` | Storage failed during native publication | Repair storage and retry identical inputs; no success is reported |
+| `DPONE_COMPACT_PACK_RELEASE_DURABILITY_UNCERTAIN` | A complete release is visible, but parent-directory durability is unproven | Retain the visible tree and retry identical inputs after storage recovery; retry verifies bytes and synchronizes the parent |
 | `DPONE_COMPACT_PACK_RELEASE_WORKSPACE_INVALID` | Native metadata, full inventory, source bytes, input mode or selected DAG set failed validation | Recompile the complete workspace with compatible components; keep the whole generated tree and omit partial DAG filtering |
 | `DPONE_DBT_SELECTION_DRIFT` at launch | Verified producer/wire, execution pack, ordered trio or source identity disagrees | Regenerate compile, materialize and deployment artifacts as a single chain; inspect safe identities at each boundary |
 | Runtime artifact integrity failure after READY | A pinned artifact changed or no longer matches the receipt | Restore retained immutable bytes or create a new release; do not reuse altered files under the old identity |
@@ -186,3 +188,32 @@ Regenerate existing artifacts through producers and retain the prior deployment
 and runtime image for rollback. A deployment rollback restores code and bindings;
 it does not undo already committed data. See [compatibility](compatibility.md)
 and the [design contract](feature-design-dbt-compact-wire-v2.md).
+
+## Reproduce the offline Docker matrix
+
+Commit the tested source first. The test image receives a bundle containing only
+the current commit and its public baseline. It never mounts a host worktree or
+credentials. Dependency installation needs network access during image build;
+the actual tests run with networking disabled. Docker Desktop must be running.
+
+```bash
+context="$(mktemp -d)"
+git bundle create "$context/source.bundle" HEAD refs/remotes/origin/master
+cp docker/dbt-compact-tests/Dockerfile "$context/Dockerfile"
+docker build --build-arg SOURCE_COMMIT="$(git rev-parse HEAD)" \
+  --build-arg BASE_COMMIT="$(git merge-base HEAD origin/master)" \
+  -t dpone-dbt-compact-tests "$context"
+docker run --rm --network none --cpus 2 dpone-dbt-compact-tests
+```
+
+The default matrix covers native delivery, CLI aliases, descriptors, source
+closure, archive hazards, stage/publication faults and exact metadata limits.
+For the complete offline suite, override the command:
+
+```bash
+docker run --rm --network none --cpus 2 dpone-dbt-compact-tests \
+  uv run pytest -m "not integration_live" -n 2 --dist loadfile
+```
+
+Historical Git assertions remain fail-closed when their original commits are
+absent from the public snapshot. Container PASS is not SQL certification.

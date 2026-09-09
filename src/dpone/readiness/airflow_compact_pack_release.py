@@ -38,6 +38,7 @@ from dpone.readiness.airflow_compact_pack_runtime_payloads import (
 )
 from dpone.readiness.airflow_deployment_projection import compute_release_id
 from dpone.readiness.airflow_local_release import (
+    ImmutableLocalReleaseDurabilityError,
     ImmutableLocalReleaseError,
     materialize_immutable_local_release,
 )
@@ -290,7 +291,18 @@ def _materialize_workspace(
         ) from exc
     release_id = release["release_id"]
     release_dir = cache / "releases" / _digest_dir(release_id)
-    materialize_immutable_local_release(release_dir, files)
+    try:
+        materialize_immutable_local_release(release_dir, files)
+    except ImmutableLocalReleaseDurabilityError as exc:
+        raise CompactPackReleaseError(
+            "DPONE_COMPACT_PACK_RELEASE_DURABILITY_UNCERTAIN",
+            "complete release is visible but durable publication is unproven; retry identical inputs after storage recovery",
+        ) from exc
+    except OSError as exc:
+        raise CompactPackReleaseError(
+            "DPONE_COMPACT_PACK_RELEASE_WRITE_FAILED",
+            "release publication failed; inspect storage and retry identical inputs",
+        ) from exc
     return CompactPackReleaseReport(
         release_id=release_id,
         release_dir=release_dir.as_posix(),

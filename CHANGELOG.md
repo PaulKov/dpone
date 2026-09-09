@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Native compact publication now reports storage failures safely, distinguishes
+  uncertain durability from immutable conflicts, and re-synchronizes retained
+  releases on identical retries.
+
 ### Fixed
 
 - Deliver complete multi-project dbt wire-v2 compile trees through compact

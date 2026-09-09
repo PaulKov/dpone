@@ -28,16 +28,17 @@ Eight pre-existing test-format defects were corrected without behavior changes.
 | Architecture fitness regression test | PASS | Cross-layer ratio 2685/8952 = 0.299932976, below 0.300; original implementation was 0.30110528 |
 | Fresh correctness/architecture review | PASS | Independent read-only review approves the final refactor; source closure, mutability, failure ordering and compatibility reviewed |
 | Fresh documentation/CLI UX review | PASS | Output safety, projection instructions, recovery and output semantics reviewed; seven-case CLI coverage includes aliases |
-| Refactor focused suite | UNVERIFIED | Final run pending; initial implementation suite had 183 passing cases |
+| Refactor focused suite | PASS | 149 cases in 123.92 s, including real offline toolchain and shared source-policy consumers |
 | Complete offline suite after refactor | UNVERIFIED | Running; preceding dependency-complete run had 19183 passed, 571 skipped and eight failures |
 | Ruff lint and format | PASS | Entire repository passes both |
 | Mypy | PASS | 1142 source files |
 | Import rules | PASS | No violations |
 | Layer metrics baseline gate | PASS | 8952 edges; maximum cross flow 199, allowed baseline delta 5 |
-| Module-size historical baseline | FAIL | Last exact-commit check reports 51 unavailable/non-ancestor baseline commits in unchanged debt entries; final-head check pending |
-| Documentation links/generated references/language/build | UNVERIFIED | Final documentation run pending; previous run passed 793 Markdown files, 3124 links, 3 references, 32 language tests and strict MkDocs |
+| Module-size historical baseline | FAIL | Exact code commit `9556727ea2282c83367a1511735924e3db98649c`: 51 unavailable/non-ancestor baseline commits in unchanged debt entries |
+| Documentation links/generated references/language/build | PASS | 793 Markdown files, 3124 links, 3 references, 32 language tests and strict MkDocs |
 | Airflow public contracts and compatibility | PASS | CLI 25/25, Python 16/16, modules 9/9, schemas 75/75, package 1/1; 19 compatibility entries |
-| Four package builds and Twine | UNVERIFIED | Refactor rebuild running; prior implementation built all eight artifacts successfully |
+| Four package builds and Twine | PASS | Four wheels and four source distributions rebuilt successfully |
+| Changed-content privacy check | PASS | No new host paths or credential patterns; reformatted tests independently verified AST-identical |
 | Task contract | PASS | 0 errors, 0 warnings |
 | Live SQL / hosted Airflow / physical target admission | SKIP | No authorized live environment; synthetic route inputs are not certification |
 | Production activation / package publication | N/A | Outside task; no authority requested or exercised |
@@ -96,3 +97,11 @@ The [delivery guide](../../docs/dbt-compact-delivery.md), compatibility notes,
 ADR 0052 amendment, CLI reference and changelog explain the complete delivery
 journey, identity preservation, migration, failure recovery and production limits.
 Raw host logs, temporary source trees and local user paths are not published.
+
+Focused command for the final refactor:
+
+```bash
+uv run pytest tests/test_dbt_compact_wire_v2.py tests/test_dbt_compact_wire_v2_cli.py tests/test_dbt_compact_wire_v2_boundaries.py tests/test_dbt_release_wire_dispatch.py tests/test_dbt_workspace_cache_installation.py tests/test_dbt_source_inventory_binding.py tests/test_dbt_release_artifact_index.py -q -o addopts=''
+```
+
+Full-suite command: `uv run pytest -m "not integration_live" -n auto --dist loadfile`.

@@ -58,6 +58,11 @@ owned_paths:
 - src/dpone/gitops/paths.py
 - src/dpone/services/dbt_release_source_reader.py
 - src/dpone/contracts/dbt_source_inventory_binding.py
+- src/dpone/runtime/immutable_local_tree.py
+- src/dpone/runtime/immutable_local_release.py
+- src/dpone/readiness/airflow_local_release.py
+- tests/test_dbt_compact_wire_v2_failures.py
+- docker/dbt-compact-tests/Dockerfile
 integrator_owned_paths:
 - CHANGELOG.md
 - mkdocs.yml

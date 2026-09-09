@@ -102,6 +102,7 @@ def _materialize_at(
     try:
         if _entry_exists(parent_descriptor, tree_name):
             _verify_existing_at(parent_descriptor, tree_name, files, tree_dir=tree_dir)
+            _require_parent_durability(parent_descriptor, tree_dir)
             return "no_op"
         os.mkdir(staging_name, mode=0o700, dir_fd=parent_descriptor)
         staging_descriptor = os.open(staging_name, _DIRECTORY_FLAGS, dir_fd=parent_descriptor)
@@ -121,19 +122,24 @@ def _materialize_at(
         except FileExistsError:
             _remove_tree_at(parent_descriptor, staging_name)
             _verify_existing_at(parent_descriptor, tree_name, files, tree_dir=tree_dir)
+            _require_parent_durability(parent_descriptor, tree_dir)
             return "no_op"
-        try:
-            os.fsync(parent_descriptor)
-        except OSError as exc:
-            raise ImmutableLocalTreeDurabilityError(
-                "immutable tree rename completed but parent durability could not be proven",
-                path=tree_dir,
-            ) from exc
+        _require_parent_durability(parent_descriptor, tree_dir)
         return "created"
     except BaseException:
         if _entry_exists(parent_descriptor, staging_name):
             _remove_tree_at(parent_descriptor, staging_name)
         raise
+
+
+def _require_parent_durability(parent_descriptor: int, tree_dir: Path) -> None:
+    """An equal retry must also finish any previously uncertain rename durability."""
+    try:
+        os.fsync(parent_descriptor)
+    except OSError as exc:
+        raise ImmutableLocalTreeDurabilityError(
+            "immutable tree is visible but parent durability could not be proven", path=tree_dir
+        ) from exc
 
 
 def _normalized_files(files: Mapping[str, TreeSource]) -> dict[str, TreeSource]:
