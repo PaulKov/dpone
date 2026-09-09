@@ -127,9 +127,15 @@ def build_window_runtime(
             schema_fingerprint=fingerprint, batch_rows=8192,
         )
 
+    def record_evidence(plan, generation, receipts, lease):
+        write_evidence(
+            plan, generation, receipts, lease,
+            metrics=target.generation_evidence(plan, generation),
+        )
+
     def executor_factory(source):
         return BoundedWindowExecutor(
-            source=source, target=target, store=store, evidence=write_evidence,
+            source=source, target=target, store=store, evidence=record_evidence,
             journal_factory=lambda lease, run_id: WindowJournal(store, lease, run_id),
             advance_state=advance_state, sleeper=sleep,
         )
@@ -145,11 +151,14 @@ def build_window_runtime(
 The ClickHouse connector factory returns the existing connector interface with
 `execute_query`, and `http_runner_factory()` returns the existing HTTP
 bulk runner. See the synthetic route test for concrete local-service wiring.
-Callback signatures are `write_evidence(plan, generation, receipts, lease)` and
-`advance_state(plan, lease)`. Evidence must be durable before its callback returns.
-Inside the evidence callback, `target.generation_evidence(plan, generation)`
-provides generated window/chunk metrics, UTC-day counts, bounds, NULL counts,
-source/staging/target counts, encoded bytes, and observed phase durations.
+In this example, the injected durable writer accepts
+`write_evidence(plan, generation, receipts, lease, *, metrics)`;
+`advance_state(plan, lease)` keeps its ordinary signature. The local
+`record_evidence` adapter binds the target and satisfies the executor's
+four-argument evidence callback. Evidence must be durable before the writer
+returns. Its `metrics` argument supplies generated window/chunk metrics, UTC-day
+counts, bounds, NULL counts, source/staging/target counts, encoded bytes, and
+observed phase durations.
 `stage_seconds` measures overlapped source/HTTP/verification work; it does not
 invent independent extract/load times. A publication duration lost with the
 process is explicitly unavailable. Source metric parity inferred from a matching
