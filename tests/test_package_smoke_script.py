@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import shlex
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -82,3 +83,14 @@ def test_run_smoke_commands_sets_project_dir_and_checks_semantics(monkeypatch) -
     assert len(seen) == len(commands)
     assert all(item[1] == str(ROOT) for item in seen)
     assert all(item[2] == str(ROOT) for item in seen)
+
+
+def test_default_package_smoke_validates_real_example_registry_bindings() -> None:
+    """Keep release smoke inputs executable, beyond mocked command assembly."""
+    module = _load_module()
+    commands = module.build_smoke_plan(
+        project_root=ROOT,
+        cases=module.DEFAULT_SMOKE_CASES,
+        dpone_cmd=f"{shlex.quote(sys.executable)} -m dpone.cli.main",
+    )
+    module.run_smoke_commands(commands, project_root=ROOT)
