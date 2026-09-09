@@ -71,6 +71,11 @@ implements atomic replacement and durable removal. Publication inspection takes
 the current lease because reconciling a published UUID also settles its pending
 marker. Marker inspection and removal share all-writer exclusion, including on
 recovery; nested operations do not reacquire a non-reentrant guard.
+Schema and topology admission is repeated under that guard before building or
+reusing an unpublished generation and before exchange. This prevents a later
+DDL change from escaping parity checks that use the configured column list.
+Already-published UUID recovery precedes admission so historical publication
+remains recognizable after subsequent legitimate schema changes.
 
 The hard architecture thresholds and import exclusions remain unchanged. Runtime
 uses `datetime.UTC` directly on the supported Python 3.11+ range; the existing

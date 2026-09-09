@@ -191,7 +191,7 @@ An evidence or state failure can occur after data has become visible.
 | Publication reply lost | Inspect persisted generation UUIDs; never blindly repeat EXCHANGE. |
 | Publication outcome unknown | Stop and reconcile physical target and generation identities; retain journals and tables. |
 | Evidence/state failed after publication | Retry the original invocation; restore its persisted plan without opening a source snapshot. |
-| Target changed between preparation and publication | Refuse publication and preserve the changed target; do not publish the stale generation. |
+| Target data or schema changed between preparation and publication | Refuse publication and preserve the changed target; do not publish the stale generation. |
 
 A fresh invocation cannot bypass unresolved publication from an older run. Keep
 its invocation registry, chunk journal, and publication metadata together.
@@ -208,6 +208,10 @@ Typed multiset digests preserve multiplicity and supplement counts. Digest
 equality is probabilistic; synthetic integration tests also compare actual
 multisets. Immediately before publication, the target additionally compares exact
 outside-window multiplicities against the prepared generation under exclusion.
+Physical schema and topology are revalidated under the same all-writer guard
+before preparing a generation and before publication. The guard must also cover
+DDL writers. Recovery of an already published UUID pair remains valid after a
+later schema change and performs no new exchange.
 
 Encoded byte limits bound a row and emitted payload chunks, not driver buffers,
 source objects, retained consumer chunks, or process RSS. Independent worker

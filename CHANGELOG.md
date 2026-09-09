@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- Revalidate ClickHouse target schema and topology under writer exclusion before
+  generation preparation and exchange, preserving intervening schema changes.
 - Fence publication-marker cleanup during recovery and retry durable metadata
   deletion after a directory-sync failure. Inject target metadata persistence.
 - Remove redundant runtime UTC compatibility hops on the supported Python 3.11+

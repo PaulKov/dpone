@@ -152,6 +152,56 @@ def seed(target):
     return rows
 
 
+@pytest.mark.parametrize("phase", ["prepare", "prepared_retry", "publish"])
+def test_schema_drift_preserves_target_before_publication(window_target, phase):
+    target, plan, lease, _ = window_target
+    initial = seed(target)
+    target.validate(plan)
+    receipts = [target.stage(plan, chunk, "empty", iter(()), lease) for chunk in plan.chunks]
+    generation = target.io.name(plan, "generation")
+    if phase != "prepare":
+        assert target.prepare(plan, receipts, lease) == generation
+    with target.io.guard.hold(lease), target.io.connection() as connection:
+        original_uuid = target.io.uuid(connection, "target")
+        connection.execute_query(
+            f"ALTER TABLE {target.io.qualified('target')} ADD COLUMN extra String DEFAULT 'retain-me'"
+        )
+    with pytest.raises(WindowContractError, match="Physical schema"):
+        if phase == "publish":
+            target.publish(plan, generation, lease)
+        else:
+            target.prepare(plan, receipts, lease)
+    with target.io.connection() as connection:
+        assert target.io.uuid(connection, "target") == original_uuid
+        assert connection.get_records(f"SELECT extra FROM {target.io.qualified('target')}") == [("retain-me",)] * len(
+            initial
+        )
+        if phase == "prepare":
+            assert target.io.uuid(connection, generation) is None
+    assert Counter(read(target)) == Counter(initial)
+
+
+def test_published_replay_survives_later_schema_change(window_target):
+    target, plan, lease, _ = window_target
+    seed(target)
+    target.validate(plan)
+    receipts = [target.stage(plan, chunk, "empty", iter(()), lease) for chunk in plan.chunks]
+    generation = target.prepare(plan, receipts, lease)
+    target.publish(plan, generation, lease)
+    with target.io.guard.hold(lease), target.io.connection() as connection:
+        published_uuid = target.io.uuid(connection, "target")
+        connection.execute_query(
+            f"ALTER TABLE {target.io.qualified('target')} ADD COLUMN extra String DEFAULT 'retain-me'"
+        )
+    with patch("dpone.runtime.sinks.clickhouse_window_target.validate_target", side_effect=AssertionError):
+        assert target.prepare(plan, receipts, lease) == generation
+        target.publish(plan, generation, lease)
+        assert target.inspect_publication(plan, generation, lease) == PublicationStatus.PUBLISHED
+    with target.io.connection() as connection:
+        assert target.io.uuid(connection, "target") == published_uuid
+        assert connection.get_records(f"SELECT extra FROM {target.io.qualified('target')}") == [("retain-me",)] * 3
+
+
 @pytest.mark.parametrize("empty", [False, True])
 def test_exact_multiset_window_atomicity_and_restart(window_target, empty):
     target, plan, lease, options = window_target

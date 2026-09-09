@@ -192,12 +192,14 @@ class ClickHouseWindowTarget:
                     return generation
                 if status != PublicationStatus.ABSENT:
                     raise WindowOutcomeUnknown("Generation identity is ambiguous")
+                validate_target(io)
                 evidence = io.evidence(connector, generation)
                 if evidence.digest() != metadata.get("digest"):
                     raise WindowContractError("Prepared generation parity changed")
                 return generation
             # No publication record means no exchange was authorized. A leftover
             # private generation from interrupted preparation can be rebuilt.
+            validate_target(io)
             io.guard.fence_attempt(lease, generation)
             io.mutate(connector, f"DROP TABLE IF EXISTS {io.qualified(generation)} SYNC", lease)
             original_uuid = io.uuid(connector, io.table)
@@ -330,6 +332,7 @@ class ClickHouseWindowTarget:
                 return
             if status != PublicationStatus.ABSENT:
                 raise WindowOutcomeUnknown("Exchange cannot be retried without observed UUID identity")
+            validate_target(io)
             metadata = io.metadata_store.load(io.path(generation))
             if metadata is None or io.evidence(connector, generation).digest() != metadata.get("digest"):
                 raise WindowContractError("Generation changed before publication")
