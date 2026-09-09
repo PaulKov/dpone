@@ -3,6 +3,8 @@
 Date: 2026-09-09. Approved specification:
 [`docs/feature-design-dbt-compact-wire-v2.md`](../../docs/feature-design-dbt-compact-wire-v2.md).
 Baseline: `f8c6a4a5e75d167829c05f65d5d3033acb193878`.
+Implementation commit: `fc176c5281c37277fd9f095d3d0ca351456f6b15`.
+[Draft PR #2](https://github.com/PaulKov/dpone/pull/2).
 This is an implementation observation, not a route certificate or release receipt.
 
 ## Result and public contracts
@@ -21,7 +23,7 @@ that could overwrite captured files are rejected before publication.
 
 | Check | Status | Result |
 | --- | --- | --- |
-| New full-path and boundary tests plus existing payload/index/cache contracts | PASS | 181 tests in 52.59 s; command below |
+| New full-path and boundary tests plus existing payload/index/cache contracts | PASS | 183 tests in 36.62 s at implementation commit; command below |
 | Exact real offline dbt path | PASS | dbt-core 1.12.3 / dbt-sqlserver 1.11.1: real parse, workspace compile, compact, projection, provider/init-fetch, launcher and actual preflight parse/ls; included above |
 | Final CLI output safety and parity | PASS | 7 tests, including symlink/hardlink aliases, in 9.11 s |
 | Task contract | PASS | 0 errors and 0 warnings |
@@ -33,7 +35,7 @@ that could overwrite captured files are rejected before publication.
 | Layer metrics baseline gate | PASS | 8957 edges; cross ratio 0.301; maximum flow 199, allowed baseline delta 5 |
 | Architecture fitness cross-layer test | FAIL | Change raises ratio from baseline 0.29973148 to 0.30110528, above test limit 0.300; unresolved merge blocker |
 | Architecture average clustering observation | PASS | Decreases from baseline 0.18152796 to 0.18140714; existing baseline debt is not a new compliance claim |
-| Exact committed module-size gate | UNVERIFIED | Pending first implementation commit |
+| Exact committed module-size gate | FAIL | 51 unchanged debt entries reference unavailable/non-ancestor baseline commits; baseline-to-baseline rerun is not supported while this head is checked out |
 | Documentation links | PASS | 793 Markdown files / 3124 local links |
 | Generated references | PASS | 3/3 synchronized through generators |
 | Documentation language tests | PASS | 32 tests |
@@ -42,10 +44,11 @@ that could overwrite captured files are rejected before publication.
 | Compatibility registry | PASS | 19 entries |
 | Four package builds and Twine | PASS | Four wheels and four source distributions; no publication |
 | First complete offline suite | FAIL | 19091 passed, 580 skipped, 30 failed, 2 collection errors, 510.19 s; included one now-corrected schema fixture, missing optional dependencies and historical Git objects |
-| Final complete offline rerun | UNVERIFIED | Running with required optional dependencies installed; final result will replace this row |
+| Complete offline rerun with optional dependencies | FAIL | 19183 passed, 571 skipped, 8 failed in 291.87 s: architecture ratio plus seven historical Git-identity tests |
 | Fresh architecture/correctness review | PASS | Sidecar finding fixed; no further production blocker identified; evidence and broad gates remain binding |
 | Fresh docs/UX review | PASS | Output overwrite finding and projection documentation gaps fixed; reviewer reran five CLI tests |
 | Live SQL / hosted Airflow / physical target admission | SKIP | No authorized live environment; synthetic route inputs are not certification |
+| Initial PR CI observation | FAIL | Agent receipt cannot obtain prerequisite GitHub evidence; Quality preflight failed; other jobs still running when observed, not claimed green |
 | Production activation / package publication | N/A | Outside task; no authority requested or exercised |
 
 Focused command:
@@ -54,8 +57,10 @@ Focused command:
 uv run pytest tests/test_dbt_compact_wire_v2.py tests/test_dbt_compact_wire_v2_cli.py tests/test_dbt_compact_wire_v2_boundaries.py tests/test_dbt_release_wire_dispatch.py tests/test_airflow_compact_pack_runtime_payload_limits.py tests/test_dbt_runtime_payload_contract.py tests/test_dbt_workspace_cache_installation.py tests/test_dbt_release_artifact_index.py -q -o addopts=''
 ```
 
-Two report-alias cases were added after this focused run and are recorded in the
-final CLI rerun. Final suite command is the repository-required
+The two report-alias cases were added after broad-suite collection. The complete
+focused set was then rerun at the implementation commit and all 183 cases pass.
+No broad green result is claimed for the committed head. The broad suite command
+is the repository-required
 `uv run pytest -m "not integration_live" -n auto --dist loadfile`.
 
 ## Acceptance evidence map
@@ -96,3 +101,27 @@ the new architecture cross-layer budget failure without weakening the gate or
 adding artificial imports. The baseline formatter debt and final broad-suite
 failures must remain visible; unrelated historical CI evidence is not repaired in
 this task. No deployment, certification or release readiness is claimed.
+
+## Failure attribution and follow-up
+
+The seven non-architecture failures in the dependency-complete run are in
+`test_ci_shadow_pr3b_scope_contracts.py` (two),
+`test_ci_shadow_pr3b_spec_contracts.py` (one),
+`agent_policy/test_ci_shadow_pr3b_implementation_contract.py` (two),
+`agent_policy/test_ci_shadow_pr3a_implementation_contract.py` (one), and
+`test_ci_shadow_pr3b_output_amendment_contracts.py` (one). Their frozen historical
+Git objects cannot be resolved from this public snapshot. No alternate repository
+or private history was accessed to satisfy them.
+
+The eight format failures are unchanged baseline files:
+`test_airflow_asset_uri_mssql_aip60.py`, `test_airflow_desired_state_authority.py`,
+`test_airflow_pack_runtime_v3.py`, `test_cli_gitops_workload_catalog.py`,
+`test_gitops_remote_artifacts.py`, `test_object_storage_retention_cli.py`,
+`test_oss_code_quality_benchmark.py`, and `test_source_materialization.py` under
+`tests/`. No unrelated formatter sweep is included.
+
+The architecture ratio failure is introduced by this change, not attributed to
+baseline debt. Independent review recommends separating pure compact release
+policy from orchestration for cohesion, but calculates that this alone would not
+close the ratio gap. Further boundary work or an explicitly governed standards
+decision remains necessary; no exception or artificial dependency is applied.

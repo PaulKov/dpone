@@ -54,7 +54,7 @@ one object with report fields at the top level and a `meta` object for invocatio
 context. `--format markdown` wraps that object in a Markdown code block.
 
 `--output report.json` optionally mirrors stdout to a UTF-8 repository-relative
-file, replacing an existing report. Input/cache overlap, path escape and invalid
+file, replacing an existing report. Input/cache overlap, unsafe file aliases, path escape and invalid
 file destinations are rejected before materialization with
 `DPONE_COMPACT_PACK_RELEASE_OUTPUT_INVALID`, and no mirror is written. The mirror
 itself uses the existing ordinary file-write semantics, not an atomic release

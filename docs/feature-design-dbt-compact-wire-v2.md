@@ -2,7 +2,7 @@
 
 - Status: APPROVED
 - Owner: repository maintainer; implementation integrator: Codex
-- Issue: none opened; implementation PR pending validation
+- Issue: [draft implementation PR #2](https://github.com/PaulKov/dpone/pull/2); validation blockers remain
 - Target release: TBD, through the established release controller
 - Last verified: 2026-09-09
 - Inspected upstream: `f8c6a4a5e75d167829c05f65d5d3033acb193878`
