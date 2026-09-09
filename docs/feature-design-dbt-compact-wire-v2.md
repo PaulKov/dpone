@@ -322,8 +322,9 @@ architecture, docs and offline pytest gates from AGENTS.md. Build affected
 distribution packages and run twine checks before release readiness. Record exact
 commit, commands, outcomes, skips and environment dependencies. A fresh-context
 reviewer must inspect code, tests, compatibility, docs and evidence before the PR
-is described as merge-ready. Existing separate component tests are baseline
-evidence only; the required new red/preflight test remains pending approval.
+is described as merge-ready. Existing separate component tests provide baseline evidence. The approved native
+red/preflight scenarios and fault matrix are implemented; exact results and
+remaining verification limits are recorded in the linked validation report.
 
 ## Documentation plan
 

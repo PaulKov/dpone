@@ -268,3 +268,28 @@ def test_shared_publication_rejects_root_alias(tmp_path):
     with pytest.raises(OSError):
         materialize_immutable_local_release(alias / "releases" / "example", {"file": b"payload"})
     assert not list(real.iterdir())
+
+
+@pytest.mark.parametrize("schema", ["dpone.release-set.v1", "dpone.release-set.v2"])
+def test_valid_singleton_release_does_not_enter_native_or_legacy_compaction(tmp_path, schema):
+    from dpone.contracts.airflow_deployment import release_id
+    from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V1
+    from dpone.readiness.airflow_release_schema_validation import validate_release_set_schema
+    from tests.test_dbt_airflow_release_e2e import _compiled_release
+
+    root = _compiled_release(tmp_path)
+    release = json.loads((root / "release-set.json").read_bytes())
+    assert release["producer"]["wire_contract"] == DBT_RUNTIME_WIRE_V1
+    release["schema"] = schema
+    if schema == "dpone.release-set.v1":
+        release.pop("producer")
+        release.pop("selection_authority")
+    release["release_id"] = release_id(release)
+    validate_release_set_schema(release, path=root / "release-set.json")
+    (root / "release-set.json").write_text(json.dumps(release))
+    DbtReleaseIntegrityService().write(root)
+    DbtReleaseIntegrityService().verify(root)
+    cache = tmp_path / "cache"
+    report = materialize(root, cache)
+    assert not report.passed and not cache.exists()
+    assert report.blockers[0].startswith("DPONE_COMPACT_PACK_RELEASE_WORKSPACE_INVALID:")

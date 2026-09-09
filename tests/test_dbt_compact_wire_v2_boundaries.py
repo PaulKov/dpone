@@ -57,3 +57,20 @@ def test_exact_runtime_inventory_aggregate_boundary(overflow):
             dbt_runtime_payload_inventory(rows)
     else:
         assert len(dbt_runtime_payload_inventory(rows)) == 2
+
+
+@pytest.mark.parametrize("kind,limit", [("dbt_manifest", 16 * 1024 * 1024), ("dbt_selection_lock", 1024 * 1024)])
+@pytest.mark.parametrize("overflow", [False, True])
+def test_exact_kind_specific_index_boundary(kind, limit, overflow):
+    from dpone.contracts.dbt_runtime_release_binding import DbtReleaseArtifactIndex
+    from tests.test_dbt_release_artifact_index import _case
+
+    release = _case()
+    row = next(row for row in release["artifacts"]["runtime_payloads"] if row["kind"] == kind)
+    row["bytes"] = limit + int(overflow)
+    if overflow:
+        with pytest.raises(ValueError):
+            DbtReleaseArtifactIndex.from_release(release)
+    else:
+        index = DbtReleaseArtifactIndex.from_release(release)
+        assert index.payloads[row["id"]]["bytes"] == limit
