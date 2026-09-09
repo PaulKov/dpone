@@ -5,7 +5,7 @@ hide:
 ---
 
 <div class="dpone-hero" markdown>
-<div class="dpone-eyebrow">Open-source batch ELT framework - Current source version v0.74.33</div>
+<div class="dpone-eyebrow">Open-source batch ELT framework - Current source version v0.74.34</div>
 
 # Build reliable data pipelines without hiding the machinery.
 

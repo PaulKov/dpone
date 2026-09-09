@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.74.34 - 2026-09-09
+
 - Native compact publication now reports storage failures safely, distinguishes
   uncertain durability from immutable conflicts, and re-synchronizes retained
   releases on identical retries.

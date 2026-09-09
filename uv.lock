@@ -817,7 +817,7 @@ wheels = [
 
 [[package]]
 name = "dpone"
-version = "0.74.33"
+version = "0.74.34"
 source = { editable = "." }
 dependencies = [
     { name = "dpone-airflow-pack" },
@@ -1069,7 +1069,7 @@ dev = [
 
 [[package]]
 name = "dpone-airflow-pack"
-version = "0.74.33"
+version = "0.74.34"
 source = { editable = "packages/dpone-airflow-pack" }
 dependencies = [
     { name = "pyyaml" },
@@ -1080,7 +1080,7 @@ requires-dist = [{ name = "pyyaml", specifier = ">=6.0.1" }]
 
 [[package]]
 name = "dpone-native-accel"
-version = "0.74.33"
+version = "0.74.34"
 source = { editable = "packages/dpone-native-accel" }
 dependencies = [
     { name = "clickhouse-driver", extra = ["lz4", "zstd"] },

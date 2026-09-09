@@ -384,8 +384,8 @@ def test_public_schema_exposes_native_acceleration_policy() -> None:
 def test_project_metadata_exposes_acceleration_extra() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.74.33"
-    assert pyproject["project"]["optional-dependencies"]["accel"] == ["dpone-native-accel==0.74.33"]
+    assert pyproject["project"]["version"] == "0.74.34"
+    assert pyproject["project"]["optional-dependencies"]["accel"] == ["dpone-native-accel==0.74.34"]
 
 
 def test_native_accel_provider_version_matches_distribution_metadata() -> None:
