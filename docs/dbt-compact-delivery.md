@@ -195,7 +195,10 @@ and the [design contract](feature-design-dbt-compact-wire-v2.md).
 Commit the tested source first. The test image receives a bundle containing only
 the current commit and its public baseline. It never mounts a host worktree or
 credentials. Dependency installation needs network access during image build;
-the actual tests run with networking disabled. Docker Desktop must be running. The container runs as an unprivileged user.
+the actual tests run with networking disabled. Docker Desktop must be running.
+The container runs as an unprivileged user with an init process to reap orphaned
+children during subprocess-supervision tests. The image includes `jq` for shell
+contract tests.
 Native publication also synchronizes newly created cache ancestor entries before
 installing the release; storage failures at those boundaries cannot report PASS.
 
@@ -206,7 +209,7 @@ cp docker/dbt-compact-tests/Dockerfile "$context/Dockerfile"
 docker build --build-arg SOURCE_COMMIT="$(git rev-parse HEAD)" \
   --build-arg BASE_COMMIT="$(git merge-base HEAD origin/master)" \
   -t dpone-dbt-compact-tests "$context"
-docker run --rm --network none --cpus 2 dpone-dbt-compact-tests
+docker run --rm --init --network none --cpus 2 dpone-dbt-compact-tests
 ```
 
 The default matrix covers native delivery, CLI aliases, descriptors, source
@@ -214,7 +217,7 @@ closure, archive hazards, stage/publication faults and exact metadata limits.
 For the complete offline suite, override the command:
 
 ```bash
-docker run --rm --network none --cpus 2 dpone-dbt-compact-tests \
+docker run --rm --init --network none --cpus 2 dpone-dbt-compact-tests \
   uv run pytest -m "not integration_live" -n 2 --dist loadfile
 ```
 

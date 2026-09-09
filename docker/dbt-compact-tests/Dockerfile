@@ -1,7 +1,7 @@
 # Public-source offline test image. Build context contains only this file and
 # source.bundle, created from the current repository's reachable public commits.
 FROM python:3.12-slim-bookworm@sha256:782412e85d0f0984994c290652577d4018aff08145c85b262bb63dc0c7522254
-RUN apt-get update && apt-get install -y --no-install-recommends git unixodbc ca-certificates build-essential \
+RUN apt-get update && apt-get install -y --no-install-recommends git jq unixodbc ca-certificates build-essential \
     && rm -rf /var/lib/apt/lists/*
 RUN python -m pip install --no-cache-dir uv==0.12.10
 COPY source.bundle /tmp/source.bundle
