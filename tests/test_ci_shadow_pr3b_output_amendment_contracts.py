@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import json
-import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -11,6 +10,7 @@ import pytest
 import yaml
 from jsonschema import Draft202012Validator
 
+from tests.agent_policy._ci_shadow_history_fixtures import commit_files, git, initialize_repository
 from tests.ci_shadow_pr3b_report_contract_model import valid_report_shape
 from tests.ci_shadow_pr3b_report_examples import report_example
 
@@ -31,17 +31,6 @@ class _FatalTestSignal(BaseException):
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
-
-
-def _git(*args: str) -> str:
-    completed = subprocess.run(
-        ["git", *args],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return completed.stdout.strip()
 
 
 def _squash(value: str) -> str:
@@ -99,7 +88,7 @@ def _valid_amendment_lifecycle(spec: str) -> bool:
     )
 
 
-def test_public_output_amendment_lifecycle_and_authority_are_exact() -> None:
+def test_public_output_amendment_lifecycle_and_authority_are_exact(tmp_path: Path) -> None:
     raw = _read(SPEC)
     assert _valid_amendment_lifecycle(raw)
     assert raw.split("## Executive summary", maxsplit=1)[0].count("- Status: APPROVED") == 1
@@ -133,13 +122,25 @@ def test_public_output_amendment_lifecycle_and_authority_are_exact() -> None:
         )
     )
 
-    assert (
-        _git("rev-parse", f"{AMENDMENT_BASE}:docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md")
-        == APPROVED_SPEC_BLOB
-    )
-    assert _git("rev-parse", f"{AMENDMENT_BASE}:docs/adr/0037-immutable-agent-pr-merge-closure.md") == ACCEPTED_ADR_BLOB
-    assert _git("hash-object", ADR.relative_to(ROOT).as_posix()) == ACCEPTED_ADR_BLOB
-    _git("merge-base", "--is-ancestor", AMENDMENT_BASE, "HEAD")
+    # Old authority identifiers remain documentation metadata, not locally verified history.
+    task = yaml.safe_load(_read(TASK))
+    assert task["base_commit"] == AMENDMENT_BASE
+    assert APPROVED_SPEC_BLOB in " ".join(task["dependencies"])
+    root = tmp_path / "authority-lifecycle"
+    initialize_repository(root)
+    base = commit_files(root, "synthetic researched amendment", {"design.md": researched, "adr.md": _read(ADR)})
+    spec_blob = git(root, "rev-parse", f"{base}:design.md")
+    assert git(root, "rev-parse", f"{base}:adr.md") == ACCEPTED_ADR_BLOB
+    approved_head = commit_files(root, "synthetic approval only", {"design.md": approved})
+    assert git(root, "merge-base", base, approved_head) == base
+    assert git(root, "diff", "--name-only", base, approved_head) == "design.md"
+    assert git(root, "rev-parse", f"{approved_head}:adr.md") == ACCEPTED_ADR_BLOB
+    assert git(root, "rev-parse", f"{approved_head}:design.md") != spec_blob
+    approved_blob = git(root, "rev-parse", f"{approved_head}:design.md")
+    tampered = commit_files(root, "synthetic invalid amendment", {"design.md": researched + "tamper\n"})
+    with pytest.raises(AssertionError):
+        assert git(root, "rev-parse", f"{tampered}:design.md") == approved_blob
+    assert git(root, "rev-parse", f"{approved_head}:design.md") == approved_blob
 
 
 def test_public_output_amendment_is_closed_and_fail_safe() -> None:

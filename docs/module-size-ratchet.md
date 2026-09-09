@@ -252,6 +252,34 @@ available for v1 file round-trips. New governance code must use the v2 model and
 codec from `dpone.metrics.module_size_policy`; legacy helpers do not authorize
 CI PASS.
 
+## Clean-root provenance migration
+
+The clean source root `f8c6a4a5e75d167829c05f65d5d3033acb193878` preserves
+51 reviewed debt entries whose original provenance commit is no longer in this
+repository. Do not restore retired Git history to satisfy the check. The
+repository-specific migration verifies that exact parentless root, the frozen
+ledger and budget digests, and its immutable module measurements before
+reanchoring provenance. Caps, ownership, reasons, reduction targets and
+deadlines do not gain headroom. Normal ancestry and no-growth checks continue
+to apply outside this one pinned transition.
+
+The original root itself cannot prove change continuity: base and head must
+remain distinct. Prepare and commit the migration on a successor branch, then
+generate its candidate:
+
+```bash
+HEAD_SHA="$(git rev-parse HEAD)"
+uv run python tools/migrate_module_size_root.py \
+  --head-ref "$HEAD_SHA" --write-baseline
+```
+
+The command returns exit `2`, `ok: false`, and `CANDIDATE_WRITTEN` when it writes
+the candidate. Review and commit or amend the result, recompute `HEAD_SHA`,
+then run the regular exact-base/head gate against the clean root. Candidate
+generation is not a passing check. Historical receipts remain
+unverified for the recreated repository; fixture tests prove invariants, not
+those old provider observations.
+
 ## Machine-readable report reference
 
 `dpone.module-size-report.v2` is a closed semantic envelope with these stable

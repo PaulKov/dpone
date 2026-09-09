@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
+from tests.agent_policy._ci_shadow_history_fixtures import commit_files, git, integration_repository
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = ROOT / "test_artifacts/agent-policy/dpone-ci-shadow-closure-pr3a-ci-hygiene.yml"
@@ -18,24 +19,31 @@ def _payload() -> dict[str, object]:
     return parsed
 
 
-def _git_output(*args: str) -> str:
-    return subprocess.run(
-        ["git", *args],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-
-
-def test_pr3a_implementation_contract_binds_merged_approved_base() -> None:
+def test_pr3a_contract_records_approval_and_synthetic_integration_preserves_it(tmp_path: Path) -> None:
     payload = _payload()
     metadata = SPEC.read_text(encoding="utf-8").split("## Executive summary", maxsplit=1)[0]
 
     assert payload["base_commit"] == BASE
     assert "- Status: APPROVED" in metadata
-    assert _git_output("rev-parse", f"{BASE}:docs/feature-design-ci-shadow-pr3a-ci-hygiene.md") == APPROVED_SPEC_BLOB
-    assert _git_output("hash-object", str(SPEC)) == APPROVED_SPEC_BLOB
+    # The frozen approved bytes are available; historical Git/hosted receipt claims are not re-certified.
+    root = tmp_path / "approval"
+    spec_path = SPEC.relative_to(ROOT).as_posix()
+    history = integration_repository(
+        root,
+        frozen_files={spec_path: SPEC.read_text(encoding="utf-8")},
+        changed_files={"implementation.txt": "synthetic reviewed change\n"},
+        method="merge",
+    )
+    assert history.frozen_blobs[spec_path] == APPROVED_SPEC_BLOB
+    assert git(root, "rev-parse", f"{history.integration_commit}:{spec_path}") == APPROVED_SPEC_BLOB
+    assert git(root, "merge-base", history.base, history.integration_commit) == history.base
+    assert git(root, "show", "-s", "--format=%P", history.integration_commit).split() == [
+        history.base,
+        history.reviewed_head,
+    ]
+    tampered = commit_files(root, "synthetic approval drift", {spec_path: "Status: RESEARCHED\n"})
+    with pytest.raises(AssertionError):
+        assert git(root, "rev-parse", f"{tampered}:{spec_path}") == APPROVED_SPEC_BLOB
     dependencies = payload["dependencies"]
     assert isinstance(dependencies, list)
     assert any(

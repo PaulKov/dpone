@@ -120,7 +120,7 @@ projection only:
 set -euo pipefail
 command -v gh >/dev/null
 gh auth status >/dev/null
-gh api repos/PaulKov/dpone/rulesets/18806829 \
+gh api repos/PaulKov/dpone/rulesets/22617738 \
   --jq '.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[] | [.context, .integration_id] | @tsv'
 ```
 
@@ -336,6 +336,28 @@ Verified at: <ISO-8601 timestamp>
 ```
 
 ## Operations notes
+
+### Fresh source history
+
+The recreated public repository has a new identity and clean root
+`f8c6a4a5e75d167829c05f65d5d3033acb193878`. Clone it into a new directory;
+never push branches or tags from retired clones, fetch retired pull-request
+refs, or restore a historical bundle into this repository.
+
+The active `protect-master` ruleset is `22617738`. Its required-check names
+remain the canonical twenty-one contexts; the temporary branch/tag creation
+holds are removed. Separate integrity rules continue to block history rewrites
+and deletion. Repository merge settings permit squash only, compatible with
+the required linear history. Normal integration must not use admin bypass.
+
+Enabling Actions is not a passing CI result. The clean root has no comparison
+parent: a root dispatch must fail with `ROOT_COMPARISON_UNAVAILABLE`, not claim
+ratchet continuity against itself or an empty tree. Validate the bootstrap on
+a reviewed successor PR, then run normal comparisons in the new lineage. See
+[the ledger migration](module-size-ratchet.md#clean-root-provenance-migration).
+Archived run IDs and receipts are historical records, not evidence for the new
+repository or a new release. No package publication or release-controller
+reconfiguration is implied by CI reactivation.
 
 - If a required check name changes, update this page, the ruleset, and the PR
   template in one PR.
