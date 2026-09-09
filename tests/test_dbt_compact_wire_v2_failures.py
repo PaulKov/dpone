@@ -176,7 +176,11 @@ def test_resealed_hazardous_transfer_archive_fails_native_capture(compiled_works
         if kind == "symlink":
             member.type = tarfile.SYMTYPE
             member.linkname = "../escaped"
-        archive.addfile(member)
+        if kind == "traversal":
+            member.size = len(b"hazard")
+            archive.addfile(member, io.BytesIO(b"hazard"))
+        else:
+            archive.addfile(member)
     body = stream.getvalue()
     pack["runtime_payload"]["archive"].update(
         data=base64.b64encode(body).decode(), bytes=len(body), sha256=sha256_bytes(body)
@@ -189,3 +193,26 @@ def test_resealed_hazardous_transfer_archive_fails_native_capture(compiled_works
     DbtReleaseIntegrityService().verify(root)
     report = materialize(root, tmp_path / "cache")
     assert not report.passed and not (tmp_path / "cache").exists() and not (tmp_path / "escaped").exists()
+
+
+@pytest.mark.parametrize("boundary", ["cache_ancestor", "release_parent"])
+def test_fresh_cache_ancestor_durability_is_required(compiled_workspace, tmp_path, monkeypatch, boundary):
+    import dpone.runtime.immutable_local_tree as tree
+
+    cache = tmp_path / "new-parent" / "nested" / "cache"
+    fsync = tree.os.fsync
+    reached = []
+
+    def fail(descriptor):
+        parent = tmp_path if boundary == "cache_ancestor" else cache
+        if parent.exists() and tree.os.fstat(descriptor).st_ino == parent.stat().st_ino:
+            reached.append(True)
+            raise OSError("SENSITIVE_SENTINEL")
+        return fsync(descriptor)
+
+    with monkeypatch.context() as faults:
+        faults.setattr(tree.os, "fsync", fail)
+        report = materialize(compiled_workspace, cache)
+        assert reached and not report.passed and "SENSITIVE_SENTINEL" not in str(report)
+        assert not list(cache.glob("releases/sha256-*"))
+    assert materialize(compiled_workspace, cache).passed

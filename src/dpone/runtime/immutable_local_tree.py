@@ -44,7 +44,7 @@ def materialize_immutable_local_tree(
         parent_parts = allowed_parent.relative_to(root).parts
     except ValueError as exc:
         raise ValueError("immutable tree parent must be inside its configured root") from exc
-    root.mkdir(parents=True, exist_ok=True)
+    _ensure_durable_root(root)
     root_descriptor = os.open(root, _DIRECTORY_FLAGS)
     try:
         _require_path_matches_descriptor(root, root_descriptor, error_path=tree_dir)
@@ -59,6 +59,22 @@ def materialize_immutable_local_tree(
             _require_path_matches_descriptor(root, root_descriptor, error_path=tree_dir)
         finally:
             os.close(root_descriptor)
+
+
+def _ensure_durable_root(root: Path) -> None:
+    """Persist each newly created ancestor; retry also finishes a failed mkdir sync."""
+    try:
+        root.mkdir()
+    except FileNotFoundError:
+        _ensure_durable_root(root.parent)
+        root.mkdir(exist_ok=True)
+    except FileExistsError:
+        pass
+    parent = os.open(root.parent, _DIRECTORY_FLAGS)
+    try:
+        os.fsync(parent)
+    finally:
+        os.close(parent)
 
 
 def materialize_immutable_local_tree_at(
@@ -255,6 +271,7 @@ def _open_parent_at(root_descriptor: int, parts: tuple[str, ...], *, create: boo
                     os.mkdir(part, mode=0o700, dir_fd=current)
                 except FileExistsError:
                     pass
+                os.fsync(current)
             child = os.open(part, _DIRECTORY_FLAGS, dir_fd=current)
             os.close(current)
             current = child

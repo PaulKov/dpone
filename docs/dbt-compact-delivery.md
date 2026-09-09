@@ -194,7 +194,9 @@ and the [design contract](feature-design-dbt-compact-wire-v2.md).
 Commit the tested source first. The test image receives a bundle containing only
 the current commit and its public baseline. It never mounts a host worktree or
 credentials. Dependency installation needs network access during image build;
-the actual tests run with networking disabled. Docker Desktop must be running.
+the actual tests run with networking disabled. Docker Desktop must be running. The container runs as an unprivileged user.
+Native publication also synchronizes newly created cache ancestor entries before
+installing the release; storage failures at those boundaries cannot report PASS.
 
 ```bash
 context="$(mktemp -d)"
