@@ -1,6 +1,6 @@
 # Feature design: bounded streaming windows and impact-aware acceptance
 
-- Status: APPROVED
+- Status: IMPLEMENTED
 - Owner: dpone maintainers
 - Target release: unassigned; no publication requested
 - Last verified: 2026-09-09
@@ -384,3 +384,16 @@ be inferred from the local synthetic fixture.
 See [ADR 0056](adr/0056-bounded-window-atomic-publication.md) and
 [agent development](agent-development.md) for review and integration. Runtime test
 artifacts are produced locally and are not committed as release certification.
+
+
+## Implementation verification
+
+The implemented boundary above is covered by 419 local Docker tests with no
+failures, errors, or skips on source commit
+`b608e86cfec7595405b1bfd140441275f314734b` (2026-09-09), including real synthetic
+PostgreSQL/ClickHouse transfer and recovery. The SHA-bound receipt validates all
+14 required test-file populations. Review and hosted verification are tracked in
+[PR #3](https://github.com/PaulKov/dpone/pull/3). This is implementation evidence,
+not release certification or an unmeasured performance claim. Local evidence is
+under `test_artifacts/bounded-streaming-implementation/`: `docker-complete.xml`,
+`docker-complete-receipt.json`, and `module-size-complete.log`.
