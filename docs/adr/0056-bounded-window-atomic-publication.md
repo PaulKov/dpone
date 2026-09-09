@@ -82,12 +82,12 @@ The coarse layer snapshot is refreshed through `check-layer-metrics
 --write-baseline`, as documented in the quality-metrics guide. Its former snapshot
 recorded 8,027 edges, 2,405 cross-layer edges and runtime-to-contracts flow 194.
 The public root already had 8,938 edges, 2,679 cross-layer edges and flow 199.
-The integrated graph has 8,953 edges, 2,680 cross-layer edges and flow 208;
-its cross-layer ratio is 0.299341003 and clustering is 0.181596463.
+The integrated graph has 8,956 edges, 2,681 cross-layer edges and flow 209;
+its cross-layer ratio is 0.299352389 and clustering is 0.181791059.
 
-The nine additional runtime-to-contracts edges are the executor, HTTP adapter,
-admission policy, three interval-runtime model dependencies, staging, target,
-and PostgreSQL source. They consume canonical value/error contracts in the
+The ten additional runtime-to-contracts edges are the executor, HTTP adapter,
+interval admission policy, three interval-runtime model dependencies, staging,
+target, target topology admission, and PostgreSQL source. They consume canonical value/error contracts in the
 allowed direction. This reviewed feature growth resets the coarse trend
 snapshot, not the hard limits, tolerance, exclusions, or module-size debt caps.
 The prior failing snapshot remains in local verification evidence. Baseline

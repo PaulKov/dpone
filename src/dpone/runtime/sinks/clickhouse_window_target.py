@@ -27,7 +27,8 @@ from dpone.contracts.bounded_window import (
     WindowPlan,
 )
 from dpone.ports.bounded_window import ExclusiveWindowWriterGuard, WindowBinaryIngest, WindowMetadataStore
-from dpone.runtime.sinks.clickhouse_window_staging import WindowConnector, WindowIO, WindowStaging, identifier, literal
+from dpone.runtime.sinks.clickhouse_window_admission import validate_target
+from dpone.runtime.sinks.clickhouse_window_staging import WindowConnector, WindowIO, WindowStaging, identifier
 
 
 def window_schema_fingerprint(schema: Sequence[tuple[str, str]]) -> str:
@@ -110,33 +111,7 @@ class ClickHouseWindowTarget:
         pending = io.metadata_store.load(io.path(io.name_for_target()))
         if pending is not None and pending.get("run_id") != plan.run_id:
             raise WindowContractError("A different run has unresolved publication; reconcile its UUIDs first")
-        with io.connection() as connector:
-            database = connector.get_records(f"SELECT engine FROM system.databases WHERE name = {literal(io.database)}")
-            if database != [("Atomic",)]:
-                raise WindowContractError("Window publication requires a local Atomic database")
-            rows = connector.get_records(
-                f"SELECT engine, create_table_query, dependencies_database, dependencies_table FROM system.tables WHERE database = {literal(io.database)} AND name = {literal(io.table)}"
-            )
-            if len(rows) != 1 or rows[0][0] != "MergeTree" or rows[0][2] or rows[0][3]:
-                raise WindowContractError("Window target requires plain MergeTree without dependencies")
-            if re.search(r"\b(TTL|PROJECTION)\b", str(rows[0][1]), re.IGNORECASE):
-                raise WindowContractError("TTL and projections are unsupported for window publication")
-            columns = connector.get_records(
-                f"SELECT name, type, default_kind FROM system.columns WHERE database = {literal(io.database)} AND table = {literal(io.table)} ORDER BY position"
-            )
-            if tuple((str(row[0]), str(row[1])) for row in columns) != io.schema or any(row[2] for row in columns):
-                raise WindowContractError("Physical schema differs or contains computed columns")
-            mutations = connector.get_records(
-                f"SELECT count() FROM system.mutations WHERE database = {literal(io.database)} AND table = {literal(io.table)} AND NOT is_done"
-            )
-            if mutations != [(0,)]:
-                raise WindowContractError("Target has active mutations")
-            policies = connector.get_records(
-                f"SELECT count() FROM system.row_policies WHERE database IN ({literal(io.database)}, '*') "
-                f"AND table IN ({literal(io.table)}, '*')"
-            )
-            if policies != [(0,)]:
-                raise WindowContractError("Row policies may hide target data; window publication is unsupported")
+        validate_target(io)
         io.encoder()
 
     def stage(

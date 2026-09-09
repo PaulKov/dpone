@@ -1,19 +1,19 @@
 {
   "snapshot": {
-    "cross_layer_edges": 2680,
-    "cross_layer_ratio": 0.2993410030157489,
+    "cross_layer_edges": 2681,
+    "cross_layer_ratio": 0.29935238945958015,
     "excluded_layers": [
       "dpone.compat"
     ],
-    "internal_edges": 8953,
-    "intra_layer_edges": 6273,
-    "intra_layer_ratio": 0.700658996984251,
+    "internal_edges": 8956,
+    "intra_layer_edges": 6275,
+    "intra_layer_ratio": 0.7006476105404198,
     "layers": 58,
-    "max_cross_layer_flow": 208,
+    "max_cross_layer_flow": 209,
     "package_name": "dpone",
     "top_cross_layer": [
       {
-        "count": 208,
+        "count": 209,
         "source": "dpone.runtime",
         "target": "dpone.contracts"
       },
@@ -90,7 +90,7 @@
     ],
     "top_cross_slice": [
       {
-        "count": 208,
+        "count": 209,
         "source": "dpone.runtime",
         "target": "dpone.contracts"
       },
