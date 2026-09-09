@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/release/release-receipt-envelope-v2.schema.json",
+  "title": "dpone release receipt envelope v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "schema_version", "receipt_id", "receipt_type", "stream", "scope",
+    "attempt", "lease", "producer", "timestamps", "payload", "payload_sha256"
+  ],
+  "properties": {
+    "schema": { "const": "dpone.release-receipt-envelope.v2" },
+    "schema_version": { "const": 2 },
+    "receipt_id": { "$ref": "#/$defs/sha256Id" },
+    "receipt_type": { "$ref": "#/$defs/nonEmptyString" },
+    "stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_identity_id", "release_authority_id", "sequence", "previous"],
+      "properties": {
+        "release_identity_id": { "$ref": "#/$defs/sha256Id" },
+        "release_authority_id": { "$ref": "#/$defs/sha256Id" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "previous": {
+          "oneOf": [
+            { "const": "GENESIS" },
+            { "$ref": "#/$defs/sha256Id" }
+          ]
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["release", "candidate", "authorization", "recovery"] },
+        "release_identity_id": { "$ref": "#/$defs/sha256Id" },
+        "candidate_id": { "$ref": "#/$defs/sha256Id" },
+        "authorization_id": { "$ref": "#/$defs/sha256Id" },
+        "recovery_id": { "$ref": "#/$defs/sha256Id" }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_id", "queue_entry_id"],
+      "properties": {
+        "attempt_id": { "$ref": "#/$defs/sha256Id" },
+        "queue_entry_id": { "$ref": "#/$defs/sha256Id" }
+      }
+    },
+    "lease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lease_id", "fencing_token"],
+      "properties": {
+        "lease_id": { "$ref": "#/$defs/sha256Id" },
+        "fencing_token": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "github_actions_job",
+            "trusted_controller_service",
+            "maintainer_incident_action"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "github_actions_job" } } },
+          "then": {
+            "required": [
+              "repository_id", "workflow_id", "workflow_path", "workflow_sha",
+              "run_id", "run_attempt", "job_name", "environment"
+            ]
+          }
+        }
+      ]
+    },
+    "timestamps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed_at", "committed_at"],
+      "properties": {
+        "observed_at": { "type": "string", "format": "date-time" },
+        "committed_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "REQUEST_ENQUEUED", "LEASE_ACQUIRED", "LEASE_RENEWED", "LEASE_RELEASED",
+            "GOVERNANCE_SNAPSHOT", "CANDIDATE_HANDOFF", "MUTATION_INTENT",
+            "ATTESTATION_VERIFIED", "PUBLIC_BUNDLE_VERIFIED", "DRAFT_TRANSITION",
+            "AUTHORIZED", "PYPI_FILE_TRANSITION", "GITHUB_RELEASE_TRANSITION",
+            "CANCELLATION", "RECOVERY_OBSERVATION", "INCIDENT_HOLD", "CLOSED"
+          ]
+        }
+      }
+    },
+    "payload_sha256": { "$ref": "#/$defs/sha256Id" }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "sha256Id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

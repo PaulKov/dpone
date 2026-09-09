@@ -1,0 +1,82 @@
+schema_version: 1
+task_id: "DPONE-QUALITY-AUTHORITY-HARDENING"
+title: "Close quality-gate report authority and evidence boundaries"
+goal: "Prevent reconciliation-metric keys or malformed probes from producing false success, and redact every public quality outcome."
+specification: "docs/feature-design-quality-checks-gates-adapter-v1.md"
+base_commit: "ef88ae7f"
+integrator: "Codex main agent"
+
+acceptance_criteria:
+  - "A reconciliation_metrics.quality_gates mapping, including passed=false, never suppresses authored quality policy execution."
+  - "Only the typed report produced by the staged governance coordinator can suppress duplicate processor execution; a failed or malformed typed report cannot produce SUCCESS."
+  - "Each authored quality policy runs exactly once on staged paths and once in the processor on legacy paths."
+  - "Boolean, negative, and non-integer row counts canonicalize to unavailable evidence and cannot satisfy min_rows or reconciliation gates."
+  - "Successful, warning, and failed public CLI/audit quality payloads pass the shared redaction boundary."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "ETLProcessor aggregate outcome"
+    - "LoadResult internal governance receipt"
+    - "quality gate evidence and CLI output"
+  migration_required: false
+
+owned_paths:
+  - src/dpone/runtime/etl/result_metrics.py
+  - src/dpone/runtime/etl/processor.py
+  - src/dpone/runtime/governance/finalization.py
+  - src/dpone/runtime/governance/service.py
+  - src/dpone/runtime/governance/audit_tap.py
+  - src/dpone/runtime/sinks/load_result.py
+  - src/dpone/commands/run_cmd.py
+  - tests/test_quality_checks_gates_adapter.py
+  - tests/test_native_load_governance_finalization.py
+  - tests/test_cli_run_command.py
+read_only_paths:
+  - src/dpone/governance/quality.py
+  - src/dpone/governance/quality_normalize.py
+  - src/dpone/schema/etl-batch-manifest.schema.json
+  - src/dpone/schema/etl-flow-manifest.schema.json
+  - docs/feature-design-quality-acceptance-fail-closed-v0731.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs
+  - src/dpone/governance
+  - src/dpone/schema
+
+shared_file_owner: "Codex main agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_quality_checks_gates_adapter.py tests/test_native_load_governance_finalization.py tests/test_cli_run_command.py -q"
+    - "uv run ruff check src/dpone/runtime/etl/result_metrics.py src/dpone/runtime/etl/processor.py src/dpone/runtime/governance/finalization.py src/dpone/runtime/governance/service.py src/dpone/runtime/governance/audit_tap.py src/dpone/runtime/sinks/load_result.py src/dpone/commands/run_cmd.py"
+  broad:
+    - "uv run pytest -k 'quality or governance' -q"
+  live:
+    - "N/A: connector-independent authority and output-boundary bug fix"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

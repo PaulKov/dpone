@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-release-closeout-gate.schema.json",
+  "title": "dpone data product release closeout gate",
+  "type": "object",
+  "required": ["schema_version", "status", "release_closeout_gate_id", "profile", "blockers", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_release_closeout_gate.v1"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "release_closeout_gate_id": {"type": "string", "pattern": "^sha256:"},
+    "profile": {"enum": ["advisory", "stage", "prod_strict", "regulated"]},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  }
+}

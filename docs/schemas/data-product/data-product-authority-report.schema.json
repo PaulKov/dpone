@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-authority-report.schema.json",
+  "title": "dpone data product authority report",
+  "type": "object",
+  "required": ["schema_version", "authority_report_id", "status", "markdown", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_authority_report.v1"},
+    "authority_report_id": {"type": "string"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "authority_gate_id": {"type": ["string", "null"]},
+    "profile": {"type": ["string", "null"]},
+    "markdown": {"type": "string"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

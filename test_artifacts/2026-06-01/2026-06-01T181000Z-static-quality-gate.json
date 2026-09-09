@@ -1,0 +1,19 @@
+{
+  "artifact_schema": "dpone.test-artifact.v1",
+  "artifact_type": "quality.static_gate",
+  "artifact_label": "2026-06-01T181000Z-static-quality-gate",
+  "created_by": "Codex GPT-5",
+  "executed_by_os_user": "macbook",
+  "executed_at": "2026-06-01T18:10:00Z",
+  "commands": [
+    "uv run ruff check .",
+    "uv run ruff format --check .",
+    "uv run mypy --config-file mypy.ini"
+  ],
+  "result": "passed",
+  "summary": {
+    "ruff_check": "All checks passed",
+    "ruff_format": "697 files already formatted",
+    "mypy": "Success: no issues found in 154 source files"
+  }
+}

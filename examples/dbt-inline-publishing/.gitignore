@@ -1,0 +1,5 @@
+.dpone/
+dbt_packages/
+logs/
+profiles/.user.yml
+target/

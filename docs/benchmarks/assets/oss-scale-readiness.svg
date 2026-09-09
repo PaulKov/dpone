@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="194" viewBox="0 0 920 194" role="img" aria-label="Scale readiness">
+<rect width="920" height="194" fill="#ffffff"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Scale readiness</text>
+<text x="32" y="66" font-size="13" font-weight="400" fill="#475569">Architecture runway score for growth toward comparator repository scale.</text>
+<text x="32" y="118" font-size="13" font-weight="700" fill="#111827">dpone</text>
+<rect x="232" y="102" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="232" y="102" width="324" height="22" rx="4" fill="#dc2626"/>
+<text x="792" y="118" font-size="12" font-weight="400" fill="#475569">58 / constrained</text>
+</svg>

@@ -1,0 +1,18 @@
+{
+  "artifact_schema": "dpone.test-artifact.v1",
+  "artifact_type": "quality.oss_coverage_build_gate",
+  "artifact_label": "2026-06-01T181300Z-oss-coverage-build-gate",
+  "created_by": "Codex GPT-5",
+  "executed_by_os_user": "macbook",
+  "executed_at": "2026-06-01T18:13:00Z",
+  "command": "uv run pytest -m \"not integration_live and not integration_mssql\" --cov=src/dpone --cov-report=xml:/tmp/dpone-coverage.xml && uv build",
+  "result": "passed",
+  "summary": {
+    "pytest": "601 passed, 6 skipped, 21 deselected",
+    "coverage": "72.31%",
+    "build": [
+      "dist/dpone-0.1.0.tar.gz",
+      "dist/dpone-0.1.0-py3-none-any.whl"
+    ]
+  }
+}

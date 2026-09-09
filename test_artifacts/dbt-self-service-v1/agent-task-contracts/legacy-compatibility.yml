@@ -1,0 +1,60 @@
+schema_version: 1
+task_id: "DBT-SS-V1-COMPAT"
+title: "Restore executable legacy dbt_publish call compatibility"
+goal: "Preserve old constructor, positional dataclass, and method call behavior through explicit preview-only compatibility adapters."
+specification: "docs/feature-design-dbt-inline-self-service-v1.md"
+base_commit: "7141afaa"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Old positional dataclass calls bind to their original fields."
+  - "Old DbtDponeCompiler, DbtPublishPlanner, and DbtExecutionPackBuilder call shapes execute."
+  - "Legacy adapters remain preview-only and cannot become production release authority."
+  - "Executable old-call-pattern tests cover behavior, not only import identity."
+
+public_contract_impact:
+  level: deprecation
+  surfaces:
+    - "dpone.dbt_publish Python compatibility facade"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/dbt_publish/**"
+  - "src/dpone/contracts/dbt_publish_models.py"
+  - "tests/test_dbt_publish_compatibility.py"
+read_only_paths:
+  - "src/dpone/services/dbt_publish_compiler.py"
+  - "src/dpone/services/dbt_publish_planning.py"
+  - "src/dpone/readiness/dbt_airflow_execution_pack.py"
+  - "docs/compatibility.md"
+  - "docs/feature-design-dbt-inline-self-service-v1.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_publish_compatibility.py -q"
+    - "uv run ruff check <owned paths>"
+    - "uv run mypy --config-file mypy.ini <owned source paths>"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live: []
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

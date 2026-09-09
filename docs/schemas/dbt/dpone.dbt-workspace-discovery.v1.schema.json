@@ -1,0 +1,174 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-workspace-discovery.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "blockers": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "remediation": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "path",
+          "severity"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "projects": {
+      "items": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "properties": {
+                "publishing": {
+                  "const": false
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "reason": {
+                  "const": "policy_present"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "manifest_path": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+                  "type": "string"
+                },
+                "profiles_path": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+                  "type": "string"
+                },
+                "project_name": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "publishing": {
+                  "const": true
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "manifest_path": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profiles_path": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project_name": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project_path": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+            "type": "string"
+          },
+          "publishing": {
+            "type": "boolean"
+          },
+          "reason": {
+            "enum": [
+              "policy_present",
+              "not_configured",
+              "invalid"
+            ]
+          }
+        },
+        "required": [
+          "project_path",
+          "project_name",
+          "publishing",
+          "profiles_path",
+          "manifest_path",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "schema": {
+      "const": "dpone.dbt-workspace-discovery.v1"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "projects",
+    "blockers"
+  ],
+  "type": "object"
+}

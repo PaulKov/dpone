@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/safe-sample-certified-copy-request.schema.json",
+  "title": "dpone GitOps safe sample certified copy request",
+  "type": "object",
+  "required": [
+    "schema",
+    "certification_id",
+    "source",
+    "sink",
+    "strategy",
+    "sample_rows",
+    "max_bytes",
+    "timeout_seconds",
+    "source_read_only",
+    "pii_policy",
+    "proof"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "dpone.safe-sample-certified-copy-request.v1"
+    },
+    "certification_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "type",
+        "connection_ref",
+        "table"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "mssql"
+        },
+        "connection_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+          "maxLength": 128
+        },
+        "table": {
+          "$ref": "#/$defs/table"
+        }
+      }
+    },
+    "sink": {
+      "type": "object",
+      "required": [
+        "type",
+        "connection_ref",
+        "temporary_table"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "clickhouse"
+        },
+        "connection_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+          "maxLength": 128
+        },
+        "temporary_table": {
+          "$ref": "#/$defs/table"
+        }
+      }
+    },
+    "strategy": {
+      "const": "incremental_merge"
+    },
+    "sample_rows": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_read_only": {
+      "const": true
+    },
+    "pii_policy": {
+      "enum": [
+        "masked",
+        "not_logged"
+      ]
+    },
+    "proof": {
+      "type": "string",
+      "pattern": "^route_certification:[A-Za-z0-9_\\-]+$"
+    }
+  },
+  "$defs": {
+    "table": {
+      "type": "object",
+      "required": [
+        "schema",
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

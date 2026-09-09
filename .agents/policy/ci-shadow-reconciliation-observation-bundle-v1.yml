@@ -1,0 +1,66 @@
+schema: dpone.ci-shadow-reconciliation-observation-bundle.v1
+domain: dpone.ci-shadow-reconciliation-observation-bundle.v1
+entries:
+  - path: .github/workflows/pr-gate-shadow-capacity.yml
+    mode: "100644"
+    blob_sha256: "sha256:c1032334f30d1e86295a92a0c19a78c3bdca40600b72af3fc58ca58c1d96482c"
+  - path: pyproject.toml
+    mode: "100644"
+    blob_sha256: "sha256:520bab1c09b296cb4b78f2805a64d15f7e1ae3544e8ac747c3ddb54db78cf693"
+  - path: src/dpone/adapters/ci_shadow_reconciliation_github.py
+    mode: "100644"
+    blob_sha256: "sha256:e733fe454257d042e2e7a1912fe296eb26719da745fa6f9ed224a6c9032fb26b"
+  - path: src/dpone/adapters/filesystem_evidence.py
+    mode: "100644"
+    blob_sha256: "sha256:b0ddc762ade4dbb4e7e6acac37e03cf262ecb4b66f1b19316383280160ad9fd8"
+  - path: src/dpone/contracts/ci_shadow_reconciliation.py
+    mode: "100644"
+    blob_sha256: "sha256:d3faf5d773d9e42f7f45e56fd44b000d639103057c66a2723973fccb6909065a"
+  - path: src/dpone/contracts/strict_json.py
+    mode: "100644"
+    blob_sha256: "sha256:5f0ac685e4ab7a2640c4eb00c92faf75e8b004ceb33c8745c7879ca1e0ac233b"
+  - path: src/dpone/ports/ci_shadow_reconciliation.py
+    mode: "100644"
+    blob_sha256: "sha256:256c81fe35632a20b1477705d1b0be37a32e166567b34124a1f8969afe608f9f"
+  - path: src/dpone/services/ci/shadow_capacity.py
+    mode: "100644"
+    blob_sha256: "sha256:e0adb1e68959335b2302001213282543fd0a4c8fc9a3efcefb64c1ab57769949"
+  - path: src/dpone/services/ci/shadow_capacity_archive.py
+    mode: "100644"
+    blob_sha256: "sha256:21d6acf24d65b1e9485bfba27fbc100563b71f80fce76cfeecc4753e9347f0be"
+  - path: src/dpone/services/ci/shadow_capacity_evidence.py
+    mode: "100644"
+    blob_sha256: "sha256:e9116be98b0eb8a337234f4ec7d662c9e5aac80819c06d457693bda02e7f6055"
+  - path: src/dpone/services/ci/shadow_capacity_source.py
+    mode: "100644"
+    blob_sha256: "sha256:64b6ba1546dd8fdf40e4eb2d148683a6ca98bbd4692777d5d5c66883796befd6"
+  - path: src/dpone/services/ci/shadow_capacity_transport.py
+    mode: "100644"
+    blob_sha256: "sha256:28c3d28e416d30e9ac9ed146a65bc3a740406d80849375af2d72e12c3b7b164b"
+  - path: src/dpone/services/ci/shadow_observation_bundle.py
+    mode: "100644"
+    blob_sha256: "sha256:c520cb2adcc5cff1cb085c8c02cad94fea565ccfcfc9b6465d989df9211d5128"
+  - path: src/dpone/services/ci/shadow_observation_bundle_verifier.py
+    mode: "100644"
+    blob_sha256: "sha256:6d02c1c7a379d07ef074053ce372588d3147c5dcb8b1ab7a1ee96c51b9ba2ae3"
+  - path: src/dpone/services/ci/shadow_reconciliation_budget.py
+    mode: "100644"
+    blob_sha256: "sha256:0444d5011bbf62f4cab35c6ec604083b07eccdf07e8fa1ca27f411d739290752"
+  - path: src/dpone/services/ci/shadow_reconciliation_complete_observation.py
+    mode: "100644"
+    blob_sha256: "sha256:16c8ab25e894639f5673c04a0d1ec2856e30bb8bc7ef00dcbd36272ebe950521"
+  - path: src/dpone/services/ci/shadow_reconciliation_observation.py
+    mode: "100644"
+    blob_sha256: "sha256:ffeb011e63d08e2d856201e7754c5d79e9ff66097b72081758f2c0003c5833b9"
+  - path: src/dpone/services/ci/shadow_reconciliation_receipts.py
+    mode: "100644"
+    blob_sha256: "sha256:badeff33d0342f27f36e421d54c238b99fc9d424dcb7ef28f4a838ccaf8e6572"
+  - path: src/dpone/services/ci/shadow_reconciliation_tree.py
+    mode: "100644"
+    blob_sha256: "sha256:d2d973e84ea33ec9a5a3f65c2a187368f8a6c5caab327ef58f0c161427172cfb"
+  - path: tools/ci/calibrate_pr_gate_shadow_capacity.py
+    mode: "100644"
+    blob_sha256: "sha256:0a507fbb9dfcc988e9b5382362ba383547cacba00660606a37702617224edc23"
+  - path: uv.lock
+    mode: "100644"
+    blob_sha256: "sha256:6af32f7edb7d2280214c4d6428936d36d40adc5870e2a7f0b65d83fc2a2cad73"

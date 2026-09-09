@@ -1,0 +1,83 @@
+schema_version: 1
+task_id: "DPONE-V0723-SAMPLE"
+title: "Harden production sample authorization and temporary lifecycle"
+goal: "Require verifiable cheap-read evidence in production and prevent temporary target/evidence leaks or collisions."
+specification: "docs/feature-design-airflow-self-service-v0723-hardening.md"
+base_commit: "bfa778b566bdf29fbe31b2c7efc7a61d528ed1c9"
+integrator: "codex/v0.72.3-self-service-hardening"
+
+acceptance_criteria:
+  - "Bundled route status without current evidence cannot authorize a production sample."
+  - "Verified route-matched cheap-read evidence can authorize a production sample within policy budgets."
+  - "ClickHouse temporary target has server-side expiry and cleanup remains best effort."
+  - "Omitted run_id is unique and evidence never replaces another run identity."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone run --sample production safety policy"
+    - "safe-sample run identity and evidence"
+  migration_required: false
+
+owned_paths:
+  - src/dpone/services/sample_route_certifications.py
+  - src/dpone/services/safe_sample_capabilities.py
+  - src/dpone/services/safe_sample_policy.py
+  - src/dpone/services/mssql_safe_sample_sql_reader.py
+  - src/dpone/services/safe_sample_clickhouse_target.py
+  - src/dpone/services/safe_sample_cli_runtime.py
+  - src/dpone/services/safe_sample_runtime_evidence.py
+  - src/dpone/commands/run_safe_sample_cmd.py
+  - src/dpone/commands/ops_parsers_safe_sample.py
+  - tests/test_airflow_mssql_clickhouse_safe_sample_copier.py
+  - tests/test_airflow_clickhouse_temporary_target_adapter.py
+  - tests/test_airflow_safe_sample_execution_plan.py
+  - tests/test_airflow_safe_sample_policy.py
+  - tests/test_airflow_safe_sample_source_request.py
+  - tests/test_cli_safe_sample_runtime_run_command.py
+  - tests/test_airflow_self_service_cli.py
+read_only_paths:
+  - docs/feature-design-airflow-self-service-v0723-hardening.md
+  - docs/airflow-self-service-architecture.md
+  - src/dpone/readiness/airflow_local_safe_sample_deployment.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - packages/dpone-airflow-pack
+  - src/dpone/gitops
+
+shared_file_owner: "integrator"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_safe_sample_policy.py tests/test_airflow_mssql_clickhouse_safe_sample_copier.py tests/test_airflow_clickhouse_temporary_target_adapter.py tests/test_cli_safe_sample_runtime_run_command.py -q"
+  broad:
+    - "uv run ruff check src/dpone/services src/dpone/commands/run_safe_sample_cmd.py"
+    - "uv run mypy --config-file mypy.ini"
+  live:
+    - "Local MSSQL/ClickHouse sample route: UNVERIFIED unless approved services are available."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

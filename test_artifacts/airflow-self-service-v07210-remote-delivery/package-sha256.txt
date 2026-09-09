@@ -1,0 +1,6 @@
+95739d86825beeef254cc734f0e539c06c3a32467682c2f519fc5437cabd6295  dpone-0.72.2-py3-none-any.whl
+303a4fd5ba79e140fc8dfe90bdd1a01c17e24831f5cdf5c13b45ad76a6e88d3b  dpone-0.72.2.tar.gz
+943899dc7436af1dce4e8682fd37c4773e7f5ef5929c579f9923fd58c14e232c  dpone_airflow_pack-0.72.2-py3-none-any.whl
+2910655e3611c71ebfc5bdd78aa2eeb87ca8b1dbb5e0242a86a82ddce1e3d35a  dpone_airflow_pack-0.72.2.tar.gz
+c06e2d73ee12f309da99f9e644b639582aa4eb673709944060d767e531962d8d  dpone_native_accel-0.72.2-py3-none-any.whl
+987e5b8df1777666446871c843d39c5443d7b86c86d8b579cd1f0558d4fb86cf  dpone_native_accel-0.72.2.tar.gz

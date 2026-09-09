@@ -1,0 +1,1587 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verifier:
+    name: Seal exact stdlib-only release verifier
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      artifact_id: ${{ steps.verifier-upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.verifier-upload.outputs.artifact-digest }}
+      artifact_name: ${{ steps.verifier-stage.outputs.artifact_name }}
+      manifest_sha256: ${{ steps.verifier-stage.outputs.manifest_sha256 }}
+      producer_run_attempt: ${{ steps.verifier-stage.outputs.producer_run_attempt }}
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Stage exact stdlib-only release verifier
+        id: verifier-stage
+        run: |
+          set -euo pipefail
+          if [[ "$(git rev-parse HEAD)" != "${GITHUB_SHA}" ]]; then
+            echo "::error::Release verifier tree must equal the exact tag commit."
+            exit 1
+          fi
+          PYTHONDONTWRITEBYTECODE=1 python tools/agent_policy/pypi_verifier_closure.py \
+            --root . \
+            --output "${RUNNER_TEMP}/release-verifier" \
+            --profile ordinary-release
+          python - <<'PY' >> "${GITHUB_OUTPUT}"
+          import hashlib
+          import os
+          from pathlib import Path
+
+          manifest = Path(os.environ["RUNNER_TEMP"]) / "release-verifier/pypi-verifier-closure.json"
+          print(f"artifact_name=release-verifier-{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}")
+          print(f"manifest_sha256={hashlib.sha256(manifest.read_bytes()).hexdigest()}")
+          print(f"producer_run_attempt={os.environ['GITHUB_RUN_ATTEMPT']}")
+          PY
+
+      - name: Upload immutable closed release verifier
+        id: verifier-upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-verifier-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-verifier/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  preflight:
+    name: Validate immutable release identity
+    needs: verifier
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      statuses: read
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      evidence_artifact_id: ${{ steps.preflight-upload.outputs.artifact-id }}
+      evidence_artifact_digest: ${{ steps.preflight-upload.outputs.artifact-digest }}
+    steps:
+      - name: Checkout complete release history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable release verifier artifact provider identity
+        env:
+          EXPECTED_ARTIFACT_ID: ${{ needs.verifier.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.verifier.outputs.artifact_digest }}
+          EXPECTED_ARTIFACT_NAME: ${{ needs.verifier.outputs.artifact_name }}
+          EXPECTED_PRODUCER_RUN_ATTEMPT: ${{ needs.verifier.outputs.producer_run_attempt }}
+          EXPECTED_RELEASE_COMMIT: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RECEIPT: test_artifacts/release-preflight/release_verifier_provider_identity.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "${RECEIPT}")"
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          def digest(value):
+              normalized = value.removeprefix("sha256:")
+              if re.fullmatch(r"[0-9a-f]{64}", normalized) is None:
+                  raise SystemExit("release verifier artifact digest is invalid")
+              return f"sha256:{normalized}"
+
+          artifact_id = int(os.environ["EXPECTED_ARTIFACT_ID"])
+          attempt = os.environ["EXPECTED_PRODUCER_RUN_ATTEMPT"]
+          expected_name = os.environ["EXPECTED_ARTIFACT_NAME"]
+          if not attempt.isascii() or not attempt.isdecimal() or attempt.startswith("0"):
+              raise SystemExit("release verifier producer attempt is invalid")
+          if expected_name != f"release-verifier-{os.environ['GITHUB_RUN_ID']}-{attempt}":
+              raise SystemExit("release verifier producer attempt binding is invalid")
+          request = urllib.request.Request(
+              f"{os.environ['GITHUB_API_URL']}/repos/{os.environ['GITHUB_REPOSITORY']}/actions/artifacts/{artifact_id}",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              payload = json.load(response)
+          workflow_run = payload.get("workflow_run") or {}
+          actual = {
+              "id": payload.get("id"),
+              "name": payload.get("name"),
+              "digest": digest(str(payload.get("digest") or "")),
+              "expired": payload.get("expired"),
+              "run_id": workflow_run.get("id"),
+              "head_sha": workflow_run.get("head_sha"),
+          }
+          expected = {
+              "id": artifact_id,
+              "name": expected_name,
+              "digest": digest(os.environ["EXPECTED_ARTIFACT_DIGEST"]),
+              "expired": False,
+              "run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "head_sha": os.environ["EXPECTED_RELEASE_COMMIT"],
+          }
+          if actual != expected:
+              raise SystemExit("release verifier artifact provider identity changed")
+          Path(os.environ["RECEIPT"]).write_text(
+              json.dumps({"producer_run_attempt": int(attempt), "status": "PASS", **actual}, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Download immutable closed release verifier
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.verifier.outputs.artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/release-verifier
+
+      - name: Validate closed release verifier before first execution
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.verifier.outputs.manifest_sha256 }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import stat
+          from pathlib import Path, PurePosixPath
+
+          maximum = 4 * 1024 * 1024
+          root = Path(os.environ["VERIFIER_DIR"])
+
+          def regular_bytes(path, label):
+              before = path.lstat()
+              if path.is_symlink() or not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= maximum:
+                  raise SystemExit(f"closed release verifier contains invalid file: {label}")
+              raw = path.read_bytes()
+              after = path.lstat()
+              identity = lambda value: (value.st_dev, value.st_ino, value.st_mode, value.st_size, value.st_mtime_ns)
+              if len(raw) != before.st_size or identity(before) != identity(after):
+                  raise SystemExit(f"closed release verifier changed while read: {label}")
+              return raw
+
+          root_metadata = root.lstat()
+          if root.is_symlink() or not stat.S_ISDIR(root_metadata.st_mode):
+              raise SystemExit("closed release verifier root is invalid")
+          manifest_name = "pypi-verifier-closure.json"
+          manifest_raw = regular_bytes(root / manifest_name, manifest_name)
+          if hashlib.sha256(manifest_raw).hexdigest() != os.environ["EXPECTED_MANIFEST_SHA256"]:
+              raise SystemExit("closed release verifier manifest differs from producer")
+          def unique_object(pairs):
+              result = {}
+              for key, value in pairs:
+                  if key in result:
+                      raise SystemExit("closed release verifier manifest contains a duplicate key; duplicate JSON key")
+                  result[key] = value
+              return result
+
+          payload = json.loads(
+              manifest_raw.decode("utf-8", "strict"),
+              object_pairs_hook=unique_object,
+          )
+          entries = payload.get("files") if isinstance(payload, dict) else None
+          if (
+              set(payload) != {"files", "profile", "schema"}
+              or payload.get("profile") != "ordinary-release"
+              or payload.get("schema") != "dpone.pypi_verifier_closure.v1"
+              or not isinstance(entries, list)
+              or len(entries) != 34
+          ):
+              raise SystemExit("closed release verifier manifest contract is invalid")
+          expected = {manifest_name}
+          for entry in entries:
+              if not isinstance(entry, dict) or set(entry) != {"path", "sha256", "size", "source"}:
+                  raise SystemExit("closed release verifier manifest entry is invalid")
+              relative = entry["path"]
+              pure = PurePosixPath(relative) if isinstance(relative, str) else PurePosixPath("/")
+              if pure.is_absolute() or len(pure.parts) != 1 or relative in expected:
+                  raise SystemExit("closed release verifier path is unsafe or duplicate")
+              if re.fullmatch(r"[0-9a-f]{64}", str(entry["sha256"])) is None:
+                  raise SystemExit("closed release verifier digest is invalid")
+              if type(entry["size"]) is not int or not 0 < entry["size"] <= maximum:
+                  raise SystemExit("closed release verifier size is invalid")
+              source = entry["source"]
+              if not isinstance(source, str) or source.startswith("/") or ".." in PurePosixPath(source).parts:
+                  raise SystemExit("closed release verifier source is invalid")
+              raw = regular_bytes(root / relative, relative)
+              if len(raw) != entry["size"] or hashlib.sha256(raw).hexdigest() != entry["sha256"]:
+                  raise SystemExit("closed release verifier file differs from manifest")
+              expected.add(relative)
+          observed = set()
+          for path in root.iterdir():
+              metadata = path.lstat()
+              if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
+                  raise SystemExit("closed release verifier tree contains a non-regular entry")
+              observed.add(path.name)
+          if observed != expected:
+              raise SystemExit("closed release verifier tree is not exact")
+          PY
+
+      - name: Resolve canonical release inputs
+        id: release
+        shell: bash
+        env:
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          if [[ "${RELEASE_REF_TYPE}" != "tag" ]]; then
+            echo "::error::Release workflow must run from an annotated vX.Y.Z tag."
+            exit 1
+          fi
+          version="${RELEASE_REF_NAME#v}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify live required checks for exact release commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          python -I -S "${VERIFIER_DIR}/release_commit_gate.py" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --sealed-authority \
+            --timeout-seconds 300 \
+            --poll-interval-seconds 15 \
+            > test_artifacts/release-preflight/exact_commit_checks.json
+          python -I -S "${VERIFIER_DIR}/release_merge_receipt_gate.py" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --required-check-report test_artifacts/release-preflight/exact_commit_checks.json \
+            --output test_artifacts/release-preflight/exact_commit_merge_receipt.json
+          python -I -S "${VERIFIER_DIR}/release_ruleset_snapshot.py" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --required-check-report test_artifacts/release-preflight/exact_commit_checks.json \
+            --sealed-authority \
+            --output test_artifacts/release-preflight/release_ruleset_snapshot.json
+
+      - name: Verify pre-tag provider-bound release-candidate evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          set -euo pipefail
+          python -I -S "${VERIFIER_DIR}/release_candidate_evidence_gate.py" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --release "${RELEASE_TAG}" \
+            --publication-workflow-path ".github/workflows/release.yml" \
+            --publication-run-id "${GITHUB_RUN_ID}" \
+            --publication-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output test_artifacts/release-preflight/release_candidate_evidence_verification.json
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Install preflight dependencies
+        run: uv pip install --system "pyyaml==6.0.3" "jsonschema==4.26.0"
+
+      - name: Validate tag, commit, package versions, and changelog
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          mkdir -p test_artifacts/release-preflight
+          python tools/agent_policy/release_identity_gate.py \
+            --root . \
+            --tag "${RELEASE_TAG}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --remote-ref origin/master \
+            --output test_artifacts/release-preflight/release_identity.json
+
+      - name: Certify frozen source for tenant hygiene
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+          TENANT_HYGIENE_POLICY: ${{ secrets.TENANT_HYGIENE_POLICY }}
+        run: |
+          set -euo pipefail
+          mkdir -p test_artifacts/release-preflight
+          if [[ -z "${TENANT_HYGIENE_POLICY}" ]]; then
+            echo "::error::TENANT_HYGIENE_POLICY secret is required; deny patterns are CI-owned and must not be committed."
+            exit 1
+          fi
+          policy_path="$(mktemp)"
+          printf '%s\n' "${TENANT_HYGIENE_POLICY}" > "${policy_path}"
+          python tools/agent_policy/tenant_hygiene.py source \
+            --root . \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --policy "${policy_path}" \
+            | tee test_artifacts/release-preflight/tenant-hygiene-source.json
+          rm -f "${policy_path}"
+
+      - name: Record release workflow context
+        if: always()
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          mkdir -p test_artifacts/release-preflight
+          python - <<'PY'
+          import json
+          import os
+          from datetime import UTC, datetime
+          from pathlib import Path
+
+          payload = {
+              "commit_sha": os.environ["RELEASE_COMMIT"],
+              "evaluated_at": datetime.now(UTC).isoformat(),
+              "event_name": os.environ["GITHUB_EVENT_NAME"],
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "schema_version": 1,
+              "tag": os.environ["RELEASE_TAG"],
+          }
+          Path("test_artifacts/release-preflight/workflow_context.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload release preflight evidence
+        id: preflight-upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/release-preflight/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  build:
+    name: Build immutable release candidates
+    needs: preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      candidates_artifact_id: ${{ steps.candidates-upload.outputs.artifact-id }}
+      candidates_artifact_digest: ${{ steps.candidates-upload.outputs.artifact-digest }}
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Install build dependencies
+        run: uv sync --all-extras
+
+      - name: Build all release distributions
+        run: |
+          uv build
+          uv build packages/dpone-native-accel --out-dir dist
+          uv build packages/dpone-airflow-pack --out-dir dist
+          uv build packages/apache-airflow-providers-dpone --out-dir dist
+          rm -f dist/.gitignore
+
+      - name: Validate exact candidate inventory
+        env:
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          mkdir -p test_artifacts/release-candidates
+          uv run python tools/pypi_release_smoke_dist.py \
+            --dist-dir dist \
+            --expected-version "${RELEASE_VERSION}" \
+            --inventory-only \
+            --format json \
+            > test_artifacts/release-candidates/candidate-inventory.json
+
+      - name: Reject repository-internal archive members
+        run: |
+          mkdir -p test_artifacts/release-candidates
+          uv run python tools/agent_policy/package_archive_gate.py \
+            dist/*.whl dist/*.tar.gz \
+            > test_artifacts/release-candidates/package-archive-gate.json
+
+      - name: Certify built archives for tenant hygiene
+        env:
+          TENANT_HYGIENE_POLICY: ${{ secrets.TENANT_HYGIENE_POLICY }}
+        run: |
+          set -euo pipefail
+          mkdir -p test_artifacts/release-candidates
+          if [[ -z "${TENANT_HYGIENE_POLICY}" ]]; then
+            echo "::error::TENANT_HYGIENE_POLICY secret is required; deny patterns are CI-owned and must not be committed."
+            exit 1
+          fi
+          policy_path="$(mktemp)"
+          printf '%s\n' "${TENANT_HYGIENE_POLICY}" > "${policy_path}"
+          uv run python tools/agent_policy/tenant_hygiene.py archive \
+            --policy "${policy_path}" \
+            dist/*.whl dist/*.tar.gz \
+            | tee test_artifacts/release-candidates/tenant-hygiene-archives.json
+          rm -f "${policy_path}"
+
+      - name: Check package metadata
+        run: uv run twine check dist/*
+
+      - name: Smoke exact local candidate wheels
+        env:
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/dpone-release-smoke
+          /tmp/dpone-release-smoke/bin/pip install --upgrade pip
+          /tmp/dpone-release-smoke/bin/pip install dist/*.whl
+          /tmp/dpone-release-smoke/bin/pip install \
+            --find-links dist \
+            "dpone[full,accel]==${RELEASE_VERSION}"
+          /tmp/dpone-release-smoke/bin/pip check \
+            | tee test_artifacts/release-candidates/pip-check.txt
+          /tmp/dpone-release-smoke/bin/python -c \
+            'import importlib.metadata as m, os; expected=os.environ["RELEASE_VERSION"]; names=("dpone","dpone-native-accel","dpone-airflow-pack","apache-airflow-providers-dpone"); actual={name:m.version(name) for name in names}; assert all(version == expected for version in actual.values()), actual; print(actual)' \
+            | tee test_artifacts/release-candidates/candidate-versions.txt
+          /tmp/dpone-release-smoke/bin/python tools/package_smoke.py \
+            --project-root . \
+            --dpone-cmd /tmp/dpone-release-smoke/bin/dpone \
+            | tee test_artifacts/release-candidates/package-smoke.txt
+
+      - name: Record candidate checksums
+        run: |
+          sha256sum dist/* | LC_ALL=C sort -k2 > release-candidate-sha256sums.txt
+
+      - name: Generate GitHub Release notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          uv run python tools/release_notes.py \
+            --version "${RELEASE_TAG}" \
+            --changelog CHANGELOG.md \
+            --output release_notes.md
+
+      - name: Upload immutable release candidates
+        id: candidates-upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-candidates
+          path: |
+            dist/
+            release-candidate-sha256sums.txt
+            release_notes.md
+            test_artifacts/release-candidates/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  build-supply-chain-evidence:
+    name: Build local supply-chain evidence
+    needs:
+      - preflight
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      supply_chain_artifact_id: ${{ steps.supply-chain-upload.outputs.artifact-id }}
+      supply_chain_artifact_digest: ${{ steps.supply-chain-upload.outputs.artifact-digest }}
+    steps:
+      - name: Download immutable release candidates
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.candidates_artifact_id }}
+          digest-mismatch: error
+          path: .
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Install exact candidate dpone wheel
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          # Sibling pack/provider wheels are not on PyPI until this release publishes;
+          # resolve pinned dpone extras from the immutable candidate dist only.
+          python -m pip install --find-links dist dist/dpone-*.whl
+
+      - name: Build dpone supply-chain evidence
+        env:
+          DPONE_LOCAL_ATTESTATION_KEY: ${{ secrets.DPONE_LOCAL_ATTESTATION_KEY }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # No repository checkout here (SS-47). SBOM metadata comes from the
+          # immutable candidate sdist already present in the release artifact.
+          sdist="$(compgen -G 'dist/dpone-*.tar.gz' | head -n 1)"
+          if [[ -z "${sdist}" ]]; then
+            echo "::error::Missing dpone sdist candidate under dist/."
+            exit 1
+          fi
+          project_root="$(mktemp -d)"
+          tar -xzf "${sdist}" -C "${project_root}" --strip-components=1
+          if [[ ! -f "${project_root}/pyproject.toml" ]]; then
+            echo "::error::Candidate sdist is missing pyproject.toml."
+            exit 1
+          fi
+          subjects=()
+          for artifact in dist/*.whl dist/*.tar.gz; do
+            subjects+=(--subject "$artifact")
+          done
+          dpone supply-chain attest \
+            --project-root "${project_root}" \
+            --release "${RELEASE_TAG}" \
+            "${subjects[@]}" \
+            --repository "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --builder-id "github-actions:$GITHUB_RUN_ID" \
+            --signing-key "$DPONE_LOCAL_ATTESTATION_KEY" \
+            --signing-key-id github-actions \
+            --output-dir test_artifacts/supply-chain/current \
+            --format json
+
+      - name: Upload local supply-chain evidence
+        id: supply-chain-upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-supply-chain-local
+          path: test_artifacts/supply-chain/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  attest:
+    name: Attest exact release candidates
+    needs:
+      - verifier
+      - preflight
+      - build
+      - build-supply-chain-evidence
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      attestations: write
+      checks: read
+      contents: read
+      id-token: write
+      statuses: read
+    outputs:
+      attestation_artifact_id: ${{ steps.attestation-upload.outputs.artifact-id }}
+      attestation_artifact_digest: ${{ steps.attestation-upload.outputs.artifact-digest }}
+    steps:
+      - name: Verify immutable release verifier artifact provider identity
+        env:
+          EXPECTED_ARTIFACT_ID: ${{ needs.verifier.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.verifier.outputs.artifact_digest }}
+          EXPECTED_ARTIFACT_NAME: ${{ needs.verifier.outputs.artifact_name }}
+          EXPECTED_PRODUCER_RUN_ATTEMPT: ${{ needs.verifier.outputs.producer_run_attempt }}
+          EXPECTED_RELEASE_COMMIT: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RECEIPT: test_artifacts/supply-chain/release_verifier_provider_identity.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "${RECEIPT}")"
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          def digest(value):
+              normalized = value.removeprefix("sha256:")
+              if re.fullmatch(r"[0-9a-f]{64}", normalized) is None:
+                  raise SystemExit("release verifier artifact digest is invalid")
+              return f"sha256:{normalized}"
+
+          artifact_id = int(os.environ["EXPECTED_ARTIFACT_ID"])
+          attempt = os.environ["EXPECTED_PRODUCER_RUN_ATTEMPT"]
+          expected_name = os.environ["EXPECTED_ARTIFACT_NAME"]
+          if not attempt.isascii() or not attempt.isdecimal() or attempt.startswith("0"):
+              raise SystemExit("release verifier producer attempt is invalid")
+          if expected_name != f"release-verifier-{os.environ['GITHUB_RUN_ID']}-{attempt}":
+              raise SystemExit("release verifier producer attempt binding is invalid")
+          request = urllib.request.Request(
+              f"{os.environ['GITHUB_API_URL']}/repos/{os.environ['GITHUB_REPOSITORY']}/actions/artifacts/{artifact_id}",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              payload = json.load(response)
+          workflow_run = payload.get("workflow_run") or {}
+          actual = {
+              "id": payload.get("id"),
+              "name": payload.get("name"),
+              "digest": digest(str(payload.get("digest") or "")),
+              "expired": payload.get("expired"),
+              "run_id": workflow_run.get("id"),
+              "head_sha": workflow_run.get("head_sha"),
+          }
+          expected = {
+              "id": artifact_id,
+              "name": expected_name,
+              "digest": digest(os.environ["EXPECTED_ARTIFACT_DIGEST"]),
+              "expired": False,
+              "run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "head_sha": os.environ["EXPECTED_RELEASE_COMMIT"],
+          }
+          if actual != expected:
+              raise SystemExit("release verifier artifact provider identity changed")
+          Path(os.environ["RECEIPT"]).write_text(
+              json.dumps({"producer_run_attempt": int(attempt), "status": "PASS", **actual}, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Download immutable closed release verifier
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.verifier.outputs.artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/release-verifier
+
+      - name: Validate closed release verifier before first execution
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.verifier.outputs.manifest_sha256 }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import stat
+          from pathlib import Path, PurePosixPath
+
+          maximum = 4 * 1024 * 1024
+          root = Path(os.environ["VERIFIER_DIR"])
+
+          def regular_bytes(path, label):
+              before = path.lstat()
+              if path.is_symlink() or not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= maximum:
+                  raise SystemExit(f"closed release verifier contains invalid file: {label}")
+              raw = path.read_bytes()
+              after = path.lstat()
+              identity = lambda value: (value.st_dev, value.st_ino, value.st_mode, value.st_size, value.st_mtime_ns)
+              if len(raw) != before.st_size or identity(before) != identity(after):
+                  raise SystemExit(f"closed release verifier changed while read: {label}")
+              return raw
+
+          root_metadata = root.lstat()
+          if root.is_symlink() or not stat.S_ISDIR(root_metadata.st_mode):
+              raise SystemExit("closed release verifier root is invalid")
+          manifest_name = "pypi-verifier-closure.json"
+          manifest_raw = regular_bytes(root / manifest_name, manifest_name)
+          if hashlib.sha256(manifest_raw).hexdigest() != os.environ["EXPECTED_MANIFEST_SHA256"]:
+              raise SystemExit("closed release verifier manifest differs from producer")
+          def unique_object(pairs):
+              result = {}
+              for key, value in pairs:
+                  if key in result:
+                      raise SystemExit("closed release verifier manifest contains a duplicate key; duplicate JSON key")
+                  result[key] = value
+              return result
+
+          payload = json.loads(
+              manifest_raw.decode("utf-8", "strict"),
+              object_pairs_hook=unique_object,
+          )
+          entries = payload.get("files") if isinstance(payload, dict) else None
+          if (
+              set(payload) != {"files", "profile", "schema"}
+              or payload.get("profile") != "ordinary-release"
+              or payload.get("schema") != "dpone.pypi_verifier_closure.v1"
+              or not isinstance(entries, list)
+              or len(entries) != 34
+          ):
+              raise SystemExit("closed release verifier manifest contract is invalid")
+          expected = {manifest_name}
+          for entry in entries:
+              if not isinstance(entry, dict) or set(entry) != {"path", "sha256", "size", "source"}:
+                  raise SystemExit("closed release verifier manifest entry is invalid")
+              relative = entry["path"]
+              pure = PurePosixPath(relative) if isinstance(relative, str) else PurePosixPath("/")
+              if pure.is_absolute() or len(pure.parts) != 1 or relative in expected:
+                  raise SystemExit("closed release verifier path is unsafe or duplicate")
+              if re.fullmatch(r"[0-9a-f]{64}", str(entry["sha256"])) is None:
+                  raise SystemExit("closed release verifier digest is invalid")
+              if type(entry["size"]) is not int or not 0 < entry["size"] <= maximum:
+                  raise SystemExit("closed release verifier size is invalid")
+              source = entry["source"]
+              if not isinstance(source, str) or source.startswith("/") or ".." in PurePosixPath(source).parts:
+                  raise SystemExit("closed release verifier source is invalid")
+              raw = regular_bytes(root / relative, relative)
+              if len(raw) != entry["size"] or hashlib.sha256(raw).hexdigest() != entry["sha256"]:
+                  raise SystemExit("closed release verifier file differs from manifest")
+              expected.add(relative)
+          observed = set()
+          for path in root.iterdir():
+              metadata = path.lstat()
+              if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
+                  raise SystemExit("closed release verifier tree contains a non-regular entry")
+              observed.add(path.name)
+          if observed != expected:
+              raise SystemExit("closed release verifier tree is not exact")
+          PY
+      - name: Download immutable release candidates
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.candidates_artifact_id }}
+          digest-mismatch: error
+          path: .
+
+      - name: Download local supply-chain evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.build-supply-chain-evidence.outputs.supply_chain_artifact_id }}
+          digest-mismatch: error
+          path: test_artifacts/supply-chain
+
+      - name: Download immutable release preflight authority
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.preflight.outputs.evidence_artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/release-preflight-authority
+
+      - name: Prove exact candidate and PyPI bytes immediately before attestation
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          set -euo pipefail
+          mkdir -p test_artifacts/supply-chain/release-authority
+          python "${VERIFIER_DIR}/pypi_prepublication_gate.py" \
+            --candidate-inventory test_artifacts/release-candidates/candidate-inventory.json \
+            --dist-dir dist \
+            --expected-version "${RELEASE_VERSION}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --release "${RELEASE_TAG}" \
+            --workflow-path ".github/workflows/release.yml" \
+            --workflow-run-id "${GITHUB_RUN_ID}" \
+            --workflow-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output test_artifacts/supply-chain/release-authority/pypi_before_attestation.json
+
+      - name: Prove fresh live authority immediately before attestation
+        env:
+          AUTHORITY_DIR: ${{ runner.temp }}/release-preflight-authority
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          set -euo pipefail
+          output_dir="test_artifacts/supply-chain/release-authority"
+          python "${VERIFIER_DIR}/release_commit_artifact_gate.py" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --authorization-report "${AUTHORITY_DIR}/exact_commit_checks.json" \
+            --authorization-ruleset-report "${AUTHORITY_DIR}/release_ruleset_snapshot.json" \
+            --output "${output_dir}/live_commit_before_attestation.json" \
+            --timeout-seconds 300 \
+            --poll-interval-seconds 15
+          python "${VERIFIER_DIR}/release_merge_receipt_gate.py" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --required-check-report "${output_dir}/live_commit_before_attestation.json" \
+            --output "${output_dir}/merge_receipt_before_attestation.json"
+          python "${VERIFIER_DIR}/release_candidate_evidence_gate.py" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --release "${RELEASE_TAG}" \
+            --publication-workflow-path ".github/workflows/release.yml" \
+            --publication-run-id "${GITHUB_RUN_ID}" \
+            --publication-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output "${output_dir}/candidate_before_attestation.json"
+          OUTPUT="${output_dir}/tag_before_attestation.json" python - <<'PY'
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          def read(path):
+              request = urllib.request.Request(
+                  f"{os.environ['GITHUB_API_URL']}/repos/{os.environ['GITHUB_REPOSITORY']}/{path}",
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          ref = read(f"git/ref/tags/{os.environ['RELEASE_TAG']}")
+          ref_object = ref.get("object") or {}
+          if ref_object.get("type") != "tag" or not isinstance(ref_object.get("sha"), str):
+              raise SystemExit("release tag is no longer an annotated tag")
+          tag = read(f"git/tags/{ref_object['sha']}")
+          target = tag.get("object") or {}
+          if target != {"sha": os.environ["RELEASE_COMMIT"], "type": "commit", "url": target.get("url")}:
+              raise SystemExit("annotated release tag no longer targets the release commit")
+          Path(os.environ["OUTPUT"]).write_text(
+              json.dumps(
+                  {
+                      "commit_sha": target["sha"],
+                      "schema_version": 1,
+                      "status": "PASS",
+                      "tag": os.environ["RELEASE_TAG"],
+                      "tag_object_sha": ref_object["sha"],
+                  },
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Attest release artifacts
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+
+      - name: Verify release artifact attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p test_artifacts/supply-chain/github-attestations
+          for artifact in dist/*.whl dist/*.tar.gz; do
+            receipt="test_artifacts/supply-chain/github-attestations/$(basename "$artifact").github-attestation.json"
+            for attempt in {1..6}; do
+              if gh attestation verify "$artifact" \
+                --repo "$GITHUB_REPOSITORY" \
+                --source-ref "$GITHUB_REF" \
+                --source-digest "${RELEASE_COMMIT}" \
+                --format json \
+                > "$receipt"; then
+                break
+              fi
+              if [ "$attempt" -eq 6 ]; then
+                exit 1
+              fi
+              sleep 10
+            done
+          done
+
+      - name: Upload release attestation evidence
+        id: attestation-upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-attestation-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/supply-chain/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  publish:
+    name: Authorize controller publication handoff
+    needs:
+      - verifier
+      - preflight
+      - build
+      - attest
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      statuses: read
+    steps:
+      - name: Verify immutable release verifier artifact provider identity
+        env:
+          EXPECTED_ARTIFACT_ID: ${{ needs.verifier.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.verifier.outputs.artifact_digest }}
+          EXPECTED_ARTIFACT_NAME: ${{ needs.verifier.outputs.artifact_name }}
+          EXPECTED_PRODUCER_RUN_ATTEMPT: ${{ needs.verifier.outputs.producer_run_attempt }}
+          EXPECTED_RELEASE_COMMIT: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RECEIPT: test_artifacts/release-pre-publication/release_verifier_provider_identity.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "${RECEIPT}")"
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          def digest(value):
+              normalized = value.removeprefix("sha256:")
+              if re.fullmatch(r"[0-9a-f]{64}", normalized) is None:
+                  raise SystemExit("release verifier artifact digest is invalid")
+              return f"sha256:{normalized}"
+
+          artifact_id = int(os.environ["EXPECTED_ARTIFACT_ID"])
+          attempt = os.environ["EXPECTED_PRODUCER_RUN_ATTEMPT"]
+          expected_name = os.environ["EXPECTED_ARTIFACT_NAME"]
+          if not attempt.isascii() or not attempt.isdecimal() or attempt.startswith("0"):
+              raise SystemExit("release verifier producer attempt is invalid")
+          if expected_name != f"release-verifier-{os.environ['GITHUB_RUN_ID']}-{attempt}":
+              raise SystemExit("release verifier producer attempt binding is invalid")
+          request = urllib.request.Request(
+              f"{os.environ['GITHUB_API_URL']}/repos/{os.environ['GITHUB_REPOSITORY']}/actions/artifacts/{artifact_id}",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              payload = json.load(response)
+          workflow_run = payload.get("workflow_run") or {}
+          actual = {
+              "id": payload.get("id"),
+              "name": payload.get("name"),
+              "digest": digest(str(payload.get("digest") or "")),
+              "expired": payload.get("expired"),
+              "run_id": workflow_run.get("id"),
+              "head_sha": workflow_run.get("head_sha"),
+          }
+          expected = {
+              "id": artifact_id,
+              "name": expected_name,
+              "digest": digest(os.environ["EXPECTED_ARTIFACT_DIGEST"]),
+              "expired": False,
+              "run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "head_sha": os.environ["EXPECTED_RELEASE_COMMIT"],
+          }
+          if actual != expected:
+              raise SystemExit("release verifier artifact provider identity changed")
+          Path(os.environ["RECEIPT"]).write_text(
+              json.dumps({"producer_run_attempt": int(attempt), "status": "PASS", **actual}, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Download immutable closed release verifier
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.verifier.outputs.artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/release-verifier
+
+      - name: Validate closed release verifier before first execution
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.verifier.outputs.manifest_sha256 }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import stat
+          from pathlib import Path, PurePosixPath
+
+          maximum = 4 * 1024 * 1024
+          root = Path(os.environ["VERIFIER_DIR"])
+
+          def regular_bytes(path, label):
+              before = path.lstat()
+              if path.is_symlink() or not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= maximum:
+                  raise SystemExit(f"closed release verifier contains invalid file: {label}")
+              raw = path.read_bytes()
+              after = path.lstat()
+              identity = lambda value: (value.st_dev, value.st_ino, value.st_mode, value.st_size, value.st_mtime_ns)
+              if len(raw) != before.st_size or identity(before) != identity(after):
+                  raise SystemExit(f"closed release verifier changed while read: {label}")
+              return raw
+
+          root_metadata = root.lstat()
+          if root.is_symlink() or not stat.S_ISDIR(root_metadata.st_mode):
+              raise SystemExit("closed release verifier root is invalid")
+          manifest_name = "pypi-verifier-closure.json"
+          manifest_raw = regular_bytes(root / manifest_name, manifest_name)
+          if hashlib.sha256(manifest_raw).hexdigest() != os.environ["EXPECTED_MANIFEST_SHA256"]:
+              raise SystemExit("closed release verifier manifest differs from producer")
+          def unique_object(pairs):
+              result = {}
+              for key, value in pairs:
+                  if key in result:
+                      raise SystemExit("closed release verifier manifest contains a duplicate key; duplicate JSON key")
+                  result[key] = value
+              return result
+
+          payload = json.loads(
+              manifest_raw.decode("utf-8", "strict"),
+              object_pairs_hook=unique_object,
+          )
+          entries = payload.get("files") if isinstance(payload, dict) else None
+          if (
+              set(payload) != {"files", "profile", "schema"}
+              or payload.get("profile") != "ordinary-release"
+              or payload.get("schema") != "dpone.pypi_verifier_closure.v1"
+              or not isinstance(entries, list)
+              or len(entries) != 34
+          ):
+              raise SystemExit("closed release verifier manifest contract is invalid")
+          expected = {manifest_name}
+          for entry in entries:
+              if not isinstance(entry, dict) or set(entry) != {"path", "sha256", "size", "source"}:
+                  raise SystemExit("closed release verifier manifest entry is invalid")
+              relative = entry["path"]
+              pure = PurePosixPath(relative) if isinstance(relative, str) else PurePosixPath("/")
+              if pure.is_absolute() or len(pure.parts) != 1 or relative in expected:
+                  raise SystemExit("closed release verifier path is unsafe or duplicate")
+              if re.fullmatch(r"[0-9a-f]{64}", str(entry["sha256"])) is None:
+                  raise SystemExit("closed release verifier digest is invalid")
+              if type(entry["size"]) is not int or not 0 < entry["size"] <= maximum:
+                  raise SystemExit("closed release verifier size is invalid")
+              source = entry["source"]
+              if not isinstance(source, str) or source.startswith("/") or ".." in PurePosixPath(source).parts:
+                  raise SystemExit("closed release verifier source is invalid")
+              raw = regular_bytes(root / relative, relative)
+              if len(raw) != entry["size"] or hashlib.sha256(raw).hexdigest() != entry["sha256"]:
+                  raise SystemExit("closed release verifier file differs from manifest")
+              expected.add(relative)
+          observed = set()
+          for path in root.iterdir():
+              metadata = path.lstat()
+              if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
+                  raise SystemExit("closed release verifier tree contains a non-regular entry")
+              observed.add(path.name)
+          if observed != expected:
+              raise SystemExit("closed release verifier tree is not exact")
+          PY
+      - name: Download immutable release candidates
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.candidates_artifact_id }}
+          digest-mismatch: error
+          path: .
+
+      - name: Download immutable release preflight authority
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.preflight.outputs.evidence_artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/release-preflight-authority
+
+      - name: Prove safe public PyPI prepublication state
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          set -euo pipefail
+          python "${VERIFIER_DIR}/pypi_prepublication_gate.py" \
+            --candidate-inventory test_artifacts/release-candidates/candidate-inventory.json \
+            --dist-dir dist \
+            --expected-version "${RELEASE_VERSION}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --release "${RELEASE_TAG}" \
+            --workflow-path ".github/workflows/release.yml" \
+            --workflow-run-id "${GITHUB_RUN_ID}" \
+            --workflow-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output test_artifacts/release-pre-publication/pypi_prepublication_gate.json
+
+      - name: Prove fresh release authority before controller handoff
+        env:
+          AUTHORITY_DIR: ${{ runner.temp }}/release-preflight-authority
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          set -euo pipefail
+          output_dir="test_artifacts/release-pre-publication"
+          python "${VERIFIER_DIR}/release_commit_artifact_gate.py" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --authorization-report "${AUTHORITY_DIR}/exact_commit_checks.json" \
+            --authorization-ruleset-report "${AUTHORITY_DIR}/release_ruleset_snapshot.json" \
+            --output "${output_dir}/live_commit_before_pypi.json" \
+            --timeout-seconds 300 \
+            --poll-interval-seconds 15
+          python "${VERIFIER_DIR}/release_merge_receipt_gate.py" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --required-check-report "${output_dir}/live_commit_before_pypi.json" \
+            --output "${output_dir}/merge_receipt_before_pypi.json"
+          python "${VERIFIER_DIR}/release_candidate_evidence_gate.py" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --release "${RELEASE_TAG}" \
+            --publication-workflow-path ".github/workflows/release.yml" \
+            --publication-run-id "${GITHUB_RUN_ID}" \
+            --publication-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output "${output_dir}/candidate_before_pypi.json"
+          OUTPUT="${output_dir}/tag_before_pypi.json" python - <<'PY'
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          def read(path):
+              request = urllib.request.Request(
+                  f"{os.environ['GITHUB_API_URL']}/repos/{os.environ['GITHUB_REPOSITORY']}/{path}",
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          ref = read(f"git/ref/tags/{os.environ['RELEASE_TAG']}")
+          ref_object = ref.get("object") or {}
+          if ref_object.get("type") != "tag" or not isinstance(ref_object.get("sha"), str):
+              raise SystemExit("release tag is no longer an annotated tag")
+          tag = read(f"git/tags/{ref_object['sha']}")
+          target = tag.get("object") or {}
+          if target != {"sha": os.environ["RELEASE_COMMIT"], "type": "commit", "url": target.get("url")}:
+              raise SystemExit("annotated release tag no longer targets the release commit")
+          Path(os.environ["OUTPUT"]).write_text(
+              json.dumps(
+                  {
+                      "commit_sha": target["sha"],
+                      "schema_version": 1,
+                      "status": "PASS",
+                      "tag": os.environ["RELEASE_TAG"],
+                      "tag_object_sha": ref_object["sha"],
+                  },
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Confirm controller is the sole PyPI publisher
+        run: |
+          set -euo pipefail
+          echo "Release candidates are authorized for the external OIDC controller."
+          echo "PyPI publication is performed only by PaulKov/dpone-release-controller/.github/workflows/pypi-release.yml."
+
+      - name: Upload pre-publication evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-pre-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/release-pre-publication/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  verify-public-bytes:
+    name: Verify public PyPI bytes
+    needs:
+      - preflight
+      - build
+      - attest
+      - publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Download immutable release candidates
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.candidates_artifact_id }}
+          digest-mismatch: error
+          path: .
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Install verification dependencies
+        run: uv sync --all-extras
+
+      - name: Verify exact PyPI wheel and sdist identities
+        env:
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p test_artifacts/pypi-release-smoke
+          uv run python tools/pypi_release_smoke_dist.py \
+            --dist-dir dist \
+            --expected-version "${RELEASE_VERSION}" \
+            --timeout-seconds 900 \
+            --poll-interval-seconds 30 \
+            --install-smoke \
+            --dpone-install-extra accel \
+            --format md \
+            | tee test_artifacts/pypi-release-smoke/pypi_release_smoke.md
+
+      - name: Upload PyPI resolver smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: pypi-resolver-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/pypi-release-smoke/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  github-release:
+    name: Create GitHub Release
+    needs:
+      - verifier
+      - preflight
+      - build
+      - attest
+      - publish
+      - verify-public-bytes
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+      contents: write
+      statuses: read
+    steps:
+      - name: Verify immutable release verifier artifact provider identity
+        env:
+          EXPECTED_ARTIFACT_ID: ${{ needs.verifier.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.verifier.outputs.artifact_digest }}
+          EXPECTED_ARTIFACT_NAME: ${{ needs.verifier.outputs.artifact_name }}
+          EXPECTED_PRODUCER_RUN_ATTEMPT: ${{ needs.verifier.outputs.producer_run_attempt }}
+          EXPECTED_RELEASE_COMMIT: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RECEIPT: test_artifacts/release-pre-publication/release_verifier_provider_identity.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "${RECEIPT}")"
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          def digest(value):
+              normalized = value.removeprefix("sha256:")
+              if re.fullmatch(r"[0-9a-f]{64}", normalized) is None:
+                  raise SystemExit("release verifier artifact digest is invalid")
+              return f"sha256:{normalized}"
+
+          artifact_id = int(os.environ["EXPECTED_ARTIFACT_ID"])
+          attempt = os.environ["EXPECTED_PRODUCER_RUN_ATTEMPT"]
+          expected_name = os.environ["EXPECTED_ARTIFACT_NAME"]
+          if not attempt.isascii() or not attempt.isdecimal() or attempt.startswith("0"):
+              raise SystemExit("release verifier producer attempt is invalid")
+          if expected_name != f"release-verifier-{os.environ['GITHUB_RUN_ID']}-{attempt}":
+              raise SystemExit("release verifier producer attempt binding is invalid")
+          request = urllib.request.Request(
+              f"{os.environ['GITHUB_API_URL']}/repos/{os.environ['GITHUB_REPOSITORY']}/actions/artifacts/{artifact_id}",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              payload = json.load(response)
+          workflow_run = payload.get("workflow_run") or {}
+          actual = {
+              "id": payload.get("id"),
+              "name": payload.get("name"),
+              "digest": digest(str(payload.get("digest") or "")),
+              "expired": payload.get("expired"),
+              "run_id": workflow_run.get("id"),
+              "head_sha": workflow_run.get("head_sha"),
+          }
+          expected = {
+              "id": artifact_id,
+              "name": expected_name,
+              "digest": digest(os.environ["EXPECTED_ARTIFACT_DIGEST"]),
+              "expired": False,
+              "run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "head_sha": os.environ["EXPECTED_RELEASE_COMMIT"],
+          }
+          if actual != expected:
+              raise SystemExit("release verifier artifact provider identity changed")
+          Path(os.environ["RECEIPT"]).write_text(
+              json.dumps({"producer_run_attempt": int(attempt), "status": "PASS", **actual}, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Download immutable closed release verifier
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.verifier.outputs.artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/release-verifier
+
+      - name: Validate closed release verifier before first execution
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.verifier.outputs.manifest_sha256 }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import stat
+          from pathlib import Path, PurePosixPath
+
+          maximum = 4 * 1024 * 1024
+          root = Path(os.environ["VERIFIER_DIR"])
+
+          def regular_bytes(path, label):
+              before = path.lstat()
+              if path.is_symlink() or not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= maximum:
+                  raise SystemExit(f"closed release verifier contains invalid file: {label}")
+              raw = path.read_bytes()
+              after = path.lstat()
+              identity = lambda value: (value.st_dev, value.st_ino, value.st_mode, value.st_size, value.st_mtime_ns)
+              if len(raw) != before.st_size or identity(before) != identity(after):
+                  raise SystemExit(f"closed release verifier changed while read: {label}")
+              return raw
+
+          root_metadata = root.lstat()
+          if root.is_symlink() or not stat.S_ISDIR(root_metadata.st_mode):
+              raise SystemExit("closed release verifier root is invalid")
+          manifest_name = "pypi-verifier-closure.json"
+          manifest_raw = regular_bytes(root / manifest_name, manifest_name)
+          if hashlib.sha256(manifest_raw).hexdigest() != os.environ["EXPECTED_MANIFEST_SHA256"]:
+              raise SystemExit("closed release verifier manifest differs from producer")
+          def unique_object(pairs):
+              result = {}
+              for key, value in pairs:
+                  if key in result:
+                      raise SystemExit("closed release verifier manifest contains a duplicate key; duplicate JSON key")
+                  result[key] = value
+              return result
+
+          payload = json.loads(
+              manifest_raw.decode("utf-8", "strict"),
+              object_pairs_hook=unique_object,
+          )
+          entries = payload.get("files") if isinstance(payload, dict) else None
+          if (
+              set(payload) != {"files", "profile", "schema"}
+              or payload.get("profile") != "ordinary-release"
+              or payload.get("schema") != "dpone.pypi_verifier_closure.v1"
+              or not isinstance(entries, list)
+              or len(entries) != 34
+          ):
+              raise SystemExit("closed release verifier manifest contract is invalid")
+          expected = {manifest_name}
+          for entry in entries:
+              if not isinstance(entry, dict) or set(entry) != {"path", "sha256", "size", "source"}:
+                  raise SystemExit("closed release verifier manifest entry is invalid")
+              relative = entry["path"]
+              pure = PurePosixPath(relative) if isinstance(relative, str) else PurePosixPath("/")
+              if pure.is_absolute() or len(pure.parts) != 1 or relative in expected:
+                  raise SystemExit("closed release verifier path is unsafe or duplicate")
+              if re.fullmatch(r"[0-9a-f]{64}", str(entry["sha256"])) is None:
+                  raise SystemExit("closed release verifier digest is invalid")
+              if type(entry["size"]) is not int or not 0 < entry["size"] <= maximum:
+                  raise SystemExit("closed release verifier size is invalid")
+              source = entry["source"]
+              if not isinstance(source, str) or source.startswith("/") or ".." in PurePosixPath(source).parts:
+                  raise SystemExit("closed release verifier source is invalid")
+              raw = regular_bytes(root / relative, relative)
+              if len(raw) != entry["size"] or hashlib.sha256(raw).hexdigest() != entry["sha256"]:
+                  raise SystemExit("closed release verifier file differs from manifest")
+              expected.add(relative)
+          observed = set()
+          for path in root.iterdir():
+              metadata = path.lstat()
+              if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
+                  raise SystemExit("closed release verifier tree contains a non-regular entry")
+              observed.add(path.name)
+          if observed != expected:
+              raise SystemExit("closed release verifier tree is not exact")
+          PY
+      - name: Download immutable release candidates
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.candidates_artifact_id }}
+          digest-mismatch: error
+          path: .
+
+      - name: Download release attestation evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.attest.outputs.attestation_artifact_id }}
+          digest-mismatch: error
+          path: test_artifacts/supply-chain
+
+      - name: Download immutable release preflight authority
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.preflight.outputs.evidence_artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/release-preflight-authority
+
+      - name: Prove exact candidate and public PyPI bytes before GitHub Release
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          set -euo pipefail
+          python "${VERIFIER_DIR}/pypi_prepublication_gate.py" \
+            --candidate-inventory test_artifacts/release-candidates/candidate-inventory.json \
+            --dist-dir dist \
+            --expected-version "${RELEASE_VERSION}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --release "${RELEASE_TAG}" \
+            --workflow-path ".github/workflows/release.yml" \
+            --workflow-run-id "${GITHUB_RUN_ID}" \
+            --workflow-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output test_artifacts/release-pre-publication/pypi_before_github_release.json
+
+      - name: Prove fresh live authority immediately before GitHub Release
+        env:
+          AUTHORITY_DIR: ${{ runner.temp }}/release-preflight-authority
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VERIFIER_DIR: ${{ runner.temp }}/release-verifier
+        run: |
+          set -euo pipefail
+          output_dir="test_artifacts/release-pre-publication"
+          python "${VERIFIER_DIR}/release_commit_artifact_gate.py" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --authorization-report "${AUTHORITY_DIR}/exact_commit_checks.json" \
+            --authorization-ruleset-report "${AUTHORITY_DIR}/release_ruleset_snapshot.json" \
+            --output "${output_dir}/live_commit_before_github_release.json" \
+            --timeout-seconds 300 \
+            --poll-interval-seconds 15
+          python "${VERIFIER_DIR}/release_merge_receipt_gate.py" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --required-check-report "${output_dir}/live_commit_before_github_release.json" \
+            --output "${output_dir}/merge_receipt_before_github_release.json"
+          python "${VERIFIER_DIR}/release_candidate_evidence_gate.py" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --release "${RELEASE_TAG}" \
+            --publication-workflow-path ".github/workflows/release.yml" \
+            --publication-run-id "${GITHUB_RUN_ID}" \
+            --publication-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output "${output_dir}/candidate_before_github_release.json"
+          OUTPUT="${output_dir}/tag_before_github_release.json" python - <<'PY'
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          def read(path):
+              request = urllib.request.Request(
+                  f"{os.environ['GITHUB_API_URL']}/repos/{os.environ['GITHUB_REPOSITORY']}/{path}",
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          ref = read(f"git/ref/tags/{os.environ['RELEASE_TAG']}")
+          ref_object = ref.get("object") or {}
+          if ref_object.get("type") != "tag" or not isinstance(ref_object.get("sha"), str):
+              raise SystemExit("release tag is no longer an annotated tag")
+          tag = read(f"git/tags/{ref_object['sha']}")
+          target = tag.get("object") or {}
+          if target != {"sha": os.environ["RELEASE_COMMIT"], "type": "commit", "url": target.get("url")}:
+              raise SystemExit("annotated release tag no longer targets the release commit")
+          Path(os.environ["OUTPUT"]).write_text(
+              json.dumps(
+                  {
+                      "commit_sha": target["sha"],
+                      "schema_version": 1,
+                      "status": "PASS",
+                      "tag": os.environ["RELEASE_TAG"],
+                      "tag_object_sha": ref_object["sha"],
+                  },
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        with:
+          body_path: release_notes.md
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+            release-candidate-sha256sums.txt
+            test_artifacts/supply-chain/**/*.json
+            test_artifacts/release-pre-publication/**/*.json
+
+      - name: Upload GitHub Release publication evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-github-publication-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/release-pre-publication/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false

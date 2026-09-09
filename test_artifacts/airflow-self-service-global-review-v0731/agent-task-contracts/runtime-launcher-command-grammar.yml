@@ -1,0 +1,84 @@
+schema_version: 1
+task_id: "AIRFLOW-SS-RUNTIME-COMMAND-GRAMMAR"
+title: "Close the verified runtime launcher command grammar"
+goal: >
+  Prevent a correctly fingerprinted pack from changing execution kind,
+  hook phase, or hook-isolation behavior through ambiguous command tokens or
+  environment values.
+specification: "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Runtime execution accepts only the canonical dpone run grammar emitted by the producer."
+  - "Hook execution accepts exactly one expected phase and one hook id, with no duplicate or unknown execution-control flags."
+  - "Runtime execution cannot substitute a hook command, and hook execution cannot substitute a runtime command."
+  - "The environment contract is exactly DPONE_SKIP_AIRFLOW_SEPARATE_HOOKS=1."
+  - "Every rejected plan fails before execvpe."
+  - "Existing valid strict-v2 runtime and hook plans remain compatible."
+  - "Runtime release/deployment receipt JSON rejects duplicate keys, NaN, Infinity, recursion overflow, and never publishes ready on failure."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "strict-v2 verified runtime execution"
+    - "runtime init-fetch receipt validation"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/runtime/verified_pack_launcher.py"
+  - "src/dpone/runtime/runtime_init_fetch_receipts.py"
+  - "tests/test_airflow_runtime_init_fetch_cli.py"
+  - "tests/test_runtime_init_fetch_security.py"
+
+read_only_paths:
+  - "src/dpone/runtime/runtime_init_fetch_plan.py"
+  - "src/dpone/runtime/runtime_init_fetch_service.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/provider_execution.py"
+  - "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - ".codex/config.toml"
+  - "docs/feature-design-airflow-pipeline-first-ux-p2.md"
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "Preserve whole-pack identity, init-fetch ready-last publication, and shell-free exec."
+  - "Do not edit quality-governance files owned by the active quality agent."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_runtime_init_fetch_cli.py tests/test_runtime_init_fetch_security.py -q"
+    - "uv run ruff check <owned Python paths>"
+    - "uv run mypy --config-file mypy.ini <owned source paths>"
+  broad:
+    - "Integrator runs full Airflow and non-live gates."
+  live:
+    - "N/A: local parser and launcher trust boundary."
+
+required_outputs:
+  - "implementation"
+  - "tests"
+  - "documentation_impact"
+  - "completion_report"
+
+completion_statuses:
+  allowed:
+    - "PASS"
+    - "FAIL"
+    - "SKIP"
+    - "N/A"
+    - "UNVERIFIED"
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

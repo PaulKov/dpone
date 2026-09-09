@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/workload-change-impact.schema.json",
+  "title": "dpone GitOps workload discovery change impact",
+  "type": "object",
+  "required": [
+    "schema",
+    "baseline_fingerprint",
+    "current_fingerprint",
+    "baseline_content_sha256",
+    "current_content_sha256",
+    "current_source",
+    "validation_status",
+    "discovery_status",
+    "issues",
+    "added",
+    "modified",
+    "removed"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.workload-change-impact.v1"
+    },
+    "baseline_fingerprint": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "current_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "baseline_content_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "current_content_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "current_source": {
+      "enum": [
+        "candidate",
+        "discovery"
+      ]
+    },
+    "validation_status": {
+      "const": "passed"
+    },
+    "discovery_status": {
+      "enum": [
+        "passed",
+        "failed",
+        "not_run"
+      ]
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "path"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "added": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9_-]{1,127}$"
+      }
+    },
+    "modified": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9_-]{1,127}$"
+      }
+    },
+    "removed": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9_-]{1,127}$"
+      }
+    }
+  }
+}

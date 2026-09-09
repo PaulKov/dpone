@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-artifact-index.schema.json",
+  "title": "dpone GitOps Airflow artifact index contract",
+  "type": "object",
+  "required": [
+    "kind",
+    "schema_version",
+    "producer",
+    "artifact_dir",
+    "output_path",
+    "created_at",
+    "entries"
+  ],
+  "properties": {
+    "kind": {
+      "const": "gitops.airflow_artifact_index"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "artifact_dir": {
+      "type": "string"
+    },
+    "output_path": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "name",
+          "path",
+          "format",
+          "expected_kind",
+          "required",
+          "exists",
+          "passed",
+          "reason"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "expected_kind": {
+            "type": "string"
+          },
+          "actual_kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schema_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "producer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "exists": {
+            "type": "boolean"
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "code",
+        "message",
+        "path",
+        "source"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

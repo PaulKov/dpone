@@ -1,0 +1,69 @@
+schema_version: 1
+task_id: "SS-REVIEW-CLI-SAFE-SAMPLE-BOUNDARY"
+title: "Fail closed on incompatible safe-sample arguments"
+goal: "Reject ignored ordinary-run options before any safe-sample side effect and render safe copyable recovery commands."
+specification: "docs/feature-design-self-service-cli-diagnostics-hardening-v0731.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Safe-sample mode rejects every explicitly supplied ordinary-run-only option with DPONE_SAFE_SAMPLE_ARGUMENTS_INVALID and exit code 2."
+  - "Validation distinguishes explicit options from parser defaults."
+  - "Argument failures create no cache, release, deployment, target or evidence artifacts and perform no remote or secret I/O."
+  - "The error lists option names but never echoes their values."
+  - "Generated safe fix commands quote spaces and shell metacharacters as inert arguments."
+  - "Human planned/completed output includes project-relative evidence paths when present."
+  - "Blocked human output includes actionable redacted recovery guidance."
+  - "The existing valid safe-sample and ordinary-run paths remain compatible."
+  - "Text, Markdown and JSON output remain traceback-free and redacted."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["dpone run safe-sample mode", "DPONE_SAFE_SAMPLE_ARGUMENTS_INVALID", "safe-sample human output"]
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/commands/run_cmd.py"
+  - "src/dpone/commands/run_safe_sample_cmd.py"
+  - "src/dpone/commands/run_safe_sample_rendering.py"
+  - "src/dpone/services/safe_sample_cli_arguments.py"
+  - "tests/test_safe_sample_cli_mode_boundary.py"
+read_only_paths:
+  - "docs/feature-design-self-service-cli-diagnostics-hardening-v0731.md"
+  - "docs/errors/DPONE_SAFE_SAMPLE_ARGUMENTS_INVALID.md"
+  - "src/dpone/commands/main.py"
+  - "src/dpone/commands/args.py"
+  - "src/dpone/security_redaction.py"
+  - "tests/test_airflow_self_service_cli.py"
+  - "tests/test_output_text_redaction.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "docs"
+  - "packages"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_safe_sample_cli_mode_boundary.py tests/test_output_text_redaction.py -q"
+    - "uv run ruff check src/dpone/commands/run_cmd.py src/dpone/commands/run_safe_sample_cmd.py src/dpone/commands/run_safe_sample_rendering.py src/dpone/services/safe_sample_cli_arguments.py tests/test_safe_sample_cli_mode_boundary.py"
+    - "uv run mypy --config-file mypy.ini src/dpone/commands/run_cmd.py src/dpone/commands/run_safe_sample_cmd.py src/dpone/commands/run_safe_sample_rendering.py src/dpone/services/safe_sample_cli_arguments.py"
+  broad:
+    - "uv run pytest -k 'safe_sample or run_command' -q"
+    - "uv run dpone docs check-airflow-public-contracts"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Validation cannot be placed before every filesystem and external side effect."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

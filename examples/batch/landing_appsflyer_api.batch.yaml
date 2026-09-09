@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+convention: landing_raw_v1
+
+vars:
+  src_system: appsflyer
+  src_database: api
+  host: hq1_appsflyer_com
+  owner_team: marketing-analytics
+  owner_contact: marketing-analytics@example.com
+  sla: daily
+
+defaults:
+  source:
+    type: api
+    api_type: appsflyer
+    connection_type: vault
+    connection_id: appsflyer-api
+    vault_path: api/appsflyer
+    options:
+      resource: "{{ src_table }}"
+      app_ids:
+        - com.example.app
+        - id1234567890
+      timezone: Europe/Moscow
+      maximum_rows: 1000000
+      incremental_column: date
+      rate_limit_delay: 1.0
+      max_retries: 3
+
+  sink:
+    type: bigquery
+    connection_type: vault
+    connection_id: bigquery-demo
+    vault_path: gcp/demo-project-{{ env_code }}/bq/example-etl-service
+    staging:
+      schema: stg
+    strategy:
+      mode: incremental_append
+    options:
+      log_sample_rows: 5
+
+  bigquery_proxy:
+    proxy_enable: true
+
+schemas:
+  app:
+    tables:
+      - daily_report
+      - installs_report
+      - in_app_events_report
+      - table: uninstall_events_report
+        overrides:
+          source:
+            options:
+              lookback_days: 14
+      - installs_retarget
+      - in_app_events_retarget
+      - organic_installs_report
+      - organic_in_app_events_report
+      - table: organic_uninstall_events_report
+        overrides:
+          source:
+            options:
+              lookback_days: 14

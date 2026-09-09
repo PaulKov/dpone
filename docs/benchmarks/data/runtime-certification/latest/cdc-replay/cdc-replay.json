@@ -1,0 +1,58 @@
+{
+  "artifact_paths": [],
+  "category": "cdc_replay",
+  "contract_checks": [
+    {
+      "actual": {
+        "1": {
+          "amount": 12,
+          "order_id": 1
+        }
+      },
+      "check_id": "final_state_matches",
+      "expected": "only key 1 remains",
+      "message": "CDC replay applies create/update/delete operations.",
+      "status": "passed"
+    },
+    {
+      "actual": 4,
+      "check_id": "checkpoint_offset",
+      "expected": 4,
+      "message": "CDC checkpoint tracks the highest consumed offset.",
+      "status": "passed"
+    },
+    {
+      "actual": {
+        "1": {
+          "amount": 12,
+          "order_id": 1
+        }
+      },
+      "check_id": "replay_idempotent",
+      "expected": {
+        "1": {
+          "amount": 12,
+          "order_id": 1
+        }
+      },
+      "message": "Replaying already consumed offsets is a no-op.",
+      "status": "passed"
+    },
+    {
+      "actual": 4,
+      "check_id": "repeated_checkpoint_stable",
+      "expected": 4,
+      "message": "CDC checkpoint remains stable on duplicate replay.",
+      "status": "passed"
+    }
+  ],
+  "input_hash": "8371105c3cb62f23db8a905375813909574962452caa83ffdf3e7739b762d3fd",
+  "output_hash": "496b00829f707db682b681ae6c8b90c7cfc7489a921cb9695323cc9fdbe99f25",
+  "required": true,
+  "row_counts": {
+    "records": 2
+  },
+  "runner": "python_api",
+  "scenario_id": "cdc-replay",
+  "status": "passed"
+}

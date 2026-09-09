@@ -1,0 +1,154 @@
+{
+  "$defs": {
+    "resource": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-runtime-pod-retention-render.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "alerts": {
+            "const": "prometheus"
+          }
+        },
+        "required": [
+          "alerts"
+        ]
+      },
+      "then": {
+        "required": [
+          "stale_after_seconds"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "alerts": {
+            "const": "off"
+          }
+        },
+        "required": [
+          "alerts"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "stale_after_seconds"
+          ]
+        }
+      }
+    }
+  ],
+  "properties": {
+    "alerts": {
+      "enum": [
+        "off",
+        "prometheus"
+      ]
+    },
+    "image": {
+      "pattern": "^[^\\s@]+@sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "manifest_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "manifests": {
+      "items": {
+        "type": "object"
+      },
+      "maxItems": 5,
+      "minItems": 4,
+      "type": "array"
+    },
+    "max_delete_count": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "minimum_age_seconds": {
+      "maximum": 2592000,
+      "minimum": 300,
+      "type": "integer"
+    },
+    "mode": {
+      "enum": [
+        "plan",
+        "apply"
+      ]
+    },
+    "namespace": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "page_size": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "passed": {
+      "const": true
+    },
+    "resources": {
+      "items": {
+        "$ref": "#/$defs/resource"
+      },
+      "type": "array"
+    },
+    "schedule": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.airflow-runtime-pod-retention-render.v1"
+    },
+    "stale_after_seconds": {
+      "maximum": 63244800,
+      "minimum": 600,
+      "type": "integer"
+    },
+    "status": {
+      "const": "rendered"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "status",
+    "namespace",
+    "mode",
+    "image",
+    "schedule",
+    "minimum_age_seconds",
+    "page_size",
+    "max_delete_count",
+    "alerts",
+    "manifest_sha256",
+    "resources",
+    "manifests"
+  ],
+  "title": "dpone GitOps Airflow runtime Pod retention manifest render",
+  "type": "object"
+}

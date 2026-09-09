@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/live-preflight.schema.json",
+  "title": "dpone GitOps live preflight report",
+  "type": "object",
+  "required": [
+    "schema",
+    "passed",
+    "runner",
+    "network",
+    "secrets",
+    "source_queries",
+    "planned_network",
+    "planned_secrets",
+    "planned_source_queries",
+    "environment",
+    "connection_refs",
+    "resolved_connection_refs",
+    "probes",
+    "errors"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "dpone.live-preflight.v1"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "runner": {
+      "enum": [
+        "not_configured",
+        "configured"
+      ]
+    },
+    "network": {
+      "type": "boolean"
+    },
+    "secrets": {
+      "type": "boolean"
+    },
+    "source_queries": {
+      "type": "boolean"
+    },
+    "planned_network": {
+      "const": true
+    },
+    "planned_secrets": {
+      "const": true
+    },
+    "planned_source_queries": {
+      "const": "bounded_probes"
+    },
+    "environment": {
+      "type": "string",
+      "minLength": 1
+    },
+    "connection_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+        "maxLength": 128
+      }
+    },
+    "resolved_connection_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+        "maxLength": 128
+      }
+    },
+    "probes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/probe"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/error"
+      }
+    }
+  },
+  "$defs": {
+    "error": {
+      "type": "object",
+      "required": [
+        "schema",
+        "code",
+        "stage",
+        "severity",
+        "message"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "const": "dpone.error.v1"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^DPONE_[A-Z0-9_]+$"
+        },
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entity": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "fixes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "safety"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "safety": {
+                "enum": [
+                  "safe",
+                  "manual",
+                  "destructive"
+                ]
+              },
+              "description": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "required": [
+        "connection_ref",
+        "probe",
+        "status",
+        "runner",
+        "network",
+        "secrets",
+        "source_queries"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "connection_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+          "maxLength": 128
+        },
+        "probe": {
+          "enum": [
+            "credential_resolution",
+            "bounded_source_probe",
+            "bounded_sink_probe"
+          ]
+        },
+        "status": {
+          "enum": [
+            "blocked",
+            "passed",
+            "failed"
+          ]
+        },
+        "runner": {
+          "enum": [
+            "not_configured",
+            "configured"
+          ]
+        },
+        "network": {
+          "type": "boolean"
+        },
+        "secrets": {
+          "type": "boolean"
+        },
+        "source_queries": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

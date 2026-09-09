@@ -1,0 +1,59 @@
+schema_version: 1
+task_id: "DPONE-DBT-004"
+title: "Implement deterministic dbt source-mirror verification"
+goal: "Provide a reusable application service that proves a prod dbt mirror is byte-identical to a pinned release project bundle."
+specification: "docs/feature-design-dbt-inline-self-service-v1.md"
+base_commit: "04bb048639641c9d6fb55fbfead21cec3345c70c"
+integrator: "parent"
+
+acceptance_criteria:
+  - "Verification rebuilds the deterministic project bundle and compares its digest to release-set.v2 runtime payload metadata."
+  - "Release identity and source snapshot are validated before any success result."
+  - "Missing, malformed, tampered or changed source returns DPONE_DBT_PROMOTION_SOURCE_DRIFT."
+  - "The service performs no network, secret or shell access."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["application service", "promotion report"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/services/dbt_promotion_verification.py"
+  - "tests/test_dbt_promotion_verification.py"
+read_only_paths:
+  - "docs/feature-design-dbt-inline-self-service-v1.md"
+  - "src/dpone/runtime/dbt_project_bundle.py"
+  - "src/dpone/dbt_publish/release_assets.py"
+  - "src/dpone/contracts/airflow_deployment.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+  - "docs/schemas/**"
+  - "src/dpone/commands/**"
+  - "src/dpone/dbt_publish/**"
+  - "src/dpone/runtime/**"
+  - "tests/conftest.py"
+
+shared_file_owner: "parent"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_promotion_verification.py -q"
+    - "uv run ruff check src/dpone/services/dbt_promotion_verification.py tests/test_dbt_promotion_verification.py"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Release-set or project-bundle public contracts must change."
+  - "A live check requires unapproved credentials or environment."
+  - "A network, secret or shell dependency would be required."
+  - "Another writer owns the same semantic contract."

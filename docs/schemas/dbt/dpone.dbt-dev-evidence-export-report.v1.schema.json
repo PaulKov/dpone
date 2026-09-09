@@ -1,0 +1,75 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-dev-evidence-export-report.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "dpone.dbt-dev-evidence-export-report.v1"
+        },
+        "status": {
+          "const": "not_requested"
+        }
+      },
+      "required": [
+        "schema",
+        "status"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "deployment_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "evidence_root": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+          "type": "string"
+        },
+        "evidence_set_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "file_count": {
+          "minimum": 3,
+          "type": "integer"
+        },
+        "no_op": {
+          "type": "boolean"
+        },
+        "release_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "schema": {
+          "const": "dpone.dbt-dev-evidence-export-report.v1"
+        },
+        "status": {
+          "const": "exported"
+        },
+        "workflow_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "release_id",
+        "deployment_id",
+        "evidence_set_id",
+        "workflow_id",
+        "evidence_root",
+        "file_count",
+        "no_op"
+      ],
+      "type": "object"
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+schema_version: 1
+task_id: "AIRFLOW-SS-ARTIFACT-INPUT-HARDENING"
+title: "Align build-plane and provider artifact input validation"
+goal: >
+  Fail before immutable deployment publication or DAG installation when
+  release artifacts contain duplicate logical IDs, ambiguous JSON objects,
+  non-finite values, or a current activation without an exact environment.
+specification: "docs/airflow-self-service-architecture.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "DAG-spec and workload-pack logical IDs are validated and unique before artifact reads, hashing, or deployment-directory creation."
+  - "Duplicate IDs fail closed and leave no deployment projection behind."
+  - "Deployment-index JSON rejects top-level and nested duplicate keys, NaN, Infinity, and recursion overflow before artifact reads."
+  - "DAG-spec JSON rejects duplicate keys and non-finite constants before fingerprint evaluation."
+  - "A v1 index resolved through current requires a non-empty valid environment matching the activation path."
+  - "Direct pinned v1 reads preserve documented compatibility."
+  - "Stable credential-free errors contain no artifact body values."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "deployment projection input validation"
+    - "provider deployment-index parser"
+    - "provider DAG-spec parser"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/readiness/airflow_deployment_artifacts.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_spec_loader.py"
+  - "tests/test_airflow_deployment_artifacts.py"
+  - "tests/test_airflow_deployment_index_provider.py"
+  - "tests/test_airflow_dag_loader_contract.py"
+
+read_only_paths:
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_artifacts.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_identity.py"
+  - "src/dpone/readiness/airflow_deployment_projection.py"
+  - "docs/airflow-self-service-architecture.md"
+
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - ".codex/config.toml"
+  - "docs/feature-design-airflow-pipeline-first-ux-p2.md"
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "Preserve provider skip_and_report isolation after a trusted index exists."
+  - "Preserve strict-v2 whole-pack identity and existing cache confinement."
+  - "Do not edit runtime quality-governance files."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_deployment_artifacts.py tests/test_airflow_deployment_index_provider.py tests/test_airflow_dag_loader_contract.py -q"
+    - "uv run ruff check <owned Python paths>"
+    - "uv run mypy --config-file mypy.ini <owned source paths>"
+  broad:
+    - "Integrator runs full Airflow and non-live gates."
+  live:
+    - "N/A: local immutable artifact/parser contract."
+
+required_outputs:
+  - "implementation"
+  - "tests"
+  - "documentation_impact"
+  - "completion_report"
+
+completion_statuses:
+  allowed:
+    - "PASS"
+    - "FAIL"
+    - "SKIP"
+    - "N/A"
+    - "UNVERIFIED"
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

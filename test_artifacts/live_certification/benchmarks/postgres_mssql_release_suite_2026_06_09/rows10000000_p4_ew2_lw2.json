@@ -1,0 +1,230 @@
+{
+  "rows": 10000000,
+  "partitioning": {
+    "enabled": true,
+    "partition_column": "id",
+    "lower_bound": 1,
+    "upper_bound": 10000000,
+    "num_partitions": 4,
+    "export_workers": 2,
+    "load_workers": 2
+  },
+  "metrics": [
+    {
+      "name": "prepare_postgres_source",
+      "rows": 10000000,
+      "seconds": 10.506,
+      "rows_per_second": 951855.28
+    },
+    {
+      "name": "postgres_to_mssql_full_refresh",
+      "rows": 10000000,
+      "seconds": 112.704,
+      "rows_per_second": 88728.0
+    },
+    {
+      "name": "mssql_to_clickhouse_full_refresh",
+      "rows": 10000000,
+      "seconds": 339.026,
+      "rows_per_second": 29496.26
+    }
+  ],
+  "phase_metrics": [
+    {
+      "name": "postgres_to_mssql.source_export",
+      "rows": 10000000,
+      "seconds": 8.015,
+      "rows_per_second": 1247736.86
+    },
+    {
+      "name": "postgres_to_mssql.target_load_finalize",
+      "rows": 10000000,
+      "seconds": 104.689,
+      "rows_per_second": 95521.13
+    },
+    {
+      "name": "mssql_to_clickhouse.source_export",
+      "rows": 10000000,
+      "seconds": 333.491,
+      "rows_per_second": 29985.85
+    },
+    {
+      "name": "mssql_to_clickhouse.target_load_finalize",
+      "rows": 10000000,
+      "seconds": 5.535,
+      "rows_per_second": 1806685.71
+    },
+    {
+      "name": "mssql_count_reconciliation",
+      "rows": 10000000,
+      "seconds": 0.479,
+      "rows_per_second": 20878888.11
+    },
+    {
+      "name": "clickhouse_count_reconciliation",
+      "rows": 10000000,
+      "seconds": 0.017,
+      "rows_per_second": 580942180.2
+    }
+  ],
+  "transfers": {
+    "postgres_to_mssql_full_refresh": {
+      "metric": {
+        "name": "postgres_to_mssql_full_refresh",
+        "rows": 10000000,
+        "seconds": 112.704,
+        "rows_per_second": 88728.0
+      },
+      "phases": [
+        {
+          "name": "postgres_to_mssql.source_export",
+          "rows": 10000000,
+          "seconds": 8.015,
+          "rows_per_second": 1247736.86
+        },
+        {
+          "name": "postgres_to_mssql.target_load_finalize",
+          "rows": 10000000,
+          "seconds": 104.689,
+          "rows_per_second": 95521.13
+        }
+      ],
+      "artifact": {
+        "artifact_type": "PartitionedFileExportArtifact",
+        "partition_count": 4,
+        "estimated_rows": null,
+        "total_bytes": 555556799,
+        "total_mb": 529.82,
+        "mb_per_second": 66.103587,
+        "partition_row_skew": 0,
+        "slowest_partition": {
+          "index": 0,
+          "artifact_type": "FileExportArtifact",
+          "file_path": "/var/folders/96/j0z_g2z57rvd8dvwb7wv58q80000gn/T/dpone_export_p0_zlzgjqm5.bcp",
+          "exists": true,
+          "bytes": 136389296,
+          "mb": 130.071,
+          "estimated_rows": null
+        },
+        "partitions": [
+          {
+            "index": 0,
+            "artifact_type": "FileExportArtifact",
+            "file_path": "/var/folders/96/j0z_g2z57rvd8dvwb7wv58q80000gn/T/dpone_export_p0_zlzgjqm5.bcp",
+            "exists": true,
+            "bytes": 136389296,
+            "mb": 130.071,
+            "estimated_rows": null
+          },
+          {
+            "index": 1,
+            "artifact_type": "FileExportArtifact",
+            "file_path": "/var/folders/96/j0z_g2z57rvd8dvwb7wv58q80000gn/T/dpone_export_p1_xsypc9po.bcp",
+            "exists": true,
+            "bytes": 139722500,
+            "mb": 133.25,
+            "estimated_rows": null
+          },
+          {
+            "index": 2,
+            "artifact_type": "FileExportArtifact",
+            "file_path": "/var/folders/96/j0z_g2z57rvd8dvwb7wv58q80000gn/T/dpone_export_p2_mmyneuls.bcp",
+            "exists": true,
+            "bytes": 139722500,
+            "mb": 133.25,
+            "estimated_rows": null
+          },
+          {
+            "index": 3,
+            "artifact_type": "FileExportArtifact",
+            "file_path": "/var/folders/96/j0z_g2z57rvd8dvwb7wv58q80000gn/T/dpone_export_p3_lifdfzvl.bcp",
+            "exists": true,
+            "bytes": 139722503,
+            "mb": 133.25,
+            "estimated_rows": null
+          }
+        ]
+      }
+    },
+    "mssql_to_clickhouse_full_refresh": {
+      "metric": {
+        "name": "mssql_to_clickhouse_full_refresh",
+        "rows": 10000000,
+        "seconds": 339.026,
+        "rows_per_second": 29496.26
+      },
+      "phases": [
+        {
+          "name": "mssql_to_clickhouse.source_export",
+          "rows": 10000000,
+          "seconds": 333.491,
+          "rows_per_second": 29985.85
+        },
+        {
+          "name": "mssql_to_clickhouse.target_load_finalize",
+          "rows": 10000000,
+          "seconds": 5.535,
+          "rows_per_second": 1806685.71
+        }
+      ],
+      "artifact": {
+        "artifact_type": "PartitionedFileExportArtifact",
+        "partition_count": 4,
+        "estimated_rows": 10000000,
+        "total_bytes": 635556799,
+        "total_mb": 606.114,
+        "mb_per_second": 1.817483,
+        "partition_row_skew": 0,
+        "slowest_partition": {
+          "index": 0,
+          "artifact_type": "FileExportArtifact",
+          "file_path": "/var/folders/96/j0z_g2z57rvd8dvwb7wv58q80000gn/T/dpone_mssql_queryout_p0_bw9c5dfu.bcp",
+          "exists": true,
+          "bytes": 156389296,
+          "mb": 149.144,
+          "estimated_rows": 2500000
+        },
+        "partitions": [
+          {
+            "index": 0,
+            "artifact_type": "FileExportArtifact",
+            "file_path": "/var/folders/96/j0z_g2z57rvd8dvwb7wv58q80000gn/T/dpone_mssql_queryout_p0_bw9c5dfu.bcp",
+            "exists": true,
+            "bytes": 156389296,
+            "mb": 149.144,
+            "estimated_rows": 2500000
+          },
+          {
+            "index": 1,
+            "artifact_type": "FileExportArtifact",
+            "file_path": "/var/folders/96/j0z_g2z57rvd8dvwb7wv58q80000gn/T/dpone_mssql_queryout_p1_8qq2edt5.bcp",
+            "exists": true,
+            "bytes": 159722500,
+            "mb": 152.323,
+            "estimated_rows": 2500000
+          },
+          {
+            "index": 2,
+            "artifact_type": "FileExportArtifact",
+            "file_path": "/var/folders/96/j0z_g2z57rvd8dvwb7wv58q80000gn/T/dpone_mssql_queryout_p2_ai7qaond.bcp",
+            "exists": true,
+            "bytes": 159722500,
+            "mb": 152.323,
+            "estimated_rows": 2500000
+          },
+          {
+            "index": 3,
+            "artifact_type": "FileExportArtifact",
+            "file_path": "/var/folders/96/j0z_g2z57rvd8dvwb7wv58q80000gn/T/dpone_mssql_queryout_p3_7981yqv8.bcp",
+            "exists": true,
+            "bytes": 159722503,
+            "mb": 152.323,
+            "estimated_rows": 2500000
+          }
+        ]
+      }
+    }
+  },
+  "mssql_count": 10000000,
+  "clickhouse_count": 10000000
+}

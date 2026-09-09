@@ -1,0 +1,78 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-artifact-attestation-prepare.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attestation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "changes": {
+      "maxItems": 0,
+      "type": "array"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "environment": {
+      "maxLength": 512,
+      "minLength": 1,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+      "type": "string"
+    },
+    "errors": {
+      "maxItems": 0,
+      "type": "array"
+    },
+    "output_path": {
+      "maxLength": 512,
+      "minLength": 1,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+      "type": "string"
+    },
+    "passed": {
+      "const": true
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.airflow-artifact-attestation-prepare.v1"
+    },
+    "statement_bytes": {
+      "maximum": 262144,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "statement_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "status": {
+      "const": "prepared"
+    },
+    "warnings": {
+      "maxItems": 0,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "changes",
+    "errors",
+    "status",
+    "attestation_id",
+    "release_id",
+    "deployment_id",
+    "environment",
+    "statement_sha256",
+    "statement_bytes",
+    "output_path",
+    "warnings"
+  ],
+  "title": "dpone GitOps canonical Airflow artifact-attestation preparation receipt",
+  "type": "object"
+}

@@ -1,0 +1,111 @@
+schema_version: 1
+task_id: "DPONE-DBT-MSSQL-ADAPTER-GUARDRAILS-V1"
+title: "Close final SQL Server macro, merge-key and eager-test boundaries"
+goal: "Close the remaining PR #454 false-pass boundaries and make the branch merge-ready as preview."
+specification: "docs/feature-design-dbt-mssql-adapter-guardrails-v1.md"
+base_commit: "d0865a31e661829def07fd2b3d5f4097934bcdf6"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Execution pack, release identity, runtime profile and evidence bind exact retry and timeout policy."
+  - "Required SQL Server project flags fail closed before dbt execution or artifact writes."
+  - "The complete selected graph is evaluated by one policy at check, compile and runtime."
+  - "Unsupported resources and strategies fail before build_started."
+  - "Cross-workflow selected-model closure overlap and foreign publish ownership fail before artifact writes."
+  - "The pinned adapter config and macro override surfaces are closed and fingerprinted."
+  - "Only column not_null is admitted as a physically provable constraint; all other column/model constraints fail before mutation."
+  - "The exact 131-macro trusted dbt/dbt-sqlserver execution closure is generated, body/dependency pinned and enforced before dbt build."
+  - "Selected executable nodes cannot depend on foreign runtime macros; protected direct/default/sqlserver dispatch candidates cannot be shadowed."
+  - "Effective merge keys are identifier-only, distinct, contract-exact and structurally non-null; independent dbt/publish keys cannot disagree."
+  - "ClickHouse key strategies reject NULL and duplicate staging keys before the native target-mutation guard is armed."
+  - "Every eager-selected data test depends only on models in its own complete workflow closure."
+  - "Focused, broad, docs, package, Airflow and governance gates pass."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "unreleased dpone.dbt-*.v1 schemas"
+    - "dbt selection lock, execution pack and evidence"
+    - "dbt check/compile validation and errors"
+    - "Airflow provider execution timeout"
+    - "workflow closure ownership"
+    - "SQL Server physical constraint admission"
+    - "SQL Server framework macro execution authority"
+    - "dbt and dpone incremental merge-key identity"
+    - "ClickHouse pre-target staging-key failure semantics"
+    - "eager-selected data-test workflow isolation"
+  migration_required: true
+  migration_notes: "Regenerate branch-local immutable v1 artifacts into a new empty output directory."
+
+owned_paths:
+  - "src/dpone/contracts"
+  - "src/dpone/adapters"
+  - "src/dpone/services"
+  - "src/dpone/runtime"
+  - "src/dpone/readiness"
+  - "src/dpone/commands"
+  - "src/dpone/ports"
+  - "packages/dpone-airflow-pack"
+  - "tests"
+  - "examples/dbt-inline-publishing"
+  - "docs"
+  - "test_artifacts/dbt-mssql-adapter-guardrails-v1"
+read_only_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - ".github/workflows"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "Codex parent agent"
+
+dependencies:
+  - "PR #454 merged implementation base d0865a31e661829def07fd2b3d5f4097934bcdf6"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_sqlserver_graph_policy.py tests/test_dbt_graph_contract.py tests/test_dbt_workflow_graph_policy.py tests/test_dbt_selection_resolution.py tests/test_dbt_inline_publishing.py tests/test_dbt_runtime_execution.py tests/test_cli_dbt_publish_command.py tests/test_dbt_project_bundle.py tests/test_dbt_publish_schema_contracts.py tests/test_dbt_airflow_release_e2e.py tests/test_clickhouse_production_finalize.py tests/test_runtime_rest_and_clickhouse_contracts.py tests/test_dbt_runtime_fixture_generator.py tests/test_dbt_self_service_docs_contracts.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run dpone docs check-generated-references"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+    - "uv build"
+    - "uv build packages/dpone-airflow-pack --out-dir dist"
+    - "uv build packages/apache-airflow-providers-dpone --out-dir dist"
+  live:
+    - "UNVERIFIED unless an approved MSSQL/ClickHouse/Airflow/Kubernetes environment is available"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - validation_report
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Another writer owns the same semantic contract."
+  - "A live check requires unapproved credentials or environment."
+  - "An unrelated user or parallel-branch change would be overwritten."

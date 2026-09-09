@@ -1,0 +1,233 @@
+name: Reusable dbt self-service dev release
+
+on:
+  workflow_call:
+    inputs:
+      dpone-version:
+        description: Exact released dpone version
+        required: true
+        type: string
+      project-dir:
+        description: dbt project root in the caller repository
+        required: true
+        type: string
+      publish-policy:
+        description: Trusted dpone dbt publish policy path
+        required: true
+        type: string
+      python-version:
+        default: "3.12"
+        required: false
+        type: string
+      artifact-name:
+        default: dpone-dbt-release
+        required: false
+        type: string
+      airflow-base-url:
+        default: ""
+        required: false
+        type: string
+    secrets:
+      dbt-profiles-yml:
+        description: Ephemeral CI-only dbt profiles.yml
+        required: true
+    outputs:
+      release-id:
+        description: Content-addressed environment-neutral release
+        value: ${{ jobs.build.outputs.release-id }}
+      source-commit:
+        description: Exact source digest bound into the release attestation
+        value: ${{ jobs.build.outputs.source-commit }}
+      source-ref:
+        description: Exact source ref bound into the release attestation
+        value: ${{ jobs.build.outputs.source-ref }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release-id: ${{ steps.release.outputs.release-id }}
+      source-commit: ${{ steps.release.outputs.source-commit }}
+      source-ref: ${{ steps.release.outputs.source-ref }}
+    env:
+      DPONE_TRUSTED_VERSION: ${{ vars.DPONE_DBT_TOOLING_VERSION }}
+      DPONE_CI_ROOT: ${{ github.workspace }}/.dpone-ci/dbt
+      DPONE_PROJECT_DIR: ${{ inputs.project-dir }}
+      DPONE_PUBLISH_POLICY: ${{ inputs.publish-policy }}
+      DPONE_AIRFLOW_BASE_URL: ${{ inputs.airflow-base-url }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+
+      - name: Install the exact certified toolchain
+        env:
+          DPONE_VERSION: ${{ inputs.dpone-version }}
+          PYTHON_VERSION: ${{ inputs.python-version }}
+          DPONE_PROJECT_DIR: ${{ inputs.project-dir }}
+          DPONE_PUBLISH_POLICY: ${{ inputs.publish-policy }}
+          DPONE_AIRFLOW_BASE_URL: ${{ inputs.airflow-base-url }}
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          rules = {
+              "DPONE_VERSION": r"^[0-9]+\.[0-9]+\.[0-9]+(?:[0-9A-Za-z._+-]*)?$",
+              "PYTHON_VERSION": r"^3\.(11|12)$",
+              "DPONE_PROJECT_DIR": r"^(?!.*(?:^|/)\.\.(?:/|$))(?!/)[A-Za-z0-9._@+/-]+$",
+              "DPONE_PUBLISH_POLICY": r"^(?!.*(?:^|/)\.\.(?:/|$))(?!/)[A-Za-z0-9._@+/-]+$",
+              "DPONE_AIRFLOW_BASE_URL": r"^(?:[A-Za-z][A-Za-z0-9+.-]*:[^\s\"'`$\\]{1,1024})?$",
+          }
+          failed = False
+          for name, pattern in rules.items():
+              value = os.environ.get(name, "")
+              if not re.fullmatch(pattern, value):
+                  print(f"{name}: rejected by allowlist", file=sys.stderr)
+                  failed = True
+          if os.environ.get("DPONE_VERSION") != os.environ.get("DPONE_TRUSTED_VERSION"):
+              print("DPONE_VERSION: differs from repository/organization DPONE_DBT_TOOLING_VERSION", file=sys.stderr)
+              failed = True
+          raise SystemExit(4 if failed else 0)
+          PY
+          python -m pip install "dpone[dbt-mssql]==${DPONE_TRUSTED_VERSION}"
+
+      - name: Materialize ephemeral dbt profile
+        env:
+          DBT_PROFILES_YML: ${{ secrets.dbt-profiles-yml }}
+        run: |
+          python -c "import os,pathlib; p=pathlib.Path(os.environ['RUNNER_TEMP'])/'dpone-dbt-profiles'/'profiles.yml'; p.parent.mkdir(parents=True,exist_ok=True); p.write_text(os.environ['DBT_PROFILES_YML'],encoding='utf-8'); p.chmod(0o600)"
+          echo "DPONE_DBT_PROFILES_DIR=${RUNNER_TEMP}/dpone-dbt-profiles" >> "${GITHUB_ENV}"
+
+      - name: Resolve pinned dbt packages and parse
+        run: |
+          if [ -f "${DPONE_PROJECT_DIR}/packages.yml" ] || [ -f "${DPONE_PROJECT_DIR}/dependencies.yml" ]; then
+            test -f "${DPONE_PROJECT_DIR}/package-lock.yml"
+            git ls-files --error-unmatch "${DPONE_PROJECT_DIR}/package-lock.yml"
+          fi
+          dbt deps --project-dir "${DPONE_PROJECT_DIR}" --profiles-dir "${DPONE_DBT_PROFILES_DIR}"
+          dbt parse --project-dir "${DPONE_PROJECT_DIR}" --profiles-dir "${DPONE_DBT_PROFILES_DIR}"
+          git diff --exit-code -- "${DPONE_PROJECT_DIR}/package-lock.yml"
+          test -z "$(git status --porcelain=v1 --untracked-files=all -- "${DPONE_PROJECT_DIR}/package-lock.yml")"
+
+      - name: Check publish intents
+        run: |
+          mkdir -p "${DPONE_CI_ROOT}"
+          dpone dbt check "${DPONE_PROJECT_DIR}" \
+            --profiles "${DPONE_PUBLISH_POLICY}" \
+            --format json > "${DPONE_CI_ROOT}/check.json"
+
+      - name: Build certified release twice
+        run: |
+          dpone dbt compile "${DPONE_PROJECT_DIR}" \
+            --profiles "${DPONE_PUBLISH_POLICY}" \
+            --dbt-profiles-dir "${DPONE_DBT_PROFILES_DIR}" \
+            --output-dir "${DPONE_CI_ROOT}/release-a" \
+            --cache-root "${DPONE_CI_ROOT}/cache-a" \
+            --format json > "${DPONE_CI_ROOT}/compile-a.json"
+          dpone dbt compile "${DPONE_PROJECT_DIR}" \
+            --profiles "${DPONE_PUBLISH_POLICY}" \
+            --dbt-profiles-dir "${DPONE_DBT_PROFILES_DIR}" \
+            --output-dir "${DPONE_CI_ROOT}/release-b" \
+            --cache-root "${DPONE_CI_ROOT}/cache-b" \
+            --format json > "${DPONE_CI_ROOT}/compile-b.json"
+          diff --recursive --brief \
+            "${DPONE_CI_ROOT}/release-a" \
+            "${DPONE_CI_ROOT}/release-b"
+
+      - name: Publish deterministic job outputs
+        id: release
+        run: |
+          {
+            python -c "import json,os,pathlib; p=pathlib.Path(os.environ['DPONE_CI_ROOT'])/'release-a'/'release-set.json'; release=json.loads(p.read_text()); print('release-id='+release['release_id'])"
+            echo "source-commit=${GITHUB_SHA}"
+            echo "source-ref=${GITHUB_REF}"
+          } >> "${GITHUB_OUTPUT}"
+          dpone dbt render-ci-report \
+            --compiled-root "${DPONE_CI_ROOT}/release-a" \
+            --airflow-base-url "${DPONE_AIRFLOW_BASE_URL}" \
+            > "${DPONE_CI_ROOT}/mr-report.md"
+          cat "${DPONE_CI_ROOT}/mr-report.md" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Create deterministic release checksum subject
+        run: |
+          dpone dbt write-release-checksums \
+            --compiled-root "${DPONE_CI_ROOT}/release-a" \
+            --format json > "${DPONE_CI_ROOT}/release-integrity.json"
+
+      - name: Upload unsigned release for isolated attestation
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dpone-dbt-unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ github.workspace }}/.dpone-ci/dbt/release-a
+            ${{ github.workspace }}/.dpone-ci/dbt/check.json
+            ${{ github.workspace }}/.dpone-ci/dbt/compile-a.json
+            ${{ github.workspace }}/.dpone-ci/dbt/release-integrity.json
+            ${{ github.workspace }}/.dpone-ci/dbt/mr-report.md
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
+
+      - name: Remove ephemeral dbt profile
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/dpone-dbt-profiles/profiles.yml"
+
+  attest:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      DPONE_CI_ROOT: ${{ github.workspace }}/.dpone-ci/dbt
+    steps:
+      - name: Download exact unsigned release
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: dpone-dbt-unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/.dpone-ci/dbt
+
+      - name: Attest the complete release checksum subject
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ github.workspace }}/.dpone-ci/dbt/release-a/release-subjects.sha256
+
+      - name: Attest the exact runtime release subject
+        id: runtime_attestation
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ github.workspace }}/.dpone-ci/dbt/release-a/release-set.json
+
+      - name: Capture the portable runtime attestation bundle
+        env:
+          DPONE_RUNTIME_ATTESTATION_SOURCE: ${{ steps.runtime_attestation.outputs.bundle-path }}
+        run: |
+          test -f "${DPONE_RUNTIME_ATTESTATION_SOURCE}"
+          cp --no-preserve=mode,ownership \
+            "${DPONE_RUNTIME_ATTESTATION_SOURCE}" \
+            "${DPONE_CI_ROOT}/release-attestation.sigstore.jsonl"
+          chmod 0600 "${DPONE_CI_ROOT}/release-attestation.sigstore.jsonl"
+
+      - name: Upload immutable attested release and review evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: |
+            ${{ github.workspace }}/.dpone-ci/dbt/release-a
+            ${{ github.workspace }}/.dpone-ci/dbt/check.json
+            ${{ github.workspace }}/.dpone-ci/dbt/compile-a.json
+            ${{ github.workspace }}/.dpone-ci/dbt/release-integrity.json
+            ${{ github.workspace }}/.dpone-ci/dbt/release-attestation.sigstore.jsonl
+            ${{ github.workspace }}/.dpone-ci/dbt/mr-report.md
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30

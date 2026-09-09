@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-registry.schema.json",
+  "title": "dpone schema contract registry query",
+  "type": "object",
+  "required": ["schema_version", "contract_id"],
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_registry.v1"},
+    "contract_id": {"type": "string"},
+    "versions": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/data-product/data-product-fleet-evaluation.schema.json",
+  "title": "dpone data product fleet evaluation",
+  "type": "object",
+  "required": ["schema_version", "fleet_evaluation_id", "status", "summary", "products", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_fleet_evaluation.v1"},
+    "fleet_evaluation_id": {"type": "string"},
+    "status": {"enum": ["disabled", "healthy", "degraded", "incident_active", "blocked", "frozen"]},
+    "profile": {"type": "string"},
+    "observed_at": {"type": "string"},
+    "summary": {"type": "object"},
+    "products": {"type": "array", "items": {"type": "object"}},
+    "by_owner": {"type": "object"},
+    "by_tier": {"type": "object"},
+    "by_criticality": {"type": "object"},
+    "release_freeze_reasons": {"type": "array", "items": {"type": "string"}},
+    "top_risks": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,320 @@
+{
+  "$comment": "Only an unexpired, unrevoked exact PASS authorizes a route; local/unavailable execution remains UNVERIFIED.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-route-live-certification-receipt.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "revoked_receipt_sha256"
+            ]
+          },
+          {
+            "required": [
+              "revoked_at"
+            ]
+          },
+          {
+            "required": [
+              "revocation_reason"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "status": {
+          "const": "PASS"
+        }
+      },
+      "required": [
+        "tested_at",
+        "effective_from",
+        "expires_at",
+        "live_environment_sha256",
+        "live_evidence_sha256",
+        "failure_matrix_sha256"
+      ]
+    },
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "revoked_receipt_sha256"
+            ]
+          },
+          {
+            "required": [
+              "revoked_at"
+            ]
+          },
+          {
+            "required": [
+              "revocation_reason"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "status": {
+          "const": "FAIL"
+        }
+      },
+      "required": [
+        "tested_at",
+        "effective_from",
+        "expires_at",
+        "live_environment_sha256",
+        "live_evidence_sha256",
+        "failure_matrix_sha256"
+      ]
+    },
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "live_environment_sha256"
+            ]
+          },
+          {
+            "required": [
+              "live_evidence_sha256"
+            ]
+          },
+          {
+            "required": [
+              "failure_matrix_sha256"
+            ]
+          },
+          {
+            "required": [
+              "revoked_receipt_sha256"
+            ]
+          },
+          {
+            "required": [
+              "revoked_at"
+            ]
+          },
+          {
+            "required": [
+              "revocation_reason"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "status": {
+          "const": "UNVERIFIED"
+        }
+      },
+      "required": [
+        "tested_at",
+        "effective_from",
+        "expires_at"
+      ]
+    },
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "tested_at"
+            ]
+          },
+          {
+            "required": [
+              "effective_from"
+            ]
+          },
+          {
+            "required": [
+              "expires_at"
+            ]
+          },
+          {
+            "required": [
+              "live_environment_sha256"
+            ]
+          },
+          {
+            "required": [
+              "live_evidence_sha256"
+            ]
+          },
+          {
+            "required": [
+              "failure_matrix_sha256"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "status": {
+          "const": "UNVERIFIED"
+        }
+      },
+      "required": [
+        "revoked_receipt_sha256",
+        "revoked_at",
+        "revocation_reason"
+      ]
+    }
+  ],
+  "properties": {
+    "certification_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "coordinates": {
+      "additionalProperties": false,
+      "properties": {
+        "capability_policy_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "environment": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "load_strategy": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "route_policy_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "runtime_image_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "sink_capability_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "sink_connector": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "sink_connector_version": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source_capability_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "source_connector": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source_connector_version": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "toolchain_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "capability_policy_sha256",
+        "environment",
+        "load_strategy",
+        "route_policy_sha256",
+        "runtime_image_digest",
+        "sink_capability_sha256",
+        "sink_connector",
+        "sink_connector_version",
+        "source_capability_sha256",
+        "source_connector",
+        "source_connector_version",
+        "toolchain_sha256"
+      ],
+      "type": "object"
+    },
+    "effective_from": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "failure_matrix_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "issuer_attestation_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "issuer_authority": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "issuer_signature_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "live_environment_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "live_evidence_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "revocation_reason": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "revoked_at": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "revoked_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "route_certification_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-route-live-certification-receipt.v1"
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "UNVERIFIED"
+      ],
+      "type": "string"
+    },
+    "tested_at": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "certification_policy_sha256",
+    "coordinates",
+    "issuer_attestation_sha256",
+    "issuer_authority",
+    "issuer_signature_sha256",
+    "route_certification_receipt_sha256",
+    "schema",
+    "status"
+  ],
+  "type": "object"
+}

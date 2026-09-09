@@ -1,0 +1,30 @@
+enabled: true
+nested_level: 4
+paths:
+  customer: preserve_json
+  internal_payload: quarantine
+split_paths:
+  - path: $.items[*]
+    table: order_lines
+    policy: child_table
+    unique_key: [order_id, sku]
+    delete_policy: replace_parent_children
+materialization: spill_to_disk
+spill_output_dir: .dpone/nested-spill/orders
+spill_output_format: json_each_row
+guardrails:
+  max_child_tables: 16
+  max_rows_per_root: 10000
+  max_array_length: 1000
+  on_explosion: fail
+raw_landing:
+  enabled: true
+  table_suffix: __raw
+  payload_column: payload
+hierarchy_contract:
+  tables:
+    orders:
+      required_columns: [order_id]
+    order_lines:
+      parent: orders
+      required_columns: [sku]

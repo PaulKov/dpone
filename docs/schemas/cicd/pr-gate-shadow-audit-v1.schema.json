@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/cicd/pr-gate-shadow-audit-v1.schema.json",
+  "title": "dpone.pr-gate-shadow-audit.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "decision", "audit_stage", "observed_event", "producer_identity", "auditor_identity", "blockers"],
+  "properties": {
+    "schema_version": {"const": "dpone.pr-gate-shadow-audit.v1"},
+    "decision": {"enum": ["PASS", "FAIL", "UNVERIFIED"]},
+    "audit_stage": {"enum": ["EVENT_RECEIVED", "RUN_AUTHENTICATED", "PLAN_RECOMPUTED", "JOBS_BOUND", "CLAIMS_BOUND"]},
+    "observed_event": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository_id", "producer_run_id", "producer_run_attempt", "head_sha", "status", "conclusion"],
+      "properties": {
+        "repository_id": {"type": "integer", "minimum": 1}, "producer_run_id": {"type": "integer", "minimum": 1}, "producer_run_attempt": {"type": "integer", "minimum": 1},
+        "head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "status": {"type": "string"}, "conclusion": {"type": "string"}
+      }
+    },
+    "producer_identity": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "object", "additionalProperties": false,
+         "required": ["repository_id", "pr_number", "base_sha", "head_sha", "merge_sha", "eligible_set_digest"],
+         "properties": {
+           "repository_id": {"type": "integer", "minimum": 1}, "pr_number": {"type": "integer", "minimum": 1},
+           "base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "merge_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+           "eligible_set_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+         }}
+      ]
+    },
+    "auditor_identity": {"type": "object", "additionalProperties": true},
+    "blockers": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+  }
+}

@@ -1,0 +1,328 @@
+name: Reusable dbt self-service prod mirror PR
+
+on:
+  workflow_call:
+    inputs:
+      dpone-version:
+        required: true
+        type: string
+      prod-repository:
+        description: Target Airflow prod repository in owner/name form
+        required: true
+        type: string
+      prod-base-branch:
+        default: main
+        required: false
+        type: string
+      prod-mirror-path:
+        description: Bot-owned dbt source subtree in the prod repository
+        required: true
+        type: string
+      prod-source-snapshot-path:
+        default: .dpone/dbt/source-snapshot.json
+        required: false
+        type: string
+      prod-descriptor-path:
+        default: .dpone/dbt/promotion.json
+        required: false
+        type: string
+      release-run-id:
+        description: Exact dev release workflow run
+        required: true
+        type: number
+      release-artifact-name:
+        default: dpone-dbt-release
+        required: false
+        type: string
+      release-source-commit:
+        required: true
+        type: string
+      release-source-ref:
+        required: true
+        type: string
+      expected-release-id:
+        required: true
+        type: string
+      dev-deployment-id:
+        required: true
+        type: string
+      dev-activation-id:
+        required: true
+        type: string
+      dev-evidence-run-id:
+        required: true
+        type: number
+      dev-evidence-artifact-name:
+        default: dpone-dbt-dev-evidence
+        required: false
+        type: string
+      dev-evidence-source-commit:
+        required: true
+        type: string
+      dev-evidence-source-ref:
+        required: true
+        type: string
+    secrets:
+      prod-repository-token:
+        description: Token limited to branch and pull-request writes in prod
+        required: true
+    outputs:
+      pull-request-url:
+        value: ${{ jobs.open.outputs.pull-request-url }}
+
+permissions:
+  actions: read
+  attestations: read
+  contents: read
+
+jobs:
+  open:
+    runs-on: ubuntu-latest
+    outputs:
+      pull-request-url: ${{ steps.pull-request.outputs.url }}
+    env:
+      DPONE_TRUSTED_VERSION: ${{ vars.DPONE_DBT_TOOLING_VERSION }}
+      DPONE_RELEASE_REPOSITORY: ${{ github.repository }}
+      DPONE_RELEASE_ID: ${{ inputs.expected-release-id }}
+      DPONE_RELEASE_SOURCE_COMMIT: ${{ inputs.release-source-commit }}
+      DPONE_RELEASE_SOURCE_REF: ${{ inputs.release-source-ref }}
+      DPONE_DEV_EVIDENCE_SOURCE_COMMIT_EXPECTED: ${{ inputs.dev-evidence-source-commit }}
+      DPONE_DEV_EVIDENCE_SOURCE_REF: ${{ inputs.dev-evidence-source-ref }}
+      EXPECTED_DEV_ACTIVATION_ID: ${{ inputs.dev-activation-id }}
+      DPONE_COMPILED_ROOT: ${{ github.workspace }}/.dpone-ci/dev-release/release-a
+      DPONE_DEV_EVIDENCE_ROOT: ${{ github.workspace }}/.dpone-ci/dev-evidence/trusted-dev-evidence
+      DPONE_PROD_ROOT: ${{ github.workspace }}/.dpone-ci/prod-repo
+      DPONE_TRUSTED_SIGNER_WORKFLOW: ${{ vars.DPONE_DBT_TRUSTED_SIGNER_WORKFLOW }}
+      DPONE_TRUSTED_SIGNER_DIGEST: ${{ vars.DPONE_DBT_TRUSTED_SIGNER_DIGEST }}
+      DPONE_TRUSTED_EVIDENCE_WORKFLOW: ${{ vars.DPONE_DBT_TRUSTED_EVIDENCE_WORKFLOW }}
+      DPONE_TRUSTED_EVIDENCE_SIGNER_DIGEST: ${{ vars.DPONE_DBT_TRUSTED_EVIDENCE_SIGNER_DIGEST }}
+      DPONE_DEV_EVIDENCE_REF: github-actions://${{ github.repository }}/actions/runs/${{ inputs.dev-evidence-run-id }}
+      GH_TOKEN: ${{ secrets.prod-repository-token }}
+    steps:
+      - name: Require the reviewed release signer identity
+        run: |
+          if [ -z "${DPONE_TRUSTED_SIGNER_WORKFLOW}" ]; then
+            echo "repository variable DPONE_DBT_TRUSTED_SIGNER_WORKFLOW is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_TRUSTED_SIGNER_DIGEST}" ]; then
+            echo "repository variable DPONE_DBT_TRUSTED_SIGNER_DIGEST is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_TRUSTED_EVIDENCE_WORKFLOW}" ]; then
+            echo "repository variable DPONE_DBT_TRUSTED_EVIDENCE_WORKFLOW is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_TRUSTED_EVIDENCE_SIGNER_DIGEST}" ]; then
+            echo "repository variable DPONE_DBT_TRUSTED_EVIDENCE_SIGNER_DIGEST is required" >&2
+            exit 4
+          fi
+
+      - name: Check out the prod audit repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ inputs.prod-repository }}
+          ref: ${{ inputs.prod-base-branch }}
+          token: ${{ secrets.prod-repository-token }}
+          path: .dpone-ci/prod-repo
+          fetch-depth: 0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install exact dpone release tooling
+        env:
+          DPONE_VERSION: ${{ inputs.dpone-version }}
+          DPONE_RELEASE_ID: ${{ inputs.expected-release-id }}
+          DPONE_RELEASE_SOURCE_COMMIT: ${{ inputs.release-source-commit }}
+          DPONE_RELEASE_SOURCE_REF: ${{ inputs.release-source-ref }}
+          DPONE_DEV_EVIDENCE_SOURCE_COMMIT_EXPECTED: ${{ inputs.dev-evidence-source-commit }}
+          DPONE_DEV_EVIDENCE_SOURCE_REF: ${{ inputs.dev-evidence-source-ref }}
+          PROD_REPOSITORY: ${{ inputs.prod-repository }}
+          PROD_BASE_BRANCH: ${{ inputs.prod-base-branch }}
+          PROD_MIRROR_PATH: ${{ inputs.prod-mirror-path }}
+          PROD_SOURCE_SNAPSHOT_PATH: ${{ inputs.prod-source-snapshot-path }}
+          PROD_DESCRIPTOR_PATH: ${{ inputs.prod-descriptor-path }}
+          EXPECTED_DEV_DEPLOYMENT_ID: ${{ inputs.dev-deployment-id }}
+          EXPECTED_DEV_ACTIVATION_ID: ${{ inputs.dev-activation-id }}
+          DEV_EVIDENCE_ARTIFACT_NAME: ${{ inputs.dev-evidence-artifact-name }}
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          rules = {
+              "DPONE_VERSION": r"^[0-9]+\.[0-9]+\.[0-9]+(?:[0-9A-Za-z._+-]*)?$",
+              "DPONE_RELEASE_ID": r"^sha256:[0-9a-f]{64}$",
+              "DPONE_RELEASE_SOURCE_COMMIT": r"^[0-9a-f]{40}$",
+              "DPONE_RELEASE_SOURCE_REF": r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$",
+              "DPONE_DEV_EVIDENCE_SOURCE_COMMIT_EXPECTED": r"^[0-9a-f]{40}$",
+              "DPONE_DEV_EVIDENCE_SOURCE_REF": r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$",
+              "PROD_REPOSITORY": r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+              "PROD_BASE_BRANCH": r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$",
+              "PROD_MIRROR_PATH": r"^(?!.*(?:^|/)\.\.(?:/|$))(?!/)[A-Za-z0-9._@+/-]+$",
+              "PROD_SOURCE_SNAPSHOT_PATH": r"^(?!.*(?:^|/)\.\.(?:/|$))(?!/)[A-Za-z0-9._@+/-]+$",
+              "PROD_DESCRIPTOR_PATH": r"^(?!.*(?:^|/)\.\.(?:/|$))(?!/)[A-Za-z0-9._@+/-]+$",
+              "EXPECTED_DEV_DEPLOYMENT_ID": r"^sha256:[0-9a-f]{64}$",
+              "EXPECTED_DEV_ACTIVATION_ID": r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "DEV_EVIDENCE_ARTIFACT_NAME": r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+          }
+          failed = False
+          for name, pattern in rules.items():
+              value = os.environ.get(name, "")
+              if not re.fullmatch(pattern, value):
+                  print(f"{name}: rejected by allowlist", file=sys.stderr)
+                  failed = True
+          if os.environ.get("DPONE_VERSION") != os.environ.get("DPONE_TRUSTED_VERSION"):
+              print("DPONE_VERSION: differs from repository/organization DPONE_DBT_TOOLING_VERSION", file=sys.stderr)
+              failed = True
+          raise SystemExit(4 if failed else 0)
+          PY
+          python -m pip install "dpone==${DPONE_TRUSTED_VERSION}"
+
+      - name: Download the exact dev release
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.release-artifact-name }}
+          path: ${{ github.workspace }}/.dpone-ci/dev-release
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.release-run-id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify release producer and complete release bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh attestation verify \
+            "${DPONE_COMPILED_ROOT}/release-subjects.sha256" \
+            --repo "${DPONE_RELEASE_REPOSITORY}" \
+            --signer-workflow "${DPONE_TRUSTED_SIGNER_WORKFLOW}" \
+            --signer-digest "${DPONE_TRUSTED_SIGNER_DIGEST}" \
+            --source-digest "${DPONE_RELEASE_SOURCE_COMMIT}" \
+            --source-ref "${DPONE_RELEASE_SOURCE_REF}" \
+            --format json > "${GITHUB_WORKSPACE}/.dpone-ci/mirror-attestation.json"
+          dpone dbt verify-release-checksums \
+            --compiled-root "${DPONE_COMPILED_ROOT}" \
+            --format json > "${GITHUB_WORKSPACE}/.dpone-ci/mirror-integrity.json"
+
+      - name: Download exact dev runtime evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.dev-evidence-artifact-name }}
+          path: ${{ github.workspace }}/.dpone-ci/dev-evidence
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.dev-evidence-run-id }}
+          github-token: ${{ github.token }}
+
+      - name: Block the prod pull request without complete dev evidence
+        env:
+          EXPECTED_DEV_DEPLOYMENT_ID: ${{ inputs.dev-deployment-id }}
+        run: |
+          gh attestation verify \
+            "${DPONE_DEV_EVIDENCE_ROOT}/evidence-subjects.sha256" \
+            --repo "${DPONE_RELEASE_REPOSITORY}" \
+            --signer-workflow "${DPONE_TRUSTED_EVIDENCE_WORKFLOW}" \
+            --signer-digest "${DPONE_TRUSTED_EVIDENCE_SIGNER_DIGEST}" \
+            --source-digest "${DPONE_DEV_EVIDENCE_SOURCE_COMMIT_EXPECTED}" \
+            --source-ref "${DPONE_DEV_EVIDENCE_SOURCE_REF}" \
+            --format json > "${GITHUB_WORKSPACE}/.dpone-ci/mirror-evidence-attestation.json"
+          dpone dbt verify-dev-evidence-integrity \
+            --compiled-root "${DPONE_COMPILED_ROOT}" \
+            --evidence-root "${DPONE_DEV_EVIDENCE_ROOT}" \
+            --expected-release-id "${DPONE_RELEASE_ID}" \
+            --expected-deployment-id "${EXPECTED_DEV_DEPLOYMENT_ID}" \
+            --expected-activation-id "${EXPECTED_DEV_ACTIVATION_ID}" \
+            --format json > "${GITHUB_WORKSPACE}/.dpone-ci/mirror-dev-evidence.json"
+          python -c "import json,os; r=json.load(open('.dpone-ci/mirror-dev-evidence.json')); p=json.load(open(os.environ['DPONE_DEV_EVIDENCE_ROOT']+'/provenance.json')); assert r.get('evidence_set_id') == p.get('evidence_set_id') and r.get('campaign_request_sha256') == p.get('campaign_request_sha256') and p.get('schema') == 'dpone.dbt-dev-evidence-provenance.v2'; print('DPONE_DEV_EVIDENCE_SUBJECT_SHA256='+r['subject_sha256']); print('DPONE_DEV_EVIDENCE_SET_ID='+p['evidence_set_id']); print('DPONE_DEV_EVIDENCE_CAMPAIGN_REQUEST_SHA256='+p['campaign_request_sha256']); print('DPONE_DEV_EVIDENCE_PRODUCER_WORKFLOW='+p['finalizer_workflow']); print('DPONE_DEV_EVIDENCE_SOURCE_COMMIT='+p['finalizer_source_commit'])" >> "${GITHUB_ENV}"
+
+      - name: Prepare byte-identical bot-owned mirror
+        env:
+          PROD_MIRROR_PATH: ${{ inputs.prod-mirror-path }}
+          PROD_SOURCE_SNAPSHOT_PATH: ${{ inputs.prod-source-snapshot-path }}
+          PROD_DESCRIPTOR_PATH: ${{ inputs.prod-descriptor-path }}
+          EXPECTED_DEV_DEPLOYMENT_ID: ${{ inputs.dev-deployment-id }}
+          DEV_EVIDENCE_ARTIFACT_NAME: ${{ inputs.dev-evidence-artifact-name }}
+        run: |
+          dpone dbt prepare-prod-mirror \
+            --compiled-root "${DPONE_COMPILED_ROOT}" \
+            --repository-root "${DPONE_PROD_ROOT}" \
+            --mirror-path "${PROD_MIRROR_PATH}" \
+            --source-snapshot-path "${PROD_SOURCE_SNAPSHOT_PATH}" \
+            --descriptor-path "${PROD_DESCRIPTOR_PATH}" \
+            --expected-release-id "${DPONE_RELEASE_ID}" \
+            --dev-deployment-id "${EXPECTED_DEV_DEPLOYMENT_ID}" \
+            --dev-evidence-ref "${DPONE_DEV_EVIDENCE_REF}" \
+            --dev-evidence-subject-sha256 "${DPONE_DEV_EVIDENCE_SUBJECT_SHA256}" \
+            --dev-evidence-set-id "${DPONE_DEV_EVIDENCE_SET_ID}" \
+            --dev-evidence-campaign-request-sha256 "${DPONE_DEV_EVIDENCE_CAMPAIGN_REQUEST_SHA256}" \
+            --dev-evidence-artifact-name "${DEV_EVIDENCE_ARTIFACT_NAME}" \
+            --dev-evidence-producer-workflow "${DPONE_DEV_EVIDENCE_PRODUCER_WORKFLOW}" \
+            --dev-evidence-source-commit "${DPONE_DEV_EVIDENCE_SOURCE_COMMIT}" \
+            --format json > "${GITHUB_WORKSPACE}/.dpone-ci/mirror-prepare.json"
+          dpone dbt verify-promotion \
+            "${DPONE_PROD_ROOT}/${PROD_MIRROR_PATH}" \
+            --compiled-root "${DPONE_COMPILED_ROOT}" \
+            --repository-root "${DPONE_PROD_ROOT}" \
+            --descriptor-path "${PROD_DESCRIPTOR_PATH}" \
+            --expected-dev-deployment-id "${EXPECTED_DEV_DEPLOYMENT_ID}" \
+            --expected-dev-evidence-ref "${DPONE_DEV_EVIDENCE_REF}" \
+            --expected-dev-evidence-subject-sha256 "${DPONE_DEV_EVIDENCE_SUBJECT_SHA256}" \
+            --expected-dev-evidence-set-id "${DPONE_DEV_EVIDENCE_SET_ID}" \
+            --expected-dev-evidence-campaign-request-sha256 "${DPONE_DEV_EVIDENCE_CAMPAIGN_REQUEST_SHA256}" \
+            --expected-dev-evidence-artifact-name "${DEV_EVIDENCE_ARTIFACT_NAME}" \
+            --expected-dev-evidence-producer-workflow "${DPONE_DEV_EVIDENCE_PRODUCER_WORKFLOW}" \
+            --expected-dev-evidence-source-commit "${DPONE_DEV_EVIDENCE_SOURCE_COMMIT}" \
+            --format json > "${GITHUB_WORKSPACE}/.dpone-ci/mirror-verification.json"
+
+      - name: Commit the immutable promotion request
+        id: commit
+        working-directory: .dpone-ci/prod-repo
+        env:
+          MIRROR_PATH: ${{ inputs.prod-mirror-path }}
+          SNAPSHOT_PATH: ${{ inputs.prod-source-snapshot-path }}
+          DESCRIPTOR_PATH: ${{ inputs.prod-descriptor-path }}
+        run: |
+          RELEASE_SUFFIX="${DPONE_RELEASE_ID#sha256:}"
+          BRANCH="dpone/dbt-release-${RELEASE_SUFFIX:0:16}"
+          echo "branch=${BRANCH}" >> "${GITHUB_OUTPUT}"
+          git checkout -B "${BRANCH}"
+          git config user.name "dpone release bot"
+          git config user.email "dpone-release-bot@users.noreply.github.com"
+          git add -- "${MIRROR_PATH}" "${SNAPSHOT_PATH}" "${DESCRIPTOR_PATH}"
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          git commit -m "chore(dbt): promote ${DPONE_RELEASE_ID}"
+          git push --force-with-lease origin "${BRANCH}"
+          echo "changed=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Open or locate the prod promotion pull request
+        id: pull-request
+        env:
+          PROD_REPOSITORY: ${{ inputs.prod-repository }}
+          PROD_BASE_BRANCH: ${{ inputs.prod-base-branch }}
+          BRANCH: ${{ steps.commit.outputs.branch }}
+          COMMIT_CHANGED: ${{ steps.commit.outputs.changed }}
+        run: |
+          URL="$(gh pr list \
+            --repo "${PROD_REPOSITORY}" \
+            --head "${BRANCH}" \
+            --base "${PROD_BASE_BRANCH}" \
+            --state open \
+            --json url \
+            --jq '.[0].url // empty')"
+          if [ -z "${URL}" ] && [ "${COMMIT_CHANGED}" = "true" ]; then
+            URL="$(gh pr create \
+              --repo "${PROD_REPOSITORY}" \
+              --head "${BRANCH}" \
+              --base "${PROD_BASE_BRANCH}" \
+              --title "chore(dbt): promote ${DPONE_RELEASE_ID}" \
+              --body "Promotes the attested dbt release \`${DPONE_RELEASE_ID}\`. Prod CI must verify the release attestation, byte-identical source mirror, and exact dev runtime evidence before deployment.")"
+          fi
+          echo "url=${URL}" >> "${GITHUB_OUTPUT}"
+          if [ -n "${URL}" ]; then
+            echo "Prod promotion PR: ${URL}" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "Prod mirror already matches ${DPONE_RELEASE_ID}; no PR required." >> "${GITHUB_STEP_SUMMARY}"
+          fi

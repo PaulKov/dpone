@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/dpone.local-route-certification-receipt.v1.schema.json",
+  "title": "dpone local route certification receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "dpone.local_route_certification_receipt.v1"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "release_id": {"type": "string", "minLength": 1},
+    "git_head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_snapshot_sha256": {"$ref": "#/$defs/digest"},
+    "worktree_dirty": {"type": "boolean"},
+    "environment_class": {"const": "LOCAL_DOCKER"},
+    "route": {"$ref": "#/$defs/route"},
+    "source_relation": {"type": "string", "minLength": 1},
+    "source_generation_sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "mssql_connection_sha256": {"$ref": "#/$defs/digest"},
+    "clickhouse_connection_sha256": {"$ref": "#/$defs/digest"},
+    "target_relation": {"type": "string", "minLength": 1},
+    "target_schema_sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "transport": {"type": "string", "minLength": 1},
+    "transport_details": {
+      "oneOf": [
+        {"$ref": "#/$defs/bcpDetails"},
+        {"$ref": "#/$defs/parquetDetails"}
+      ]
+    },
+    "binary_format": {"type": ["string", "null"]},
+    "requested_acceleration_mode": {"type": ["string", "null"]},
+    "runtime_decisions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/runtimeDecision"}
+    },
+    "result": {"$ref": "#/$defs/artifact"},
+    "upstream_evidence": {
+      "oneOf": [
+        {"$ref": "#/$defs/artifact"},
+        {"type": "null"}
+      ]
+    },
+    "artifact_cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "verified": {"type": "boolean"},
+        "remaining_artifacts": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      },
+      "required": ["verified", "remaining_artifacts"]
+    },
+    "passed": {"type": "boolean"},
+    "evidence_status": {"enum": ["PASS", "UNVERIFIED"]},
+    "blockers": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "production_certification": {"const": "UNVERIFIED"},
+    "production_certification_reason": {"type": "string", "minLength": 1},
+    "receipt_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "required": [
+    "schema_version",
+    "created_at",
+    "release_id",
+    "git_head_sha",
+    "source_snapshot_sha256",
+    "worktree_dirty",
+    "environment_class",
+    "route",
+    "source_relation",
+    "source_generation_sha256",
+    "mssql_connection_sha256",
+    "clickhouse_connection_sha256",
+    "target_relation",
+    "target_schema_sha256",
+    "transport",
+    "transport_details",
+    "binary_format",
+    "requested_acceleration_mode",
+    "runtime_decisions",
+    "result",
+    "upstream_evidence",
+    "artifact_cleanup",
+    "passed",
+    "evidence_status",
+    "blockers",
+    "production_certification",
+    "production_certification_reason",
+    "receipt_sha256"
+  ],
+  "allOf": [
+    {
+      "if": {"properties": {"passed": {"const": true}}, "required": ["passed"]},
+      "then": {"properties": {"target_schema_sha256": {"$ref": "#/$defs/digest"}}}
+    },
+    {
+      "if": {
+        "properties": {
+          "passed": {"const": true},
+          "transport": {"const": "typed_binary_bcp_native"}
+        },
+        "required": ["passed", "transport"]
+      },
+      "then": {
+        "properties": {
+          "transport_details": {
+            "properties": {"loaded_slices": {"minItems": 1}},
+            "required": ["loaded_slices"]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {"type": "string", "minLength": 1},
+        "source": {"type": "string", "minLength": 1},
+        "sink": {"type": "string", "minLength": 1},
+        "strategy": {"type": "string", "minLength": 1}
+      },
+      "required": ["case_id", "source", "sink", "strategy"]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      },
+      "required": ["path", "schema_version", "sha256"]
+    },
+    "runtimeDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"type": "string", "minLength": 1},
+        "decision_id": {"type": "string", "minLength": 1},
+        "phase": {"type": "string", "minLength": 1},
+        "component": {"type": "string", "minLength": 1},
+        "category": {"type": "string", "minLength": 1},
+        "requested": {"type": ["string", "null"]},
+        "selected": {"type": ["string", "null"]},
+        "fallback_allowed": {"type": "boolean"},
+        "fallback_reason": {"type": ["string", "null"]},
+        "release_gate": {"type": "string", "minLength": 1},
+        "warnings": {"type": "array", "items": {"type": "string"}},
+        "blockers": {"type": "array", "items": {"type": "string"}},
+        "route_id": {"type": ["string", "null"]},
+        "provider": {"type": ["string", "null"]},
+        "provider_version": {"type": ["string", "null"]},
+        "details": {"$ref": "#/$defs/accelerationDetails"}
+      },
+      "required": [
+        "schema_version",
+        "decision_id",
+        "phase",
+        "component",
+        "category",
+        "requested",
+        "selected",
+        "fallback_allowed",
+        "fallback_reason",
+        "release_gate",
+        "warnings",
+        "blockers",
+        "route_id",
+        "provider",
+        "provider_version",
+        "details"
+      ]
+    },
+    "accelerationDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "available": {"type": "boolean"},
+        "backend_id": {"type": ["string", "null"]},
+        "certified": {"type": "boolean"},
+        "schema_hash": {"$ref": "#/$defs/digest"},
+        "source_format": {"const": "mssql-bcp-native"},
+        "source_type_count": {"type": "integer", "minimum": 1},
+        "target_format": {"const": "Native"},
+        "type_layout_hash": {"$ref": "#/$defs/digest"}
+      },
+      "required": [
+        "available",
+        "backend_id",
+        "certified",
+        "schema_hash",
+        "source_format",
+        "source_type_count",
+        "target_format",
+        "type_layout_hash"
+      ]
+    },
+    "bcpDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hashed_rows": {"type": "integer", "minimum": 1},
+        "target_rows_per_partition": {"type": "integer", "minimum": 1},
+        "export_workers": {"type": "integer", "minimum": 1},
+        "load_workers": {"type": "integer", "minimum": 1},
+        "bcp_file_format": {"const": "native"},
+        "loaded_slices": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/bcpLoadedSlice"}
+        }
+      },
+      "required": [
+        "hashed_rows",
+        "target_rows_per_partition",
+        "export_workers",
+        "load_workers",
+        "bcp_file_format",
+        "loaded_slices"
+      ]
+    },
+    "bcpLoadedSlice": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "partition_index": {"type": "integer", "minimum": 0},
+        "slice_index": {"type": "integer", "minimum": 0},
+        "rows_exported": {"type": "integer", "minimum": 1},
+        "rows_loaded": {"type": "integer", "minimum": 1}
+      },
+      "required": ["partition_index", "slice_index", "rows_exported", "rows_loaded"]
+    },
+    "parquetDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hashed_rows": {"type": "integer", "minimum": 1},
+        "s3_endpoint_sha256": {"$ref": "#/$defs/digest"},
+        "bucket": {"type": "string", "minLength": 1},
+        "object_prefix": {"type": "string", "minLength": 1},
+        "named_collection": {"type": "string", "minLength": 1},
+        "parquet_chunks": {"type": "integer", "minimum": 1},
+        "parquet_bytes": {"type": "integer", "minimum": 1}
+      },
+      "required": ["hashed_rows", "s3_endpoint_sha256", "bucket", "object_prefix", "named_collection", "parquet_chunks", "parquet_bytes"]
+    }
+  }
+}

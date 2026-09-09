@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-run-spec.schema.json",
+  "title": "dpone GitOps Airflow run spec contract",
+  "type": "object",
+  "required": [
+    "kind",
+    "schema_version",
+    "producer",
+    "bundle_path",
+    "image",
+    "worktree",
+    "evidence_output",
+    "entries",
+    "steps"
+  ],
+  "properties": {
+    "kind": {
+      "const": "gitops.airflow_run_spec"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "bundle_path": {
+      "type": "string"
+    },
+    "bundle_digest": {
+      "type": "string"
+    },
+    "image": {
+      "type": "string"
+    },
+    "image_digest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "worktree": {
+      "type": "string"
+    },
+    "evidence_output": {
+      "type": "string"
+    },
+    "airflow_context_env": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "manifest",
+          "plan_path",
+          "verify_path",
+          "passed"
+        ],
+        "properties": {
+          "manifest": {
+            "type": "string"
+          },
+          "plan_path": {
+            "type": "string"
+          },
+          "verify_path": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "name",
+          "kind",
+          "command",
+          "required"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "manifest": {
+            "type": "string"
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "code",
+        "message",
+        "path",
+        "source"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

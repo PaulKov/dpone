@@ -1,0 +1,56 @@
+schema_version: 1
+task_id: "DPONE-DBT-001"
+title: "Harden dbt publishing compiler and CLI"
+goal: "Eliminate false success, coercive parsing, unstable identity and non-atomic output in the existing dbt publishing facade."
+specification: "docs/feature-design-dbt-inline-self-service-v1.md"
+base_commit: "04bb048639641c9d6fb55fbfead21cec3345c70c"
+integrator: "parent"
+
+acceptance_criteria:
+  - "Zero enabled models fails by default and explicit allow-empty writes no artifacts."
+  - "Booleans and positive integers use strict JSON typing without coercion."
+  - "Compile output is path-independent, atomic, idempotent and CAS-protected."
+  - "CLI JSON failures use dpone.error.v1 without traceback output."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["CLI", "dbt publish compile report", "artifact output"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/dbt_publish/**"
+  - "src/dpone/commands/dbt_publish_cmd.py"
+  - "tests/test_dbt_inline_publishing.py"
+  - "tests/test_cli_dbt_publish_command.py"
+  - "tests/test_dbt_publish_atomicity.py"
+read_only_paths:
+  - "docs/feature-design-dbt-inline-self-service-v1.md"
+  - "src/dpone/contracts/airflow_deployment.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "docs/schemas/**"
+  - "src/dpone/gitops/**"
+  - "src/dpone/runtime/**"
+
+shared_file_owner: "parent"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_inline_publishing.py tests/test_cli_dbt_publish_command.py tests/test_dbt_publish_atomicity.py -q"
+  broad:
+    - "uv run ruff check src/dpone/dbt_publish src/dpone/commands/dbt_publish_cmd.py tests/test_dbt_*"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Shared schema or runtime edit is required."

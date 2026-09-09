@@ -1,0 +1,170 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-cache-status-publication.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "published"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "passed": {
+            "const": true
+          }
+        },
+        "required": [
+          "source_sha256",
+          "target_sha256"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "published_with_warning"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "passed": {
+            "const": true
+          }
+        },
+        "required": [
+          "source_sha256",
+          "target_sha256",
+          "error_code"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "rejected"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "passed": {
+            "const": false
+          }
+        },
+        "required": [
+          "error_code"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "commit_unknown"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "passed": {
+            "const": false
+          }
+        },
+        "required": [
+          "source_sha256",
+          "target_sha256",
+          "error_code"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "attempted_at": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "diagnostic_error_code": {
+      "pattern": "^DPONE_AIRFLOW_CACHE_STATUS_[A-Z0-9_]+$",
+      "type": "string"
+    },
+    "error_code": {
+      "pattern": "^DPONE_AIRFLOW_CACHE_STATUS_[A-Z0-9_]+$",
+      "type": "string"
+    },
+    "expected_schema": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "failure_marker": {
+      "maxLength": 255,
+      "minLength": 1,
+      "pattern": "^[^/\\\\]+$",
+      "type": "string"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "schema": {
+      "const": "dpone.airflow-cache-status-publication.v1"
+    },
+    "source": {
+      "maxLength": 255,
+      "minLength": 1,
+      "pattern": "^[^/\\\\]+$",
+      "type": "string"
+    },
+    "source_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "published",
+        "published_with_warning",
+        "rejected",
+        "commit_unknown"
+      ]
+    },
+    "target": {
+      "maxLength": 255,
+      "minLength": 1,
+      "pattern": "^[^/\\\\]+$",
+      "type": "string"
+    },
+    "target_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "status",
+    "source",
+    "target",
+    "failure_marker",
+    "expected_schema",
+    "attempted_at"
+  ],
+  "title": "dpone GitOps Airflow cache status publication report",
+  "type": "object"
+}

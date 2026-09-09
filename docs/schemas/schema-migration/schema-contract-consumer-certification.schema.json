@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-consumer-certification.schema.json",
+  "title": "dpone schema contract consumer certification",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "contract_id",
+    "consumer_matrix_id",
+    "test_kit_id",
+    "summary",
+    "blockers",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_consumer_certification.v1"},
+    "consumer_certification_id": {"type": "string", "pattern": "^sha256:"},
+    "status": {"enum": ["certified", "warning", "blocked"]},
+    "pack_id": {"type": ["string", "null"]},
+    "contract_id": {"type": ["string", "null"]},
+    "base_version": {"type": ["string", "null"]},
+    "head_version": {"type": ["string", "null"]},
+    "consumer_matrix_id": {"type": ["string", "null"]},
+    "test_kit_id": {"type": ["string", "null"]},
+    "result_status": {"type": ["string", "null"]},
+    "passed_cases": {"type": "array", "items": {"type": "string"}},
+    "failed_cases": {"type": "array", "items": {"type": "string"}},
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  }
+}

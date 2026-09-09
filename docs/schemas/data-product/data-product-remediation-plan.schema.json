@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-remediation-plan.schema.json",
+  "title": "dpone data product remediation plan",
+  "type": "object",
+  "required": ["schema_version", "status", "remediation_plan_id"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_remediation_plan.v1"},
+    "status": {"type": "string"},
+    "remediation_plan_id": {"type": "string"},
+    "product_id": {"type": ["string", "null"]},
+    "summary": {"type": "object"},
+    "signals": {"type": "array"},
+    "actions": {"type": "array"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  },
+  "additionalProperties": true
+}

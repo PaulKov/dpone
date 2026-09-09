@@ -1,0 +1,40 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-artifact-attestation-error.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "changes": {
+      "maxItems": 0,
+      "type": "array"
+    },
+    "errors": {
+      "items": {
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "passed": {
+      "const": false
+    },
+    "schema": {
+      "const": "dpone.airflow-artifact-attestation-error.v1"
+    },
+    "status": {
+      "const": "failed"
+    },
+    "warnings": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "changes",
+    "status",
+    "errors",
+    "warnings"
+  ],
+  "title": "dpone GitOps Airflow artifact-attestation command failure",
+  "type": "object"
+}

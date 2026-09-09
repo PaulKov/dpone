@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/catalog-bundle-verification.schema.json",
+  "title": "dpone GitOps catalog bundle verification",
+  "type": "object",
+  "required": [
+    "schema",
+    "decision",
+    "code",
+    "bundle_id",
+    "bundle_manifest_sha256",
+    "kind",
+    "publisher_id",
+    "environment",
+    "policy_fingerprint",
+    "verified_artifacts",
+    "verifier_version",
+    "verified_at",
+    "errors"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.catalog-bundle-verification.v1"
+    },
+    "decision": {
+      "enum": [
+        "verified",
+        "invalid",
+        "unverified"
+      ]
+    },
+    "code": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bundle_id": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "bundle_manifest_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "publisher_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "environment": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "policy_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "verified_artifacts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "verifier_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "verified_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

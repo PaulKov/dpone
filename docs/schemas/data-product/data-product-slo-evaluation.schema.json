@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/data-product/data-product-slo-evaluation.schema.json",
+  "title": "dpone data product SLO evaluation",
+  "type": "object",
+  "required": ["schema_version", "slo_evaluation_id", "status", "product_id", "checks", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_slo_evaluation.v1"},
+    "slo_evaluation_id": {"type": "string"},
+    "slo_plan_id": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "status": {"enum": ["disabled", "passed", "warning", "blocked"]},
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "details"],
+        "properties": {
+          "name": {"type": "string"},
+          "status": {"type": "string"},
+          "details": {"type": "array", "items": {"type": "string"}},
+          "metrics": {"type": "object"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "metrics": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

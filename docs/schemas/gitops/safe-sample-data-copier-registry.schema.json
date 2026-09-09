@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/safe-sample-data-copier-registry.schema.json",
+  "title": "dpone GitOps safe sample data copier registry",
+  "type": "object",
+  "required": [
+    "schema",
+    "registered_copiers"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "dpone.safe-sample-data-copier-registry.v1"
+    },
+    "registered_copiers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/registration"
+      }
+    }
+  },
+  "$defs": {
+    "registration": {
+      "type": "object",
+      "required": [
+        "certification_id",
+        "status",
+        "source",
+        "sink",
+        "strategy",
+        "transport",
+        "schema_evolution",
+        "airflow_runtime_mode",
+        "sampling_mode"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "certification_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "experimental",
+            "route-certified",
+            "production-certified",
+            "enterprise-certified"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sink": {
+          "type": "string",
+          "minLength": 1
+        },
+        "strategy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transport": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_evolution": {
+          "type": "string",
+          "minLength": 1
+        },
+        "airflow_runtime_mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sampling_mode": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

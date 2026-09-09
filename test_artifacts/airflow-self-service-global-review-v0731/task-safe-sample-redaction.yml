@@ -1,0 +1,50 @@
+schema_version: 1
+task_id: "SS-REVIEW-SAFE-SAMPLE-REDACTION"
+title: "Redact credential-bearing URI userinfo from safe-sample outputs"
+goal: "Apply the canonical recursive redactor before CLI JSON and evidence persistence."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Credential-bearing URI userinfo never appears in runtime report or evidence."
+  - "Assignments, nested lists, and mappings remain redacted."
+  - "Non-secret diagnostics remain useful."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["safe-sample CLI JSON", "safe-sample evidence"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/services/safe_sample_redaction.py"
+  - "src/dpone/services/safe_sample_runtime_executor.py"
+  - "src/dpone/services/safe_sample_runtime_evidence.py"
+  - "tests/test_safe_sample_runtime.py"
+read_only_paths:
+  - "src/dpone/security_redaction.py"
+  - "docs/schemas/gitops/safe-sample-runtime-run.schema.json"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_safe_sample_runtime.py -q"
+  broad:
+    - "uv run pytest tests/test_safe_sample_runtime.py tests/test_airflow_safe_sample_runtime_executor.py -q"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

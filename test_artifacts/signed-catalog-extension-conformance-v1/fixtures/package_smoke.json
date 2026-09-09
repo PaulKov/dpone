@@ -1,0 +1,10 @@
+{
+  "schema": "dpone.extension-check-receipt.v1",
+  "check": "package_smoke",
+  "subject_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "status": "PASS",
+  "producer": "phase4b-contract-fixture",
+  "command": "uv run pytest tests/test_extension_conformance.py -q",
+  "code": "DPONE_FIXTURE_PASS",
+  "message": "Synthetic contract fixture; not production certification."
+}

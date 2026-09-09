@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+convention: landing_raw_v1
+
+vars:
+  src_system: google_ads
+  src_database: api
+  host: googleads_googleapis_com
+  owner_team: performance-marketing
+  owner_contact: performance-marketing@example.com
+  sla: daily
+
+defaults:
+  source:
+    type: api
+    api_type: google_ads
+    connection_type: vault
+    connection_id: api__google_ads
+    vault_path: api/google_ads
+    options:
+      resource: "{{ src_table }}"
+      customer_ids:
+        - "1234567890"
+      unique_key:
+        - date
+        - login
+        - campaign_id
+        - term
+        - report
+      lookback_days: 3
+      full_refresh_days: 30
+      timeout: 60
+      max_retries: 3
+      rate_limit_delay: 1.0
+
+  sink:
+    type: bigquery
+    connection_type: vault
+    connection_id: bigquery-demo
+    vault_path: gcp/demo-project-{{ env_code }}/bq/example-etl-service
+    staging:
+      schema: stg
+    strategy:
+      mode: incremental_merge
+    options:
+      log_sample_rows: 5
+
+  bigquery_proxy:
+    proxy_enable: true
+
+schemas:
+  app:
+    tables:
+      - ads_stats

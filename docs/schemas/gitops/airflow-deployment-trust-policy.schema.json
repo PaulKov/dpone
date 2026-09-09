@@ -1,0 +1,172 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-deployment-trust-policy.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "allowed_artifact_registry_refs": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "allowed_environments": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "allowed_registry_scope_ids": {
+      "items": {
+        "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+        "type": "string"
+      },
+      "maxItems": 256,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "allowed_source_projects": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "allowed_source_refs": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "attestations": {
+      "const": "required_for_prod"
+    },
+    "backend": {
+      "const": "cosign_public_key_v1"
+    },
+    "cosign": {
+      "additionalProperties": false,
+      "properties": {
+        "maximum_version_exclusive": {
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+          "type": "string"
+        },
+        "minimum_version": {
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "maximum": 60,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "minimum_version",
+        "maximum_version_exclusive",
+        "timeout_seconds"
+      ],
+      "type": "object"
+    },
+    "revoked_attestation_ids": {
+      "items": {
+        "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+        "type": "string"
+      },
+      "maxItems": 256,
+      "minItems": 0,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "revoked_public_key_ids": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 0,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema": {
+      "const": "dpone.airflow-deployment-trust-policy.v1"
+    },
+    "trust_tier": {
+      "const": "production"
+    },
+    "trusted_public_keys": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "maxLength": 253,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,252}(?![\\s\\S])",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "maxProperties": 8,
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}(?![\\s\\S])"
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema",
+    "trust_tier",
+    "attestations",
+    "backend",
+    "trusted_public_keys",
+    "cosign",
+    "allowed_environments",
+    "allowed_artifact_registry_refs",
+    "allowed_registry_scope_ids",
+    "allowed_source_projects",
+    "allowed_source_refs",
+    "revoked_attestation_ids",
+    "revoked_public_key_ids"
+  ],
+  "title": "dpone GitOps production Airflow artifact trust policy",
+  "type": "object"
+}

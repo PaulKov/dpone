@@ -1,0 +1,41 @@
+{
+  "evaluated_at": "2026-07-17T13:05:30.831165Z",
+  "expected_commit": "6fc1289070eac73171a683656e5b99cdda56c042",
+  "has_input_failures": false,
+  "overall_status": "UNVERIFIED",
+  "reference_deployments": {
+    "blockers": [
+      "self_service.reference_deployments_missing"
+    ],
+    "distinct_deployment_count": 0,
+    "distinct_signer_count": 0,
+    "proofs": [],
+    "status": "UNVERIFIED",
+    "supplied_count": 0,
+    "valid_count": 0
+  },
+  "schema": "dpone.self-service-certification.v1",
+  "usability": {
+    "blockers": [
+      "self_service.usability_study_missing"
+    ],
+    "complete_success_rate": null,
+    "first_dag_target_rate": null,
+    "no_airflow_python_rate": null,
+    "p50_first_dag_seconds": null,
+    "p50_safe_sample_seconds": null,
+    "safe_sample_target_rate": null,
+    "source_sha256": null,
+    "status": "UNVERIFIED",
+    "successful_sessions": 0,
+    "supplied": false,
+    "thresholds": {
+      "maximum_commands": 5,
+      "maximum_first_dag_seconds": 600,
+      "maximum_safe_sample_seconds": 900,
+      "minimum_participants": 5,
+      "minimum_success_rate": 0.8
+    },
+    "valid_sessions": 0
+  }
+}

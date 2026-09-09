@@ -1,0 +1,100 @@
+schema_version: 1
+task_id: "DPONE-REVIEW-QG-RECEIPT"
+title: "Bind QualityGateReceipt to one immutable quality execution"
+goal: "Close policy-drift, forged/replayed receipt, wrong-boundary, and unbounded diagnostic false-success paths."
+specification: "docs/feature-design-quality-acceptance-fail-closed-v0731.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Canonical QualityGateRunner stamps a deterministic normalized-policy fingerprint and ordered gate contract."
+  - "A non-empty current policy rejects missing, unbound, stale, incomplete, extra, reordered, type-downgraded, or severity-downgraded receipts."
+  - "A valid canonical receipt is evaluated exactly once and permits source-state advancement."
+  - "One immutable gate/acceptance snapshot is passed explicitly from ETLProcessor through the selected coordinator."
+  - "Staged, legacy, and resume-only paths accept only their own boundary and one ordered consumption."
+  - "Non-empty-to-empty policy drift fails before target mutation or, when observed after legacy mutation, before source state."
+  - "Direct, replaced, cross-execution, replayed, out-of-order, and concurrently consumed receipts fail closed."
+  - "Invalid reports never reach evidence storage; report metrics/messages use a bounded safe allowlist projection."
+  - "Empty-policy compatibility remains explicit and cannot authorize a non-empty policy."
+  - "Staged failures occur before finalization; post-commit and resume failures retain the existing typed mutation outcome."
+  - "Stable safe error codes contain no SQL, row values, credentials, paths, or raw policy."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "QualityGateReport additive binding metadata"
+    - "QualityGateReceipt validation"
+    - "process-local quality execution authority"
+    - "runtime structured quality errors"
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/governance/quality.py"
+  - "src/dpone/runtime/governance/quality_receipt.py"
+  - "src/dpone/runtime/governance/quality_execution.py"
+  - "src/dpone/runtime/governance/service.py"
+  - "src/dpone/runtime/governance/finalization.py"
+  - "src/dpone/runtime/governance/legacy_acceptance.py"
+  - "src/dpone/runtime/etl/payload_loader.py"
+  - "src/dpone/runtime/etl/extracted_payload_load.py"
+  - "src/dpone/runtime/etl/result_metrics.py"
+  - "src/dpone/runtime/etl/processor.py"
+  - "src/dpone/contracts/quality_failure.py"
+  - "tests/test_quality_gate_receipt_binding.py"
+  - "tests/test_quality_checks_gates_adapter.py"
+  - "tests/test_quality_acceptance_runtime.py"
+
+read_only_paths:
+  - "docs/feature-design-quality-acceptance-fail-closed-v0731.md"
+  - "docs/adr/0011-canonical-fingerprints.md"
+  - "docs/adr/0025-process-local-quality-gate-authority.md"
+  - "src/dpone/governance/quality_normalize.py"
+  - "src/dpone/runtime/native_transfer_quality_scope.py"
+  - "tests/test_etl_processor_post_commit_failure_state.py"
+
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - ".codex/config.toml"
+  - "docs/feature-design-airflow-pipeline-first-ux-p2.md"
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "Preserve the already-integrated post-commit counter enrichment in result_metrics.py and processor.py."
+  - "Preserve the integrated native target-commit guard callbacks and ordering."
+  - "Avoid globals, ContextVar, service locators, hidden config mutation, and module-size regression."
+
+required_checks:
+  focused:
+    - ".venv/bin/pytest tests/test_quality_gate_receipt_binding.py tests/test_quality_checks_gates_adapter.py tests/test_quality_acceptance_runtime.py tests/test_etl_processor_post_commit_failure_state.py -q"
+    - ".venv/bin/ruff check <owned Python paths>"
+    - ".venv/bin/mypy --config-file mypy.ini <owned source paths>"
+  broad:
+    - "Integrator runs repository-wide gates."
+  live:
+    - "N/A: in-process governance contract."
+
+required_outputs:
+  - "implementation"
+  - "tests"
+  - "documentation_impact"
+  - "completion_report"
+
+completion_statuses:
+  allowed:
+    - "PASS"
+    - "FAIL"
+    - "SKIP"
+    - "N/A"
+    - "UNVERIFIED"
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

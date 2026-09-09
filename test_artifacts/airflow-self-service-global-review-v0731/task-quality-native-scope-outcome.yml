@@ -1,0 +1,103 @@
+schema_version: 1
+task_id: "DPONE-QUALITY-NATIVE-SCOPE-OUTCOME"
+title: "Evaluate quality gates over the native logical workload and preserve post-commit outcomes"
+goal: "Eliminate false quality evidence on native resume/retry and stop public failures from replacing real post-commit counters with synthetic zeros."
+specification: "docs/feature-design-quality-acceptance-fail-closed-v0731.md"
+base_commit: "ef88ae7f"
+integrator: "Codex main agent"
+
+acceptance_criteria:
+  - "Native quality scope is derived from planned, active, matching committed skipped, and deliberately reactivated partition identities."
+  - "All-skipped resume evaluates matching committed source and target rows and never calls the sink."
+  - "Partial retry combines committed skipped rows and current active rows; mixed full_refresh never double-counts reactivated partitions."
+  - "Missing, stale, boolean, string, or negative contributing row counts make the aggregate unavailable instead of coercing or falling back."
+  - "Logical-scope counts do not overwrite attempt-local LoadResult counters, and no aggregate typed hash is invented."
+  - "Scope evidence exposes only a stable digest and aggregate counts, never raw partition identities, bounds, row data, SQL, credentials, or paths."
+  - "Staged, legacy, and resume-only coordinators attach one typed QualityGateReceipt; processor execution remains exactly once."
+  - "StagedQualityGateReceipt and report_from_staged_quality_receipt remain compatible facades."
+  - "A quality failure after sink mutation carries a typed QualityGateFailureOutcome with actual safe counters, boundary, target/checkpoint/source state, retry classification, and attempts."
+  - "Native post-commit failure preserves COMMITTED checkpoints and retries through sink-free resume validation."
+  - "CLI JSON renders actual safe counters and additive failure_context for an enriched failure while preserving quality_gates, stable error code, redaction, and old-constructor behavior."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "quality gate runtime receipt"
+    - "native resume and retry quality semantics"
+    - "QualityGateFailure optional typed outcome"
+    - "dpone run structured failure output"
+  migration_required: false
+
+owned_paths:
+  - src/dpone/contracts/quality_failure.py
+  - src/dpone/runtime/native_transfer_quality_scope.py
+  - src/dpone/runtime/native_transfer.py
+  - src/dpone/runtime/etl/payload_loader.py
+  - src/dpone/runtime/etl/result_metrics.py
+  - src/dpone/runtime/governance/legacy_acceptance.py
+  - src/dpone/runtime/governance/finalization.py
+  - src/dpone/runtime/governance/service.py
+  - src/dpone/runtime/sinks/load_result.py
+  - src/dpone/commands/run_cmd.py
+  - tests/test_etl_processor_native_transfer_resume.py
+  - tests/test_native_transfer_runtime_service.py
+  - tests/test_native_load_governance_finalization.py
+  - tests/test_quality_checks_gates_adapter.py
+  - tests/test_cli_run_command.py
+read_only_paths:
+  - docs/feature-design-quality-acceptance-fail-closed-v0731.md
+  - docs/feature-design-quality-checks-gates-adapter-v1.md
+  - src/dpone/runtime/etl/processor.py
+  - src/dpone/runtime/native_transfer_checkpoint_lifecycle.py
+  - src/dpone/runtime/native_transfer_plan_runtime.py
+  - src/dpone/runtime/lineage/partition_checkpoint.py
+  - src/dpone/runtime/lineage/partition_checkpoint_store.py
+  - src/dpone/runtime/lineage/partition_resume.py
+  - src/dpone/governance/quality.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs
+  - src/dpone/schema
+  - tests/conftest.py
+
+shared_file_owner: "Codex main agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - ".venv/bin/pytest tests/test_etl_processor_native_transfer_resume.py tests/test_native_transfer_runtime_service.py tests/test_native_load_governance_finalization.py tests/test_quality_checks_gates_adapter.py tests/test_cli_run_command.py -q"
+    - ".venv/bin/ruff check src/dpone/contracts/quality_failure.py src/dpone/runtime/native_transfer_quality_scope.py src/dpone/runtime/native_transfer.py src/dpone/runtime/etl/payload_loader.py src/dpone/runtime/etl/result_metrics.py src/dpone/runtime/governance/legacy_acceptance.py src/dpone/runtime/governance/finalization.py src/dpone/runtime/governance/service.py src/dpone/runtime/sinks/load_result.py src/dpone/commands/run_cmd.py"
+    - ".venv/bin/mypy --config-file mypy.ini src/dpone/contracts/quality_failure.py src/dpone/runtime/native_transfer_quality_scope.py src/dpone/runtime/native_transfer.py src/dpone/runtime/governance/service.py"
+  broad:
+    - ".venv/bin/pytest tests/test_quality_acceptance_runtime.py tests/test_load_governance_runtime_service.py tests/test_load_governance_manifest_contracts.py -q"
+    - ".venv/bin/dpone docs check-import-rules"
+    - ".venv/bin/dpone docs check-module-size --baseline docs/module_size_baseline.json"
+  live:
+    - "UNVERIFIED unless an approved native source/sink environment is available"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - compatibility_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "The change requires modifying partition checkpoint storage schema or connector-specific code."

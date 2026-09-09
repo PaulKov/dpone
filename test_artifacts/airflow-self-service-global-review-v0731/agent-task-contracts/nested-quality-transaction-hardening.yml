@@ -1,0 +1,92 @@
+schema_version: 1
+task_id: "SS-56"
+title: "Nested load quality authority and failure preservation"
+goal: >
+  Fix the reproduced nested-normalization regression so a package of root and
+  child tables has one correctly scoped quality/commit authority, cannot mutate
+  only the root and then fail by replaying an already-consumed authority, and
+  never masks the primary failure while recording audit state.
+specification: >
+  Isolated release-blocking bug fix. Impact and validation plan are captured in
+  test_artifacts/airflow-self-service-global-review-v0731/review-report.md under
+  SS-55 and in this task contract. No new public DSL or architecture is allowed.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "Existing nested-normalization positive contracts pass for root plus child tables."
+  - "Quality authority is scoped and consumed exactly once at the nested package mutation boundary."
+  - "A child-table failure cannot leave an unaudited partial success or cause root duplication on retry."
+  - "Inert and non-empty quality policies behave deterministically for in-memory and spill paths."
+  - "The real LoadIdentityService.mark_failed(record, exc) signature is honored and the primary exception is preserved."
+  - "Tests use signature-exact spies or the real service; permissive mocks must not hide API mismatches."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - nested normalization runtime ordering
+    - quality gate receipt scope
+    - audit failure semantics
+    - retry and replay behavior
+  migration_required: false
+
+owned_paths:
+  - src/dpone/runtime/etl/processor.py
+  - src/dpone/runtime/etl/extracted_payload_load.py
+  - src/dpone/runtime/etl/payload_loader.py
+  - src/dpone/runtime/etl/nested_load.py
+  - src/dpone/runtime/normalization/load_package.py
+  - tests/test_nested_normalization_contracts.py
+  - tests/test_nested_normalization_industrial_layer.py
+  - tests/test_nested_normalization_spill.py
+  - tests/test_nested_normalization_spill_large.py
+read_only_paths:
+  - src/dpone/runtime/governance/quality_execution.py
+  - src/dpone/runtime/governance/finalization.py
+  - src/dpone/runtime/lineage/audit.py
+  - tests/test_quality_gate_receipt_binding.py
+  - docs/adr/0025-process-local-quality-gate-authority.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - src/dpone/runtime/governance/quality_execution.py
+  - tests/test_quality_gate_receipt_binding.py
+
+shared_file_owner: "parent Codex agent"
+
+dependencies:
+  - "ADR-0025 process-local quality gate authority"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_nested_normalization_contracts.py tests/test_nested_normalization_industrial_layer.py tests/test_nested_normalization_spill.py tests/test_nested_normalization_spill_large.py -q"
+  broad:
+    - "uv run ruff check <owned Python paths>"
+    - "uv run mypy --config-file mypy.ini <owned source paths>"
+  live:
+    - "UNVERIFIED unless an explicitly approved live route is available"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "The fix would change the authored manifest or quality DSL."
+  - "Public-contract impact is larger than compatible bug repair."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

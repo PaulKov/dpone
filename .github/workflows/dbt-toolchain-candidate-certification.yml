@@ -1,0 +1,187 @@
+# Disposable evidence for an exact dbt/SQL Server toolchain and catalog observer.
+name: dbt SQL Server candidate certification
+
+on:
+  workflow_call:
+  pull_request:
+    paths:
+      - ".github/workflows/dbt-toolchain-candidate-certification.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "src/dpone/contracts/dbt_toolchain.py"
+      - "src/dpone/contracts/dbt_sqlserver_macro_authority_baseline.py"
+      - "src/dpone/contracts/dbt_workspace_observation.py"
+      - "src/dpone/runtime/dbt_workspace_mssql_*.py"
+      - "tests/test_dbt_workspace_mssql_observation*.py"
+      - "tools/dbt_self_service/generate_sqlserver_macro_authority.py"
+      - "packages/dbt-dpone/**"
+      - "examples/dbt-inline-publishing/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DBT_CORE_VERSION: "1.12.3"
+  DBT_SQLSERVER_VERSION: "1.11.1"
+  MSSQL_PASSWORD: Dp0ne.Strong.Pw.2026!
+
+jobs:
+  certify-disposable-sqlserver:
+    name: dbt 1.12 / SQL Server 1.11 disposable certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CERT_ROOT: test_artifacts/dbt_sqlserver_candidate
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Install SQL Server client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg unixodbc-dev
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+            | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+          . /etc/os-release
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/${VERSION_ID}/prod ${VERSION_CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 mssql-tools18
+
+      - name: Install exact candidate wheels
+        run: |
+          set -euo pipefail
+          uv venv "$CERT_ROOT/venv"
+          uv pip install --python "$CERT_ROOT/venv/bin/python" \
+            "dbt-core==${DBT_CORE_VERSION}" "dbt-sqlserver==${DBT_SQLSERVER_VERSION}"
+          "$CERT_ROOT/venv/bin/dbt" --version | tee "$CERT_ROOT/dbt-version.txt"
+
+      - name: Start disposable SQL Server
+        env:
+          DPONE_IT_MSSQL_PORT_FORWARD: "51433"
+          DPONE_IT_MSSQL_PASSWORD: ${{ env.MSSQL_PASSWORD }}
+        run: docker compose -f docker/docker-compose.integration.yml up -d mssql
+
+      - name: Seed disposable dbt source
+        env:
+          SQLCMDPASSWORD: ${{ env.MSSQL_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..60}; do
+            if /opt/mssql-tools18/bin/sqlcmd -S 'localhost,51433' -U sa -C -Q 'SELECT 1' >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Disposable SQL Server did not become ready." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          /opt/mssql-tools18/bin/sqlcmd -S 'localhost,51433' -U sa -C -Q "
+          IF DB_ID(N'DWH_Stage') IS NULL CREATE DATABASE [DWH_Stage];
+          "
+          /opt/mssql-tools18/bin/sqlcmd -S 'localhost,51433' -U sa -C -d DWH_Stage -Q "
+          IF SCHEMA_ID(N'pricing_raw') IS NULL EXEC(N'CREATE SCHEMA pricing_raw');
+          IF OBJECT_ID(N'pricing_raw.competitive_price_inputs', N'U') IS NULL
+              CREATE TABLE pricing_raw.competitive_price_inputs (
+                  date_id date NOT NULL,
+                  product_id bigint NOT NULL,
+                  calculated_price decimal(18,2) NOT NULL,
+                  price_source nvarchar(100) NOT NULL
+              );
+          TRUNCATE TABLE pricing_raw.competitive_price_inputs;
+          INSERT INTO pricing_raw.competitive_price_inputs (date_id, product_id, calculated_price, price_source)
+          VALUES ('2026-01-01', 1, 101.25, N'candidate-certification'),
+                 ('2026-01-02', 2, 202.50, N'candidate-certification');
+          "
+
+      - name: Parse, build, and test the exact candidate
+        env:
+          DPONE_DBT_DEMO_SQLSERVER_USER: sa
+          DPONE_DBT_DEMO_SQLSERVER_PASSWORD: ${{ env.MSSQL_PASSWORD }}
+        run: |
+          set -euo pipefail
+          cert_root="$PWD/$CERT_ROOT"
+          project="$cert_root/project"
+          target_path="$cert_root/target"
+          mkdir -p "$cert_root/packages"
+          cp -a examples/dbt-inline-publishing/. "$project"
+          cp -a packages/dbt-dpone "$cert_root/packages/dbt-dpone"
+          sed -i 's/port: 1433/port: 51433/' "$project/profiles/profiles.yml"
+          cat > "$project/packages.yml" <<'YAML'
+          packages:
+            - local: ../packages/dbt-dpone
+          YAML
+          dbt=("$CERT_ROOT/venv/bin/dbt" --no-send-anonymous-usage-stats --no-use-colors)
+          "${dbt[@]}" deps --project-dir "$project"
+          "${dbt[@]}" parse --project-dir "$project" --profiles-dir "$project/profiles" --target-path "$target_path" --no-partial-parse
+          "${dbt[@]}" build --full-refresh --project-dir "$project" --profiles-dir "$project/profiles" --target-path "$target_path" --no-partial-parse
+          "${dbt[@]}" build --project-dir "$project" --profiles-dir "$project/profiles" --target-path "$target_path"
+          "${dbt[@]}" ls --select 'package:dpone_dbt_demo' --project-dir "$project" --profiles-dir "$project/profiles" --target-path "$target_path" > "$cert_root/selected-nodes.txt"
+          test -s "$target_path/manifest.json"
+          "$CERT_ROOT/venv/bin/python" tools/dbt_self_service/generate_sqlserver_macro_authority.py \
+            --candidate-manifest "$target_path/manifest.json" \
+            --diff-output "$cert_root/macro-authority-diff.json"
+          sha256sum "$target_path/manifest.json" "$cert_root/macro-authority-diff.json" > "$cert_root/sha256sums.txt"
+
+      - name: Install exact observer test dependencies
+        run: |
+          set -euo pipefail
+          uv pip install --python "$CERT_ROOT/venv/bin/python" --no-deps --only-binary :all: \
+            "pytest==9.0.3" "iniconfig==2.3.0" "packaging==25.0" "pluggy==1.6.0" \
+            "pygments==2.20.0" "prettytable==3.18.0" "wcwidth==0.8.2" "pyodbc==5.3.0"
+          uv pip check --python "$CERT_ROOT/venv/bin/python"
+
+      - name: Observe real workspace targets
+        env:
+          DPONE_RUN_DBT_WORKSPACE_MSSQL_OBSERVATION_LIVE: "1"
+          DPONE_IT_MSSQL_HOST: "127.0.0.1"
+          DPONE_IT_MSSQL_PORT_FORWARD: "51433"
+          DPONE_IT_MSSQL_DATABASE: "DWH_Stage"
+          DPONE_IT_MSSQL_USER: "sa"
+          DPONE_IT_MSSQL_PASSWORD: ${{ env.MSSQL_PASSWORD }}
+          DPONE_IT_MSSQL_DRIVER: "ODBC Driver 18 for SQL Server"
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$PWD/src:$PWD" "$CERT_ROOT/venv/bin/python" -m pytest \
+            tests/test_dbt_workspace_mssql_observation_live.py -o addopts='' -q \
+            --junitxml="$CERT_ROOT/workspace-observation.xml"
+          PYTHONPATH="$PWD/src" "$CERT_ROOT/venv/bin/python" - <<'PY'
+          from pathlib import Path
+          import dpone.runtime.dbt_workspace_mssql_observer as observer
+          from xml.etree import ElementTree
+          assert Path(observer.__file__).resolve().is_relative_to(Path.cwd() / "src")
+          root = ElementTree.parse("test_artifacts/dbt_sqlserver_candidate/workspace-observation.xml").getroot()
+          suites = root.findall("testsuite") if root.tag == "testsuites" else [root]
+          assert len(suites) == 1 and suites[0].tag == "testsuite"
+          suite = suites[0]
+          assert int(suite.attrib.get("tests", "0")) == 3
+          assert all(int(suite.attrib.get(name, "0")) == 0 for name in ("skipped", "failures", "errors"))
+          PY
+
+      - name: Upload candidate evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dbt-sqlserver-candidate-certification-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.CERT_ROOT }}/
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Stop disposable SQL Server
+        if: always()
+        run: docker compose -f docker/docker-compose.integration.yml down -v

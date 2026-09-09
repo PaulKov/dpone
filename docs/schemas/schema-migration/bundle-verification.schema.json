@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/bundle-verification.schema.json",
+  "title": "dpone schema migration bundle verification",
+  "type": "object",
+  "required": ["schema_version", "status", "bundle_id", "pack_id", "artifact_checks", "blockers", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_bundle_verification.v1"
+    },
+    "status": {"enum": ["passed", "blocked"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "artifact_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "path", "expected_sha256", "actual_sha256", "passed"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {"type": ["string", "null"]},
+          "path": {"type": ["string", "null"]},
+          "expected_sha256": {"type": ["string", "null"]},
+          "actual_sha256": {"type": ["string", "null"]},
+          "passed": {"type": "boolean"}
+        }
+      }
+    },
+    "attestation_required": {"type": "boolean"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

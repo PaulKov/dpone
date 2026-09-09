@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/rehearsal-run.schema.json",
+  "title": "dpone schema migration rehearsal run",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "rehearsal_run_id",
+    "status",
+    "executed",
+    "rehearsal_plan_id",
+    "pack_id",
+    "environment",
+    "target",
+    "operations",
+    "rollback_operations",
+    "blockers",
+    "warnings",
+    "metrics"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_rehearsal_run.v1"},
+    "rehearsal_run_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["dry_run", "passed", "warning", "blocked"]},
+    "executed": {"type": "boolean"},
+    "rehearsal_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "bundle_id": {"type": ["string", "null"]},
+    "environment": {"type": "string", "minLength": 1},
+    "target": {"type": "object"},
+    "operations": {"type": "array", "items": {"type": "object"}},
+    "rollback_operations": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "metrics": {
+      "type": "object",
+      "required": ["duration_ms", "rows_validated", "operations_executed"],
+      "additionalProperties": true,
+      "properties": {
+        "duration_ms": {"type": "integer", "minimum": 0},
+        "rows_validated": {"type": "integer", "minimum": 0},
+        "operations_executed": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

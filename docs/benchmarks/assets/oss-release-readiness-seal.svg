@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="210" viewBox="0 0 920 210" role="img" aria-label="Benchmark v3 release readiness">
+<rect width="920" height="210" fill="#ffffff"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Benchmark v3 release readiness</text>
+<text x="32" y="66" font-size="13" font-weight="400" fill="#475569">Release seal, evidence policy and go/no-go evidence for the public benchmark.</text>
+<rect x="32" y="96" width="380" height="72" rx="8" fill="#0f766e"/>
+<text x="56" y="128" font-size="24" font-weight="700" fill="#ffffff">Benchmark v3 verified</text>
+<text x="56" y="154" font-size="14" font-weight="400" fill="#ecfeff">score 100/100 · release-ready</text>
+<text x="455" y="112" font-size="13" font-weight="700" fill="#475569">stable groups: 15</text>
+<text x="455" y="142" font-size="13" font-weight="400" fill="#475569">experimental groups: 15</text>
+<text x="455" y="172" font-size="13" font-weight="400" fill="#475569">generated: 2026-06-30T15:36:13+00:00</text>
+</svg>

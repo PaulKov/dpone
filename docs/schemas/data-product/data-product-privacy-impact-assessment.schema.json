@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-privacy-impact-assessment.schema.json",
+  "title": "Data Product Privacy Impact Assessment",
+  "type": "object",
+  "required": ["schema_version", "status", "privacy_impact_id", "sensitive_access", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_privacy_impact_assessment.v1"},
+    "status": {"enum": ["assessed", "warning", "blocked", "disabled"]},
+    "privacy_impact_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "entitlement_plan_id": {"type": ["string", "null"]},
+    "product": {"type": "object"},
+    "product_id": {"type": ["string", "null"]},
+    "authority_gate_ref": {"type": "object"},
+    "sensitive_access": {"type": "array", "items": {"type": "object"}},
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-governance-export-payload.schema.json",
+  "title": "dpone data product governance export payload",
+  "type": "object",
+  "required": ["schema_version", "payload_id", "payload_sha256", "provider", "status", "payload", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_governance_export_payload.v1"},
+    "payload_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "payload_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "provider": {"enum": ["datahub", "openmetadata", "openlineage", "opa", "json"]},
+    "status": {"enum": ["rendered", "blocked"]},
+    "product_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "plan_id": {"type": ["string", "null"]},
+    "payload": {"type": "object"},
+    "evidence_refs": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

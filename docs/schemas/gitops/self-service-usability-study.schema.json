@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/self-service-usability-study.schema.json",
+  "title": "dpone GitOps self-service usability study",
+  "type": "object",
+  "required": [
+    "schema",
+    "protocol",
+    "target_commit",
+    "facilitator_ref",
+    "started_at",
+    "completed_at",
+    "sessions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.self-service-usability-study.v1"
+    },
+    "protocol": {
+      "const": "airflow_first_dag_and_safe_sample_v1"
+    },
+    "target_commit": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "facilitator_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sessions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/session"
+      },
+      "maxItems": 100
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "session": {
+      "type": "object",
+      "required": [
+        "session_id",
+        "participant_ref",
+        "first_time_dpone_user",
+        "consent_recorded",
+        "started_at",
+        "dag_preview_at",
+        "safe_sample_at",
+        "finished_at",
+        "outcome",
+        "commands_used",
+        "assistance_events",
+        "authored_airflow_python",
+        "transcript_sha256",
+        "blocker_codes"
+      ],
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "participant_ref": {
+          "$ref": "#/$defs/sha256"
+        },
+        "first_time_dpone_user": {
+          "const": true
+        },
+        "consent_recorded": {
+          "const": true
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "dag_preview_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "safe_sample_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finished_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "outcome": {
+          "enum": [
+            "passed",
+            "failed",
+            "abandoned"
+          ]
+        },
+        "commands_used": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "assistance_events": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "authored_airflow_python": {
+          "type": "boolean"
+        },
+        "transcript_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "blocker_codes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "uniqueItems": true,
+          "maxItems": 50
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,623 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-publish-policy.v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "profiles": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "certification": {
+            "additionalProperties": false,
+            "properties": {
+              "airflow_runtime_mode": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "schema_evolution": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "transport": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              }
+            },
+            "required": [
+              "transport",
+              "schema_evolution",
+              "airflow_runtime_mode"
+            ],
+            "type": "object"
+          },
+          "execution": {
+            "additionalProperties": false,
+            "properties": {
+              "deferrable": {
+                "type": "boolean"
+              },
+              "get_logs": {
+                "type": "boolean"
+              },
+              "logging_interval_seconds": {
+                "maximum": 3600,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "max_parallelism": {
+                "maximum": 1024,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "on_finish_action": {
+                "enum": [
+                  "delete_pod",
+                  "delete_succeeded_pod",
+                  "keep_pod"
+                ]
+              },
+              "profile": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "task_executor": {
+                "enum": [
+                  "KubernetesExecutor",
+                  "CeleryExecutor",
+                  "LocalExecutor"
+                ]
+              }
+            },
+            "required": [],
+            "type": "object"
+          },
+          "lineage": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "preset": {
+                "enum": [
+                  "standard"
+                ]
+              }
+            },
+            "required": [],
+            "type": "object"
+          },
+          "physical_design": {
+            "additionalProperties": false,
+            "properties": {
+              "clickhouse": {
+                "additionalProperties": false,
+                "properties": {
+                  "cluster": {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "type": "string"
+                  },
+                  "partition_by": {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "type": "string"
+                  },
+                  "profile": {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "type": "string"
+                  },
+                  "replica_count": {
+                    "maximum": 1024,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "profile"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [],
+            "type": "object"
+          },
+          "quality": {
+            "additionalProperties": false,
+            "properties": {
+              "dbt_warning_policy": {
+                "enum": [
+                  "fail",
+                  "allow"
+                ]
+              },
+              "preset": {
+                "enum": [
+                  "standard",
+                  "strict"
+                ]
+              }
+            },
+            "required": [],
+            "type": "object"
+          },
+          "refresh": {
+            "additionalProperties": false,
+            "properties": {
+              "automatic_sql_retry": {
+                "const": false
+              },
+              "capability": {
+                "const": "scope_stable_event_fact"
+              },
+              "concurrency": {
+                "const": "exclusive_workflow"
+              },
+              "enabled": {
+                "const": true
+              },
+              "initial_load": {
+                "const": "require_existing_complete_relation"
+              },
+              "mutation": {
+                "additionalProperties": false,
+                "properties": {
+                  "deletes": {
+                    "const": "ignore_missing"
+                  },
+                  "protocol": {
+                    "const": "update_insert_v1"
+                  }
+                },
+                "required": [
+                  "protocol",
+                  "deletes"
+                ],
+                "type": "object"
+              },
+              "publication": {
+                "additionalProperties": false,
+                "properties": {
+                  "database_engine": {
+                    "const": "Atomic"
+                  },
+                  "replica_count": {
+                    "const": 1
+                  },
+                  "strategy": {
+                    "const": "full_table_exchange"
+                  },
+                  "table_engine": {
+                    "const": "MergeTree"
+                  }
+                },
+                "required": [
+                  "database_engine",
+                  "table_engine",
+                  "replica_count",
+                  "strategy"
+                ],
+                "type": "object"
+              },
+              "schema": {
+                "const": "dpone.semantic-refresh-profile.v1"
+              },
+              "scope": {
+                "additionalProperties": false,
+                "properties": {
+                  "grain": {
+                    "const": "day"
+                  },
+                  "interval": {
+                    "const": "half_open"
+                  },
+                  "timezone": {
+                    "const": "UTC"
+                  }
+                },
+                "required": [
+                  "grain",
+                  "timezone",
+                  "interval"
+                ],
+                "type": "object"
+              },
+              "source_snapshot": {
+                "const": "snapshot"
+              },
+              "workflow_publish_atomicity": {
+                "const": "none"
+              }
+            },
+            "required": [
+              "schema",
+              "enabled",
+              "capability",
+              "scope",
+              "mutation",
+              "initial_load",
+              "concurrency",
+              "source_snapshot",
+              "publication",
+              "workflow_publish_atomicity",
+              "automatic_sql_retry"
+            ],
+            "type": "object"
+          },
+          "runtime": {
+            "additionalProperties": false,
+            "properties": {
+              "airflow": {
+                "additionalProperties": false,
+                "properties": {
+                  "service_account_name": {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "dbt_profile": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "dbt_target": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "dbt_threads": {
+                "maximum": 1024,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "dbt_timeout_seconds": {
+                "maximum": 86400,
+                "minimum": 600,
+                "type": "integer"
+              },
+              "image": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "namespace": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "toolchain": {
+                "const": "dbt-sqlserver-1.11-core-1.12-certified"
+              },
+              "xcom_sidecar_image": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              }
+            },
+            "required": [
+              "image",
+              "xcom_sidecar_image",
+              "toolchain"
+            ],
+            "type": "object"
+          },
+          "sink": {
+            "additionalProperties": false,
+            "properties": {
+              "connection_ref": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "options": {
+                "additionalProperties": false,
+                "properties": {
+                  "load_governance": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "audit": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "state_schema": {
+                            "maxLength": 256,
+                            "minLength": 1,
+                            "pattern": ".*\\S.*",
+                            "type": "string"
+                          }
+                        },
+                        "required": [],
+                        "type": "object"
+                      }
+                    },
+                    "required": [],
+                    "type": "object"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "staging_schema": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "target_schema": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "type": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "connection_ref",
+              "target_schema"
+            ],
+            "type": "object"
+          },
+          "source": {
+            "additionalProperties": false,
+            "properties": {
+              "connection_ref": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "options": {
+                "additionalProperties": false,
+                "properties": {
+                  "native_transfer": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "mode": {
+                        "enum": [
+                          "auto"
+                        ]
+                      }
+                    },
+                    "required": [],
+                    "type": "object"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "type": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "connection_ref"
+            ],
+            "type": "object"
+          },
+          "state": {
+            "additionalProperties": false,
+            "properties": {
+              "connection_ref": {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": ".*\\S.*",
+                "type": "string"
+              },
+              "partition_checkpoint_table": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "type": "string"
+                  },
+                  "schema": {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "schema",
+                  "name"
+                ],
+                "type": "object"
+              },
+              "table": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "type": "string"
+                  },
+                  "schema": {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "schema",
+                  "name"
+                ],
+                "type": "object"
+              },
+              "type": {
+                "enum": [
+                  "mssql",
+                  "postgres",
+                  "bigquery"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "connection_ref",
+              "partition_checkpoint_table"
+            ],
+            "type": "object"
+          },
+          "strategy_policy": {
+            "additionalProperties": false,
+            "properties": {
+              "allowed_strategies": {
+                "items": {
+                  "enum": [
+                    "full_refresh",
+                    "incremental_merge",
+                    "partition_replace"
+                  ]
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "full_refresh": {
+                "additionalProperties": false,
+                "properties": {
+                  "authorized": {
+                    "type": "boolean"
+                  },
+                  "max_source_bytes": {
+                    "maximum": 9223372036854775807,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "authorized"
+                ],
+                "type": "object"
+              },
+              "partition_replace": {
+                "additionalProperties": false,
+                "properties": {
+                  "require_atomic_capability": {
+                    "const": true
+                  }
+                },
+                "required": [],
+                "type": "object"
+              }
+            },
+            "required": [
+              "allowed_strategies"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "source",
+          "sink",
+          "runtime",
+          "strategy_policy",
+          "refresh"
+        ],
+        "type": "object"
+      },
+      "minProperties": 1,
+      "type": "object"
+    },
+    "schema": {
+      "const": "dpone.dbt-publish-policy.v2"
+    },
+    "workflows": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "catchup": {
+            "type": "boolean"
+          },
+          "max_active_runs": {
+            "maximum": 1024,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "owner": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "type": "string"
+          },
+          "schedule": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_date": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "timezone": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner"
+        ],
+        "type": "object"
+      },
+      "minProperties": 1,
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema",
+    "profiles",
+    "workflows"
+  ],
+  "type": "object"
+}

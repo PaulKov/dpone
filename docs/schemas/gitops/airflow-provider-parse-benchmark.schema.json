@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-provider-parse-benchmark.schema.json",
+  "title": "dpone installed Airflow provider parse benchmark evidence",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "passed",
+    "source_commit",
+    "matrix",
+    "candidate_identity",
+    "fixture",
+    "fixture_integrity",
+    "sampling",
+    "measurement_integrity",
+    "process_integrity",
+    "budgets",
+    "load_integrity",
+    "side_effects",
+    "loader",
+    "runner",
+    "failures",
+    "live_certification"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.airflow-provider-parse-benchmark.v1"
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "source_commit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "matrix": {
+      "$ref": "#/$defs/evaluation"
+    },
+    "candidate_identity": {
+      "$ref": "#/$defs/evaluation"
+    },
+    "fixture": {
+      "type": "object",
+      "required": [
+        "status",
+        "dags",
+        "workloads",
+        "workloads_per_dag",
+        "runtime_connection_artifacts",
+        "expected_topology"
+      ],
+      "additionalProperties": true
+    },
+    "fixture_integrity": {
+      "$ref": "#/$defs/evaluation"
+    },
+    "sampling": {
+      "type": "object",
+      "required": [
+        "process_cold",
+        "cold_loader",
+        "import_plus_first_load",
+        "warm_loader",
+        "cold",
+        "warm"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "process_cold": {
+          "$ref": "#/$defs/sample"
+        },
+        "cold_loader": {
+          "$ref": "#/$defs/sample"
+        },
+        "import_plus_first_load": {
+          "$ref": "#/$defs/sample"
+        },
+        "warm_loader": {
+          "$ref": "#/$defs/sample"
+        },
+        "cold": {
+          "$ref": "#/$defs/sample"
+        },
+        "warm": {
+          "$ref": "#/$defs/sample"
+        }
+      }
+    },
+    "measurement_integrity": {
+      "$ref": "#/$defs/evaluation"
+    },
+    "process_integrity": {
+      "$ref": "#/$defs/evaluation"
+    },
+    "budgets": {
+      "type": "object",
+      "required": [
+        "process_cold_p95_seconds",
+        "cold_loader_p95_seconds",
+        "import_plus_first_load_p95_seconds",
+        "warm_loader_p95_seconds",
+        "additional_rss_bytes",
+        "cold_p95_seconds",
+        "warm_p95_seconds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "process_cold_p95_seconds": {
+          "$ref": "#/$defs/evaluation"
+        },
+        "cold_loader_p95_seconds": {
+          "$ref": "#/$defs/evaluation"
+        },
+        "import_plus_first_load_p95_seconds": {
+          "$ref": "#/$defs/evaluation"
+        },
+        "warm_loader_p95_seconds": {
+          "$ref": "#/$defs/evaluation"
+        },
+        "additional_rss_bytes": {
+          "$ref": "#/$defs/evaluation"
+        },
+        "cold_p95_seconds": {
+          "$ref": "#/$defs/evaluation"
+        },
+        "warm_p95_seconds": {
+          "$ref": "#/$defs/evaluation"
+        }
+      }
+    },
+    "load_integrity": {
+      "$ref": "#/$defs/evaluation"
+    },
+    "side_effects": {
+      "$ref": "#/$defs/evaluation"
+    },
+    "loader": {
+      "type": "object",
+      "required": [
+        "import_path",
+        "resolved_modules"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "import_path": {
+          "const": "airflow.providers.dpone:load_dpone_dags"
+        },
+        "resolved_modules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/failure"
+      }
+    },
+    "live_certification": {
+      "type": "object",
+      "required": [
+        "status",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "N/A",
+            "UNVERIFIED"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "status": {
+          "const": "PASS"
+        },
+        "passed": {
+          "const": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "status": {
+          "const": "FAIL"
+        },
+        "passed": {
+          "const": false
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "evaluation": {
+      "type": "object",
+      "required": [
+        "status",
+        "passed"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "N/A",
+            "UNVERIFIED"
+          ]
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "PASS"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "passed": {
+                "const": true
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "passed": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sample": {
+      "type": "object",
+      "required": [
+        "model",
+        "requested",
+        "observed",
+        "durations_seconds"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "requested": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "observed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "durations_seconds": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "required": [
+        "code",
+        "message",
+        "stage",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "worker": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^DPONE_[A-Z0-9_]+$",
+          "maxLength": 128
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "stage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    }
+  }
+}

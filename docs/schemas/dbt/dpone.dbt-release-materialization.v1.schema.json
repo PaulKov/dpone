@@ -1,0 +1,33 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-release-materialization.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "no_op": {
+      "type": "boolean"
+    },
+    "passed": {
+      "const": true
+    },
+    "release_dir": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.dbt-release-materialization.v1"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "release_id",
+    "release_dir",
+    "no_op"
+  ],
+  "type": "object"
+}

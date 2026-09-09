@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-shadow-validation.schema.json",
+  "title": "dpone data product shadow validation",
+  "type": "object",
+  "required": ["schema_version", "status", "shadow_validation_id", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_shadow_validation.v1"},
+    "status": {"type": "string"},
+    "shadow_validation_id": {"type": "string"},
+    "rollout_plan_id": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

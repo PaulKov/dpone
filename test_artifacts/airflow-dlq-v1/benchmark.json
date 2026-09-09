@@ -1,0 +1,26 @@
+{
+  "environment": {
+    "live_connector_certification": "UNVERIFIED",
+    "platform": "macOS-15.3-arm64-arm-64bit",
+    "python": "3.11.14"
+  },
+  "leaked_files": [],
+  "limits": {
+    "false_applied_claims": 0,
+    "stable_replay_plan_ids": true,
+    "unmasked_artifact_values": 0
+  },
+  "metrics": {
+    "false_applied_claims": 0,
+    "peak_tracemalloc_bytes": 40372499,
+    "plan_repeats_seconds": 15.738274,
+    "stable_replay_plan_ids": true,
+    "unmasked_artifact_values": 0,
+    "write_and_index_seconds": 30.869281
+  },
+  "plan_repeats": 20,
+  "records": 10000,
+  "scenario": "contract-enforced metadata-only DLQ",
+  "schema": "dpone.airflow-dlq-benchmark.v1",
+  "status": "passed"
+}

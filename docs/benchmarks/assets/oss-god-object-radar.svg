@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="474" viewBox="0 0 920 474" role="img" aria-label="God object radar">
+<rect width="920" height="474" fill="#f8fafc"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">God object radar</text>
+<text x="32" y="66" font-size="13" fill="#475569">Counts of oversized modules, classes and functions. Lower is better.</text>
+<text x="32" y="118" font-size="13" font-weight="700" fill="#111827">dpone</text>
+<rect x="210" y="102" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="102" width="560" height="22" rx="4" fill="#dc2626"/>
+<text x="790" y="118" font-size="12" fill="#334155">166 god objects</text>
+<text x="32" y="176" font-size="13" font-weight="700" fill="#111827">Airbyte</text>
+<rect x="210" y="160" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="160" width="560" height="22" rx="4" fill="#dc2626"/>
+<text x="790" y="176" font-size="12" fill="#334155">97 god objects</text>
+<text x="32" y="234" font-size="13" font-weight="700" fill="#111827">dlt</text>
+<rect x="210" y="218" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="218" width="560" height="22" rx="4" fill="#dc2626"/>
+<text x="790" y="234" font-size="12" fill="#334155">143 god objects</text>
+<text x="32" y="292" font-size="13" font-weight="700" fill="#111827">Pentaho Kettle</text>
+<rect x="210" y="276" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="276" width="560" height="22" rx="4" fill="#dc2626"/>
+<text x="790" y="292" font-size="12" fill="#334155">15 god objects</text>
+<text x="32" y="350" font-size="13" font-weight="700" fill="#111827">Apache Hop</text>
+<rect x="210" y="334" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="334" width="560" height="22" rx="4" fill="#dc2626"/>
+<text x="790" y="350" font-size="12" fill="#334155">15 god objects</text>
+<text x="32" y="408" font-size="13" font-weight="700" fill="#111827">Sling</text>
+<rect x="210" y="392" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="392" width="560" height="22" rx="4" fill="#dc2626"/>
+<text x="790" y="408" font-size="12" fill="#334155">15 god objects</text>
+</svg>

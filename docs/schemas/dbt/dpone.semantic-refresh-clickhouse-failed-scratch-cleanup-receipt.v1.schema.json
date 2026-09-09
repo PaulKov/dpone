@@ -1,0 +1,130 @@
+{
+  "$comment": "The digest is recomputed from every field except scratch_absence_evidence_sha256. The typed producer requires the exact ordered shadow/staging absence closure.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-clickhouse-failed-scratch-cleanup-receipt.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempt_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "fencing_epoch": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "operation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "operation_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "relations": {
+      "items": false,
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "expected_uuid": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "const": "shadow"
+            },
+            "name": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "observed_uuid": {
+              "const": null
+            }
+          },
+          "required": [
+            "expected_uuid",
+            "kind",
+            "name",
+            "observed_uuid"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "expected_uuid": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "const": "staging"
+            },
+            "name": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "observed_uuid": {
+              "const": null
+            }
+          },
+          "required": [
+            "expected_uuid",
+            "kind",
+            "name",
+            "observed_uuid"
+          ],
+          "type": "object"
+        }
+      ],
+      "type": "array"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-clickhouse-failed-scratch-cleanup-receipt.v1"
+    },
+    "scratch_absence_evidence_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "target_uuid": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "workflow_execution_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_execution_id": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "attempt_binding_sha256",
+    "fencing_epoch",
+    "operation_id",
+    "operation_plan_sha256",
+    "relations",
+    "schema",
+    "scratch_absence_evidence_sha256",
+    "target_uuid",
+    "workflow_execution_binding_sha256",
+    "workflow_execution_id"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,66 @@
+schema_version: 1
+task_id: "DPONE-512-PR6A"
+title: "Implement the dormant readiness pair transaction"
+goal: "Provide the approved internal, descriptor-confined JSON/Markdown readiness-pair transaction with truthful recovery outcomes."
+specification: "docs/feature-design-ci-shadow-pr6a-readiness-core.md"
+base_commit: "aaf1bd842cd487a13e600f5d5c4b0bcb243e770e"
+integrator: "root"
+
+acceptance_criteria:
+  - "Journal contains identities, names and canonical digests only; retained backup leaves, never journal payload, hold prior bytes."
+  - "All mutable leaves are descriptor-confined, no-follow regular files and a nonblocking internal lock serializes one output directory."
+  - "The PREPARED, JSON_REPLACED, PAIR_REPLACED and COMMITTED recovery semantics preserve uncertain evidence and never report it as success."
+  - "Focused tests cover happy path, malformed journal, lock contention, phase recovery and failure injection boundaries."
+
+public_contract_impact:
+  level: none
+  surfaces: []
+  migration_required: false
+
+owned_paths:
+  - src/dpone/manifest/ci_shadow_readiness_pair.py
+  - src/dpone/manifest/ci_shadow_readiness_pair_codec.py
+  - src/dpone/manifest/ci_shadow_readiness_pair_fs.py
+  - src/dpone/manifest/ci_shadow_readiness_pair_identity.py
+  - tests/test_ci_shadow_readiness_pair.py
+  - test_artifacts/agent-policy/ci-shadow-pr6a-implementation-task-contract.yml
+integrator_owned_paths:
+  - docs/feature-design-ci-shadow-pr6a-readiness-core.md
+read_only_paths:
+  - src/dpone/manifest/confined_mutations.py
+  - src/dpone/manifest/confined_atomic_exchange.py
+  - src/dpone/manifest/confined_files.py
+  - src/dpone/manifest/confined_transaction_journal.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "integrator"
+dependencies:
+  - "ADR 0048"
+  - "docs/feature-design-ci-shadow-pr6a-readiness-core.md"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_ci_shadow_readiness.py tests/test_ci_shadow_readiness_pair.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live: []
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+stop_conditions:
+  - "Approved specification is contradicted."
+  - "A change would expose a public readiness interface or authority."
+  - "Required edit falls outside owned_paths."

@@ -1,0 +1,9 @@
+name: dpone CodeQL
+
+# Exclude clear-text-logging: CLI stdout helpers route every buffer through
+# dpone.security_redaction.redact_text before write. CodeQL does not model that
+# helper as a sanitizer, so the query produces a durable false positive on
+# src/dpone/output_text.py and floods path-problem results on redaction regexes.
+query-filters:
+  - exclude:
+      id: py/clear-text-logging-sensitive-data

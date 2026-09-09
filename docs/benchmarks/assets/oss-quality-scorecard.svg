@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="550" viewBox="0 0 920 550" role="img">
+<rect width="920" height="550" fill="#f8fafc"/>
+<text x="32" y="42" font-size="24" font-weight="700" fill="#111827">OSS code quality scorecard</text>
+<text x="32" y="68" font-size="13" fill="#475569">SOLID and Clean OOP scores use static maintainability proxies on pinned source snapshots.</text>
+<text x="32" y="106" font-size="15" font-weight="700" fill="#111827">dpone</text>
+<text x="210" y="85" font-size="11" fill="#475569">SOLID: 5.0/5</text>
+<rect x="210" y="92" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="92" width="210" height="16" rx="4" fill="#0f766e"/>
+<text x="500" y="85" font-size="11" fill="#475569">Clean OOP: 5.0/5</text>
+<rect x="500" y="92" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="500" y="92" width="210" height="16" rx="4" fill="#2563eb"/>
+<text x="790" y="106" font-size="12" fill="#475569">Ce 2.08 / cohesion 0.63</text>
+<text x="32" y="178" font-size="15" font-weight="700" fill="#111827">Airbyte</text>
+<text x="210" y="157" font-size="11" fill="#475569">SOLID: 4.2/5</text>
+<rect x="210" y="164" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="164" width="176" height="16" rx="4" fill="#0f766e"/>
+<text x="500" y="157" font-size="11" fill="#475569">Clean OOP: 4.0/5</text>
+<rect x="500" y="164" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="500" y="164" width="168" height="16" rx="4" fill="#2563eb"/>
+<text x="790" y="178" font-size="12" fill="#475569">Ce 1.82 / cohesion 0.60</text>
+<text x="32" y="250" font-size="15" font-weight="700" fill="#111827">dlt</text>
+<text x="210" y="229" font-size="11" fill="#475569">SOLID: 4.2/5</text>
+<rect x="210" y="236" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="236" width="176" height="16" rx="4" fill="#0f766e"/>
+<text x="500" y="229" font-size="11" fill="#475569">Clean OOP: 4.0/5</text>
+<rect x="500" y="236" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="500" y="236" width="168" height="16" rx="4" fill="#2563eb"/>
+<text x="790" y="250" font-size="12" fill="#475569">Ce 4.69 / cohesion 0.38</text>
+<text x="32" y="322" font-size="15" font-weight="700" fill="#111827">Pentaho Kettle</text>
+<text x="210" y="301" font-size="11" fill="#475569">SOLID: 1.4/5</text>
+<rect x="210" y="308" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="308" width="58" height="16" rx="4" fill="#0f766e"/>
+<text x="500" y="301" font-size="11" fill="#475569">Clean OOP: 1.1/5</text>
+<rect x="500" y="308" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="500" y="308" width="46" height="16" rx="4" fill="#2563eb"/>
+<text x="790" y="322" font-size="12" fill="#475569">Ce 8.18 / cohesion 0.32</text>
+<text x="32" y="394" font-size="15" font-weight="700" fill="#111827">Apache Hop</text>
+<text x="210" y="373" font-size="11" fill="#475569">SOLID: 2.1/5</text>
+<rect x="210" y="380" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="380" width="88" height="16" rx="4" fill="#0f766e"/>
+<text x="500" y="373" font-size="11" fill="#475569">Clean OOP: 2.6/5</text>
+<rect x="500" y="380" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="500" y="380" width="109" height="16" rx="4" fill="#2563eb"/>
+<text x="790" y="394" font-size="12" fill="#475569">Ce 7.98 / cohesion 0.19</text>
+<text x="32" y="466" font-size="15" font-weight="700" fill="#111827">Sling</text>
+<text x="210" y="445" font-size="11" fill="#475569">SOLID: 3.1/5</text>
+<rect x="210" y="452" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="452" width="130" height="16" rx="4" fill="#0f766e"/>
+<text x="500" y="445" font-size="11" fill="#475569">Clean OOP: 2.7/5</text>
+<rect x="500" y="452" width="210" height="16" rx="4" fill="#e2e8f0"/>
+<rect x="500" y="452" width="113" height="16" rx="4" fill="#2563eb"/>
+<text x="790" y="466" font-size="12" fill="#475569">Ce 0.00 / cohesion 0.00</text>
+</svg>

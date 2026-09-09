@@ -1,0 +1,345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/route-certification-matrix.schema.json",
+  "title": "dpone GitOps route certification matrix",
+  "type": "object",
+  "required": [
+    "schema",
+    "expected_commit",
+    "evaluated_at",
+    "has_input_failures",
+    "counts",
+    "rows",
+    "errors"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.route-certification-matrix.v1"
+    },
+    "expected_commit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "has_input_failures": {
+      "type": "boolean"
+    },
+    "counts": {
+      "type": "object",
+      "required": [
+        "experimental",
+        "route-certified",
+        "production-certified",
+        "enterprise-certified"
+      ],
+      "properties": {
+        "experimental": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "route-certified": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "production-certified": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "enterprise-certified": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/row"
+      },
+      "maxItems": 10000
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/error"
+      },
+      "maxItems": 10000
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "nullable_sha256": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullable_text": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 1024
+    },
+    "dimensions": {
+      "type": "object",
+      "required": [
+        "source",
+        "sink",
+        "strategy",
+        "transport",
+        "schema_evolution",
+        "airflow_runtime_mode"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "sink": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "strategy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "transport": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "schema_evolution": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "airflow_runtime_mode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      },
+      "additionalProperties": false
+    },
+    "proof": {
+      "type": "object",
+      "required": [
+        "evidence_set",
+        "evidence_status",
+        "certification_level",
+        "release_id",
+        "deployment_id",
+        "environment",
+        "signer_identity",
+        "expires_at",
+        "release_set_sha256",
+        "certification_bundle_sha256",
+        "attestation_sha256",
+        "verification_sha256",
+        "production_attempted",
+        "blockers"
+      ],
+      "properties": {
+        "evidence_set": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "evidence_status": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "certification_level": {
+          "enum": [
+            "experimental",
+            "route-certified",
+            "production-certified"
+          ]
+        },
+        "release_id": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "deployment_id": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "environment": {
+          "$ref": "#/$defs/nullable_text"
+        },
+        "signer_identity": {
+          "$ref": "#/$defs/nullable_text"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/nullable_text"
+        },
+        "release_set_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "certification_bundle_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "attestation_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "verification_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "production_attempted": {
+          "type": "boolean"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "uniqueItems": true,
+          "maxItems": 10000
+        }
+      },
+      "additionalProperties": false
+    },
+    "row": {
+      "type": "object",
+      "required": [
+        "route_id",
+        "dimensions",
+        "sampling_mode",
+        "status",
+        "catalog_status",
+        "capability_status",
+        "contract_status",
+        "live_status",
+        "production_status",
+        "docs_link",
+        "blockers",
+        "proofs"
+      ],
+      "properties": {
+        "route_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "dimensions": {
+          "$ref": "#/$defs/dimensions"
+        },
+        "sampling_mode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "status": {
+          "enum": [
+            "experimental",
+            "route-certified",
+            "production-certified",
+            "enterprise-certified"
+          ]
+        },
+        "catalog_status": {
+          "enum": [
+            "experimental",
+            "route-certified",
+            "production-certified",
+            "enterprise-certified"
+          ]
+        },
+        "capability_status": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "contract_status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNVERIFIED"
+          ]
+        },
+        "live_status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNVERIFIED"
+          ]
+        },
+        "production_status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNVERIFIED"
+          ]
+        },
+        "docs_link": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "uniqueItems": true,
+          "maxItems": 10000
+        },
+        "proofs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/proof"
+          },
+          "maxItems": 1000
+        }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "required": [
+        "code",
+        "evidence_set",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "evidence_set": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

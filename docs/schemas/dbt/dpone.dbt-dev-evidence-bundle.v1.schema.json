@@ -1,0 +1,73 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-dev-evidence-bundle.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "file_count": {
+      "maximum": 1502,
+      "minimum": 4,
+      "type": "integer"
+    },
+    "no_op": {
+      "type": "boolean"
+    },
+    "output_root": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "type": "string"
+    },
+    "passed": {
+      "const": true
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.dbt-dev-evidence-bundle.v1"
+    },
+    "subject_path": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
+    "subject_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "total_bytes": {
+      "maximum": 268435456,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "verified_workloads": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "release_id",
+    "deployment_id",
+    "output_root",
+    "subject_path",
+    "subject_sha256",
+    "file_count",
+    "total_bytes",
+    "verified_workloads",
+    "no_op"
+  ],
+  "type": "object"
+}

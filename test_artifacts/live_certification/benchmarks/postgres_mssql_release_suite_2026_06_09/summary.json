@@ -1,0 +1,189 @@
+{
+  "failed": false,
+  "certification_passed": true,
+  "results": [
+    {
+      "name": "rows10000_p4_ew2_lw2",
+      "rows": 10000,
+      "partitions": 4,
+      "export_workers": 2,
+      "load_workers": 2,
+      "returncode": 0,
+      "seconds": 2.084,
+      "output_file": "test_artifacts/live_certification/benchmarks/postgres_mssql_release_suite_2026_06_09/rows10000_p4_ew2_lw2.json",
+      "certification": {
+        "passed": true,
+        "rows": 10000,
+        "rows_per_second": {
+          "postgres_to_mssql": 12953.368,
+          "mssql_to_clickhouse": 16949.153
+        },
+        "bottleneck_phase": "postgres_to_mssql.target_load_finalize",
+        "checks": [
+          {
+            "name": "row_volume_at_or_above_policy",
+            "passed": true,
+            "details": {
+              "min_rows": 10000
+            }
+          },
+          {
+            "name": "mssql_count_matches_rows",
+            "passed": true,
+            "details": {
+              "rows": 10000
+            }
+          },
+          {
+            "name": "clickhouse_count_matches_rows",
+            "passed": true,
+            "details": {
+              "rows": 10000
+            }
+          },
+          {
+            "name": "postgres_to_mssql_slo",
+            "passed": true,
+            "details": {
+              "actual_rows_per_second": 12953.368,
+              "min_rows_per_second": null
+            }
+          },
+          {
+            "name": "mssql_to_clickhouse_slo",
+            "passed": true,
+            "details": {
+              "actual_rows_per_second": 16949.153,
+              "min_rows_per_second": null
+            }
+          }
+        ],
+        "recommendations": [
+          "Tune MSSQL bcp load/finalizer: bulk batch size, table lock, indexes, recovery model, and transaction size."
+        ]
+      }
+    },
+    {
+      "name": "rows1000000_p4_ew2_lw2",
+      "rows": 1000000,
+      "partitions": 4,
+      "export_workers": 2,
+      "load_workers": 2,
+      "returncode": 0,
+      "seconds": 46.578,
+      "output_file": "test_artifacts/live_certification/benchmarks/postgres_mssql_release_suite_2026_06_09/rows1000000_p4_ew2_lw2.json",
+      "certification": {
+        "passed": true,
+        "rows": 1000000,
+        "rows_per_second": {
+          "postgres_to_mssql": 89493.467,
+          "mssql_to_clickhouse": 29307.465
+        },
+        "bottleneck_phase": "mssql_to_clickhouse.source_export",
+        "checks": [
+          {
+            "name": "row_volume_at_or_above_policy",
+            "passed": true,
+            "details": {
+              "min_rows": 1000000
+            }
+          },
+          {
+            "name": "mssql_count_matches_rows",
+            "passed": true,
+            "details": {
+              "rows": 1000000
+            }
+          },
+          {
+            "name": "clickhouse_count_matches_rows",
+            "passed": true,
+            "details": {
+              "rows": 1000000
+            }
+          },
+          {
+            "name": "postgres_to_mssql_slo",
+            "passed": true,
+            "details": {
+              "actual_rows_per_second": 89493.467,
+              "min_rows_per_second": null
+            }
+          },
+          {
+            "name": "mssql_to_clickhouse_slo",
+            "passed": true,
+            "details": {
+              "actual_rows_per_second": 29307.465,
+              "min_rows_per_second": null
+            }
+          }
+        ],
+        "recommendations": [
+          "Tune MSSQL bcp queryout: partitioning.column, export_workers, source predicate, bcp packet size, and temp artifact disk."
+        ]
+      }
+    },
+    {
+      "name": "rows10000000_p4_ew2_lw2",
+      "rows": 10000000,
+      "partitions": 4,
+      "export_workers": 2,
+      "load_workers": 2,
+      "returncode": 0,
+      "seconds": 463.428,
+      "output_file": "test_artifacts/live_certification/benchmarks/postgres_mssql_release_suite_2026_06_09/rows10000000_p4_ew2_lw2.json",
+      "certification": {
+        "passed": true,
+        "rows": 10000000,
+        "rows_per_second": {
+          "postgres_to_mssql": 88727.995,
+          "mssql_to_clickhouse": 29496.263
+        },
+        "bottleneck_phase": "mssql_to_clickhouse.source_export",
+        "checks": [
+          {
+            "name": "row_volume_at_or_above_policy",
+            "passed": true,
+            "details": {
+              "min_rows": 10000000
+            }
+          },
+          {
+            "name": "mssql_count_matches_rows",
+            "passed": true,
+            "details": {
+              "rows": 10000000
+            }
+          },
+          {
+            "name": "clickhouse_count_matches_rows",
+            "passed": true,
+            "details": {
+              "rows": 10000000
+            }
+          },
+          {
+            "name": "postgres_to_mssql_slo",
+            "passed": true,
+            "details": {
+              "actual_rows_per_second": 88727.995,
+              "min_rows_per_second": null
+            }
+          },
+          {
+            "name": "mssql_to_clickhouse_slo",
+            "passed": true,
+            "details": {
+              "actual_rows_per_second": 29496.263,
+              "min_rows_per_second": null
+            }
+          }
+        ],
+        "recommendations": [
+          "Tune MSSQL bcp queryout: partitioning.column, export_workers, source predicate, bcp packet size, and temp artifact disk."
+        ]
+      }
+    }
+  ]
+}

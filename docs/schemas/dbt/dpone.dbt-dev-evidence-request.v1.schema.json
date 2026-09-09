@@ -1,0 +1,94 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-dev-evidence-request.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "evidence_set_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "orchestration_run_attempt": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "orchestration_run_id": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+      "type": "string"
+    },
+    "producer_repository": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+      "type": "string"
+    },
+    "producer_workflow": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.dbt-dev-evidence-request.v1"
+    },
+    "source_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "workflows": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "dag_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "dag_run_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "workflow_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow_id",
+          "dag_id",
+          "dag_run_id"
+        ],
+        "type": "object"
+      },
+      "maxItems": 200,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schema",
+    "evidence_set_id",
+    "release_id",
+    "deployment_id",
+    "producer_repository",
+    "producer_workflow",
+    "source_commit",
+    "orchestration_run_id",
+    "orchestration_run_attempt",
+    "workflows"
+  ],
+  "type": "object"
+}

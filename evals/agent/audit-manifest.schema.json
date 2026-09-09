@@ -1,0 +1,342 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/agent-audit-manifest-v1.json",
+  "title": "dpone agent governance audit manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "repository",
+    "workflow",
+    "run_id",
+    "run_attempt",
+    "artifact_name",
+    "artifact_retention_days",
+    "generated_at",
+    "pr_number",
+    "base_ref",
+    "base_sha",
+    "head_ref",
+    "head_sha",
+    "merge_sha",
+    "receipt_status",
+    "receipt_errors",
+    "receipt_warnings",
+    "traceability_source",
+    "traceability_source_kind",
+    "traceability_statuses",
+    "traceability_non_pass_reasons",
+    "evidence_chain_head_sha",
+    "evidence_chain_required_checks",
+    "evidence_chain_governance_artifact",
+    "required_checks",
+    "evidence_artifacts"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "agent_pr_receipt"},
+    "repository": {"type": "string", "minLength": 1},
+    "workflow": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "run_attempt": {"type": "string", "minLength": 1},
+    "artifact_name": {"type": "string", "minLength": 1},
+    "artifact_retention_days": {"type": "integer", "minimum": 1},
+    "generated_at": {"type": "string", "minLength": 1},
+    "pr_number": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+    "base_ref": {"$ref": "#/$defs/nullable_string"},
+    "base_sha": {"$ref": "#/$defs/nullable_string"},
+    "head_ref": {"$ref": "#/$defs/nullable_string"},
+    "head_sha": {"$ref": "#/$defs/nullable_string"},
+    "merge_sha": {"$ref": "#/$defs/nullable_string"},
+    "receipt_status": {"enum": ["PASS", "FAIL", "N/A"]},
+    "receipt_errors": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "receipt_warnings": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "traceability_source": {"$ref": "#/$defs/nullable_string"},
+    "traceability_source_kind": {
+      "anyOf": [
+        {"enum": ["issue", "url", "docs", "adr", "na", "unknown"]},
+        {"type": "null"}
+      ]
+    },
+    "traceability_statuses": {
+      "type": "array",
+      "items": {"enum": ["PASS", "FAIL", "SKIP", "N/A", "UNVERIFIED"]},
+      "uniqueItems": true
+    },
+    "traceability_non_pass_reasons": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/non_pass_reason"}
+    },
+    "evidence_chain_head_sha": {"$ref": "#/$defs/nullable_string"},
+    "evidence_chain_required_checks": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/evidence_chain_check"}
+    },
+    "evidence_chain_governance_artifact": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/evidence_chain_artifact"}
+      ]
+    },
+    "required_checks": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "evidence_artifacts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/evidence_artifact"}
+    }
+  },
+  "$defs": {
+    "nullable_integer": {
+      "anyOf": [
+        {"type": "integer"},
+        {"type": "null"}
+      ]
+    },
+    "nullable_string": {
+      "anyOf": [
+        {"type": "string"},
+        {"type": "null"}
+      ]
+    },
+    "evidence_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "workflow_run_head_sha",
+        "workflow_run_id",
+        "expired",
+        "url",
+        "artifact_id",
+        "digest",
+        "size_in_bytes",
+        "archive_sha256",
+        "archive_size_bytes",
+        "created_at",
+        "expires_at",
+        "content",
+        "attestation"
+      ],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "workflow_run_head_sha": {"type": "string", "minLength": 1},
+        "workflow_run_id": {"type": "integer"},
+        "expired": {"type": "boolean"},
+        "url": {"$ref": "#/$defs/nullable_string"},
+        "artifact_id": {"$ref": "#/$defs/nullable_integer"},
+        "digest": {"$ref": "#/$defs/nullable_string"},
+        "size_in_bytes": {"$ref": "#/$defs/nullable_integer"},
+        "archive_sha256": {"$ref": "#/$defs/nullable_string"},
+        "archive_size_bytes": {"$ref": "#/$defs/nullable_integer"},
+        "created_at": {"$ref": "#/$defs/nullable_string"},
+        "expires_at": {"$ref": "#/$defs/nullable_string"},
+        "content": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/governance_artifact_content"}
+          ]
+        },
+        "attestation": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/attestation_evidence"}
+          ]
+        }
+      }
+    },
+    "attestation_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "predicate_type",
+        "subject_sha256",
+        "source_repository",
+        "source_ref",
+        "source_digest",
+        "signer_workflow",
+        "issuer",
+        "verified_timestamps_count",
+        "runner_environment",
+        "errors"
+      ],
+      "properties": {
+        "status": {"enum": ["PASS", "FAIL", "UNVERIFIED"]},
+        "predicate_type": {"$ref": "#/$defs/nullable_string"},
+        "subject_sha256": {"$ref": "#/$defs/nullable_string"},
+        "source_repository": {"$ref": "#/$defs/nullable_string"},
+        "source_ref": {"$ref": "#/$defs/nullable_string"},
+        "source_digest": {"$ref": "#/$defs/nullable_string"},
+        "signer_workflow": {"$ref": "#/$defs/nullable_string"},
+        "issuer": {"$ref": "#/$defs/nullable_string"},
+        "verified_timestamps_count": {"$ref": "#/$defs/nullable_integer"},
+        "runner_environment": {"$ref": "#/$defs/nullable_string"},
+        "errors": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "governance_artifact_content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "status",
+        "control_surface_changed",
+        "changed_paths",
+        "head_commit",
+        "checks",
+        "errors"
+      ],
+      "properties": {
+        "schema_version": {"$ref": "#/$defs/nullable_integer"},
+        "status": {"$ref": "#/$defs/nullable_string"},
+        "control_surface_changed": {
+          "anyOf": [
+            {"type": "boolean"},
+            {"type": "null"}
+          ]
+        },
+        "changed_paths": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "head_commit": {"$ref": "#/$defs/nullable_string"},
+        "checks": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/governance_content_check"}
+        },
+        "errors": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "governance_content_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "artifact", "details"],
+      "properties": {
+        "name": {"$ref": "#/$defs/nullable_string"},
+        "status": {"$ref": "#/$defs/nullable_string"},
+        "artifact": {"$ref": "#/$defs/nullable_string"},
+        "details": {"$ref": "#/$defs/nullable_string"}
+      }
+    },
+    "evidence_chain_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "source",
+        "id",
+        "workflow_run_id",
+        "status",
+        "conclusion",
+        "state",
+        "url",
+        "completed_at"
+      ],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "source": {
+          "anyOf": [
+            {"enum": ["check_run", "status"]},
+            {"type": "null"}
+          ]
+        },
+        "id": {"$ref": "#/$defs/nullable_integer"},
+        "workflow_run_id": {"$ref": "#/$defs/nullable_integer"},
+        "status": {"$ref": "#/$defs/nullable_string"},
+        "conclusion": {"$ref": "#/$defs/nullable_string"},
+        "state": {"$ref": "#/$defs/nullable_string"},
+        "url": {"$ref": "#/$defs/nullable_string"},
+        "completed_at": {"$ref": "#/$defs/nullable_string"}
+      }
+    },
+    "evidence_chain_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "artifact_id",
+        "workflow_run_id",
+        "workflow_run_head_sha",
+        "digest",
+        "archive_sha256",
+        "archive_size_bytes",
+        "expired",
+        "url",
+        "content_status",
+        "content_control_surface_changed",
+        "content_changed_paths",
+        "content_checks",
+        "attestation"
+      ],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "artifact_id": {"$ref": "#/$defs/nullable_integer"},
+        "workflow_run_id": {"$ref": "#/$defs/nullable_integer"},
+        "workflow_run_head_sha": {"$ref": "#/$defs/nullable_string"},
+        "digest": {"$ref": "#/$defs/nullable_string"},
+        "archive_sha256": {"$ref": "#/$defs/nullable_string"},
+        "archive_size_bytes": {"$ref": "#/$defs/nullable_integer"},
+        "expired": {"type": "boolean"},
+        "url": {"$ref": "#/$defs/nullable_string"},
+        "content_status": {"$ref": "#/$defs/nullable_string"},
+        "content_control_surface_changed": {
+          "anyOf": [
+            {"type": "boolean"},
+            {"type": "null"}
+          ]
+        },
+        "content_changed_paths": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "content_checks": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/evidence_chain_content_check"}
+        },
+        "attestation": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/attestation_evidence"}
+          ]
+        }
+      }
+    },
+    "evidence_chain_content_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status"],
+      "properties": {
+        "name": {"$ref": "#/$defs/nullable_string"},
+        "status": {"$ref": "#/$defs/nullable_string"}
+      }
+    },
+    "non_pass_reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check", "status", "reason"],
+      "properties": {
+        "check": {"type": "string"},
+        "status": {"enum": ["SKIP", "N/A", "UNVERIFIED"]},
+        "reason": {"type": "string"}
+      }
+    }
+  }
+}

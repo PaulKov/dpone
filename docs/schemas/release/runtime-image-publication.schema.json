@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/release/runtime-image-publication.schema.json",
+  "title": "dpone runtime image publication v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "outcome",
+    "candidate_digest",
+    "certification_sha256",
+    "transitions"
+  ],
+  "properties": {
+    "schema": {
+      "const": "dpone.runtime-image-publication.v1"
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "PUBLISHED",
+        "BLOCKED",
+        "PARTIAL_ALIAS_PENDING"
+      ]
+    },
+    "candidate_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "certification_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "transitions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/transition"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "PASS"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "const": "PUBLISHED"
+          },
+          "transitions": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/passVersionTransition"
+              },
+              {
+                "$ref": "#/$defs/passShaTransition"
+              },
+              {
+                "$ref": "#/$defs/passLatestTransition"
+              }
+            ],
+            "items": false
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "BLOCKED",
+              "PARTIAL_ALIAS_PENDING"
+            ]
+          },
+          "transitions": {
+            "contains": {
+              "properties": {
+                "status": {
+                  "const": "FAIL"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "stableSemver": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$"
+    },
+    "safeCode": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+    },
+    "reference": {
+      "type": "string",
+      "pattern": "^ghcr\\.io/[a-z0-9]+(?:[._/-][a-z0-9]+)*:[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$"
+    },
+    "observation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "const": "ABSENT"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "digest"
+          ],
+          "properties": {
+            "state": {
+              "const": "PRESENT"
+            },
+            "digest": {
+              "$ref": "#/$defs/digest"
+            },
+            "version": {
+              "$ref": "#/$defs/stableSemver"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "error_code"
+          ],
+          "properties": {
+            "state": {
+              "const": "ERROR"
+            },
+            "error_code": {
+              "$ref": "#/$defs/safeCode"
+            }
+          }
+        }
+      ]
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "reference",
+        "before",
+        "decision",
+        "after",
+        "status"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "version",
+            "sha",
+            "latest"
+          ]
+        },
+        "reference": {
+          "$ref": "#/$defs/reference"
+        },
+        "before": {
+          "$ref": "#/$defs/observation"
+        },
+        "decision": {
+          "enum": [
+            "CREATED",
+            "NOOP_SAME",
+            "ADVANCED",
+            "PRESERVED_NEWER",
+            "BLOCKED"
+          ]
+        },
+        "after": {
+          "$ref": "#/$defs/observation"
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "blocker_code": {
+          "$ref": "#/$defs/safeCode"
+        }
+      }
+    },
+    "passVersionTransition": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/transition"
+        },
+        {
+          "properties": {
+            "role": {
+              "const": "version"
+            },
+            "decision": {
+              "enum": [
+                "CREATED",
+                "NOOP_SAME"
+              ]
+            },
+            "status": {
+              "const": "PASS"
+            }
+          },
+          "not": {
+            "required": [
+              "blocker_code"
+            ]
+          }
+        }
+      ]
+    },
+    "passShaTransition": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/transition"
+        },
+        {
+          "properties": {
+            "role": {
+              "const": "sha"
+            },
+            "decision": {
+              "enum": [
+                "CREATED",
+                "NOOP_SAME"
+              ]
+            },
+            "status": {
+              "const": "PASS"
+            }
+          },
+          "not": {
+            "required": [
+              "blocker_code"
+            ]
+          }
+        }
+      ]
+    },
+    "passLatestTransition": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/transition"
+        },
+        {
+          "properties": {
+            "role": {
+              "const": "latest"
+            },
+            "decision": {
+              "enum": [
+                "CREATED",
+                "NOOP_SAME",
+                "ADVANCED",
+                "PRESERVED_NEWER"
+              ]
+            },
+            "status": {
+              "const": "PASS"
+            }
+          },
+          "not": {
+            "required": [
+              "blocker_code"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

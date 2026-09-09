@@ -1,0 +1,111 @@
+{
+  "$comment": "Only exact complete model receipt closure can produce this summary or authorize success Assets.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-durable-workflow-summary.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "expected_operation_ids": {
+      "items": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "publications": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_manifest_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "attempt_binding_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "clickhouse_terminal_receipt_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "operation_id": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "operation_plan_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "scope_revision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "status": {
+            "const": "COMPLETE"
+          },
+          "target_generation": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "terminal_receipt_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "workflow_execution_binding_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_manifest_sha256",
+          "attempt_binding_sha256",
+          "clickhouse_terminal_receipt_sha256",
+          "operation_id",
+          "operation_plan_sha256",
+          "scope_revision",
+          "status",
+          "target_generation",
+          "terminal_receipt_sha256",
+          "workflow_execution_binding_sha256"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-durable-workflow-summary.v1"
+    },
+    "status": {
+      "const": "FULLY_COMPLETE"
+    },
+    "terminal_summary_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_execution_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_execution_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "workflow_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "expected_operation_ids",
+    "publications",
+    "schema",
+    "status",
+    "terminal_summary_sha256",
+    "workflow_execution_binding_sha256",
+    "workflow_execution_id",
+    "workflow_plan_sha256"
+  ],
+  "type": "object"
+}

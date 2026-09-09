@@ -1,0 +1,77 @@
+schema_version: 1
+task_id: "SS-REVIEW-ROUTE-DOCS-EXECUTABLE-CONTRACTS"
+title: "Make every source-to-sink guide schema-valid, executable and truthful"
+goal: "Replace copy/paste claims with checked manifests and route-specific behavior that matches public schemas and runtime capabilities."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Every docs/source-sink guide references an existing examples/source-sink YAML file."
+  - "The guide copy/paste manifest is semantically identical to its referenced example."
+  - "All 25 example files validate against the official batch schema and load through the normal manifest/config parser without external I/O."
+  - "Connector table, option, export-format and strategy fields use only canonical public names and values."
+  - "Kafka sink documentation states append-only message publication and never claims table replacement or staging swap."
+  - "snapshot_diff is identified as the load strategy; reconciliation.mode=snapshot is documented as a separate capability."
+  - "A full_refresh transition warns that row-count reconciliation can pass 0/0 and adds an explicit target min_rows gate where non-empty output is required."
+  - "Useful route-specific algorithms, runbooks and cross-links are preserved."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["source/sink guides", "executable examples", "documentation contract tests"]
+  migration_required: true
+
+owned_paths:
+  - "docs/source-sink/*.md"
+  - "examples/source-sink/*.yaml"
+  - "tests/test_docs_language_contracts.py"
+  - "tests/test_docs_source_sink_contracts.py"
+  - "tests/test_source_sink_executable_examples.py"
+read_only_paths:
+  - "src/dpone/schema/etl-batch-manifest.schema.json"
+  - "src/dpone/schema/etl-flow-manifest.schema.json"
+  - "src/dpone/config"
+  - "src/dpone/manifest"
+  - "src/dpone/runtime"
+  - "docs/source-sink-matrix.md"
+  - "docs/load-strategies.md"
+  - "docs/connector-certification.md"
+  - "docs/load-governance.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src"
+  - "docs/load-governance.md"
+
+shared_file_owner: "integrator"
+dependencies:
+  - "SS-REVIEW-QUALITY-ROUTE-DOCS"
+  - "SS-REVIEW-QUALITY-ACCEPTANCE-SCHEMA-DOCS"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_docs_language_contracts.py tests/test_docs_source_sink_contracts.py tests/test_source_sink_executable_examples.py -q"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  broad:
+    - "uv run pytest -k 'manifest or schema or compatibility' -q"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A runtime behavior or route capability cannot be proven from code, tests or current certification metadata."
+  - "A guide would need to delete route-specific content instead of correcting it."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+
+# Integrator handoff, 2026-07-18:
+# SS-REVIEW-QUALITY-ROUTE-DOCS is complete and its current edits are the
+# baseline. Ownership of docs/source-sink and tests/test_docs_language_contracts.py
+# is transferred to this executable-contract follow-up; prior detail must be
+# preserved and corrected in place.

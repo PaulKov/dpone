@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-incident-lifecycle.schema.json",
+  "title": "dpone data product incident lifecycle",
+  "type": "object",
+  "required": ["schema_version", "status", "incident_id", "events", "blockers", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_incident_lifecycle.v1"},
+    "status": {"enum": ["healthy", "open", "acknowledged", "resolved", "blocked", "warning"]},
+    "incident_id": {"type": "string", "pattern": "^sha256:"},
+    "events": {"type": "array"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  }
+}

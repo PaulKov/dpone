@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/safe-sample-source-request.schema.json",
+  "title": "dpone GitOps safe sample source request",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "mode",
+    "sample_rows",
+    "max_bytes",
+    "timeout_seconds",
+    "source_read_only",
+    "full_scan_allowed",
+    "pii_policy",
+    "target",
+    "errors"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.safe-sample-source-request.v1"
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "blocked"
+      ]
+    },
+    "mode": {
+      "enum": [
+        "pushdown",
+        "full_scan",
+        "blocked"
+      ]
+    },
+    "sample_rows": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_read_only": {
+      "const": true
+    },
+    "full_scan_allowed": {
+      "type": "boolean"
+    },
+    "estimated_read_bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "proof": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pii_policy": {
+      "enum": [
+        "masked",
+        "not_logged"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "mode",
+        "connection_ref",
+        "temporary_table",
+        "ttl_seconds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "temporary"
+        },
+        "connection_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+          "maxLength": 128
+        },
+        "temporary_table": {
+          "type": "object",
+          "required": [
+            "schema",
+            "name"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "schema": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "ttl_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/error"
+      }
+    }
+  },
+  "$defs": {
+    "error": {
+      "type": "object",
+      "required": [
+        "schema",
+        "code",
+        "stage",
+        "severity",
+        "message"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "const": "dpone.error.v1"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^DPONE_[A-Z0-9_]+$"
+        },
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixes": {
+          "type": "array"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "planned"
+          },
+          "mode": {
+            "const": "full_scan"
+          }
+        },
+        "required": [
+          "status",
+          "mode"
+        ]
+      },
+      "then": {
+        "required": [
+          "estimated_read_bytes"
+        ],
+        "properties": {
+          "estimated_read_bytes": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  ]
+}

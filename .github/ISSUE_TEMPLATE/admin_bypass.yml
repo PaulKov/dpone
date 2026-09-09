@@ -1,0 +1,72 @@
+name: Admin bypass / break-glass
+description: Record an emergency ruleset or branch-protection bypass.
+title: "break-glass: "
+labels: [governance, security]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this only when normal PR review or required checks cannot complete and delaying the change would create higher production or release risk. Do not include secrets, credentials, or private incident data.
+  - type: input
+    id: owner
+    attributes:
+      label: Responsible owner
+      description: GitHub handle of the maintainer accountable for the bypass and follow-up.
+      placeholder: "@maintainer"
+    validations:
+      required: true
+  - type: input
+    id: affected_ref
+    attributes:
+      label: Affected PR, commit, or tag
+      description: Link the exact PR, commit SHA, tag, or release workflow run.
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: Why bypass is required
+      description: Explain the blocking rule, why the normal path cannot finish in time, and what risk is avoided.
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Available evidence
+      description: List completed local, CI, security, release, or manual checks with links where possible.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: residual_risk
+    attributes:
+      label: Residual risk
+      description: What remains unreviewed, untested, or time-boxed after the bypass?
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: rollback_plan
+    attributes:
+      label: Rollback plan
+      description: Exact revert, hotfix, disablement, or recovery action if the bypassed change fails.
+      render: markdown
+    validations:
+      required: true
+  - type: input
+    id: follow_up_review
+    attributes:
+      label: Follow-up review deadline
+      description: ISO-8601 date/time when owner review and any missing evidence must be completed.
+      placeholder: "2026-07-12T12:00:00Z"
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgement
+    attributes:
+      label: Break-glass acknowledgement
+      options:
+        - label: This bypass is exceptional, recorded, and tied to a follow-up owner.
+          required: true
+        - label: I will link this issue from the PR, release, or incident evidence.
+          required: true

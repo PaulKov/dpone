@@ -1,0 +1,127 @@
+schema_version: 1
+task_id: "DPONE-BCP-CHUNK-LIMITS"
+title: "Enforce BCP physical chunk limits and expose the FIFO read buffer"
+goal: "Restore physical max-byte enforcement and replace the misleading streaming chunk option with a compatible bounded read-buffer policy."
+specification: "docs/superpowers/specs/2026-07-14-bcp-chunk-limits-and-stream-buffer-contract.md"
+base_commit: "1d434eb26d5f20a92ec145b0c608b44d00040505"
+integrator: "Codex primary integrator"
+
+acceptance_criteria:
+  - "Every emitted physical chunk is at most max_chunk_bytes and complete rows are never split."
+  - "A row larger than max_chunk_bytes fails with safe typed metadata and leaves no FIFO or partial chunk."
+  - "Streaming FIFO reads use validated read_buffer_bytes in the 64KiB..16MiB range."
+  - "The legacy streaming target_chunk_bytes key is accepted for one release, warns, and keeps the 4MiB effective buffer."
+  - "Evidence never serializes loader exception bodies or row data, and cleanup deletes only artifact-owned chunk paths."
+  - "Schema and runtime enforce the same read-buffer string grammar and bounds, and one route emits one deprecation warning."
+  - "BCP abort joins output drainers even when kill/reap times out, and ambiguous decoded-table creation is cleaned by planned identity."
+  - "Iterator cancellation propagates a safe cleanup failure, while loader failures remain primary and receive redacted cleanup context."
+  - "Output-drainer timeout is detected explicitly instead of returning while reader threads remain alive."
+  - "FIFO reads cannot wait forever after an early BCP exit, malformed legacy-only input fails, and fractional numeric buffers are rejected."
+  - "Raw and decoded ClickHouse staging identities are known before DDL and remain cleanable after ambiguous create timeouts."
+  - "Evidence whitelists base exception fields, and physical plus legacy byte-size parsers reject schema-invalid or non-positive inputs."
+  - "Both manifest schemas, repository examples, tests, documentation, and changelog expose the canonical contract."
+
+public_contract_impact:
+  level: deprecation
+  surfaces:
+    - "manifest schemas"
+    - "runtime policy Python API"
+    - "physical chunk failure contract"
+    - "runtime decision evidence"
+    - "documentation and executable examples"
+  migration_required: true
+
+owned_paths:
+  - docs/superpowers/specs/2026-07-14-bcp-chunk-limits-and-stream-buffer-contract.md
+  - test_artifacts/agent-policy/bcp-chunk-limits-task-contract.yml
+  - test_artifacts/agent-policy/bcp-chunk-limits-validation.md
+  - src/dpone/runtime/physical_chunking.py
+  - src/dpone/runtime/physical_chunk_policy.py
+  - src/dpone/runtime/source_scan.py
+  - src/dpone/runtime/connectors/mssql_bulk.py
+  - src/dpone/runtime/connectors/mssql_bcp_process.py
+  - src/dpone/runtime/process_io.py
+  - src/dpone/runtime/streaming_transfer.py
+  - src/dpone/runtime/byte_stream_artifacts.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_pipe_stream.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_queryout_bcp.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_single_scan_chunks.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_streaming_artifacts.py
+  - src/dpone/runtime/sinks/clickhouse_staged_load.py
+  - src/dpone/runtime/sinks/clickhouse_staging_decoder.py
+  - src/dpone/runtime/sinks/clickhouse_sink.py
+  - src/dpone/schema/etl-batch-manifest.schema.json
+  - src/dpone/schema/etl-config.schema.json
+  - tests/test_physical_chunking.py
+  - tests/test_physical_chunk_limits.py
+  - tests/test_physical_chunk_evidence.py
+  - tests/test_physical_chunk_lifecycle.py
+  - tests/test_clickhouse_staging_lifecycle.py
+  - tests/test_streaming_transfer.py
+  - tests/test_mssql_pipe_streaming.py
+  - tests/test_mssql_bcp_process.py
+  - tests/test_mssql_clickhouse_type_fidelity.py
+  - tests/integration/mssql/test_mssql_clickhouse_pipe_streaming_integration.py
+  - docs/mssql.md
+  - docs/performance.md
+  - docs/native-transfer-industrial-runtime.md
+  - docs/reference/configuration.md
+  - docs/compatibility.md
+  - docs/runtime-decision-audit.md
+  - docs/source-sink/mssql-to-clickhouse.md
+  - docs/clickhouse.md
+  - docs/migration/config-aliases.md
+read_only_paths:
+  - docs/architecture.md
+  - docs/import-rules.md
+  - docs/engineering-standards.md
+  - docs/testing
+  - docs/benchmarks/quality_budgets.yml
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "Codex primary integrator"
+
+dependencies:
+  - "CHANGELOG.md is a protected shared file and is integrated by shared_file_owner after path-scoped implementation."
+required_checks:
+  focused:
+    - "uv run pytest tests/test_physical_chunking.py tests/test_physical_chunk_limits.py tests/test_physical_chunk_evidence.py tests/test_physical_chunk_lifecycle.py tests/test_clickhouse_staging_lifecycle.py tests/test_streaming_transfer.py tests/test_mssql_pipe_streaming.py tests/test_mssql_bcp_process.py tests/test_mssql_clickhouse_type_fidelity.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "uv run pytest tests/integration/mssql/test_mssql_clickhouse_pipe_streaming_integration.py -m 'integration_mssql and integration_clickhouse' -q"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

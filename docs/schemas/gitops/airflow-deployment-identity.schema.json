@@ -1,0 +1,31 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-deployment-identity.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "activation_id": {
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.airflow-deployment-identity.v1"
+    }
+  },
+  "required": [
+    "schema",
+    "release_id",
+    "deployment_id",
+    "activation_id"
+  ],
+  "title": "dpone GitOps exact Airflow cache activation identity",
+  "type": "object"
+}

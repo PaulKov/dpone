@@ -1,0 +1,41 @@
+promote_dev_snapshot_to_argocd_mr:
+  extends:
+    - .uv_dev_job_template
+    - .rules_develop_or_mr_manual
+  stage: promote
+  needs:
+    - job: publish_dev_snapshot
+      artifacts: true
+    - job: snapshot_install_smoke
+    - job: snapshot_runtime_install_smoke
+  script:
+    - |
+      set -euo pipefail
+      test -n "${DPONE_PACKAGE_SPEC:-}"
+      test -n "${ARGOCD_MAIN_REPO_URL:-}"
+      test -n "${ARGOCD_MAIN_PROJECT_ID:-}"
+      test -n "${ARGOCD_MAIN_PUSH_USER:-}"
+      test -n "${ARGOCD_MAIN_PUSH_TOKEN:-}"
+
+      uv run python tools/promote_snapshot_to_argocd_mr.py         --snapshot-env snapshot.env         --repo-url "$ARGOCD_MAIN_REPO_URL"         --project-id "$ARGOCD_MAIN_PROJECT_ID"         --target-branch "${ARGOCD_MAIN_DEFAULT_BRANCH:-master}"         --snapshot-file "${ARGOCD_MAIN_SNAPSHOT_FILE:-.helm/overrides/airflow-dev-dpone-snapshot.yaml}"         --push-user "$ARGOCD_MAIN_PUSH_USER"         --push-token "$ARGOCD_MAIN_PUSH_TOKEN"         --api-url "${ARGOCD_MAIN_GITLAB_API_V4_URL:-$CI_API_V4_URL}"         --git-author-name "${ARGOCD_MAIN_GIT_AUTHOR_NAME:-dpone-ci-bot}"         --git-author-email "${ARGOCD_MAIN_GIT_AUTHOR_EMAIL:-dpone-ci-bot@local}"         --mr-label dpone --mr-label snapshot --mr-label airflow-dev         --format json > promote_argocd_result.json
+
+      python - <<'PYTHON'
+      import json
+      from pathlib import Path
+
+      payload = json.loads(Path("promote_argocd_result.json").read_text(encoding="utf-8"))
+      lines = [
+          f"ARGOCD_PROMOTE_BRANCH={payload['branch_name']}",
+          f"ARGOCD_PROMOTE_PACKAGE_SPEC={payload['package_spec']}",
+      ]
+      if payload.get("mr_url"):
+          lines.append(f"ARGOCD_PROMOTE_MR_URL={payload['mr_url']}")
+      Path("promote_argocd.env").write_text("\n".join(lines) + "\n", encoding="utf-8")
+      PYTHON
+  artifacts:
+    paths:
+      - promote_argocd_result.json
+      - promote_argocd.env
+    reports:
+      dotenv: promote_argocd.env
+    expire_in: 1 week

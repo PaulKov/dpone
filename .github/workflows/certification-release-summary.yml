@@ -1,0 +1,117 @@
+name: Certification release summary
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Release or promotion identifier.
+        required: true
+        type: string
+      replay_run_id:
+        description: GitHub Actions run ID that published replay-evidence-chain.
+        required: true
+        type: string
+      matrix_run_id:
+        description: GitHub Actions run ID that published source-sink certification artifacts.
+        required: true
+        type: string
+      connector_run_id:
+        description: GitHub Actions run ID that published connector certification artifacts.
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  release-summary-report:
+    name: Build certification release summary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Download replay evidence chain
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.replay_run_id }}" \
+            --name replay-evidence-chain \
+            --dir test_artifacts/certification-release-summary/replay-chain
+
+      - name: Download source sink certification suite
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.matrix_run_id }}" \
+            --name source-sink-certification-suite \
+            --dir test_artifacts/certification-release-summary/matrix-suite
+
+      - name: Download source sink evidence chain
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.matrix_run_id }}" \
+            --name source-sink-evidence-chain \
+            --dir test_artifacts/certification-release-summary/matrix-chain
+
+      - name: Download connector certification suite
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.connector_run_id }}" \
+            --name connector-certification-suite \
+            --dir test_artifacts/certification-release-summary/connector-suite
+
+      - name: Download connector evidence chain
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.connector_run_id }}" \
+            --name connector-evidence-chain \
+            --dir test_artifacts/certification-release-summary/connector-chain
+
+      - name: Build release summary
+        run: |
+          REPLAY_CHAIN_INDEX="$(find test_artifacts/certification-release-summary/replay-chain -name evidence_chain_index.json -print -quit)"
+          MATRIX_SUITE="$(find test_artifacts/certification-release-summary/matrix-suite -name certification_suite.json -print -quit)"
+          MATRIX_CHAIN_INDEX="$(find test_artifacts/certification-release-summary/matrix-chain -name evidence_chain_index.json -print -quit)"
+          CONNECTOR_SUITE="$(find test_artifacts/certification-release-summary/connector-suite -name certification_suite.json -print -quit)"
+          CONNECTOR_CHAIN_INDEX="$(find test_artifacts/certification-release-summary/connector-chain -name evidence_chain_index.json -print -quit)"
+
+          for required_path in "$REPLAY_CHAIN_INDEX" "$MATRIX_SUITE" "$MATRIX_CHAIN_INDEX" "$CONNECTOR_SUITE" "$CONNECTOR_CHAIN_INDEX"; do
+            if [ -z "$required_path" ]; then
+              echo "Missing required certification artifact"
+              exit 1
+            fi
+          done
+
+          uv run dpone ops release-summary \
+            --output-dir test_artifacts/certification/release-summary \
+            --release-id "${{ inputs.release_id }}" \
+            --replay-chain-dir "$(dirname "$REPLAY_CHAIN_INDEX")" \
+            --matrix-suite "$MATRIX_SUITE" \
+            --matrix-chain-dir "$(dirname "$MATRIX_CHAIN_INDEX")" \
+            --connector-suite "$CONNECTOR_SUITE" \
+            --connector-chain-dir "$(dirname "$CONNECTOR_CHAIN_INDEX")" \
+            --format json
+
+      - name: Upload certification release summary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: certification-release-summary
+          path: test_artifacts/certification/release-summary

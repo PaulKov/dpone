@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-version.schema.json",
+  "title": "dpone schema contract version",
+  "type": "object",
+  "required": ["schema_version", "contract_id", "version", "contract_version_id", "contract_fingerprint", "columns"],
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_version.v1"},
+    "contract_id": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "owner": {"type": "string"},
+    "status": {"type": "string"},
+    "compatibility": {"type": "string", "enum": ["backward", "forward", "full", "none"]},
+    "enforcement": {"type": "string"},
+    "target": {"type": "object"},
+    "columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string"},
+          "identity_id": {"type": ["string", "null"]},
+          "logical_type": {"type": "string"},
+          "nullable": {"type": "boolean"},
+          "aliases": {"type": "array"},
+          "deprecated": {"type": "boolean"},
+          "remove_after": {"type": ["string", "null"]}
+        },
+        "additionalProperties": true
+      }
+    },
+    "registry": {"type": "object"},
+    "versioning": {"type": "object"},
+    "consumers": {"type": "array"},
+    "contract_fingerprint": {"type": "string", "pattern": "^sha256:"},
+    "contract_version_id": {"type": "string", "pattern": "^sha256:"}
+  },
+  "additionalProperties": true
+}

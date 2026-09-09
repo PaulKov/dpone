@@ -1,0 +1,85 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-dev-evidence-provenance.v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "campaign_controller_repository": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+      "type": "string"
+    },
+    "campaign_controller_workflow": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+      "type": "string"
+    },
+    "campaign_request_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "campaign_source_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "evidence_set_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "finalizer_repository": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+      "type": "string"
+    },
+    "finalizer_source_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "finalizer_workflow": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+      "type": "string"
+    },
+    "orchestration_run_attempt": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "orchestration_run_id": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.dbt-dev-evidence-provenance.v2"
+    }
+  },
+  "required": [
+    "schema",
+    "release_id",
+    "deployment_id",
+    "evidence_set_id",
+    "campaign_request_sha256",
+    "campaign_controller_repository",
+    "campaign_controller_workflow",
+    "campaign_source_commit",
+    "orchestration_run_id",
+    "orchestration_run_attempt",
+    "finalizer_repository",
+    "finalizer_workflow",
+    "finalizer_source_commit"
+  ],
+  "type": "object"
+}

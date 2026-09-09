@@ -1,0 +1,112 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-P4-ROUTE-MATRIX"
+title: "Publish the six-dimensional route certification matrix"
+goal: "Project explicit route candidates and immutable evidence into one fail-closed public matrix."
+specification: "docs/feature-design-route-certification-matrix-v1.md"
+base_commit: "17e61ed053c9853b8aec9ac5fe936c3bba46bb50"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Every row identifies source, sink, strategy, transport, schema evolution, and Airflow/runtime mode."
+  - "Mock, missing, stale, unsigned, or mismatched evidence never produces a production claim."
+  - "The JSON artifact validates against dpone.route-certification-matrix.v1."
+  - "CLI and Python API publish deterministic JSON and Markdown with actionable blockers."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone certify routes"
+    - "dpone.route-certification-matrix.v1"
+    - "additive dpone.route-matrix-claim.v1 in route certification bundles"
+    - "route certification documentation"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/ops/route_certification_matrix*.py"
+  - "src/dpone/ops/route_certify.py"
+  - "src/dpone/ops/routes/certify_models.py"
+  - "src/dpone/commands/certify_cmd.py"
+  - "src/dpone/commands/ops_parsers_routes_certification.py"
+  - "src/dpone/services/ops/facades.py"
+  - "src/dpone/services/ops/command_handlers_routes_certification.py"
+  - "src/dpone/gitops/schema_contracts.py"
+  - "src/dpone/gitops/schema_route_certification_matrix_contracts.py"
+  - "docs/schemas/gitops/route-certification-matrix.schema.json"
+  - "docs/schemas/gitops/route-matrix-claim.schema.json"
+  - "docs/feature-design-route-certification-matrix-v1.md"
+  - "docs/route-certification-matrix.md"
+  - "docs/route-certify.md"
+  - "docs/architecture.md"
+  - "docs/reference/gitops-schema-catalog.md"
+  - "docs/cli-reference.md"
+  - "docs/source-sink-matrix.md"
+  - "docs/connector-certification.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "tests/test_route_certification_matrix.py"
+  - "tests/test_route_certify.py"
+  - "tests/test_cli_route_certify_command.py"
+  - "tests/test_gitops_schema_contracts.py"
+  - "tests/test_docs_language_contracts.py"
+  - "test_artifacts/route-certification-matrix-v1/**"
+  - "test_artifacts/agent-policy/route-certification-matrix-v1.yml"
+
+read_only_paths:
+  - "src/dpone/services/sample_route_certifications.py"
+  - "src/dpone/contracts/route_attestation.py"
+  - "src/dpone/contracts/airflow_deployment.py"
+
+forbidden_paths:
+  - "src/dpone/runtime/**"
+  - "src/dpone/adapters/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+
+shared_file_owner: "Codex"
+
+dependencies:
+  - "existing six-dimensional safe-sample route catalog"
+  - "existing route certification bundles and route attestation verification"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_route_certification_matrix.py tests/test_gitops_schema_contracts.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "two approved independent production route proof sets"
+
+required_outputs:
+  - implementation
+  - tests
+  - schema
+  - documentation_impact
+  - validation_report
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Another writer owns the same semantic contract."
+  - "A status promotion would rely on mocked or unavailable live evidence."
+  - "A live check requires unapproved credentials or environment."

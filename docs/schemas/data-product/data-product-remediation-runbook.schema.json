@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-remediation-runbook.schema.json",
+  "title": "dpone data product remediation runbook",
+  "type": "object",
+  "required": ["schema_version", "status", "remediation_runbook_id"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_remediation_runbook.v1"},
+    "status": {"type": "string"},
+    "remediation_runbook_id": {"type": "string"},
+    "remediation_plan_id": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "actions": {"type": "array"},
+    "markdown": {"type": "string"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,116 @@
+schema_version: 1
+task_id: "work-item-runtime"
+title: "PostgreSQL XMin key reconciliation and atomic MSSQL finalizer"
+goal: "Implement the approved runtime contracts and focused regression tests without editing shared schemas or release files."
+specification: "docs/feature-design-postgres-xmin-key-reconciliation-mssql-v1.md"
+base_commit: "0aacebbbf"
+integrator: "/root"
+
+acceptance_criteria:
+  - "XMin extraction can return a bounded delta and complete-key artifact from one snapshot envelope."
+  - "MSSQL finalization supports timestamp_only, timestamp_and_flag, and flag_only with exact lifecycle metrics."
+  - "Target mutation, CAS checkpoint, and commit receipt can share one MSSQL transaction."
+  - "Focused tests prove no-op, delete, repeated delete, reactivation, rollback, and state identity behavior."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "runtime source extraction contracts"
+    - "MSSQL staged-load and state ports"
+    - "technical columns"
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/contracts/__init__.py"
+  - "src/dpone/contracts/incremental_snapshot.py"
+  - "src/dpone/contracts/soft_delete.py"
+  - "src/dpone/contracts/technical_columns.py"
+  - "src/dpone/ports/source_state_storage.py"
+  - "src/dpone/runtime/sources/postgres.py"
+  - "src/dpone/runtime/sources/strategies/postgres/**"
+  - "src/dpone/runtime/sinks/mssql.py"
+  - "src/dpone/runtime/sinks/staging_managers/mssql.py"
+  - "src/dpone/runtime/sinks/strategies/mssql/**"
+  - "src/dpone/runtime/state/mssql.py"
+  - "src/dpone/runtime/state/mssql_transactional.py"
+  - "src/dpone/runtime/state/mssql_operational.py"
+  - "src/dpone/runtime/state/mssql_contract.py"
+  - "src/dpone/runtime/state/models.py"
+  - "src/dpone/runtime/state/xmin_storage.py"
+  - "src/dpone/runtime/etl/source_state.py"
+  - "src/dpone/runtime/sources/extract_result.py"
+  - "src/dpone/runtime/sinks/load_result.py"
+  - "tests/test_postgres_xmin_key_reconciliation.py"
+  - "tests/test_mssql_snapshot_reconciliation.py"
+  - "tests/test_mssql_state_location_contract.py"
+  - "tests/test_postgres_xmin_strategy_selection.py"
+  - "tests/test_runtime_postgres_strategy_split.py"
+
+integrator_owned_paths:
+  - "src/dpone/schema/**"
+  - "src/dpone/config/**"
+  - "src/dpone/dag/**"
+  - "src/dpone/manifest/**"
+  - "src/dpone/runtime/bootstrap_state.py"
+  - "src/dpone/runtime/state/factory.py"
+  - "src/dpone/runtime/credentials/**"
+  - "docs/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+
+read_only_paths:
+  - "src/dpone/runtime/connectors/**"
+  - "src/dpone/runtime/lineage/**"
+  - "tests/integration/postgres/**"
+
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/schema"
+  - "src/dpone/config"
+  - "src/dpone/dag"
+  - "src/dpone/manifest"
+  - "src/dpone/runtime/bootstrap_state.py"
+  - "src/dpone/runtime/state/factory.py"
+  - "src/dpone/runtime/credentials"
+  - "docs"
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "Approved feature specification"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_postgres_xmin_key_reconciliation.py tests/test_mssql_snapshot_reconciliation.py tests/test_mssql_state_location_contract.py -q"
+  broad:
+    - "uv run ruff check changed paths"
+    - "uv run mypy --config-file mypy.ini changed modules"
+  live:
+    - "UNVERIFIED until integrator runs approved vendor-live profile"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

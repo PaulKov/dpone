@@ -1,0 +1,27 @@
+# Dev overlay: snapshot install without rebuilding the Airflow image.
+
+dpone:
+  installMode: snapshot
+  packageSpec: dpone[gcp]==1.4.3.dev8123  # replace with published snapshot version
+  packageIndexUrlSecretRef: dpone-package-registry
+  packageTarget: /opt/airflow/.dpone-pkgs
+
+airflow:
+  extraEnv:
+    - name: DPONE_INSTALL_MODE
+      value: snapshot
+    - name: DPONE_PACKAGE_SPEC
+      value: dpone[gcp]==1.4.3.dev8123  # replace with published snapshot version
+    - name: DPONE_PACKAGE_INDEX_URL
+      valueFrom:
+        secretKeyRef:
+          name: dpone-package-registry
+          key: index_url
+    - name: DPONE_PACKAGE_EXTRA_INDEX_URL
+      value: https://pypi.org/simple
+    - name: ENV_CODE
+      value: dev
+    - name: DPONE_PROJECT_DIR
+      value: /opt/airflow/dags/repo
+    - name: DPONE_PACKAGE_TARGET
+      value: /opt/airflow/.dpone-pkgs

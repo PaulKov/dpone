@@ -1,0 +1,73 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-CACHE-07332-B"
+title: "Bounded artifact reads, redacted evidence, and strict CLI"
+goal: "Prevent pre-limit OOM, credential-bearing URI evidence, and CLI removal of hard cache bounds."
+specification: "docs/feature-design-airflow-legacy-pack-cache-hardening-v07332.md"
+base_commit: "b58295232540ddc869a6af1310770e2f9ba9c722"
+integrator: "Codex parent integrator"
+
+acceptance_criteria:
+  - "Artifact readers enforce a caller-provided maximum before or during bounded streaming reads."
+  - "S3 and local readers never materialize more than max_bytes plus one sentinel byte."
+  - "Evidence redacts URI userinfo and sensitive query parameters in stdout, files, and Airflow metadata payloads."
+  - "Empty CLI byte limits fail before cache-root mutation; Python API null remains explicit and supported."
+  - "CLI help describes roots, units, defaults, output, and failure semantics."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - CLI
+    - Python-API
+    - artifacts-evidence
+  migration_required: false
+
+owned_paths:
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/artifact_store.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_sync_evidence.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cli_sync.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cli_cache_status.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/artifact_uri_redaction.py
+  - tests/test_airflow_cache_bounded_io_cli.py
+read_only_paths:
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_sync.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/airflow_metadata.py
+  - docs/airflow-legacy-pack-cache-operations.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_sync.py
+
+shared_file_owner: "Codex parent integrator"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_cache_bounded_io_cli.py -q"
+  broad:
+    - "uv run ruff check <owned Python paths>"
+    - "uv run ruff format --check <owned Python paths>"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,55 @@
+schema_version: 1
+task_id: "DPONE-V07332-DURABLE-PUBLISHER"
+title: "Provide an exact-byte durable runtime Pod evidence adapter"
+goal: "Expose a connector-neutral DI boundary that reports durable_acknowledged only after a matching sink ACK."
+specification: "docs/feature-design-airflow-runtime-pod-retention-control-v0732.md"
+base_commit: "5a48134b29961d7299dbbb50e09e88da2880971d"
+integrator: "primary Codex agent"
+
+acceptance_criteria:
+  - "The adapter verifies operation, sequence, and canonical event digest."
+  - "Sink failures and mismatched acknowledgements become redacted evidence errors."
+  - "No vendor SDK is imported by the contract, port, or adapter."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["runtime Pod retention Python embedding API"]
+  migration_required: false
+
+owned_paths:
+  - src/dpone/contracts/airflow_runtime_pod_retention_ack.py
+  - src/dpone/ports/airflow_runtime_pod_retention.py
+  - src/dpone/adapters/airflow_runtime_pod_retention_durable.py
+  - tests/test_airflow_runtime_pod_retention_durable_publisher.py
+  - docs/airflow-runtime-pod-retention-python-api.md
+  - docs/airflow-runtime-pod-retention-operations.md
+  - docs/adr/0042-airflow-runtime-pod-retention-evidence.md
+read_only_paths:
+  - src/dpone/services/airflow_runtime_pod_retention.py
+  - src/dpone/services/airflow_runtime_pod_retention_evidence.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "primary Codex agent"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_runtime_pod_retention_durable_publisher.py -q"
+  broad:
+    - "uv run ruff check owned paths"
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-docs"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

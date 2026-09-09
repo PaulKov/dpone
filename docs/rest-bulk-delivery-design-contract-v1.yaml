@@ -1,0 +1,703 @@
+schema: dpone.rest-bulk-delivery-design.v1
+version: 1
+status: RESEARCHED
+implementation_gate: BLOCKED_UNTIL_ADR_AND_SECURITY_APPROVAL
+schema_document: docs/schema/rest-bulk-delivery-design-contract-v1.schema.json
+
+namespaces:
+  operation_namespace:
+    encoding: canonical_typed_length_delimited_v1
+    digest: sha256
+    fields:
+      - platform_instance_id
+      - tenant_id
+      - environment_id
+      - namespace_revision
+  unique_admission_key:
+    - operation_namespace
+    - delivery_key
+
+identities:
+  delivery_key:
+    fields:
+      - logical_route_id
+      - target_effect_scope
+      - source_boundary
+      - mutation_kind
+      - explicit_generation
+  receiver_mutation_key:
+    fields:
+      - operation_namespace
+      - delivery_key
+  receiver_binding_semantics_digest:
+    fields:
+      - authority_origin
+      - remote_principal_id
+      - remote_account_id
+      - remote_resource_namespace
+      - authentication_semantics
+      - tls_policy_identity
+      - network_policy_identity
+  mutation_intent_digest:
+    fields:
+      - receiver_binding_semantics_digest
+      - operation_semantics_digest
+      - rendered_request_semantics_digest
+  operation_semantics_digest:
+    fields:
+      - method_semantics
+      - authority_relative_path_semantics
+      - normalized_query_semantics
+      - non_secret_header_semantics
+      - canonical_body_envelope_semantics
+      - acknowledgement_contract
+      - mutation_fence_contract
+      - verification_contract
+  rendered_request_semantics_digest:
+    fields:
+      - method
+      - normalized_rendered_path
+      - normalized_rendered_query
+      - all_non_secret_semantic_headers
+      - ordered_scalar_multipart_parts
+      - file_part_name
+      - deterministic_filename
+      - content_disposition
+      - content_type
+      - deterministic_boundary
+      - sealed_payload_digest
+  execution_policy_digest:
+    fields:
+      - retry_policy
+      - timeout_policy
+      - rate_limit_policy
+      - concurrency_policy
+      - retention_policy
+      - observability_policy
+  profile_contract_digest:
+    fields:
+      - operation_semantics_digest
+      - execution_policy_digest
+      - profile_schema_id
+      - profile_version
+  parent_plan_digest:
+    fields:
+      - frozen_parent_digest
+      - compiled_plan_digest
+      - profile_contract_digest
+      - planner_algorithm_version
+      - ordered_child_descriptors
+      - complete_coverage_proof
+
+receiver_binding:
+  stable_non_secret_identity_fields:
+    - authority_origin
+    - remote_principal_id
+    - remote_account_id
+    - remote_resource_namespace
+    - authentication_semantics
+    - tls_policy_identity
+    - network_policy_identity
+  certification:
+    source: connection_handshake
+    secret_rotation_changes_identity: false
+    principal_swap_changes_identity: true
+    remote_identity:
+      allowed_assurance_modes:
+        - receiver_attested
+        - platform_attested
+      required_fields:
+        - mode
+        - principal_id
+        - account_id
+        - evidence_ref
+        - verified_at
+        - valid_until
+      platform_attested_requires:
+        - dual_approval
+        - periodic_recertification
+        - immutable_evidence
+
+authentication:
+  supported:
+    - bearer
+    - api_key_header
+    - http_basic
+    - oauth2_client_credentials
+    - mtls
+  api_key_query:
+    production_default: FORBIDDEN
+    exception_requires:
+      - immutable_profile_exception
+      - security_approval
+      - end_to_end_url_redaction
+      - log_trace_exception_waf_receiver_review
+
+generation_fence:
+  value:
+    ordered_fields:
+      - scheduled_interval_end_utc
+      - explicit_correction_revision
+    correction_revision_type: non_negative_integer
+  effect_conflict_domain_fields:
+    - remote_principal_id
+    - remote_account_id
+    - remote_resource_namespace
+    - receiver_resource_id
+    - effect_conflict_group
+  mutation_policies:
+    incremental_append:
+      scope_conflict_mode: exact
+      correction_revision_allowed: false
+      already_applied_action: block
+      already_applied_error: REST_DELIVERY_APPEND_SCOPE_ALREADY_APPLIED
+      exception_requires:
+        - certified_receiver_deduplication_or_upsert
+        - natural_idempotent_key_or_replacement_semantics
+        - explicit_compensating_correction_contract
+    partition_replace:
+      scope_conflict_mode: overlap
+      correction_revision_allowed: true
+      already_applied_action: compare_generation
+  linearization:
+    authority: postgresql
+    isolation_level: read_committed_with_explicit_domain_lock
+    domain_lock:
+      table: rest_delivery_effect_domain_lock
+      key_fields:
+        - effect_conflict_domain
+      acquisition: insert_on_conflict_then_select_for_update
+      lock_order: canonical_effect_conflict_domain_order
+    scope_range:
+      canonical_form: half_open
+      postgres_types:
+        date: daterange
+        timestamp: tstzrange
+      overlap_operator: "&&"
+      index: gist
+    admission_transaction_steps:
+      - acquire_or_create_domain_lock_row
+      - select_domain_lock_for_update
+      - query_overlapping_operations_and_interval_watermarks
+      - reject_stale_or_unresolved_overlap
+      - insert_generation_admission
+      - commit_before_submit
+    watermark:
+      representation: normalized_non_overlapping_interval_map
+      fields:
+        - effect_conflict_domain
+        - conflict_scope_range
+        - highest_applied_generation
+      update: split_merge_under_domain_lock_in_effect_commit
+  admission_rules:
+    - lower_overlapping_generation_cannot_enter_submitting_after_higher_admission
+    - higher_generation_cannot_submit_while_lower_overlap_is_effect_unresolved
+    - fully_applied_generation_permanently_stales_every_lower_overlap
+  unresolved_effect_states:
+    - SUBMITTING
+    - ACCEPTED
+    - RUNNING
+    - UNDETERMINED
+    - UNKNOWN
+    - PARTIALLY_APPLIED
+  errors:
+    stale: REST_DELIVERY_STALE_GENERATION
+    overlap_in_flight: REST_DELIVERY_OVERLAPPING_EFFECT_IN_FLIGHT
+    append_scope_already_applied: REST_DELIVERY_APPEND_SCOPE_ALREADY_APPLIED
+
+parent_plan:
+  states:
+    - PLANNING
+    - ADMITTED
+  admission_transaction_contains:
+    - parent_operation
+    - immutable_parent_plan
+    - every_child_ordinal
+    - every_child_scope
+    - every_child_delivery_key
+    - every_child_payload_ref_and_digest
+    - coverage_proof
+    - generation
+    - frontier_order
+  barriers:
+    - materialize_immutable_parent_before_planning
+    - verify_parent_completeness_and_digest_before_snapshot_close
+    - close_source_snapshot_after_parent_materialization
+    - seal_every_child_before_parent_admission
+    - admit_complete_parent_plan_before_first_child_submitting
+    - existing_parent_operation_never_replans
+
+journal:
+  production_adapter: postgresql_15_plus
+  mutation_admission_rpo: zero
+  submit_attempt_rpo: zero
+  critical_transition_commit_policy: synchronous_remote_apply_quorum
+  immutable_pre_attempt_marker:
+    kind: MAY_ATTEMPT
+    create_if_absent_key:
+      - operation_namespace
+      - operation_id
+      - attempt_ordinal
+    fields:
+      - attempt_id
+      - attempt_ordinal
+      - operation_id
+      - operation_namespace
+      - parent_and_child_identity
+      - generation
+      - expected_journal_revision
+      - journal_epoch
+      - mutation_intent_digest
+      - created_at
+  remote_job_semaphore:
+    authority: same_postgresql_control_plane
+    reservation_scope: certified_remote_principal_and_operation_profile
+    atomic_submit_transaction_contains:
+      - capacity_reservation
+      - attempt_scoped_may_attempt_binding
+      - attempt_row
+      - operation_cas_to_submitting
+    release_policy:
+      accepted_or_running: terminal_observation
+      unknown_or_partial: reconciliation_or_audited_incident_capacity_transfer
+      request_not_started: durable_retry_wait_or_terminal_transition
+    orphan_recovery: journal_reconciliation_by_attempt_id
+  mutation_gate:
+    default: ENABLED
+    blocked_after:
+      - restore_without_proven_zero_rpo
+      - failover_without_proven_zero_rpo
+      - journal_epoch_mismatch
+      - pre_attempt_marker_without_matching_journal_attempt
+    unblock_requires:
+      - reconciliation_campaign
+      - security_or_platform_approval
+      - new_journal_epoch_attestation
+
+effect_authority_retention:
+  append: until_route_decommission_or_audited_namespace_reset
+  partition_replace: permanent_highest_applied_generation_per_conflict_scope
+  unknown_or_partial: until_explicit_reconciliation_then_governed_retention
+  large_payload: independently_collectable_after_effect_safe_horizon
+  reset: audited_operator_only
+
+state_machine:
+  axes:
+    execution:
+      - PLANNED
+      - SEALED
+      - SUBMITTING
+      - RETRY_WAIT
+      - ACCEPTED
+      - WAITING
+      - VERIFYING
+      - FINALIZED
+    remote_effect:
+      - NONE_PROVEN
+      - UNDETERMINED
+      - FULLY_APPLIED
+      - PARTIALLY_APPLIED
+      - UNKNOWN
+    acknowledgement:
+      - NOT_ACCEPTED
+      - ACCEPTED
+      - RUNNING
+      - SUCCEEDED
+      - FAILED
+      - CANCELLED
+      - EXPIRED
+      - PROTOCOL_UNKNOWN
+    verification:
+      - NOT_RUN
+      - PASSED
+      - FAILED
+      - NOT_PROVABLE
+    checkpoint:
+      - BLOCKED
+      - ELIGIBLE
+      - PROMOTED
+  initial_tuple: planned
+  legal_tuples:
+    planned: [PLANNED, NONE_PROVEN, NOT_ACCEPTED, NOT_RUN, BLOCKED]
+    sealed: [SEALED, NONE_PROVEN, NOT_ACCEPTED, NOT_RUN, BLOCKED]
+    submitting: [SUBMITTING, UNDETERMINED, NOT_ACCEPTED, NOT_RUN, BLOCKED]
+    retry_wait: [RETRY_WAIT, NONE_PROVEN, NOT_ACCEPTED, NOT_RUN, BLOCKED]
+    accepted: [ACCEPTED, UNDETERMINED, ACCEPTED, NOT_RUN, BLOCKED]
+    waiting: [WAITING, UNDETERMINED, RUNNING, NOT_RUN, BLOCKED]
+    verifying_success: [VERIFYING, UNDETERMINED, SUCCEEDED, NOT_RUN, BLOCKED]
+    verifying_failure: [VERIFYING, UNDETERMINED, FAILED, NOT_RUN, BLOCKED]
+    verifying_cancelled: [VERIFYING, UNDETERMINED, CANCELLED, NOT_RUN, BLOCKED]
+    verifying_expired: [VERIFYING, UNDETERMINED, EXPIRED, NOT_RUN, BLOCKED]
+    final_not_started: [FINALIZED, NONE_PROVEN, NOT_ACCEPTED, PASSED, BLOCKED]
+    final_no_effect_accepted_ack: [FINALIZED, NONE_PROVEN, ACCEPTED, PASSED, BLOCKED]
+    final_no_effect_success_ack: [FINALIZED, NONE_PROVEN, SUCCEEDED, PASSED, BLOCKED]
+    final_no_effect_failed_ack: [FINALIZED, NONE_PROVEN, FAILED, PASSED, BLOCKED]
+    final_no_effect_cancelled_ack: [FINALIZED, NONE_PROVEN, CANCELLED, PASSED, BLOCKED]
+    final_no_effect_expired_ack: [FINALIZED, NONE_PROVEN, EXPIRED, PASSED, BLOCKED]
+    final_no_effect_protocol_ack: [FINALIZED, NONE_PROVEN, PROTOCOL_UNKNOWN, PASSED, BLOCKED]
+    final_full_not_accepted_eligible: [FINALIZED, FULLY_APPLIED, NOT_ACCEPTED, PASSED, ELIGIBLE]
+    final_full_not_accepted_promoted: [FINALIZED, FULLY_APPLIED, NOT_ACCEPTED, PASSED, PROMOTED]
+    final_full_accepted_ack_eligible: [FINALIZED, FULLY_APPLIED, ACCEPTED, PASSED, ELIGIBLE]
+    final_full_accepted_ack_promoted: [FINALIZED, FULLY_APPLIED, ACCEPTED, PASSED, PROMOTED]
+    final_full_eligible: [FINALIZED, FULLY_APPLIED, SUCCEEDED, PASSED, ELIGIBLE]
+    final_full_promoted: [FINALIZED, FULLY_APPLIED, SUCCEEDED, PASSED, PROMOTED]
+    final_full_failed_ack_eligible: [FINALIZED, FULLY_APPLIED, FAILED, PASSED, ELIGIBLE]
+    final_full_failed_ack_promoted: [FINALIZED, FULLY_APPLIED, FAILED, PASSED, PROMOTED]
+    final_full_cancelled_ack_eligible: [FINALIZED, FULLY_APPLIED, CANCELLED, PASSED, ELIGIBLE]
+    final_full_cancelled_ack_promoted: [FINALIZED, FULLY_APPLIED, CANCELLED, PASSED, PROMOTED]
+    final_full_expired_ack_eligible: [FINALIZED, FULLY_APPLIED, EXPIRED, PASSED, ELIGIBLE]
+    final_full_expired_ack_promoted: [FINALIZED, FULLY_APPLIED, EXPIRED, PASSED, PROMOTED]
+    final_full_protocol_ack_eligible: [FINALIZED, FULLY_APPLIED, PROTOCOL_UNKNOWN, PASSED, ELIGIBLE]
+    final_full_protocol_ack_promoted: [FINALIZED, FULLY_APPLIED, PROTOCOL_UNKNOWN, PASSED, PROMOTED]
+    final_full_unverified: [FINALIZED, FULLY_APPLIED, SUCCEEDED, FAILED, BLOCKED]
+    final_partial_not_accepted: [FINALIZED, PARTIALLY_APPLIED, NOT_ACCEPTED, FAILED, BLOCKED]
+    final_partial_accepted_ack: [FINALIZED, PARTIALLY_APPLIED, ACCEPTED, FAILED, BLOCKED]
+    final_partial_success_ack: [FINALIZED, PARTIALLY_APPLIED, SUCCEEDED, FAILED, BLOCKED]
+    final_partial_failed_ack: [FINALIZED, PARTIALLY_APPLIED, FAILED, FAILED, BLOCKED]
+    final_partial_cancelled_ack: [FINALIZED, PARTIALLY_APPLIED, CANCELLED, FAILED, BLOCKED]
+    final_partial_expired_ack: [FINALIZED, PARTIALLY_APPLIED, EXPIRED, FAILED, BLOCKED]
+    final_partial_protocol_ack: [FINALIZED, PARTIALLY_APPLIED, PROTOCOL_UNKNOWN, FAILED, BLOCKED]
+    final_unknown_not_accepted: [FINALIZED, UNKNOWN, NOT_ACCEPTED, NOT_PROVABLE, BLOCKED]
+    final_unknown_accepted_ack: [FINALIZED, UNKNOWN, ACCEPTED, NOT_PROVABLE, BLOCKED]
+    final_unknown_success_ack: [FINALIZED, UNKNOWN, SUCCEEDED, NOT_PROVABLE, BLOCKED]
+    final_unknown_failed_ack: [FINALIZED, UNKNOWN, FAILED, NOT_PROVABLE, BLOCKED]
+    final_unknown_cancelled_ack: [FINALIZED, UNKNOWN, CANCELLED, NOT_PROVABLE, BLOCKED]
+    final_unknown_expired_ack: [FINALIZED, UNKNOWN, EXPIRED, NOT_PROVABLE, BLOCKED]
+    final_unknown_protocol_ack: [FINALIZED, UNKNOWN, PROTOCOL_UNKNOWN, NOT_PROVABLE, BLOCKED]
+    reconciling_unknown_not_accepted: [VERIFYING, UNKNOWN, NOT_ACCEPTED, NOT_PROVABLE, BLOCKED]
+    reconciling_unknown_accepted_ack: [VERIFYING, UNKNOWN, ACCEPTED, NOT_PROVABLE, BLOCKED]
+    reconciling_unknown_success_ack: [VERIFYING, UNKNOWN, SUCCEEDED, NOT_PROVABLE, BLOCKED]
+    reconciling_unknown_failed_ack: [VERIFYING, UNKNOWN, FAILED, NOT_PROVABLE, BLOCKED]
+    reconciling_unknown_cancelled_ack: [VERIFYING, UNKNOWN, CANCELLED, NOT_PROVABLE, BLOCKED]
+    reconciling_unknown_expired_ack: [VERIFYING, UNKNOWN, EXPIRED, NOT_PROVABLE, BLOCKED]
+    reconciling_unknown_protocol_ack: [VERIFYING, UNKNOWN, PROTOCOL_UNKNOWN, NOT_PROVABLE, BLOCKED]
+    reconciling_partial_not_accepted: [VERIFYING, PARTIALLY_APPLIED, NOT_ACCEPTED, FAILED, BLOCKED]
+    reconciling_partial_accepted_ack: [VERIFYING, PARTIALLY_APPLIED, ACCEPTED, FAILED, BLOCKED]
+    reconciling_partial_success_ack: [VERIFYING, PARTIALLY_APPLIED, SUCCEEDED, FAILED, BLOCKED]
+    reconciling_partial_failed_ack: [VERIFYING, PARTIALLY_APPLIED, FAILED, FAILED, BLOCKED]
+    reconciling_partial_cancelled_ack: [VERIFYING, PARTIALLY_APPLIED, CANCELLED, FAILED, BLOCKED]
+    reconciling_partial_expired_ack: [VERIFYING, PARTIALLY_APPLIED, EXPIRED, FAILED, BLOCKED]
+    reconciling_partial_protocol_ack: [VERIFYING, PARTIALLY_APPLIED, PROTOCOL_UNKNOWN, FAILED, BLOCKED]
+    reconciling_full_success_ack: [VERIFYING, FULLY_APPLIED, SUCCEEDED, FAILED, BLOCKED]
+  automatic_transitions:
+    - from: planned
+      to: sealed
+      cas: revision
+      guards: [complete_payload_seal]
+      effects: [sealed_payload_digest_persisted]
+    - from: sealed
+      to: submitting
+      cas: revision_and_generation_fence
+      guards: [generation_fence_passed, mutation_gate_enabled, remote_capacity_available]
+      effects: [attempt_ordinal_incremented, attempt_marker_and_capacity_committed]
+    - {from: submitting, to: accepted, cas: revision}
+    - from: submitting
+      to: retry_wait
+      cas: revision_and_transport_proof
+      guards: [transport_proof_request_not_started, retry_budget_remaining]
+      effects: [attempt_outcome_recorded, next_attempt_after_set, capacity_released_or_transferred]
+    - from: retry_wait
+      to: submitting
+      cas: revision_and_due_attempt
+      guards: [next_attempt_after_reached, generation_fence_passed, mutation_gate_enabled, remote_capacity_available]
+      effects: [attempt_ordinal_incremented, attempt_marker_and_capacity_committed]
+    - from: submitting
+      to: final_not_started
+      cas: revision_and_transport_proof
+      guards: [transport_proof_request_not_started, automatic_retry_unavailable_or_abandoned]
+      effects: [attempt_outcome_recorded, capacity_released]
+    - {from: submitting, to: verifying_success, cas: revision}
+    - {from: submitting, to: verifying_failure, cas: revision}
+    - {from: submitting, to: final_unknown_not_accepted, cas: revision_and_attempt_evidence}
+    - {from: accepted, to: waiting, cas: revision}
+    - {from: accepted, to: verifying_success, cas: revision}
+    - {from: accepted, to: verifying_failure, cas: revision}
+    - {from: accepted, to: verifying_cancelled, cas: revision}
+    - {from: accepted, to: verifying_expired, cas: revision}
+    - {from: accepted, to: final_unknown_accepted_ack, cas: revision_and_attempt_evidence}
+    - {from: waiting, to: verifying_success, cas: revision}
+    - {from: waiting, to: verifying_failure, cas: revision}
+    - {from: waiting, to: verifying_cancelled, cas: revision}
+    - {from: waiting, to: verifying_expired, cas: revision}
+    - {from: waiting, to: final_unknown_protocol_ack, cas: revision_and_attempt_evidence}
+    - {from: verifying_success, to: final_full_eligible, cas: revision}
+    - {from: verifying_success, to: final_full_unverified, cas: revision}
+    - {from: verifying_success, to: final_partial_success_ack, cas: revision}
+    - {from: verifying_success, to: final_unknown_success_ack, cas: revision}
+    - {from: verifying_failure, to: final_no_effect_failed_ack, cas: revision}
+    - {from: verifying_failure, to: final_partial_failed_ack, cas: revision}
+    - {from: verifying_failure, to: final_unknown_failed_ack, cas: revision}
+    - {from: verifying_cancelled, to: final_no_effect_cancelled_ack, cas: revision}
+    - {from: verifying_cancelled, to: final_partial_cancelled_ack, cas: revision}
+    - {from: verifying_cancelled, to: final_unknown_cancelled_ack, cas: revision}
+    - {from: verifying_expired, to: final_no_effect_expired_ack, cas: revision}
+    - {from: verifying_expired, to: final_partial_expired_ack, cas: revision}
+    - {from: verifying_expired, to: final_unknown_expired_ack, cas: revision}
+    - {from: final_full_not_accepted_eligible, to: final_full_not_accepted_promoted, cas: revision_and_frontier}
+    - {from: final_full_accepted_ack_eligible, to: final_full_accepted_ack_promoted, cas: revision_and_frontier}
+    - {from: final_full_eligible, to: final_full_promoted, cas: revision_and_frontier}
+    - {from: final_full_failed_ack_eligible, to: final_full_failed_ack_promoted, cas: revision_and_frontier}
+    - {from: final_full_cancelled_ack_eligible, to: final_full_cancelled_ack_promoted, cas: revision_and_frontier}
+    - {from: final_full_expired_ack_eligible, to: final_full_expired_ack_promoted, cas: revision_and_frontier}
+    - {from: final_full_protocol_ack_eligible, to: final_full_protocol_ack_promoted, cas: revision_and_frontier}
+  operator_only_transitions:
+    - {from: final_unknown_not_accepted, to: reconciling_unknown_not_accepted, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_unknown_accepted_ack, to: reconciling_unknown_accepted_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_unknown_success_ack, to: reconciling_unknown_success_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_unknown_failed_ack, to: reconciling_unknown_failed_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_unknown_cancelled_ack, to: reconciling_unknown_cancelled_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_unknown_expired_ack, to: reconciling_unknown_expired_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_unknown_protocol_ack, to: reconciling_unknown_protocol_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_partial_not_accepted, to: reconciling_partial_not_accepted, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_partial_accepted_ack, to: reconciling_partial_accepted_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_partial_success_ack, to: reconciling_partial_success_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_partial_failed_ack, to: reconciling_partial_failed_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_partial_cancelled_ack, to: reconciling_partial_cancelled_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_partial_expired_ack, to: reconciling_partial_expired_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_partial_protocol_ack, to: reconciling_partial_protocol_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: final_full_unverified, to: reconciling_full_success_ack, cas: revision_reconciliation_id_and_operator_approval}
+    - {from: reconciling_unknown_not_accepted, to: final_not_started, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_not_accepted, to: final_full_not_accepted_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_not_accepted, to: final_partial_not_accepted, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_not_accepted, to: final_unknown_not_accepted, cas: revision_reconciliation_id_evidence_digest_and_operator_approval}
+    - {from: reconciling_unknown_accepted_ack, to: final_no_effect_accepted_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_accepted_ack, to: final_full_accepted_ack_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_accepted_ack, to: final_partial_accepted_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_accepted_ack, to: final_unknown_accepted_ack, cas: revision_reconciliation_id_evidence_digest_and_operator_approval}
+    - {from: reconciling_unknown_success_ack, to: final_no_effect_success_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_success_ack, to: final_full_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_success_ack, to: final_partial_success_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_success_ack, to: final_unknown_success_ack, cas: revision_reconciliation_id_evidence_digest_and_operator_approval}
+    - {from: reconciling_unknown_failed_ack, to: final_no_effect_failed_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_failed_ack, to: final_full_failed_ack_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_failed_ack, to: final_partial_failed_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_failed_ack, to: final_unknown_failed_ack, cas: revision_reconciliation_id_evidence_digest_and_operator_approval}
+    - {from: reconciling_unknown_cancelled_ack, to: final_no_effect_cancelled_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_cancelled_ack, to: final_full_cancelled_ack_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_cancelled_ack, to: final_partial_cancelled_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_cancelled_ack, to: final_unknown_cancelled_ack, cas: revision_reconciliation_id_evidence_digest_and_operator_approval}
+    - {from: reconciling_unknown_expired_ack, to: final_no_effect_expired_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_expired_ack, to: final_full_expired_ack_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_expired_ack, to: final_partial_expired_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_expired_ack, to: final_unknown_expired_ack, cas: revision_reconciliation_id_evidence_digest_and_operator_approval}
+    - {from: reconciling_unknown_protocol_ack, to: final_no_effect_protocol_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_protocol_ack, to: final_full_protocol_ack_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_protocol_ack, to: final_partial_protocol_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_unknown_protocol_ack, to: final_unknown_protocol_ack, cas: revision_reconciliation_id_evidence_digest_and_operator_approval}
+    - {from: reconciling_partial_not_accepted, to: final_not_started, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_not_accepted, to: final_full_not_accepted_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_not_accepted, to: final_partial_not_accepted, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_accepted_ack, to: final_no_effect_accepted_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_accepted_ack, to: final_full_accepted_ack_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_accepted_ack, to: final_partial_accepted_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_success_ack, to: final_no_effect_success_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_success_ack, to: final_full_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_success_ack, to: final_partial_success_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_failed_ack, to: final_no_effect_failed_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_failed_ack, to: final_full_failed_ack_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_failed_ack, to: final_partial_failed_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_cancelled_ack, to: final_no_effect_cancelled_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_cancelled_ack, to: final_full_cancelled_ack_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_cancelled_ack, to: final_partial_cancelled_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_expired_ack, to: final_no_effect_expired_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_expired_ack, to: final_full_expired_ack_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_expired_ack, to: final_partial_expired_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_protocol_ack, to: final_no_effect_protocol_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_protocol_ack, to: final_full_protocol_ack_eligible, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_partial_protocol_ack, to: final_partial_protocol_ack, cas: revision_reconciliation_id_effect_proof_and_operator_approval}
+    - {from: reconciling_full_success_ack, to: final_full_eligible, cas: revision_reconciliation_id_verification_proof_and_operator_approval}
+    - {from: reconciling_full_success_ack, to: final_unknown_success_ack, cas: revision_reconciliation_id_evidence_digest_and_operator_approval}
+  terminal_for_automatic_execution:
+    - final_not_started
+    - final_no_effect_accepted_ack
+    - final_no_effect_success_ack
+    - final_no_effect_failed_ack
+    - final_no_effect_cancelled_ack
+    - final_no_effect_expired_ack
+    - final_no_effect_protocol_ack
+    - final_full_not_accepted_promoted
+    - final_full_accepted_ack_promoted
+    - final_full_promoted
+    - final_full_failed_ack_promoted
+    - final_full_cancelled_ack_promoted
+    - final_full_expired_ack_promoted
+    - final_full_protocol_ack_promoted
+    - final_full_unverified
+    - final_partial_not_accepted
+    - final_partial_accepted_ack
+    - final_partial_success_ack
+    - final_partial_failed_ack
+    - final_partial_cancelled_ack
+    - final_partial_expired_ack
+    - final_partial_protocol_ack
+    - final_unknown_not_accepted
+    - final_unknown_accepted_ack
+    - final_unknown_success_ack
+    - final_unknown_failed_ack
+    - final_unknown_cancelled_ack
+    - final_unknown_expired_ack
+    - final_unknown_protocol_ack
+  monotonic_fields:
+    - revision
+    - journal_epoch
+    - attempt_ordinal
+    - observation_ordinal
+    - explicit_correction_revision
+    - highest_applied_generation
+    - contiguous_checkpoint_frontier
+  forbidden_combinations:
+    - [FINALIZED, UNDETERMINED, RUNNING]
+    - [FINALIZED, UNKNOWN, RUNNING]
+    - [WAITING, UNKNOWN, RUNNING]
+    - [SUBMITTING, NONE_PROVEN, NOT_ACCEPTED]
+
+continuations:
+  automatic:
+    - poll_receipt
+  internal_automatic_states:
+    - RETRY_WAIT
+  poll_receipt_terminal_observations:
+    - SUCCEEDED
+    - FAILED
+    - CANCELLED
+    - EXPIRED
+    - PROTOCOL_UNKNOWN
+  blocked_without_receipt:
+    - reconcile_delivery_key
+  active_remote_cancel_supported: false
+
+async_execution:
+  sync_batch:
+    max_in_flight_children: profile_bounded
+  async_bulk_job:
+    max_in_flight_children: 1
+    parent_continuation: sequential_child_supervisor
+    bounded_parallel_deferred_to: V1.1
+
+failure_scenarios:
+  request_not_started_retry:
+    from: submitting
+    to: retry_wait
+    acknowledgement_preserved: NOT_ACCEPTED
+  request_not_started_no_retry:
+    from: submitting
+    to: final_not_started
+    acknowledgement_preserved: NOT_ACCEPTED
+  success_count_mismatch_partial:
+    from: verifying_success
+    to: final_partial_success_ack
+    acknowledgement_preserved: SUCCEEDED
+  success_count_missing_unknown:
+    from: verifying_success
+    to: final_unknown_success_ack
+    acknowledgement_preserved: SUCCEEDED
+  failed_atomic_rollback_proven:
+    from: verifying_failure
+    to: final_no_effect_failed_ack
+    acknowledgement_preserved: FAILED
+  failed_partial_effect:
+    from: verifying_failure
+    to: final_partial_failed_ack
+    acknowledgement_preserved: FAILED
+  failed_effect_unknown:
+    from: verifying_failure
+    to: final_unknown_failed_ack
+    acknowledgement_preserved: FAILED
+  cancelled_effect_unknown:
+    from: verifying_cancelled
+    to: final_unknown_cancelled_ack
+    acknowledgement_preserved: CANCELLED
+  expired_effect_unknown:
+    from: verifying_expired
+    to: final_unknown_expired_ack
+    acknowledgement_preserved: EXPIRED
+  protocol_unknown_after_running:
+    from: waiting
+    to: final_unknown_protocol_ack
+    acknowledgement_preserved: PROTOCOL_UNKNOWN
+
+stable_error_codes:
+  - REST_DELIVERY_INTENT_CONFLICT
+  - REST_DELIVERY_REMOTE_EFFECT_UNKNOWN
+  - REST_DELIVERY_PARTIALLY_APPLIED
+  - REST_DELIVERY_UNSAFE_RETRY
+  - REST_DELIVERY_SCOPE_EXCEEDS_LIMIT
+  - REST_DELIVERY_COUNT_MISMATCH
+  - REST_DELIVERY_RECEIPT_EXPIRED
+  - REST_DELIVERY_PROTOCOL_UNKNOWN
+  - REST_DELIVERY_STALE_GENERATION
+  - REST_DELIVERY_OVERLAPPING_EFFECT_IN_FLIGHT
+  - REST_DELIVERY_RETRY_AFTER_EXCEEDS_BUDGET
+  - REST_DELIVERY_APPEND_SCOPE_ALREADY_APPLIED
+  - REST_DELIVERY_JOURNAL_EPOCH_BLOCKED
+
+error_catalog:
+  REST_DELIVERY_INTENT_CONFLICT: {exit_class: 2, retryability: never, operator_action: correct_intent_or_generation, alert_severity: warning, evidence_schema: dpone.rest_delivery_operation.v1}
+  REST_DELIVERY_REMOTE_EFFECT_UNKNOWN: {exit_class: 4, retryability: reconciliation_only, operator_action: inspect_and_reconcile, alert_severity: critical, evidence_schema: dpone.rest_delivery_reconciliation.v1}
+  REST_DELIVERY_PARTIALLY_APPLIED: {exit_class: 4, retryability: compensation_or_reconciliation_only, operator_action: reconcile_or_compensate, alert_severity: critical, evidence_schema: dpone.rest_delivery_reconciliation.v1}
+  REST_DELIVERY_UNSAFE_RETRY: {exit_class: 4, retryability: never, operator_action: reconcile_delivery_key_before_retry, alert_severity: critical, evidence_schema: dpone.rest_delivery_reconciliation.v1}
+  REST_DELIVERY_SCOPE_EXCEEDS_LIMIT: {exit_class: 2, retryability: never, operator_action: shrink_scope_or_change_receiver_atomicity, alert_severity: warning, evidence_schema: dpone.rest_delivery_operation.v1}
+  REST_DELIVERY_COUNT_MISMATCH: {exit_class: 4, retryability: reconciliation_only, operator_action: inspect_receiver_counts, alert_severity: critical, evidence_schema: dpone.rest_delivery_reconciliation.v1}
+  REST_DELIVERY_RECEIPT_EXPIRED: {exit_class: 4, retryability: reconciliation_only, operator_action: query_delivery_key_or_reconcile, alert_severity: warning, evidence_schema: dpone.rest_delivery_reconciliation.v1}
+  REST_DELIVERY_PROTOCOL_UNKNOWN: {exit_class: 4, retryability: reconciliation_only, operator_action: inspect_protocol_and_reconcile, alert_severity: critical, evidence_schema: dpone.rest_delivery_reconciliation.v1}
+  REST_DELIVERY_STALE_GENERATION: {exit_class: 2, retryability: never, operator_action: inspect_newer_overlapping_generation, alert_severity: warning, evidence_schema: dpone.rest_delivery_operation.v1}
+  REST_DELIVERY_OVERLAPPING_EFFECT_IN_FLIGHT: {exit_class: 4, retryability: observation_only, operator_action: observe_or_reconcile_overlap, alert_severity: warning, evidence_schema: dpone.rest_delivery_reconciliation.v1}
+  REST_DELIVERY_RETRY_AFTER_EXCEEDS_BUDGET: {exit_class: 4, retryability: blocked, operator_action: extend_budget_or_wait_server_window, alert_severity: warning, evidence_schema: dpone.rest_delivery_operation.v1}
+  REST_DELIVERY_APPEND_SCOPE_ALREADY_APPLIED: {exit_class: 2, retryability: never, operator_action: use_certified_correction_contract, alert_severity: warning, evidence_schema: dpone.rest_delivery_effect_tombstone.v1}
+  REST_DELIVERY_JOURNAL_EPOCH_BLOCKED: {exit_class: 4, retryability: reconciliation_only, operator_action: run_restore_reconciliation_and_approve_epoch, alert_severity: critical, evidence_schema: dpone.rest_delivery_reconciliation.v1}
+
+promotion_strategy:
+  researched_contract:
+    immutable: true
+    status: RESEARCHED
+    digest_algorithm: sha256
+  approval_receipt:
+    schema: dpone.rest-bulk-delivery-approval.v1
+    schema_document: docs/schema/rest-bulk-delivery-approval-v1.schema.json
+    references:
+      - design_contract_digest
+      - adr_digests
+      - owner_approvals
+      - evidence_requirements
+    mutates_researched_contract: false
+    required_before_implementation: true
+  production_certification:
+    separate_receipt_required: true
+    required_before_cutover: true
+
+invariants:
+  - checkpoint_requires_verified_full_effect
+  - older_overlapping_generation_cannot_submit
+  - new_generation_blocks_on_older_unresolved_overlap
+  - complete_parent_plan_precedes_first_mutation
+  - seal_all_children_precedes_first_mutation
+  - source_snapshot_closes_before_first_mutation
+  - journal_restore_blocks_submission_without_zero_rpo
+  - immutable_pre_attempt_marker_precedes_submitting
+  - existing_parent_never_replans
+  - policy_only_change_does_not_change_mutation_intent
+  - remote_principal_swap_changes_binding_identity
+  - rendered_request_semantics_bind_complete_envelope
+  - success_effect_authority_survives_maximum_replay_horizon
+  - state_cross_product_contains_only_legal_tuples
+  - remote_job_semaphore_reserved_before_submit
+  - unknown_remote_job_retains_capacity_until_reconciliation
+  - request_not_started_can_retry_with_same_delivery_key
+  - successful_acknowledgement_preserved_on_partial_or_unknown_effect
+  - expired_acknowledgement_preserved_on_unknown_effect
+  - overlapping_admissions_linearize_under_postgresql_domain_lock
+  - generation_watermark_is_range_scoped
+  - incremental_append_rejects_correction_generation_by_default
+  - async_bulk_job_has_one_in_flight_child_in_v1
+  - may_attempt_marker_is_attempt_scoped
+  - remote_job_capacity_and_submitting_share_one_postgresql_transaction
+  - duplicate_yaml_keys_are_rejected
+  - every_failure_scenario_maps_to_a_legal_transition
+  - receiver_mutation_key_includes_operation_namespace_without_payload_digest
+  - receiver_binding_semantics_changes_mutation_intent
+  - credential_rotation_preserves_binding_when_semantics_unchanged
+  - physical_receiver_effects_share_conflict_domain_across_local_namespaces_and_mutation_kinds
+  - reconciliation_preserves_acknowledgement_while_resolving_effect
+  - every_unknown_reconciliation_can_resolve_none_full_partial_or_remain_unknown
+  - researched_design_contract_is_immutable_and_approval_is_separate_receipt
+  - stable_error_catalog_is_complete_and_metadata_bearing

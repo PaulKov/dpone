@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schema/rest-bulk-delivery-approval-v1.schema.json",
+  "title": "dpone REST bulk-delivery implementation approval receipt V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "design_contract",
+    "adrs",
+    "approvals",
+    "evidence_requirements",
+    "decision",
+    "decided_at"
+  ],
+  "properties": {
+    "schema": {"const": "dpone.rest-bulk-delivery-approval.v1"},
+    "version": {"const": 1},
+    "design_contract": {"$ref": "#/$defs/designContract"},
+    "adrs": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/adrApproval"}
+    },
+    "approvals": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/ownerApproval"}
+    },
+    "evidence_requirements": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/evidenceRequirement"}
+    },
+    "decision": {"const": "APPROVED_FOR_IMPLEMENTATION"},
+    "decided_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "nonEmptyString": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "designContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "digest"],
+      "properties": {
+        "schema": {"const": "dpone.rest-bulk-delivery-design.v1"},
+        "digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "adrApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "digest"],
+      "properties": {
+        "id": {"enum": ["ADR-0053", "ADR-0054", "ADR-0055"]},
+        "status": {"const": "APPROVED"},
+        "digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "ownerApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "actor_id", "decision", "decided_at", "evidence_ref"],
+      "properties": {
+        "role": {
+          "enum": ["architecture", "security", "postgresql_sre", "airflow", "product_profile"]
+        },
+        "actor_id": {"$ref": "#/$defs/nonEmptyString"},
+        "decision": {"const": "APPROVED"},
+        "decided_at": {"type": "string", "format": "date-time"},
+        "evidence_ref": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "evidenceRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "evidence_ref", "digest"],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonEmptyString"},
+        "status": {"enum": ["PASS", "N/A"]},
+        "evidence_ref": {"$ref": "#/$defs/nonEmptyString"},
+        "digest": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

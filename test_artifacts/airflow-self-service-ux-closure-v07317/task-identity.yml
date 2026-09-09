@@ -1,0 +1,52 @@
+schema_version: 1
+task_id: "SS-UX-IDENTITY"
+title: "Canonical pipeline identity and source reference"
+goal: "Reject non-canonical pipeline IDs before writes and share one confined ID/path resolver."
+specification: "docs/feature-design-airflow-self-service-ux-closure-v07317.md"
+base_commit: "d9bb630dc691257b8efe6f00a38f5da171e06c04"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "PipelineId exactly matches existing flow/batch schema syntax."
+  - "Invalid scaffold input returns DPONE_PIPELINE_ID_INVALID and writes nothing."
+  - "ID, directory and file references resolve identically without basename fallback."
+
+public_contract_impact:
+  level: compatible
+  surfaces: [CLI, authoring]
+  migration_required: false
+
+owned_paths:
+  - src/dpone/manifest/pipeline_identity.py
+  - src/dpone/manifest/pipeline_source_reference.py
+  - src/dpone/readiness/airflow_pipeline_scaffold.py
+  - tests/test_pipeline_identity.py
+  - tests/test_pipeline_source_resolution.py
+read_only_paths:
+  - src/dpone/schema/etl-flow-manifest.schema.json
+  - src/dpone/schema/etl-batch-manifest.schema.json
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/airflow-self-service-public-contracts-v1.yaml
+shared_file_owner: "Codex"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_pipeline_identity.py tests/test_pipeline_source_resolution.py -q"
+  broad:
+    - "uv run ruff check src/dpone/manifest/pipeline_identity.py src/dpone/manifest/pipeline_source_reference.py tests/test_pipeline_identity.py tests/test_pipeline_source_resolution.py"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than compatible."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

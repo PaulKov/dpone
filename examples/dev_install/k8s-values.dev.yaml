@@ -1,0 +1,23 @@
+dpone:
+  installMode: snapshot
+  packageSpec: dpone==0.0.0.dev1234
+  packageIndexUrlSecretRef: dpone-package-registry
+  packageTarget: /opt/airflow/.dpone-pkgs
+
+airflow:
+  extraEnv:
+    - name: DPONE_INSTALL_MODE
+      value: snapshot
+    - name: DPONE_PACKAGE_SPEC
+      value: dpone==0.0.0.dev1234
+    - name: DPONE_PACKAGE_TARGET
+      value: /opt/airflow/.dpone-pkgs
+    - name: DPONE_PACKAGE_INDEX_URL
+      valueFrom:
+        secretKeyRef:
+          name: dpone-package-registry
+          key: index_url
+  scheduler:
+    command: ["dpone-runtime-exec", "airflow", "scheduler"]
+  worker:
+    command: ["dpone-runtime-exec", "airflow", "celery", "worker"]

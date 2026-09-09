@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="220" viewBox="0 0 920 220" role="img" aria-label="Public evidence integrity">
+<rect width="920" height="220" fill="#ffffff"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Public evidence integrity</text>
+<text x="32" y="66" font-size="13" font-weight="400" fill="#475569">Public artifact redaction, claim evidence coverage and publication safety.</text>
+<text x="32" y="94" font-size="12" font-weight="700" fill="#334155">Integrity score</text>
+<rect x="32" y="104" width="420" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="32" y="104" width="420" height="22" rx="4" fill="#0f766e"/>
+<text x="470" y="120" font-size="12" font-weight="400" fill="#334155">100/100</text>
+<text x="32" y="140" font-size="12" font-weight="700" fill="#334155">Claim coverage</text>
+<rect x="32" y="150" width="420" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="32" y="150" width="420" height="22" rx="4" fill="#2563eb"/>
+<text x="470" y="166" font-size="12" font-weight="400" fill="#334155">100/100</text>
+<text x="690" y="120" font-size="13" font-weight="700" fill="#0f766e">redaction violations: 0</text>
+<text x="690" y="150" font-size="13" font-weight="700" fill="#334155">status: verified</text>
+</svg>

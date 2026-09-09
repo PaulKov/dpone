@@ -1,0 +1,40 @@
+[build-system]
+requires = ["uv_build>=0.9.18,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "dpone_airflow_pack"
+
+[project]
+name = "dpone-airflow-pack"
+version = "0.74.33"
+description = "Lightweight Airflow scheduler-side pack provider for dpone GitOps workloads"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = "Apache-2.0"
+authors = [{ name = "PaulKov" }]
+maintainers = [{ name = "PaulKov" }]
+keywords = ["airflow", "gitops", "data-engineering", "scheduler", "kubernetes"]
+dependencies = ["pyyaml>=6.0.1"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Database",
+  "Topic :: System :: Distributed Computing",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/PaulKov/dpone"
+Repository = "https://github.com/PaulKov/dpone"
+Issues = "https://github.com/PaulKov/dpone/issues"
+Documentation = "https://paulkov.github.io/dpone/"
+
+[project.scripts]
+dpone-airflow-pack-sync = "dpone_airflow_pack.cli_sync:main"
+dpone-airflow-pack-cache-status = "dpone_airflow_pack.cli_cache_status:main"
+dpone-airflow-pack-helm-post-renderer = "dpone_airflow_pack.cli_helm_post_renderer:main"

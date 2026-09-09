@@ -1,0 +1,176 @@
+{
+  "$comment": "workflow_execution_id is the trusted logical DagRun identity and participates in the binding digest. The first three model ID arrays are equal; replacement also equals action IDs.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-workflow-execution-binding.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "recovery_plan_digest"
+            ]
+          },
+          {
+            "required": [
+              "workflow_replacement_plan_sha256"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "replacement_action_ids": {
+          "maxItems": 0
+        },
+        "workflow_mode": {
+          "const": "normal"
+        }
+      }
+    },
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "recovery_plan_digest"
+            ]
+          },
+          {
+            "required": [
+              "workflow_replacement_plan_sha256"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "replacement_action_ids": {
+          "maxItems": 0
+        },
+        "workflow_mode": {
+          "const": "complete_scope_replay"
+        }
+      }
+    },
+    {
+      "properties": {
+        "replacement_action_ids": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "workflow_mode": {
+          "const": "failed_precommit_replacement"
+        }
+      },
+      "required": [
+        "recovery_plan_digest",
+        "workflow_replacement_plan_sha256"
+      ]
+    }
+  ],
+  "properties": {
+    "binding_set_ref": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "connection_registry_ref": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "credential_runtime_ref": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "expected_model_outcome_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "model_operation_plan_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "recovery_plan_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "replacement_action_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-workflow-execution-binding.v1"
+    },
+    "selected_mutating_node_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "workflow_execution_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_execution_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "workflow_mode": {
+      "enum": [
+        "normal",
+        "failed_precommit_replacement",
+        "complete_scope_replay"
+      ],
+      "type": "string"
+    },
+    "workflow_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_replacement_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "binding_set_ref",
+    "connection_registry_ref",
+    "credential_runtime_ref",
+    "deployment_id",
+    "expected_model_outcome_ids",
+    "model_operation_plan_ids",
+    "replacement_action_ids",
+    "schema",
+    "selected_mutating_node_ids",
+    "workflow_execution_binding_sha256",
+    "workflow_execution_id",
+    "workflow_mode",
+    "workflow_plan_sha256"
+  ],
+  "type": "object"
+}

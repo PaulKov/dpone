@@ -1,0 +1,77 @@
+schema_version: 1
+task_id: "SS-40-CONTRACT"
+title: "Add immutable runtime connection descriptors"
+goal: >-
+  Extend the existing binding resolver with one immutable, non-secret
+  connection descriptor and bounded connector-specific fields so downstream
+  capability projectors never infer environment metadata or copy raw backend
+  payloads.
+specification: "docs/feature-design-runtime-connection-authority-and-hygiene-v0732.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent-agent"
+
+acceptance_criteria:
+  - "ResolvedBindingConnection keeps its existing first two positional fields and adds an optional descriptor."
+  - "ResolvedConnectionDescriptor contains the declared registry type and a recursively immutable copy of non-secret connection metadata."
+  - "CredentialsConfig.additional_params contains only explicitly declared connection.parameters and declared credential field values not mapped to canonical credential fields."
+  - "Raw Vault/Kubernetes payload keys that were not declared by the registry never enter credentials, descriptors, repr, or evidence."
+  - "Existing credential resolver behavior, version evidence, success/failure semantics, and Airflow parse isolation remain compatible."
+  - "Focused tests cover immutability, positional compatibility, non-disclosure, declared extra fields, and existing resolver paths."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone runtime credential resolution"
+    - "ResolvedBindingConnection Python API"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/contracts/runtime_connection.py"
+  - "src/dpone/runtime/credentials/binding_resolver.py"
+  - "tests/test_runtime_connection_authority.py"
+  - "tests/test_airflow_credential_resolver_lifecycle.py"
+read_only_paths:
+  - "docs/feature-design-runtime-connection-authority-and-hygiene-v0732.md"
+  - "docs/adr/0010-binding-set-and-credential-resolvers.md"
+  - "docs/adr/0012-vault-runtime-authentication.md"
+  - "src/dpone/runtime/credentials/config.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "parent-agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_runtime_connection_authority.py tests/test_airflow_credential_resolver_lifecycle.py -q"
+    - "uv run ruff check src/dpone/contracts/runtime_connection.py src/dpone/runtime/credentials/binding_resolver.py tests/test_runtime_connection_authority.py tests/test_airflow_credential_resolver_lifecycle.py"
+    - "uv run ruff format --check src/dpone/contracts/runtime_connection.py src/dpone/runtime/credentials/binding_resolver.py tests/test_runtime_connection_authority.py tests/test_airflow_credential_resolver_lifecycle.py"
+    - "uv run mypy --config-file mypy.ini src/dpone/contracts/runtime_connection.py src/dpone/runtime/credentials/binding_resolver.py"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

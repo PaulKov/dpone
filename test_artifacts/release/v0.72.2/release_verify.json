@@ -1,0 +1,53 @@
+{
+  "attempts": 1,
+  "blockers": [],
+  "checks": [
+    {
+      "code": "github_release_found",
+      "details": {
+        "repository": "PaulKov/dpone",
+        "status": 200
+      },
+      "name": "github_release",
+      "passed": true,
+      "summary": "GitHub release `v0.72.2` exists"
+    },
+    {
+      "code": "pypi_resolver_visible",
+      "details": {
+        "json_status": 200,
+        "package": "dpone",
+        "simple_status": 200,
+        "version_in_simple_index": true
+      },
+      "name": "pypi_resolver",
+      "passed": true,
+      "summary": "PyPI package `dpone==0.72.2` is resolver-visible"
+    },
+    {
+      "code": "pypi_install_smoke_passed",
+      "details": {
+        "package_spec": "dpone==0.72.2",
+        "python": null,
+        "returncode": 0
+      },
+      "name": "pypi_install_smoke",
+      "passed": true,
+      "summary": "`uvx --from dpone==0.72.2 dpone --version` passed"
+    },
+    {
+      "code": "runtime_image_manifest_found",
+      "details": {
+        "image": "ghcr.io/paulkov/dpone-runtime:0.72.2",
+        "returncode": 0
+      },
+      "name": "runtime_image",
+      "passed": true,
+      "summary": "Runtime image `ghcr.io/paulkov/dpone-runtime:0.72.2` is visible"
+    }
+  ],
+  "passed": true,
+  "release": "v0.72.2",
+  "schema_version": "dpone.release_verification.v1",
+  "version": "0.72.2"
+}

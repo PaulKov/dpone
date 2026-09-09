@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-audit-package.schema.json",
+  "title": "Data Product Audit Package",
+  "type": "object",
+  "required": ["schema_version", "status", "audit_package_id", "controls", "evidence_refs", "blockers", "warnings", "markdown"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_audit_package.v1"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "audit_package_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "compliance_gate_id": {"type": ["string", "null"]},
+    "compliance_evaluation_id": {"type": ["string", "null"]},
+    "compliance_plan_id": {"type": ["string", "null"]},
+    "profile": {"type": ["string", "null"]},
+    "product": {"type": "object"},
+    "product_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "controls": {"type": "array", "items": {"type": "object"}},
+    "evidence_refs": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "markdown": {"type": "string"}
+  },
+  "additionalProperties": true
+}

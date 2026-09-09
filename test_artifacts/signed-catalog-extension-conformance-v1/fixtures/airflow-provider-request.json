@@ -1,0 +1,41 @@
+{
+  "schema": "dpone.extension-conformance-request.v1",
+  "profile": "airflow_provider",
+  "subject": {
+    "id": "apache-airflow-providers-dpone-fixture",
+    "version": "contract-fixture",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "evidence": [
+    {
+      "check": "public_contract",
+      "artifact_ref": "test_artifacts/signed-catalog-extension-conformance-v1/fixtures/public_contract.json",
+      "sha256": "sha256:cce35048a57b1939529dc1087fb7fb28d350c2b88503bf08c6032f476cdc8f90",
+      "expected_schema": "dpone.extension-check-receipt.v1"
+    },
+    {
+      "check": "provider_discovery",
+      "artifact_ref": "test_artifacts/signed-catalog-extension-conformance-v1/fixtures/provider_discovery.json",
+      "sha256": "sha256:63b9f99ae86a7abb9908d0b1333d62380b23159503a8b33edb89371553f96799",
+      "expected_schema": "dpone.extension-check-receipt.v1"
+    },
+    {
+      "check": "airflow_matrix",
+      "artifact_ref": "test_artifacts/signed-catalog-extension-conformance-v1/fixtures/airflow_matrix.json",
+      "sha256": "sha256:e49b630c87b44dd750dc000f713bb6d5e3b0e059b024fb32f7fb852e78f63ab4",
+      "expected_schema": "dpone.extension-check-receipt.v1"
+    },
+    {
+      "check": "package_smoke",
+      "artifact_ref": "test_artifacts/signed-catalog-extension-conformance-v1/fixtures/package_smoke.json",
+      "sha256": "sha256:15509da5b8580462c334f906def38e06e9dac744ac9bc61eaafac98dc0693a8e",
+      "expected_schema": "dpone.extension-check-receipt.v1"
+    },
+    {
+      "check": "parse_budget",
+      "artifact_ref": "test_artifacts/signed-catalog-extension-conformance-v1/fixtures/parse_budget.json",
+      "sha256": "sha256:eafc6c80c1e35be2df73e8dd7e8e57875b152f89ecb014dbafee4888b12b06bd",
+      "expected_schema": "dpone.extension-check-receipt.v1"
+    }
+  ]
+}

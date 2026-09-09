@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-trust-snapshot.schema.json",
+  "title": "dpone data product trust snapshot",
+  "type": "object",
+  "required": ["schema_version", "status", "trust_snapshot_id"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_trust_snapshot.v1"},
+    "status": {"type": "string"},
+    "trust_snapshot_id": {"type": "string"},
+    "evidence_lake_index_id": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "trust_score": {"type": "number"},
+    "domains": {"type": "object"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  },
+  "additionalProperties": true
+}

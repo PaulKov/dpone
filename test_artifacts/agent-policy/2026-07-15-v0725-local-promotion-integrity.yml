@@ -1,0 +1,101 @@
+schema_version: 1
+task_id: "DPONE-V0725-LOCAL-PROMOTION"
+title: "Fail-close local Airflow deployment promotion"
+goal: >-
+  Require an exact actor allowlist and current-state CAS for every public
+  preview and safe-sample local cache promotion without adding beginner CLI
+  steps.
+specification: "docs/feature-design-airflow-local-promotion-integrity-v0725.md"
+base_commit: "64e0b3946281da9f4541f11894ff20c372fa210f"
+integrator: "codex/v0.72.5-local-promotion-integrity"
+
+acceptance_criteria:
+  - "cache_sync_result rejects an empty or mismatched allowlist before cache mutation."
+  - "Preview promotion uses exactly local://dpone-airflow-preview and a current-state CAS guard."
+  - "Safe-sample promotion uses exactly local://dpone-safe-sample and a current-state CAS guard."
+  - "The five-command beginner journey remains unchanged and preview loads one DAG through the public provider."
+  - "Concurrent stale local promotion cannot overwrite current."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "cache_sync_result actor authorization"
+    - "dpone airflow preview local current promotion"
+    - "dpone run --sample local deployment promotion"
+  migration_required: true
+  migration: "Readiness API callers must pass their exact actor in allowed_promoters."
+
+owned_paths:
+  - docs/feature-design-airflow-local-promotion-integrity-v0725.md
+  - test_artifacts/agent-policy/2026-07-15-v0725-local-promotion-integrity.yml
+  - src/dpone/readiness/airflow_self_service_cache_sync.py
+  - src/dpone/readiness/airflow_self_service.py
+  - src/dpone/readiness/airflow_local_safe_sample_deployment.py
+  - src/dpone/runtime/deployment_cache.py
+  - tests/test_airflow_cache_materializer.py
+  - tests/test_airflow_cache_promotion_integrity.py
+  - tests/test_airflow_self_service_cli.py
+  - tests/test_airflow_self_service_preview_provider.py
+  - docs/airflow-cache-sync.md
+  - docs/airflow-self-service-architecture.md
+  - docs/getting-started/first-airflow-dag.md
+  - test_artifacts/airflow-local-promotion-integrity/validation-report.md
+
+read_only_paths:
+  - docs/adr/0009-artifact-delivery-and-cache-materializer.md
+  - src/dpone/runtime/deployment_cache_materializer.py
+  - src/dpone/runtime/deployment_cache_current_state.py
+  - docs/schemas/gitops/current-pointer.schema.json
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - packages/dpone-airflow-pack
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "DPONE-V0723-PROVIDER"
+  - "DPONE-V0724-SAFE-SAMPLE-LIVE-RUNTIME"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_cache_materializer.py tests/test_airflow_cache_promotion_integrity.py tests/test_airflow_self_service_cli.py tests/test_airflow_self_service_preview_provider.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "The fix requires a new beginner CLI action."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

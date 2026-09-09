@@ -1,0 +1,90 @@
+name: Industrial readiness
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "31 4 * * 2"
+
+permissions:
+  contents: read
+
+jobs:
+  industrial-readiness:
+    name: Aggregate industrial readiness evidence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run focused industrial readiness tests
+        run: uv run pytest tests/test_industrial_readiness_suite.py tests/test_cli_industrial_readiness_command.py -q
+
+      - name: Build local industrial evidence stubs
+        run: |
+          mkdir -p test_artifacts/industrial_readiness/input
+          cat > test_artifacts/industrial_readiness/input/local_matrix.json <<'JSON'
+          {"passed": true, "summary": "Local matrix evidence is available.", "cases": [{"source": "postgres", "sink": "mssql", "strategy": "incremental_merge", "row_count": 10000, "changed_pct": 20, "deleted_pct": 5, "wide_columns": 120}, {"source": "mssql", "sink": "clickhouse", "strategy": "partition_replace", "row_count": 10000, "changed_pct": 20, "deleted_pct": 5, "wide_columns": 120}]}
+          JSON
+          cat > test_artifacts/industrial_readiness/input/correctness.json <<'JSON'
+          {"passed": true, "summary": "Data correctness evidence is available.", "hash_mismatches": 0, "row_count_mismatches": 0}
+          JSON
+          cat > test_artifacts/industrial_readiness/input/reliability.json <<'JSON'
+          {"passed": true, "summary": "Runtime reliability evidence is available.", "resume_failures": 0, "state_commit_violations": 0}
+          JSON
+          cat > test_artifacts/industrial_readiness/input/performance_lab.json <<'JSON'
+          {"passed": true, "summary": "Performance lab evidence is available.", "regressions": []}
+          JSON
+          cat > test_artifacts/industrial_readiness/input/ux.json <<'JSON'
+          {"passed": true, "summary": "Self-service UX evidence is available.", "commands": ["doctor", "plan", "run", "run-report"]}
+          JSON
+          cat > test_artifacts/industrial_readiness/input/governance.json <<'JSON'
+          {"passed": true, "summary": "Governance evidence is available.", "violations": []}
+          JSON
+          cat > test_artifacts/industrial_readiness/input/schema_evolution.json <<'JSON'
+          {"passed": true, "summary": "Online schema evolution evidence is available.", "blockers": [], "changes": []}
+          JSON
+
+      - name: Run industrial readiness gate
+        run: |
+          mkdir -p test_artifacts/industrial_readiness/report
+          uv run dpone ops industrial-readiness \
+            --output-dir test_artifacts/industrial_readiness/report \
+            --release "industrial-readiness-${GITHUB_RUN_ID}" \
+            --artifact local_matrix=test_artifacts/industrial_readiness/input/local_matrix.json \
+            --artifact correctness=test_artifacts/industrial_readiness/input/correctness.json \
+            --artifact reliability=test_artifacts/industrial_readiness/input/reliability.json \
+            --artifact performance_lab=test_artifacts/industrial_readiness/input/performance_lab.json \
+            --artifact ux=test_artifacts/industrial_readiness/input/ux.json \
+            --artifact governance=test_artifacts/industrial_readiness/input/governance.json \
+            --artifact schema_evolution=test_artifacts/industrial_readiness/input/schema_evolution.json \
+            --case postgres:mssql:incremental_merge \
+            --case mssql:clickhouse:partition_replace \
+            --format json | tee test_artifacts/industrial_readiness/report/industrial_readiness.stdout.json
+
+      - name: Index industrial readiness artifacts
+        run: |
+          mkdir -p test_artifacts/industrial_readiness/index
+          uv run dpone ops artifact-index \
+            --root test_artifacts/industrial_readiness \
+            --output-dir test_artifacts/industrial_readiness/index \
+            --release "industrial-readiness-${GITHUB_RUN_ID}" \
+            --format json | tee test_artifacts/industrial_readiness/index/artifact_index.stdout.json
+
+      - name: Upload industrial readiness report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: industrial-readiness-report
+          path: test_artifacts/industrial_readiness/

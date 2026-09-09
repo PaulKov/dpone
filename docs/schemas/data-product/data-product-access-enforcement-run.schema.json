@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-access-enforcement-run.schema.json",
+  "title": "Data Product Access Enforcement Run",
+  "type": "object",
+  "required": ["schema_version", "status", "access_enforcement_run_id", "plan_id", "operations", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_access_enforcement_run.v1"},
+    "status": {"enum": ["dry_run", "applied", "warning", "failed"]},
+    "access_enforcement_run_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "plan_id": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "operations": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

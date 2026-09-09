@@ -1,0 +1,165 @@
+{
+  "$defs": {
+    "expect": {
+      "additionalProperties": false,
+      "dependentRequired": {
+        "match": [
+          "output_fixture"
+        ]
+      },
+      "properties": {
+        "match": {
+          "const": "exact_unordered"
+        },
+        "output_fixture": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "not": {
+            "pattern": "^(?:/|[A-Za-z]:|.*\\\\)"
+          },
+          "type": "string"
+        },
+        "rejected_rows": {
+          "const": 0,
+          "default": 0
+        },
+        "rows": {
+          "maximum": 20000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "schema": {
+          "additionalProperties": {
+            "enum": [
+              "null",
+              "bool",
+              "int64",
+              "float64",
+              "string",
+              "array",
+              "object",
+              "mixed"
+            ]
+          },
+          "maxProperties": 1000,
+          "type": "object"
+        }
+      },
+      "required": [
+        "rows"
+      ],
+      "type": "object"
+    },
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "not": {
+            "pattern": "^(?:/|[A-Za-z]:|.*\\\\)"
+          },
+          "type": "string"
+        },
+        "format": {
+          "const": "jsonl",
+          "default": "jsonl"
+        },
+        "initial_target": {
+          "additionalProperties": false,
+          "properties": {
+            "fixture": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "not": {
+                "pattern": "^(?:/|[A-Za-z]:|.*\\\\)"
+              },
+              "type": "string"
+            }
+          },
+          "required": [
+            "fixture"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "fixture"
+      ],
+      "type": "object"
+    },
+    "limits": {
+      "additionalProperties": false,
+      "properties": {
+        "max_bytes": {
+          "default": 10485760,
+          "maximum": 10485760,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_line_bytes": {
+          "default": 1048576,
+          "maximum": 1048576,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_rows": {
+          "default": 10000,
+          "maximum": 10000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "maximum": 300,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/test-manifest.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "expect": {
+      "$ref": "#/$defs/expect"
+    },
+    "input": {
+      "$ref": "#/$defs/input"
+    },
+    "kind": {
+      "const": "dpone.test.v1"
+    },
+    "limits": {
+      "$ref": "#/$defs/limits"
+    },
+    "name": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "pipeline": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "not": {
+        "pattern": "^(?:/|[A-Za-z]:|.*\\\\)"
+      },
+      "type": "string"
+    },
+    "process": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "pipeline",
+    "input",
+    "expect"
+  ],
+  "title": "dpone GitOps hermetic test manifest",
+  "type": "object"
+}

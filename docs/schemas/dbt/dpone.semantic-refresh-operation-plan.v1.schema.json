@@ -1,0 +1,632 @@
+{
+  "$comment": "operation_id excludes its own field and all attempt/runtime facts; operation_plan_sha256 excludes itself. Python validation requires the named event_time_column itself to be the temporal key pair.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-operation-plan.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "scope_predecessor_operation_id"
+            ]
+          },
+          {
+            "required": [
+              "replaces_failed_operation_id"
+            ]
+          },
+          {
+            "required": [
+              "replacement_reason"
+            ]
+          },
+          {
+            "required": [
+              "replacement_ordinal"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "operation_kind": {
+          "const": "normal"
+        },
+        "scope_revision": {
+          "const": 1
+        }
+      }
+    },
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "replaces_failed_operation_id"
+            ]
+          },
+          {
+            "required": [
+              "replacement_reason"
+            ]
+          },
+          {
+            "required": [
+              "replacement_ordinal"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "operation_kind": {
+          "const": "complete_scope_replay"
+        },
+        "scope_revision": {
+          "minimum": 2
+        }
+      },
+      "required": [
+        "scope_predecessor_operation_id"
+      ]
+    },
+    {
+      "not": {
+        "required": [
+          "scope_predecessor_operation_id"
+        ]
+      },
+      "properties": {
+        "operation_kind": {
+          "const": "failed_precommit_replacement"
+        }
+      },
+      "required": [
+        "replaces_failed_operation_id",
+        "replacement_reason",
+        "replacement_ordinal"
+      ]
+    }
+  ],
+  "properties": {
+    "archetype": {
+      "const": "scope_stable_event_fact"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "effective_key_columns": {
+      "contains": {
+        "oneOf": [
+          {
+            "properties": {
+              "source_type": {
+                "const": "date"
+              },
+              "target_type": {
+                "const": "Date"
+              }
+            },
+            "required": [
+              "source_type",
+              "target_type"
+            ]
+          },
+          {
+            "properties": {
+              "source_type": {
+                "const": "datetime2(6)"
+              },
+              "target_type": {
+                "const": "DateTime64(6,'UTC')"
+              }
+            },
+            "required": [
+              "source_type",
+              "target_type"
+            ]
+          }
+        ]
+      },
+      "items": {
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "domain_min"
+                  ]
+                },
+                {
+                  "required": [
+                    "domain_max"
+                  ]
+                },
+                {
+                  "required": [
+                    "utc_assurance_sha256"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "mapping": {
+                "const": "bit_bool"
+              },
+              "source_type": {
+                "const": "bit"
+              },
+              "target_type": {
+                "const": "Bool"
+              }
+            }
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "domain_min"
+                  ]
+                },
+                {
+                  "required": [
+                    "domain_max"
+                  ]
+                },
+                {
+                  "required": [
+                    "utc_assurance_sha256"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "mapping": {
+                "const": "integer_width_preserving"
+              },
+              "source_type": {
+                "const": "tinyint"
+              },
+              "target_type": {
+                "const": "UInt8"
+              }
+            }
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "domain_min"
+                  ]
+                },
+                {
+                  "required": [
+                    "domain_max"
+                  ]
+                },
+                {
+                  "required": [
+                    "utc_assurance_sha256"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "mapping": {
+                "const": "integer_width_preserving"
+              },
+              "source_type": {
+                "const": "smallint"
+              },
+              "target_type": {
+                "const": "Int16"
+              }
+            }
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "domain_min"
+                  ]
+                },
+                {
+                  "required": [
+                    "domain_max"
+                  ]
+                },
+                {
+                  "required": [
+                    "utc_assurance_sha256"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "mapping": {
+                "const": "integer_width_preserving"
+              },
+              "source_type": {
+                "const": "int"
+              },
+              "target_type": {
+                "const": "Int32"
+              }
+            }
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "domain_min"
+                  ]
+                },
+                {
+                  "required": [
+                    "domain_max"
+                  ]
+                },
+                {
+                  "required": [
+                    "utc_assurance_sha256"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "mapping": {
+                "const": "integer_width_preserving"
+              },
+              "source_type": {
+                "const": "bigint"
+              },
+              "target_type": {
+                "const": "Int64"
+              }
+            }
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "domain_min"
+                  ]
+                },
+                {
+                  "required": [
+                    "domain_max"
+                  ]
+                },
+                {
+                  "required": [
+                    "utc_assurance_sha256"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "mapping": {
+                "const": "uuid_equality"
+              },
+              "source_type": {
+                "const": "uniqueidentifier"
+              },
+              "target_type": {
+                "const": "UUID"
+              }
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "utc_assurance_sha256"
+              ]
+            },
+            "properties": {
+              "domain_max": {
+                "const": "2149-06-06"
+              },
+              "domain_min": {
+                "const": "1970-01-01"
+              },
+              "mapping": {
+                "const": "date"
+              },
+              "source_type": {
+                "const": "date"
+              },
+              "target_type": {
+                "const": "Date"
+              }
+            },
+            "required": [
+              "domain_max",
+              "domain_min"
+            ]
+          },
+          {
+            "properties": {
+              "domain_max": {
+                "const": "2299-12-31T23:59:59.999999Z"
+              },
+              "domain_min": {
+                "const": "1900-01-01T00:00:00.000000Z"
+              },
+              "mapping": {
+                "const": "datetime2_utc"
+              },
+              "source_type": {
+                "const": "datetime2(6)"
+              },
+              "target_type": {
+                "const": "DateTime64(6,'UTC')"
+              }
+            },
+            "required": [
+              "domain_max",
+              "domain_min",
+              "utc_assurance_sha256"
+            ]
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "domain_min"
+                  ]
+                },
+                {
+                  "required": [
+                    "domain_max"
+                  ]
+                },
+                {
+                  "required": [
+                    "utc_assurance_sha256"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "mapping": {
+                "const": "decimal_exact"
+              },
+              "source_type": {
+                "pattern": "^decimal\\((?:[1-9]|[12][0-9]|3[0-8]),[0-9]{1,2}\\)$"
+              },
+              "target_type": {
+                "pattern": "^Decimal\\((?:[1-9]|[12][0-9]|3[0-8]),[0-9]{1,2}\\)$"
+              }
+            }
+          }
+        ],
+        "properties": {
+          "domain_max": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "domain_min": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "mapping": {
+            "enum": [
+              "bit_bool",
+              "integer_width_preserving",
+              "uuid_equality",
+              "date",
+              "datetime2_utc",
+              "decimal_exact"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "nullable": {
+            "const": false
+          },
+          "source_type": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "target_type": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "utc_assurance_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mapping",
+          "name",
+          "nullable",
+          "source_type",
+          "target_type"
+        ],
+        "type": "object"
+      },
+      "minContains": 1,
+      "minItems": 1,
+      "type": "array"
+    },
+    "effective_key_mapping_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "effective_key_template_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "environment": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "event_time_column": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "missing_key_policy": {
+      "const": "ignore_missing"
+    },
+    "model_definition_proof_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "model_unique_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "mutation_closure_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "mutation_order": {
+      "items": false,
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "const": "UPDATE"
+        },
+        {
+          "const": "INSERT"
+        }
+      ],
+      "type": "array"
+    },
+    "operation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "operation_kind": {
+      "enum": [
+        "normal",
+        "failed_precommit_replacement",
+        "complete_scope_replay"
+      ],
+      "type": "string"
+    },
+    "operation_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "owner_generation": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "platform_policy_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "read_dependency_proof_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "replacement_ordinal": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "replacement_reason": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "replaces_failed_operation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "resource_policy_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-operation-plan.v1"
+    },
+    "scope_end": {
+      "format": "date-time",
+      "pattern": "T00:00:00Z$",
+      "type": "string"
+    },
+    "scope_family_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "scope_predecessor_operation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "scope_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "scope_start": {
+      "format": "date-time",
+      "pattern": "T00:00:00Z$",
+      "type": "string"
+    },
+    "sqlserver_lifecycle_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "target_predecessor_generation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "writer_assurance_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "archetype",
+    "deployment_id",
+    "effective_key_columns",
+    "effective_key_mapping_sha256",
+    "effective_key_template_sha256",
+    "environment",
+    "event_time_column",
+    "missing_key_policy",
+    "model_definition_proof_sha256",
+    "model_unique_id",
+    "mutation_closure_sha256",
+    "mutation_order",
+    "operation_id",
+    "operation_kind",
+    "operation_plan_sha256",
+    "owner_generation",
+    "platform_policy_digest",
+    "read_dependency_proof_sha256",
+    "release_id",
+    "resource_policy_digest",
+    "schema",
+    "scope_end",
+    "scope_family_id",
+    "scope_revision",
+    "scope_start",
+    "sqlserver_lifecycle_policy_sha256",
+    "target_predecessor_generation_id",
+    "workflow_id",
+    "writer_assurance_digest"
+  ],
+  "type": "object"
+}

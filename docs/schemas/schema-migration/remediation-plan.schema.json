@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/remediation-plan.schema.json",
+  "title": "dpone schema migration remediation plan",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "remediation_plan_id",
+    "pack_id",
+    "watch_certificate_id",
+    "environment",
+    "target",
+    "capability",
+    "operations",
+    "preconditions",
+    "blockers",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_remediation_plan.v1"},
+    "status": {"enum": ["planned", "blocked", "disabled"]},
+    "remediation_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "watch_certificate_id": {"type": ["string", "null"]},
+    "environment": {"type": "string", "minLength": 1},
+    "target": {
+      "type": "object",
+      "required": ["sink_type", "table"],
+      "additionalProperties": true,
+      "properties": {
+        "sink_type": {"type": "string"},
+        "table": {"type": "string"}
+      }
+    },
+    "capability": {
+      "enum": [
+        "online_safe",
+        "shadow_exchange",
+        "drop_shadow",
+        "manual_only",
+        "unsupported",
+        "blocked_after_contract",
+        "restore_from_backup"
+      ]
+    },
+    "profile": {"enum": ["advisory", "stage", "prod_strict", "regulated"]},
+    "mode": {"enum": ["observe", "gate"]},
+    "operations": {"type": "array", "items": {"type": "object"}},
+    "preconditions": {"type": "object"},
+    "certify": {"type": "object"},
+    "ledger_summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

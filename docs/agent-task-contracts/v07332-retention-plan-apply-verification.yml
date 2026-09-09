@@ -1,0 +1,50 @@
+schema_version: 1
+task_id: "DPONE-V07332-PLAN-APPLY-VERIFY"
+title: "Bind cache-retention apply certification to the reviewed plan"
+goal: "Reject forged apply/publication evidence that contradicts the reviewed plan or is not byte-bound to it."
+specification: "docs/feature-design-airflow-retention-apply-receipt-v0732.md"
+base_commit: "5a48134b29961d7299dbbb50e09e88da2880971d"
+integrator: "primary Codex agent"
+
+acceptance_criteria:
+  - "Verifier retains and validates the reviewed plan body, candidate/protected projections, and canonical digest."
+  - "Publication evidence is cryptographically bound to the exact apply bytes."
+  - "Forged protected deletion, omitted candidate, and arbitrary publication digest fail closed."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["cache-retention approval runbook", "certification evidence"]
+  migration_required: false
+
+owned_paths:
+  - docs/airflow-cache-retention-approval.md
+  - tests/test_airflow_cache_retention_approval_adversarial.py
+read_only_paths:
+  - src/dpone/contracts/gitops_schema_semantics.py
+  - src/dpone/contracts/deployment_cache_retention_state.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "primary Codex agent"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_cache_retention_approval_adversarial.py -q"
+  broad:
+    - "uv run ruff check owned paths"
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-docs"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

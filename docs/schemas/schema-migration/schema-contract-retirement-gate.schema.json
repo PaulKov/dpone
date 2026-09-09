@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-retirement-gate.schema.json",
+  "title": "Schema Contract Retirement Gate",
+  "type": "object",
+  "required": ["schema_version", "status", "profile", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_retirement_gate.v1"},
+    "retirement_gate_id": {"type": "string", "pattern": "^sha256:"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "profile": {"type": "string"},
+    "contract_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "adoption_status_id": {"type": ["string", "null"]},
+    "consumer_matrix_id": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

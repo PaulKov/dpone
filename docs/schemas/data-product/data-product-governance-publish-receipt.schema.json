@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-governance-publish-receipt.schema.json",
+  "title": "dpone data product governance publish receipt",
+  "type": "object",
+  "required": ["schema_version", "publish_receipt_id", "status", "provider", "payload_id", "payload_sha256", "idempotency_key", "network_writes", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_governance_publish_receipt.v1"},
+    "publish_receipt_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["dry_run", "published", "blocked"]},
+    "provider": {"enum": ["datahub", "openmetadata", "openlineage", "opa", "json"]},
+    "payload_id": {"type": ["string", "null"]},
+    "payload_sha256": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "idempotency_key": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "network_writes": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

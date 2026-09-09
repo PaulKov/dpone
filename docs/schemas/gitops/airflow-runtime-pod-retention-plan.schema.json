@@ -1,0 +1,216 @@
+{
+  "$defs": {
+    "inventory": {
+      "additionalProperties": false,
+      "properties": {
+        "failed_pods": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "quarantined": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "succeeded_pods": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "terminal_pods": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "terminal_pods",
+        "succeeded_pods",
+        "failed_pods",
+        "quarantined"
+      ],
+      "type": "object"
+    },
+    "plan_item": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "protect",
+            "delete",
+            "quarantine"
+          ]
+        },
+        "age_basis": {
+          "const": "creation_timestamp_fallback"
+        },
+        "age_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "created_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dag_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phase": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "pod_name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "pod_ref": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "precondition_ref": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "inventory_phase_conflict",
+            "invalid_phase",
+            "invalid_identity",
+            "terminating",
+            "invalid_ownership",
+            "missing_correlation",
+            "timestamp_missing",
+            "future_timestamp",
+            "minimum_age",
+            "stale_terminal"
+          ]
+        },
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "task_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "terminal_age_exact": {
+          "const": false
+        },
+        "workload_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "pod_ref",
+        "precondition_ref",
+        "pod_name",
+        "phase",
+        "action",
+        "reason",
+        "age_seconds",
+        "age_basis",
+        "terminal_age_exact",
+        "created_at",
+        "workload_id",
+        "dag_id",
+        "task_id",
+        "run_id"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-runtime-pod-retention-plan.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "age_basis": {
+      "const": "creation_timestamp_fallback"
+    },
+    "delete_candidates": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 10000,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "inventory": {
+      "$ref": "#/$defs/inventory"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/plan_item"
+      },
+      "maxItems": 10000,
+      "type": "array"
+    },
+    "minimum_age_seconds": {
+      "maximum": 2592000,
+      "minimum": 300,
+      "type": "integer"
+    },
+    "namespace": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "page_size": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "schema": {
+      "const": "dpone.airflow-runtime-pod-retention-plan.v1"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "needs_cleanup",
+        "needs_attention"
+      ]
+    },
+    "terminal_age_exact": {
+      "const": false
+    },
+    "warnings": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 10000,
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schema",
+    "status",
+    "namespace",
+    "observed_at",
+    "minimum_age_seconds",
+    "page_size",
+    "age_basis",
+    "terminal_age_exact",
+    "inventory",
+    "warnings",
+    "items",
+    "delete_candidates"
+  ],
+  "title": "dpone GitOps Airflow runtime Pod retention plan",
+  "type": "object"
+}

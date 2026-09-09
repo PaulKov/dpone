@@ -1,0 +1,51 @@
+schema_version: 1
+task_id: "SS-UX-INIT-POLICY"
+title: "Project Airflow default and explicit override"
+goal: "Use dpone.yaml airflow.enabled for init pipeline without breaking explicit --airflow."
+specification: "docs/feature-design-airflow-self-service-ux-closure-v07317.md"
+base_commit: "d9bb630dc691257b8efe6f00a38f5da171e06c04"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Absent pipeline flag inherits a valid project Airflow setting."
+  - "--airflow and --no-airflow are mutually exclusive and override project policy."
+  - "Invalid project configuration fails before scaffold writes."
+
+public_contract_impact:
+  level: compatible
+  surfaces: [CLI, project-config]
+  migration_required: false
+
+owned_paths:
+  - src/dpone/commands/init_cmd.py
+  - src/dpone/manifest/project_config.py
+  - src/dpone/readiness/airflow_self_service.py
+  - tests/test_airflow_init_project_policy.py
+read_only_paths:
+  - src/dpone/manifest/bounded_yaml.py
+  - src/dpone/manifest/confined_files.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/airflow-self-service-public-contracts-v1.yaml
+shared_file_owner: "Codex"
+dependencies: [SS-UX-IDENTITY]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_init_project_policy.py tests/test_init_cli_contract.py -q"
+  broad:
+    - "uv run ruff check src/dpone/commands/init_cmd.py src/dpone/manifest/project_config.py src/dpone/readiness/airflow_self_service.py tests/test_airflow_init_project_policy.py"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Project config requires network or secrets."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

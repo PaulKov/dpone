@@ -1,0 +1,101 @@
+schema_version: 1
+task_id: "SS-46-47-CUTOVER"
+title: "Release-trust SS-46/SS-47 coordinated cutover"
+goal: >
+  Implement the APPROVED release-trust boundary as one coordinated cutover:
+  governance policy v2 + parser/views, A/B/C live governance binding (SS-46),
+  external privileged controller composition root without candidate checkout
+  on mutation paths (SS-47), lease/fencing, receipt schemas, and evidence
+  vocabulary. Do not invent live provider IDs; activation stays UNVERIFIED
+  until approved live inventory exists.
+specification: "docs/feature-design-release-trust-boundary-v0732.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "Feature design remains APPROVED and ADR 0028 remains Accepted; no silent reopen."
+  - "dpone.github-governance-policy.v2 lands with schema, one parser, branch and release views, and every semantic consumer in one integrator commit (or fails closed with full rollback plan)."
+  - "Live comparison binds ruleset target, conditions, bypass actors, ruleset version IDs, and exact check producer/workflow/run identity through A/B/C snapshots (SS-46)."
+  - "Privileged mutation/attestation/OIDC/contents-write paths are action-only in the external controller; candidate release.yml cannot checkout or run repository code on those paths (SS-47)."
+  - "Pre-mutation durable lease CAS and fencing token precede MUTATION_INTENT and short-lived provider capabilities."
+  - "Checked-in JSON schemas: release-receipt-envelope-v2, release-public-bundle-v2, release-evidence-v2, and migrated governance schema."
+  - "AUTHORIZED is pre-publication only; PASS/GO only at CLOSED; token bootstrap remains LEGACY_UNVERIFIED."
+  - "Live GitHub/PyPI/controller/store inventories remain UNVERIFIED until an approved live-administration session; never reported as PASS."
+  - "Focused and broad non-live gates PASS; live activation checks are UNVERIFIED with reasons."
+
+public_contract_impact:
+  level: deprecation
+  surfaces:
+    - release CLI compatibility arguments
+    - release evidence schemas
+    - GitHub Actions job graph
+    - governance policy schema/parser
+    - maintainer release journey
+  migration_required: true
+
+owned_paths:
+  - tools/agent_policy/
+  - tests/agent_policy/
+  - docs/schemas/
+  - .agents/policy/github-branch-protection.yml
+read_only_paths:
+  - docs/feature-design-release-trust-boundary-v0732.md
+  - docs/adr/0028-frozen-release-policy-and-publication-boundary.md
+  - docs/agent-release-protocol.md
+  - docs/supply-chain.md
+  - test_artifacts/airflow-self-service-global-review-v0731/review-report.md
+  - .github/workflows/release.yml
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/adr-index.md
+  - src/dpone/adapters
+  - src/dpone/runtime
+
+shared_file_owner: "parent Codex agent"
+
+dependencies:
+  - "Feature design APPROVED and ADR 0028 Accepted (2026-07-19)"
+  - "SS-68 architect APPROVE_SPEC and MUTATION_INTENT payload-union reconciliation"
+required_checks:
+  focused:
+    - "uv run pytest tests/agent_policy -q"
+    - "uv run python tools/agent_policy/workflow_security.py ."
+    - "uv run python tools/agent_policy/branch_protection.py .agents/policy/github-branch-protection.yml"
+  broad:
+    - "uv run ruff check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run pytest -m \"not integration_live\" -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "GitHub ruleset/version/bypass/producer inventory UNVERIFIED until approved session"
+    - "External controller/App/environment inventory UNVERIFIED until approved session"
+    - "Evidence store and four PyPI Trusted Publisher bindings UNVERIFIED until approved session"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "A placeholder would be replaced with an invented live identifier."
+  - "Candidate-repository workflow gains privileged mutation authority."
+  - "Workflow or shared-index edits are required without an integrator-owned follow-up contract."
+  - "Another writer owns the same semantic contract."

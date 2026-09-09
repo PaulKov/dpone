@@ -1,0 +1,77 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-S3-DESIRED-STATE-DOMAIN"
+title: "Airflow desired-state contracts, ports, and application service"
+goal: "Implement the dependency-free desired-state envelope, capability ports, CAS reconciliation service, and focused unit tests."
+specification: "docs/feature-design-airflow-s3-desired-state-pull-v1.md"
+base_commit: "0eecc4a62fb747d917d04fb235b0acf926406c5e"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Strict deterministic bounded desired-state envelope rejects unknown, duplicate, malformed, unsafe, and secret-like fields."
+  - "Opaque revisions are never interpreted as checksums."
+  - "Create-if-absent, replace-if-revision, idempotent replay, conflict, and ambiguous-write reconciliation are explicit."
+  - "No vendor, Airflow, GitLab, or Kubernetes imports enter contracts, ports, or services."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "Python contracts and ports"
+    - "desired-state evidence models"
+  migration_required: false
+
+owned_paths:
+  - src/dpone/contracts/airflow_desired_state.py
+  - src/dpone/ports/airflow_desired_state.py
+  - src/dpone/services/airflow_desired_state.py
+  - tests/test_airflow_desired_state.py
+read_only_paths:
+  - docs/feature-design-airflow-s3-desired-state-pull-v1.md
+  - src/dpone/contracts/airflow_deployment.py
+  - src/dpone/contracts/airflow_deployment_projection.py
+  - src/dpone/ports/artifact_registry.py
+  - src/dpone/services/readiness_io.py
+  - docs/engineering-standards.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - src/dpone/gitops
+  - src/dpone/commands
+  - src/dpone/adapters
+  - src/dpone/storage
+  - tests/conftest.py
+
+shared_file_owner: "Codex parent agent"
+
+dependencies:
+  - "APPROVED feature specification"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_desired_state.py -q"
+    - "uv run ruff check src/dpone/contracts/airflow_desired_state.py src/dpone/ports/airflow_desired_state.py src/dpone/services/airflow_desired_state.py tests/test_airflow_desired_state.py"
+  broad:
+    - "uv run mypy --config-file mypy.ini src/dpone/contracts/airflow_desired_state.py src/dpone/ports/airflow_desired_state.py src/dpone/services/airflow_desired_state.py"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-compatibility-plan.schema.json",
+  "title": "dpone schema contract compatibility plan",
+  "type": "object",
+  "required": ["schema_version", "status", "contract_id", "required_bump", "changes", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_compatibility_plan.v1"},
+    "status": {"type": "string", "enum": ["new", "compatible", "breaking", "blocked"]},
+    "contract_id": {"type": "string"},
+    "base_version": {"type": ["string", "null"]},
+    "head_version": {"type": ["string", "null"]},
+    "compatibility": {"type": ["string", "null"], "enum": ["backward", "forward", "full", "none", null]},
+    "required_bump": {"type": "string", "enum": ["patch", "minor", "major"]},
+    "changes": {"type": "array", "items": {"type": "object"}},
+    "risk_tags": {"type": "array", "items": {"type": "string"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "compatibility_plan_id": {"type": "string", "pattern": "^sha256:"}
+  },
+  "additionalProperties": true
+}

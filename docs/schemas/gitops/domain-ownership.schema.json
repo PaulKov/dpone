@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/domain-ownership.schema.json",
+  "title": "dpone GitOps domain ownership authority",
+  "type": "object",
+  "required": [
+    "schema",
+    "domain",
+    "owner",
+    "approvers"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.domain-ownership.v1"
+    },
+    "domain": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{1,127}$"
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "team",
+        "contact"
+      ],
+      "properties": {
+        "team": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "\\S",
+          "not": {
+            "pattern": "^\\s*TODO\\s*$"
+          }
+        },
+        "contact": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "\\S",
+          "not": {
+            "pattern": "^\\s*TODO\\s*$"
+          }
+        }
+      }
+    },
+    "approvers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "github_team"
+      ],
+      "properties": {
+        "github_team": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "\\S",
+          "not": {
+            "pattern": "^\\s*TODO\\s*$"
+          }
+        }
+      }
+    }
+  }
+}

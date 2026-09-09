@@ -1,0 +1,132 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-dev-evidence-verification.v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "code": {
+          "const": "DPONE_DBT_DEV_EVIDENCE_VERIFIED"
+        },
+        "passed": {
+          "const": true
+        },
+        "reason_codes": {
+          "maxItems": 0
+        },
+        "status": {
+          "const": "passed"
+        }
+      },
+      "required": [
+        "status",
+        "passed",
+        "code",
+        "reason_codes"
+      ]
+    },
+    {
+      "properties": {
+        "code": {
+          "const": "DPONE_DBT_DEV_EVIDENCE_UNVERIFIED"
+        },
+        "passed": {
+          "const": false
+        },
+        "reason_codes": {
+          "minItems": 1
+        },
+        "status": {
+          "const": "unverified"
+        }
+      },
+      "required": [
+        "status",
+        "passed",
+        "code",
+        "reason_codes"
+      ]
+    }
+  ],
+  "properties": {
+    "code": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "evidence_set_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "reason_codes": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "required_workloads": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema": {
+      "const": "dpone.dbt-dev-evidence-verification.v2"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "unverified"
+      ]
+    },
+    "verified_dbt_workflows": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "verified_workloads": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schema",
+    "status",
+    "passed",
+    "code",
+    "release_id",
+    "deployment_id",
+    "required_workloads",
+    "verified_workloads",
+    "verified_dbt_workflows",
+    "reason_codes",
+    "evidence_set_id"
+  ],
+  "type": "object"
+}

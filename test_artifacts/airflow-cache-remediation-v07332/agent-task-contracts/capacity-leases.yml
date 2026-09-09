@@ -1,0 +1,72 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-CACHE-07332-C"
+title: "Recoverable capacity reservations and cross-UID leases"
+goal: "Make cache capacity, staging leases, and retention safe after crash and across writers sharing fsGroup."
+specification: "docs/feature-design-airflow-legacy-pack-cache-hardening-v07332.md"
+base_commit: "b58295232540ddc869a6af1310770e2f9ba9c722"
+integrator: "Codex parent integrator"
+
+acceptance_criteria:
+  - "Reservations record owner and timestamps, reclaim only provably stale entries, and include orphan stage bytes."
+  - "Shared control directories use setgid group-writable modes; private mode remains owner-only."
+  - "Unreadable or malformed leases block deletion instead of being treated as inactive."
+  - "Retention never deletes active, unreadable, or authority-protected stages/generations."
+  - "Changed and new Python modules remain at or below 400 SLOC."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - artifacts-evidence
+    - state-checkpoint
+  migration_required: false
+
+owned_paths:
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_generation_budget.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_generation_lease.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_generation_retention.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_writer_coordination.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_permissions.py
+  - tests/test_airflow_cache_capacity_leases.py
+read_only_paths:
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_generation_store.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_sync.py
+  - docs/airflow-legacy-pack-cache-operations.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_sync.py
+
+shared_file_owner: "Codex parent integrator"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_cache_capacity_leases.py -q"
+  broad:
+    - "uv run ruff check <owned Python paths>"
+    - "uv run ruff format --check <owned Python paths>"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,63 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-invocation-context.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "dynamic_vars": {
+      "items": false,
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "const": "dpone_data_interval_end"
+        },
+        {
+          "const": "dpone_data_interval_start"
+        }
+      ],
+      "type": "array"
+    },
+    "environment_policy": {
+      "const": "isolated_v1"
+    },
+    "indirect_selection": {
+      "const": "eager"
+    },
+    "invocation_context_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.dbt-invocation-context.v1"
+    },
+    "static_environment": {
+      "additionalProperties": false,
+      "properties": {
+        "DBT_SEND_ANONYMOUS_USAGE_STATS": {
+          "const": "false"
+        },
+        "LANG": {
+          "const": "C.UTF-8"
+        },
+        "LC_ALL": {
+          "const": "C.UTF-8"
+        }
+      },
+      "required": [
+        "DBT_SEND_ANONYMOUS_USAGE_STATS",
+        "LANG",
+        "LC_ALL"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema",
+    "environment_policy",
+    "indirect_selection",
+    "static_environment",
+    "dynamic_vars",
+    "invocation_context_sha256"
+  ],
+  "type": "object"
+}

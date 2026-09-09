@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/release/runtime-image-certification-v2.schema.json",
+  "title": "dpone runtime image certification v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "idempotency_key",
+    "release",
+    "subject",
+    "build",
+    "checks",
+    "attestations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "dpone.runtime-image-certification.v2"
+    },
+    "status": {
+      "const": "PASS"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "pattern": "^ghcr\\.io/[a-z0-9]+(?:[._/-][a-z0-9]+)*\\|(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\|sha256:[0-9a-f]{64}$"
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "tag",
+        "source_commit_sha",
+        "source_ref"
+      ],
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/stableSemver"
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^v(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$"
+        },
+        "source_commit_sha": {
+          "$ref": "#/$defs/fullSha"
+        },
+        "source_ref": {
+          "type": "string",
+          "pattern": "^refs/tags/v(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$"
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "digest",
+        "platform"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/imageName"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "platform": {
+          "const": "linux/amd64"
+        }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "run_attempt",
+        "dockerfile_sha256",
+        "dockerignore_sha256",
+        "context_manifest_sha256"
+      ],
+      "properties": {
+        "run_id": {
+          "$ref": "#/$defs/positiveId"
+        },
+        "run_attempt": {
+          "$ref": "#/$defs/positiveId"
+        },
+        "dockerfile_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "dockerignore_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "context_manifest_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/check"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "installed-dpone-version"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "dpone-version"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "pip-check"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "bcp"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "sqlcmd"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "clickhouse-client"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "native-accel-doctor"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "airflow-runtime-init-fetch-help"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "airflow-runtime-pack-exec-help"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "id": {
+                "const": "cosign"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        }
+      ]
+    },
+    "attestations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provenance",
+        "sbom"
+      ],
+      "properties": {
+        "provenance": {
+          "$ref": "#/$defs/attestation"
+        },
+        "sbom": {
+          "$ref": "#/$defs/attestation"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "stableSemver": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$"
+    },
+    "fullSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "imageName": {
+      "type": "string",
+      "pattern": "^ghcr\\.io/[a-z0-9]+(?:[._/-][a-z0-9]+)*$"
+    },
+    "positiveId": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "subject_digest"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "installed-dpone-version",
+            "dpone-version",
+            "pip-check",
+            "bcp",
+            "sqlcmd",
+            "clickhouse-client",
+            "native-accel-doctor",
+            "airflow-runtime-init-fetch-help",
+            "airflow-runtime-pack-exec-help",
+            "cosign"
+          ]
+        },
+        "status": {
+          "const": "PASS"
+        },
+        "subject_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "subject_digest"
+      ],
+      "properties": {
+        "status": {
+          "const": "PASS"
+        },
+        "subject_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}

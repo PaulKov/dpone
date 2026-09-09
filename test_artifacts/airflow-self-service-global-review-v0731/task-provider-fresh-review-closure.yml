@@ -1,0 +1,76 @@
+schema_version: 1
+task_id: "SS-REVIEW-PROVIDER-FRESH-REVIEW-CLOSURE"
+title: "Close provider confinement, isolation, identity and SDK fallback findings"
+goal: "Ensure every index-backed provider API consumes one confined verified artifact, isolates legacy per-DAG failures, binds release identity and fails closed on broken Airflow SDK installs."
+specification: "docs/airflow-self-service-architecture.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "DponeTaskGroup.from_pack consumes the exact confined verified snapshot and never reopens an unconfined path."
+  - "A legacy descriptor missing bytes remains deferred so one corrupt artifact is isolated by skip_and_report."
+  - "Every cache:// release artifact path is bound to the index release_id."
+  - "A missing requested DAG with only unrelated invalid DAG errors returns DPONE_AIRFLOW_DAG_SPEC_NOT_FOUND."
+  - "Airflow 2 fallback occurs only when airflow.sdk is genuinely absent; an installed but broken SDK fails closed."
+  - "Modern index behavior, public signatures and deprecation warnings remain compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["DponeTaskGroup.from_pack", "DponeDag.from_spec", "deployment index compatibility", "Airflow 2/3 import selection"]
+  migration_required: true
+
+owned_paths:
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/provider.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_artifact_resolver.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_tasks.py"
+  - "tests/test_airflow_deployment_index_provider.py"
+  - "tests/test_airflow_pack_cache.py"
+  - "tests/test_airflow_public_sdk_preference.py"
+read_only_paths:
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/adr/0008-airflow-parse-safe-provider.md"
+  - "docs/adr/0009-artifact-delivery-and-cache-materializer.md"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_artifact_contract.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_provenance.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_loader.py"
+  - "tests/test_airflow_dag_loader_contract.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src"
+  - "docs"
+
+shared_file_owner: "integrator"
+dependencies:
+  - "SS-REVIEW-PROVIDER-SNAPSHOT-ATOMICITY"
+  - "SS-REVIEW-PROVIDER-PARSE-HARDENING"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_deployment_index_provider.py tests/test_airflow_pack_cache.py tests/test_airflow_public_sdk_preference.py -q"
+    - "uv run ruff check packages/dpone-airflow-pack/src/dpone_airflow_pack/provider.py packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_artifact_resolver.py packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_tasks.py tests/test_airflow_deployment_index_provider.py tests/test_airflow_pack_cache.py tests/test_airflow_public_sdk_preference.py"
+    - "uv run mypy --config-file mypy.ini packages/dpone-airflow-pack/src/dpone_airflow_pack/provider.py packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_artifact_resolver.py packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_tasks.py"
+  broad:
+    - "uv run pytest -k airflow -q"
+    - "uv run dpone docs check-airflow-public-contracts"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "The fix requires remote I/O or repository scanning during Airflow parse."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+
+# Integrator handoff, 2026-07-18:
+# The provider snapshot/parse writers are complete and closed. Their current
+# changes are the baseline. Ownership of overlapping package/test paths is
+# transferred to this fresh-review closure and prior changes must not be
+# reverted.

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="468" viewBox="0 0 920 468" role="img" aria-label="Analyzer confidence">
+<rect width="920" height="468" fill="#f8fafc"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Analyzer confidence</text>
+<text x="32" y="66" font-size="13" font-weight="400" fill="#475569">Confidence score from analyzer agreement, coverage and explicit unavailable-tool handling.</text>
+<text x="32" y="118" font-size="13" font-weight="700" fill="#111827">dpone</text>
+<rect x="222" y="102" width="540" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="222" y="102" width="334" height="22" rx="4" fill="#f59e0b"/>
+<text x="792" y="118" font-size="12" font-weight="400" fill="#475569">62/100 medium</text>
+<text x="32" y="174" font-size="13" font-weight="700" fill="#111827">Airbyte</text>
+<rect x="222" y="158" width="540" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="222" y="158" width="378" height="22" rx="4" fill="#f59e0b"/>
+<text x="792" y="174" font-size="12" font-weight="400" fill="#475569">70/100 medium</text>
+<text x="32" y="230" font-size="13" font-weight="700" fill="#111827">dlt</text>
+<rect x="222" y="214" width="540" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="222" y="214" width="334" height="22" rx="4" fill="#f59e0b"/>
+<text x="792" y="230" font-size="12" font-weight="400" fill="#475569">62/100 medium</text>
+<text x="32" y="286" font-size="13" font-weight="700" fill="#111827">Pentaho Kettle</text>
+<rect x="222" y="270" width="540" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="222" y="270" width="334" height="22" rx="4" fill="#f59e0b"/>
+<text x="792" y="286" font-size="12" font-weight="400" fill="#475569">62/100 medium</text>
+<text x="32" y="342" font-size="13" font-weight="700" fill="#111827">Apache Hop</text>
+<rect x="222" y="326" width="540" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="222" y="326" width="334" height="22" rx="4" fill="#f59e0b"/>
+<text x="792" y="342" font-size="12" font-weight="400" fill="#475569">62/100 medium</text>
+<text x="32" y="398" font-size="13" font-weight="700" fill="#111827">Sling</text>
+<rect x="222" y="382" width="540" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="222" y="382" width="334" height="22" rx="4" fill="#f59e0b"/>
+<text x="792" y="398" font-size="12" font-weight="400" fill="#475569">62/100 medium</text>
+</svg>

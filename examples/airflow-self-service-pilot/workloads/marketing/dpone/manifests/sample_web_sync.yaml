@@ -1,0 +1,28 @@
+kind: dpone.batch.v1
+metadata:
+  id: sample_web_sync
+  domain: marketing
+  tags: [dpone, airflow]
+defaults:
+  source:
+    type: clickhouse
+    connection_ref: clickhouse_dev
+    table:
+      schema: "{{ src_schema }}"
+      name: "{{ src_table }}"
+    sql_file: ../sql/sample_web_sync.sql
+  sink:
+    type: mssql
+    connection_ref: mssql_dev
+    table:
+      schema: analytics
+      name: "{{ src_schema }}__{{ src_table }}"
+    mode: replace
+    strategy:
+      mode: full_refresh
+naming:
+  process_name: "{{ src_schema }}__{{ src_table }}"
+schemas:
+  marketing:
+    tables:
+      - table: sample_web_sync

@@ -1,0 +1,59 @@
+schema_version: 1
+task_id: "DPONE-DBT-002"
+title: "Implement strict dbt runtime contracts and execution"
+goal: "Provide bounded project bundle, selection, execution evidence and shell-free dbt runtime services without changing shared Airflow schemas."
+specification: "docs/feature-design-dbt-inline-self-service-v1.md"
+base_commit: "04bb048639641c9d6fb55fbfead21cec3345c70c"
+integrator: "parent"
+
+acceptance_criteria:
+  - "Project snapshots are deterministic, no-follow, confined and bounded."
+  - "Execution pack and run-results evidence use strict typed contracts."
+  - "Runtime command returns the real dbt exit code and never invokes a shell."
+  - "Temporary dbt profile is mode 0600, removable and contains no evidence/log secret data."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["Python contracts", "runtime command", "evidence"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/contracts/dbt_publishing.py"
+  - "src/dpone/ports/dbt_publishing.py"
+  - "src/dpone/runtime/dbt_*.py"
+  - "src/dpone/adapters/dbt_*.py"
+  - "tests/test_dbt_project_bundle.py"
+  - "tests/test_dbt_runtime_execution.py"
+read_only_paths:
+  - "docs/feature-design-dbt-inline-self-service-v1.md"
+  - "src/dpone/runtime/verified_pack_launcher.py"
+  - "src/dpone/runtime/runtime_init_fetch_plan.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "docs/schemas/**"
+  - "src/dpone/gitops/**"
+  - "src/dpone/runtime/verified_pack_launcher.py"
+  - "src/dpone/runtime/runtime_init_fetch_plan.py"
+
+shared_file_owner: "parent"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_project_bundle.py tests/test_dbt_runtime_execution.py -q"
+  broad:
+    - "uv run ruff check src/dpone/contracts/dbt_publishing.py src/dpone/ports/dbt_publishing.py src/dpone/runtime/dbt_*.py src/dpone/adapters/dbt_*.py tests/test_dbt_project_bundle.py tests/test_dbt_runtime_execution.py"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Shared Airflow wire edit is required."

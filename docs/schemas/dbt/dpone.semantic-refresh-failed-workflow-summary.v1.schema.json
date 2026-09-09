@@ -1,0 +1,86 @@
+{
+  "$comment": "Python validation additionally requires expected_operation_ids and ordered model operation IDs to be the same canonical set. COMMIT_UNKNOWN is intentionally excluded.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-failed-workflow-summary.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "expected_operation_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "models": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_binding_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "mssql_evidence_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "mssql_outcome": {
+            "enum": [
+              "NOT_INVOKED",
+              "ROLLED_BACK",
+              "COMMITTED_WITH_IMAGES"
+            ],
+            "type": "string"
+          },
+          "operation_id": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attempt_binding_sha256",
+          "mssql_evidence_sha256",
+          "mssql_outcome",
+          "operation_id"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-failed-workflow-summary.v1"
+    },
+    "status": {
+      "const": "FAILED_PRE_COMMIT"
+    },
+    "terminal_summary_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_execution_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "workflow_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "expected_operation_ids",
+    "models",
+    "schema",
+    "status",
+    "terminal_summary_sha256",
+    "workflow_execution_binding_sha256",
+    "workflow_id",
+    "workflow_plan_sha256"
+  ],
+  "type": "object"
+}

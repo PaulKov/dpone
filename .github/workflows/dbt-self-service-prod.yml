@@ -1,0 +1,478 @@
+name: Reusable dbt self-service prod promotion
+
+on:
+  workflow_call:
+    inputs:
+      dpone-version:
+        required: true
+        type: string
+      airflow-version:
+        description: Exact tested Airflow version
+        required: true
+        type: string
+      python-version:
+        description: Python version from the tested Airflow matrix
+        default: "3.12"
+        required: false
+        type: string
+      project-dir:
+        description: CI-managed dbt source mirror in the prod repository
+        required: true
+        type: string
+      promotion-descriptor-path:
+        description: Bot-owned promotion descriptor in the prod repository
+        default: .dpone/dbt/promotion.json
+        required: false
+        type: string
+      release-repository:
+        description: Dev repository containing the release artifact
+        required: true
+        type: string
+      release-run-id:
+        description: Exact dev workflow run id
+        required: true
+        type: number
+      release-artifact-name:
+        default: dpone-dbt-release
+        required: false
+        type: string
+      release-source-commit:
+        required: true
+        type: string
+      release-source-ref:
+        required: true
+        type: string
+      expected-release-id:
+        required: true
+        type: string
+      expected-dev-deployment-id:
+        description: Dev deployment identity proven by runtime evidence
+        required: true
+        type: string
+      expected-dev-activation-id:
+        description: Exact dev cache activation proven by runtime evidence
+        required: true
+        type: string
+      dev-evidence-run-id:
+        description: Exact workflow run containing final dev runtime evidence
+        required: true
+        type: number
+      dev-evidence-artifact-name:
+        default: dpone-dbt-dev-evidence
+        required: false
+        type: string
+      dev-evidence-source-commit:
+        required: true
+        type: string
+      dev-evidence-source-ref:
+        required: true
+        type: string
+      runtime-image-ref:
+        required: true
+        type: string
+      runtime-image-digest:
+        required: true
+        type: string
+      artifact-registry-ref:
+        required: true
+        type: string
+      registry-uri:
+        required: true
+        type: string
+      registry-config-map-name:
+        required: true
+        type: string
+      registry-config-sha256:
+        required: true
+        type: string
+      trust-policy-config-map-name:
+        required: true
+        type: string
+    secrets:
+      release-artifact-token:
+        description: Read-only token for the exact dev workflow artifact
+        required: true
+    outputs:
+      deployment-id:
+        value: ${{ jobs.promote.outputs.deployment-id }}
+
+permissions:
+  contents: read
+  attestations: read
+
+jobs:
+  promote:
+    runs-on: [self-hosted, dpone-dbt-prod]
+    environment: production
+    outputs:
+      deployment-id: ${{ steps.deployment.outputs.deployment-id }}
+    env:
+      PYTHONNOUSERSITE: "1"
+      PYTHONPATH: ""
+      DPONE_TRUSTED_VERSION: ${{ vars.DPONE_DBT_TOOLING_VERSION }}
+      DPONE_COMPILED_ROOT: .dpone-ci/dev-release/release-a
+      DPONE_CACHE_ROOT: /var/lib/dpone/airflow/prod/.dpone-cache
+      DPONE_PROJECT_DIR: ${{ inputs.project-dir }}
+      DPONE_RELEASE_ID: ${{ inputs.expected-release-id }}
+      DPONE_DEV_EVIDENCE_ROOT: .dpone-ci/dev-evidence/trusted-dev-evidence
+      DPONE_DEV_EVIDENCE_REF: github-actions://${{ inputs.release-repository }}/actions/runs/${{ inputs.dev-evidence-run-id }}
+      DPONE_ENVIRONMENT: prod
+      DPONE_RUNTIME_IMAGE_REF: ${{ inputs.runtime-image-ref }}
+      DPONE_RUNTIME_IMAGE_DIGEST: ${{ inputs.runtime-image-digest }}
+      DPONE_ARTIFACT_REGISTRY_REF: ${{ inputs.artifact-registry-ref }}
+      DPONE_REGISTRY_URI: ${{ inputs.registry-uri }}
+      DPONE_ARTIFACT_REGISTRY_SCOPE_ID: ${{ vars.DPONE_DBT_ARTIFACT_REGISTRY_SCOPE_ID }}
+      DPONE_RELEASE_REPOSITORY: ${{ inputs.release-repository }}
+      DPONE_RELEASE_SOURCE_COMMIT: ${{ inputs.release-source-commit }}
+      DPONE_RELEASE_SOURCE_REF: ${{ inputs.release-source-ref }}
+      DPONE_DEV_EVIDENCE_SOURCE_COMMIT_EXPECTED: ${{ inputs.dev-evidence-source-commit }}
+      DPONE_DEV_EVIDENCE_SOURCE_REF: ${{ inputs.dev-evidence-source-ref }}
+      EXPECTED_DEV_ACTIVATION_ID: ${{ inputs.expected-dev-activation-id }}
+      DPONE_PROMOTED_BY: ${{ vars.DPONE_PROMOTION_IDENTITY }}
+      DPONE_ALLOWED_PROMOTER: ${{ vars.DPONE_DBT_ALLOWED_PROMOTER }}
+      DPONE_TRUSTED_SIGNER_WORKFLOW: ${{ vars.DPONE_DBT_TRUSTED_SIGNER_WORKFLOW }}
+      DPONE_TRUSTED_SIGNER_DIGEST: ${{ vars.DPONE_DBT_TRUSTED_SIGNER_DIGEST }}
+      DPONE_TRUSTED_EVIDENCE_WORKFLOW: ${{ vars.DPONE_DBT_TRUSTED_EVIDENCE_WORKFLOW }}
+      DPONE_TRUSTED_EVIDENCE_SIGNER_DIGEST: ${{ vars.DPONE_DBT_TRUSTED_EVIDENCE_SIGNER_DIGEST }}
+      DPONE_EXPECTED_CURRENT: ${{ vars.DPONE_DBT_EXPECTED_CURRENT_DEPLOYMENT_ID }}
+      DPONE_TRUST_POLICY_PATH: platform/runtime-artifact-trust-policy.json
+      DPONE_TRUST_POLICY_SHA256: ${{ vars.DPONE_DBT_RUNTIME_TRUST_POLICY_SHA256 }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+
+      - name: Install exact dpone/dbt tooling and Airflow provider matrices
+        env:
+          DPONE_VERSION: ${{ inputs.dpone-version }}
+          AIRFLOW_VERSION: ${{ inputs.airflow-version }}
+          PYTHON_VERSION: ${{ inputs.python-version }}
+          DPONE_PROJECT_DIR: ${{ inputs.project-dir }}
+          DPONE_RELEASE_ID: ${{ inputs.expected-release-id }}
+          DPONE_RELEASE_REPOSITORY: ${{ inputs.release-repository }}
+          DPONE_RELEASE_SOURCE_COMMIT: ${{ inputs.release-source-commit }}
+          DPONE_RELEASE_SOURCE_REF: ${{ inputs.release-source-ref }}
+          DPONE_RUNTIME_IMAGE_REF: ${{ inputs.runtime-image-ref }}
+          DPONE_RUNTIME_IMAGE_DIGEST: ${{ inputs.runtime-image-digest }}
+          EXPECTED_DEV_DEPLOYMENT_ID: ${{ inputs.expected-dev-deployment-id }}
+          EXPECTED_DEV_ACTIVATION_ID: ${{ inputs.expected-dev-activation-id }}
+          DEV_EVIDENCE_ARTIFACT_NAME: ${{ inputs.dev-evidence-artifact-name }}
+          DPONE_DEV_EVIDENCE_SOURCE_COMMIT_EXPECTED: ${{ inputs.dev-evidence-source-commit }}
+          DPONE_DEV_EVIDENCE_SOURCE_REF: ${{ inputs.dev-evidence-source-ref }}
+          DPONE_ARTIFACT_REGISTRY_REF: ${{ inputs.artifact-registry-ref }}
+          DPONE_REGISTRY_URI: ${{ inputs.registry-uri }}
+          REGISTRY_CONFIG_MAP_NAME: ${{ inputs.registry-config-map-name }}
+          REGISTRY_CONFIG_SHA256: ${{ inputs.registry-config-sha256 }}
+          TRUST_POLICY_CONFIG_MAP_NAME: ${{ inputs.trust-policy-config-map-name }}
+          PROMOTION_DESCRIPTOR_PATH: ${{ inputs.promotion-descriptor-path }}
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          rules = {
+              "DPONE_VERSION": r"^[0-9]+\.[0-9]+\.[0-9]+(?:[0-9A-Za-z._+-]*)?$",
+              "AIRFLOW_VERSION": r"^[0-9]+\.[0-9]+\.[0-9]+(?:[0-9A-Za-z._+-]*)?$",
+              "PYTHON_VERSION": r"^3\.(11|12)$",
+              "DPONE_PROJECT_DIR": r"^(?!.*(?:^|/)\.\.(?:/|$))(?!/)[A-Za-z0-9._@+/-]+$",
+              "DPONE_RELEASE_ID": r"^sha256:[0-9a-f]{64}$",
+              "DPONE_RELEASE_REPOSITORY": r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+              "DPONE_RELEASE_SOURCE_COMMIT": r"^[0-9a-f]{40}$",
+              "DPONE_RELEASE_SOURCE_REF": r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$",
+              "DPONE_RUNTIME_IMAGE_REF": r"^[A-Za-z0-9._/-]+@[sS][hH][aA]256:[0-9a-f]{64}$",
+              "DPONE_RUNTIME_IMAGE_DIGEST": r"^sha256:[0-9a-f]{64}$",
+              "EXPECTED_DEV_DEPLOYMENT_ID": r"^sha256:[0-9a-f]{64}$",
+              "EXPECTED_DEV_ACTIVATION_ID": r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "DEV_EVIDENCE_ARTIFACT_NAME": r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+              "DPONE_DEV_EVIDENCE_SOURCE_COMMIT_EXPECTED": r"^[0-9a-f]{40}$",
+              "DPONE_DEV_EVIDENCE_SOURCE_REF": r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$",
+              "DPONE_ARTIFACT_REGISTRY_REF": r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+              "DPONE_REGISTRY_URI": r"^[A-Za-z][A-Za-z0-9+.-]*:[^\s\"'`$\\]{1,1024}$",
+              "DPONE_ARTIFACT_REGISTRY_SCOPE_ID": r"^sha256:[0-9a-f]{64}$",
+              "REGISTRY_CONFIG_MAP_NAME": r"^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+              "REGISTRY_CONFIG_SHA256": r"^sha256:[0-9a-f]{64}$",
+              "TRUST_POLICY_CONFIG_MAP_NAME": r"^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+              "DPONE_TRUST_POLICY_SHA256": r"^sha256:[0-9a-f]{64}$",
+              "PROMOTION_DESCRIPTOR_PATH": r"^(?!.*(?:^|/)\.\.(?:/|$))(?!/)[A-Za-z0-9._@+/-]+$",
+              "DPONE_EXPECTED_CURRENT": r"^(?:sha256:[0-9a-f]{64})?$",
+          }
+          failed = False
+          for name, pattern in rules.items():
+              value = os.environ.get(name, "")
+              if not re.fullmatch(pattern, value):
+                  print(f"{name}: rejected by allowlist", file=sys.stderr)
+                  failed = True
+          if os.environ.get("DPONE_VERSION") != os.environ.get("DPONE_TRUSTED_VERSION"):
+              print("DPONE_VERSION: differs from protected DPONE_DBT_TOOLING_VERSION", file=sys.stderr)
+              failed = True
+          raise SystemExit(4 if failed else 0)
+          PY
+          case "${AIRFLOW_VERSION}:${PYTHON_VERSION}" in
+            2.10.5:3.11|2.10.5:3.12|2.11.0:3.11|2.11.0:3.12|3.2.0:3.11|3.2.0:3.12|3.3.0:3.11|3.3.0:3.12) ;;
+            *) echo "unsupported Airflow/Python pair" >&2; exit 4 ;;
+          esac
+          CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+          python -m venv .venv-dpone
+          python -m venv .venv-airflow
+          .venv-dpone/bin/python -m pip install \
+            "dpone[dbt-mssql]==${DPONE_TRUSTED_VERSION}"
+          .venv-dpone/bin/python -m pip check
+          .venv-airflow/bin/python -m pip install \
+            --constraint "${CONSTRAINT_URL}" \
+            "apache-airflow==${AIRFLOW_VERSION}" \
+            "apache-airflow-providers-dpone==${DPONE_TRUSTED_VERSION}"
+          .venv-airflow/bin/python -m pip check
+          echo "${GITHUB_WORKSPACE}/.venv-dpone/bin" >> "${GITHUB_PATH}"
+
+      - name: Download exact dev release artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.release-artifact-name }}
+          path: .dpone-ci/dev-release
+          repository: ${{ inputs.release-repository }}
+          run-id: ${{ inputs.release-run-id }}
+          github-token: ${{ secrets.release-artifact-token }}
+
+      - name: Download exact dev runtime evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.dev-evidence-artifact-name }}
+          path: .dpone-ci/dev-evidence
+          repository: ${{ inputs.release-repository }}
+          run-id: ${{ inputs.dev-evidence-run-id }}
+          github-token: ${{ secrets.release-artifact-token }}
+
+      - name: Require an environment-owned scheduler cache
+        run: |
+          if [ -z "${DPONE_PROMOTED_BY}" ]; then
+            echo "trusted repository variable DPONE_PROMOTION_IDENTITY is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_ALLOWED_PROMOTER}" ]; then
+            echo "trusted repository variable DPONE_DBT_ALLOWED_PROMOTER is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_ARTIFACT_REGISTRY_SCOPE_ID}" ]; then
+            echo "protected production-environment variable DPONE_DBT_ARTIFACT_REGISTRY_SCOPE_ID is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_TRUSTED_SIGNER_WORKFLOW}" ]; then
+            echo "trusted repository variable DPONE_DBT_TRUSTED_SIGNER_WORKFLOW is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_TRUSTED_SIGNER_DIGEST}" ]; then
+            echo "trusted repository variable DPONE_DBT_TRUSTED_SIGNER_DIGEST is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_TRUSTED_EVIDENCE_WORKFLOW}" ]; then
+            echo "trusted repository variable DPONE_DBT_TRUSTED_EVIDENCE_WORKFLOW is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_TRUSTED_EVIDENCE_SIGNER_DIGEST}" ]; then
+            echo "trusted repository variable DPONE_DBT_TRUSTED_EVIDENCE_SIGNER_DIGEST is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_TRUST_POLICY_SHA256}" ]; then
+            echo "protected environment variable DPONE_DBT_RUNTIME_TRUST_POLICY_SHA256 is required" >&2
+            exit 4
+          fi
+          python - <<'PY'
+          import os
+          import pathlib
+
+          root = pathlib.Path(os.environ["GITHUB_WORKSPACE"]).resolve(strict=True)
+          candidate = root / os.environ["DPONE_TRUST_POLICY_PATH"]
+          if candidate.is_symlink():
+              raise SystemExit("production trust policy must not be a symlink")
+          resolved = candidate.resolve(strict=True)
+          if not resolved.is_file() or not resolved.is_relative_to(root):
+              raise SystemExit("production trust policy must be a regular file inside GITHUB_WORKSPACE")
+          PY
+          case "${DPONE_CACHE_ROOT}" in
+            /*) ;;
+            *) echo "trusted prod cache root must be absolute" >&2; exit 4 ;;
+          esac
+
+      - name: Verify release producer and every downloaded release byte
+        env:
+          GH_TOKEN: ${{ secrets.release-artifact-token }}
+        run: |
+          gh attestation verify \
+            "${DPONE_COMPILED_ROOT}/release-subjects.sha256" \
+            --repo "${DPONE_RELEASE_REPOSITORY}" \
+            --signer-workflow "${DPONE_TRUSTED_SIGNER_WORKFLOW}" \
+            --signer-digest "${DPONE_TRUSTED_SIGNER_DIGEST}" \
+            --source-digest "${DPONE_RELEASE_SOURCE_COMMIT}" \
+            --source-ref "${DPONE_RELEASE_SOURCE_REF}" \
+            --format json > .dpone-ci/github-attestation-verification.json
+          RECEIPT_SHA256="$(sha256sum .dpone-ci/github-attestation-verification.json | cut -d' ' -f1)"
+          echo "DPONE_ATTESTATION_REF=github-attestation-receipt:sha256:${RECEIPT_SHA256}" >> "${GITHUB_ENV}"
+          dpone dbt verify-release-checksums \
+            --compiled-root "${DPONE_COMPILED_ROOT}" \
+            --format json > .dpone-ci/release-integrity-verification.json
+
+      - name: Verify the runtime attestation with the exact offline policy
+        run: |
+          dpone airflow verify-attestation \
+            --subject "${DPONE_COMPILED_ROOT}/release-set.json" \
+            --bundle .dpone-ci/dev-release/release-attestation.sigstore.jsonl \
+            --trust-policy "${DPONE_TRUST_POLICY_PATH}" \
+            --expected-trust-policy-sha256 "${DPONE_TRUST_POLICY_SHA256}" \
+            --expected-trust-tier production \
+            --format json > .dpone-ci/runtime-attestation-verification.json
+
+      - name: Resolve the pinned package tree for mirror verification
+        run: |
+          if [ -f "${DPONE_PROJECT_DIR}/packages.yml" ] || [ -f "${DPONE_PROJECT_DIR}/dependencies.yml" ]; then
+            test -f "${DPONE_PROJECT_DIR}/package-lock.yml"
+            git ls-files --error-unmatch "${DPONE_PROJECT_DIR}/package-lock.yml"
+          fi
+          dbt deps --project-dir "${DPONE_PROJECT_DIR}"
+          git diff --exit-code -- "${DPONE_PROJECT_DIR}/package-lock.yml"
+          test -z "$(git status --porcelain=v1 --untracked-files=all -- "${DPONE_PROJECT_DIR}/package-lock.yml")"
+
+      - name: Verify byte-identical prod source mirror
+        env:
+          EXPECTED_DEV_DEPLOYMENT_ID: ${{ inputs.expected-dev-deployment-id }}
+          GH_TOKEN: ${{ secrets.release-artifact-token }}
+        run: |
+          gh attestation verify \
+            "${DPONE_DEV_EVIDENCE_ROOT}/evidence-subjects.sha256" \
+            --repo "${DPONE_RELEASE_REPOSITORY}" \
+            --signer-workflow "${DPONE_TRUSTED_EVIDENCE_WORKFLOW}" \
+            --signer-digest "${DPONE_TRUSTED_EVIDENCE_SIGNER_DIGEST}" \
+            --source-digest "${DPONE_DEV_EVIDENCE_SOURCE_COMMIT_EXPECTED}" \
+            --source-ref "${DPONE_DEV_EVIDENCE_SOURCE_REF}" \
+            --format json > .dpone-ci/dev-evidence-attestation-verification.json
+          dpone dbt verify-dev-evidence-integrity \
+            --compiled-root "${DPONE_COMPILED_ROOT}" \
+            --evidence-root "${DPONE_DEV_EVIDENCE_ROOT}" \
+            --expected-release-id "${DPONE_RELEASE_ID}" \
+            --expected-deployment-id "${EXPECTED_DEV_DEPLOYMENT_ID}" \
+            --expected-activation-id "${EXPECTED_DEV_ACTIVATION_ID}" \
+            --format json > .dpone-ci/dev-evidence-verification.json
+          python -c "import json,os; r=json.load(open('.dpone-ci/dev-evidence-verification.json')); p=json.load(open(os.environ['DPONE_DEV_EVIDENCE_ROOT']+'/provenance.json')); assert r.get('evidence_set_id') == p.get('evidence_set_id') and r.get('campaign_request_sha256') == p.get('campaign_request_sha256') and p.get('schema') == 'dpone.dbt-dev-evidence-provenance.v2'; print('DPONE_DEV_EVIDENCE_SUBJECT_SHA256='+r['subject_sha256']); print('DPONE_DEV_EVIDENCE_SET_ID='+p['evidence_set_id']); print('DPONE_DEV_EVIDENCE_CAMPAIGN_REQUEST_SHA256='+p['campaign_request_sha256']); print('DPONE_DEV_EVIDENCE_PRODUCER_WORKFLOW='+p['finalizer_workflow']); print('DPONE_DEV_EVIDENCE_SOURCE_COMMIT='+p['finalizer_source_commit'])" >> "${GITHUB_ENV}"
+
+      - name: Verify byte-identical prod source and immutable promotion descriptor
+        env:
+          PROMOTION_DESCRIPTOR_PATH: ${{ inputs.promotion-descriptor-path }}
+          EXPECTED_DEV_DEPLOYMENT_ID: ${{ inputs.expected-dev-deployment-id }}
+          DEV_EVIDENCE_ARTIFACT_NAME: ${{ inputs.dev-evidence-artifact-name }}
+        run: |
+          dpone dbt verify-promotion "${DPONE_PROJECT_DIR}" \
+            --compiled-root "${DPONE_COMPILED_ROOT}" \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --descriptor-path "${PROMOTION_DESCRIPTOR_PATH}" \
+            --expected-dev-deployment-id "${EXPECTED_DEV_DEPLOYMENT_ID}" \
+            --expected-dev-evidence-ref "${DPONE_DEV_EVIDENCE_REF}" \
+            --expected-dev-evidence-subject-sha256 "${DPONE_DEV_EVIDENCE_SUBJECT_SHA256}" \
+            --expected-dev-evidence-set-id "${DPONE_DEV_EVIDENCE_SET_ID}" \
+            --expected-dev-evidence-campaign-request-sha256 "${DPONE_DEV_EVIDENCE_CAMPAIGN_REQUEST_SHA256}" \
+            --expected-dev-evidence-artifact-name "${DEV_EVIDENCE_ARTIFACT_NAME}" \
+            --expected-dev-evidence-producer-workflow "${DPONE_DEV_EVIDENCE_PRODUCER_WORKFLOW}" \
+            --expected-dev-evidence-source-commit "${DPONE_DEV_EVIDENCE_SOURCE_COMMIT}" \
+            --format json > .dpone-ci/promotion-verification.json
+
+      - name: Materialize the verified release
+        run: |
+          dpone dbt materialize-release \
+            --compiled-root "${DPONE_COMPILED_ROOT}" \
+            --cache-root "${DPONE_CACHE_ROOT}" \
+            --expected-release-id "${DPONE_RELEASE_ID}" \
+            --format json > .dpone-ci/release-materialization.json
+
+      - name: Build immutable prod deployment
+        id: deployment
+        env:
+          REGISTRY_CONFIG_MAP_NAME: ${{ inputs.registry-config-map-name }}
+          REGISTRY_CONFIG_SHA256: ${{ inputs.registry-config-sha256 }}
+          TRUST_POLICY_CONFIG_MAP_NAME: ${{ inputs.trust-policy-config-map-name }}
+          AIRFLOW_BUNDLE_REF: git:${{ github.sha }}
+        run: |
+          dpone airflow build \
+            --release-id "${DPONE_RELEASE_ID}" \
+            --environment "${DPONE_ENVIRONMENT}" \
+            --trust-tier production \
+            --runtime-image-ref "${DPONE_RUNTIME_IMAGE_REF}" \
+            --runtime-image-digest "${DPONE_RUNTIME_IMAGE_DIGEST}" \
+            --artifact-registry-ref "${DPONE_ARTIFACT_REGISTRY_REF}" \
+            --registry-config-map-name "${REGISTRY_CONFIG_MAP_NAME}" \
+            --registry-config-sha256 "${REGISTRY_CONFIG_SHA256}" \
+            --trust-policy-config-map-name "${TRUST_POLICY_CONFIG_MAP_NAME}" \
+            --trust-policy-sha256 "${DPONE_TRUST_POLICY_SHA256}" \
+            --airflow-bundle-ref "${AIRFLOW_BUNDLE_REF}" \
+            --format json > .dpone-ci/deployment.json
+          python -c "import json; p=json.load(open('.dpone-ci/deployment.json')); print('deployment-id='+p['deployment_id']); print('deployment-dir='+p['deployment_dir'])" >> "${GITHUB_OUTPUT}"
+
+      - name: Parse smoke the exact deployment index
+        env:
+          DPONE_INDEX_PATH: ${{ steps.deployment.outputs.deployment-dir }}/airflow-index.json
+        run: |
+          .venv-airflow/bin/python -c "import os; from airflow.providers.dpone import load_dpone_dags; namespace={}; report=load_dpone_dags(namespace,index_path=os.environ['DPONE_INDEX_PATH'],invalid_dag_policy='fail_all',duplicate_policy='fail_all'); raise SystemExit(4 if report.fatal or report.errors or not report.loaded else 0)"
+
+      - name: Publish immutable release and deployment
+        env:
+          DPONE_DEPLOYMENT_ID: ${{ steps.deployment.outputs.deployment-id }}
+        run: |
+          dpone airflow publish \
+            --cache-root "${DPONE_CACHE_ROOT}" \
+            --release-id "${DPONE_RELEASE_ID}" \
+            --deployment-id "${DPONE_DEPLOYMENT_ID}" \
+            --environment "${DPONE_ENVIRONMENT}" \
+            --artifact-registry-ref "${DPONE_ARTIFACT_REGISTRY_REF}" \
+            --registry-uri "${DPONE_REGISTRY_URI}" \
+            --identity-mode workload_identity \
+            --artifact-attestation-bundle .dpone-ci/dev-release/release-attestation.sigstore.jsonl \
+            --expected-registry-scope-id "${DPONE_ARTIFACT_REGISTRY_SCOPE_ID}" \
+            --publication-mode exact \
+            --format json > .dpone-ci/publish.json
+
+      - name: CAS-promote current deployment
+        env:
+          DPONE_DEPLOYMENT_DIR: ${{ steps.deployment.outputs.deployment-dir }}
+        run: |
+          if [ -n "${DPONE_EXPECTED_CURRENT}" ]; then
+            CAS_ARGS=(--expected-current-deployment-id "${DPONE_EXPECTED_CURRENT}")
+          else
+            CAS_ARGS=(--expect-current-absent)
+          fi
+          dpone airflow cache-sync \
+            --cache-root "${DPONE_CACHE_ROOT}" \
+            --deployment-dir "${DPONE_DEPLOYMENT_DIR}" \
+            --environment "${DPONE_ENVIRONMENT}" \
+            --promoted-by "${DPONE_PROMOTED_BY}" \
+            --allowed-promoter "${DPONE_ALLOWED_PROMOTER}" \
+            "${CAS_ARGS[@]}" \
+            --source-commit "${GITHUB_SHA}" \
+            --attestation-ref "${DPONE_ATTESTATION_REF}" \
+            --confirm-promote \
+            --format json > .dpone-ci/cache-sync.json
+
+      - name: Verify environment activation receipt
+        run: |
+          dpone airflow cache-recovery-plan \
+            --cache-root "${DPONE_CACHE_ROOT}" \
+            --environment "${DPONE_ENVIRONMENT}" \
+            --format json > .dpone-ci/activation-receipt.json
+
+      - name: Upload promotion evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dpone-dbt-prod-promotion-${{ github.run_id }}
+          path: |
+            .dpone-ci/promotion-verification.json
+            .dpone-ci/github-attestation-verification.json
+            .dpone-ci/release-integrity-verification.json
+            .dpone-ci/runtime-attestation-verification.json
+            .dpone-ci/dev-evidence-attestation-verification.json
+            .dpone-ci/dev-evidence-verification.json
+            .dpone-ci/release-materialization.json
+            .dpone-ci/deployment.json
+            .dpone-ci/publish.json
+            .dpone-ci/cache-sync.json
+            .dpone-ci/activation-receipt.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 180

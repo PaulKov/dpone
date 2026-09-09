@@ -1,0 +1,71 @@
+schema_version: 1
+task_id: "DPONE-CI-GOVERNANCE-PROFILE-V2-DESIGN"
+title: "Research prior ADR-0037 V2 policy amendment"
+goal: >-
+  Define a versioned, fail-closed policy-evolution contract before #607 changes
+  pull-request receipt subscriptions or #618 changes CI topology.
+specification: "docs/feature-design-ci-governance-profile-v2-amendment.md"
+base_commit: "90abed74bc49b105223ffd2e1f2237aa12b25c12"
+integrator: "/root"
+
+acceptance_criteria:
+  - "The design remains RESEARCHED until a maintainer approves the exact reviewed specification."
+  - "V1 policy, schema, fixtures and historical evidence remain byte-identical."
+  - "#607 V2 trigger evolution and #618 V3 topology evolution require separate prior approvals."
+  - "No workflow, policy, schema, scanner, runtime, package, release or provider setting changes occur in this design PR."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["planned CI governance-policy evolution", "planned Agent PR receipt trigger contract"]
+  migration_required: false
+
+owned_paths:
+  - "docs/feature-design-ci-governance-profile-v2-amendment.md"
+  - "test_artifacts/agent-policy/ci-governance-profile-v2-amendment-design.yml"
+integrator_owned_paths: []
+read_only_paths:
+  - "docs/adr/0037-immutable-agent-pr-merge-closure.md"
+  - "docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md"
+  - "docs/feature-design-standard.md"
+  - "docs/agent-development.md"
+  - "docs/agent-templates/feature-design-spec.md"
+  - "tools/agent_policy/task_contract.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github"
+  - ".github/workflows"
+  - ".agents/policy"
+  - "evals/agent"
+  - "tools"
+  - "src"
+  - "packages"
+  - "tests"
+  - "docs/adr"
+shared_file_owner: "/root"
+
+dependencies:
+  - "Closed PR #653 exact-head failure evidence."
+  - "Open PR #655 exact-head failure evidence."
+required_checks:
+  focused:
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/ci-governance-profile-v2-amendment-design.yml"
+    - "uv run dpone docs check-docs"
+  broad:
+    - "uv run mkdocs build --strict"
+    - "git diff --check"
+  live:
+    - "N/A: design-only PR; a later implementation requires exact-head hosted evidence."
+required_outputs: ["implementation", "tests", "documentation_impact", "completion_report"]
+completion_statuses:
+  allowed: ["PASS", "FAIL", "SKIP", "N/A", "UNVERIFIED"]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "The document is marked APPROVED without an exact maintainer review."
+  - "A production implementation change is introduced."

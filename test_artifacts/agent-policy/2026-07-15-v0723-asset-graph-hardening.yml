@@ -1,0 +1,77 @@
+schema_version: 1
+task_id: "DPONE-V0723-ASSETS"
+title: "Make inferred Airflow asset schedules publish-safe"
+goal: "Block ambiguous/cyclic inferred asset graphs and emit producer outlets for every inferred cross-DAG edge."
+specification: "docs/feature-design-airflow-self-service-v0723-hardening.md"
+base_commit: "bfa778b566bdf29fbe31b2c7efc7a61d528ed1c9"
+integrator: "codex/v0.72.3-self-service-hardening"
+
+acceptance_criteria:
+  - "Multiple writers for one asset block publication unless an explicit curator decision resolves ownership."
+  - "An inferred consumer schedule has a matching producer outlet with provenance."
+  - "Cross-DAG cycles are detected deterministically and block every involved DAG."
+  - "Valid acyclic single-writer graphs preserve current DAG-spec behavior."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "Airflow asset inference blockers"
+    - "DAG-spec asset outlets and schedules"
+  migration_required: false
+
+owned_paths:
+  - src/dpone/gitops/airflow_asset_graph.py
+  - src/dpone/gitops/airflow_asset_cross_dag.py
+  - src/dpone/gitops/airflow_dag_spec_builder.py
+  - src/dpone/gitops/airflow_dag_spec_deps.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/asset_outlets.py
+  - tests/test_airflow_asset_graph.py
+  - tests/test_airflow_asset_cross_dag.py
+  - tests/test_airflow_dag_spec_builder.py
+  - tests/test_airflow_dag_spec_explain.py
+  - tests/test_airflow_asset_outlets.py
+read_only_paths:
+  - docs/feature-design-airflow-self-service-v0723-hardening.md
+  - docs/airflow-self-service-architecture.md
+  - docs/schemas/gitops/airflow-dag-spec.schema.json
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_loader.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/operators.py
+
+shared_file_owner: "integrator"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_asset_graph.py tests/test_airflow_asset_cross_dag.py tests/test_airflow_dag_spec_builder.py tests/test_airflow_dag_spec_explain.py tests/test_airflow_asset_outlets.py -q"
+  broad:
+    - "uv run ruff check src/dpone/gitops packages/dpone-airflow-pack/src/dpone_airflow_pack/asset_outlets.py"
+    - "uv run mypy --config-file mypy.ini"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

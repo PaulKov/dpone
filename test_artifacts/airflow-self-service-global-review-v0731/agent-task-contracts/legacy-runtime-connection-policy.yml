@@ -1,0 +1,62 @@
+schema_version: 1
+task_id: "SS-73"
+title: "Explicit-only legacy runtime connection policy"
+goal: >
+  Enforce the approved default-disabled compatibility policy for legacy runtime
+  connection authority while retaining an explicit one-release migration path.
+specification: >
+  Approved feature design and ADR 0027 define
+  runtime.compatibility.legacy_runtime_connections as disabled by default and
+  explicit_only as the sole temporary compatibility mode. The resolver must
+  decide this before constructing legacy source, sink, state, proxy, or
+  object-storage credential providers.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "Legacy authority is rejected when the policy is absent or disabled."
+  - "Only explicit_only permits explicitly authored legacy fields."
+  - "Unknown compatibility values fail with a stable bounded error."
+  - "Canonical connection_ref without a verified context remains rejected."
+  - "Strict context continues to reject every legacy authority field."
+  - "One DeprecationWarning per process is emitted only for allowed explicit legacy execution."
+
+public_contract_impact:
+  level: approved_breaking_migration
+  surfaces:
+    - runtime.compatibility.legacy_runtime_connections
+    - legacy runtime connector hydration
+  migration_required: true
+
+owned_paths:
+  - src/dpone/runtime/credentials/authority.py
+  - tests/test_runtime_connection_legacy_policy.py
+read_only_paths:
+  - docs/feature-design-runtime-connection-authority-and-hygiene-v0732.md
+  - docs/adr/0027-single-runtime-connection-authority.md
+  - tests/test_runtime_connection_composition_root.py
+forbidden_paths:
+  - src/dpone/schema
+  - docs
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "parent Codex agent"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_runtime_connection_legacy_policy.py tests/test_runtime_connection_composition_root.py -q"
+  broad:
+    - "uv run ruff check <owned Python paths>"
+    - "uv run ruff format --check <owned Python paths>"
+    - "uv run mypy --config-file mypy.ini src/dpone/runtime/credentials/authority.py"
+  live:
+    - "N/A: policy evaluation is deterministic and performs no I/O."
+
+stop_conditions:
+  - "The implementation restores or infers an implicit connection default."
+  - "The compatibility policy is read from an ambient environment variable."
+  - "Another writer owns the same path."

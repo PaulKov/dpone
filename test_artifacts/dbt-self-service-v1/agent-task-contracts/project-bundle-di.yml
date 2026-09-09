@@ -1,0 +1,70 @@
+schema_version: 1
+task_id: "DBT-SS-V1-BUNDLE-DI"
+title: "Inject dbt project bundle capabilities and remove preview defaults"
+goal: "Restore clean dependency direction and require explicit selection authority in the canonical release writer."
+specification: "docs/feature-design-dbt-inline-self-service-v1.md"
+base_commit: "7141afaa"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Canonical services do not import runtime bundle mechanics directly or through readiness re-exports."
+  - "Bundle build, extract, and post-selection verification are injected through capability-oriented ports."
+  - "Canonical DbtArtifactWriter requires an explicit selection resolver and bundle operations."
+  - "The app composition root injects dbt_cli selection and runtime-backed bundle operations."
+  - "Fake-port failures happen before output publication; composition output is dbt_cli-authoritative and materializable."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "internal dbt build-plane dependency injection"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/ports/dbt_project_bundle.py"
+  - "src/dpone/services/dbt_release_builder.py"
+  - "src/dpone/services/dbt_publish_artifact_writer.py"
+  - "src/dpone/services/dbt_prod_mirror_transaction.py"
+  - "src/dpone/app/dbt_publish_composition.py"
+  - "src/dpone/app/dbt_promotion_composition.py"
+  - "tests/test_dbt_selection_resolution.py"
+  - "tests/test_dbt_publish_atomicity.py"
+  - "tests/test_dbt_airflow_release_e2e.py"
+read_only_paths:
+  - "src/dpone/runtime/dbt_project_bundle.py"
+  - "src/dpone/readiness/dbt_publish_project_bundle.py"
+  - "docs/import-rules.md"
+  - "docs/feature-design-dbt-inline-self-service-v1.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/dbt_publish/**"
+  - "src/dpone/contracts/dbt_publish_models.py"
+  - "tests/test_dbt_publish_compatibility.py"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_selection_resolution.py tests/test_dbt_publish_atomicity.py tests/test_dbt_airflow_release_e2e.py -q"
+    - "uv run dpone docs check-import-rules"
+    - "uv run ruff check <owned paths>"
+    - "uv run mypy --config-file mypy.ini <owned source paths>"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live: []
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

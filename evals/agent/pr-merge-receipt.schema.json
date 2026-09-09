@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/agent-pr-merge-receipt-v1.json",
+  "title": "dpone Agent PR merge-closure receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "binding_id",
+    "repository",
+    "protected_base_ref",
+    "pr_number",
+    "merged_at",
+    "integration_method",
+    "reviewed_head_sha",
+    "reviewed_head_tree",
+    "base_parent_sha",
+    "integration_commit_sha",
+    "integration_tree",
+    "changed_paths",
+    "pr_body_sha256",
+    "source_receipt",
+    "producer",
+    "errors",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "binding_id": {
+      "$ref": "#/$defs/nullable_digest"
+    },
+    "repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protected_base_ref": {
+      "$ref": "#/$defs/nullable_string"
+    },
+    "pr_number": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "merged_at": {
+      "$ref": "#/$defs/nullable_string"
+    },
+    "integration_method": {
+      "anyOf": [
+        {
+          "enum": [
+            "merge",
+            "squash"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reviewed_head_sha": {
+      "$ref": "#/$defs/nullable_sha"
+    },
+    "reviewed_head_tree": {
+      "$ref": "#/$defs/nullable_sha"
+    },
+    "base_parent_sha": {
+      "$ref": "#/$defs/nullable_sha"
+    },
+    "integration_commit_sha": {
+      "$ref": "#/$defs/nullable_sha"
+    },
+    "integration_tree": {
+      "$ref": "#/$defs/nullable_sha"
+    },
+    "changed_paths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "pr_body_sha256": {
+      "$ref": "#/$defs/nullable_digest"
+    },
+    "source_receipt": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/source_receipt"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "producer": {
+      "$ref": "#/$defs/producer"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "PASS"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "binding_id": {
+            "$ref": "#/$defs/digest"
+          },
+          "protected_base_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pr_number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "merged_at": {
+            "type": "string",
+            "minLength": 1
+          },
+          "integration_method": {
+            "enum": [
+              "merge",
+              "squash"
+            ]
+          },
+          "reviewed_head_sha": {
+            "$ref": "#/$defs/sha"
+          },
+          "reviewed_head_tree": {
+            "$ref": "#/$defs/sha"
+          },
+          "base_parent_sha": {
+            "$ref": "#/$defs/sha"
+          },
+          "integration_commit_sha": {
+            "$ref": "#/$defs/sha"
+          },
+          "integration_tree": {
+            "$ref": "#/$defs/sha"
+          },
+          "pr_body_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "source_receipt": {
+            "$ref": "#/$defs/source_receipt"
+          },
+          "errors": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "FAIL"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "errors": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "nullable_sha": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullable_digest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullable_string": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "check_run_id",
+        "workflow_run_id",
+        "workflow_run_attempt",
+        "artifact_id",
+        "artifact_digest",
+        "artifact_size_bytes",
+        "archive_sha256",
+        "archive_size_bytes",
+        "created_at",
+        "completed_at",
+        "receipt_sha256",
+        "audit_manifest_sha256",
+        "body_sha256",
+        "status"
+      ],
+      "properties": {
+        "check_run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "workflow_run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "workflow_run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "artifact_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "artifact_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "archive_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "archive_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "completed_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "audit_manifest_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "body_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "N/A"
+          ]
+        }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflow",
+        "run_id",
+        "run_attempt"
+      ],
+      "properties": {
+        "workflow": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_attempt": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

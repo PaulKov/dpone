@@ -1,0 +1,720 @@
+name: Airflow pack compatibility
+
+# Validates the formal dpone provider and dependency-light reader against the
+# supported Apache Airflow release lines (2.10, 2.11, 3.2, and 3.3), including:
+# - import safety on a scheduler image (no heavy dpone runtime deps),
+# - KubernetesPodOperator task-group construction from static packs,
+# - interval/partition env templating and native/degraded Asset scheduling.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_call:
+    inputs:
+      airflow_max_parallel:
+        required: false
+        type: number
+        default: 2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Package and Helm evidence must identify the reviewed PR head. Other CI
+  # workflows still validate GitHub's synthetic merge commit independently.
+  DPONE_CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+concurrency:
+  group: airflow-pack-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-airflow-distributions:
+    name: Build Airflow distribution artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validate Airflow matrix parallelism
+        env:
+          RAW_AIRFLOW_MAX_PARALLEL: ${{ inputs.airflow_max_parallel }}
+        run: |
+          set -euo pipefail
+          case "${RAW_AIRFLOW_MAX_PARALLEL}" in
+            ""|2|4) ;;
+            *)
+              echo "::error::airflow_max_parallel must be empty, 2, or 4."
+              exit 1
+              ;;
+          esac
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: ${{ env.DPONE_CANDIDATE_SHA }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Install pinned Helm 3
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: v3.19.0
+
+      - name: Build immutable candidate wheels
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${DPONE_CANDIDATE_SHA}"
+          mkdir -p dist-airflow
+          uv build --wheel --out-dir dist-airflow
+          uv build packages/dpone-airflow-pack --wheel --out-dir dist-airflow
+          uv build packages/apache-airflow-providers-dpone --wheel --out-dir dist-airflow
+          uv tool run twine check dist-airflow/*.whl
+          cp docs/examples/airflow-cache-values-2.10.yaml dist-airflow/
+          cp docs/examples/airflow-cache-values-3.2.yaml dist-airflow/
+          (
+            cd dist-airflow
+            sha256sum ./*.whl airflow-cache-values-*.yaml > SHA256SUMS
+          )
+          printf '%s\n' "${DPONE_CANDIDATE_SHA}" > dist-airflow/SOURCE_COMMIT
+
+      - name: Render official Airflow charts with the ACK authority policy
+        run: |
+          set -euo pipefail
+          repo_root="${PWD}"
+          mkdir -p test_artifacts/airflow-helm
+          chart_dir="${RUNNER_TEMP}/dpone-airflow-charts"
+          render_dir="${RUNNER_TEMP}/dpone-airflow-renders"
+          mkdir -p "${chart_dir}" "${render_dir}"
+          uv venv .venv-helm
+          uv pip install --python .venv-helm/bin/python dist-airflow/dpone_airflow_pack-*.whl
+          post_renderer="${PWD}/.venv-helm/bin/dpone-airflow-pack-helm-post-renderer"
+          evidence_renderer=("${PWD}/.venv-helm/bin/python" -m dpone_airflow_pack.cli_helm_evidence)
+          pack_wheels=(dist-airflow/dpone_airflow_pack-*.whl)
+          provider_wheels=(dist-airflow/apache_airflow_providers_dpone-*.whl)
+          test "${#pack_wheels[@]}" -eq 1
+          test "${#provider_wheels[@]}" -eq 1
+          pack_wheel_sha256="$(sha256sum "${pack_wheels[0]}" | awk '{print $1}')"
+          provider_wheel_sha256="$(sha256sum "${provider_wheels[0]}" | awk '{print $1}')"
+          renderer_sha256="$(sha256sum "${post_renderer}" | awk '{print $1}')"
+          helm repo add apache-airflow https://airflow.apache.org
+          helm repo update apache-airflow
+          helm version --short > test_artifacts/airflow-helm/HELM_VERSION
+          helm pull apache-airflow/airflow --version 1.19.0 --destination "${chart_dir}"
+          helm pull apache-airflow/airflow --version 1.22.0 --destination "${chart_dir}"
+          cat > test_artifacts/airflow-helm/CHART_SHA256SUMS <<'EOF'
+          3d5735278047856c7698752a9cdb8abc0f9c164a915903f1c1f05cb75734ea7c  airflow-1.19.0.tgz
+          1f7d1dfe3d58e2c54899950aba907a43625a18c8b6fb3c54760c21592129a5b6  airflow-1.22.0.tgz
+          EOF
+          (
+            cd "${chart_dir}"
+            sha256sum -c "${repo_root}/test_artifacts/airflow-helm/CHART_SHA256SUMS"
+          )
+          helm template airflow "${chart_dir}/airflow-1.19.0.tgz" \
+            -f dist-airflow/airflow-cache-values-2.10.yaml \
+            --post-renderer "${post_renderer}" \
+            > "${render_dir}/airflow-2.10-chart-1.19.0.yaml"
+          helm template airflow "${chart_dir}/airflow-1.22.0.tgz" \
+            -f dist-airflow/airflow-cache-values-3.2.yaml \
+            --post-renderer "${post_renderer}" \
+            > "${render_dir}/airflow-3.2-chart-1.22.0.yaml"
+          helm_version="$(cat test_artifacts/airflow-helm/HELM_VERSION)"
+          "${post_renderer}" --verify-only < "${render_dir}/airflow-2.10-chart-1.19.0.yaml" > /dev/null
+          "${evidence_renderer[@]}" \
+            --source-commit "${DPONE_CANDIDATE_SHA}" \
+            --helm-version "${helm_version}" \
+            --chart-name apache-airflow/airflow \
+            --chart-version 1.19.0 \
+            --chart-sha256 3d5735278047856c7698752a9cdb8abc0f9c164a915903f1c1f05cb75734ea7c \
+            --pack-wheel-sha256 "${pack_wheel_sha256}" \
+            --provider-wheel-sha256 "${provider_wheel_sha256}" \
+            --values-sha256 "$(sha256sum dist-airflow/airflow-cache-values-2.10.yaml | awk '{print $1}')" \
+            --renderer-sha256 "${renderer_sha256}" \
+            < "${render_dir}/airflow-2.10-chart-1.19.0.yaml" \
+            > test_artifacts/airflow-helm/airflow-2.10-chart-1.19.0.evidence.json
+          "${post_renderer}" --verify-only < "${render_dir}/airflow-3.2-chart-1.22.0.yaml" > /dev/null
+          "${evidence_renderer[@]}" \
+            --source-commit "${DPONE_CANDIDATE_SHA}" \
+            --helm-version "${helm_version}" \
+            --chart-name apache-airflow/airflow \
+            --chart-version 1.22.0 \
+            --chart-sha256 1f7d1dfe3d58e2c54899950aba907a43625a18c8b6fb3c54760c21592129a5b6 \
+            --pack-wheel-sha256 "${pack_wheel_sha256}" \
+            --provider-wheel-sha256 "${provider_wheel_sha256}" \
+            --values-sha256 "$(sha256sum dist-airflow/airflow-cache-values-3.2.yaml | awk '{print $1}')" \
+            --renderer-sha256 "${renderer_sha256}" \
+            < "${render_dir}/airflow-3.2-chart-1.22.0.yaml" \
+            > test_artifacts/airflow-helm/airflow-3.2-chart-1.22.0.evidence.json
+          printf '%s\n' "${DPONE_CANDIDATE_SHA}" > test_artifacts/airflow-helm/SOURCE_COMMIT
+          if find test_artifacts/airflow-helm -type f \( -name '*.yaml' -o -name '*.yml' \) -print -quit | grep -q .; then
+            echo "rendered Kubernetes manifests must never be persisted as CI evidence" >&2
+            exit 1
+          fi
+          .venv-helm/bin/python - <<'PY'
+          import json
+          from pathlib import Path
+
+          forbidden = {"data", "stringData", "annotations"}
+          for path in Path("test_artifacts/airflow-helm").glob("*.json"):
+              payload = json.loads(path.read_text(encoding="utf-8"))
+              stack = [payload]
+              while stack:
+                  value = stack.pop()
+                  if isinstance(value, dict):
+                      overlap = forbidden.intersection(value)
+                      if overlap:
+                          raise SystemExit(f"forbidden rendered-secret fields in {path}: {sorted(overlap)}")
+                      stack.extend(value.values())
+                  elif isinstance(value, list):
+                      stack.extend(value)
+          PY
+
+      - name: Upload immutable candidate wheels
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: airflow-distributions-${{ env.DPONE_CANDIDATE_SHA }}
+          path: dist-airflow/
+          if-no-files-found: error
+
+      - name: Upload official Helm render evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: airflow-helm-ack-mounts-${{ env.DPONE_CANDIDATE_SHA }}
+          path: test_artifacts/airflow-helm/
+          if-no-files-found: error
+
+  airflow-compat:
+    name: Airflow ${{ matrix.airflow-version }} / py${{ matrix.python-version }}
+    needs: build-airflow-distributions
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DPONE_AIRFLOW_SCHEDULER_ONLY: "1"
+      DPONE_TEST_USE_INSTALLED_PACKAGE: "1"
+      PYTHONNOUSERSITE: "1"
+      PYTHONPATH: ""
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ inputs.airflow_max_parallel || 2 }}
+      matrix:
+        include:
+          - airflow-version: "2.10.5"
+            cncf-provider-version: "10.1.0"
+            mssql-provider-version: ""
+            python-version: "3.11"
+            support: "compatibility"
+            cosmos-version: ""
+          - airflow-version: "2.10.5"
+            cncf-provider-version: "10.1.0"
+            mssql-provider-version: ""
+            python-version: "3.12"
+            support: "compatibility"
+            cosmos-version: ""
+          - airflow-version: "2.11.0"
+            cncf-provider-version: "10.5.0"
+            mssql-provider-version: "4.7.0"
+            python-version: "3.11"
+            support: "compatibility"
+            cosmos-version: "1.15.0"
+          - airflow-version: "2.11.0"
+            cncf-provider-version: "10.5.0"
+            mssql-provider-version: "4.7.0"
+            python-version: "3.12"
+            support: "compatibility"
+            cosmos-version: ""
+          - airflow-version: "3.2.0"
+            cncf-provider-version: "10.14.0"
+            mssql-provider-version: "4.7.0"
+            python-version: "3.11"
+            support: "primary"
+            cosmos-version: ""
+          - airflow-version: "3.2.0"
+            cncf-provider-version: "10.14.0"
+            mssql-provider-version: "4.7.0"
+            python-version: "3.12"
+            support: "primary"
+            cosmos-version: ""
+          - airflow-version: "3.3.0"
+            cncf-provider-version: "10.20.0"
+            mssql-provider-version: "4.7.0"
+            python-version: "3.11"
+            support: "latest"
+            cosmos-version: ""
+          - airflow-version: "3.3.0"
+            cncf-provider-version: "10.20.0"
+            mssql-provider-version: "4.7.0"
+            python-version: "3.12"
+            support: "latest"
+            cosmos-version: "1.15.0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: ${{ env.DPONE_CANDIDATE_SHA }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download immutable candidate wheels
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: airflow-distributions-${{ env.DPONE_CANDIDATE_SHA }}
+          path: dist-airflow
+
+      - name: Create scheduler-like environment
+        run: |
+          set -euo pipefail
+          test "$(cat dist-airflow/SOURCE_COMMIT)" = "${DPONE_CANDIDATE_SHA}"
+          constraint_url="https://raw.githubusercontent.com/apache/airflow/constraints-${{ matrix.airflow-version }}/constraints-${{ matrix.python-version }}.txt"
+          constraints_file="${RUNNER_TEMP}/airflow-${{ matrix.airflow-version }}-py${{ matrix.python-version }}-constraints.txt"
+          install_constraints_file="${RUNNER_TEMP}/airflow-${{ matrix.airflow-version }}-py${{ matrix.python-version }}-cncf-${{ matrix.cncf-provider-version }}-constraints.txt"
+          override_evidence="test_artifacts/airflow-provider-parse/constraints-provider-override.json"
+          curl --disable --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            --output "$constraints_file" -- "$constraint_url"
+          python tools/airflow_constraints_override.py \
+            --source "$constraints_file" \
+            --output "$install_constraints_file" \
+            --distribution apache-airflow-providers-cncf-kubernetes \
+            --requested-version "${{ matrix.cncf-provider-version }}" \
+            --evidence "$override_evidence"
+          constraints_sha256="sha256:$(sha256sum "$constraints_file" | awk '{print $1}')"
+          install_constraints_sha256="sha256:$(sha256sum "$install_constraints_file" | awk '{print $1}')"
+          {
+            printf 'AIRFLOW_CONSTRAINTS_URL=%s\n' "$constraint_url"
+            printf 'AIRFLOW_CONSTRAINTS_FILE=%s\n' "$constraints_file"
+            printf 'AIRFLOW_CONSTRAINTS_SHA256=%s\n' "$constraints_sha256"
+            printf 'AIRFLOW_INSTALL_CONSTRAINTS_FILE=%s\n' "$install_constraints_file"
+            printf 'AIRFLOW_INSTALL_CONSTRAINTS_SHA256=%s\n' "$install_constraints_sha256"
+          } >> "$GITHUB_ENV"
+          (
+            cd dist-airflow
+            sha256sum -c SHA256SUMS
+          )
+          uv venv .venv-airflow
+          uv pip install --python .venv-airflow/bin/python \
+            --constraint "$install_constraints_file" \
+            "apache-airflow==${{ matrix.airflow-version }}" \
+            "apache-airflow-providers-cncf-kubernetes==${{ matrix.cncf-provider-version }}"
+          uv pip install --python .venv-airflow/bin/python "pytest==8.4.2"
+          uv pip install --python .venv-airflow/bin/python \
+            dist-airflow/dpone_airflow_pack-*.whl \
+            dist-airflow/apache_airflow_providers_dpone-*.whl
+          uv pip check --python .venv-airflow/bin/python
+
+      - name: Prove Airflow 3.3 provider 10.19 fails closed without durable KPO
+        if: matrix.airflow-version == '3.3.0' && matrix.python-version == '3.11'
+        run: |
+          set -euo pipefail
+          uv venv .venv-airflow-negative
+          uv pip install --python .venv-airflow-negative/bin/python \
+            --constraint "$AIRFLOW_CONSTRAINTS_FILE" \
+            "apache-airflow==3.3.0" \
+            "apache-airflow-providers-cncf-kubernetes==10.19.0"
+          uv pip install --python .venv-airflow-negative/bin/python \
+            "pytest==8.4.2" \
+            dist-airflow/dpone_airflow_pack-*.whl \
+            dist-airflow/apache_airflow_providers_dpone-*.whl
+          uv pip check --python .venv-airflow-negative/bin/python
+          .venv-airflow-negative/bin/python - <<'EOF'
+          import importlib.metadata as metadata
+          import inspect
+
+          from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+
+          assert metadata.version("apache-airflow-providers-cncf-kubernetes") == "10.19.0"
+          assert "durable" not in inspect.signature(KubernetesPodOperator.__init__).parameters
+          EOF
+          .venv-airflow-negative/bin/python -m pytest \
+            tests/test_airflow_launch_pin_task_state.py \
+            -q -k installed_provider_capability_is_enforced_without_version_guessing
+          # This focused contract intentionally bypasses the repository-wide
+          # pytest plugin set: the negative compatibility cell installs only
+          # Airflow, the CNCF provider and dpone-airflow-pack dependencies.
+          .venv-airflow-negative/bin/python -m pytest -c /dev/null --noconftest \
+            -p no:cacheprovider \
+            tests/test_kpo_live_base_container_logs.py -q
+
+      - name: Install microsoft-mssql AIP-60 provider cell (Airflow >= 2.11)
+        if: matrix.mssql-provider-version != ''
+        run: |
+          set -euo pipefail
+          # Install outside Airflow constraints: official constraint files may pin an
+          # older microsoft-mssql release; this cell intentionally validates AIP-60
+          # against provider 4.7.0 on Airflow >= 2.11.
+          uv pip install --python .venv-airflow/bin/python \
+            "apache-airflow-providers-microsoft-mssql==${{ matrix.mssql-provider-version }}"
+          .venv-airflow/bin/python - <<'EOF'
+          import importlib.metadata as md
+          import importlib.util
+          assert importlib.util.find_spec("airflow.providers.microsoft.mssql") is not None
+          assert md.version("apache-airflow-providers-microsoft-mssql") == "${{ matrix.mssql-provider-version }}"
+          EOF
+
+      - name: Install the pinned optional Cosmos coexistence probe
+        if: matrix.cosmos-version != ''
+        run: |
+          uv pip install --python .venv-airflow/bin/python \
+            "astronomer-cosmos==${{ matrix.cosmos-version }}"
+          uv pip check --python .venv-airflow/bin/python
+
+      - name: Parse independent dpone and Cosmos DAGs in one DagBag
+        if: matrix.cosmos-version != ''
+        env:
+          DPONE_COSMOS_PROBE_PASSWORD: parse-only
+        run: .venv-airflow/bin/python tools/dbt_self_service/cosmos_coexistence_probe.py
+
+      - name: Parse dpone exact-cache DAG in DagBag
+        run: |
+          .venv-airflow/bin/python -c \
+            "from tools.dbt_self_service.cosmos_coexistence_probe import dpone_only_main; raise SystemExit(dpone_only_main())"
+
+      - name: Import safety on scheduler image
+        run: |
+          .venv-airflow/bin/python - <<'EOF'
+          import importlib.util
+          from pathlib import Path
+
+          import dpone_airflow_pack
+          import airflow.providers.dpone as dpone_provider
+          from dpone_airflow_pack import (
+              build_dpone_gitops_task_group_from_pack,
+              load_dpone_airflow_pack,
+              load_dpone_dags,
+              validate_dpone_artifacts,
+          )
+          import airflow
+          if importlib.util.find_spec("dpone") is not None:
+              raise SystemExit("scheduler image unexpectedly imports the dpone runtime")
+          for module in (dpone_airflow_pack, dpone_provider):
+              if ".venv-airflow" not in Path(module.__file__).as_posix():
+                  raise SystemExit("scheduler package resolved outside the Airflow environment")
+          print(
+              "airflow", airflow.__version__,
+              "provider", dpone_provider.__name__,
+              "pack", dpone_airflow_pack.__name__,
+          )
+          EOF
+
+      # Pack tests that stub the `airflow` module run in the main CI job
+      # (scheduler-less environment); this matrix runs the suites that
+      # require the real Airflow runtime: cache IO and the Jinja rendering
+      # contracts for DPONE_* interval env and partition timetable negotiation.
+      - name: Pack provider tests against pinned Airflow
+        run: |
+          .venv-airflow/bin/python -m pytest \
+            tests/test_airflow_pack_cache.py \
+            tests/test_airflow_interval_env_rendering.py \
+            tests/test_airflow_pack_asset_partitions_compat.py \
+            tests/test_airflow_dag_schedule.py \
+            tests/test_airflow_dag_loader_contract.py \
+            tests/test_airflow_launch_pin.py \
+            tests/test_airflow_launch_pin_real.py \
+            tests/test_airflow_launch_pin_task_state.py \
+            tests/test_airflow_exact_activation_real.py \
+            tests/test_airflow_loader_ack.py \
+            tests/test_airflow_deployment_index_provider.py \
+            tests/test_airflow_provider_init_fetch_execution.py \
+            tests/test_airflow_provider_parse_benchmark.py \
+            tests/test_airflow_pack_bounded_mapping_compat.py \
+            tests/test_airflow_mssql_provider_asset_uri.py \
+            tests/test_airflow_asset_outlets.py \
+            tests/test_kpo_live_base_container_logs.py \
+            tests/test_dbt_workflow_outcome.py \
+            -q --junitxml=airflow-compat-junit.xml
+
+      - name: Installed-provider parse SLO benchmark
+        run: |
+          set -euo pipefail
+          mkdir -p test_artifacts/airflow-provider-parse
+          test -f "${AIRFLOW_CONSTRAINTS_FILE}"
+          test "sha256:$(sha256sum "${AIRFLOW_CONSTRAINTS_FILE}" | awk '{print $1}')" = "${AIRFLOW_CONSTRAINTS_SHA256}"
+          test -f "${AIRFLOW_INSTALL_CONSTRAINTS_FILE}"
+          test "sha256:$(sha256sum "${AIRFLOW_INSTALL_CONSTRAINTS_FILE}" | awk '{print $1}')" = "${AIRFLOW_INSTALL_CONSTRAINTS_SHA256}"
+          source_commit="$(git rev-parse HEAD)"
+          .venv-airflow/bin/python - <<PY
+          import json
+          from pathlib import Path
+          from tools.airflow_provider_parse_benchmark_support import (
+              build_candidate_manifest,
+              canonical_json_sha256,
+          )
+
+          manifest = build_candidate_manifest(
+              source_commit="${source_commit}",
+              wheels_dir=Path("dist-airflow"),
+              constraints_ref="${AIRFLOW_CONSTRAINTS_URL}",
+              constraints_sha256="${AIRFLOW_CONSTRAINTS_SHA256}",
+              cncf_provider_version="${{ matrix.cncf-provider-version }}",
+          )
+          out = Path("test_artifacts/airflow-provider-parse/candidate-manifest.json")
+          out.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n", encoding="utf-8")
+          Path("test_artifacts/airflow-provider-parse/candidate-manifest.sha256").write_text(
+              canonical_json_sha256(manifest) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          manifest_sha256="$(tr -d '[:space:]' < test_artifacts/airflow-provider-parse/candidate-manifest.sha256)"
+          .venv-airflow/bin/python tools/airflow_provider_parse_benchmark.py \
+            --cold-samples 30 \
+            --warm-samples 30 \
+            --source-commit "$source_commit" \
+            --airflow-version "${{ matrix.airflow-version }}" \
+            --python-version "${{ matrix.python-version }}" \
+            --support "${{ matrix.support }}" \
+            --constraints "$AIRFLOW_CONSTRAINTS_URL" \
+            --constraints-sha256 "$AIRFLOW_CONSTRAINTS_SHA256" \
+            --cncf-provider-version "${{ matrix.cncf-provider-version }}" \
+            --candidate-manifest test_artifacts/airflow-provider-parse/candidate-manifest.json \
+            --candidate-manifest-sha256 "$manifest_sha256" \
+            --output "test_artifacts/airflow-provider-parse/airflow-${{ matrix.airflow-version }}-py${{ matrix.python-version }}.json"
+
+      - name: Install the exact candidate activation dependency sets
+        run: |
+          set -euo pipefail
+          core_wheels=(dist-airflow/dpone-*.whl)
+          pack_wheels=(dist-airflow/dpone_airflow_pack-*.whl)
+          test "${#core_wheels[@]}" -eq 1
+          test "${#pack_wheels[@]}" -eq 1
+          uv venv .venv-activation
+          uv pip install --python .venv-activation/bin/python \
+            "${core_wheels[0]}[dbt-mssql]" \
+            "${pack_wheels[0]}"
+          uv pip check --python .venv-activation/bin/python
+          uv pip check --python .venv-airflow/bin/python
+          .venv-activation/bin/python - <<'EOF'
+          import dpone
+          from dpone.adapters.dbt_manifest_schema import OfficialDbtManifestValidator
+          from dpone.runtime.dbt_preflight import DbtRuntimePreflight
+
+          assert dpone is not None
+          assert OfficialDbtManifestValidator is not None
+          assert DbtRuntimePreflight is not None
+          EOF
+          .venv-airflow/bin/python - <<'EOF'
+          import airflow
+          import airflow.providers.dpone as dpone_provider
+
+          assert airflow is not None
+          assert dpone_provider is not None
+          EOF
+
+      - name: Upload junit artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: airflow-compat-junit-${{ matrix.airflow-version }}-py${{ matrix.python-version }}
+          path: airflow-compat-junit.xml
+          if-no-files-found: error
+
+      - name: Upload parse SLO evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: airflow-parse-slo-${{ matrix.airflow-version }}-py${{ matrix.python-version }}
+          path: test_artifacts/airflow-provider-parse/*.json
+          if-no-files-found: error
+
+  runtime-wheel-smoke:
+    name: Runtime wheel smoke / py${{ matrix.python-version }}
+    needs: build-airflow-distributions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: ${{ env.DPONE_CANDIDATE_SHA }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download immutable candidate wheels
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: airflow-distributions-${{ env.DPONE_CANDIDATE_SHA }}
+          path: dist-runtime
+
+      - name: Install exact runtime wheels
+        run: |
+          set -euo pipefail
+          test "$(cat dist-runtime/SOURCE_COMMIT)" = "${DPONE_CANDIDATE_SHA}"
+          (
+            cd dist-runtime
+            sha256sum -c SHA256SUMS
+          )
+          uv venv --python "${{ matrix.python-version }}" .venv-runtime
+          core_wheels=(dist-runtime/dpone-*.whl)
+          test "${#core_wheels[@]}" -eq 1
+          uv pip install --python .venv-runtime/bin/python \
+            dist-runtime/dpone_airflow_pack-*.whl \
+            "${core_wheels[0]}[dbt-mssql]" \
+            "pytest==8.4.2"
+          uv pip check --python .venv-runtime/bin/python
+          mkdir -p test_artifacts/runtime-wheel
+          .venv-runtime/bin/python - <<'EOF' > test_artifacts/runtime-wheel/import-origins.txt
+          from pathlib import Path
+          import dpone
+          import dpone_airflow_pack
+
+          for module in (dpone, dpone_airflow_pack):
+              path = Path(module.__file__).resolve()
+              if ".venv-runtime" not in path.as_posix():
+                  raise SystemExit("runtime package resolved outside the runtime environment")
+              print(f"{module.__name__}={path}")
+          EOF
+          uv pip freeze --python .venv-runtime/bin/python > test_artifacts/runtime-wheel/pip-freeze.txt
+          cp dist-runtime/SHA256SUMS dist-runtime/SOURCE_COMMIT test_artifacts/runtime-wheel/
+
+      - name: Smoke runtime CLI from installed wheel
+        run: |
+          set -euo pipefail
+          .venv-runtime/bin/dpone airflow runtime-init-fetch --help
+          .venv-runtime/bin/dpone airflow runtime-pack-exec --help
+          .venv-runtime/bin/dpone airflow runtime-pod-retention-plan --help
+          .venv-runtime/bin/dpone airflow runtime-pod-retention-apply --help
+          .venv-runtime/bin/dpone airflow runtime-pod-retention-render --help
+          .venv-runtime/bin/dpone airflow cache-retention-plan --help
+          .venv-runtime/bin/dpone airflow cache-retention-apply --help
+          .venv-runtime/bin/dpone dbt execute-pack --help
+
+          set +e
+          output="$(
+            env -u DPONE_INIT_FETCH_PLAN_B64 -u DPONE_INIT_FETCH_PLAN_SHA256 \
+              .venv-runtime/bin/dpone airflow runtime-init-fetch 2>&1
+          )"
+          status=$?
+          set -e
+
+          test "$status" -eq 2
+          if grep -q "Traceback (most recent call last)" <<<"$output"; then
+            printf '%s\n' "$output"
+            exit 1
+          fi
+
+          set +e
+          output="$(
+            env -u DPONE_INIT_FETCH_PLAN_B64 -u DPONE_INIT_FETCH_PLAN_SHA256 \
+              .venv-runtime/bin/dpone airflow runtime-pack-exec 2>&1
+          )"
+          status=$?
+          set -e
+
+          test "$status" -eq 2
+          if grep -q "Traceback (most recent call last)" <<<"$output"; then
+            printf '%s\n' "$output"
+            exit 1
+          fi
+
+      - name: Run real dbt offline parse and selection from installed wheels
+        env:
+          DPONE_DBT_FIXTURE_MSSQL_HOST: 127.0.0.1
+          DPONE_DBT_FIXTURE_MSSQL_DATABASE: DWH_Stage
+          DPONE_DBT_FIXTURE_MSSQL_USER: offline-smoke
+          DPONE_DBT_FIXTURE_MSSQL_PASSWORD: offline-smoke
+        run: |
+          set -euo pipefail
+          smoke_root="${RUNNER_TEMP}/dpone-dbt-offline-smoke"
+          .venv-runtime/bin/dbt --quiet --no-use-colors parse \
+            --project-dir tests/fixtures/dbt-runtime-correctness-v1 \
+            --profiles-dir tests/fixtures/dbt-runtime-correctness-v1/profiles \
+            --target-path "${smoke_root}/target" \
+            --log-path "${smoke_root}/logs" \
+            --no-partial-parse
+          .venv-runtime/bin/dbt --quiet --no-use-colors ls \
+            --project-dir tests/fixtures/dbt-runtime-correctness-v1 \
+            --profiles-dir tests/fixtures/dbt-runtime-correctness-v1/profiles \
+            --target-path "${smoke_root}/target" \
+            --log-path "${smoke_root}/logs" \
+            --resource-type model test unit_test \
+            --indirect-selection eager \
+            --output json \
+            --output-keys unique_id > "${smoke_root}/selection.jsonl"
+          .venv-runtime/bin/python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          from dpone.adapters.dbt_manifest_schema import OfficialDbtManifestValidator
+          from dpone.adapters.dbt_subprocess import DistributionDbtToolchainInspector
+
+          root = Path(os.environ["RUNNER_TEMP"]) / "dpone-dbt-offline-smoke"
+          manifest = json.loads((root / "target" / "manifest.json").read_text(encoding="utf-8"))
+          diagnostics = OfficialDbtManifestValidator().validate(manifest, version=12)
+          assert diagnostics
+          assert {item.severity for item in diagnostics} == {"warning"}
+          observed = {
+              json.loads(line)["unique_id"]
+              for line in (root / "selection.jsonl").read_text(encoding="utf-8").splitlines()
+              if line
+          }
+          assert observed == {
+              "model.dpone_runtime_fixture.ephemeral_orders",
+              "model.dpone_runtime_fixture.orders",
+              "test.dpone_runtime_fixture.not_null_orders_order_id.cf6c17daed",
+              "unit_test.dpone_runtime_fixture.orders.orders_from_ephemeral_parent",
+          }
+          installed = DistributionDbtToolchainInspector().inspect("sqlserver")
+          assert (installed.dbt_core_version, installed.adapter_version) == ("1.12.3", "1.11.1")
+          PY
+
+      - name: Runtime wheel contract tests
+        env:
+          DPONE_TEST_USE_INSTALLED_PACKAGE: "1"
+          PYTHONNOUSERSITE: "1"
+          PYTHONPATH: ""
+        run: |
+          .venv-runtime/bin/python -m pytest \
+            tests/test_airflow_runtime_init_fetch_cli.py \
+            tests/test_airflow_runtime_pod_retention.py \
+            tests/test_airflow_runtime_pod_retention_durable_publisher.py \
+            tests/test_deployment_cache_retention_state.py \
+            tests/test_deployment_cache_retention_recovery_ack.py \
+            tests/test_airflow_cache_retention_occurrence_hardening.py \
+            tests/test_airflow_cache_retention_receipt_hardening.py \
+            tests/test_airflow_runtime_pod_retention_render.py \
+            tests/test_gitops_schema_contracts.py \
+            tests/test_airflow_cache_materializer.py \
+            tests/test_runtime_init_fetch_security.py \
+            tests/test_cli_shim_and_main.py \
+            tests/test_dbt_manifest_schema_validation.py \
+            tests/test_dbt_dev_evidence_verification.py \
+            tests/test_dbt_project_bundle.py \
+            tests/test_dbt_publish_schema_contracts.py \
+            tests/test_dbt_run_results_schema_validation.py \
+            tests/test_dbt_runtime_execution.py \
+            tests/test_dbt_subprocess_supervision.py \
+            -q --junitxml=test_artifacts/runtime-wheel/runtime-wheel-junit.xml
+
+      - name: Upload runtime wheel evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runtime-wheel-${{ env.DPONE_CANDIDATE_SHA }}-py${{ matrix.python-version }}
+          path: test_artifacts/runtime-wheel/
+          if-no-files-found: error

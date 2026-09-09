@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-adoption-plan.schema.json",
+  "title": "Schema Contract Adoption Plan",
+  "type": "object",
+  "required": ["schema_version", "status", "contract_id", "consumers", "summary", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_adoption_plan.v1"},
+    "adoption_plan_id": {"type": "string", "pattern": "^sha256:"},
+    "status": {"enum": ["planned", "blocked", "disabled"]},
+    "contract_id": {"type": ["string", "null"]},
+    "base_version": {"type": ["string", "null"]},
+    "head_version": {"type": ["string", "null"]},
+    "base_contract_version_id": {"type": ["string", "null"]},
+    "head_contract_version_id": {"type": ["string", "null"]},
+    "consumer_matrix_id": {"type": ["string", "null"]},
+    "compatibility_view_plan_id": {"type": ["string", "null"]},
+    "mode": {"type": "string"},
+    "profile": {"type": "string"},
+    "options": {"type": "object"},
+    "consumers": {"type": "array", "items": {"type": "object"}},
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

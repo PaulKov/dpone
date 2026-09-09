@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/safe-sample-runtime-run.schema.json",
+  "title": "dpone GitOps safe sample runtime run report",
+  "type": "object",
+  "required": [
+    "schema",
+    "release_id",
+    "deployment_id",
+    "execution_status",
+    "data_outcome",
+    "runtime_execution",
+    "evidence_write",
+    "errors"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.safe-sample-runtime-run.v1"
+    },
+    "release_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "deployment_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "execution_status": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "cancelled",
+        "skipped"
+      ]
+    },
+    "data_outcome": {
+      "enum": [
+        "passed",
+        "passed_with_quarantine",
+        "failed_quality_gate",
+        "no_data",
+        "unknown"
+      ]
+    },
+    "runtime_execution": {
+      "type": "object",
+      "required": [
+        "schema",
+        "execution_status",
+        "data_outcome",
+        "release_id",
+        "deployment_id",
+        "errors"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "const": "dpone.safe-sample-runtime-execution.v1"
+        }
+      }
+    },
+    "evidence_write": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "schema",
+        "path",
+        "sha256",
+        "bytes"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "const": "dpone.safe-sample-runtime-evidence-write.v1"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/error"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "error": {
+      "type": "object",
+      "required": [
+        "schema",
+        "code",
+        "stage",
+        "severity",
+        "message"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "const": "dpone.error.v1"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^DPONE_[A-Z0-9_]+$"
+        },
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixes": {
+          "type": "array"
+        }
+      }
+    }
+  }
+}

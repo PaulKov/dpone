@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/recovery-catalog.schema.json",
+  "title": "dpone schema migration recovery catalog",
+  "type": "object",
+  "required": ["schema_version", "restore_points"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_recovery_catalog.v1"},
+    "restore_points": {
+      "type": "array",
+      "items": {"type": "object", "required": ["schema_version", "restore_point_id", "status"]}
+    }
+  }
+}

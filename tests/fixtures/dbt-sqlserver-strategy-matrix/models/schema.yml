@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: matrix_table
+    config: &contract
+      contract:
+        enforced: true
+    columns: &columns
+      - name: id
+        data_type: int
+        constraints:
+          - type: not_null
+      - name: payload
+        data_type: varchar(32)
+      - name: batch_id
+        data_type: int
+        constraints:
+          - type: not_null
+  - name: matrix_view
+    config: *contract
+    columns: *columns
+  - name: matrix_append
+    config: *contract
+    columns: *columns
+  - name: matrix_merge
+    config: *contract
+    columns: *columns

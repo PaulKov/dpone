@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+convention: landing_raw_v1
+
+vars:
+  src_system: fasttrack
+  src_database: api
+  host: dashboard_fstrk_io
+  owner_team: crm-analytics
+  owner_contact: crm-analytics@example.com
+  sla: daily
+
+defaults:
+  source:
+    type: api
+    api_type: fasttrack
+    connection_type: vault
+    connection_id: api__fasttrack
+    vault_path: api/fasttrack
+    options:
+      resource: "{{ src_table }}"
+      batch_size: 5000
+      timeout: 60
+      max_retries: 3
+      rate_limit_delay: 0.2
+
+  sink:
+    type: bigquery
+    connection_type: vault
+    connection_id: bigquery-demo
+    vault_path: gcp/demo-project-{{ env_code }}/bq/example-etl-service
+    staging:
+      schema: stg
+    strategy:
+      mode: incremental_merge
+    options:
+      log_sample_rows: 5
+
+  bigquery_proxy:
+    proxy_enable: true
+
+schemas:
+  default:
+    tables:
+      - table: cascade_transactions
+        overrides:
+          source:
+            options:
+              unique_key:
+                - transaction_uuid
+      - table: chat_sessions
+        overrides:
+          source:
+            options:
+              unique_key:
+                - uuid_polzovatelya
+                - data_nachala
+          sink:
+            strategy:
+              mode: incremental_merge
+      - table: flex_cms_ratings
+        overrides:
+          sink:
+            strategy:
+              mode: full_refresh

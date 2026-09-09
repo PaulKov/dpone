@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-migration-trust-verification.schema.json",
+  "title": "dpone schema migration trust verification",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "trust_verification_id",
+    "status",
+    "bundle_id",
+    "pack_id",
+    "provenance_id",
+    "checks",
+    "blockers",
+    "warnings",
+    "recommendations"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_trust_verification.v1"
+    },
+    "trust_verification_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["trusted", "warning", "blocked"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "provenance_id": {"type": ["string", "null"]},
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "details"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string"},
+          "status": {"enum": ["passed", "warning", "blocked"]},
+          "details": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  }
+}

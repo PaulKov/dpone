@@ -1,0 +1,78 @@
+schema_version: 1
+task_id: "DPONE-607-V2"
+title: "Activate exact-head receipt through immutable governance profile V2"
+goal: >-
+  Implement #607 only through the approved V2 policy selection path, preserving
+  V1 byte-for-byte and rejecting every missing, malformed, stale or mismatched
+  V2 binding before receipt evidence can pass.
+specification: "docs/feature-design-ci-governance-profile-v2-amendment.md"
+base_commit: "2bca315cce9249c9a324a65371dfb105cc973d6c"
+integrator: "/root"
+acceptance_criteria:
+  - "V1 policy/schema/fixtures stay byte-identical."
+  - "V2 selection is exact, bounded and fail-closed."
+  - "#607 receipt observes opened/reopened/synchronize heads with bounded wait and cancellation."
+  - "Exact-head hosted evidence and all protected checks pass without bypass."
+public_contract_impact:
+  level: compatible
+  surfaces: ["Agent PR receipt", "privileged workflow-policy evidence", "CI trigger contract"]
+  migration_required: false
+owned_paths:
+  - ".agents/policy/workflow-security-privileged-v2.yml"
+  - "docs/agent-governance.md"
+  - "docs/cicd/runbooks.md"
+  - "docs/quality-metrics.md"
+  - "evals/agent/workflow-security-privileged-policy-v2.schema.json"
+  - "evals/agent/workflow-security-privileged-report.schema.json"
+  - "test_artifacts/agent-policy/agent-pr-receipt-v2-task-contract.yml"
+  - "test_artifacts/agent-policy/agent_governance_gate.json"
+  - "test_artifacts/agent-policy/pr3b-semantic-privilege-certification.json"
+  - "tests/agent_policy/**"
+  - "tests/test_github_workflow_governance.py"
+  - "tests/test_runtime_github_artifact_attestation.py"
+  - "tools/agent_policy/**"
+integrator_owned_paths:
+  - ".github/workflows/agent-pr-receipt.yml"
+  - ".agents/policy/workflow-security-privileged.yml"
+  - "evals/agent/workflow-security-privileged-policy.schema.json"
+read_only_paths:
+  - "docs/feature-design-ci-governance-profile-v2-amendment.md"
+  - "docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md"
+  - "docs/adr/0037-immutable-agent-pr-merge-closure.md"
+  - "docs/feature-design-standard.md"
+  - "docs/agent-development.md"
+forbidden_paths:
+  - ".github/workflows"
+  - ".agents/policy/workflow-security-privileged.yml"
+  - "evals/agent/workflow-security-privileged-policy.schema.json"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/release.yml"
+  - ".github/workflows/runtime-image.yml"
+  - ".github/workflows/certification-release-summary.yml"
+  - ".github/workflows/route-certification-release.yml"
+  - ".github/workflows/route-release-finalize.yml"
+  - "src"
+  - "packages"
+shared_file_owner: "/root"
+dependencies: ["Approved amendment merge 2bca315cce9249c9a324a65371dfb105cc973d6c."]
+required_checks:
+  focused:
+    - "V2 policy-selection, receipt wait and workflow-governance tests"
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/agent-pr-receipt-v2-task-contract.yml"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "normal exact-head hosted CI"
+  live: ["exact-head hosted Agent PR receipt"]
+required_outputs: ["implementation", "tests", "documentation_impact", "completion_report"]
+completion_statuses:
+  allowed: ["PASS", "FAIL", "SKIP", "N/A", "UNVERIFIED"]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "V1 policy, schema or fixtures are modified."

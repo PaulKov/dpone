@@ -1,0 +1,710 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dpone:workflow-security-privileged-report:v1",
+  "title": "dpone PR3B semantic privilege report v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "ok",
+    "root",
+    "policy",
+    "inventory",
+    "roots",
+    "routes",
+    "route_authority",
+    "privileged_profiles",
+    "findings",
+    "limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "UNVERIFIED"
+      ]
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "root": {
+      "const": "."
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "inventory": {
+      "$ref": "#/$defs/inventory"
+    },
+    "roots": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "$ref": "#/$defs/root"
+      }
+    },
+    "routes": {
+      "type": "array",
+      "maxItems": 16384,
+      "items": {
+        "$ref": "#/$defs/route"
+      }
+    },
+    "route_authority": {
+      "type": "array",
+      "maxItems": 16384,
+      "items": {
+        "$ref": "#/$defs/authority"
+      }
+    },
+    "privileged_profiles": {
+      "type": "array",
+      "maxItems": 16384,
+      "items": {
+        "$ref": "#/$defs/profile"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "limits": {
+      "const": {
+        "workflow_files": 256,
+        "reusable_workflows_including_root": 50,
+        "local_call_edges": 9,
+        "workflow_run_edges": 1,
+        "jobs": 4096,
+        "graph_edges": 8192,
+        "roots": 512,
+        "routes": 16384,
+        "authority_records": 16384,
+        "profile_matches": 16384,
+        "route_edges": 256,
+        "findings": 4096,
+        "workflow_bytes": 1048576,
+        "total_workflow_bytes": 33554432,
+        "policy_bytes": 1048576,
+        "expression_bytes": 8192,
+        "expression_tokens": 512,
+        "yaml_depth": 32,
+        "yaml_nodes": 100000,
+        "finding_detail_bytes": 2048,
+        "report_bytes": 16777216,
+        "text_stdout_bytes": 16777216
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullableSha": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "policy": {
+      "type": "object",
+      "required": [
+        "path",
+        "sha256",
+        "schema_version"
+      ],
+      "properties": {
+        "path": {
+          "enum": [
+            ".agents/policy/workflow-security-privileged.yml",
+            ".agents/policy/workflow-security-privileged-v2.yml",
+            ".agents/policy/workflow-security-privileged-v3.yml"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/nullableSha"
+        },
+        "schema_version": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "enum": [1, 2, 3]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "inventory": {
+      "type": "object",
+      "required": [
+        "complete",
+        "manifest_sha256",
+        "workflow_count",
+        "job_count",
+        "edge_count",
+        "root_count",
+        "route_count",
+        "overflow_dimensions"
+      ],
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/nullableSha"
+        },
+        "workflow_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 257
+        },
+        "job_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4097
+        },
+        "edge_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8193
+        },
+        "root_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 513
+        },
+        "route_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16385
+        },
+        "overflow_dimensions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "workflow_files",
+              "reusable_workflows_including_root",
+              "local_call_edges",
+              "workflow_run_edges",
+              "jobs",
+              "graph_edges",
+              "roots",
+              "routes",
+              "authority_records",
+              "profile_matches",
+              "route_edges",
+              "findings",
+              "workflow_bytes",
+              "total_workflow_bytes",
+              "policy_bytes",
+              "expression_bytes",
+              "expression_tokens",
+              "yaml_depth",
+              "yaml_nodes",
+              "finding_detail_bytes",
+              "report_bytes",
+              "text_stdout_bytes"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "root": {
+      "type": "object",
+      "required": [
+        "workflow",
+        "event"
+      ],
+      "properties": {
+        "workflow": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "event": {
+          "enum": [
+            "pull_request",
+            "pull_request_target"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "edge": {
+      "type": "object",
+      "required": [
+        "kind",
+        "source_workflow",
+        "source_job",
+        "target_workflow",
+        "target_job"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "NEEDS",
+            "LOCAL_WORKFLOW_CALL",
+            "WORKFLOW_RUN"
+          ]
+        },
+        "source_workflow": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "source_job": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_workflow": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "target_job": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "route": {
+      "type": "object",
+      "required": [
+        "route_id",
+        "root_index",
+        "event_variant",
+        "edge_chain",
+        "workflow",
+        "job_id",
+        "classification"
+      ],
+      "properties": {
+        "route_id": {
+          "$ref": "#/$defs/sha"
+        },
+        "root_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 511
+        },
+        "event_variant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^(?:CLOSED_(?:UNMERGED|MERGED)|ACTIVITY:[a-z][a-z0-9_-]{0,63})(?:>WORKFLOW_RUN:[a-z][a-z0-9_-]{0,63})?$"
+        },
+        "edge_chain": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/edge"
+          }
+        },
+        "workflow": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "job_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "classification": {
+          "enum": [
+            "PR_HEAD",
+            "POST_MERGE_INTEGRATED_CODE",
+            "PROVEN_NOT_PR_REACHABLE"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "permissions": {
+      "type": "object",
+      "required": [
+        "actions",
+        "artifact-metadata",
+        "attestations",
+        "checks",
+        "code-quality",
+        "contents",
+        "deployments",
+        "discussions",
+        "id-token",
+        "issues",
+        "models",
+        "packages",
+        "pages",
+        "pull-requests",
+        "security-events",
+        "statuses",
+        "vulnerability-alerts"
+      ],
+      "properties": {
+        "actions": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "artifact-metadata": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "attestations": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "checks": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "code-quality": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "contents": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "deployments": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "discussions": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "id-token": {
+          "enum": [
+            "none",
+            "write"
+          ]
+        },
+        "issues": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "models": {
+          "enum": [
+            "none",
+            "read"
+          ]
+        },
+        "packages": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "pages": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "pull-requests": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "security-events": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "statuses": {
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "vulnerability-alerts": {
+          "enum": [
+            "none",
+            "read"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "runner": {
+      "type": "object",
+      "required": [
+        "classification",
+        "labels"
+      ],
+      "properties": {
+        "classification": {
+          "enum": [
+            "GITHUB_HOSTED",
+            "SELF_HOSTED",
+            "UNKNOWN"
+          ]
+        },
+        "labels": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "authority": {
+      "type": "object",
+      "required": [
+        "route_id",
+        "workflow",
+        "workflow_name",
+        "job_id",
+        "classification",
+        "declared_permissions",
+        "effective_permissions",
+        "permission_source",
+        "runner",
+        "environment",
+        "secrets",
+        "profile_id"
+      ],
+      "properties": {
+        "route_id": {
+          "$ref": "#/$defs/sha"
+        },
+        "workflow": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "workflow_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "job_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "classification": {
+          "enum": [
+            "PR_HEAD",
+            "POST_MERGE_INTEGRATED_CODE",
+            "PROVEN_NOT_PR_REACHABLE"
+          ]
+        },
+        "declared_permissions": {
+          "$ref": "#/$defs/permissions"
+        },
+        "effective_permissions": {
+          "$ref": "#/$defs/permissions"
+        },
+        "permission_source": {
+          "enum": [
+            "WORKFLOW",
+            "JOB",
+            "CALL_INTERSECTION"
+          ]
+        },
+        "runner": {
+          "$ref": "#/$defs/runner"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secrets": {
+          "enum": [
+            "NONE",
+            "EXPLICIT",
+            "INHERIT",
+            "UNKNOWN"
+          ]
+        },
+        "profile_id": {
+          "anyOf": [
+            {
+              "enum": [
+                "CODEQL_PR_UPLOAD",
+                "ADR0037_GOVERNANCE_SOURCE_ATTESTOR",
+                "ADR0037_MERGED_CLOSURE_CHECK_PUBLISHER"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "profile": {
+      "type": "object",
+      "required": [
+        "route_id",
+        "id",
+        "workflow",
+        "job_id",
+        "fingerprint",
+        "classification"
+      ],
+      "properties": {
+        "route_id": {
+          "$ref": "#/$defs/sha"
+        },
+        "id": {
+          "enum": [
+            "CODEQL_PR_UPLOAD",
+            "ADR0037_GOVERNANCE_SOURCE_ATTESTOR",
+            "ADR0037_MERGED_CLOSURE_CHECK_PUBLISHER"
+          ]
+        },
+        "workflow": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "job_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "fingerprint": {
+          "$ref": "#/$defs/sha"
+        },
+        "classification": {
+          "enum": [
+            "PR_HEAD",
+            "POST_MERGE_INTEGRATED_CODE"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "required": [
+        "code",
+        "status",
+        "subject",
+        "route_id",
+        "detail",
+        "recovery_command_id"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "enum": [
+            "FAIL",
+            "UNVERIFIED"
+          ]
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "route_id": {
+          "$ref": "#/$defs/nullableSha"
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "recovery_command_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

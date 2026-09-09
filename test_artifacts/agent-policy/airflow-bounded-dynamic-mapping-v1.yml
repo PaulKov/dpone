@@ -1,0 +1,148 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-BOUNDED-DYNAMIC-MAPPING-V1"
+title: "Project bounded Airflow task mapping over the dpone backfill ledger"
+goal: "Offer internal, visible and summary backfill mapping without duplicating campaign state or exceeding Airflow task budgets."
+specification: "docs/feature-design-airflow-bounded-dynamic-mapping-v1.md"
+base_commit: "071340a5"
+integrator: "current Codex task"
+
+acceptance_criteria:
+  - "Internal mode preserves existing one-task backfill behavior."
+  - "Visible and summary plans are static, deterministic, fingerprinted and bounded to at most 200 task instances."
+  - "Provider mapping sets a static pool and max_active_tis_per_dag and validates each mapped KPO outcome inline."
+  - "Runtime re-plans and verifies the selected chunk range before connector I/O."
+  - "The dpone ledger remains authoritative and stale completion is rejected by owner compare-and-set."
+  - "Mapped execution fails closed without certified distributed campaign lock and chunk-lease capabilities."
+  - "Airflow parse performs no network, state, metadata, Variable, Connection, Vault, Kubernetes or cache-refresh I/O."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "workload airflow.mapping policy"
+    - "dpone.airflow-mapping-plan.v1"
+    - "dpone.airflow-mapping-item.v1"
+    - "gitops.airflow_pack process mapping plan"
+    - "backfill result and XCom optional mapping summary"
+    - "Postgres and MSSQL audit-state distributed chunk lease/CAS capability"
+  migration_required: false
+
+owned_paths:
+  - "docs/feature-design-airflow-bounded-dynamic-mapping-v1.md"
+  - "docs/adr/0019-bounded-airflow-backfill-mapping.md"
+  - "docs/adr-index.md"
+  - "src/dpone/backfill/mapping.py"
+  - "src/dpone/backfill/runtime_execution.py"
+  - "src/dpone/backfill/state.py"
+  - "src/dpone/backfill/state_coordination.py"
+  - "src/dpone/backfill/sql_state.py"
+  - "src/dpone/backfill/sql_state_coordination.py"
+  - "src/dpone/backfill/sql_state_journal.py"
+  - "src/dpone/backfill/sql_state_rendering.py"
+  - "src/dpone/backfill/sql_locks.py"
+  - "src/dpone/backfill/state_factory.py"
+  - "src/dpone/backfill/__init__.py"
+  - "src/dpone/runtime/etl/backfill_orchestrator.py"
+  - "src/dpone/runtime/bootstrap_runner.py"
+  - "src/dpone/contracts/run_context.py"
+  - "src/dpone/services/run_manifest.py"
+  - "src/dpone/services/airflow_mapping_context.py"
+  - "src/dpone/commands/run_cmd.py"
+  - "src/dpone/gitops/airflow_compact_process_plans.py"
+  - "src/dpone/gitops/airflow_compact_pack.py"
+  - "src/dpone/gitops/airflow_compact_pack_helpers.py"
+  - "src/dpone/gitops/airflow_xcom_outcome.py"
+  - "src/dpone/gitops/airflow_runtime_profile_models.py"
+  - "src/dpone/gitops/schema_airflow_mapping_contracts.py"
+  - "src/dpone/gitops/schema_airflow_pack_contracts.py"
+  - "src/dpone/gitops/schema_airflow_runtime_contracts.py"
+  - "src/dpone/gitops/schema_airflow_contracts.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/mapping.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/mapped_tasks.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/node_materialization.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/outcome.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_validation.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_tasks.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/operators.py"
+  - "docs/schemas/gitops/airflow-mapping-plan.schema.json"
+  - "docs/schemas/gitops/airflow-mapping-item.schema.json"
+  - "docs/schemas/gitops/airflow-pack.schema.json"
+  - "docs/schemas/gitops/airflow-xcom-summary.schema.json"
+  - "tests/test_airflow_bounded_mapping_policy.py"
+  - "tests/test_airflow_bounded_mapping_runtime.py"
+  - "tests/test_airflow_bounded_mapping_provider.py"
+  - "tests/test_backfill_audit_schema_state.py"
+  - "tests/test_backfill_orchestrator.py"
+  - "tests/test_gitops_schema_contracts.py"
+  - "tests/test_airflow_pack_bounded_mapping_compat.py"
+  - "docs/airflow-self-service.md"
+  - "docs/airflow-pack-provider.md"
+  - "docs/backfill.md"
+  - "docs/compatibility.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "docs/reference/gitops-schema-catalog.md"
+  - "docs/quality-metrics.md"
+  - "test_artifacts/agent-policy/airflow-bounded-dynamic-mapping-v1.yml"
+  - "test_artifacts/airflow-bounded-dynamic-mapping-v1/**"
+read_only_paths:
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/adr/0008-airflow-parse-safe-provider.md"
+  - "docs/adr/0013-reproducible-rerun-and-retention.md"
+  - "src/dpone/contracts/airflow_run_identity.py"
+forbidden_paths:
+  - ".cursor/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+
+shared_file_owner: "current Codex task"
+
+dependencies:
+  - "Airflow run identity and reproducible rerun slice at commit e0ca3970"
+  - "Generated quality metrics refresh at commit 913a1a39"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_bounded_mapping_policy.py tests/test_airflow_bounded_mapping_runtime.py tests/test_airflow_bounded_mapping_provider.py tests/test_backfill_audit_schema_state.py tests/test_backfill_orchestrator.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv build packages/dpone-airflow-pack --out-dir dist"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "UNVERIFIED until an approved multi-pod Airflow/Kubernetes run uses Postgres or MSSQL distributed audit state"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Implementation makes visible or summary mapping the default."
+  - "Airflow task state replaces the dpone campaign ledger."
+  - "Provider parse reads network, state, metadata DB, Variable, Connection, Vault, Kubernetes or refreshes cache."
+  - "Runtime accepts chunk predicate SQL or credentials from a mapping item."
+  - "Mapped execution proceeds without distributed chunk lease and owner-CAS capability."
+  - "A required edit touches user-owned .cursor files."

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/data-product/data-product-fleet-gate.schema.json",
+  "title": "dpone data product fleet gate",
+  "type": "object",
+  "required": ["schema_version", "fleet_gate_id", "status", "profile", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_fleet_gate.v1"},
+    "fleet_gate_id": {"type": "string"},
+    "status": {"enum": ["allowed", "warning", "blocked", "frozen"]},
+    "profile": {"enum": ["advisory", "stage", "prod_strict", "regulated"]},
+    "fleet_evaluation_id": {"type": ["string", "null"]},
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

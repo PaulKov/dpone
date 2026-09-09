@@ -1,0 +1,110 @@
+schema_version: 1
+task_id: "DPONE-512-PR4C-CAPACITY"
+title: "Read-only CI shadow capacity calibration"
+goal: "Produce source-bound, archive-authenticated, always-UNVERIFIED capacity evidence before reconciler implementation."
+specification: "docs/feature-design-ci-shadow-pr4c-capacity.md"
+base_commit: "0b4849bd2e7afc9a2778d6120f742d2202db8aff"
+integrator: "codex"
+
+acceptance_criteria:
+  - "The probe is default-branch source-free workflow_dispatch and never changes legacy merge authority."
+  - "Two independently acquired bounded observations are required; capacity evidence is always UNVERIFIED."
+  - "Provider digest/size bind archive bytes; exactly one hardened JSON payload member has separate digest/size."
+  - "Every outbound request, redirect and retry is metered before dispatch under immutable parent caps."
+  - "The create-only evidence writer is durable and no-replace; legacy route-attestation behavior remains compatible."
+  - "Public documentation explains that qualifying evidence does not approve a daily reconciliation root."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["CI workflow", "capacity artifact schema", "fixture CLI", "documentation"]
+  migration_required: false
+
+owned_paths:
+  - ".agents/policy/ci-shadow-reconciliation-observation-bundle-v1.yml"
+  - "src/dpone/contracts/ci_shadow_reconciliation.py"
+  - "src/dpone/contracts/ci_shadow_capacity.py"
+  - "src/dpone/ports/ci_shadow_reconciliation.py"
+  - "src/dpone/ports/evidence.py"
+  - "src/dpone/services/ci/shadow_reconciliation_observation.py"
+  - "src/dpone/services/ci/shadow_reconciliation_receipts.py"
+  - "src/dpone/services/ci/shadow_reconciliation_tree.py"
+  - "src/dpone/services/ci/shadow_reconciliation_budget.py"
+  - "src/dpone/services/ci/shadow_reconciliation_complete_observation.py"
+  - "src/dpone/services/ci/shadow_capacity.py"
+  - "src/dpone/services/ci/shadow_capacity_evidence.py"
+  - "src/dpone/services/ci/shadow_capacity_source.py"
+  - "src/dpone/services/ci/shadow_capacity_transport.py"
+  - "src/dpone/services/ci/shadow_observation_bundle.py"
+  - "src/dpone/services/ci/shadow_observation_bundle_verifier.py"
+  - "src/dpone/adapters/ci_shadow_reconciliation_github.py"
+  - "src/dpone/adapters/filesystem_evidence.py"
+  - "tools/ci/calibrate_pr_gate_shadow_capacity.py"
+  - "docs/cicd/pr-gate-shadow-capacity.md"
+  - "docs/cicd/pr-gate-shadow.md"
+  - "docs/cicd/pr-gate-shadow-runbook.md"
+  - "docs/schemas/cicd/ci-shadow-reconciliation-capacity-v1.schema.json"
+  - "docs/feature-design-ci-shadow-pr4c-capacity.md"
+  - "docs/feature-design-ci-pr-gate-exact-sha-evidence.md"
+  - "docs/adr/0048-exact-sha-readiness-evidence.md"
+  - "test_artifacts/agent-policy/ci-shadow-pr4c-capacity-task-contract.yml"
+  - "tests/test_ci_shadow_pr4c_capacity*.py"
+  - "tests/test_ci_shadow_pr4c_capacity_budget.py"
+  - "tests/test_ci_shadow_pr4c_capacity_observation.py"
+  - "tests/test_ci_shadow_pr4c_github_adapter.py"
+  - "tests/test_ci_shadow_pr4c_observation_bundle.py"
+
+integrator_owned_paths:
+  - ".github/workflows/pr-gate-shadow-capacity.yml"
+  - "mkdocs.yml"
+  - "docs/quality-metrics.md"
+  - "test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-capacity.schema.json"
+  - "test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-mvp.schema.json"
+  - "tests/test_ci_shadow_reconciliation_contracts.py"
+read_only_paths:
+  - "src/dpone/contracts/strict_json.py"
+  - "src/dpone/services/ci/shadow_audit.py"
+  - "src/dpone/adapters/ci_shadow_audit_github.py"
+  - "src/dpone/readiness/route_attestation_files.py"
+  - "test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-mvp.yml"
+  - "tests/test_ci_shadow_capacity_contracts.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "docs/quality-metrics.md"
+  - "test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-capacity.schema.json"
+  - "test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-mvp.schema.json"
+  - ".github/workflows/ci.yml"
+  - ".github/workflows/pr-gate-shadow.yml"
+  - ".github/workflows/pr-gate-shadow-audit.yml"
+  - "tests/conftest.py"
+  - "tests/test_ci_shadow_reconciliation_contracts.py"
+shared_file_owner: "codex"
+
+dependencies:
+  - "PR4B merged at 0b4849bd2e7afc9a2778d6120f742d2202db8aff"
+  - "Approved parent specification and ADR0048 transport amendment"
+required_checks:
+  focused:
+    - "tests/test_ci_shadow_capacity_contracts.py"
+    - "tests/test_ci_shadow_capacity_validation_contracts.py"
+    - "tests/test_ci_shadow_pr4c_capacity*.py"
+  broad:
+    - "select_checks"
+    - "ruff, format, mypy, import/layer/module metrics"
+    - "workflow security, docs strict build, non-live suite"
+  live:
+    - "default-branch workflow dispatch and authenticated capacity artifact"
+required_outputs: ["implementation", "tests", "documentation_impact", "completion_report"]
+completion_statuses: {allowed: ["PASS", "FAIL", "SKIP", "N/A", "UNVERIFIED"]}
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "A required artifact transport cannot authenticate archive and payload separately."
+  - "A live public-fork canary is claimed without recorded evidence."
+  - "A required edit changes legacy required checks or live protection."

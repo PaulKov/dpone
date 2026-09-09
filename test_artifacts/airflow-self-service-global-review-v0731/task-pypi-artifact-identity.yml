@@ -1,0 +1,73 @@
+schema_version: 1
+task_id: "DPONE-PYPI-ARTIFACT-IDENTITY"
+title: "Make PyPI release smoke verify exact candidate wheel identity"
+goal: "Prevent an already-published filename with different bytes from producing a false-green release smoke."
+specification: "docs/release.md"
+base_commit: "ef88ae7f"
+integrator: "Codex main agent"
+
+acceptance_criteria:
+  - "The smoke compares each local candidate wheel filename and SHA-256 with the matching PyPI release file."
+  - "A missing filename, unavailable digest, or digest mismatch is a non-success result with an actionable stable reason."
+  - "The three-distribution release set is checked as one bounded report without printing credentials."
+  - "Current success behavior remains compatible when every published digest matches."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "release verification tooling and evidence"
+  migration_required: false
+
+owned_paths:
+  - tools/pypi_release_smoke.py
+  - tools/pypi_release_smoke_dist.py
+  - tests/test_pypi_release_smoke.py
+  - tests/test_pypi_release_smoke_dist.py
+read_only_paths:
+  - .github/workflows/release.yml
+  - docs/release.md
+  - pyproject.toml
+  - packages/dpone-airflow-pack/pyproject.toml
+  - packages/apache-airflow-providers-dpone/pyproject.toml
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs
+  - packages
+  - src
+
+shared_file_owner: "Codex main agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_pypi_release_smoke.py tests/test_pypi_release_smoke_dist.py -q"
+    - "uv run ruff check tools/pypi_release_smoke.py tools/pypi_release_smoke_dist.py tests/test_pypi_release_smoke.py tests/test_pypi_release_smoke_dist.py"
+  broad:
+    - "uv run pytest -k 'pypi and release and smoke' -q"
+  live:
+    - "UNVERIFIED unless the exact candidate version has been published to PyPI"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

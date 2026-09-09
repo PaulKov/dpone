@@ -1,0 +1,46 @@
+{
+  "budget": {
+    "p95_seconds": 5.0
+  },
+  "measurements": {
+    "elapsed_seconds": [
+      0.924397,
+      0.643174,
+      0.637484,
+      0.661956,
+      0.627131,
+      0.659434,
+      0.598234,
+      0.597307,
+      0.636427,
+      0.580452,
+      0.575317,
+      0.585178,
+      0.589455,
+      0.634082,
+      0.668176,
+      0.726441,
+      0.612726,
+      0.564692,
+      0.545854,
+      0.563811
+    ],
+    "p50_seconds": 0.612726,
+    "p95_seconds": 0.726441,
+    "peak_rss_bytes": 28819456,
+    "stable_test_ids": 100
+  },
+  "runner": {
+    "cpu_count": 12,
+    "platform": "macOS-15.3-arm64-arm-64bit",
+    "python": "3.11.14"
+  },
+  "scenario": {
+    "rows_per_test": 2,
+    "runs": 20,
+    "tests": 100
+  },
+  "schema": "dpone.hermetic-test-benchmark.v1",
+  "scope": "credential-free hermetic contract; not route certification",
+  "status": "PASS"
+}

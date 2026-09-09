@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-governance-publish-verification.schema.json",
+  "title": "dpone data product governance publish verification",
+  "type": "object",
+  "required": ["schema_version", "publish_verification_id", "status", "provider", "publish_receipt_id", "payload_id", "payload_sha256", "checks", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_governance_publish_verification.v1"},
+    "publish_verification_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["verified", "warning", "blocked"]},
+    "provider": {"enum": ["datahub", "openmetadata", "openlineage", "opa", "json"]},
+    "publish_receipt_id": {"type": ["string", "null"]},
+    "payload_id": {"type": ["string", "null"]},
+    "payload_sha256": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "checks": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

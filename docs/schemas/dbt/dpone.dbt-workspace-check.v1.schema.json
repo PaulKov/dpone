@@ -1,0 +1,575 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-workspace-check.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "blockers": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "remediation": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "path",
+          "severity"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "discovery": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              "message": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string"
+              },
+              "path": {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              "remediation": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "path",
+              "severity"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "projects": {
+          "items": {
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "else": {
+                  "properties": {
+                    "publishing": {
+                      "const": false
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "reason": {
+                      "const": "policy_present"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "manifest_path": {
+                      "maxLength": 1024,
+                      "minLength": 1,
+                      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+                      "type": "string"
+                    },
+                    "profiles_path": {
+                      "maxLength": 1024,
+                      "minLength": 1,
+                      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+                      "type": "string"
+                    },
+                    "project_name": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "publishing": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            ],
+            "properties": {
+              "manifest_path": {
+                "anyOf": [
+                  {
+                    "maxLength": 1024,
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "profiles_path": {
+                "anyOf": [
+                  {
+                    "maxLength": 1024,
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "project_name": {
+                "anyOf": [
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "project_path": {
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+                "type": "string"
+              },
+              "publishing": {
+                "type": "boolean"
+              },
+              "reason": {
+                "enum": [
+                  "policy_present",
+                  "not_configured",
+                  "invalid"
+                ]
+              }
+            },
+            "required": [
+              "project_path",
+              "project_name",
+              "publishing",
+              "profiles_path",
+              "manifest_path",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "schema": {
+          "const": "dpone.dbt-workspace-discovery.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "passed",
+        "projects",
+        "blockers"
+      ],
+      "type": "object"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "projects": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "project_path": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+            "type": "string"
+          },
+          "report": {
+            "additionalProperties": false,
+            "properties": {
+              "artifacts": {
+                "additionalProperties": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "blockers": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "message": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "path": {
+                      "maxLength": 4096,
+                      "type": "string"
+                    },
+                    "remediation": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "severity": {
+                      "enum": [
+                        "error",
+                        "warning"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "path",
+                    "severity"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "compile_fingerprint": {
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "dbt_adapter": {
+                "anyOf": [
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dbt_adapter_version": {
+                "anyOf": [
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dbt_version": {
+                "anyOf": [
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "manifest_path": {
+                "type": "string"
+              },
+              "manifest_schema_version": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      10,
+                      11,
+                      12
+                    ],
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "manifest_sha256": {
+                "anyOf": [
+                  {
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "models": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "intent": {
+                      "type": "object"
+                    },
+                    "model": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "model_path": {
+                      "maxLength": 1024,
+                      "minLength": 1,
+                      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+                      "type": "string"
+                    },
+                    "resolved_physical_design": {
+                      "type": "object"
+                    },
+                    "resolved_strategy": {
+                      "type": "object"
+                    },
+                    "route_capability": {
+                      "type": "object"
+                    },
+                    "source_relation": {
+                      "type": "object"
+                    },
+                    "warnings": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "code": {
+                            "maxLength": 256,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "message": {
+                            "maxLength": 256,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "path": {
+                            "maxLength": 4096,
+                            "type": "string"
+                          },
+                          "remediation": {
+                            "maxLength": 256,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "severity": {
+                            "enum": [
+                              "error",
+                              "warning"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message",
+                          "path",
+                          "severity"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "workload_id": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "model",
+                    "model_path",
+                    "source_relation",
+                    "intent",
+                    "resolved_strategy",
+                    "resolved_physical_design",
+                    "route_capability",
+                    "workload_id",
+                    "warnings"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "release_id": {
+                "anyOf": [
+                  {
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "schema": {
+                "const": "dpone.dbt-publish-compile.v2"
+              },
+              "warnings": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "message": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "path": {
+                      "maxLength": 4096,
+                      "type": "string"
+                    },
+                    "remediation": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "severity": {
+                      "enum": [
+                        "error",
+                        "warning"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "path",
+                    "severity"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "workflows": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "dag_id": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "models": {
+                      "items": {
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "workflow": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "workflow",
+                    "dag_id",
+                    "models"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "schema",
+              "manifest_path",
+              "manifest_schema_version",
+              "manifest_sha256",
+              "dbt_version",
+              "dbt_adapter",
+              "dbt_adapter_version",
+              "release_id",
+              "passed",
+              "models",
+              "workflows",
+              "warnings",
+              "blockers",
+              "artifacts",
+              "compile_fingerprint"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "project_path",
+          "report"
+        ],
+        "type": "object"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "schema": {
+      "const": "dpone.dbt-workspace-check.v1"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "discovery",
+    "projects",
+    "blockers"
+  ],
+  "type": "object"
+}

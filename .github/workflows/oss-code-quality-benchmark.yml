@@ -1,0 +1,181 @@
+name: OSS code quality benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: Project to refresh.
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - dpone
+          - airbyte
+          - dlt
+          - pentaho-kettle
+          - apache-hop
+          - sling
+      allow_stale:
+        description: Preserve previous values and mark them stale when a metric refresh fails.
+        required: true
+        default: true
+        type: boolean
+      max_stale_days:
+        description: Freshness warning threshold for governance review.
+        required: true
+        default: "30"
+        type: string
+      create_pr:
+        description: Create a pull request with refreshed benchmark artifacts.
+        required: true
+        default: true
+        type: boolean
+      verify_source_urls:
+        description: Live-check URL sources for Source Citation Verification. Local/source metadata checks always run.
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    name: Refresh OSS benchmark evidence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Restore external repository cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/oss-code-quality-benchmark
+          key: oss-code-quality-benchmark-${{ runner.os }}-${{ hashFiles('tools/oss_code_quality_benchmark.py', 'tools/oss_benchmark/**') }}
+          restore-keys: |
+            oss-code-quality-benchmark-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Install external analyzer toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cloc
+          cargo install tokei --locked
+          uv pip install radon lizard
+
+      - name: Refresh benchmark metrics
+        run: |
+          release_version="$(python - <<'PY'
+          import tomllib
+
+          with open("pyproject.toml", "rb") as handle:
+              print(tomllib.load(handle)["project"]["version"])
+          PY
+          )"
+          release_tag="v${release_version}"
+          release_sha="$(git rev-list -n 1 "$release_tag" 2>/dev/null || true)"
+          if [[ -z "$release_sha" ]]; then
+            release_sha="${{ github.sha }}"
+          fi
+          args=(
+            --include-external
+            --project "${{ inputs.project }}"
+            --previous-data docs/benchmarks/data/oss-code-quality-benchmark-2026-06-12.json
+            --baseline-data docs/benchmarks/data/oss-code-quality-benchmark-2026-06-12.json
+            --runner-name "${{ github.actor }}"
+            --workflow-name "${{ github.workflow }}"
+            --run-id "${{ github.run_id }}"
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            --git-sha "${{ github.sha }}"
+            --branch "${{ github.ref_name }}"
+            --release-version "$release_version"
+            --release-tag "$release_tag"
+            --release-sha "$release_sha"
+            --max-stale-days "${{ inputs.max_stale_days }}"
+            --external-analyzer-timeout 60
+            --pr-summary test_artifacts/oss-code-quality-benchmark/pr-comment.md
+            --enforce-quality-gates
+            --run-certification
+            --certification-mode local
+            --fail-on-certification
+          )
+          if [[ "${{ inputs.allow_stale }}" == "true" ]]; then
+            args+=(--allow-stale)
+          fi
+          if [[ "${{ inputs.verify_source_urls }}" == "true" ]]; then
+            args+=(--verify-source-urls)
+          fi
+          uv run python tools/oss_code_quality_benchmark.py "${args[@]}"
+
+      - name: Refresh generated docs metrics
+        run: uv run dpone docs update-dev-metrics
+
+      - name: Verify public benchmark redaction
+        run: |
+          if grep -R -n -E "/Users/|/private/tmp|data-platform-dpone" docs/benchmarks test_artifacts/oss-code-quality-benchmark; then
+            echo "Public benchmark artifacts contain machine-specific paths."
+            exit 1
+          fi
+
+      - name: Validate benchmark tests
+        run: uv run pytest tests/test_oss_code_quality_benchmark.py tests/test_oss_benchmark_v4_executable_certification.py -q
+
+      - name: Validate docs contracts
+        run: uv run pytest tests/test_docs_language_contracts.py tests/test_cicd_docs_contracts.py -q
+
+      - name: Validate docs metrics are current
+        run: uv run dpone docs update-dev-metrics --check
+
+      - name: Build documentation
+        run: uv run mkdocs build --strict
+
+      - name: Upload oss-code-quality-benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: oss-code-quality-benchmark
+          path: |
+            docs/benchmarks/
+            docs/benchmarks/data/runtime-certification/
+            docs/benchmarks/assets/oss-release-readiness-seal.svg
+            docs/benchmarks/oss-benchmark-release-readiness-2026-06-12.md
+            docs/benchmarks/data/oss-benchmark-release-readiness-2026-06-12.json
+            test_artifacts/oss-code-quality-benchmark/
+
+      - name: Create benchmark refresh pull request
+        if: ${{ inputs.create_pr }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ -z "$(git status --porcelain docs/benchmarks docs/quality-metrics.md)" ]]; then
+            echo "No benchmark changes to publish."
+            exit 0
+          fi
+          branch="automation/oss-code-quality-benchmark-${{ github.run_id }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add docs/benchmarks docs/quality-metrics.md
+          git commit -m "Refresh OSS code quality benchmark"
+          git push --force-with-lease origin "$branch"
+          gh pr create \
+            --base "${{ github.event.repository.default_branch }}" \
+            --head "$branch" \
+            --title "Refresh OSS code quality benchmark" \
+            --body-file test_artifacts/oss-code-quality-benchmark/pr-comment.md

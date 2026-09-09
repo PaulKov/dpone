@@ -1,0 +1,1079 @@
+{
+  "$defs": {
+    "issue": {
+      "additionalProperties": true,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "path",
+        "source"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-pack.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "artifact_dir": {
+      "type": "string"
+    },
+    "artifact_index": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "artifacts": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "actual_kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "exists": {
+            "type": "boolean"
+          },
+          "expected_kind": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "format",
+          "expected_kind",
+          "required",
+          "exists",
+          "passed",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "blockers": {
+      "items": {
+        "$ref": "#/$defs/issue"
+      },
+      "type": "array"
+    },
+    "bundle_path": {
+      "type": "string"
+    },
+    "connection_projection": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "effective_config": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "image": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "image_digest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "include_live_gates": {
+      "type": "boolean"
+    },
+    "kind": {
+      "const": "gitops.airflow_pack"
+    },
+    "kpo_kwargs": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "mapped_kpo_kwargs": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "mapping_plan": {
+      "additionalProperties": false,
+      "properties": {
+        "backfill_plan_hash": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "chunks_total": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "chunks_count": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "first_chunk_index": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "item_index": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "last_chunk_index": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "item_index",
+              "first_chunk_index",
+              "last_chunk_index",
+              "chunks_count"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
+        },
+        "items_total": {
+          "maximum": 200,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "limits": {
+          "additionalProperties": false,
+          "properties": {
+            "max_active": {
+              "maximum": 64,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "max_items": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "pool": {
+              "pattern": "^[A-Za-z0-9_.-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "max_items",
+            "max_active",
+            "pool"
+          ],
+          "type": "object"
+        },
+        "mode": {
+          "enum": [
+            "internal",
+            "visible",
+            "summary"
+          ]
+        },
+        "plan_fingerprint": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "schema": {
+          "const": "dpone.airflow-mapping-plan.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "mode",
+        "plan_fingerprint",
+        "backfill_plan_hash",
+        "chunks_total",
+        "items_total",
+        "limits",
+        "items"
+      ],
+      "type": "object"
+    },
+    "mode": {
+      "type": "string"
+    },
+    "next_actions": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "outcome_gate": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "output_path": {
+      "type": "string"
+    },
+    "pack_fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "pack_identity": {
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "dpone.airflow-pack-identity.v1"
+        }
+      },
+      "required": [
+        "schema"
+      ],
+      "type": "object"
+    },
+    "pod_spec": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "process_plans": {
+      "additionalProperties": {
+        "additionalProperties": true,
+        "properties": {
+          "dag_node": {
+            "additionalProperties": true,
+            "properties": {
+              "depends_on_process_selectors": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "estimated_visible_tasks": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "node_id": {
+                "type": "string"
+              },
+              "process_name": {
+                "type": "string"
+              },
+              "task_group": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "visibility": {
+                "enum": [
+                  "inline",
+                  "task",
+                  "group"
+                ]
+              }
+            },
+            "required": [
+              "process_name",
+              "visibility",
+              "task_group",
+              "estimated_visible_tasks",
+              "depends_on_process_selectors"
+            ],
+            "type": "object"
+          },
+          "mapping_plan": {
+            "additionalProperties": false,
+            "properties": {
+              "backfill_plan_hash": {
+                "anyOf": [
+                  {
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "chunks_total": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "items": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "chunks_count": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "first_chunk_index": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "item_index": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "last_chunk_index": {
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "item_index",
+                    "first_chunk_index",
+                    "last_chunk_index",
+                    "chunks_count"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 200,
+                "type": "array"
+              },
+              "items_total": {
+                "maximum": 200,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "limits": {
+                "additionalProperties": false,
+                "properties": {
+                  "max_active": {
+                    "maximum": 64,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "max_items": {
+                    "maximum": 200,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "pool": {
+                    "pattern": "^[A-Za-z0-9_.-]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "max_items",
+                  "max_active",
+                  "pool"
+                ],
+                "type": "object"
+              },
+              "mode": {
+                "enum": [
+                  "internal",
+                  "visible",
+                  "summary"
+                ]
+              },
+              "plan_fingerprint": {
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "schema": {
+                "const": "dpone.airflow-mapping-plan.v1"
+              }
+            },
+            "required": [
+              "schema",
+              "mode",
+              "plan_fingerprint",
+              "backfill_plan_hash",
+              "chunks_total",
+              "items_total",
+              "limits",
+              "items"
+            ],
+            "type": "object"
+          },
+          "runtime_commands": {
+            "additionalProperties": true,
+            "properties": {
+              "expanded": {
+                "type": "string"
+              },
+              "inline": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "inline",
+              "expanded"
+            ],
+            "type": "object"
+          },
+          "selector": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "steps": {
+            "items": {
+              "additionalProperties": true,
+              "properties": {
+                "command": {
+                  "type": "string"
+                },
+                "credential_required": {
+                  "type": "boolean"
+                },
+                "depends_on": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "phase": {
+                  "type": "string"
+                },
+                "produces": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "runtime_command": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "argv": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 10,
+                      "minItems": 8,
+                      "type": "array"
+                    },
+                    "hook_id": {
+                      "maxLength": 256,
+                      "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+                      "type": "string"
+                    },
+                    "process_selector": {
+                      "anyOf": [
+                        {
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schema": {
+                      "const": "dpone.airflow-pre-hook-command.v1"
+                    }
+                  },
+                  "required": [
+                    "schema",
+                    "hook_id",
+                    "process_selector",
+                    "argv"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "name",
+                "phase",
+                "command",
+                "required",
+                "credential_required",
+                "produces",
+                "reason"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "selector",
+          "dag_node",
+          "runtime_commands",
+          "steps"
+        ],
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "provider_execution": {
+      "additionalProperties": false,
+      "properties": {
+        "kpo_kwargs": {
+          "additionalProperties": false,
+          "properties": {
+            "env_vars": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "execution_timeout_seconds": {
+              "maximum": 86700,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "executor": {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+              "type": "string"
+            },
+            "labels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "required": [
+                "dpone.dev/workload-id"
+              ],
+              "type": "object"
+            },
+            "name": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "pool": {
+              "maxLength": 256,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+              "type": "string"
+            },
+            "task_id": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "task_id",
+            "name",
+            "labels",
+            "env_vars"
+          ],
+          "type": "object"
+        },
+        "pod_spec": {
+          "additionalProperties": false,
+          "properties": {
+            "spec": {
+              "additionalProperties": false,
+              "properties": {
+                "containers": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "const": "base"
+                      },
+                      "resources": {
+                        "additionalProperties": false,
+                        "minProperties": 1,
+                        "properties": {
+                          "limits": {
+                            "additionalProperties": {
+                              "maxLength": 64,
+                              "minLength": 1,
+                              "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+                              "type": "string"
+                            },
+                            "maxProperties": 64,
+                            "minProperties": 1,
+                            "propertyNames": {
+                              "maxLength": 253,
+                              "minLength": 1,
+                              "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "requests": {
+                            "additionalProperties": {
+                              "maxLength": 64,
+                              "minLength": 1,
+                              "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+                              "type": "string"
+                            },
+                            "maxProperties": 64,
+                            "minProperties": 1,
+                            "propertyNames": {
+                              "maxLength": 253,
+                              "minLength": 1,
+                              "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+                              "type": "string"
+                            },
+                            "type": "object"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 1,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "imagePullSecrets": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 8,
+                  "type": "array"
+                },
+                "nodeSelector": {
+                  "additionalProperties": {
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+                    "type": "string"
+                  },
+                  "maxProperties": 64,
+                  "propertyNames": {
+                    "maxLength": 317,
+                    "minLength": 1,
+                    "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "tolerations": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "effect": {
+                        "enum": [
+                          "NoExecute",
+                          "NoSchedule",
+                          "PreferNoSchedule"
+                        ]
+                      },
+                      "key": {
+                        "maxLength": 317,
+                        "minLength": 1,
+                        "pattern": "^[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?$",
+                        "type": "string"
+                      },
+                      "operator": {
+                        "const": "Equal"
+                      },
+                      "value": {
+                        "maxLength": 63,
+                        "minLength": 0,
+                        "pattern": "^(?:|[^\\u0000-\\u0020](?:[^\\u0000-\\u001f]*[^\\u0000-\\u0020])?)$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "effect",
+                      "key",
+                      "operator",
+                      "value"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 32,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "containers"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "spec"
+          ],
+          "type": "object"
+        },
+        "retry_authority": {
+          "additionalProperties": false,
+          "properties": {
+            "max_task_retries": {
+              "const": 3
+            },
+            "mode": {
+              "const": "postgres_xmin_initial_mssql_target_atomic_v1"
+            },
+            "schema": {
+              "const": "dpone.airflow-retry-authority.v1"
+            }
+          },
+          "required": [
+            "max_task_retries",
+            "mode",
+            "schema"
+          ],
+          "type": "object"
+        },
+        "schema": {
+          "const": "dpone.airflow-provider-execution.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "kpo_kwargs",
+        "pod_spec"
+      ],
+      "type": "object"
+    },
+    "runner_policy": {
+      "type": "string"
+    },
+    "runtime_bootstrap": {
+      "additionalProperties": false,
+      "properties": {
+        "commands": {
+          "additionalProperties": {
+            "additionalProperties": false,
+            "properties": {
+              "argv": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 3,
+                "type": "array"
+              },
+              "env": {
+                "additionalProperties": false,
+                "properties": {
+                  "DPONE_SKIP_AIRFLOW_SEPARATE_HOOKS": {
+                    "const": "1"
+                  }
+                },
+                "required": [
+                  "DPONE_SKIP_AIRFLOW_SEPARATE_HOOKS"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "argv",
+              "env"
+            ],
+            "type": "object"
+          },
+          "minProperties": 1,
+          "type": "object"
+        },
+        "schema": {
+          "const": "dpone.airflow-runtime-bootstrap.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "commands"
+      ],
+      "type": "object"
+    },
+    "runtime_command": {
+      "type": "string"
+    },
+    "runtime_manifest": {
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "runtime_payload": {
+      "additionalProperties": false,
+      "properties": {
+        "archive": {
+          "additionalProperties": false,
+          "properties": {
+            "bytes": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "data": {
+              "minLength": 4,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+              "type": "string"
+            },
+            "encoding": {
+              "const": "base64"
+            },
+            "format": {
+              "const": "tar+gzip"
+            },
+            "sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "encoding",
+            "format",
+            "sha256",
+            "bytes",
+            "data"
+          ],
+          "type": "object"
+        },
+        "schema": {
+          "const": "dpone.airflow-runtime-payload.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "archive"
+      ],
+      "type": "object"
+    },
+    "runtime_selection": {
+      "additionalProperties": true,
+      "properties": {
+        "mode": {
+          "type": "string"
+        },
+        "required_for_selected_nodes": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "credential_required": {
+            "type": "boolean"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "produces": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "runtime_command": {
+            "additionalProperties": false,
+            "properties": {
+              "argv": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "minItems": 8,
+                "type": "array"
+              },
+              "hook_id": {
+                "maxLength": 256,
+                "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+                "type": "string"
+              },
+              "process_selector": {
+                "anyOf": [
+                  {
+                    "maxLength": 256,
+                    "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "schema": {
+                "const": "dpone.airflow-pre-hook-command.v1"
+              }
+            },
+            "required": [
+              "schema",
+              "hook_id",
+              "process_selector",
+              "argv"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "phase",
+          "command",
+          "required",
+          "credential_required",
+          "produces",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/issue"
+      },
+      "type": "array"
+    },
+    "workload": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "workload_dependencies": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "xcom": {
+      "additionalProperties": true,
+      "type": "object"
+    }
+  },
+  "required": [
+    "kind",
+    "schema_version",
+    "pack_identity",
+    "pack_fingerprint",
+    "producer",
+    "artifact_dir",
+    "output_path",
+    "bundle_path",
+    "mode",
+    "runner_policy",
+    "include_live_gates",
+    "artifacts",
+    "steps",
+    "next_actions",
+    "warnings",
+    "blockers"
+  ],
+  "title": "dpone GitOps Airflow runtime pack report",
+  "type": "object"
+}

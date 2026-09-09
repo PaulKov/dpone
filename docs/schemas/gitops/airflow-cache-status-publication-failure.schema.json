@@ -1,0 +1,51 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-cache-status-publication-failure.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempted_at": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "error_code": {
+      "pattern": "^DPONE_AIRFLOW_CACHE_STATUS_[A-Z0-9_]+$",
+      "type": "string"
+    },
+    "expected_schema": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.airflow-cache-status-publication-failure.v1"
+    },
+    "source": {
+      "maxLength": 255,
+      "minLength": 1,
+      "pattern": "^[^/\\\\]+$",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "rejected",
+        "commit_unknown"
+      ]
+    },
+    "target": {
+      "maxLength": 255,
+      "minLength": 1,
+      "pattern": "^[^/\\\\]+$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "status",
+    "source",
+    "target",
+    "expected_schema",
+    "attempted_at",
+    "error_code"
+  ],
+  "title": "dpone GitOps Airflow cache status publication failure marker",
+  "type": "object"
+}

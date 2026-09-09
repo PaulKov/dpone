@@ -1,0 +1,50 @@
+schema_version: 1
+task_id: "DPONE-V07332-SCHEDULED-CERT"
+title: "Bind scheduled retention evidence to rollout occurrence and freshness"
+goal: "Reject stale, replaced, active, or execution-drifted Jobs during scheduled certification."
+specification: "docs/feature-design-airflow-runtime-pod-retention-control-v0732.md"
+base_commit: "5a48134b29961d7299dbbb50e09e88da2880971d"
+integrator: "primary Codex agent"
+
+acceptance_criteria:
+  - "Rollout marker binds CronJob UID, generation, and reviewed template digest before Job selection."
+  - "Selected Job is recent, completed, inactive, owned by that occurrence, and matches full bounded Job execution policy."
+  - "Every kubectl call, including diff, has a request timeout and activation requires two plan cycles."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["runtime Pod retention Kubernetes certification runbook"]
+  migration_required: false
+
+owned_paths:
+  - docs/airflow-runtime-pod-retention-kubernetes.md
+  - tests/test_airflow_runtime_pod_retention_scheduled_adversarial.py
+read_only_paths:
+  - src/dpone/contracts/airflow_runtime_pod_retention_template.py
+  - tests/test_airflow_runtime_pod_retention_docs_contract.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "primary Codex agent"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_runtime_pod_retention_scheduled_adversarial.py -q"
+  broad:
+    - "uv run ruff check owned paths"
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-docs"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

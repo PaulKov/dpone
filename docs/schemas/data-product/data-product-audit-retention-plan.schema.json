@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-audit-retention-plan.schema.json",
+  "title": "Data Product Audit Retention Plan",
+  "type": "object",
+  "required": ["schema_version", "status", "audit_retention_plan_id", "decision", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_audit_retention_plan.v1"},
+    "status": {"enum": ["ready", "warning", "blocked"]},
+    "decision": {"type": "string"},
+    "audit_retention_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "audit_archive_verification_id": {"type": ["string", "null"]},
+    "audit_archive_run_id": {"type": ["string", "null"]},
+    "retention_items": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "changes": [],
+  "errors": [],
+  "schema": "dpone.airflow-artifact-publish.v1",
+  "status": "published",
+  "release_id": "sha256:63d535a1edd2362b12fe06416c59a8c9f115d4f2791cc1a0b1c42a5d0ee81703",
+  "deployment_id": "sha256:9c9362bbe2335ce3d065e7f0f4f377cc6480abf6748db1632c988fd3fcaa76b9",
+  "environment": "dev",
+  "artifact_registry_ref": "local-test",
+  "created_objects": 10,
+  "existing_equal_objects": 0,
+  "published_release": true,
+  "published_deployment": true
+}

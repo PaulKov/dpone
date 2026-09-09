@@ -1,0 +1,73 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-airflow-attempt-evidence.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempt": {
+      "additionalProperties": false,
+      "properties": {
+        "dag_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "map_index": {
+          "minimum": -1,
+          "type": "integer"
+        },
+        "run_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "try_number": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dag_id",
+        "task_id",
+        "run_id",
+        "try_number",
+        "map_index"
+      ],
+      "type": "object"
+    },
+    "evidence_set_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "run_identity": {
+      "type": "object"
+    },
+    "schema": {
+      "const": "dpone.dbt-airflow-attempt-evidence.v1"
+    },
+    "status": {
+      "const": "passed"
+    },
+    "xcom_summary": {
+      "type": "object"
+    },
+    "xcom_summary_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "status",
+    "evidence_set_id",
+    "run_identity",
+    "attempt",
+    "xcom_summary_sha256",
+    "xcom_summary"
+  ],
+  "type": "object"
+}

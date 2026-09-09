@@ -1,0 +1,101 @@
+schema_version: 1
+task_id: ci-shadow-pr4c-budget-amendment
+title: "PR4C measured request-budget amendment"
+goal: >-
+  Apply the approved #512 parent amendment that changes only the fixed PR4C
+  HTTP request hard maximum and derived approval threshold after live evidence
+  proved the former values infeasible for the retained double observation.
+  CHANGELOG.md is an integrator-only shared-semantic exception: forbidden_paths
+  retains the schema-required non-writer guard, while integrator ownership below
+  authorizes this public-contract changelog entry.
+specification: docs/feature-design-ci-shadow-pr4c-budget-amendment.md
+base_commit: 6ff094671f64f371428f458a945025acdd5e6998
+integrator: codex
+
+acceptance_criteria:
+  - The policy preserves a 2x safety factor and all non-request limits.
+  - Tests cover 1499/1500/1501 and 2999/3000/3001 request boundaries.
+  - Two independent exact-input observations remain mandatory.
+  - Docs describe intentionally-red receipt UX and safe recovery.
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - ReconciliationPolicyV1 historical canonical bytes and digest
+    - ReconciliationPolicyV2 canonical bytes and digest
+    - capacity evidence hard and approval request bounds
+  migration_required: true
+
+owned_paths:
+  - src/dpone/contracts/ci_shadow_reconciliation.py
+  - src/dpone/services/ci/shadow_capacity.py
+  - src/dpone/services/ci/shadow_capacity_evidence.py
+  - src/dpone/services/ci/shadow_reconciliation_budget.py
+  - src/dpone/services/ci/shadow_reconciliation_complete_observation.py
+  - src/dpone/services/ci/shadow_reconciliation_receipts.py
+  - tools/ci/calibrate_pr_gate_shadow_capacity.py
+  - test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-capacity.schema.json
+  - test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-capacity-v2.schema.json
+  - test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-mvp.yml
+  - test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-mvp.schema.json
+  - test_artifacts/agent-policy/dpone-ci-shadow-closure-pr2-spec.yml
+  - tests/test_ci_shadow_pr4c_capacity_policy.py
+  - tests/test_ci_shadow_pr4c_capacity_budget.py
+  - tests/test_ci_shadow_pr4c_capacity_evidence.py
+  - tests/test_ci_shadow_pr4c_capacity_service.py
+  - tests/test_ci_shadow_capacity_contracts.py
+  - tests/test_ci_shadow_capacity_validation_contracts.py
+  - tests/test_ci_shadow_reconciliation_contracts.py
+  - docs/adr/0048-exact-sha-readiness-evidence.md
+  - docs/feature-design-ci-pr-gate-exact-sha-evidence.md
+  - docs/feature-design-ci-shadow-pr4c-capacity.md
+  - docs/feature-design-ci-shadow-pr4c-budget-amendment.md
+  - docs/cicd/pr-gate-shadow-capacity.md
+  - docs/cicd/pr-gate-shadow-capacity-runbook.md
+  - docs/cicd/pr-gate-shadow.md
+  - docs/ci-cd.md
+  - .agents/policy/ci-shadow-reconciliation-observation-bundle-v1.yml
+integrator_owned_paths:
+  - mkdocs.yml
+  - CHANGELOG.md
+read_only_paths:
+  - docs/agent-development.md
+  - docs/feature-design-standard.md
+  - docs/engineering-standards.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/benchmarks
+
+shared_file_owner: codex
+dependencies:
+  - "Live capacity receipt run 33105043667"
+required_checks:
+  focused:
+    - "PR4C policy/schema/test suite"
+  broad:
+    - "change-aware validation selection"
+    - "docs checks and strict MkDocs build"
+  live:
+    - "fresh exact-master capacity receipt after merge"
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

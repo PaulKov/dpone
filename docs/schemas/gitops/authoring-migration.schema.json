@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/authoring-migration.schema.json",
+  "title": "dpone GitOps authoring-mode migration plan and receipt",
+  "type": "object",
+  "required": [
+    "kind",
+    "schema",
+    "passed",
+    "mode",
+    "status",
+    "plan_id",
+    "source",
+    "target",
+    "changes",
+    "retained_files",
+    "warnings",
+    "errors"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "const": "dpone.authoring-migration.v1"
+    },
+    "schema": {
+      "const": "dpone.authoring-migration.v1"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "mode": {
+      "enum": [
+        "plan",
+        "apply"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "no_op",
+        "blocked",
+        "applied"
+      ]
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "mode",
+        "semantic_fingerprint"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "classic",
+            "flow",
+            "folder"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "semantic_fingerprint": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "mode",
+        "semantic_fingerprint"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "classic",
+            "flow",
+            "folder"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "semantic_fingerprint": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "action",
+          "path",
+          "before_sha256",
+          "after_sha256",
+          "unified_diff"
+        ],
+        "properties": {
+          "action": {
+            "enum": [
+              "create",
+              "modify",
+              "no_op"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "before_sha256": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "after_sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "unified_diff": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "retained_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "schema",
+          "code",
+          "stage",
+          "severity",
+          "message",
+          "fixes"
+        ],
+        "properties": {
+          "schema": {
+            "const": "dpone.error.v1"
+          },
+          "code": {
+            "type": "string"
+          },
+          "stage": {
+            "const": "authoring_migration"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "entity": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "fixes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "exit_code": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

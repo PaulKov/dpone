@@ -1,0 +1,167 @@
+{
+  "$comment": "The three model ID arrays are equal; replacement also equals action IDs. This plan never contains recovery_plan_digest.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-workflow-plan.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "replacement_action_ids": {
+          "maxItems": 0
+        },
+        "scope_revision": {
+          "const": 1
+        },
+        "workflow_mode": {
+          "const": "normal"
+        }
+      }
+    },
+    {
+      "properties": {
+        "replacement_action_ids": {
+          "maxItems": 0
+        },
+        "scope_revision": {
+          "minimum": 2
+        },
+        "workflow_mode": {
+          "const": "complete_scope_replay"
+        }
+      }
+    },
+    {
+      "properties": {
+        "replacement_action_ids": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "workflow_mode": {
+          "const": "failed_precommit_replacement"
+        }
+      }
+    }
+  ],
+  "properties": {
+    "expected_model_outcome_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "model_operation_plan_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "mutation_closure_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "operation_plan_refs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "model_unique_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "operation_id": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "operation_plan_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_unique_id",
+          "operation_id",
+          "operation_plan_sha256"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "replacement_action_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-workflow-plan.v1"
+    },
+    "scope_end": {
+      "format": "date-time",
+      "pattern": "T00:00:00Z$",
+      "type": "string"
+    },
+    "scope_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "scope_start": {
+      "format": "date-time",
+      "pattern": "T00:00:00Z$",
+      "type": "string"
+    },
+    "selected_mutating_node_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "workflow_mode": {
+      "enum": [
+        "normal",
+        "failed_precommit_replacement",
+        "complete_scope_replay"
+      ],
+      "type": "string"
+    },
+    "workflow_name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "workflow_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "expected_model_outcome_ids",
+    "model_operation_plan_ids",
+    "mutation_closure_sha256",
+    "operation_plan_refs",
+    "replacement_action_ids",
+    "schema",
+    "scope_end",
+    "scope_revision",
+    "scope_start",
+    "selected_mutating_node_ids",
+    "workflow_mode",
+    "workflow_name",
+    "workflow_plan_sha256"
+  ],
+  "type": "object"
+}

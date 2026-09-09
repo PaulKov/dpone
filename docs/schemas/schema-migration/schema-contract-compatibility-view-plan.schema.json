@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-compatibility-view-plan.schema.json",
+  "title": "dpone schema contract compatibility view plan",
+  "type": "object",
+  "required": ["schema_version", "status", "contract_id", "views", "summary", "blockers", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_compatibility_view_plan.v1"},
+    "compatibility_view_plan_id": {"type": "string", "pattern": "^sha256:"},
+    "status": {"enum": ["planned", "blocked", "disabled", "warning"]},
+    "contract_id": {"type": ["string", "null"]},
+    "base_version": {"type": ["string", "null"]},
+    "head_version": {"type": ["string", "null"]},
+    "base_contract_version_id": {"type": ["string", "null"]},
+    "head_contract_version_id": {"type": ["string", "null"]},
+    "mode": {"enum": ["observe", "gate", null]},
+    "target": {"type": "object"},
+    "required_bump": {"enum": ["patch", "minor", "major"]},
+    "affected_versions": {"type": "array", "items": {"type": "string"}},
+    "views": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["view", "version_constraint", "status", "projections", "blockers", "warnings"],
+        "additionalProperties": true,
+        "properties": {
+          "view": {"type": "string"},
+          "version_constraint": {"type": "string"},
+          "source_contract": {"type": ["string", "null"]},
+          "remove_after": {"type": ["string", "null"]},
+          "owner": {"type": ["string", "null"]},
+          "strategy": {"type": "string"},
+          "status": {"enum": ["planned", "blocked"]},
+          "projections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["column", "expression", "kind"],
+              "additionalProperties": true,
+              "properties": {
+                "column": {"type": "string"},
+                "expression": {"type": "string"},
+                "kind": {"type": "string"}
+              }
+            }
+          },
+          "ddl": {"type": "array", "items": {"type": "string"}},
+          "validation": {"type": "array", "items": {"type": "string"}},
+          "blockers": {"type": "array", "items": {"type": "string"}},
+          "warnings": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["views_count", "covered_versions", "blocked_projections"],
+      "additionalProperties": true,
+      "properties": {
+        "views_count": {"type": "integer", "minimum": 0},
+        "covered_versions": {"type": "array", "items": {"type": "string"}},
+        "blocked_projections": {"type": "integer", "minimum": 0}
+      }
+    },
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  }
+}

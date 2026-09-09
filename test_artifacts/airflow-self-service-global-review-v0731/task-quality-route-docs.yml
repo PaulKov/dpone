@@ -1,0 +1,58 @@
+schema_version: 1
+task_id: "SS-REVIEW-QUALITY-ROUTE-DOCS"
+title: "Align route docs with executable quality gates and the real CLI"
+goal: "Ensure every copyable route example executes the canonical fail-closed quality contract."
+specification: "docs/feature-design-quality-checks-gates-adapter-v1.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Route guides use `dpone run`, not the nonexistent `dpone batch run`."
+  - "Canonical examples use top-level `quality.gates`."
+  - "Acceptance configuration is top-level and incremental no-data is not made an accidental failure."
+  - "Staged pre-finalize and legacy post-finalize behavior are documented truthfully."
+  - "Docs CI prevents the same command and placement regressions."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["route tutorials", "quality authoring guide", "First DAG diagnostics"]
+  migration_required: true
+
+owned_paths:
+  - "docs/source-sink/*.md"
+  - "docs/managed-ux.md"
+  - "docs/load-governance.md"
+  - "docs/getting-started/first-airflow-dag.md"
+  - "tests/test_docs_language_contracts.py"
+read_only_paths:
+  - "src/dpone/governance"
+  - "src/dpone/runtime/governance"
+  - "src/dpone/commands/run_cmd.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "mkdocs.yml"
+  - "CHANGELOG.md"
+  - "docs/schemas"
+  - "src"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies: ["SS-REVIEW-QUALITY-FINALIZATION-CLOSURE"]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run dpone docs check-docs"
+  broad:
+    - "uv run mkdocs build --strict"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Executable behavior contradicts the approved quality contract."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

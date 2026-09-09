@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-trust-query-result.schema.json",
+  "title": "dpone data product trust query result",
+  "type": "object",
+  "required": ["schema_version", "status", "trust_query_result_id"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_trust_query_result.v1"},
+    "status": {"type": "string"},
+    "trust_query_result_id": {"type": "string"},
+    "evidence_lake_index_id": {"type": ["string", "null"]},
+    "summary": {"type": "object"},
+    "evidence_refs": {"type": "array"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  },
+  "additionalProperties": true
+}

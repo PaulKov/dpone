@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-access-enforcement-report.schema.json",
+  "title": "Data Product Access Enforcement Report",
+  "type": "object",
+  "required": ["schema_version", "status", "access_report_id", "access_enforcement_certificate_id", "blockers", "warnings", "markdown"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_access_enforcement_report.v1"},
+    "status": {"enum": ["certified", "warning", "blocked"]},
+    "access_report_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "access_enforcement_certificate_id": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "markdown": {"type": "string"}
+  },
+  "additionalProperties": true
+}

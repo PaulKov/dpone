@@ -1,0 +1,50 @@
+schema_version: 1
+task_id: "SS-QUALITY-AUTHORITY-MATRIX"
+title: "Cross-artifact quality row-authority matrix"
+goal: "Prevent source_target_count false-success and authority loss across artifact wrappers."
+specification: "docs/feature-design-airflow-self-service-ux-closure-v07317.md"
+base_commit: "d9bb630dc691257b8efe6f00a38f5da171e06c04"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Every supported completed artifact family projects exact source rows."
+  - "Estimated-only and malformed authority never certify a quality gate."
+  - "Wrappers preserve live authority without copying row data into evidence."
+
+public_contract_impact:
+  level: none
+  surfaces: []
+  migration_required: false
+
+owned_paths:
+  - tests/test_quality_row_authority_matrix.py
+read_only_paths:
+  - src/dpone/runtime
+  - tests/test_quality_probe_snapshot_validation.py
+  - tests/test_native_transfer_row_authority.py
+  - tests/test_streaming_rows_quality_authority.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+shared_file_owner: "Codex"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_quality_row_authority_matrix.py tests/test_quality_probe_snapshot_validation.py -q"
+  broad:
+    - "uv run ruff check tests/test_quality_row_authority_matrix.py"
+    - "uv run mypy --config-file mypy.ini"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "A production bug is found that requires code outside owned_paths."
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

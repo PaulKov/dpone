@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-pod-launch-evidence.schema.json",
+  "title": "dpone GitOps Airflow pod launch evidence contract",
+  "type": "object",
+  "required": [
+    "kind",
+    "schema_version",
+    "producer",
+    "mode",
+    "runner_policy",
+    "runtime_profile_path",
+    "pod_contract_path",
+    "pod_name",
+    "namespace",
+    "service_account",
+    "image",
+    "expected_phase",
+    "timeout_seconds",
+    "log_tail_lines",
+    "checks",
+    "commands",
+    "results",
+    "observed_pod"
+  ],
+  "properties": {
+    "kind": {
+      "const": "gitops.airflow_pod_launch_evidence"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string"
+    },
+    "runner_policy": {
+      "type": "string"
+    },
+    "runtime_profile_path": {
+      "type": "string"
+    },
+    "pod_contract_path": {
+      "type": "string"
+    },
+    "image_contract_path": {
+      "type": "string"
+    },
+    "runtime_evidence_path": {
+      "type": "string"
+    },
+    "xcom_summary_path": {
+      "type": "string"
+    },
+    "pod_name": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "service_account": {
+      "type": "string"
+    },
+    "image": {
+      "type": "string"
+    },
+    "image_digest": {
+      "type": "string"
+    },
+    "expected_phase": {
+      "type": "string"
+    },
+    "timeout_seconds": {
+      "type": "integer"
+    },
+    "log_tail_lines": {
+      "type": "integer"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "name",
+          "passed",
+          "severity",
+          "message",
+          "path",
+          "source"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "name",
+          "kind",
+          "command",
+          "required",
+          "timeout_seconds",
+          "executed"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "timeout_seconds": {
+            "type": "integer"
+          },
+          "executed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "name",
+          "command",
+          "exit_code",
+          "stdout",
+          "stderr",
+          "duration_seconds"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "duration_seconds": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "observed_pod": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "pod_name",
+            "namespace",
+            "phase",
+            "service_account",
+            "containers",
+            "events",
+            "logs_tail"
+          ],
+          "properties": {
+            "pod_name": {
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "phase": {
+              "type": "string"
+            },
+            "service_account": {
+              "type": "string"
+            },
+            "node_name": {
+              "type": "string"
+            },
+            "containers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true,
+                "required": [
+                  "name",
+                  "image",
+                  "image_id",
+                  "ready",
+                  "restart_count",
+                  "state"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string"
+                  },
+                  "image_id": {
+                    "type": "string"
+                  },
+                  "ready": {
+                    "type": "boolean"
+                  },
+                  "restart_count": {
+                    "type": "integer"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "exit_code": {
+                    "type": "integer"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true,
+                "required": [
+                  "type",
+                  "reason",
+                  "message",
+                  "count"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "count": {
+                    "type": "integer"
+                  }
+                }
+              }
+            },
+            "logs_tail": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "code",
+        "message",
+        "path",
+        "source"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,141 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-CLOSURE-PR1"
+title: "Repair the legacy CI baseline and introduce module-size ratchet v2"
+goal: >-
+  Restore deterministic non-live and legacy CI checks on the exact master baseline
+  while replacing the module-size allowlist with a fail-closed, no-headroom debt
+  ratchet and splitting the current hard-limit offender by responsibility.
+specification: >-
+  Approved DPONE-CI-SHADOW-CLOSURE plan tracked by
+  https://github.com/PaulKov/dpone/issues/512; PR1 is the isolated baseline repair
+  that is explicitly permitted to precede the repository specification amendment.
+base_commit: "e1d93822b47234e940829319cac0dc9678f6906c"
+integrator: "/root"
+
+acceptance_criteria:
+  - "Schema catalog drift and must_not_leak regressions are fixed at their producers without weakening assertions."
+  - "The full non-live suite collects and passes on Python 3.11 and 3.12."
+  - "src/dpone/readiness/airflow_compact_pack_release.py is split below the global 400 SLOC limit by cohesive responsibility."
+  - "Compact-v1 runtime payload materialization accepts at most 64 distinct payloads, 268435456 bytes per payload, and 536870912 aggregate actual bytes; equality passes and a breach publishes no immutable release."
+  - "Aggregate overflow through dpone gitops airflow release-materialize exits 2 with passed=false, the stable full blocker code, empty release identity/path, and no cache release publication."
+  - "Module baseline v2 records exact LOC and SLOC caps with no headroom and rejects growth, stale debt, invalid ADR/commit identity, missing files, and unauthorized rename semantics."
+  - "Module-size exact-byte CAS and final canonical verification never recreate a missing canonical parent namespace."
+  - "All 19 legacy required checks are green on the exact PR head without admin bypass."
+
+public_contract_impact:
+  level: breaking
+  surfaces:
+    - "dpone docs check-module-size baseline schema and diagnostic output"
+    - "docs/module_size_baseline.json repository quality contract"
+    - "dpone.metrics.module_size legacy Python helpers remain source compatible"
+    - "compact release-set v1 optional runtime-payload compatibility inventory"
+    - "legacy CI quality checkout and module-size evidence bind the exact pull-request head"
+  migration_required: true
+
+owned_paths:
+  - src/dpone/commands/airflow_deployment_build_cmd.py
+  - src/dpone/commands/docs/check_module_size_cmd.py
+  - src/dpone/contracts/airflow_deployment.py
+  - src/dpone/metrics/module_size.py
+  - src/dpone/metrics/module_size_baseline.py
+  - src/dpone/metrics/module_size_confined_write.py
+  - src/dpone/metrics/module_size_snapshot.py
+  - src/dpone/metrics/module_size_thresholds.py
+  - src/dpone/metrics/module_size_write.py
+  - src/dpone/metrics/render.py
+  - src/dpone/services/docs/check_module_size_service.py
+  - src/dpone/readiness/airflow_compact_pack_release.py
+  - src/dpone/readiness/airflow_compact_pack_release_*.py
+  - src/dpone/readiness/airflow_deployment_errors.py
+  - src/dpone/readiness/airflow_deployment_projection_policy.py
+  - src/dpone/contracts/dbt_runtime.py
+  - src/dpone/runtime/**
+  - src/dpone/gitops/schema_*.py
+  - tests/test_module_size_gate.py
+  - tests/test_module_size_confined_write_revalidation.py
+  - tests/test_module_size_schema_contract.py
+  - tests/*module_size_snapshot_contract.py
+  - tests/test_module_size_transaction.py
+  - tests/test_architecture_phase2_contracts.py
+  - tests/test_architecture_phase3_contracts.py
+  - tests/test_airflow_compact_pack_release*.py
+  - tests/test_airflow_compact_pack_runtime_payload_limits.py
+  - tests/test_airflow_deployment_artifacts.py
+  - tests/test_airflow_release_runtime_payload_inventory.py
+  - tests/test_airflow_runtime_init_fetch_cli.py
+  - tests/test_github_workflow_governance.py
+  - tests/test_gitops_schema_contracts.py
+  - tests/test_metrics_contracts.py
+  - docs/module_size_baseline.json
+  - docs/schemas/gitops/release-set.schema.json
+  - docs/quality-tooling.md
+  - docs/module-size-ratchet.md
+  - docs/quality-metrics.md
+  - docs/airflow-cache-sync-strict-v2.md
+  - docs/airflow-self-service-architecture.md
+  - docs/cli-reference.md
+  - docs/compatibility.md
+  - docs/dbt-self-service-errors.md
+  - docs/gitops-airflow-reconcile.md
+  - docs/gitops-control-plane.md
+  - docs/schemas/quality/module-size-baseline-v2.schema.json
+  - test_artifacts/agent-policy/dpone-ci-shadow-closure-pr1-baseline.yml
+read_only_paths:
+  - .github/workflows/airflow-pack-compat.yml
+  - .github/workflows/secret-scan.yml
+  - docs/benchmarks/quality_budgets.yml
+  - docs/engineering-standards.md
+  - docs/architecture.md
+  - pyproject.toml
+  - uv.lock
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - .agents/policy/github-branch-protection.yml
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "Phase 0 freeze and audit ledger in GitHub issue #512"
+  - "Grandfathered module-size debt burn-down in GitHub issue #520"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_module_size_confined_write_revalidation.py tests/test_module_size_gate.py tests/test_architecture_phase2_contracts.py tests/test_architecture_phase3_contracts.py -q"
+    - "uv run pytest tests/test_airflow_compact_pack_runtime_payload_limits.py tests/test_airflow_runtime_init_fetch_cli.py tests/test_gitops_schema_contracts.py tests/test_airflow_release_runtime_payload_inventory.py -q"
+  broad:
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "HEAD_SHA=$(git rev-parse HEAD); BASE_SHA=$(git merge-base $HEAD_SHA origin/master); test $BASE_SHA != $HEAD_SHA; uv run dpone docs check-module-size --baseline docs/module_size_baseline.json --base-ref $BASE_SHA --head-ref $HEAD_SHA"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live:
+    - "GitHub legacy required-check matrix on the exact PR head"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

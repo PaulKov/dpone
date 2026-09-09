@@ -1,0 +1,34 @@
+global:
+  max_sloc: 400
+  warn_sloc: 350
+  max_loc: 600
+  warn_loc: 450
+  max_avg_clustering: 0.182
+  max_stale_days: 30
+layers:
+  dpone-runtime:
+    path_prefixes:
+      - src/dpone/runtime
+    max_sloc: 400
+    warn_sloc: 350
+    max_avg_clustering: 0.182
+  dpone-commands:
+    path_prefixes:
+      - src/dpone/commands
+    max_sloc: 400
+    warn_sloc: 350
+  dpone-services:
+    path_prefixes:
+      - src/dpone/services
+    max_sloc: 400
+    warn_sloc: 350
+  dpone-readiness:
+    path_prefixes:
+      - src/dpone/readiness
+    max_sloc: 400
+    warn_sloc: 350
+  benchmark-tools:
+    path_prefixes:
+      - tools/oss_benchmark
+    max_sloc: 400
+    warn_sloc: 350

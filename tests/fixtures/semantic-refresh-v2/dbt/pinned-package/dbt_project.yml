@@ -1,0 +1,5 @@
+name: semantic_refresh_consumer
+version: 1.0.0
+config-version: 2
+packages-install-path: dbt_packages
+model-paths: [models]

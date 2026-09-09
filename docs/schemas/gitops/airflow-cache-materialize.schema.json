@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-cache-materialize.schema.json",
+  "title": "dpone GitOps Airflow cache materialization report",
+  "type": "object",
+  "required": [
+    "schema",
+    "passed",
+    "changes",
+    "errors",
+    "status",
+    "release_id",
+    "deployment_id",
+    "environment",
+    "artifact_registry_ref",
+    "downloaded_objects",
+    "downloaded_bytes",
+    "local_release_state",
+    "local_deployment_state",
+    "projection_verified",
+    "activated"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.airflow-cache-materialize.v1"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "status": {
+      "enum": [
+        "materialized",
+        "no_op",
+        "failed"
+      ]
+    },
+    "release_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "deployment_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "environment": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "artifact_registry_ref": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "downloaded_objects": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "downloaded_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "local_release_state": {
+      "enum": [
+        "created",
+        "no_op",
+        "not_installed"
+      ]
+    },
+    "local_deployment_state": {
+      "enum": [
+        "created",
+        "no_op",
+        "not_installed"
+      ]
+    },
+    "projection_verified": {
+      "type": "boolean"
+    },
+    "activated": {
+      "const": false
+    }
+  }
+}

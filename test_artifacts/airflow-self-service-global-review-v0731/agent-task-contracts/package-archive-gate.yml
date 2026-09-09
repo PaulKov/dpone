@@ -1,0 +1,74 @@
+schema_version: 1
+task_id: "RELEASE-SS-37"
+title: "Reject internal repository files from release archives"
+goal: >
+  Add a reusable, machine-readable gate that inspects wheels and sdists and
+  fails when repository instructions, VCS metadata or environment files are
+  accidentally packaged.
+specification: "docs/release.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "Codex parent"
+
+acceptance_criteria:
+  - "The gate inspects wheel zip members and sdist tar members without extracting them."
+  - "AGENTS.md, .gitignore, .env, .env.* and .git/.codex/.agents content fail closed."
+  - "Normal package files and dist-info metadata pass."
+  - "Output is deterministic, bounded and contains no archive payload bytes."
+  - "CLI exits non-zero for any malformed archive or forbidden member."
+
+public_contract_impact:
+  level: none
+  surfaces:
+    - release tooling
+  migration_required: false
+
+owned_paths:
+  - tools/agent_policy/package_archive_gate.py
+  - tests/agent_policy/test_package_archive_gate.py
+read_only_paths:
+  - pyproject.toml
+  - .github/workflows/release.yml
+  - docs/release.md
+forbidden_paths:
+  - src
+  - packages
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - .codex/config.toml
+
+shared_file_owner: "integrator"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/agent_policy/test_package_archive_gate.py -q"
+    - "uv run ruff check tools/agent_policy/package_archive_gate.py tests/agent_policy/test_package_archive_gate.py"
+    - "uv run mypy --config-file mypy.ini tools/agent_policy/package_archive_gate.py"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Archive inspection would require extracting or executing archive content."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

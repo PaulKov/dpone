@@ -1,0 +1,82 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-UX-P0"
+title: "Airflow pipeline-first UX P0 (docs progressive disclosure)"
+goal: "Simple beginner CJM + advanced Data Engineer CJM; demote GitOps catalog/selectors; no runtime change"
+specification: "docs/feature-design-airflow-pipeline-first-ux-p0.md"
+base_commit: "b14de5935c07bc52f362f34a425b5dd6de79bf41"
+integrator: "parent-agent"
+
+acceptance_criteria:
+  - "Glossary defines pipeline, workload, DAG, pack"
+  - "First Airflow DAG keeps five golden-path commands and What-to-commit (domains do not edit)"
+  - "Advanced pages contain Advanced path (not the beginner journey)"
+  - "mkdocs Advanced Airflow cluster; catalog/selectors not in Getting started or Core concepts"
+  - "Freeze YAML and public-contract freeze tests unchanged"
+  - "docs language contracts + check-docs + mkdocs --strict PASS"
+
+public_contract_impact:
+  level: none
+  surfaces: []
+  migration_required: false
+
+owned_paths:
+  - docs/getting-started/airflow-pipeline-glossary.md
+  - docs/getting-started/first-airflow-dag.md
+  - docs/getting-started/credentials-quickstart.md
+  - docs/airflow-self-service-advanced-cjm.md
+  - docs/airflow-self-service-selectors.md
+  - docs/gitops-workload-catalog.md
+  - docs/airflow-self-service.md
+  - examples/airflow-self-service-pilot/README.md
+  - docs/feature-design-airflow-pipeline-first-ux-p0.md
+  - docs/superpowers/plans/2026-07-17-airflow-pipeline-first-ux-p0.md
+  - docs/agent-contracts/airflow-pipeline-first-ux-p0.yml
+
+read_only_paths:
+  - docs/airflow-self-service-public-contracts-v1.yaml
+  - tests/test_airflow_v1_public_contract_freeze.py
+  - AGENTS.md
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - src/
+  - packages/
+  - docs/schemas/
+  - .github/workflows
+
+shared_file_owner: "integrator"
+integrator_owned_paths:
+  - mkdocs.yml
+  - CHANGELOG.md
+  - tests/test_docs_language_contracts.py
+  - docs/airflow-self-service-backlog.md
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+  broad:
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Freeze YAML or freeze tests are modified."

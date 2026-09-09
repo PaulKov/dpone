@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="606" viewBox="0 0 920 606" role="img" aria-label="Evidence confidence">
+<rect width="920" height="606" fill="#ffffff"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Evidence confidence</text>
+<text x="32" y="66" font-size="13" fill="#475569">Auditability score from freshness, source measurements, derived formulas and closed-core caveats.</text>
+<text x="760" y="42" font-size="14" font-weight="700" fill="#334155">92/100</text>
+<text x="32" y="120" font-size="13" font-weight="700" fill="#111827">dpone</text>
+<rect x="210" y="104" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="104" width="560" height="22" rx="4" fill="#0f766e"/>
+<text x="790" y="120" font-size="12" fill="#334155">100 / audit-ready</text>
+<text x="32" y="174" font-size="13" font-weight="700" fill="#111827">Airbyte</text>
+<rect x="210" y="158" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="158" width="532" height="22" rx="4" fill="#0f766e"/>
+<text x="790" y="174" font-size="12" fill="#334155">95 / audit-ready</text>
+<text x="32" y="228" font-size="13" font-weight="700" fill="#111827">dlt</text>
+<rect x="210" y="212" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="212" width="532" height="22" rx="4" fill="#0f766e"/>
+<text x="790" y="228" font-size="12" fill="#334155">95 / audit-ready</text>
+<text x="32" y="282" font-size="13" font-weight="700" fill="#111827">Pentaho Kettle</text>
+<rect x="210" y="266" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="266" width="532" height="22" rx="4" fill="#0f766e"/>
+<text x="790" y="282" font-size="12" fill="#334155">95 / audit-ready</text>
+<text x="32" y="336" font-size="13" font-weight="700" fill="#111827">Apache Hop</text>
+<rect x="210" y="320" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="320" width="532" height="22" rx="4" fill="#0f766e"/>
+<text x="790" y="336" font-size="12" fill="#334155">95 / audit-ready</text>
+<text x="32" y="390" font-size="13" font-weight="700" fill="#111827">Sling</text>
+<rect x="210" y="374" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="374" width="532" height="22" rx="4" fill="#0f766e"/>
+<text x="790" y="390" font-size="12" fill="#334155">95 / audit-ready</text>
+<text x="32" y="438" font-size="14" font-weight="700" fill="#111827">Evidence mode mix</text>
+<text x="52" y="462" font-size="12" fill="#334155">measured: 3</text>
+<text x="52" y="490" font-size="12" fill="#334155">derived: 15</text>
+<text x="52" y="518" font-size="12" fill="#334155">inferred: 3</text>
+<text x="52" y="546" font-size="12" fill="#334155">closed-core note: 1</text>
+</svg>

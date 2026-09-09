@@ -1,0 +1,154 @@
+schema_version: 1
+task_id: "SIGNED-CATALOG-EXTENSION-CONFORMANCE-V1"
+title: "Signed catalog bundles and closed extension conformance v1"
+goal: >-
+  Implement externally signed, content-addressed recipe/connection-registry
+  bundles and a closed evidence-based conformance suite without adding Airflow
+  parse-time I/O, runtime template execution, or false production certification.
+specification: "docs/feature-design-signed-catalog-extension-conformance-v1.md"
+base_commit: "ff3d1af6"
+integrator: "codex-integrator"
+
+acceptance_criteria:
+  - "Recipe catalog and connection registry bundles have deterministic content identities."
+  - "Every payload byte, size, path, schema, signer identity, issuer, root, and policy is verified."
+  - "Cosign process policy is shared through one narrow blob-verification adapter."
+  - "Route-attestation imports, codes, and behavior remain backward compatible."
+  - "Airflow parse/runtime perform no catalog fetch, signature verification, or recipe execution."
+  - "Four closed conformance profiles cannot report PASS with missing required evidence."
+  - "Credential resolver and route profiles require approved live evidence for PASS."
+  - "Schemas, docs, security tests, package smoke, and architecture budgets pass."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone.catalog-bundle.v1"
+    - "dpone.catalog-trust-policy.v1"
+    - "dpone.catalog-bundle-verification.v1"
+    - "dpone.extension-check-receipt.v1"
+    - "dpone.extension-conformance-request.v1"
+    - "dpone.extension-conformance.v1"
+    - "dpone supply-chain catalog-bundle-build"
+    - "dpone supply-chain catalog-bundle-verify"
+    - "dpone supply-chain extension-conformance"
+    - "BlobSignatureVerifier"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/contracts/catalog_bundle.py"
+  - "src/dpone/contracts/catalog_supply_chain.py"
+  - "src/dpone/contracts/extension_conformance.py"
+  - "src/dpone/contracts/blob_signature.py"
+  - "src/dpone/ports/blob_signature.py"
+  - "src/dpone/adapters/cosign_blob_signature.py"
+  - "src/dpone/adapters/cosign_route_attestation.py"
+  - "src/dpone/contracts/route_attestation.py"
+  - "src/dpone/ports/route_attestation.py"
+  - "src/dpone/services/catalog_bundle*.py"
+  - "src/dpone/services/catalog_supply_chain*.py"
+  - "src/dpone/services/extension_conformance*.py"
+  - "src/dpone/manifest/catalog_bundle_support.py"
+  - "src/dpone/manifest/recipe_catalog.py"
+  - "src/dpone/manifest/recipe_catalog_operations.py"
+  - "src/dpone/manifest/recipe_resolver.py"
+  - "src/dpone/commands/supply_chain_catalog_cmd.py"
+  - "src/dpone/commands/supply_chain_cmd.py"
+  - "src/dpone/commands/registry_platform.py"
+  - "src/dpone/supply_chain/catalog_operations.py"
+  - "src/dpone/gitops/schema_catalog_bundle_contracts.py"
+  - "src/dpone/gitops/schema_contracts.py"
+  - "src/dpone/schema/catalog-bundle.schema.json"
+  - "src/dpone/schema/catalog-trust-policy.schema.json"
+  - "src/dpone/schema/catalog-bundle-verification.schema.json"
+  - "src/dpone/schema/extension-check-receipt.schema.json"
+  - "src/dpone/schema/extension-conformance-request.schema.json"
+  - "src/dpone/schema/extension-conformance.schema.json"
+  - "docs/schemas/gitops/catalog-bundle.schema.json"
+  - "docs/schemas/gitops/catalog-trust-policy.schema.json"
+  - "docs/schemas/gitops/catalog-bundle-verification.schema.json"
+  - "docs/schemas/gitops/extension-check-receipt.schema.json"
+  - "docs/schemas/gitops/extension-conformance-request.schema.json"
+  - "docs/schemas/gitops/extension-conformance.schema.json"
+  - "tests/test_signed_catalog_bundle.py"
+  - "tests/test_signed_catalog_extension_benchmark.py"
+  - "tests/test_extension_conformance.py"
+  - "tests/test_gitops_schema_contracts.py"
+  - "tests/test_manifest_schema_reference_docs.py"
+  - "tests/test_cicd_docs_contracts.py"
+  - "tests/test_architecture_fitness_gate.py"
+  - "tests/test_route_attestation_verification.py"
+  - "tests/test_cosign_route_attestation.py"
+  - "docs/feature-design-signed-catalog-extension-conformance-v1.md"
+  - "docs/adr/0021-signed-catalog-bundle-conformance-boundary.md"
+  - "docs/adr-index.md"
+  - "docs/signed-catalog-bundles.md"
+  - "docs/extension-conformance.md"
+  - "docs/airflow-recipes.md"
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/compatibility.md"
+  - "docs/cli-reference.md"
+  - "docs/errors/DPONE_CATALOG*.md"
+  - "tools/signed_catalog_extension_benchmark.py"
+  - "test_artifacts/signed-catalog-extension-conformance-v1/**"
+read_only_paths:
+  - "src/dpone/readiness/airflow_connection_checks.py"
+  - "src/dpone/runtime/**"
+  - "packages/dpone-airflow-pack/**"
+  - "packages/apache-airflow-providers-dpone/**"
+forbidden_paths:
+  - ".cursor/**"
+  - "uv.lock"
+  - "pyproject.toml"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+
+shared_file_owner: "codex-integrator"
+integrator_owned_shared_paths:
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - "docs/quality-metrics.md"
+
+dependencies:
+  - "docs/adr/0016-content-pinned-declarative-recipes.md"
+  - "docs/feature-design-signed-catalog-extension-conformance-v1.md"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_signed_catalog_bundle.py tests/test_extension_conformance.py -q"
+    - "uv run pytest tests/test_route_attestation_verification.py tests/test_cosign_route_attestation.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "Real keyless Sigstore verification in an approved CI identity/environment."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+  - validation_report
+  - conformance_fixture_reports
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

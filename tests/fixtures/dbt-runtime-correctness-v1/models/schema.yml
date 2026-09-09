@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: orders
+    columns:
+      - name: order_id
+        data_type: int
+        constraints:
+          - type: not_null
+        data_tests:
+          - not_null
+      - name: amount
+        data_type: decimal(18,2)
+        constraints:
+          - type: not_null
+
+unit_tests:
+  - name: orders_from_ephemeral_parent
+    model: orders
+    given:
+      - input: ref('ephemeral_orders')
+        rows:
+          - {order_id: 7, amount: 12.50}
+    expect:
+      rows:
+        - {order_id: 7, amount: 12.50}

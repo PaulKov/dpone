@@ -1,0 +1,96 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-PUBLICATION-RECEIPT-07323"
+title: "Trusted Airflow publication receipt"
+goal: "Bind exact promotion to remotely read-back immutable release and deployment bytes."
+specification: "docs/feature-design-airflow-publication-receipt-v07323.md"
+base_commit: "53ec0b4f"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Publication reads back and verifies every immutable object before success."
+  - "The receipt binds release, deployment, index, and the actual object-storage endpoint authority."
+  - "Exact promotion rejects v1, malformed, wrong-scope, or unverified receipts."
+  - "Publication evidence remains distinct from activation occurrence evidence."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone airflow publish JSON evidence"
+    - "dpone airflow publish CLI"
+    - "GitOps schema catalog"
+    - "ArtifactRegistryAuthority capability"
+    - "ObjectStorageArtifactRegistry.scope_id"
+    - "ArtifactRegistryOptions.scope_id"
+  migration_required: false
+  migration_notes: "First-party adapters expose exact endpoint authority; custom adapters add ObjectStorageEndpointAuthority or remain in compatible mode."
+
+owned_paths:
+  - "src/dpone/runtime/airflow_artifact_*"
+  - "src/dpone/ports/artifact_registry.py"
+  - "src/dpone/adapters/object_storage_artifact_registry.py"
+  - "src/dpone/readiness/airflow_artifact_delivery.py"
+  - "src/dpone/commands/airflow_artifact_delivery_cmd.py"
+  - "src/dpone/gitops/schema_airflow_artifact_delivery_contracts.py"
+  - "src/dpone/storage/adapters.py"
+  - "src/dpone/storage/azure_adapter.py"
+  - "src/dpone/storage/protocols.py"
+  - "src/dpone/storage/__init__.py"
+  - "src/dpone/storage/local.py"
+  - "tests/test_airflow_remote_artifact_delivery.py"
+  - "tests/test_airflow_registry_authority.py"
+  - "tests/test_object_storage_artifact_registry.py"
+  - "tests/test_gitops_schema_contracts.py"
+  - "docs/feature-design-airflow-publication-receipt-v07323.md"
+  - "docs/quality-metrics.md"
+  - "docs/schemas/gitops/airflow-artifact-publish-v2.schema.json"
+  - "docs/reference/gitops-schema-catalog.md"
+  - "docs/adr/0009-artifact-delivery-and-cache-materializer.md"
+
+read_only_paths:
+  - "src/dpone/runtime/deployment_cache_*"
+  - "docs/adr/0032-airflow-exact-activation-occurrence.md"
+
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - ".cursor"
+  - "outputs"
+  - "test_artifacts/release/v0.73.21"
+  - "test_artifacts/release/v0.73.23"
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "airflow-platform-ci exact promotion consumer"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_remote_artifact_delivery.py tests/test_gitops_schema_contracts.py -q"
+  broad:
+    - "change-aware validation plan and repository quality gates"
+  live:
+    - "immutable S3 publish and exact dev activation"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

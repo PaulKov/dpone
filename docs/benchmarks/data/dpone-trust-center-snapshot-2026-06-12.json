@@ -1,0 +1,221 @@
+{
+  "badge": {
+    "band": "excellent",
+    "label": "dpone verified",
+    "score": 100
+  },
+  "controls": [
+    {
+      "band": "excellent",
+      "evidence": "SOLID/Clean OOP, module size, coupling, cohesion and freshness.",
+      "label": "Industrial Maintainability",
+      "score": 100,
+      "slug": "maintainability"
+    },
+    {
+      "band": "leader",
+      "evidence": "Governance & Compliance benchmark posture.",
+      "label": "Governance & Compliance",
+      "score": 100,
+      "slug": "governance_compliance"
+    },
+    {
+      "band": "excellent",
+      "evidence": "Security & Supply Chain benchmark posture.",
+      "label": "Security & Supply Chain",
+      "score": 100,
+      "slug": "security_supply_chain"
+    },
+    {
+      "band": "strong",
+      "evidence": "Operational Reliability benchmark posture.",
+      "label": "Operational Reliability",
+      "score": 80,
+      "slug": "operational_reliability"
+    },
+    {
+      "band": "excellent",
+      "evidence": "TCO & Operability benchmark posture.",
+      "label": "TCO & Operability",
+      "score": 100,
+      "slug": "operability_tco"
+    },
+    {
+      "band": "n/a",
+      "evidence": "Static test footprint plus CI/coverage configuration evidence.",
+      "label": "Coverage Confidence",
+      "score": 100,
+      "slug": "coverage_confidence"
+    },
+    {
+      "band": "low",
+      "evidence": "Lower risk score means fewer oversized modules, fan-out hotspots and cohesion problems.",
+      "label": "Architecture Risk",
+      "score": 84,
+      "slug": "architecture_risk"
+    }
+  ],
+  "evidence_links": [
+    {
+      "href": "oss-code-quality-benchmark-2026-06-12.md",
+      "label": "Open benchmark report"
+    },
+    {
+      "href": "data/oss-code-quality-benchmark-2026-06-12.json",
+      "label": "Open benchmark evidence"
+    },
+    {
+      "href": "data/dpone-trust-center-snapshot-2026-06-12.json",
+      "label": "Open trust-center JSON"
+    }
+  ],
+  "freshness": {
+    "fresh": 6,
+    "stale": 0,
+    "unavailable": 0
+  },
+  "limitations": [
+    "Static maintainability and governance proxies, not runtime performance claims.",
+    "Closed-core competitors are included only as public-documentation posture comparators.",
+    "Fresh/stale semantics are inherited from the merged benchmark evidence payload."
+  ],
+  "quality_gates": {
+    "checks": [
+      {
+        "actual": "available",
+        "id": "project_available",
+        "label": "Project evidence available",
+        "operator": "==",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": "available"
+      },
+      {
+        "actual": 100,
+        "id": "industrial_maintainability",
+        "label": "Industrial Maintainability Index",
+        "operator": ">=",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": 85
+      },
+      {
+        "actual": 16,
+        "id": "architecture_risk",
+        "label": "Architecture risk score",
+        "operator": "<=",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": 24
+      },
+      {
+        "actual": 100,
+        "id": "coverage_confidence",
+        "label": "Coverage confidence score",
+        "operator": ">=",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": 75
+      },
+      {
+        "actual": 449,
+        "id": "max_module_loc",
+        "label": "Largest production module LOC",
+        "operator": "<=",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": 600
+      },
+      {
+        "actual": 397,
+        "id": "max_module_sloc",
+        "label": "Largest production module SLOC",
+        "operator": "<=",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": 400
+      },
+      {
+        "actual": 26,
+        "id": "max_fan_out",
+        "label": "Maximum fan-out",
+        "operator": "<=",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": 30
+      },
+      {
+        "actual": 0.6332322953981813,
+        "id": "cohesion",
+        "label": "Cohesion ratio",
+        "operator": ">=",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": 0.55
+      },
+      {
+        "actual": "fresh",
+        "id": "freshness",
+        "label": "Metric freshness",
+        "operator": "==",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": "fresh"
+      },
+      {
+        "actual": 0.1567142498960825,
+        "id": "avg_clustering",
+        "label": "Average clustering",
+        "operator": "<=",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": 0.18
+      },
+      {
+        "actual": "resolved",
+        "id": "release_context",
+        "label": "Release context resolved",
+        "operator": "==",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": "resolved"
+      },
+      {
+        "actual": "passed",
+        "id": "quality_budget",
+        "label": "Quality budget hard failures",
+        "operator": "==",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": "passed"
+      },
+      {
+        "actual": "passed",
+        "id": "executable_certification",
+        "label": "Executable certification",
+        "operator": "==",
+        "severity": "blocker",
+        "status": "passed",
+        "threshold": "passed"
+      }
+    ],
+    "failed": 0,
+    "failed_checks": [],
+    "passed": 13,
+    "project": "dpone",
+    "status": "passed"
+  },
+  "run_context": {
+    "branch": "codex/release-v0.62.1",
+    "generated_at": "2026-06-30T15:36:13+00:00",
+    "git_sha": "3f562b42ebc8db96a14361ce93353486faa23af4",
+    "run_id": "local",
+    "run_url": "",
+    "updated_by": "codex-local",
+    "workflow_name": "local"
+  },
+  "schema_version": 1,
+  "status": "verified",
+  "summary": "Customer-ready certification snapshot for dpone code quality, governance, security, reliability, operability, freshness and benchmark evidence.",
+  "title": "dpone Trust Center Snapshot"
+}

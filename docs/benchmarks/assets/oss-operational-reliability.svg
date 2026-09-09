@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="502" viewBox="0 0 920 502" role="img">
+<rect width="920" height="502" fill="#ffffff"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Operational reliability posture</text>
+<text x="32" y="66" font-size="13" fill="#475569">Measured recovery proof is separated from public documented posture.</text>
+<text x="32" y="113" font-size="13" font-weight="700" fill="#111827">dpone</text>
+<rect x="230" y="98" width="520" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="230" y="98" width="416" height="20" rx="4" fill="#2563eb"/>
+<text x="770" y="113" font-size="12" fill="#334155">80 / measured</text>
+<text x="32" y="161" font-size="13" font-weight="700" fill="#111827">Airbyte</text>
+<rect x="230" y="146" width="520" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="230" y="146" width="265" height="20" rx="4" fill="#f59e0b"/>
+<text x="770" y="161" font-size="12" fill="#334155">51 / public-doc</text>
+<text x="32" y="209" font-size="13" font-weight="700" fill="#111827">dlt</text>
+<rect x="230" y="194" width="520" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="230" y="194" width="145" height="20" rx="4" fill="#dc2626"/>
+<text x="770" y="209" font-size="12" fill="#334155">28 / public-doc</text>
+<text x="32" y="257" font-size="13" font-weight="700" fill="#111827">Pentaho Kettle</text>
+<rect x="230" y="242" width="520" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="230" y="242" width="88" height="20" rx="4" fill="#dc2626"/>
+<text x="770" y="257" font-size="12" fill="#334155">17 / public-doc</text>
+<text x="32" y="305" font-size="13" font-weight="700" fill="#111827">Apache Hop</text>
+<rect x="230" y="290" width="520" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="230" y="290" width="104" height="20" rx="4" fill="#dc2626"/>
+<text x="770" y="305" font-size="12" fill="#334155">20 / public-doc</text>
+<text x="32" y="353" font-size="13" font-weight="700" fill="#111827">Sling</text>
+<rect x="230" y="338" width="520" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="230" y="338" width="130" height="20" rx="4" fill="#dc2626"/>
+<text x="770" y="353" font-size="12" fill="#334155">25 / public-doc</text>
+<text x="32" y="401" font-size="13" font-weight="700" fill="#111827">Fivetran</text>
+<rect x="230" y="386" width="520" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="230" y="386" width="306" height="20" rx="4" fill="#f59e0b"/>
+<text x="770" y="401" font-size="12" fill="#334155">59 / public-doc</text>
+<text x="32" y="449" font-size="13" font-weight="700" fill="#111827">Informatica</text>
+<rect x="230" y="434" width="520" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="230" y="434" width="317" height="20" rx="4" fill="#f59e0b"/>
+<text x="770" y="449" font-size="12" fill="#334155">61 / public-doc</text>
+</svg>

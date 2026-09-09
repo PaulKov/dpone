@@ -1,0 +1,47 @@
+"""Static methodology section for the OSS benchmark document."""
+
+from __future__ import annotations
+
+
+def render_static_methodology_sections() -> list[str]:
+    return [
+        "",
+        "## Comparable OSS corpus",
+        "",
+        "- [Airbyte](https://github.com/airbytehq/airbyte) is included as an open-source data movement platform with a large connector and platform codebase.",
+        "- [dlt](https://github.com/dlt-hub/dlt) is included as an open-source Python data loading library.",
+        "- [Pentaho Kettle](https://github.com/pentaho/pentaho-kettle) is included as a mature open-source ETL/data-integration baseline.",
+        "- [Apache Hop](https://github.com/apache/hop) is included as a modern open-source orchestration and data-integration platform in the Kettle/Hop lineage.",
+        "- [Sling](https://github.com/slingdata-io/sling-cli) is included as an open-source CLI-first data movement and replication baseline.",
+        "- [Fivetran](https://github.com/fivetran) is **closed-core / not code-comparable** for managed ELT. Its public repositories expose SDK/provider surfaces, not the managed platform core.",
+        "- [Informatica PowerCenter/IDMC](https://www.informatica.com/download.html) is **closed-core / not code-comparable**. Public product positioning is useful context, but the core source is unavailable for the same metrics.",
+        "",
+        "## Methodology",
+        "",
+        "- Source scope: Python, Java, Kotlin, TypeScript, JavaScript, Go, Groovy and Scala files.",
+        "- Excluded noise: build/cache/vendor directories and root-level tooling folders such as `tools`, `target`, `build`, `dist`, `.cache`, `node_modules` and `test_artifacts`.",
+        "- Test exclusion: path segments such as `test`, `tests`, `integration-tests`, `__tests__`, plus filename patterns such as `*Test.java`, `*_test.py`, `*.spec.ts` and `*.test.ts`.",
+        "- Coupling: static imports resolved to internal repository modules where possible.",
+        "- Cohesion: share of internal dependency edges that stay inside the same top-level architectural slice.",
+        "- SOLID and Clean OOP: 0-5 rubric scores based on measurable proxies: module size, fan-out, clustering, cohesion and explicit interface/protocol density.",
+        "- Visual assets: `docs/benchmarks/assets/oss-quality-scorecard.svg`, `docs/benchmarks/assets/dpone-trust-center-badge.svg`, `docs/benchmarks/assets/oss-release-readiness-seal.svg`, `docs/benchmarks/assets/oss-evidence-confidence.svg`, `docs/benchmarks/assets/oss-public-evidence-integrity.svg`, `docs/benchmarks/assets/oss-source-verification.svg`, `docs/benchmarks/assets/oss-independent-validation.svg`, `docs/benchmarks/assets/oss-analyzer-confidence.svg`, `docs/benchmarks/assets/oss-feature-parity.svg`, `docs/benchmarks/assets/oss-governance-compliance.svg`, `docs/benchmarks/assets/oss-operability-tco.svg`, `docs/benchmarks/assets/oss-operational-reliability.svg`, `docs/benchmarks/assets/oss-security-supply-chain.svg`, `docs/benchmarks/assets/oss-architecture-taxonomy.svg`, `docs/benchmarks/assets/oss-complexity-boundary.svg`, `docs/benchmarks/assets/oss-semantic-maintainability.svg`, `docs/benchmarks/assets/oss-god-object-radar.svg`, `docs/benchmarks/assets/oss-score-calibration.svg`, `docs/benchmarks/assets/oss-score-sensitivity.svg`, `docs/benchmarks/assets/oss-normalized-vs-raw.svg`, `docs/benchmarks/assets/oss-scale-readiness.svg`, `docs/benchmarks/assets/oss-architecture-runway.svg`, `docs/benchmarks/assets/oss-quality-headroom.svg`, `docs/benchmarks/assets/oss-refactor-roi-roadmap.svg`, `docs/benchmarks/assets/oss-loc-sloc.svg`, `docs/benchmarks/assets/oss-coupling-cohesion-quadrant.svg`, `docs/benchmarks/assets/oss-module-hotspots.svg`, `docs/benchmarks/assets/oss-architecture-risk-heatmap.svg`, `docs/benchmarks/assets/oss-quality-trend.svg`.",
+        "- Release readiness pack: `docs/benchmarks/oss-benchmark-release-readiness-2026-06-12.md` ([open pack](oss-benchmark-release-readiness-2026-06-12.md)) and `docs/benchmarks/data/oss-benchmark-release-readiness-2026-06-12.json` ([open JSON](data/oss-benchmark-release-readiness-2026-06-12.json)).",
+        "- Raw evidence: `docs/benchmarks/data/oss-code-quality-benchmark-2026-06-12.json` ([open JSON](data/oss-code-quality-benchmark-2026-06-12.json)).",
+        "- Provenance ledger: `docs/benchmarks/data/oss-benchmark-provenance.json` ([open ledger](data/oss-benchmark-provenance.json)).",
+        "- Trend history: `docs/benchmarks/data/oss-code-quality-benchmark-history.json` ([open history JSON](data/oss-code-quality-benchmark-history.json)).",
+        "- PR benchmark summary: `test_artifacts/oss-code-quality-benchmark/pr-comment.md`.",
+        "",
+        "## Data freshness policy",
+        "",
+        "- A fresh metric group was collected successfully in the latest run.",
+        "- A stale metric group keeps the last known published value, shows when it was last updated, and records the latest failed refresh attempt.",
+        "- An unavailable metric group has no prior evidence and is rendered as `n/a`; values are never fabricated.",
+        "- Manual CI refreshes can update all projects or a single project through the workflow inputs.",
+        "",
+        "![LOC and SLOC](assets/oss-loc-sloc.svg)",
+        "",
+        "![Coupling and cohesion quadrant](assets/oss-coupling-cohesion-quadrant.svg)",
+        "",
+        "![Module hotspots](assets/oss-module-hotspots.svg)",
+        "",
+    ]

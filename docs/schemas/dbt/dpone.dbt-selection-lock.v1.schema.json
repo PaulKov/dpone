@@ -1,0 +1,100 @@
+{
+  "$comment": "publish_model_unique_ids must be a subset of expected_run_result_unique_ids, which must be a subset of selected_graph_unique_ids; selection_sha256 must match the canonical semantic payload.",
+  "$id": "https://dpone.dev/schemas/dpone.dbt-selection-lock.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "expected_run_result_unique_ids": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "graph_contract_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "graph_policy_id": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "graph_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "invocation_context_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "manifest_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "publish_model_unique_ids": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema": {
+      "const": "dpone.dbt-selection-lock.v1"
+    },
+    "selected_graph_unique_ids": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "selection_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "selectors": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "toolchain_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "manifest_sha256",
+    "toolchain_sha256",
+    "invocation_context_sha256",
+    "graph_policy_id",
+    "graph_policy_sha256",
+    "graph_contract_sha256",
+    "selectors",
+    "selected_graph_unique_ids",
+    "expected_run_result_unique_ids",
+    "publish_model_unique_ids",
+    "selection_sha256"
+  ],
+  "type": "object",
+  "x-dpone-semantic-invariants": [
+    "expected_run_result_unique_ids_subset_of_selected_graph_unique_ids",
+    "publish_model_unique_ids_subset_of_expected_run_result_unique_ids",
+    "selection_sha256_matches_canonical_payload"
+  ]
+}

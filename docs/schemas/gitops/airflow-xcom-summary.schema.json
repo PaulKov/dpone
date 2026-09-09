@@ -1,0 +1,613 @@
+{
+  "$defs": {
+    "issue": {
+      "additionalProperties": true,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "path",
+        "source"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-xcom-summary.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "artifact_paths": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "backfill": {
+      "additionalProperties": true,
+      "properties": {
+        "chunks_committed": {
+          "type": "integer"
+        },
+        "chunks_failed": {
+          "type": "integer"
+        },
+        "chunks_selected": {
+          "type": "integer"
+        },
+        "chunks_skipped_resume": {
+          "type": "integer"
+        },
+        "chunks_total": {
+          "type": "integer"
+        },
+        "dataset": {
+          "type": "string"
+        },
+        "inner_mode": {
+          "type": "string"
+        },
+        "mapping": {
+          "additionalProperties": false,
+          "properties": {
+            "backfill_plan_hash": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "chunks_count": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "first_chunk_index": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "item_index": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "item_status": {
+              "enum": [
+                "success",
+                "error",
+                "cancelled"
+              ]
+            },
+            "last_chunk_index": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "mode": {
+              "enum": [
+                "visible",
+                "summary"
+              ]
+            },
+            "plan_fingerprint": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode",
+            "backfill_plan_hash",
+            "item_index",
+            "first_chunk_index",
+            "last_chunk_index",
+            "chunks_count",
+            "plan_fingerprint",
+            "item_status"
+          ],
+          "type": "object"
+        },
+        "operation_status": {
+          "type": "string"
+        },
+        "retry_policy": {
+          "type": "string"
+        },
+        "run_key": {
+          "type": "string"
+        },
+        "state_authority": {
+          "additionalProperties": true,
+          "properties": {
+            "backend": {
+              "enum": [
+                "local_file",
+                "audit_schema"
+              ]
+            },
+            "campaigns_table": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "chunks_table": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dialect": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "run_key": {
+              "type": "string"
+            },
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "state_cache_status": {
+          "enum": [
+            "authoritative",
+            "present_non_authoritative",
+            "unavailable"
+          ]
+        },
+        "state_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verification": {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "blockers": {
+      "items": {
+        "$ref": "#/$defs/issue"
+      },
+      "type": "array"
+    },
+    "dbt_execution_evidence_ref": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "maximum": 16777216,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "schema": {
+          "const": "dpone.dbt-execution-evidence-ref.v1"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "storage_scope": {
+          "const": "dbt_spool"
+        },
+        "workflow_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "workflow_id",
+        "sha256",
+        "bytes",
+        "storage_scope"
+      ],
+      "type": "object"
+    },
+    "deployment_identity": {
+      "additionalProperties": false,
+      "properties": {
+        "activation_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "deployment_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "release_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "schema": {
+          "const": "dpone.airflow-deployment-identity.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "release_id",
+        "deployment_id",
+        "activation_id"
+      ],
+      "type": "object"
+    },
+    "failed_step": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "interval": {
+      "additionalProperties": true,
+      "properties": {
+        "dag_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dag_run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "interval_end": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "interval_start": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "logical_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "partition_dimension": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "partition_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "partition_mode": {
+          "enum": [
+            "native",
+            "degraded_unpartitioned",
+            null
+          ],
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "try_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "kind": {
+      "const": "gitops.airflow_xcom_summary"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "recovery": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_state": {
+          "enum": [
+            "not_advanced",
+            "incomplete"
+          ]
+        },
+        "code": {
+          "const": "COMMIT_UNKNOWN"
+        },
+        "failure_boundary": {
+          "enum": [
+            "target_invocation",
+            "checkpoint_persistence"
+          ]
+        },
+        "operator_verification_required": {
+          "const": true
+        },
+        "recovery_action": {
+          "const": "operator_verification_required"
+        },
+        "safe_to_retry": {
+          "const": false
+        },
+        "source_state": {
+          "const": "not_advanced"
+        },
+        "target_state": {
+          "const": "unknown"
+        }
+      },
+      "required": [
+        "code",
+        "failure_boundary",
+        "target_state",
+        "checkpoint_state",
+        "source_state",
+        "safe_to_retry",
+        "operator_verification_required",
+        "recovery_action"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "run_identity": {
+      "additionalProperties": false,
+      "properties": {
+        "airflow_bundle": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "else": {
+                    "properties": {
+                      "version": {
+                        "type": "null"
+                      }
+                    }
+                  },
+                  "if": {
+                    "properties": {
+                      "versioned": {
+                        "const": true
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "version": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              ],
+              "properties": {
+                "backend": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "ref": {
+                  "minLength": 1,
+                  "not": {
+                    "pattern": "(?:[?&](?:token|password|signature|credential|x-amz-signature|x-goog-signature)=|://[^/]*@)"
+                  },
+                  "pattern": "^\\S+$",
+                  "type": "string"
+                },
+                "snapshot_ref": {
+                  "anyOf": [
+                    {
+                      "pattern": "^sha256:[0-9a-f]{64}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "version": {
+                  "anyOf": [
+                    {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "versioned": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "backend",
+                "ref",
+                "versioned",
+                "version",
+                "snapshot_ref"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "binding_set_ref": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connection_registry_ref": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "credential_runtime_ref": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dag_spec": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "sha256": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "sha256"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deployment_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "release_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "runtime_image_digest": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schema": {
+          "const": "dpone.airflow-run-identity.v1"
+        },
+        "workload_pack": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "sha256"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "schema",
+        "release_id",
+        "deployment_id",
+        "dag_spec",
+        "workload_pack",
+        "runtime_image_digest",
+        "binding_set_ref",
+        "connection_registry_ref",
+        "credential_runtime_ref",
+        "airflow_bundle"
+      ],
+      "type": "object"
+    },
+    "run_spec_path": {
+      "type": "string"
+    },
+    "runtime_evidence": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "runtime_evidence_path": {
+      "type": "string"
+    },
+    "runtime_evidence_sha256": {
+      "type": "string"
+    },
+    "runtime_profile_path": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "step_counts": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/issue"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "kind",
+    "schema_version",
+    "producer",
+    "status",
+    "run_spec_path",
+    "runtime_evidence_path"
+  ],
+  "title": "dpone GitOps Airflow XCom summary contract",
+  "type": "object"
+}

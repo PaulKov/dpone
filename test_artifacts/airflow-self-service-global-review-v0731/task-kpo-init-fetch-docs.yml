@@ -1,0 +1,67 @@
+schema_version: 1
+task_id: "SS-REVIEW-KPO-INIT-FETCH-DOCS"
+title: "Document executable KPO init-fetch v2 and its trust boundary"
+goal: "Make the approved v2 wire tripwire, runtime delivery, migration, and operator diagnostics understandable without overstating live certification."
+specification: "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "A new ADR freezes the v1 compatibility/v2 executable boundary and explicit trust-tier policy."
+  - "Docs describe the producer -> index -> provider -> KPO -> init_fetch -> verified launcher path."
+  - "Docs state that scheduler/provider/cache are trusted for this increment and do not claim compromised-scheduler resistance."
+  - "V1 local_preview remains supported; v1 init_fetch receives a migration-required error; v2 is the only executable strict path."
+  - "Operator docs explain fixed mounts, ConfigMap snapshot verification, workload identity, readiness, failure codes, and no-shell execution."
+  - "Live Kubernetes, attestation, Vault, MSSQL, and ClickHouse certification remains UNVERIFIED unless current evidence exists."
+  - "Existing concurrent documentation changes are preserved and incorporated."
+
+public_contract_impact:
+  level: documentation
+  surfaces: ["Airflow provider", "deployment/index v2", "runtime image CLI", "migration guide"]
+  migration_required: true
+
+owned_paths:
+  - "docs/adr/0024-airflow-executable-init-fetch-wire-boundary.md"
+  - "docs/adr-index.md"
+  - "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+  - "docs/airflow-pack-provider.md"
+  - "docs/airflow-provider-api.md"
+  - "docs/airflow-cache-sync.md"
+  - "docs/airflow-provider-cache-migration.md"
+  - "docs/runtime-image.md"
+read_only_paths:
+  - "src/dpone/runtime"
+  - "src/dpone/readiness"
+  - "src/dpone/gitops"
+  - "packages/dpone-airflow-pack"
+  - "tests/test_airflow_provider_init_fetch_execution.py"
+  - "tests/test_airflow_runtime_init_fetch_cli.py"
+forbidden_paths:
+  - "src"
+  - "packages"
+  - "tests"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+shared_file_owner: "integrator; adr-index explicitly delegated for this ADR only"
+dependencies:
+  - "SS-REVIEW-KPO-INIT-FETCH-CONTRACT"
+  - "SS-REVIEW-KPO-INIT-FETCH-PROVIDER"
+  - "SS-REVIEW-KPO-INIT-FETCH-RUNTIME"
+required_checks:
+  focused:
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live: []
+required_outputs:
+  [adr, implementation_docs, migration_docs, operator_runbook, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Approved implementation contradicts the specification."
+  - "A documented claim lacks current code or test evidence."
+  - "A required edit falls outside owned_paths."
+  - "Live certification would be claimed without executing the live environment."

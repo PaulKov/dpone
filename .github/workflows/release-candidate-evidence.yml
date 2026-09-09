@@ -1,0 +1,151 @@
+name: Release candidate evidence
+
+run-name: Release candidate evidence ${{ inputs.release }} at ${{ inputs.commit_sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Canonical stable release (vX.Y.Z) certified before tagging.
+        required: true
+        type: string
+      commit_sha:
+        description: Full lowercase SHA currently at the tip of master.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate-evidence-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  collect-live-evidence:
+    name: Collect observed real-local and native-transfer evidence
+    permissions:
+      contents: read
+    uses: ./.github/workflows/live-certification.yml
+    with:
+      profile: native_transfer
+      row_count: "25000"
+      run_native_benchmark_suite: false
+      expected_commit_sha: ${{ inputs.commit_sha }}
+      local_artifact_name: release-candidate-live-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+  release-candidate-evidence:
+    name: Release candidate evidence
+    needs: [collect-live-evidence]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      statuses: read
+    env:
+      AUTHORITY_DIR: test_artifacts/release-candidate/authority
+      EXPECTED_COMMIT_SHA: ${{ inputs.commit_sha }}
+      INPUT_ROOT: test_artifacts/release-candidate/input
+      LOCAL_VERIFICATION: test_artifacts/release-candidate/local-verification.json
+      RELEASE: ${{ inputs.release }}
+    steps:
+      - name: Checkout exact workflow commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable master identity
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ] || [ "${GITHUB_REF}" != "refs/heads/master" ] || [ "${GITHUB_REF_TYPE}" != "branch" ]; then
+            echo "::error::Release-candidate evidence must be dispatched from master."
+            exit 1
+          fi
+          if ! printf '%s\n' "${EXPECTED_COMMIT_SHA}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::commit_sha must be one full lowercase SHA."
+            exit 1
+          fi
+          if ! printf '%s\n' "${RELEASE}" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::release must use canonical stable form vX.Y.Z."
+            exit 1
+          fi
+          checked_out_commit="$(git rev-parse HEAD)"
+          master_commit="$(git rev-parse refs/remotes/origin/master)"
+          if [ "${EXPECTED_COMMIT_SHA}" != "${GITHUB_SHA}" ] || [ "${EXPECTED_COMMIT_SHA}" != "${checked_out_commit}" ] || [ "${EXPECTED_COMMIT_SHA}" != "${master_commit}" ]; then
+            echo "::error::Release-candidate workflow is not bound to the current exact master commit."
+            exit 1
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Install locked evidence dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Download observed live evidence from this exact attempt
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-candidate-live-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/release-candidate/input/live
+
+      - name: Capture exact-commit checks and merge receipt
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${INPUT_ROOT}/preflight"
+          uv run python tools/agent_policy/release_commit_gate.py \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${EXPECTED_COMMIT_SHA}" \
+            --policy .agents/policy/github-branch-protection.yml \
+            --timeout-seconds 300 \
+            --poll-interval-seconds 15 \
+            > "${INPUT_ROOT}/preflight/exact_commit_checks.json"
+          uv run python tools/agent_policy/release_merge_receipt_gate.py \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${EXPECTED_COMMIT_SHA}" \
+            --required-check-report "${INPUT_ROOT}/preflight/exact_commit_checks.json" \
+            --output "${INPUT_ROOT}/preflight/exact_commit_merge_receipt.json"
+
+      - name: Build closed release-candidate authority
+        run: |
+          uv run python tools/agent_policy/release_candidate_evidence_builder.py \
+            --root . \
+            --input-root "${INPUT_ROOT}" \
+            --output-dir "${AUTHORITY_DIR}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${GITHUB_SHA}" \
+            --release "${RELEASE}" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}"
+
+      - name: Verify closed authority before provider upload
+        run: |
+          uv run python tools/agent_policy/release_candidate_evidence_archive.py \
+            --directory "${AUTHORITY_DIR}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${GITHUB_SHA}" \
+            --release "${RELEASE}" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output "${LOCAL_VERIFICATION}"
+
+      - name: Upload immutable release-candidate authority
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-candidate-evidence-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/release-candidate/authority/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false

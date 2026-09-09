@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+convention: landing_raw_v1
+
+vars:
+  host: kafka_example_com
+  sla: daily
+  owner_contact: data-platform@example.com
+  owner_team: data-platform-team
+  src_system: demo_kafka
+  src_database: demo_topic
+
+defaults:
+  source:
+    type: kafka
+    connection_type: vault
+    connection_id: kafka-demo
+    vault_path: kafka/demo
+    topic: orders_events
+    options: {group_id: dpone.orders.batch, read_mode: offsets, offset_storage: dpone, message_format: json}
+  sink:
+    type: postgres
+    connection_type: vault
+    connection_id: postgres-demo-dwh
+    vault_path: postgres/demo-dwh
+    table: {schema: landing__demo_kafka__demo_topic, name: kafka__orders_events}
+    staging: {schema: stg}
+    strategy: {mode: incremental_merge, unique_key: id}
+  state:
+    type: postgres
+    connection_id: postgres-demo-dwh
+    connection_type: vault
+    vault_path: postgres/demo-dwh
+    table: {schema: etl_state, name: etl_xmin_state, kafka_name: etl_kafka_offsets}
+
+schemas:
+  kafka:
+    tables: [orders_events]

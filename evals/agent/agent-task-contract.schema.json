@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/agent-task-contract-v1.json",
+  "title": "dpone agent task contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "title",
+    "goal",
+    "specification",
+    "base_commit",
+    "integrator",
+    "acceptance_criteria",
+    "public_contract_impact",
+    "owned_paths",
+    "read_only_paths",
+    "forbidden_paths",
+    "shared_file_owner",
+    "dependencies",
+    "required_checks",
+    "required_outputs",
+    "completion_statuses",
+    "stop_conditions"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "task_id": {"type": "string"},
+    "title": {"type": "string"},
+    "goal": {"type": "string"},
+    "specification": {"type": "string"},
+    "base_commit": {"type": "string"},
+    "integrator": {"type": "string"},
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "public_contract_impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "surfaces", "migration_required"],
+      "properties": {
+        "level": {"enum": ["none", "compatible", "deprecation", "breaking"]},
+        "surfaces": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "migration_required": {"type": "boolean"}
+      }
+    },
+    "owned_paths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "integrator_owned_paths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "read_only_paths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "forbidden_paths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "shared_file_owner": {"type": "string"},
+    "dependencies": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "required_checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["focused", "broad", "live"],
+      "properties": {
+        "focused": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "broad": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "live": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "required_outputs": {
+      "type": "array",
+      "items": {"enum": ["implementation", "tests", "documentation_impact", "completion_report"]},
+      "uniqueItems": true
+    },
+    "completion_statuses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed"],
+      "properties": {
+        "allowed": {
+          "type": "array",
+          "items": {"enum": ["PASS", "FAIL", "SKIP", "N/A", "UNVERIFIED"]},
+          "uniqueItems": true
+        }
+      }
+    },
+    "stop_conditions": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    }
+  }
+}

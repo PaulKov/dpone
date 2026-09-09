@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/runtime-artifact-trust-policy-v2.schema.json",
+  "title": "dpone GitOps runtime artifact trust policy v2",
+  "type": "object",
+  "required": [
+    "schema",
+    "trust_tier",
+    "attestations",
+    "verifier"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.runtime-artifact-trust-policy.v2"
+    },
+    "trust_tier": {
+      "enum": [
+        "production",
+        "non_production"
+      ]
+    },
+    "attestations": {
+      "enum": [
+        "optional",
+        "required_for_prod"
+      ]
+    },
+    "verifier": {
+      "type": "object",
+      "required": [
+        "backend",
+        "repository",
+        "signer_workflow",
+        "signer_digest",
+        "predicate_type",
+        "cert_oidc_issuer",
+        "deny_self_hosted_runners",
+        "trusted_root",
+        "gh"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "const": "github_artifact_attestation_v1"
+        },
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "signer_workflow": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/\\.github/workflows/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\\.ya?ml$",
+          "maxLength": 300
+        },
+        "signer_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "predicate_type": {
+          "const": "https://slsa.dev/provenance/v1"
+        },
+        "cert_oidc_issuer": {
+          "const": "https://token.actions.githubusercontent.com"
+        },
+        "deny_self_hosted_runners": {
+          "const": true
+        },
+        "trusted_root": {
+          "type": "object",
+          "required": [
+            "encoding",
+            "content",
+            "sha256",
+            "generated_at",
+            "refresh_after"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "encoding": {
+              "const": "base64"
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 699052,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "generated_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "refresh_after": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "gh": {
+          "type": "object",
+          "required": [
+            "minimum_version",
+            "maximum_version_exclusive",
+            "timeout_seconds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "minimum_version": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+$"
+            },
+            "maximum_version_exclusive": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+$"
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
+        }
+      }
+    }
+  }
+}

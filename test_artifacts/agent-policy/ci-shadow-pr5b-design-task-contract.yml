@@ -1,0 +1,147 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-PR5B-DESIGN"
+title: "PR5B completed-producer verifier child specification and authority amendment"
+goal: >-
+  Freeze the exact PR5B workflow, archive, identity, receipt, retry, security,
+  test, live-evidence and documentation contracts without adding production code.
+specification: "docs/feature-design-ci-shadow-pr5b-completed-producer-verifier.md"
+base_commit: "816e0f9906a07dadeb44cdb958647109d592b6e9"
+integrator: "/root"
+
+acceptance_criteria:
+  - "The amended child specification is RESEARCHED, preserves the prior exact-head approval as history, and requires a fresh exact-head approval."
+  - "Parent and ADR authority language resolves the 21-context policy snapshot without duplicating a mutable count as operational authority."
+  - "PR5A transport is corrected to one bounded raw USTAR file for upload-artifact archive:false."
+  - "The ten-case matrix, trust boundaries, schemas, commands, retries, limits, evidence and docs journey are executable without implementer discretion."
+  - "Cross-job preflight acquisition and tokenless dependency preparation are explicit, bounded, authenticated and fail closed."
+  - "Partial preflight coordinates remain representable as INVALID, sealed candidate/dependency/verifier capabilities cross the exact descriptor bootstrap explicitly, and the root session is fail closed."
+  - "Dependency plans use authenticated resolver bytes, split official Airflow constraints from conflicting compatibility pins, and enforce one cumulative per-case resource budget."
+  - "Only the verified fail-closed emitter maps the seven preflight job outputs, with executor admission requiring successful preflight and execute_candidate true."
+  - "The sandbox receives sealed candidate, dependency/constraint, verifier-tree and exact setup-python runtime capabilities through one fully specified framed root session."
+  - "Opaque pip HTTP activity is not misreported as observable evidence; a capped tokenless resolver namespace plus parent admission counters provide executable bounds."
+  - "Candidate METADATA parsing, inner operation plans, stop semantics, observation DTOs and dedicated fault/live certification paths are closed."
+  - "A sealed ResolverInputSnapshotV1 carries exact pip and constraint bytes, and both privileged launcher sources are authenticated from the verifier tree before root-owned create-only provisioning."
+  - "The resolver leaf/ACK transport is a closed sequenced protocol with exact caps, digest, abort, kill/reap and terminal semantics."
+  - "Every sandbox command maps to one exact classified operation, uses authenticated distribution-scoped original wheel paths and persists enough session/runtime/verifier/materialized-plan evidence to distinguish FAIL from UNVERIFIED."
+  - "A separate read-only post-upload certifier and provider-revalidating campaign collector are the sole repository workflow/CLI producers of hosted PR5B certification candidates; later consumers still authenticate provider coordinates and terminal outcomes."
+  - "Root launch uses Ubuntu-compatible create-only root provisioning, authenticated Unix rendezvous, sealed-memfd namespace re-exec and verified cleanup; no sudo FD-preserve option is assumed."
+  - "Candidate wheel references materialize to authenticated original PEP 427 filenames in one sealed plan bound to resolver, sandbox, dispatcher and evidence digests."
+  - "Case and certification schemas represent every pre-bootstrap, missing-artifact, selective-rerun and cancelled-run outcome through closed observation states without synthetic identities."
+  - "Workflow C is manual read-only workflow_dispatch, preserves the one-hop architecture, accepts exact current identity plus closed certification/8-role campaign coordinate schemas, and emits URL-free evidence."
+  - "Workflow C binds workflow_dispatch to same-repository refs/heads/master and exact provider/checkout SHA, materializes the bounded raw input without shell interpolation, and persists non-pass candidates through capture, always-upload, readback, then enforcement."
+  - "Campaign roles bind independently observed terminal certifier conclusions, exact control blocker/job-set evidence, closed cross-role algebra, canonical campaign naming, current-attempt readback, and later collector terminal success."
+  - "A dedicated closed certification/campaign direct-JSON readback composition root independently binds the recaptured local candidate, exact current-attempt provider coordinate and freshly downloaded canonical bytes before Workflow C enforcement."
+  - "Workflow C commits writer-time kind/schema/size/digest/device/inode outputs before upload, and readback requires four-way agreement among that commitment, the post-upload local snapshot, provider coordinate, and freshly downloaded canonical bytes."
+  - "All provider clients share explicit noncopyable dispatch/response-byte/monotonic-time budget capabilities; Workflow B arithmetic includes raw candidates, and Workflow C producer/readback partitions have exact closed sums."
+  - "Workflow B preflight producer and post-upload readback use disjoint process-local provider partitions with exact dispatch/byte/time sums; no cross-process capability or borrowing is implied."
+  - "Sandbox and resolver mount only three authenticated candidate wheel leaves plus the sealed materialized-plan leaf into tmpfs-created exact paths; no whole candidate tree is exposed."
+  - "Root staging, launch, connect, session and cleanup share one monotonic deadline, bounded connect backoff, exact nonce/HMAC peer authentication, idempotent descriptor-confined cleanup, and closed staging/cleanup observations."
+  - "Case evidence distinguishes materialized-plan observation and authenticated partial sessions; resolver evidence binds materialized plan, staging, provisioner and cleanup identities."
+  - "Serialized identities and resolver/sandbox observations live in canonical stdlib-only contracts while reader/writer/process capabilities remain inward-dependent ports, with no contracts-to-ports import edge."
+  - "Sandbox/resolver bootstrap, terminal, partial-protocol, provider job-set and campaign coordinate-set digests have exact domain-separated byte projections, and inner/outer terminal DTO states are closed."
+  - "Sandbox and resolver READY bind closed bootstrap observations to retained requests, mount/resolver-input/dependency inventories have exact independently recomputable projections, and canonical receipts persist the accepted observations."
+  - "A clean early nonzero PRODUCT stop is a terminally VERIFIED PRODUCT_STOP prefix, while COMPLETE is reserved for the full command tuple and partial cleanup can never authenticate FAIL."
+  - "Privileged terminate/cleanup failures before helper PID acquisition are representable as terminal UNVERIFIED observations and do not prevent local capability closure."
+  - "Every privileged process/helper and namespace represents never-started, started-unreaped and reaped PID/start/wait states without synthesizing wait status; cleanup binds the process observation and proves recorded descendants absent rather than claiming nonchild reaping."
+  - "A descriptor-confined root-owned hash-chained journal is the sole process/mount inventory authority; its steward durably records intent before releasing each process or performing each mount effect, and torn, missing, stale or substituted journal state is UNVERIFIED."
+  - "The exact cleanup request, process observation and cleanup observation bind root-peer/namespace lifecycle identities plus journal/process/mount inventory digests, with identical process-to-cleanup binding for CLEANED and UNVERIFIED."
+  - "Pre-READY root-peer and namespace never-started, started-unreaped and reaped states remain in ordered public root-attempt lifecycle evidence, and verified sessions require raw wait status zero."
+  - "The journal has an exact framed wire/hash contract including physical byte arithmetic, frozen payload keys and independent golden vectors, operation-ID mount transitions, authenticated privileged-descendant terminal counts, and a sole successor cleanup writer after steward termination."
+  - "Root peer, namespace and privileged descendants retain one outer-sudo process group; the common stage/outer proof-before-reap prover returns a closed success or failure outcome and releases its pidfd without inventing wait or absence state."
+  - "Journal, deadline, protocol, group-presence, nonzero-wait and helper candidates fold into one representable public process diagnostic by a fixed execution-order-independent priority."
+  - "Stage cleanup is crash-safe and idempotent through five exact states from active stage before durable retire-intent through no-replace rename, retired record and already-sealed tombstone replay; the authority journal is never deleted before stage absence."
+  - "Every successor cleanup-helper attempt remains in an ordered bounded tuple; only a reaped raw-zero MISSING response can have a successor, while nonzero, signalled, unreaped, invalid or UNVERIFIED attempts terminate retry."
+  - "REMOVE_AND_PROVE has a separate exact canonical helper-response DTO/digest that excludes runner-owned PID/wait/history; only complete EOF-terminated raw-zero responses are VERIFIED, partial-at-deadline is MISSING, and established invalidity is INVALID."
+  - "Pre-READY resolver and sandbox failures preserve explicit UNKNOWN lifecycle state until descriptor-confined journal discovery, and dependency failure variants freeze exact session/lifecycle cardinality."
+  - "Resolver-input acquisition returns a close-once outcome with exact take/close/cancellation ownership; only the case service constructs INPUT_INVALID, while the downstream dependency preparer receives only a verified snapshot."
+  - "The runner proves both stage-sudo and shared outer process groups absent through one exact pidfd-zombie and descriptor-relative procfs predicate that fails closed on live members, EINTR exhaustion, EPERM and identity reuse."
+  - "Dependency preparer alone owns resolver start outcomes and the case service alone owns sandbox start outcomes; close returns DISPATCHED_FAILURE or untaken-READY terminal evidence exactly once per lifecycle with no hidden mutable handoff."
+  - "Provider retry jitter binds a secret-free closed request identity with exact canonical projection, redirect identity, retry index encoding, and deterministic vectors."
+  - "Snapshot, fixed-download, metadata, resolver, provider-retry and selective-rerun boundaries have executable negative and N-1/N/N+1 tests."
+  - "Focused specification and documentation contracts pass."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "CI shadow design contract"
+    - "agent implementation gate"
+    - "diagnostic evidence documentation"
+  migration_required: false
+
+owned_paths:
+  - "docs/feature-design-ci-shadow-pr5b-completed-producer-verifier.md"
+  - "test_artifacts/agent-policy/ci-shadow-pr5b-design-task-contract.yml"
+  - "tests/test_ci_shadow_pr5b_spec_contracts.py"
+integrator_owned_paths:
+  - "docs/quality-metrics.md"
+  - "docs/feature-design-ci-pr-gate-exact-sha-evidence.md"
+  - "docs/feature-design-ci-shadow-pr5a-candidate-manifest.md"
+  - "docs/adr/0046-component-aware-pr-gate-authority.md"
+  - "docs/adr/0048-exact-sha-readiness-evidence.md"
+  - "docs/cicd/pr-gate-shadow.md"
+  - "docs/cicd/pr-gate-shadow-runbook.md"
+  - "tests/test_ci_shadow_spec_contracts.py"
+read_only_paths:
+  - ".agents/policy/github-branch-protection.yml"
+  - ".github/workflows/airflow-pack-compat.yml"
+  - "docs/compatibility.md"
+  - "docs/agent-development.md"
+  - "docs/documentation-standard.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src"
+  - "packages"
+  - "tools"
+  - "docs/quality-metrics.md"
+  - "docs/feature-design-ci-pr-gate-exact-sha-evidence.md"
+  - "docs/feature-design-ci-shadow-pr5a-candidate-manifest.md"
+  - "docs/adr/0046-component-aware-pr-gate-authority.md"
+  - "docs/adr/0048-exact-sha-readiness-evidence.md"
+  - "docs/cicd/pr-gate-shadow.md"
+  - "docs/cicd/pr-gate-shadow-runbook.md"
+  - "tests/test_ci_shadow_spec_contracts.py"
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "origin/master@816e0f9906a07dadeb44cdb958647109d592b6e9"
+  - "PR5A implementation merge 5a2e6c06272805f5dcb3069d23a2be181bb8e17b"
+required_checks:
+  focused:
+    - "python tools/agent_policy/task_contract.py test_artifacts/agent-policy/ci-shadow-pr5b-design-task-contract.yml"
+    - "pytest tests/test_ci_shadow_pr5b_spec_contracts.py tests/test_ci_shadow_spec_contracts.py -q"
+  broad:
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live:
+    - "N/A: design-only change; hosted producer/verifier does not exist yet"
+
+required_outputs:
+  - "implementation"
+  - "tests"
+  - "documentation_impact"
+  - "completion_report"
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Fresh exact-head approval is missing when integration or implementation is attempted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Maintainer approval evidence does not bind the exact researched child specification head."
+  - "A proposed change would mutate production workflow, runtime, package or release authority."
+  - "The canonical active branch-protection policy and live observed authority disagree."

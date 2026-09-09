@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/quality/module-size-baseline-v2.schema.json",
+  "title": "dpone module-size debt baseline v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "debt"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "debt": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(?![\\s\\S]*[\\u0000-\\u001F\\u007F])(?!/)(?!\\.{1,2}(?:/|$))(?!.*//)(?!.*(?:/\\.{1,2}/|/\\.{1,2}$))(?!.*\\\\)[^/]+(?:/[^/]+)*\\.py$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/debt_entry"
+      }
+    }
+  },
+  "$defs": {
+    "debt_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted_adr",
+        "baseline_commit",
+        "max_lines",
+        "max_sloc",
+        "owner",
+        "reason",
+        "target_date",
+        "target_sloc"
+      ],
+      "properties": {
+        "accepted_adr": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^(?![\\s\\S]*[\\u0000-\\u001F\\u007F])docs/adr/(?!\\.{1,2}(?:/|$))(?!.*//)(?!.*(?:/\\.{1,2}/|/\\.{1,2}$))(?!.*\\\\)[^/]+(?:/[^/]+)*\\.md$"
+            }
+          ]
+        },
+        "baseline_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "max_lines": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_sloc": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?![\\s\\S]*[\\u0000-\\u001F\\u007F])\\S(?:.*\\S)?$"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?![\\s\\S]*[\\u0000-\\u001F\\u007F])\\S(?:.*\\S)?$"
+        },
+        "target_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "target_sloc": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

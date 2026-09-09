@@ -1,0 +1,2 @@
+{"order_id":1,"customer":{"customer_id":"c-1","segment":"vip"},"items":[{"sku":"sku-1","qty":2},{"sku":"sku-2","qty":1}],"tags":["new","promo"],"internal_payload":{"trace_id":"trace-1"}}
+{"order_id":2,"customer":{"customer_id":"c-2","segment":"base"},"items":[{"sku":"sku-3","qty":1}],"tags":["new"],"internal_payload":{"trace_id":"trace-2"}}

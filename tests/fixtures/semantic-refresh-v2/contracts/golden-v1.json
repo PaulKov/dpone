@@ -1,0 +1,784 @@
+{
+  "documents": {
+    "dpone.semantic-refresh-attempt-binding.v1": {
+      "attempt_binding_sha256": "sha256:a19c8210bf49c13941a6b0747a10ade50e4ebe638e395807e259ea370c354c3b",
+      "dag_run_id": "replacement__2026-08-07T00:00:00+00:00",
+      "fencing_epoch": 7,
+      "operation_id": "sha256:09301e2f1bfadaec50456a09fc3458c6df1b23081ed7485344953a30325f5f59",
+      "operation_plan_sha256": "sha256:aaea1c4a4661dd34d163ad6b9cbe6d219eb6209339814b5af2d5bc392da5268d",
+      "owner_id": "airflow-controller",
+      "pod_uid": "0198f11c-6956-74f2-984b-4cfcb1653b87",
+      "schema": "dpone.semantic-refresh-attempt-binding.v1",
+      "task_id": "semantic_refresh__events",
+      "try_number": 1,
+      "workflow_execution_binding_sha256": "sha256:3e0a653338fa341d9c517a24ab75a44582cd28d6a49d362463cb4be0dd8900dd",
+      "workflow_execution_id": "replacement__2026-08-07T00:00:00+00:00"
+    },
+    "dpone.semantic-refresh-model-definition-proof.v1": {
+      "catalog_observation_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "compiled_sql_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "macro_closure_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "manifest_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "model_definition_proof_sha256": "sha256:b094f636e25abb841bedf50d7274fcbe43dc46f50c54440fd3a24e842bdb9dee",
+      "model_unique_id": "model.analytics.events",
+      "parser_runtime_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "raw_code_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "resolved_module_dependency_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "resolved_relation_dependency_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "schema": "dpone.semantic-refresh-model-definition-proof.v1",
+      "status": "PROVEN",
+      "target_independence_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "toolchain_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "dpone.semantic-refresh-mutation-closure.v1": {
+      "indirect_selection": "empty",
+      "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+      "schema": "dpone.semantic-refresh-mutation-closure.v1",
+      "selected_mutating_node_ids": [
+        "model.analytics.events"
+      ],
+      "selected_node_ids": [
+        "model.analytics.events"
+      ],
+      "selected_read_only_node_ids": [],
+      "selectors": [
+        "model.analytics.events"
+      ],
+      "status": "PROVEN",
+      "unclassified_mutating_node_ids": []
+    },
+    "dpone.semantic-refresh-operation-plan.v1": {
+      "archetype": "scope_stable_event_fact",
+      "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "effective_key_columns": [
+        {
+          "domain_max": "2299-12-31T23:59:59.999999Z",
+          "domain_min": "1900-01-01T00:00:00.000000Z",
+          "mapping": "datetime2_utc",
+          "name": "event_at",
+          "nullable": false,
+          "source_type": "datetime2(6)",
+          "target_type": "DateTime64(6,'UTC')",
+          "utc_assurance_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "mapping": "integer_width_preserving",
+          "name": "event_id",
+          "nullable": false,
+          "source_type": "bigint",
+          "target_type": "Int64"
+        }
+      ],
+      "effective_key_mapping_sha256": "sha256:40acb1178c464f1ab570e639a19a66e5037d482d1a22364ea9d400f51fe59f02",
+      "effective_key_template_sha256": "sha256:332b0a54cfed391b2182b1d528c3790fb5b11892c2452a0fa74c159232cf8721",
+      "environment": "production",
+      "event_time_column": "event_at",
+      "missing_key_policy": "ignore_missing",
+      "model_definition_proof_sha256": "sha256:b094f636e25abb841bedf50d7274fcbe43dc46f50c54440fd3a24e842bdb9dee",
+      "model_unique_id": "model.analytics.events",
+      "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+      "mutation_order": [
+        "UPDATE",
+        "INSERT"
+      ],
+      "operation_id": "sha256:09301e2f1bfadaec50456a09fc3458c6df1b23081ed7485344953a30325f5f59",
+      "operation_kind": "failed_precommit_replacement",
+      "operation_plan_sha256": "sha256:aaea1c4a4661dd34d163ad6b9cbe6d219eb6209339814b5af2d5bc392da5268d",
+      "owner_generation": 3,
+      "platform_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "read_dependency_proof_sha256": "sha256:c20cb5c93c4eb2edef71be279b5157b29381fe7541255c72cdc443a9563e1033",
+      "release_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "replacement_ordinal": 1,
+      "replacement_reason": "model_correction",
+      "replaces_failed_operation_id": "sha256:7ae0c4b4bceabaf835ce947460f978ca46471b6d166923c89c1fa3fd7da6635a",
+      "resource_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "schema": "dpone.semantic-refresh-operation-plan.v1",
+      "scope_end": "2026-08-08T00:00:00Z",
+      "scope_family_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scope_revision": 1,
+      "scope_start": "2026-08-07T00:00:00Z",
+      "sqlserver_lifecycle_policy_sha256": "sha256:7f3cc0794a86de9d5ea2c5fdcc0f7cf88d3fb7baef978523e425c72cf6b2ffc8",
+      "target_predecessor_generation_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "workflow_id": "daily_events",
+      "writer_assurance_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "dpone.semantic-refresh-read-dependency-proof.v1": {
+      "base_relation_object_ids": [
+        200
+      ],
+      "catalog_snapshot_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "compiled_sql_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "database_name": "analytics",
+      "dependency_edges": [
+        {
+          "dependency_kind": "BASE_TABLE",
+          "from_object_id": 100,
+          "to_object_id": 200
+        }
+      ],
+      "max_definition_bytes": 1000000,
+      "max_depth": 8,
+      "max_edges": 200,
+      "max_nodes": 100,
+      "model_unique_id": "model.analytics.events",
+      "normalized_definitions_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "policy_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "read_dependency_proof_sha256": "sha256:c20cb5c93c4eb2edef71be279b5157b29381fe7541255c72cdc443a9563e1033",
+      "schema": "dpone.semantic-refresh-read-dependency-proof.v1",
+      "status": "PROVEN"
+    },
+    "dpone.semantic-refresh-sqlserver-lifecycle-policy.v1": {
+      "adapter_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "compatibility_level": 160,
+      "contract_enforced": true,
+      "dbt_core_version": "1.12.3",
+      "dbt_sqlserver_version": "1.11.1",
+      "dispatch_closure_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "driver_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "existing_table_required": true,
+      "full_refresh_allowed": false,
+      "hooks_allowed": false,
+      "incremental_strategy": "dpone_scope_merge",
+      "invocation_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "macro_closure_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "materialization": "incremental",
+      "materialization_closure_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "odbc_driver": "ODBC Driver 18 for SQL Server",
+      "on_schema_change": "fail",
+      "package_artifacts_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "profile_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "project_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pyodbc_version": "5.2.0",
+      "python_version": "3.12.12",
+      "runtime_image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "schema": "dpone.semantic-refresh-sqlserver-lifecycle-policy.v1",
+      "schema_mutation_allowed": false,
+      "sqlserver_lifecycle_policy_sha256": "sha256:7f3cc0794a86de9d5ea2c5fdcc0f7cf88d3fb7baef978523e425c72cf6b2ffc8",
+      "sqlserver_version": "16.0"
+    },
+    "dpone.semantic-refresh-workflow-execution-binding.v1": {
+      "binding_set_ref": "prod-bindings-v1",
+      "connection_registry_ref": "prod-connections-v1",
+      "credential_runtime_ref": "vault-runtime-v1",
+      "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_model_outcome_ids": [
+        "model.analytics.events"
+      ],
+      "model_operation_plan_ids": [
+        "model.analytics.events"
+      ],
+      "recovery_plan_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "replacement_action_ids": [
+        "model.analytics.events"
+      ],
+      "schema": "dpone.semantic-refresh-workflow-execution-binding.v1",
+      "selected_mutating_node_ids": [
+        "model.analytics.events"
+      ],
+      "workflow_execution_binding_sha256": "sha256:3e0a653338fa341d9c517a24ab75a44582cd28d6a49d362463cb4be0dd8900dd",
+      "workflow_execution_id": "replacement__2026-08-07T00:00:00+00:00",
+      "workflow_mode": "failed_precommit_replacement",
+      "workflow_plan_sha256": "sha256:d9f0c4bef83d5f2fed31b7e8d58fdc1f81c2ff15f117e6b2706e28691d4dd091",
+      "workflow_replacement_plan_sha256": "sha256:1c69181d5135a415b14b6259bcc15b935b8fbddc4e3ec987b0ff21c5eeaa616e"
+    },
+    "dpone.semantic-refresh-workflow-plan.v1": {
+      "expected_model_outcome_ids": [
+        "model.analytics.events"
+      ],
+      "model_operation_plan_ids": [
+        "model.analytics.events"
+      ],
+      "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+      "operation_plan_refs": [
+        {
+          "model_unique_id": "model.analytics.events",
+          "operation_id": "sha256:09301e2f1bfadaec50456a09fc3458c6df1b23081ed7485344953a30325f5f59",
+          "operation_plan_sha256": "sha256:aaea1c4a4661dd34d163ad6b9cbe6d219eb6209339814b5af2d5bc392da5268d"
+        }
+      ],
+      "replacement_action_ids": [
+        "model.analytics.events"
+      ],
+      "schema": "dpone.semantic-refresh-workflow-plan.v1",
+      "scope_end": "2026-08-08T00:00:00Z",
+      "scope_revision": 1,
+      "scope_start": "2026-08-07T00:00:00Z",
+      "selected_mutating_node_ids": [
+        "model.analytics.events"
+      ],
+      "workflow_mode": "failed_precommit_replacement",
+      "workflow_name": "daily_events",
+      "workflow_plan_sha256": "sha256:d9f0c4bef83d5f2fed31b7e8d58fdc1f81c2ff15f117e6b2706e28691d4dd091"
+    },
+    "dpone.semantic-refresh-workflow-replacement-plan.v1": {
+      "expected_model_outcome_ids": [
+        "model.analytics.events"
+      ],
+      "model_operation_plan_ids": [
+        "model.analytics.events"
+      ],
+      "predecessor_workflow_execution_binding_sha256": "sha256:37f04e029411d1b540c9e18df44740c0f559d59fed822b08fe6d1d8f66b85966",
+      "predecessor_workflow_execution_id": "failed-workflow-2026-08-07",
+      "predecessor_workflow_summary_sha256": "sha256:b38485e68045c988bd9ce7784beb9b10e95b0442eb5309d1cca67597a12a414e",
+      "recovery_plan_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "replacement_action_ids": [
+        "model.analytics.events"
+      ],
+      "replacement_actions": [
+        {
+          "action": "BUILD_FRESH",
+          "action_id": "model.analytics.events",
+          "outcome": "ROLLED_BACK"
+        }
+      ],
+      "schema": "dpone.semantic-refresh-workflow-replacement-plan.v1",
+      "selected_mutating_node_ids": [
+        "model.analytics.events"
+      ],
+      "workflow_mode": "failed_precommit_replacement",
+      "workflow_plan_sha256": "sha256:d9f0c4bef83d5f2fed31b7e8d58fdc1f81c2ff15f117e6b2706e28691d4dd091",
+      "workflow_replacement_plan_sha256": "sha256:1c69181d5135a415b14b6259bcc15b935b8fbddc4e3ec987b0ff21c5eeaa616e"
+    }
+  },
+  "execution_mode_vectors": {
+    "complete_scope_replay": {
+      "binding_set_ref": "prod-bindings-v1",
+      "connection_registry_ref": "prod-connections-v1",
+      "credential_runtime_ref": "vault-runtime-v1",
+      "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_model_outcome_ids": [
+        "model.analytics.events"
+      ],
+      "model_operation_plan_ids": [
+        "model.analytics.events"
+      ],
+      "replacement_action_ids": [],
+      "schema": "dpone.semantic-refresh-workflow-execution-binding.v1",
+      "selected_mutating_node_ids": [
+        "model.analytics.events"
+      ],
+      "workflow_execution_binding_sha256": "sha256:7f879664e5a7933541c0babb20a14c2c7854fa90bb30319c3f463a8a7e96b6a0",
+      "workflow_execution_id": "replay__2026-08-07T00:00:00+00:00",
+      "workflow_mode": "complete_scope_replay",
+      "workflow_plan_sha256": "sha256:4effe024252505e53437c9e6944486315fba988374e726356a0351bdfffcf977"
+    },
+    "failed_precommit_replacement": {
+      "binding_set_ref": "prod-bindings-v1",
+      "connection_registry_ref": "prod-connections-v1",
+      "credential_runtime_ref": "vault-runtime-v1",
+      "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_model_outcome_ids": [
+        "model.analytics.events"
+      ],
+      "model_operation_plan_ids": [
+        "model.analytics.events"
+      ],
+      "recovery_plan_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "replacement_action_ids": [
+        "model.analytics.events"
+      ],
+      "schema": "dpone.semantic-refresh-workflow-execution-binding.v1",
+      "selected_mutating_node_ids": [
+        "model.analytics.events"
+      ],
+      "workflow_execution_binding_sha256": "sha256:3e0a653338fa341d9c517a24ab75a44582cd28d6a49d362463cb4be0dd8900dd",
+      "workflow_execution_id": "replacement__2026-08-07T00:00:00+00:00",
+      "workflow_mode": "failed_precommit_replacement",
+      "workflow_plan_sha256": "sha256:d9f0c4bef83d5f2fed31b7e8d58fdc1f81c2ff15f117e6b2706e28691d4dd091",
+      "workflow_replacement_plan_sha256": "sha256:1c69181d5135a415b14b6259bcc15b935b8fbddc4e3ec987b0ff21c5eeaa616e"
+    },
+    "normal": {
+      "binding_set_ref": "prod-bindings-v1",
+      "connection_registry_ref": "prod-connections-v1",
+      "credential_runtime_ref": "vault-runtime-v1",
+      "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_model_outcome_ids": [
+        "model.analytics.events"
+      ],
+      "model_operation_plan_ids": [
+        "model.analytics.events"
+      ],
+      "replacement_action_ids": [],
+      "schema": "dpone.semantic-refresh-workflow-execution-binding.v1",
+      "selected_mutating_node_ids": [
+        "model.analytics.events"
+      ],
+      "workflow_execution_binding_sha256": "sha256:d10f0ede61fd373162cabcaebeb1d37c6a26dc806326012e7e5f837cd1230f02",
+      "workflow_execution_id": "scheduled__2026-08-07T00:00:00+00:00",
+      "workflow_mode": "normal",
+      "workflow_plan_sha256": "sha256:d3cb115956847185f545801358e664ba8b4ba33fb27af0a7e60d3928565c77c8"
+    }
+  },
+  "identity_mode_chains": {
+    "complete_scope_replay": {
+      "execution_binding": {
+        "binding_set_ref": "prod-bindings-v1",
+        "connection_registry_ref": "prod-connections-v1",
+        "credential_runtime_ref": "vault-runtime-v1",
+        "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_model_outcome_ids": [
+          "model.analytics.events"
+        ],
+        "model_operation_plan_ids": [
+          "model.analytics.events"
+        ],
+        "replacement_action_ids": [],
+        "schema": "dpone.semantic-refresh-workflow-execution-binding.v1",
+        "selected_mutating_node_ids": [
+          "model.analytics.events"
+        ],
+        "workflow_execution_binding_sha256": "sha256:7f879664e5a7933541c0babb20a14c2c7854fa90bb30319c3f463a8a7e96b6a0",
+        "workflow_execution_id": "replay__2026-08-07T00:00:00+00:00",
+        "workflow_mode": "complete_scope_replay",
+        "workflow_plan_sha256": "sha256:4effe024252505e53437c9e6944486315fba988374e726356a0351bdfffcf977"
+      },
+      "operation_plan": {
+        "archetype": "scope_stable_event_fact",
+        "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "effective_key_columns": [
+          {
+            "domain_max": "2299-12-31T23:59:59.999999Z",
+            "domain_min": "1900-01-01T00:00:00.000000Z",
+            "mapping": "datetime2_utc",
+            "name": "event_at",
+            "nullable": false,
+            "source_type": "datetime2(6)",
+            "target_type": "DateTime64(6,'UTC')",
+            "utc_assurance_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "mapping": "integer_width_preserving",
+            "name": "event_id",
+            "nullable": false,
+            "source_type": "bigint",
+            "target_type": "Int64"
+          }
+        ],
+        "effective_key_mapping_sha256": "sha256:40acb1178c464f1ab570e639a19a66e5037d482d1a22364ea9d400f51fe59f02",
+        "effective_key_template_sha256": "sha256:332b0a54cfed391b2182b1d528c3790fb5b11892c2452a0fa74c159232cf8721",
+        "environment": "production",
+        "event_time_column": "event_at",
+        "missing_key_policy": "ignore_missing",
+        "model_definition_proof_sha256": "sha256:b094f636e25abb841bedf50d7274fcbe43dc46f50c54440fd3a24e842bdb9dee",
+        "model_unique_id": "model.analytics.events",
+        "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+        "mutation_order": [
+          "UPDATE",
+          "INSERT"
+        ],
+        "operation_id": "sha256:9a4935433392f530dbd14ea987bc233b6cd50cc0d2514d6c98a319337354901c",
+        "operation_kind": "complete_scope_replay",
+        "operation_plan_sha256": "sha256:501a8ad9fe521f35ef57cc3b2484b3d585f4d6e088a03578860815e2d79b90ca",
+        "owner_generation": 3,
+        "platform_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "read_dependency_proof_sha256": "sha256:c20cb5c93c4eb2edef71be279b5157b29381fe7541255c72cdc443a9563e1033",
+        "release_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resource_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "schema": "dpone.semantic-refresh-operation-plan.v1",
+        "scope_end": "2026-08-08T00:00:00Z",
+        "scope_family_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "scope_predecessor_operation_id": "sha256:7ae0c4b4bceabaf835ce947460f978ca46471b6d166923c89c1fa3fd7da6635a",
+        "scope_revision": 2,
+        "scope_start": "2026-08-07T00:00:00Z",
+        "sqlserver_lifecycle_policy_sha256": "sha256:7f3cc0794a86de9d5ea2c5fdcc0f7cf88d3fb7baef978523e425c72cf6b2ffc8",
+        "target_predecessor_generation_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "workflow_id": "daily_events",
+        "writer_assurance_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "workflow_plan": {
+        "expected_model_outcome_ids": [
+          "model.analytics.events"
+        ],
+        "model_operation_plan_ids": [
+          "model.analytics.events"
+        ],
+        "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+        "operation_plan_refs": [
+          {
+            "model_unique_id": "model.analytics.events",
+            "operation_id": "sha256:9a4935433392f530dbd14ea987bc233b6cd50cc0d2514d6c98a319337354901c",
+            "operation_plan_sha256": "sha256:501a8ad9fe521f35ef57cc3b2484b3d585f4d6e088a03578860815e2d79b90ca"
+          }
+        ],
+        "replacement_action_ids": [],
+        "schema": "dpone.semantic-refresh-workflow-plan.v1",
+        "scope_end": "2026-08-08T00:00:00Z",
+        "scope_revision": 2,
+        "scope_start": "2026-08-07T00:00:00Z",
+        "selected_mutating_node_ids": [
+          "model.analytics.events"
+        ],
+        "workflow_mode": "complete_scope_replay",
+        "workflow_name": "daily_events",
+        "workflow_plan_sha256": "sha256:4effe024252505e53437c9e6944486315fba988374e726356a0351bdfffcf977"
+      }
+    },
+    "failed_precommit_replacement": {
+      "execution_binding": {
+        "binding_set_ref": "prod-bindings-v1",
+        "connection_registry_ref": "prod-connections-v1",
+        "credential_runtime_ref": "vault-runtime-v1",
+        "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_model_outcome_ids": [
+          "model.analytics.events"
+        ],
+        "model_operation_plan_ids": [
+          "model.analytics.events"
+        ],
+        "recovery_plan_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "replacement_action_ids": [
+          "model.analytics.events"
+        ],
+        "schema": "dpone.semantic-refresh-workflow-execution-binding.v1",
+        "selected_mutating_node_ids": [
+          "model.analytics.events"
+        ],
+        "workflow_execution_binding_sha256": "sha256:3e0a653338fa341d9c517a24ab75a44582cd28d6a49d362463cb4be0dd8900dd",
+        "workflow_execution_id": "replacement__2026-08-07T00:00:00+00:00",
+        "workflow_mode": "failed_precommit_replacement",
+        "workflow_plan_sha256": "sha256:d9f0c4bef83d5f2fed31b7e8d58fdc1f81c2ff15f117e6b2706e28691d4dd091",
+        "workflow_replacement_plan_sha256": "sha256:1c69181d5135a415b14b6259bcc15b935b8fbddc4e3ec987b0ff21c5eeaa616e"
+      },
+      "operation_plan": {
+        "archetype": "scope_stable_event_fact",
+        "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "effective_key_columns": [
+          {
+            "domain_max": "2299-12-31T23:59:59.999999Z",
+            "domain_min": "1900-01-01T00:00:00.000000Z",
+            "mapping": "datetime2_utc",
+            "name": "event_at",
+            "nullable": false,
+            "source_type": "datetime2(6)",
+            "target_type": "DateTime64(6,'UTC')",
+            "utc_assurance_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "mapping": "integer_width_preserving",
+            "name": "event_id",
+            "nullable": false,
+            "source_type": "bigint",
+            "target_type": "Int64"
+          }
+        ],
+        "effective_key_mapping_sha256": "sha256:40acb1178c464f1ab570e639a19a66e5037d482d1a22364ea9d400f51fe59f02",
+        "effective_key_template_sha256": "sha256:332b0a54cfed391b2182b1d528c3790fb5b11892c2452a0fa74c159232cf8721",
+        "environment": "production",
+        "event_time_column": "event_at",
+        "missing_key_policy": "ignore_missing",
+        "model_definition_proof_sha256": "sha256:b094f636e25abb841bedf50d7274fcbe43dc46f50c54440fd3a24e842bdb9dee",
+        "model_unique_id": "model.analytics.events",
+        "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+        "mutation_order": [
+          "UPDATE",
+          "INSERT"
+        ],
+        "operation_id": "sha256:09301e2f1bfadaec50456a09fc3458c6df1b23081ed7485344953a30325f5f59",
+        "operation_kind": "failed_precommit_replacement",
+        "operation_plan_sha256": "sha256:aaea1c4a4661dd34d163ad6b9cbe6d219eb6209339814b5af2d5bc392da5268d",
+        "owner_generation": 3,
+        "platform_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "read_dependency_proof_sha256": "sha256:c20cb5c93c4eb2edef71be279b5157b29381fe7541255c72cdc443a9563e1033",
+        "release_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "replacement_ordinal": 1,
+        "replacement_reason": "model_correction",
+        "replaces_failed_operation_id": "sha256:7ae0c4b4bceabaf835ce947460f978ca46471b6d166923c89c1fa3fd7da6635a",
+        "resource_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "schema": "dpone.semantic-refresh-operation-plan.v1",
+        "scope_end": "2026-08-08T00:00:00Z",
+        "scope_family_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "scope_revision": 1,
+        "scope_start": "2026-08-07T00:00:00Z",
+        "sqlserver_lifecycle_policy_sha256": "sha256:7f3cc0794a86de9d5ea2c5fdcc0f7cf88d3fb7baef978523e425c72cf6b2ffc8",
+        "target_predecessor_generation_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "workflow_id": "daily_events",
+        "writer_assurance_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "predecessor_execution_binding": {
+        "binding_set_ref": "prod-bindings-v1",
+        "connection_registry_ref": "prod-connections-v1",
+        "credential_runtime_ref": "vault-runtime-v1",
+        "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_model_outcome_ids": [
+          "model.analytics.events"
+        ],
+        "model_operation_plan_ids": [
+          "model.analytics.events"
+        ],
+        "replacement_action_ids": [],
+        "schema": "dpone.semantic-refresh-workflow-execution-binding.v1",
+        "selected_mutating_node_ids": [
+          "model.analytics.events"
+        ],
+        "workflow_execution_binding_sha256": "sha256:37f04e029411d1b540c9e18df44740c0f559d59fed822b08fe6d1d8f66b85966",
+        "workflow_execution_id": "failed-workflow-2026-08-07",
+        "workflow_mode": "normal",
+        "workflow_plan_sha256": "sha256:d3cb115956847185f545801358e664ba8b4ba33fb27af0a7e60d3928565c77c8"
+      },
+      "predecessor_failed_summary": {
+        "expected_operation_ids": [
+          "sha256:7ae0c4b4bceabaf835ce947460f978ca46471b6d166923c89c1fa3fd7da6635a"
+        ],
+        "models": [
+          {
+            "attempt_binding_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "mssql_evidence_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "mssql_outcome": "ROLLED_BACK",
+            "operation_id": "sha256:7ae0c4b4bceabaf835ce947460f978ca46471b6d166923c89c1fa3fd7da6635a"
+          }
+        ],
+        "schema": "dpone.semantic-refresh-failed-workflow-summary.v1",
+        "status": "FAILED_PRE_COMMIT",
+        "terminal_summary_sha256": "sha256:b38485e68045c988bd9ce7784beb9b10e95b0442eb5309d1cca67597a12a414e",
+        "workflow_execution_binding_sha256": "sha256:37f04e029411d1b540c9e18df44740c0f559d59fed822b08fe6d1d8f66b85966",
+        "workflow_id": "failed-workflow-2026-08-07",
+        "workflow_plan_sha256": "sha256:d3cb115956847185f545801358e664ba8b4ba33fb27af0a7e60d3928565c77c8"
+      },
+      "replacement_plan": {
+        "expected_model_outcome_ids": [
+          "model.analytics.events"
+        ],
+        "model_operation_plan_ids": [
+          "model.analytics.events"
+        ],
+        "predecessor_workflow_execution_binding_sha256": "sha256:37f04e029411d1b540c9e18df44740c0f559d59fed822b08fe6d1d8f66b85966",
+        "predecessor_workflow_execution_id": "failed-workflow-2026-08-07",
+        "predecessor_workflow_summary_sha256": "sha256:b38485e68045c988bd9ce7784beb9b10e95b0442eb5309d1cca67597a12a414e",
+        "recovery_plan_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "replacement_action_ids": [
+          "model.analytics.events"
+        ],
+        "replacement_actions": [
+          {
+            "action": "BUILD_FRESH",
+            "action_id": "model.analytics.events",
+            "outcome": "ROLLED_BACK"
+          }
+        ],
+        "schema": "dpone.semantic-refresh-workflow-replacement-plan.v1",
+        "selected_mutating_node_ids": [
+          "model.analytics.events"
+        ],
+        "workflow_mode": "failed_precommit_replacement",
+        "workflow_plan_sha256": "sha256:d9f0c4bef83d5f2fed31b7e8d58fdc1f81c2ff15f117e6b2706e28691d4dd091",
+        "workflow_replacement_plan_sha256": "sha256:1c69181d5135a415b14b6259bcc15b935b8fbddc4e3ec987b0ff21c5eeaa616e"
+      },
+      "workflow_plan": {
+        "expected_model_outcome_ids": [
+          "model.analytics.events"
+        ],
+        "model_operation_plan_ids": [
+          "model.analytics.events"
+        ],
+        "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+        "operation_plan_refs": [
+          {
+            "model_unique_id": "model.analytics.events",
+            "operation_id": "sha256:09301e2f1bfadaec50456a09fc3458c6df1b23081ed7485344953a30325f5f59",
+            "operation_plan_sha256": "sha256:aaea1c4a4661dd34d163ad6b9cbe6d219eb6209339814b5af2d5bc392da5268d"
+          }
+        ],
+        "replacement_action_ids": [
+          "model.analytics.events"
+        ],
+        "schema": "dpone.semantic-refresh-workflow-plan.v1",
+        "scope_end": "2026-08-08T00:00:00Z",
+        "scope_revision": 1,
+        "scope_start": "2026-08-07T00:00:00Z",
+        "selected_mutating_node_ids": [
+          "model.analytics.events"
+        ],
+        "workflow_mode": "failed_precommit_replacement",
+        "workflow_name": "daily_events",
+        "workflow_plan_sha256": "sha256:d9f0c4bef83d5f2fed31b7e8d58fdc1f81c2ff15f117e6b2706e28691d4dd091"
+      }
+    },
+    "normal": {
+      "execution_binding": {
+        "binding_set_ref": "prod-bindings-v1",
+        "connection_registry_ref": "prod-connections-v1",
+        "credential_runtime_ref": "vault-runtime-v1",
+        "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_model_outcome_ids": [
+          "model.analytics.events"
+        ],
+        "model_operation_plan_ids": [
+          "model.analytics.events"
+        ],
+        "replacement_action_ids": [],
+        "schema": "dpone.semantic-refresh-workflow-execution-binding.v1",
+        "selected_mutating_node_ids": [
+          "model.analytics.events"
+        ],
+        "workflow_execution_binding_sha256": "sha256:d10f0ede61fd373162cabcaebeb1d37c6a26dc806326012e7e5f837cd1230f02",
+        "workflow_execution_id": "scheduled__2026-08-07T00:00:00+00:00",
+        "workflow_mode": "normal",
+        "workflow_plan_sha256": "sha256:d3cb115956847185f545801358e664ba8b4ba33fb27af0a7e60d3928565c77c8"
+      },
+      "operation_plan": {
+        "archetype": "scope_stable_event_fact",
+        "deployment_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "effective_key_columns": [
+          {
+            "domain_max": "2299-12-31T23:59:59.999999Z",
+            "domain_min": "1900-01-01T00:00:00.000000Z",
+            "mapping": "datetime2_utc",
+            "name": "event_at",
+            "nullable": false,
+            "source_type": "datetime2(6)",
+            "target_type": "DateTime64(6,'UTC')",
+            "utc_assurance_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "mapping": "integer_width_preserving",
+            "name": "event_id",
+            "nullable": false,
+            "source_type": "bigint",
+            "target_type": "Int64"
+          }
+        ],
+        "effective_key_mapping_sha256": "sha256:40acb1178c464f1ab570e639a19a66e5037d482d1a22364ea9d400f51fe59f02",
+        "effective_key_template_sha256": "sha256:332b0a54cfed391b2182b1d528c3790fb5b11892c2452a0fa74c159232cf8721",
+        "environment": "production",
+        "event_time_column": "event_at",
+        "missing_key_policy": "ignore_missing",
+        "model_definition_proof_sha256": "sha256:b094f636e25abb841bedf50d7274fcbe43dc46f50c54440fd3a24e842bdb9dee",
+        "model_unique_id": "model.analytics.events",
+        "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+        "mutation_order": [
+          "UPDATE",
+          "INSERT"
+        ],
+        "operation_id": "sha256:7ae0c4b4bceabaf835ce947460f978ca46471b6d166923c89c1fa3fd7da6635a",
+        "operation_kind": "normal",
+        "operation_plan_sha256": "sha256:a9e929d3a234f2c37972f65497f64ece022b52a5607a6da2dd96948519208afb",
+        "owner_generation": 3,
+        "platform_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "read_dependency_proof_sha256": "sha256:c20cb5c93c4eb2edef71be279b5157b29381fe7541255c72cdc443a9563e1033",
+        "release_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resource_policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "schema": "dpone.semantic-refresh-operation-plan.v1",
+        "scope_end": "2026-08-08T00:00:00Z",
+        "scope_family_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "scope_revision": 1,
+        "scope_start": "2026-08-07T00:00:00Z",
+        "sqlserver_lifecycle_policy_sha256": "sha256:7f3cc0794a86de9d5ea2c5fdcc0f7cf88d3fb7baef978523e425c72cf6b2ffc8",
+        "target_predecessor_generation_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "workflow_id": "daily_events",
+        "writer_assurance_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "workflow_plan": {
+        "expected_model_outcome_ids": [
+          "model.analytics.events"
+        ],
+        "model_operation_plan_ids": [
+          "model.analytics.events"
+        ],
+        "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+        "operation_plan_refs": [
+          {
+            "model_unique_id": "model.analytics.events",
+            "operation_id": "sha256:7ae0c4b4bceabaf835ce947460f978ca46471b6d166923c89c1fa3fd7da6635a",
+            "operation_plan_sha256": "sha256:a9e929d3a234f2c37972f65497f64ece022b52a5607a6da2dd96948519208afb"
+          }
+        ],
+        "replacement_action_ids": [],
+        "schema": "dpone.semantic-refresh-workflow-plan.v1",
+        "scope_end": "2026-08-08T00:00:00Z",
+        "scope_revision": 1,
+        "scope_start": "2026-08-07T00:00:00Z",
+        "selected_mutating_node_ids": [
+          "model.analytics.events"
+        ],
+        "workflow_mode": "normal",
+        "workflow_name": "daily_events",
+        "workflow_plan_sha256": "sha256:d3cb115956847185f545801358e664ba8b4ba33fb27af0a7e60d3928565c77c8"
+      }
+    }
+  },
+  "workflow_mode_vectors": {
+    "complete_scope_replay": {
+      "expected_model_outcome_ids": [
+        "model.analytics.events"
+      ],
+      "model_operation_plan_ids": [
+        "model.analytics.events"
+      ],
+      "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+      "operation_plan_refs": [
+        {
+          "model_unique_id": "model.analytics.events",
+          "operation_id": "sha256:9a4935433392f530dbd14ea987bc233b6cd50cc0d2514d6c98a319337354901c",
+          "operation_plan_sha256": "sha256:501a8ad9fe521f35ef57cc3b2484b3d585f4d6e088a03578860815e2d79b90ca"
+        }
+      ],
+      "replacement_action_ids": [],
+      "schema": "dpone.semantic-refresh-workflow-plan.v1",
+      "scope_end": "2026-08-08T00:00:00Z",
+      "scope_revision": 2,
+      "scope_start": "2026-08-07T00:00:00Z",
+      "selected_mutating_node_ids": [
+        "model.analytics.events"
+      ],
+      "workflow_mode": "complete_scope_replay",
+      "workflow_name": "daily_events",
+      "workflow_plan_sha256": "sha256:4effe024252505e53437c9e6944486315fba988374e726356a0351bdfffcf977"
+    },
+    "failed_precommit_replacement": {
+      "expected_model_outcome_ids": [
+        "model.analytics.events"
+      ],
+      "model_operation_plan_ids": [
+        "model.analytics.events"
+      ],
+      "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+      "operation_plan_refs": [
+        {
+          "model_unique_id": "model.analytics.events",
+          "operation_id": "sha256:09301e2f1bfadaec50456a09fc3458c6df1b23081ed7485344953a30325f5f59",
+          "operation_plan_sha256": "sha256:aaea1c4a4661dd34d163ad6b9cbe6d219eb6209339814b5af2d5bc392da5268d"
+        }
+      ],
+      "replacement_action_ids": [
+        "model.analytics.events"
+      ],
+      "schema": "dpone.semantic-refresh-workflow-plan.v1",
+      "scope_end": "2026-08-08T00:00:00Z",
+      "scope_revision": 1,
+      "scope_start": "2026-08-07T00:00:00Z",
+      "selected_mutating_node_ids": [
+        "model.analytics.events"
+      ],
+      "workflow_mode": "failed_precommit_replacement",
+      "workflow_name": "daily_events",
+      "workflow_plan_sha256": "sha256:d9f0c4bef83d5f2fed31b7e8d58fdc1f81c2ff15f117e6b2706e28691d4dd091"
+    },
+    "normal": {
+      "expected_model_outcome_ids": [
+        "model.analytics.events"
+      ],
+      "model_operation_plan_ids": [
+        "model.analytics.events"
+      ],
+      "mutation_closure_sha256": "sha256:5541412e5f4f068cf5ec3df3b260efe46223c0eea3ba25e5525906581d5cbc24",
+      "operation_plan_refs": [
+        {
+          "model_unique_id": "model.analytics.events",
+          "operation_id": "sha256:7ae0c4b4bceabaf835ce947460f978ca46471b6d166923c89c1fa3fd7da6635a",
+          "operation_plan_sha256": "sha256:a9e929d3a234f2c37972f65497f64ece022b52a5607a6da2dd96948519208afb"
+        }
+      ],
+      "replacement_action_ids": [],
+      "schema": "dpone.semantic-refresh-workflow-plan.v1",
+      "scope_end": "2026-08-08T00:00:00Z",
+      "scope_revision": 1,
+      "scope_start": "2026-08-07T00:00:00Z",
+      "selected_mutating_node_ids": [
+        "model.analytics.events"
+      ],
+      "workflow_mode": "normal",
+      "workflow_name": "daily_events",
+      "workflow_plan_sha256": "sha256:d3cb115956847185f545801358e664ba8b4ba33fb27af0a7e60d3928565c77c8"
+    }
+  }
+}

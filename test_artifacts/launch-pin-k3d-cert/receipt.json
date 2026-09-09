@@ -1,0 +1,46 @@
+{
+  "schema": "dpone.launch-pin-k3d-cert.v1",
+  "status": "PASS",
+  "certified_at": "2026-08-11T19:22:37.558369+00:00",
+  "commit_sha": "18570c11788088744e9eab2d33ab4fcfadf32224",
+  "cluster": "dpone-lp-cert",
+  "namespace": "airflow",
+  "kubernetes_version": "v1.33.6+k3s1",
+  "scenarios": [
+    {
+      "name": "worker_configmap_cas",
+      "status": "PASS",
+      "detail": "ACTIVE pin uid=9e478e60-22d9-45d1-a43b-213852836aa7",
+      "duration_ms": 30
+    },
+    {
+      "name": "worker_pod_delete",
+      "status": "PASS",
+      "detail": "deleted pod dpone-lp-cert-pod-b487067d (created by platform, deleted by worker SA)",
+      "duration_ms": 12
+    },
+    {
+      "name": "runtime_configmap_get_only",
+      "status": "PASS",
+      "detail": "runtime get ok; create denied as expected",
+      "duration_ms": 15
+    },
+    {
+      "name": "multi_worker_cas_single_winner",
+      "status": "PASS",
+      "detail": "single ACTIVE winner try=2",
+      "duration_ms": 38
+    },
+    {
+      "name": "runtime_reads_active_barrier",
+      "status": "PASS",
+      "detail": "runtime read ACTIVE per-try dpone-lp-d81a7058ff5978637a4e911ccbd5399b9fe52f84",
+      "duration_ms": 29
+    }
+  ],
+  "limitations": [
+    "Single-node k3d cluster with two logical worker clients (not separate Airflow worker pods).",
+    "Does not exercise full Airflow KPO/barrier init container or outcome_gate task graph.",
+    "Gate/cleanup workers reuse worker RBAC profile (same verbs as documented worker SA)."
+  ]
+}

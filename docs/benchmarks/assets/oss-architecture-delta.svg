@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="402" viewBox="0 0 920 402" role="img">
+<rect width="920" height="402" fill="#f8fafc"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Architecture delta</text>
+<text x="32" y="66" font-size="13" fill="#475569">Governance movement against previous benchmark evidence.</text>
+<text x="760" y="42" font-size="13" font-weight="700" fill="#334155">unchanged</text>
+<text x="32" y="104" font-size="13" font-weight="700" fill="#111827">Max fan-out</text>
+<rect x="260" y="86" width="360" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="260" y="86" width="180" height="22" rx="4" fill="#64748b" opacity="0.84"/>
+<text x="642" y="104" font-size="12" fill="#334155">26 -> 26</text>
+<text x="790" y="104" font-size="12" font-weight="700" fill="#64748b">0</text>
+<text x="32" y="158" font-size="13" font-weight="700" fill="#111827">P90 fan-out</text>
+<rect x="260" y="140" width="360" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="260" y="140" width="180" height="22" rx="4" fill="#64748b" opacity="0.84"/>
+<text x="642" y="158" font-size="12" fill="#334155">5 -> 5</text>
+<text x="790" y="158" font-size="12" font-weight="700" fill="#64748b">0</text>
+<text x="32" y="212" font-size="13" font-weight="700" fill="#111827">Average fan-out</text>
+<rect x="260" y="194" width="360" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="260" y="194" width="180" height="22" rx="4" fill="#64748b" opacity="0.84"/>
+<text x="642" y="212" font-size="12" fill="#334155">2.076 -> 2.076</text>
+<text x="790" y="212" font-size="12" font-weight="700" fill="#64748b">0</text>
+<text x="32" y="266" font-size="13" font-weight="700" fill="#111827">Largest module LOC</text>
+<rect x="260" y="248" width="360" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="260" y="248" width="180" height="22" rx="4" fill="#64748b" opacity="0.84"/>
+<text x="642" y="266" font-size="12" fill="#334155">449 -> 449</text>
+<text x="790" y="266" font-size="12" font-weight="700" fill="#64748b">0</text>
+<text x="32" y="320" font-size="13" font-weight="700" fill="#111827">Static test footprint</text>
+<rect x="260" y="302" width="360" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="260" y="302" width="180" height="22" rx="4" fill="#64748b" opacity="0.84"/>
+<text x="642" y="320" font-size="12" fill="#334155">0.51 -> 0.51</text>
+<text x="790" y="320" font-size="12" font-weight="700" fill="#64748b">0</text>
+</svg>

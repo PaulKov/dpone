@@ -1,0 +1,165 @@
+{
+  "base_ref": "origin/master",
+  "changed_paths": [
+    ".agents/policy/ci-shadow-reconciliation-observation-bundle-v1.yml",
+    ".github/workflows/ci.yml",
+    "CHANGELOG.md",
+    "docs/adr-index.md",
+    "docs/adr/0053-rest-delivery-identity-effect-journal.md",
+    "docs/adr/0054-resumable-delivery-runtime-airflow.md",
+    "docs/adr/0055-rest-operation-profile-authority.md",
+    "docs/cli-reference.md",
+    "docs/feature-design-rest-api-sink-v1.md",
+    "docs/quality-metrics.md",
+    "docs/rest-bulk-delivery-design-contract-v1.yaml",
+    "docs/rest-bulk-delivery-threat-model.md",
+    "docs/schema/rest-bulk-delivery-approval-v1.schema.json",
+    "docs/schema/rest-bulk-delivery-design-contract-v1.schema.json",
+    "mkdocs.yml",
+    "pyproject.toml",
+    "src/dpone/adapters/fs_local.py",
+    "src/dpone/adapters/fs_memory.py",
+    "src/dpone/commands/docs/__init__.py",
+    "src/dpone/commands/docs/check_rest_delivery_design_contract_cmd.py",
+    "src/dpone/commands/registry_docs_checks.py",
+    "src/dpone/ports/filesystem.py",
+    "src/dpone/services/docs/check_rest_delivery_design_contract_service.py",
+    "src/dpone/services/docs/rest_delivery_design_contract.py",
+    "src/dpone/services/docs/rest_delivery_design_contract_authority.py",
+    "src/dpone/services/docs/rest_delivery_design_contract_state.py",
+    "src/dpone/services/docs/rest_delivery_design_contract_types.py",
+    "test_artifacts/agent-policy/agent_governance_gate.json",
+    "test_artifacts/agent-policy/pr3b-semantic-privilege-certification.json",
+    "tests/test_cicd_docs_contracts.py",
+    "tests/test_public_contracts_and_adapters.py",
+    "tests/test_rest_bulk_delivery_design_contract.py",
+    "tests/test_rest_delivery_design_contract_validator.py",
+    "uv.lock"
+  ],
+  "checks": [
+    {
+      "artifact": "tools/agent_policy/validate_setup.py",
+      "details": "Repository-local agent control-plane inventory is valid.",
+      "name": "agent_policy_setup",
+      "status": "PASS"
+    },
+    {
+      "artifact": "evals/agent/red_team_scenarios.yml",
+      "details": "Required connector-scope-escalation, prompt-injection, secret-disclosure, workflow-tampering, verification-laundering, excessive-agency, unbounded-consumption, unregistered-tool-use, and GitHub-settings-drift scenarios are valid.",
+      "name": "agent_red_team_catalog",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".agents/policy/agent-permission-profile.yml",
+      "details": "Agent permission profiles define role owners, allowed tools, forbidden tools, protected actions, escalation, and required evidence.",
+      "name": "agent_permission_profile",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".agents/policy/tool-registry.yml",
+      "details": "Agent tool registry defines tool provenance, risk tier, allowed profiles, approval requirements, scopes, and evidence.",
+      "name": "agent_tool_registry",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".agents/policy/mcp-connector-onboarding.yml",
+      "details": "MCP/connector onboarding defines provenance, scopes, tenant boundaries, approval gates, red-team coverage, and evidence receipts.",
+      "name": "agent_mcp_connector_onboarding",
+      "status": "PASS"
+    },
+    {
+      "artifact": "docs/agent-templates/agent-task-contract.yml",
+      "details": "Agent task contract template preserves schema, protected paths, status vocabulary, and stop conditions.",
+      "name": "agent_task_contract_template",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".agents/policy/github-branch-protection.yml",
+      "details": "GitHub branch protection policy preserves solo-maintainer PR flow, strict required checks, conversation resolution, and protected branch actions.",
+      "name": "github_branch_protection_policy",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".agents/policy/workflow-security.yml",
+      "details": "GitHub Actions workflows define top-level permissions, pin external actions, avoid pull_request_target, and document write scopes.",
+      "name": "github_workflow_security_policy",
+      "status": "PASS"
+    },
+    {
+      "artifact": "evals/agent/red_team_scenarios.yml",
+      "details": "Agent-control paths changed and the executable red-team catalog validates.",
+      "name": "changed_control_surface_red_team",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".github/workflows/release.yml",
+      "details": "Release workflow attests wheel/sdist artifacts and verifies GitHub attestation receipts before handing immutable candidates to the external publisher.",
+      "name": "release_artifact_attestations",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".github/workflows/scorecard.yml",
+      "details": "OpenSSF Scorecard publishes SARIF and public results from a least-privilege workflow.",
+      "name": "ossf_scorecard",
+      "status": "PASS"
+    },
+    {
+      "artifact": "docs/supply-chain-slsa.md",
+      "details": "SLSA posture is documented as a scoped self-assessment with explicit non-claims.",
+      "name": "slsa_self_assessment",
+      "status": "PASS"
+    }
+  ],
+  "control_surface_changed": true,
+  "generated_at": "2026-08-30T20:38:01+00:00",
+  "head_commit": "97b54b4cb9c536980b2f584adc9eb6b2e48338af",
+  "risks": [
+    "AG-001",
+    "AG-002",
+    "AG-005",
+    "AG-007",
+    "AG-008",
+    "AG-009",
+    "AG-010",
+    "AG-011",
+    "AG-012",
+    "AG-013",
+    "AG-014",
+    "AG-015",
+    "AG-016"
+  ],
+  "schema_version": 1,
+  "standards": [
+    {
+      "name": "SLSA Build Track",
+      "url": "https://slsa.dev/spec/v1.2/tracks",
+      "version": "v1.2"
+    },
+    {
+      "name": "OpenSSF Scorecard",
+      "url": "https://scorecard.dev/",
+      "version": "current"
+    },
+    {
+      "name": "OWASP Top 10 for LLM Applications",
+      "url": "https://genai.owasp.org/llm-top-10/",
+      "version": "2025"
+    },
+    {
+      "name": "OWASP Top 10 for Agentic Applications",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "version": "2026"
+    },
+    {
+      "name": "Model Context Protocol Security",
+      "url": "https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices",
+      "version": "current"
+    },
+    {
+      "name": "CISA AI SBOM Minimum Elements",
+      "url": "https://www.cisa.gov/resources-tools/resources/software-bill-materials-ai-minimum-elements",
+      "version": "2026"
+    }
+  ],
+  "status": "PASS"
+}

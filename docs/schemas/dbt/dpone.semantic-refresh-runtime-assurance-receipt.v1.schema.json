@@ -1,0 +1,551 @@
+{
+  "$comment": "Authorization additionally requires an external trusted digest whose resolver has verified signature and the current revocation index. Absence or expiry fails closed.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-runtime-assurance-receipt.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "revoked_receipt_sha256"
+            ]
+          },
+          {
+            "required": [
+              "revoked_at"
+            ]
+          },
+          {
+            "required": [
+              "revocation_reason"
+            ]
+          },
+          {
+            "required": [
+              "ddl_epoch"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "status": {
+          "const": "CERTIFIED"
+        },
+        "subject": {
+          "properties": {
+            "assurance_kind": {
+              "const": "writer_exclusivity"
+            }
+          }
+        }
+      },
+      "required": [
+        "effective_from",
+        "expires_at",
+        "evidence_sha256",
+        "engine_acl_proof_sha256",
+        "engine_acl_proof_status",
+        "platform_allowlist_sha256",
+        "platform_allowlist_status",
+        "external_job_inventory_sha256",
+        "external_job_inventory_status",
+        "organizational_control_sha256",
+        "organizational_control_status"
+      ]
+    },
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "engine_acl_proof_sha256"
+            ]
+          },
+          {
+            "required": [
+              "engine_acl_proof_status"
+            ]
+          },
+          {
+            "required": [
+              "platform_allowlist_sha256"
+            ]
+          },
+          {
+            "required": [
+              "platform_allowlist_status"
+            ]
+          },
+          {
+            "required": [
+              "external_job_inventory_sha256"
+            ]
+          },
+          {
+            "required": [
+              "external_job_inventory_status"
+            ]
+          },
+          {
+            "required": [
+              "organizational_control_sha256"
+            ]
+          },
+          {
+            "required": [
+              "organizational_control_status"
+            ]
+          },
+          {
+            "required": [
+              "revoked_receipt_sha256"
+            ]
+          },
+          {
+            "required": [
+              "revoked_at"
+            ]
+          },
+          {
+            "required": [
+              "revocation_reason"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "status": {
+          "const": "CERTIFIED"
+        },
+        "subject": {
+          "properties": {
+            "assurance_kind": {
+              "const": "ddl_freeze"
+            }
+          }
+        }
+      },
+      "required": [
+        "effective_from",
+        "expires_at",
+        "evidence_sha256",
+        "ddl_epoch"
+      ]
+    },
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "engine_acl_proof_sha256"
+            ]
+          },
+          {
+            "required": [
+              "engine_acl_proof_status"
+            ]
+          },
+          {
+            "required": [
+              "platform_allowlist_sha256"
+            ]
+          },
+          {
+            "required": [
+              "platform_allowlist_status"
+            ]
+          },
+          {
+            "required": [
+              "external_job_inventory_sha256"
+            ]
+          },
+          {
+            "required": [
+              "external_job_inventory_status"
+            ]
+          },
+          {
+            "required": [
+              "organizational_control_sha256"
+            ]
+          },
+          {
+            "required": [
+              "organizational_control_status"
+            ]
+          },
+          {
+            "required": [
+              "revoked_receipt_sha256"
+            ]
+          },
+          {
+            "required": [
+              "revoked_at"
+            ]
+          },
+          {
+            "required": [
+              "revocation_reason"
+            ]
+          },
+          {
+            "required": [
+              "ddl_epoch"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "status": {
+          "const": "CERTIFIED"
+        },
+        "subject": {
+          "properties": {
+            "assurance_kind": {
+              "const": "utc_semantics"
+            }
+          }
+        }
+      },
+      "required": [
+        "effective_from",
+        "expires_at",
+        "evidence_sha256"
+      ]
+    },
+    {
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "effective_from"
+            ]
+          },
+          {
+            "required": [
+              "expires_at"
+            ]
+          },
+          {
+            "required": [
+              "evidence_sha256"
+            ]
+          },
+          {
+            "required": [
+              "engine_acl_proof_sha256"
+            ]
+          },
+          {
+            "required": [
+              "engine_acl_proof_status"
+            ]
+          },
+          {
+            "required": [
+              "platform_allowlist_sha256"
+            ]
+          },
+          {
+            "required": [
+              "platform_allowlist_status"
+            ]
+          },
+          {
+            "required": [
+              "external_job_inventory_sha256"
+            ]
+          },
+          {
+            "required": [
+              "external_job_inventory_status"
+            ]
+          },
+          {
+            "required": [
+              "organizational_control_sha256"
+            ]
+          },
+          {
+            "required": [
+              "organizational_control_status"
+            ]
+          },
+          {
+            "required": [
+              "ddl_epoch"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "status": {
+          "const": "REVOKED"
+        }
+      },
+      "required": [
+        "revoked_receipt_sha256",
+        "revoked_at",
+        "revocation_reason"
+      ]
+    }
+  ],
+  "properties": {
+    "acl_policy_version": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "approver_attestation_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "approver_authority": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "approver_signature_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "ddl_epoch": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "effective_from": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "engine_acl_proof_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "engine_acl_proof_status": {
+      "const": "PASS"
+    },
+    "evidence_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "external_job_inventory_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "external_job_inventory_status": {
+      "const": "PASS"
+    },
+    "organizational_control_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "organizational_control_status": {
+      "const": "CERTIFIED"
+    },
+    "platform_allowlist_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "platform_allowlist_status": {
+      "const": "PASS"
+    },
+    "producer_version": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "revocation_reason": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "revoked_at": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "revoked_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "runtime_assurance_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "runtime_assurance_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-runtime-assurance-receipt.v1"
+    },
+    "status": {
+      "enum": [
+        "CERTIFIED",
+        "REVOKED"
+      ],
+      "type": "string"
+    },
+    "subject": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "assurance_kind": {
+              "const": "utc_semantics"
+            },
+            "subject_type": {
+              "const": "column"
+            }
+          },
+          "required": [
+            "column_name"
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "column_name"
+            ]
+          },
+          "properties": {
+            "assurance_kind": {
+              "enum": [
+                "writer_exclusivity",
+                "ddl_freeze"
+              ]
+            },
+            "subject_type": {
+              "const": "target"
+            }
+          }
+        }
+      ],
+      "properties": {
+        "assurance_kind": {
+          "enum": [
+            "writer_exclusivity",
+            "utc_semantics",
+            "ddl_freeze"
+          ],
+          "type": "string"
+        },
+        "column_name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "database": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "deployment_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "effective_key_template_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "environment": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "model_definition_proof_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "model_unique_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "mssql_control_database": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "mssql_control_schema": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "mssql_image_schema": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "mssql_target_authority_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "release_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "route_certification_receipt_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "scope_image_namespace_policy_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "sqlserver_lifecycle_policy_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "subject_type": {
+          "enum": [
+            "target",
+            "column"
+          ],
+          "type": "string"
+        },
+        "writable_schema_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "assurance_kind",
+        "database",
+        "deployment_id",
+        "effective_key_template_sha256",
+        "environment",
+        "model_definition_proof_sha256",
+        "model_unique_id",
+        "mssql_control_database",
+        "mssql_control_schema",
+        "mssql_image_schema",
+        "mssql_target_authority_id",
+        "release_id",
+        "route_certification_receipt_sha256",
+        "scope_image_namespace_policy_sha256",
+        "sqlserver_lifecycle_policy_sha256",
+        "subject_type",
+        "writable_schema_sha256"
+      ],
+      "type": "object"
+    },
+    "transformation_version": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "acl_policy_version",
+    "approver_attestation_sha256",
+    "approver_authority",
+    "approver_signature_sha256",
+    "producer_version",
+    "runtime_assurance_policy_sha256",
+    "runtime_assurance_receipt_sha256",
+    "schema",
+    "status",
+    "subject",
+    "transformation_version"
+  ],
+  "type": "object"
+}

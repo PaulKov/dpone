@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/route-attestation-policy.schema.json",
+  "title": "dpone GitOps route attestation policy",
+  "type": "object",
+  "required": [
+    "schema",
+    "backend",
+    "certificate_identity",
+    "certificate_oidc_issuer",
+    "trusted_root",
+    "cosign",
+    "allowed_environments",
+    "allowed_authorization_profiles",
+    "allowed_certification_profiles",
+    "minimum_certification_level",
+    "max_validity_seconds",
+    "clock_skew_seconds",
+    "revoked_attestation_ids",
+    "revoked_certificate_identities"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.route-attestation-policy.v1"
+    },
+    "backend": {
+      "const": "cosign_keyless_v1"
+    },
+    "certificate_identity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "certificate_oidc_issuer": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "trusted_root": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ]
+    },
+    "cosign": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minimum_version": {
+          "type": "string",
+          "pattern": "^3\\.[0-9]+\\.[0-9]+$"
+        },
+        "maximum_version_exclusive": {
+          "const": "4.0.0"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120
+        }
+      },
+      "required": [
+        "minimum_version",
+        "maximum_version_exclusive",
+        "timeout_seconds"
+      ]
+    },
+    "allowed_environments": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      },
+      "uniqueItems": true,
+      "minItems": 1,
+      "maxItems": 1024
+    },
+    "allowed_authorization_profiles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      },
+      "uniqueItems": true,
+      "minItems": 1,
+      "maxItems": 1024
+    },
+    "allowed_certification_profiles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      },
+      "uniqueItems": true,
+      "minItems": 1,
+      "maxItems": 1024
+    },
+    "minimum_certification_level": {
+      "const": "certified"
+    },
+    "max_validity_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 604800
+    },
+    "clock_skew_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3600
+    },
+    "revoked_attestation_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "uniqueItems": true,
+      "minItems": 0,
+      "maxItems": 1024
+    },
+    "revoked_certificate_identities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      },
+      "uniqueItems": true,
+      "minItems": 0,
+      "maxItems": 1024
+    }
+  }
+}

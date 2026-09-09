@@ -1,0 +1,198 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-CACHE-INTEGRITY"
+title: "Fail-closed Airflow cache promotion integrity"
+goal: "Prevent current-pointer promotion until the pinned release-set and every indexed DAG spec and workload pack pass local path, size, and SHA-256 verification."
+specification: "docs/feature-design-airflow-cache-promotion-integrity.md"
+base_commit: "d9ace7bd"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "A valid complete deployment projection promotes with the existing current-pointer contract."
+  - "Missing or mismatched release-set identity blocks promotion before current, pointer, or audit mutation."
+  - "The materializer recomputes the canonical release fingerprint and rejects a stale or malformed release_id."
+  - "Unsafe, unpinned, missing, oversized, or checksum-mismatched indexed artifacts block promotion with stable structured errors."
+  - "The release-set control file and artifact files cannot escape the pinned release directory through traversal or symlinks."
+  - "The verifier performs local filesystem reads only and never imports Airflow, Vault, Kubernetes, connectors, or remote clients."
+  - "CLI text remains topology-free while JSON preserves the precise structured error and path."
+  - "Local promotion write failures are structured and direct the operator to cache recovery instead of claiming no mutation."
+  - "Recovery detects missing or mismatched promotion audit state and an explicit recovery apply restores consistency."
+  - "Release artifacts declare exactly one traversal-free relative path through canonical path or the legacy artifact_ref alias."
+  - "Deployment identity is recomputed and every environment-specific deployment/index mirror field matches before promotion."
+  - "Concurrent guarded promotions serialize through one inter-process lock and exactly one stale-CAS contender succeeds."
+  - "Pointer/audit authorization is durable before current is atomically activated as the final commit point."
+  - "Recovery requires an allowed actor and reviewed active-state CAS, rejects healthy/stale state, and offers only fully validated candidates."
+  - "Promotion, recovery apply, and retention apply share one transaction lock so current cannot change between plan and mutation."
+  - "Safe sample execution reuses current only after pointer, audit, projection, release, and artifact integrity validation."
+  - "Immutable local sample releases are never repaired by overwriting content-addressed files in place."
+  - "Promotion activates a sealed snapshot, so late candidate mutation cannot change current after validation."
+  - "Current, pointer, and audit reads use no-follow I/O and current accepts only a canonical relative in-cache symlink."
+  - "Retention apply requires an allowed actor and deletes nothing while pointer and physical current state disagree."
+  - "Safe-sample preparation failure blocks execution instead of reusing an older verified current deployment."
+  - "Identical inline workload bytes produce the same gzip, pack, and release fingerprints across processes."
+  - "Unreadable current deployment files retain a canonical physical deployment identity for stale recovery CAS detection."
+  - "Current replacement and post-replace directory fsync failures report exact partial-mutation semantics and clean temporary entries."
+  - "Retention action rendering preserves every effective evidence protection as a deployment-id flag."
+  - "Retention delete candidates pass full deployment, index, release, and artifact validation under the transaction lock."
+  - "Candidate and pinned release mutation between initial validation and snapshot revalidation cannot activate mixed bytes."
+  - "Recovery and retention CLI actor/allowlist failures use the documented usage and safety exit codes."
+  - "Retention plan and apply reject malformed explicit protection ids with usage exit code 2 and delete nothing."
+  - "Pointer release identity must match the fully validated current projection before audit-only recovery or safe-sample use."
+  - "An existing activation is reused only when its complete regular-file tree matches the newly validated candidate."
+  - "Recovery is blocked when an existing current path has no canonical deployment identity for stale-plan CAS."
+  - "Artifact file opens are descriptor-anchored beneath cache root so an intermediate symlink swap cannot redirect I/O."
+  - "Unreadable activation subtrees fail closed and cannot be omitted from a successful sealed snapshot."
+  - "Every deployment_id in retention evidence is valid or the entire plan/apply fails before deletion."
+  - "Current symlink preparation failures report possible cache-artifact mutation without claiming recovery is required."
+  - "Cache and control identities use canonical lowercase sha256 text; uppercase identities fail before mutation."
+  - "Current pointer authorization fields are validated before recovery, retention, or safe-sample use."
+  - "Non-regular candidate entries such as FIFOs are opened nonblocking and rejected without holding the transaction indefinitely."
+  - "Retention validates every delete candidate before mutation and reports partial deletion details on filesystem failure."
+  - "Recovery and retention diagnostics remain schema-valid when pointer or directory identities are malformed."
+  - "A later retention candidate validation failure deletes no earlier candidate."
+  - "The serialized release-set identity is canonical lowercase; an uppercase release_id fails before activation."
+  - "Retention text reports unidentified quarantine entries as NEEDS_ATTENTION with a stable error code."
+  - "Retention schemas reject null deployment identities for protect, delete, and deleted actions."
+  - "Domain prevalidation failures preserve their cause code and report no mutation or completed deletion ids."
+  - "Retention fully validates active current before classifying or deleting another deployment."
+  - "The Airflow provider rejects noncanonical uppercase deployment-index identities in parity with the public schema."
+
+public_contract_impact:
+  level: breaking
+  surfaces:
+    - "dpone airflow cache-sync"
+    - "DeploymentCacheMaterializer.promote"
+    - "dpone.error.v1 cache-sync errors"
+    - "cache-sync pinned release prerequisite with dpone.release-set.v1 artifact_ref compatibility"
+    - "dpone airflow cache-recovery-apply actor and active-state CAS requirements"
+    - "DeploymentCacheMaterializer deployment identity, locking, and ordered activation"
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/runtime/deployment_cache_integrity.py"
+  - "src/dpone/runtime/deployment_cache_activation.py"
+  - "src/dpone/runtime/deployment_cache_artifact_verifier.py"
+  - "src/dpone/runtime/deployment_cache_common.py"
+  - "src/dpone/runtime/deployment_cache_current_state.py"
+  - "src/dpone/runtime/deployment_cache_commit.py"
+  - "src/dpone/runtime/deployment_cache_materializer.py"
+  - "src/dpone/runtime/deployment_cache_models.py"
+  - "src/dpone/runtime/deployment_cache_projection_validator.py"
+  - "src/dpone/runtime/deployment_cache_audit.py"
+  - "src/dpone/runtime/deployment_cache_recovery.py"
+  - "src/dpone/runtime/deployment_cache_recovery_models.py"
+  - "src/dpone/runtime/deployment_cache_recovery_policy.py"
+  - "src/dpone/runtime/deployment_cache.py"
+  - "src/dpone/runtime/deployment_cache_retention_contracts.py"
+  - "src/dpone/runtime/immutable_local_release.py"
+  - "src/dpone/contracts/airflow_release_artifacts.py"
+  - "src/dpone/contracts/airflow_deployment.py"
+  - "src/dpone/contracts/airflow_deployment_projection.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index.py"
+  - "src/dpone/commands/airflow_cache_sync_rendering.py"
+  - "src/dpone/commands/airflow_build_rendering.py"
+  - "src/dpone/readiness/airflow_self_service_cache_sync.py"
+  - "src/dpone/readiness/airflow_self_service_cache.py"
+  - "src/dpone/readiness/airflow_cache_retention.py"
+  - "src/dpone/readiness/airflow_self_service.py"
+  - "src/dpone/readiness/airflow_cache_recovery.py"
+  - "src/dpone/commands/airflow_cache_recovery_rendering.py"
+  - "src/dpone/readiness/airflow_deployment_projection.py"
+  - "src/dpone/readiness/airflow_verified_current_deployment.py"
+  - "src/dpone/readiness/airflow_local_safe_sample_deployment.py"
+  - "src/dpone/readiness/airflow_local_release.py"
+  - "src/dpone/gitops/airflow_compact_pack_bootstrap.py"
+  - "src/dpone/services/safe_sample_execution_plan.py"
+  - "src/dpone/commands/run_cmd.py"
+  - "src/dpone/commands/run_output.py"
+  - "src/dpone/commands/run_safe_sample_cmd.py"
+  - "src/dpone/commands/airflow_self_service_cmd.py"
+  - "src/dpone/commands/airflow_self_service_output.py"
+  - "src/dpone/commands/airflow_cache_recovery_cmd.py"
+  - "src/dpone/commands/airflow_cache_retention_cmd.py"
+  - "src/dpone/commands/airflow_cache_retention_rendering.py"
+  - "src/dpone/gitops/schema_release_deployment_contracts.py"
+  - "src/dpone/gitops/schema_deployment_cache_contracts.py"
+  - "src/dpone/gitops/schema_airflow_preflight_contracts.py"
+  - "tests/test_airflow_cache_materializer.py"
+  - "tests/test_airflow_cache_promotion_integrity.py"
+  - "tests/test_airflow_deployment_index_provider.py"
+  - "tests/test_airflow_environment_deployment_projection.py"
+  - "tests/test_airflow_self_service_cli.py"
+  - "tests/test_airflow_safe_sample_execution_plan.py"
+  - "tests/test_gitops_schema_contracts.py"
+  - "test_artifacts/airflow-cache-promotion-integrity/validation-report.md"
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/architecture.md"
+  - "docs/feature-design-airflow-cache-promotion-integrity.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "docs/airflow-cache-sync.md"
+  - "docs/errors/DPONE_CACHE_CHECKSUM_MISMATCH.md"
+  - "docs/schemas/gitops/release-set.schema.json"
+  - "docs/schemas/gitops/deployment-set.schema.json"
+  - "docs/schemas/gitops/current-pointer.schema.json"
+  - "docs/schemas/gitops/airflow-deployment-index.schema.json"
+  - "docs/schemas/gitops/airflow-operator-diagnostics.schema.json"
+  - "docs/schemas/gitops/deployment-cache-recovery-plan.schema.json"
+  - "docs/schemas/gitops/deployment-cache-recovery-apply.schema.json"
+  - "docs/schemas/gitops/deployment-cache-retention-plan.schema.json"
+  - "docs/schemas/gitops/deployment-cache-retention-apply.schema.json"
+  - "docs/cli-reference.md"
+  - "docs/reference/gitops-schema-catalog.md"
+  - "docs/quality-metrics.md"
+  - "docs/compatibility.md"
+  - "docs/airflow-pack-provider.md"
+  - "docs/adr/0009-artifact-delivery-and-cache-materializer.md"
+  - "docs/adr/0011-canonical-fingerprints.md"
+  - "test_artifacts/agent-policy/2026-07-13-airflow-cache-promotion-integrity.yml"
+read_only_paths:
+  - "src/dpone/runtime/artifact_delivery.py"
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "integrator"
+integrator_owned_shared_paths:
+  - CHANGELOG.md
+  - mkdocs.yml
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_cache_materializer.py tests/test_airflow_cache_promotion_integrity.py -q"
+  broad:
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - "test_artifacts/airflow-cache-promotion-integrity/validation-report.md"
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

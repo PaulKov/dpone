@@ -1,0 +1,76 @@
+schema_version: 1
+task_id: "DPONE-RELEASE-COMMIT-GATE"
+title: "Require successful live GitHub checks for the exact release commit"
+goal: "Provide a bounded fail-closed release preflight that proves the exact commit satisfies the live required-check policy."
+specification: "docs/release.md"
+base_commit: "ef88ae7f"
+integrator: "Codex main agent"
+
+acceptance_criteria:
+  - "The tool fetches required contexts from the configured live GitHub ruleset, not only the checked-in desired list."
+  - "It evaluates check runs and commit statuses for one exact commit SHA."
+  - "Missing, pending, failed, cancelled, skipped, neutral, stale, or API-unavailable evidence is non-success."
+  - "Duplicate observations cannot hide a newer or unsuccessful required context."
+  - "The tool supports bounded polling and emits a credential-free JSON report with stable blocker codes."
+  - "Exit code is zero only when every live required context is successful for the exact commit."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "release verification tooling and evidence"
+  migration_required: false
+
+owned_paths:
+  - tools/agent_policy/release_commit_gate.py
+  - tests/agent_policy/test_release_commit_gate.py
+read_only_paths:
+  - tools/agent_policy/pr_receipt_github.py
+  - tools/agent_policy/pr_receipt_github_api.py
+  - tools/agent_policy/pr_receipt_github_validation.py
+  - .agents/policy/github-branch-protection.yml
+  - .github/workflows/release.yml
+  - docs/release.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs
+  - packages
+  - src
+  - tests/conftest.py
+
+shared_file_owner: "Codex main agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - ".venv/bin/pytest tests/agent_policy/test_release_commit_gate.py -q"
+    - ".venv/bin/ruff check tools/agent_policy/release_commit_gate.py tests/agent_policy/test_release_commit_gate.py"
+    - ".venv/bin/mypy --config-file mypy.ini tools/agent_policy/release_commit_gate.py"
+  broad:
+    - ".venv/bin/pytest tests/agent_policy -q"
+  live:
+    - "UNVERIFIED unless executed with approved GitHub token against the frozen release commit"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-audit-archive-verification.schema.json",
+  "title": "Data Product Audit Archive Verification",
+  "type": "object",
+  "required": ["schema_version", "status", "audit_archive_verification_id", "audit_archive_run_id", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_audit_archive_verification.v1"},
+    "status": {"enum": ["verified", "warning", "blocked"]},
+    "audit_archive_verification_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "audit_archive_run_id": {"type": ["string", "null"]},
+    "archive_uri": {"type": ["string", "null"]},
+    "artifact_count": {"type": "integer"},
+    "artifacts": {"type": "array", "items": {"type": "object"}},
+    "merkle_root": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

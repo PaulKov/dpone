@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/agent-policy/ci-shadow-reconciliation-capacity-v2.json",
+  "title": "CI shadow reconciliation read-only capacity evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schema",
+    "decision",
+    "code",
+    "complete",
+    "source",
+    "execution_configuration",
+    "policy_sha256",
+    "observation_bundle_sha256",
+    "observation_bundle_manifest",
+    "interval",
+    "evidence_observed_through",
+    "calibration_observed_at",
+    "valid_until",
+    "two_observations_match",
+    "limits_crossed",
+    "counters",
+    "hard_maxima",
+    "approval_thresholds",
+    "within_thresholds",
+    "counter_semantics",
+    "wall_time_scope"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "schema": {"const": "dpone.ci-shadow-reconciliation-capacity.v2"},
+    "decision": {"const": "UNVERIFIED"},
+    "code": {"enum": ["RECONCILIATION_CAPACITY_CALIBRATION_ONLY", "RECONCILIATION_PR4C_IMPLEMENTATION_BLOCKED"]},
+    "complete": {"type": "boolean"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_id",
+        "workflow_id",
+        "workflow_path",
+        "event",
+        "ref",
+        "workflow_sha",
+        "run_id",
+        "run_attempt"
+      ],
+      "properties": {
+        "repository_id": {"type": "integer", "minimum": 1},
+        "workflow_id": {"type": "integer", "minimum": 1},
+        "workflow_path": {"const": ".github/workflows/pr-gate-shadow-capacity.yml"},
+        "event": {"const": "workflow_dispatch"},
+        "ref": {"const": "refs/heads/master"},
+        "workflow_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "run_id": {"type": "integer", "minimum": 1},
+        "run_attempt": {"type": "integer", "minimum": 1}
+      }
+    },
+    "execution_configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runner_label", "runner_arch", "python_version"],
+      "properties": {
+        "runner_label": {"type": "string", "minLength": 1},
+        "runner_arch": {"type": "string", "minLength": 1},
+        "python_version": {"type": "string", "minLength": 1}
+      }
+    },
+    "policy_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "observation_bundle_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "observation_bundle_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "domain", "manifest_sha256", "entries"],
+      "properties": {
+        "schema": {"const": "dpone.ci-shadow-reconciliation-observation-bundle.v1"},
+        "domain": {"const": "dpone.ci-shadow-reconciliation-observation-bundle.v1"},
+        "manifest_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "entries": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "mode", "blob_sha256"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024,
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000]+$"
+              },
+              "mode": {"enum": ["100644", "100755"]},
+              "blob_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+            }
+          }
+        }
+      }
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scan_from", "safe_scan_through", "observation_started_at"],
+      "properties": {
+        "scan_from": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+        "safe_scan_through": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+        "observation_started_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"}
+      }
+    },
+    "evidence_observed_through": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+    "calibration_observed_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+    "valid_until": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+    "two_observations_match": {"type": "boolean"},
+    "limits_crossed": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": ["total_http_requests", "total_response_body_bytes", "execution_wall_seconds"]
+      }
+    },
+    "counters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "producer_runs",
+        "producer_attempts",
+        "auditor_runs",
+        "producer_list_page_requests",
+        "auditor_list_page_requests",
+        "exact_producer_run_requests",
+        "attempt_run_requests",
+        "jobs_page_requests",
+        "artifact_metadata_requests",
+        "artifact_download_requests",
+        "redirect_requests",
+        "git_object_requests",
+        "pull_request_identity_requests",
+        "polling_requests",
+        "retry_requests",
+        "api_response_body_bytes",
+        "artifact_download_body_bytes",
+        "total_response_body_bytes",
+        "total_http_requests",
+        "execution_wall_seconds"
+      ],
+      "properties": {
+        "producer_runs": {"type": "integer", "minimum": 0},
+        "producer_attempts": {"type": "integer", "minimum": 0},
+        "auditor_runs": {"type": "integer", "minimum": 0},
+        "producer_list_page_requests": {"type": "integer", "minimum": 0},
+        "auditor_list_page_requests": {"type": "integer", "minimum": 0},
+        "exact_producer_run_requests": {"type": "integer", "minimum": 0},
+        "attempt_run_requests": {"type": "integer", "minimum": 0},
+        "jobs_page_requests": {"type": "integer", "minimum": 0},
+        "artifact_metadata_requests": {"type": "integer", "minimum": 0},
+        "artifact_download_requests": {"type": "integer", "minimum": 0},
+        "redirect_requests": {"type": "integer", "minimum": 0},
+        "git_object_requests": {"type": "integer", "minimum": 0},
+        "pull_request_identity_requests": {"type": "integer", "minimum": 0},
+        "polling_requests": {"type": "integer", "minimum": 0},
+        "retry_requests": {"type": "integer", "minimum": 0},
+        "api_response_body_bytes": {"type": "integer", "minimum": 0},
+        "artifact_download_body_bytes": {"type": "integer", "minimum": 0},
+        "total_response_body_bytes": {"type": "integer", "minimum": 0, "maximum": 134217728},
+        "total_http_requests": {"type": "integer", "minimum": 0, "maximum": 3000},
+        "execution_wall_seconds": {"type": "number", "minimum": 0, "maximum": 900}
+      }
+    },
+    "hard_maxima": {
+      "const": {
+        "total_http_requests": 3000,
+        "total_response_body_bytes": 134217728,
+        "execution_wall_seconds": 900
+      }
+    },
+    "approval_thresholds": {
+      "const": {
+        "total_http_requests": 1500,
+        "total_response_body_bytes": 67108864,
+        "execution_wall_seconds": 450
+      }
+    },
+    "within_thresholds": {"type": "boolean"},
+    "counter_semantics": {
+      "const": "exact below limits; saturating lower bounds at a crossed hard limit; retry_requests is a subset and is not added to total_http_requests"
+    },
+    "wall_time_scope": {
+      "const": "injected monotonic seconds from immediately before first provider dispatch through final observation evaluation; each dispatch timeout is min(adapter timeout, remaining wall budget)"
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"limits_crossed": {"contains": {"const": "total_http_requests"}}}},
+      "then": {"properties": {"counters": {"properties": {"total_http_requests": {"const": 3000}}}}}
+    },
+    {
+      "if": {"properties": {"limits_crossed": {"contains": {"const": "total_response_body_bytes"}}}},
+      "then": {"properties": {"counters": {"properties": {"total_response_body_bytes": {"const": 134217728}}}}}
+    },
+    {
+      "if": {"properties": {"limits_crossed": {"contains": {"const": "execution_wall_seconds"}}}},
+      "then": {"properties": {"counters": {"properties": {"execution_wall_seconds": {"const": 900}}}}}
+    },
+    {
+      "if": {
+        "properties": {
+          "complete": {"const": true},
+          "two_observations_match": {"const": true},
+          "limits_crossed": {"maxItems": 0},
+          "within_thresholds": {"const": true}
+        }
+      },
+      "then": {
+        "properties": {
+          "code": {"const": "RECONCILIATION_CAPACITY_CALIBRATION_ONLY"},
+          "counters": {
+            "properties": {
+              "total_http_requests": {"maximum": 1500},
+              "total_response_body_bytes": {"maximum": 67108864},
+              "execution_wall_seconds": {"maximum": 450}
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "code": {"const": "RECONCILIATION_PR4C_IMPLEMENTATION_BLOCKED"}
+        }
+      }
+    }
+  ]
+}

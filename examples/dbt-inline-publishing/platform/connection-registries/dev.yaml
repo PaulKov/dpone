@@ -1,0 +1,24 @@
+schema: dpone.connection-registry.v1
+environment: dev
+connections:
+  mssql_dwh_stage:
+    type: mssql
+    connection:
+      asset_authority:
+        host: mssql.internal
+        port: 1433
+      host: mssql.internal
+      port: 1433
+      database: DWH_Stage
+    credentials:
+      resolver: airflow_connection
+      connection_id: mssql_dwh_stage
+  clickhouse_dwh_dev:
+    type: clickhouse
+    connection:
+      host: clickhouse.internal
+      port: 9000
+      database: analytics
+    credentials:
+      resolver: airflow_connection
+      connection_id: clickhouse_dwh_dev

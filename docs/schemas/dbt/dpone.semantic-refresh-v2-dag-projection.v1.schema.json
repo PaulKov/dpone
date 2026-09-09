@@ -1,0 +1,89 @@
+{
+  "$comment": "The optional Airflow pack recomputes dag_projection_sha256 and validates the exact nested template, plan, topology, operation and task closures before DAG materialization.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-v2-dag-projection.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "dag_projection_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "operation_ids_by_model": {
+      "additionalProperties": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minProperties": 1,
+      "type": "object"
+    },
+    "package_artifacts_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "plan_bundle": {
+      "minProperties": 1,
+      "type": "object"
+    },
+    "plan_bundle_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "pre_release_bundle_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-v2-dag-projection.v1"
+    },
+    "task_projection": {
+      "minProperties": 1,
+      "type": "object"
+    },
+    "template_pack": {
+      "minProperties": 1,
+      "type": "object"
+    },
+    "template_pack_fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "topology": {
+      "minProperties": 1,
+      "type": "object"
+    },
+    "topology_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "dag_projection_sha256",
+    "deployment_id",
+    "operation_ids_by_model",
+    "package_artifacts_sha256",
+    "plan_bundle",
+    "plan_bundle_sha256",
+    "pre_release_bundle_sha256",
+    "release_id",
+    "schema",
+    "task_projection",
+    "template_pack",
+    "template_pack_fingerprint",
+    "topology",
+    "topology_sha256",
+    "workflow_plan_sha256"
+  ],
+  "type": "object"
+}

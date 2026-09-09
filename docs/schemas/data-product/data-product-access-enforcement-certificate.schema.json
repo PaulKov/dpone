@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-access-enforcement-certificate.schema.json",
+  "title": "Data Product Access Enforcement Certificate",
+  "type": "object",
+  "required": ["schema_version", "status", "access_enforcement_certificate_id", "access_enforcement_run_id", "access_drift_report_id", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_access_enforcement_certificate.v1"},
+    "status": {"enum": ["certified", "warning", "blocked"]},
+    "access_enforcement_certificate_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "profile": {"type": "string"},
+    "access_enforcement_run_id": {"type": ["string", "null"]},
+    "access_drift_report_id": {"type": ["string", "null"]},
+    "plan_id": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

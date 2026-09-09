@@ -1,0 +1,112 @@
+{
+  "dpone.semantic-refresh-clickhouse-failed-scratch-cleanup-receipt.v1": {
+    "attempt_binding_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "fencing_epoch": 7,
+    "operation_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "operation_plan_sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "relations": [
+      {
+        "expected_uuid": "0298f11c-6956-74f2-984b-4cfcb1653b87",
+        "kind": "shadow",
+        "name": "events__shadow_failed",
+        "observed_uuid": null
+      },
+      {
+        "expected_uuid": "0398f11c-6956-74f2-984b-4cfcb1653b87",
+        "kind": "staging",
+        "name": "events__staging_failed",
+        "observed_uuid": null
+      }
+    ],
+    "schema": "dpone.semantic-refresh-clickhouse-failed-scratch-cleanup-receipt.v1",
+    "scratch_absence_evidence_sha256": "sha256:eb9081b7a9dc063d02982db400f1c888b85d7592e9b350280976e0da7760730a",
+    "target_uuid": "0198f11c-6956-74f2-984b-4cfcb1653b87",
+    "workflow_execution_binding_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "workflow_execution_id": "scheduled__2026-08-07T00:00:00+00:00"
+  },
+  "dpone.semantic-refresh-mssql-failed-precommit-cleanup-ack.v1": {
+    "cleanup_receipt_sha256": "sha256:92b1fb81fcd1ca08bbafe130cc86989ebd16f9174b6ca8a0e093c5c46b29a3a1",
+    "resource_allocation_closure": {
+      "allocations": [
+        {
+          "allocation_id": "sha256:3033667262d062c97222ae14b3b88d6ba9343ae8fe089eaac5212d03783d8f1d",
+          "amount": 1,
+          "operation_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reservation_id": "reservation-cleanup-1",
+          "resource_kind": "clickhouse_staging_bytes",
+          "status": "RELEASED",
+          "workflow_execution_binding_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "allocation_id": "sha256:f759ee4084cf5ba090d87974761546130408b33269ae8ace679aa7739fa67cb2",
+          "amount": 2,
+          "operation_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reservation_id": "reservation-cleanup-1",
+          "resource_kind": "prepared_models",
+          "status": "RELEASED",
+          "workflow_execution_binding_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "allocation_id": "sha256:ee5e719e14298b5bf0cc2aeb7fe33a71d42e8ceb00ed114cb78ea90147b293fa",
+          "amount": 3,
+          "operation_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reservation_id": "reservation-cleanup-1",
+          "resource_kind": "retained_generation_bytes",
+          "status": "RELEASED",
+          "workflow_execution_binding_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "allocation_id": "sha256:fc52a67601ac107d48d06b9251e62fc894fb532c83d25aceae2d8b7f064e8970",
+          "amount": 4,
+          "operation_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reservation_id": "reservation-cleanup-1",
+          "resource_kind": "sealed_extract_bytes",
+          "status": "RELEASED",
+          "workflow_execution_binding_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "allocation_id": "sha256:66a60514ea09943662a66066f0953be1d74d17c2732d941d12e5ce7b8b74598b",
+          "amount": 5,
+          "operation_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reservation_id": "reservation-cleanup-1",
+          "resource_kind": "shadow_bytes",
+          "status": "RELEASED",
+          "workflow_execution_binding_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "operation_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reservation_id": "reservation-cleanup-1",
+      "schema": "dpone.semantic-refresh-mssql-resource-allocation-closure.v1",
+      "workflow_execution_binding_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "resource_allocation_closure_sha256": "sha256:0bbdc9465fed3ec9a74e0d5546239a92c3a295870f1f958df9b07054f7df7957",
+    "schema": "dpone.semantic-refresh-mssql-failed-precommit-cleanup-ack.v1",
+    "scratch_absence_evidence": {
+      "attempt_binding_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "fencing_epoch": 7,
+      "operation_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "operation_plan_sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "relations": [
+        {
+          "expected_uuid": "0298f11c-6956-74f2-984b-4cfcb1653b87",
+          "kind": "shadow",
+          "name": "events__shadow_failed",
+          "observed_uuid": null
+        },
+        {
+          "expected_uuid": "0398f11c-6956-74f2-984b-4cfcb1653b87",
+          "kind": "staging",
+          "name": "events__staging_failed",
+          "observed_uuid": null
+        }
+      ],
+      "schema": "dpone.semantic-refresh-clickhouse-failed-scratch-cleanup-receipt.v1",
+      "scratch_absence_evidence_sha256": "sha256:eb9081b7a9dc063d02982db400f1c888b85d7592e9b350280976e0da7760730a",
+      "target_uuid": "0198f11c-6956-74f2-984b-4cfcb1653b87",
+      "workflow_execution_binding_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "workflow_execution_id": "scheduled__2026-08-07T00:00:00+00:00"
+    },
+    "scratch_absence_evidence_sha256": "sha256:eb9081b7a9dc063d02982db400f1c888b85d7592e9b350280976e0da7760730a",
+    "status": "COMPLETE"
+  }
+}

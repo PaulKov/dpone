@@ -1,0 +1,103 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-desired-state-fetch.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "deployment_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "desired_state_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "status": {
+          "const": "fetched"
+        }
+      }
+    },
+    {
+      "properties": {
+        "deployment_id": {
+          "type": "null"
+        },
+        "desired_state_sha256": {
+          "type": "null"
+        },
+        "status": {
+          "const": "unchanged"
+        }
+      }
+    }
+  ],
+  "properties": {
+    "deployment_id": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "desired_state_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "environment": {
+      "not": {
+        "enum": [
+          "current",
+          "latest"
+        ]
+      },
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$",
+      "type": "string"
+    },
+    "observed_revision": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "type": "string"
+    },
+    "output_path": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "type": "string"
+    },
+    "passed": {
+      "const": true
+    },
+    "schema": {
+      "const": "dpone.airflow-desired-state-fetch.v1"
+    },
+    "status": {
+      "enum": [
+        "fetched",
+        "unchanged"
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "status",
+    "environment",
+    "observed_revision",
+    "desired_state_sha256",
+    "deployment_id",
+    "output_path"
+  ],
+  "title": "dpone GitOps Airflow desired-state fetch evidence",
+  "type": "object"
+}

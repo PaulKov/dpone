@@ -1,0 +1,515 @@
+{
+  "debt": {
+    "src/dpone/commands/airflow_desired_state_publish_cmd.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 399,
+      "max_sloc": 354,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/commands/airflow_self_service_cmd.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 395,
+      "max_sloc": 357,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/commands/airflow_self_service_rendering.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 449,
+      "max_sloc": 384,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/commands/dbt_promotion_cmd.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 427,
+      "max_sloc": 392,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/commands/dbt_publish_cmd.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 383,
+      "max_sloc": 354,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/commands/init_parser.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 389,
+      "max_sloc": 358,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/commands/run_safe_sample_cmd.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 387,
+      "max_sloc": 359,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/contracts/dbt_sqlserver_graph_policy.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 409,
+      "max_sloc": 372,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/contracts/dbt_sqlserver_graph_rules.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 424,
+      "max_sloc": 378,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/contracts/dbt_sqlserver_macro_authority.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 410,
+      "max_sloc": 364,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/gitops/airflow_asset_cross_dag.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 416,
+      "max_sloc": 354,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/gitops/airflow_compact_pack.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 377,
+      "max_sloc": 356,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/gitops/airflow_connection_bridge_plan.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 426,
+      "max_sloc": 376,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/gitops/airflow_dag_spec.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 434,
+      "max_sloc": 373,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/gitops/schema_airflow_runtime_init_fetch_contracts.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 403,
+      "max_sloc": 364,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/gitops/schema_deployment_cache_contracts.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 396,
+      "max_sloc": 367,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/gitops/schema_validation.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 401,
+      "max_sloc": 355,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/governance/quality.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 399,
+      "max_sloc": 352,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/manifest/authoring.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 419,
+      "max_sloc": 385,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/manifest/authoring_migration_io.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 394,
+      "max_sloc": 352,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/manifest/confined_mutations.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 443,
+      "max_sloc": 387,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/manifest/selection_models.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 419,
+      "max_sloc": 351,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/ops/evidence_chain.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 412,
+      "max_sloc": 374,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/readiness/airflow_artifact_delivery.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 396,
+      "max_sloc": 363,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/readiness/airflow_authoring_check_service.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 401,
+      "max_sloc": 363,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/readiness/airflow_pipeline_scaffold.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 375,
+      "max_sloc": 356,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/readiness/airflow_self_service_application.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 403,
+      "max_sloc": 376,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/readiness/capability_discovery_service.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 393,
+      "max_sloc": 358,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/readiness/project_selection_preview.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 403,
+      "max_sloc": 374,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/airflow_artifact_publication.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 388,
+      "max_sloc": 358,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/credentials/binding_resolver.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 429,
+      "max_sloc": 373,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/dbt_project_bundle_source.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 396,
+      "max_sloc": 356,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/deployment_cache_retention_applier.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 400,
+      "max_sloc": 388,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/deployment_cache_retention_transaction.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 409,
+      "max_sloc": 384,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/governance/finalization.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 387,
+      "max_sloc": 368,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/governance/legacy_acceptance.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 391,
+      "max_sloc": 369,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/native_transfer.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 422,
+      "max_sloc": 372,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/normalization/row_emitter.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 396,
+      "max_sloc": 379,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/runtime_init_fetch_ready.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 421,
+      "max_sloc": 375,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/runtime_payload_archive.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 409,
+      "max_sloc": 361,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/runtime/sources/strategies/mssql/mssql_columnar_provider.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 393,
+      "max_sloc": 367,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/security_redaction.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 446,
+      "max_sloc": 394,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/services/airflow_desired_state.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 409,
+      "max_sloc": 383,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/services/airflow_desired_state_control.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 400,
+      "max_sloc": 366,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/services/airflow_desired_state_reconcile.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 384,
+      "max_sloc": 353,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/services/airflow_runtime_pod_retention.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 383,
+      "max_sloc": 357,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/services/dbt_dev_evidence_bundle.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 393,
+      "max_sloc": 368,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/services/readiness.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 394,
+      "max_sloc": 364,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/services/safe_sample_policy.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 449,
+      "max_sloc": 382,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/services/schema_type_matrix.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 423,
+      "max_sloc": 393,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    },
+    "src/dpone/type_system/source_sink/profiles.py": {
+      "accepted_adr": null,
+      "baseline_commit": "e1d93822b47234e940829319cac0dc9678f6906c",
+      "max_lines": 408,
+      "max_sloc": 352,
+      "owner": "architecture",
+      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
+      "target_date": "2026-12-31",
+      "target_sloc": 350
+    }
+  },
+  "schema_version": 2
+}

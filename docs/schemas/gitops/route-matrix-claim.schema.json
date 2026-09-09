@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/route-matrix-claim.schema.json",
+  "title": "dpone GitOps content-bound route matrix claim",
+  "type": "object",
+  "required": [
+    "schema",
+    "release_id",
+    "source_commit",
+    "certified_at",
+    "route"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.route-matrix-claim.v1"
+    },
+    "release_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "certified_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "route": {
+      "type": "object",
+      "required": [
+        "route_id",
+        "source",
+        "sink",
+        "strategy",
+        "transport",
+        "schema_evolution",
+        "airflow_runtime_mode",
+        "sampling_mode"
+      ],
+      "properties": {
+        "route_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "sink": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "strategy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "transport": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "schema_evolution": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "airflow_runtime_mode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "sampling_mode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

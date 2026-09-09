@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/github-governance-policy-v2.json",
+  "title": "dpone GitHub governance policy v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "github_api_version", "branch_governance", "release_trust"],
+  "properties": {
+    "schema": { "const": "dpone.github-governance-policy.v2" },
+    "schema_version": { "const": 2 },
+    "github_api_version": { "type": "string", "minLength": 1 },
+    "branch_governance": { "$ref": "#/$defs/branchGovernance" },
+    "release_trust": { "$ref": "#/$defs/releaseTrust" }
+  },
+  "$defs": {
+    "positiveInt": { "type": "integer", "minimum": 1 },
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "workflow_path", "workflow_id"],
+      "properties": {
+        "kind": { "const": "github_actions_workflow" },
+        "workflow_path": { "$ref": "#/$defs/nonEmptyString" },
+        "workflow_id": { "$ref": "#/$defs/positiveInt" }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context", "integration_id", "producer"],
+      "properties": {
+        "context": { "$ref": "#/$defs/nonEmptyString" },
+        "integration_id": { "$ref": "#/$defs/positiveInt" },
+        "producer": { "$ref": "#/$defs/producer" }
+      }
+    },
+    "bypassActor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actor_id", "actor_type", "bypass_mode"],
+      "properties": {
+        "actor_id": { "$ref": "#/$defs/positiveInt" },
+        "actor_type": { "$ref": "#/$defs/nonEmptyString" },
+        "bypass_mode": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["include", "exclude"],
+      "properties": {
+        "include": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonEmptyString" },
+          "uniqueItems": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonEmptyString" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "branchRuleset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "version_id", "name", "target", "source_type", "source", "enforcement",
+        "conditions", "bypass_actors", "pull_request", "required_status_checks", "protected_actions"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/positiveInt" },
+        "version_id": { "$ref": "#/$defs/positiveInt" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "target": { "const": "branch" },
+        "source_type": { "$ref": "#/$defs/nonEmptyString" },
+        "source": { "$ref": "#/$defs/nonEmptyString" },
+        "enforcement": { "const": "active" },
+        "conditions": { "$ref": "#/$defs/conditions" },
+        "bypass_actors": { "type": "array", "items": { "$ref": "#/$defs/bypassActor" } },
+        "pull_request": { "type": "object" },
+        "required_status_checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["strict", "checks"],
+          "properties": {
+            "strict": { "type": "boolean" },
+            "checks": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/check" }
+            }
+          }
+        },
+        "protected_actions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["block_deletion", "block_force_push"],
+          "properties": {
+            "block_deletion": { "type": "boolean" },
+            "block_force_push": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "tagRuleset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "version_id", "name", "target", "source_type", "source", "enforcement",
+        "conditions", "bypass_actors", "protected_actions"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/positiveInt" },
+        "version_id": { "$ref": "#/$defs/positiveInt" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "target": { "const": "tag" },
+        "source_type": { "$ref": "#/$defs/nonEmptyString" },
+        "source": { "$ref": "#/$defs/nonEmptyString" },
+        "enforcement": { "const": "active" },
+        "conditions": { "$ref": "#/$defs/conditions" },
+        "bypass_actors": { "type": "array", "items": { "$ref": "#/$defs/bypassActor" } },
+        "protected_actions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["block_update", "block_deletion"],
+          "properties": {
+            "block_update": { "type": "boolean" },
+            "block_deletion": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "branchGovernance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "last_reviewed", "mode", "purpose", "ruleset", "owner_attestation"],
+      "properties": {
+        "owner": { "$ref": "#/$defs/nonEmptyString" },
+        "last_reviewed": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "mode": { "enum": ["solo_maintainer", "multi_reviewer"] },
+        "purpose": { "$ref": "#/$defs/nonEmptyString" },
+        "ruleset": { "$ref": "#/$defs/branchRuleset" },
+        "owner_attestation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required_when_no_independent_reviewer", "evidence_required"],
+          "properties": {
+            "required_when_no_independent_reviewer": { "type": "boolean" },
+            "evidence_required": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/nonEmptyString" }
+            }
+          }
+        }
+      }
+    },
+    "releaseTrust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository", "tag_ruleset", "trusted_controller", "immutable_releases",
+        "publication_control", "pypi", "evidence"
+      ],
+      "properties": {
+        "repository": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name_with_owner", "repository_id", "canonical_remote_url",
+            "protected_base_ref", "candidate_workflow_path"
+          ],
+          "properties": {
+            "name_with_owner": { "$ref": "#/$defs/nonEmptyString" },
+            "repository_id": { "$ref": "#/$defs/positiveInt" },
+            "canonical_remote_url": { "$ref": "#/$defs/nonEmptyString" },
+            "protected_base_ref": { "$ref": "#/$defs/nonEmptyString" },
+            "candidate_workflow_path": { "$ref": "#/$defs/nonEmptyString" }
+          }
+        },
+        "tag_ruleset": { "$ref": "#/$defs/tagRuleset" },
+        "trusted_controller": { "type": "object" },
+        "immutable_releases": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required"],
+          "properties": { "required": { "const": true } }
+        },
+        "publication_control": { "type": "object" },
+        "pypi": { "type": "object" },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "store_id", "pre_mutation_retention_days",
+            "external_commit_retention_days", "incident_hold_supported"
+          ],
+          "properties": {
+            "store_id": { "$ref": "#/$defs/nonEmptyString" },
+            "pre_mutation_retention_days": { "type": "integer", "minimum": 1 },
+            "external_commit_retention_days": { "type": "integer", "minimum": 1 },
+            "incident_hold_supported": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  }
+}

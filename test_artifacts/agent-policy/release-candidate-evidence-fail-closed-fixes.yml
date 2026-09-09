@@ -1,0 +1,120 @@
+schema_version: 1
+task_id: "DPONE-RELEASE-CANDIDATE-EVIDENCE-CUTOFF-FAIL-CLOSED"
+title: "Close release-candidate publication-cutoff false positives"
+goal: >-
+  Preserve exact-SHA release evidence authority by rejecting terminal provider
+  timestamps that are equal to the publication cutoff while retaining the
+  inherited exact 237-case matrix contract from merged master.
+specification: "docs/feature-design-release-candidate-evidence-gate.md"
+base_commit: "151140230364a40df095bd30bb356cd53b36b691"
+integrator: "/root"
+
+acceptance_criteria:
+  - "A candidate run updated_at, terminal check completed_at, or authority artifact created_at equal to the earliest paired publication created_at fails closed as ambiguous; only terminal timestamps strictly before the cutoff are authoritative."
+  - "Dispatch eligibility remains bound to the newest unique exact-SHA workflow_dispatch created no later than the cutoff, without weakening run, attempt, producer, artifact, or paired-publication identity checks."
+  - "The accepted feature design remains byte-identical at SHA-256 75416831857aabae3ee36da80263ae816e3c9c512f7f0548c08c41dc24c27990 and accepted ADR 0049 remains read-only."
+  - "The merged-master matrix fix, live-certification workflow, canonical semantic-privilege certification, changelog, and live-certification documentation remain byte-identical to exact base 151140230364a40df095bd30bb356cd53b36b691."
+  - "For local PR preparation on Darwin only, tests/test_airflow_cache_shared_directory_mode.py::test_ensure_shared_directory_accepts_foreign_owned_superset and tests/test_airflow_cache_shared_directory_mode.py::test_ensure_cache_layout_succeeds_on_foreign_owned_shared_superset may be N/A only when clean exact-base 151140230364a40df095bd30bb356cd53b36b691 and the candidate identically observe chmod 02777 as 0777; hosted Linux must still PASS the full non-live suite before merge."
+  - "No released Python API, package schema, runtime data path, release publisher, or policy profile changes."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "workflow-internal release-candidate evidence authorization"
+  migration_required: false
+
+owned_paths:
+  - tools/agent_policy/release_candidate_evidence_source.py
+  - tests/agent_policy/test_release_candidate_evidence_source.py
+  - tests/agent_policy/test_release_candidate_evidence_publication.py
+
+integrator_owned_paths:
+  - docs/quality-metrics.md
+  - test_artifacts/agent-policy/release-candidate-evidence-fail-closed-fixes.yml
+
+read_only_paths:
+  - docs/feature-design-release-candidate-evidence-gate.md
+  - docs/adr/0049-provider-bound-release-candidate-evidence.md
+  - docs/release.md
+  - docs/release-evidence.md
+  - docs/cicd/runbooks.md
+  - CHANGELOG.md
+  - docs/live-certification.md
+  - .github/workflows/live-certification.yml
+  - tests/test_live_certification_automation.py
+  - test_artifacts/agent-policy/pr3b-semantic-privilege-certification.json
+  - tools/agent_policy/release_candidate_evidence_gate.py
+  - tools/agent_policy/release_candidate_evidence_policy.py
+  - tests/agent_policy/test_release_candidate_evidence_gate.py
+  - tests/agent_policy/test_release_candidate_evidence_publication_polling.py
+  - tests/agent_policy/test_release_candidate_evidence_publication_receipt.py
+  - tests/test_release_candidate_evidence_workflow_contracts.py
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - .agents/policy
+  - src
+  - packages
+  - docs/live-certification.md
+  - docs/quality-metrics.md
+  - test_artifacts/agent-policy/pr3b-semantic-privilege-certification.json
+  - test_artifacts/agent-policy/release-candidate-evidence-fail-closed-fixes.yml
+  - test_artifacts/agent-policy/agent_governance_gate.json
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "The exact implementation base is merged PR 557 commit 151140230364a40df095bd30bb356cd53b36b691."
+  - "The approved specification is docs/feature-design-release-candidate-evidence-gate.md at SHA-256 75416831857aabae3ee36da80263ae816e3c9c512f7f0548c08c41dc24c27990."
+  - "ADR 0049 is Accepted and remains architecture authority without modification."
+  - "Exact base 151140230364a40df095bd30bb356cd53b36b691 already contains the separately reviewed PR 557 matrix receipt isolation and its documentation/certification updates; this task does not modify or re-own them."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/agent_policy/test_release_candidate_evidence_source.py tests/agent_policy/test_release_candidate_evidence_publication.py -q"
+    - "uv run pytest tests/agent_policy/test_release_candidate_evidence_gate.py tests/agent_policy/test_release_candidate_evidence_publication_polling.py tests/agent_policy/test_release_candidate_evidence_publication_receipt.py -q"
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/release-candidate-evidence-fail-closed-fixes.yml --format json"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref 151140230364a40df095bd30bb356cd53b36b691 and execute every selected non-live check."
+    - "uv run pytest tests/agent_policy -q"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "Darwin baseline comparison: exactly tests/test_airflow_cache_shared_directory_mode.py::test_ensure_shared_directory_accepts_foreign_owned_superset and tests/test_airflow_cache_shared_directory_mode.py::test_ensure_cache_layout_succeeds_on_foreign_owned_shared_superset may be reported N/A for local PR preparation only after clean exact-base 151140230364a40df095bd30bb356cd53b36b691 and candidate runs identically prove chmod 02777 becomes 0777; every other local check must PASS, and hosted Linux must PASS the full non-live suite before merge."
+    - "uv run ruff check tools/agent_policy/release_candidate_evidence_source.py tests/agent_policy/test_release_candidate_evidence_source.py tests/agent_policy/test_release_candidate_evidence_publication.py and uv run ruff format --check on the same paths."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run python tools/agent_policy/workflow_security.py . --format json"
+    - "uv run python tools/agent_policy/governance_gate.py --root . --base-ref 151140230364a40df095bd30bb356cd53b36b691 --format json"
+    - "uv run dpone docs update-dev-metrics --check; uv run dpone docs check-docs; uv run dpone docs check-generated-references; and uv run mkdocs build --strict."
+    - "git diff --check and all hard and baseline module-size gates pass without generating metrics."
+  live:
+    - "After merge, dispatch a new Release candidate evidence run on exact master SHA for v0.74.0; require the inherited exact 237 real matrix cases PASS, zero synthetic matrix_execution cases, the fixed terminal check PASS, and the unique unexpired attempt-bound authority artifact."
+    - "Require all protected contexts, governance source verification, artifact attestation, Agent PR receipt, and post-merge receipt PASS on the exact final commit before tagging."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "The implementation branch merge-base with protected master is not exact 151140230364a40df095bd30bb356cd53b36b691, the implementation HEAD is not a descendant of that base, protected master moves before integration, or the approved specification digest differs."
+  - "Any release/runtime workflow changes relative to exact base 151140230364a40df095bd30bb356cd53b36b691."
+  - "Any package, runtime, policy profile, release publisher, public schema, ADR 0049, or approved feature-design byte changes."
+  - "The final changed-path set relative to exact base 151140230364a40df095bd30bb356cd53b36b691 is not exactly the three owned implementation/test paths plus the two integrator-owned task/metrics paths (five paths total)."
+  - "Any focused, broad, exact-head, provider-live, or post-merge evidence is missing, stale, foreign, bypassed, or non-PASS, except the two fully-qualified Darwin S_ISGID tests may be N/A under the exact clean-base/candidate 02777-to-0777 equivalence above; any additional or different failure stops, and hosted Linux full non-live must PASS before merge."

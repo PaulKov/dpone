@@ -1,0 +1,10 @@
+<clickhouse>
+  <!-- Local-integration only: values are supplied by docker-compose environment. -->
+  <named_collections>
+    <dpone_stage>
+      <url>http://minio:9000/dpone-stage/</url>
+      <access_key_id from_env="DPONE_IT_MINIO_ACCESS_KEY" />
+      <secret_access_key from_env="DPONE_IT_MINIO_SECRET_KEY" />
+    </dpone_stage>
+  </named_collections>
+</clickhouse>

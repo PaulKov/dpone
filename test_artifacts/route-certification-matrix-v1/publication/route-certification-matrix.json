@@ -1,0 +1,39 @@
+{
+  "counts": {
+    "enterprise-certified": 0,
+    "experimental": 1,
+    "production-certified": 0,
+    "route-certified": 0
+  },
+  "errors": [],
+  "evaluated_at": "2026-07-17T12:06:31.714515Z",
+  "expected_commit": "17e61ed053c9853b8aec9ac5fe936c3bba46bb50",
+  "has_input_failures": false,
+  "rows": [
+    {
+      "blockers": [
+        "route_matrix.live_evidence_unverified",
+        "route_matrix.production_evidence_unverified"
+      ],
+      "capability_status": "contract_gate",
+      "catalog_status": "experimental",
+      "contract_status": "UNVERIFIED",
+      "dimensions": {
+        "airflow_runtime_mode": "kpo",
+        "schema_evolution": "widening",
+        "sink": "clickhouse",
+        "source": "mssql",
+        "strategy": "incremental_merge",
+        "transport": "native_bcp_to_clickhouse"
+      },
+      "docs_link": "docs/source-sink/mssql-to-clickhouse.md",
+      "live_status": "UNVERIFIED",
+      "production_status": "UNVERIFIED",
+      "proofs": [],
+      "route_id": "mssql_clickhouse_incremental_merge_airflow_kpo",
+      "sampling_mode": "pushdown",
+      "status": "experimental"
+    }
+  ],
+  "schema": "dpone.route-certification-matrix.v1"
+}

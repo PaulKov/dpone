@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-rollout-promotion.schema.json",
+  "title": "dpone data product rollout promotion",
+  "type": "object",
+  "required": ["schema_version", "status", "rollout_promotion_id", "from_ring", "to_ring", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_rollout_promotion.v1"},
+    "status": {"type": "string"},
+    "rollout_promotion_id": {"type": "string"},
+    "from_ring": {"type": "string"},
+    "to_ring": {"type": "string"},
+    "ring_gate_id": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

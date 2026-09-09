@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-compatibility-view-gate.schema.json",
+  "title": "dpone schema contract compatibility view gate",
+  "type": "object",
+  "required": ["schema_version", "status", "compatibility_view_plan_id", "blockers", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_compatibility_view_gate.v1"},
+    "compatibility_view_gate_id": {"type": "string", "pattern": "^sha256:"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "contract_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "compatibility_view_plan_id": {"type": ["string", "null"]},
+    "consumer_gate_id": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,21 @@
+name: Airflow pack compatibility nightly
+
+on:
+  schedule:
+    - cron: '23 1 * * *'
+      timezone: Europe/Berlin
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airflow-pack-compat-nightly
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  compatibility:
+    uses: ./.github/workflows/airflow-pack-compat.yml
+    with:
+      airflow_max_parallel: 4

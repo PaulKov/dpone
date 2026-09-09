@@ -1,0 +1,78 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-desired-state-authority-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_registry_ref": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "artifact_registry_uri": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "pattern": "^s3://[^/?#]+/[^?#]+$",
+      "type": "string"
+    },
+    "certified_s3_endpoint_url": {
+      "maxLength": 512,
+      "minLength": 1,
+      "pattern": "^https://[^/?#]+(?::[0-9]{1,5})?$",
+      "type": "string"
+    },
+    "desired_state_uri": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "pattern": "^s3://[^/?#]+/[^?#]+$",
+      "type": "string"
+    },
+    "environment": {
+      "not": {
+        "enum": [
+          "current",
+          "latest"
+        ]
+      },
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.airflow-desired-state-authority.v2"
+    },
+    "source_project": {
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?(?:/[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?)+$",
+      "type": "string"
+    },
+    "source_ref": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "watcher_identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "workspace_authority_connection_ref": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]{0,127}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "environment",
+    "desired_state_uri",
+    "certified_s3_endpoint_url",
+    "artifact_registry_uri",
+    "artifact_registry_ref",
+    "watcher_identity",
+    "source_project",
+    "source_ref",
+    "workspace_authority_connection_ref"
+  ],
+  "title": "dpone GitOps Airflow desired-state workspace activation authority",
+  "type": "object"
+}

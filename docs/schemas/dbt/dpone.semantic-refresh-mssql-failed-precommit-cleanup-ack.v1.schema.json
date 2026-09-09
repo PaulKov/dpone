@@ -1,0 +1,404 @@
+{
+  "$comment": "The acknowledgement digest excludes only cleanup_receipt_sha256. The typed producer verifies exact scratch/resource identity correlation, both nested digests, and the complete RELEASED allocation closure.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-mssql-failed-precommit-cleanup-ack.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cleanup_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "resource_allocation_closure": {
+      "additionalProperties": false,
+      "properties": {
+        "allocations": {
+          "items": false,
+          "maxItems": 5,
+          "minItems": 5,
+          "prefixItems": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "allocation_id": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "amount": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "operation_id": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "reservation_id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "resource_kind": {
+                  "const": "clickhouse_staging_bytes"
+                },
+                "status": {
+                  "const": "RELEASED"
+                },
+                "workflow_execution_binding_sha256": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "allocation_id",
+                "amount",
+                "operation_id",
+                "reservation_id",
+                "resource_kind",
+                "status",
+                "workflow_execution_binding_sha256"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "allocation_id": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "amount": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "operation_id": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "reservation_id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "resource_kind": {
+                  "const": "prepared_models"
+                },
+                "status": {
+                  "const": "RELEASED"
+                },
+                "workflow_execution_binding_sha256": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "allocation_id",
+                "amount",
+                "operation_id",
+                "reservation_id",
+                "resource_kind",
+                "status",
+                "workflow_execution_binding_sha256"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "allocation_id": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "amount": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "operation_id": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "reservation_id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "resource_kind": {
+                  "const": "retained_generation_bytes"
+                },
+                "status": {
+                  "const": "RELEASED"
+                },
+                "workflow_execution_binding_sha256": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "allocation_id",
+                "amount",
+                "operation_id",
+                "reservation_id",
+                "resource_kind",
+                "status",
+                "workflow_execution_binding_sha256"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "allocation_id": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "amount": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "operation_id": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "reservation_id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "resource_kind": {
+                  "const": "sealed_extract_bytes"
+                },
+                "status": {
+                  "const": "RELEASED"
+                },
+                "workflow_execution_binding_sha256": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "allocation_id",
+                "amount",
+                "operation_id",
+                "reservation_id",
+                "resource_kind",
+                "status",
+                "workflow_execution_binding_sha256"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "allocation_id": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "amount": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "operation_id": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "reservation_id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "resource_kind": {
+                  "const": "shadow_bytes"
+                },
+                "status": {
+                  "const": "RELEASED"
+                },
+                "workflow_execution_binding_sha256": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "allocation_id",
+                "amount",
+                "operation_id",
+                "reservation_id",
+                "resource_kind",
+                "status",
+                "workflow_execution_binding_sha256"
+              ],
+              "type": "object"
+            }
+          ],
+          "type": "array"
+        },
+        "operation_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "reservation_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema": {
+          "const": "dpone.semantic-refresh-mssql-resource-allocation-closure.v1"
+        },
+        "workflow_execution_binding_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "allocations",
+        "operation_id",
+        "reservation_id",
+        "schema",
+        "workflow_execution_binding_sha256"
+      ],
+      "type": "object"
+    },
+    "resource_allocation_closure_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-mssql-failed-precommit-cleanup-ack.v1"
+    },
+    "scratch_absence_evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt_binding_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "fencing_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "operation_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "operation_plan_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "relations": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "expected_uuid": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "const": "shadow"
+                },
+                "name": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "observed_uuid": {
+                  "const": null
+                }
+              },
+              "required": [
+                "expected_uuid",
+                "kind",
+                "name",
+                "observed_uuid"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "expected_uuid": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "const": "staging"
+                },
+                "name": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "observed_uuid": {
+                  "const": null
+                }
+              },
+              "required": [
+                "expected_uuid",
+                "kind",
+                "name",
+                "observed_uuid"
+              ],
+              "type": "object"
+            }
+          ],
+          "type": "array"
+        },
+        "schema": {
+          "const": "dpone.semantic-refresh-clickhouse-failed-scratch-cleanup-receipt.v1"
+        },
+        "scratch_absence_evidence_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "target_uuid": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "workflow_execution_binding_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "workflow_execution_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "attempt_binding_sha256",
+        "fencing_epoch",
+        "operation_id",
+        "operation_plan_sha256",
+        "relations",
+        "schema",
+        "scratch_absence_evidence_sha256",
+        "target_uuid",
+        "workflow_execution_binding_sha256",
+        "workflow_execution_id"
+      ],
+      "type": "object"
+    },
+    "scratch_absence_evidence_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "status": {
+      "const": "COMPLETE"
+    }
+  },
+  "required": [
+    "cleanup_receipt_sha256",
+    "resource_allocation_closure",
+    "resource_allocation_closure_sha256",
+    "schema",
+    "scratch_absence_evidence",
+    "scratch_absence_evidence_sha256",
+    "status"
+  ],
+  "type": "object"
+}

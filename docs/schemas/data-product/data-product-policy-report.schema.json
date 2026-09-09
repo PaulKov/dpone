@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-policy-report.schema.json",
+  "title": "Data Product Policy Report",
+  "type": "object",
+  "required": ["schema_version", "status", "policy_report_id", "markdown"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_policy_report.v1"},
+    "status": {"enum": ["allowed", "warning", "blocked", "waived"]},
+    "policy_report_id": {"type": "string"},
+    "policy_gate_id": {"type": ["string", "null"]},
+    "markdown": {"type": "string"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,66 @@
+schema_version: 1
+task_id: "DPONE-DBT-RUNTIME-PROCESS"
+title: "Bound dbt process-tree and collector lifetime"
+goal: "Terminate the complete POSIX dbt process group and prevent unbounded output collector joins."
+specification: "docs/feature-design-dbt-runtime-correctness-remediation-v1.md"
+base_commit: "c91387b70904fcfa55a66876d8e75409757961b9"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "POSIX dbt processes start in a new session and timeout terminates the process group."
+  - "Collectors use bounded joins and a retained descendant pipe cannot hang execution."
+  - "Non-POSIX fallback remains bounded and output redaction is preserved."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dbt runtime timeout behavior"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/adapters/dbt_subprocess.py"
+  - "src/dpone/adapters/dbt_process_supervisor.py"
+  - "tests/test_dbt_subprocess_supervision.py"
+read_only_paths:
+  - "src/dpone/contracts/dbt_publishing.py"
+  - "src/dpone/ports/dbt_publishing.py"
+  - "tests/test_dbt_runtime_execution.py"
+  - "docs/feature-design-dbt-runtime-correctness-remediation-v1.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "docs/schemas"
+
+shared_file_owner: "Codex parent agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_subprocess_supervision.py -q"
+  broad:
+    - "uv run ruff check src/dpone/adapters/dbt_subprocess.py src/dpone/adapters/dbt_process_supervisor.py tests/test_dbt_subprocess_supervision.py"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-approval-quorum.schema.json",
+  "title": "dpone data product approval quorum",
+  "type": "object",
+  "required": ["schema_version", "approval_quorum_id", "status", "approved_actors", "satisfied_roles", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_approval_quorum.v1"},
+    "approval_quorum_id": {"type": "string"},
+    "authority_registry_id": {"type": ["string", "null"]},
+    "waiver_request_id": {"type": ["string", "null"]},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "quorum": {"type": "object"},
+    "approved_actors": {"type": "array", "items": {"type": "string"}},
+    "satisfied_roles": {"type": "array", "items": {"type": "string"}},
+    "authority_checks": {"type": "array"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

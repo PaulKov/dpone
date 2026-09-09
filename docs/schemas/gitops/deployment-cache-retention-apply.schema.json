@@ -1,0 +1,154 @@
+{
+  "$defs": {
+    "item": {
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "deployment_id": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "deployment_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "action": {
+                "const": "skipped"
+              },
+              "reason": {
+                "enum": [
+                  "incomplete",
+                  "invalid"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "deleted"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "deployment_id": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "deleted",
+            "skipped"
+          ]
+        },
+        "deployment_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error_code": {
+          "pattern": "^DPONE_(CACHE|RELEASE|DEPLOYMENT|AIRFLOW)_[A-Z0-9_]+$",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "current",
+            "retention_evidence",
+            "unreferenced",
+            "incomplete",
+            "invalid"
+          ]
+        }
+      },
+      "required": [
+        "deployment_id",
+        "action",
+        "reason",
+        "path"
+      ],
+      "type": "object"
+    },
+    "sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/deployment-cache-retention-apply.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "current_deployment_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "deleted_deployment_ids": {
+      "items": {
+        "$ref": "#/$defs/sha256"
+      },
+      "type": "array"
+    },
+    "environment": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/item"
+      },
+      "type": "array"
+    },
+    "promoted_by": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.deployment-cache-retention-apply.v1"
+    },
+    "skipped_deployment_ids": {
+      "items": {
+        "$ref": "#/$defs/sha256"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "environment",
+    "promoted_by",
+    "current_deployment_id",
+    "items",
+    "deleted_deployment_ids",
+    "skipped_deployment_ids"
+  ],
+  "title": "dpone GitOps deployment cache retention apply report",
+  "type": "object"
+}

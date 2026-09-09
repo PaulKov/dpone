@@ -1,0 +1,73 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-CLOSURE-PR1-BASELINE-FIXES"
+title: "Fix deterministic redaction and secret-scan baseline regressions"
+goal: >-
+  Remove identity values from externally visible dbt mismatch errors and remove
+  the verified Lob false positive without weakening either security assertion.
+specification: >-
+  Approved DPONE-CI-SHADOW-CLOSURE baseline repair tracked in GitHub issue #512.
+base_commit: "e1d93822b47234e940829319cac0dc9678f6906c"
+integrator: "/root"
+
+acceptance_criteria:
+  - "DBT mismatch errors retain stable codes but never expose rejected workload or payload identity values."
+  - "Existing must_not_leak tests pass without weakening their assertions."
+  - "The Lob false positive is eliminated through a behavior-neutral test identifier change or a narrower documented fix, not a repository-wide scanner exclusion."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "redacted error messages for invalid dbt runtime identity"
+  migration_required: false
+
+owned_paths:
+  - src/dpone/contracts/dbt_runtime.py
+  - tests/test_airflow_runtime_init_fetch_cli.py
+  - tests/test_airflow_release_runtime_payload_inventory.py
+  - test_artifacts/agent-policy/dpone-ci-shadow-closure-pr1-baseline-fixes.yml
+read_only_paths:
+  - src/dpone/runtime/verified_pack_launcher.py
+  - .github/workflows/secret-scan.yml
+  - tests/test_gitops_schema_contracts.py
+  - docs/schemas/gitops/release-set.schema.json
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/schemas
+  - src/dpone/gitops
+
+shared_file_owner: "/root"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_runtime_init_fetch_cli.py::test_launcher_rejects_dbt_release_and_execution_pack_identity_mismatch tests/test_airflow_release_runtime_payload_inventory.py -q"
+  broad:
+    - "uv run ruff check src/dpone/contracts/dbt_runtime.py tests/test_airflow_runtime_init_fetch_cli.py tests/test_airflow_release_runtime_payload_inventory.py"
+    - "uv run mypy --config-file mypy.ini"
+  live:
+    - "TruffleHog verified secrets on the exact PR head"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

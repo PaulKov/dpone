@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-mapping-plan.schema.json",
+  "title": "dpone GitOps bounded Airflow backfill mapping plan",
+  "type": "object",
+  "required": [
+    "schema",
+    "mode",
+    "plan_fingerprint",
+    "backfill_plan_hash",
+    "chunks_total",
+    "items_total",
+    "limits",
+    "items"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.airflow-mapping-plan.v1"
+    },
+    "mode": {
+      "enum": [
+        "internal",
+        "visible",
+        "summary"
+      ]
+    },
+    "plan_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "backfill_plan_hash": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "chunks_total": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "items_total": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 200
+    },
+    "limits": {
+      "type": "object",
+      "required": [
+        "max_items",
+        "max_active",
+        "pool"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_items": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "max_active": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "pool": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]*$"
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": [
+          "item_index",
+          "first_chunk_index",
+          "last_chunk_index",
+          "chunks_count"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "item_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "first_chunk_index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "last_chunk_index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "chunks_count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  }
+}

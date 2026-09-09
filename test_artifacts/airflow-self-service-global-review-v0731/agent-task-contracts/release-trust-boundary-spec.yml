@@ -1,0 +1,86 @@
+schema_version: 1
+task_id: "SS-45-48-51-SPEC"
+title: "Frozen release policy and privileged publication boundary specification"
+goal: >
+  Turn the approved read-only release audit architecture into a complete
+  project-standard feature design and ADR without changing production code,
+  workflow behavior, policy bytes, or live GitHub settings.
+specification: "docs/feature-design-release-trust-boundary-v0732.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "Feature spec follows docs/agent-templates/feature-design-spec.md and starts as PROPOSED."
+  - "ADR-0028 records frozen commit policy authority, two-read live governance snapshots, privileged-job isolation, tag/release immutability, and irreversible external publication recovery."
+  - "State machine covers preflight, immutable candidate handoff, attestation, PyPI partial publication, GitHub draft verification, immutable publication, and final closure."
+  - "Exact policy v2, evidence v2, CLI compatibility, migration, security tests, docs/CJM, rollout and rollback contracts are specified."
+  - "Unknown provider-assigned IDs or unsupported live state are marked placeholders/UNVERIFIED and never invented."
+  - "Market comparison is N/A with reason; official GitHub and PyPI primary sources are linked."
+
+public_contract_impact:
+  level: deprecation
+  surfaces:
+    - release CLI compatibility arguments
+    - release evidence schemas
+    - GitHub Actions job graph
+    - maintainer release journey
+  migration_required: true
+
+owned_paths:
+  - docs/feature-design-release-trust-boundary-v0732.md
+  - docs/adr/0028-frozen-release-policy-and-publication-boundary.md
+read_only_paths:
+  - docs/agent-templates/feature-design-spec.md
+  - docs/release.md
+  - docs/agent-release-protocol.md
+  - .github/workflows/release.yml
+  - .agents/policy/github-branch-protection.yml
+  - tools/agent_policy/release_commit_gate.py
+  - tools/agent_policy/release_identity_gate.py
+  - test_artifacts/airflow-self-service-global-review-v0731/review-report.md
+forbidden_paths:
+  - docs/adr-index.md
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - .agents/policy
+  - tools
+  - src
+  - tests
+
+shared_file_owner: "parent Codex agent"
+
+dependencies:
+  - "Fresh release trust-boundary audit completed on 2026-07-19"
+required_checks:
+  focused:
+    - "uv run dpone docs check-docs"
+  broad:
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+  live:
+    - "N/A for documentation-only work"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "A provider-assigned live ID or PASS state would need to be invented."
+  - "The proposal contradicts current official GitHub or PyPI behavior."
+  - "Another writer owns the same semantic contract."

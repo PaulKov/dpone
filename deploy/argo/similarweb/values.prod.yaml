@@ -1,0 +1,16 @@
+# Prod overlay: baked package, but keep dpone-runtime-exec wrapper for command parity.
+
+dpone:
+  installMode: baked
+  packageTarget: /opt/airflow/.dpone-pkgs
+
+airflow:
+  extraEnv:
+    - name: DPONE_INSTALL_MODE
+      value: baked
+    - name: ENV_CODE
+      value: prod
+    - name: DPONE_PROJECT_DIR
+      value: /opt/airflow/dags/repo
+    - name: DPONE_PACKAGE_TARGET
+      value: /opt/airflow/.dpone-pkgs

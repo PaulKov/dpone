@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PaulKov/dpone/docs/schemas/dlq/dpone.dlq-index.v1.schema.json",
+  "title": "dpone DLQ index v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "run_id", "records", "fingerprint"],
+  "properties": {
+    "schema": {"const": "dpone.dlq-index.v1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "record_ref", "reason_code", "sha256", "expires_at"],
+        "properties": {
+          "id": {"type": "string"},
+          "record_ref": {"type": "string", "pattern": "^dpone://"},
+          "reason_code": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "expires_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    },
+    "fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

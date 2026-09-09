@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/cicd/ci-shadow-route-policy-v1.schema.json",
+  "title": "dpone.ci-shadow-route-policy.v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "default_route"],
+  "properties": {"schema_version": {"const": "dpone.ci-shadow-route-policy.v1"}, "default_route": {"const": "full"}}
+}

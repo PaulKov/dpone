@@ -1,0 +1,52 @@
+schema_version: 1
+task_id: "SS-UX-REFERENCE"
+title: "Beginner pipeline reference parity"
+goal: "Accept one pipeline ID/path grammar across check, preview, test and safe-sample."
+specification: "docs/feature-design-airflow-self-service-ux-closure-v07317.md"
+base_commit: "d9bb630dc691257b8efe6f00a38f5da171e06c04"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Safe-sample resolves a bare ID before any durable side effect."
+  - "Ordinary run manifest semantics remain unchanged."
+  - "Generated beginner next commands use the pipeline ID."
+
+public_contract_impact:
+  level: compatible
+  surfaces: [CLI]
+  migration_required: false
+
+owned_paths:
+  - src/dpone/commands/run_cmd.py
+  - src/dpone/commands/airflow_preview_rendering.py
+  - src/dpone/services/hermetic_test_project.py
+  - tests/test_airflow_pipeline_reference_parity.py
+read_only_paths:
+  - src/dpone/manifest/pipeline_source_reference.py
+  - src/dpone/commands/run_safe_sample_cmd.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/airflow-self-service-public-contracts-v1.yaml
+shared_file_owner: "Codex"
+dependencies: [SS-UX-IDENTITY]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_pipeline_reference_parity.py tests/test_airflow_self_service_cli.py -q"
+  broad:
+    - "uv run ruff check src/dpone/commands/airflow_preview_rendering.py src/dpone/services/hermetic_test_project.py tests/test_airflow_pipeline_reference_parity.py"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Ordinary dpone run behavior would change."
+  - "Resolution performs a side effect."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

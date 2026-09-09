@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/mssql-safe-sample-read-plan.schema.json",
+  "title": "dpone GitOps MSSQL safe sample read plan",
+  "type": "object",
+  "required": [
+    "schema",
+    "sql",
+    "parameters",
+    "sample_rows",
+    "max_bytes",
+    "timeout_seconds",
+    "source_read_only",
+    "source"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.mssql-safe-sample-read-plan.v1"
+    },
+    "sql": {
+      "type": "string",
+      "pattern": "^SELECT TOP \\(@sample_rows\\) \\* FROM .+$"
+    },
+    "parameters": {
+      "type": "object",
+      "required": [
+        "sample_rows"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "sample_rows": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "sample_rows": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_read_only": {
+      "const": true
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "type",
+        "connection_ref",
+        "table"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "mssql"
+        },
+        "connection_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+          "maxLength": 128
+        },
+        "table": {
+          "$ref": "#/$defs/table"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "table": {
+      "type": "object",
+      "required": [
+        "schema",
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

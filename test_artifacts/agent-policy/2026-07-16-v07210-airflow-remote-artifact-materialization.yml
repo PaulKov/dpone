@@ -1,0 +1,178 @@
+schema_version: 1
+task_id: "DPONE-V07210-AIRFLOW-REMOTE-ARTIFACT-MATERIALIZATION"
+title: "Publish and materialize pinned Airflow release/deployment artifacts"
+goal: >-
+  Complete the remote Phase 1B handoff with content-addressed create-or-compare
+  publication and bounded pinned materialization while preserving local
+  cache-sync as the only activation boundary and keeping Airflow parse free of
+  network, storage SDK, credential, and secret side effects.
+specification: "docs/feature-design-airflow-remote-artifact-materialization-v07210.md"
+base_commit: "608a1e68"
+integrator: "codex/v0.72.10-remote-artifact-materializer"
+
+acceptance_criteria:
+  - "Publisher validates one canonical local release/deployment projection before constructing a remote client."
+  - "Remote release/deployment keys are derived only from exact canonical digests and never from current, latest, tags, branches, or remote discovery."
+  - "Remote publication uses conditional create-or-compare; identical retries are no-op and conflicting bytes never overwrite."
+  - "Completion markers are published last and missing markers make materialization fail closed."
+  - "Materializer enforces per-object and total budgets, verifies downloaded SHA-256 bytes, validates in an isolated canonical staging cache, and installs immutable local trees without activating current."
+  - "Existing cache-sync/recovery/retention and provider loader remain the activation and parse paths without remote I/O."
+  - "Text/JSON output and errors do not expose credentials, signed URLs, SDK payloads, Vault paths, or private staging paths."
+  - "Legacy gitops pack publication and provider cache sync remain compatible and are documented as legacy."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - airflow_platform_cli
+    - python_runtime_api
+    - artifact_registry_port
+    - object_storage_clients
+    - gitops_json_schemas
+    - structured_errors
+    - compatibility_and_operator_docs
+  migration_required: false
+
+owned_paths:
+  - CHANGELOG.md
+  - README.md
+  - pyproject.toml
+  - uv.lock
+  - docs/feature-design-airflow-remote-artifact-materialization-v07210.md
+  - docs/airflow-cache-sync.md
+  - docs/airflow-pack-provider.md
+  - docs/airflow-provider-api.md
+  - docs/airflow-self-service-architecture.md
+  - docs/airflow-self-service-backlog.md
+  - docs/architecture.md
+  - docs/compatibility.md
+  - docs/getting-started/first-airflow-dag.md
+  - docs/cli-reference.md
+  - docs/reference/gitops-schema-catalog.md
+  - docs/schemas/gitops/airflow-artifact-publish.schema.json
+  - docs/schemas/gitops/airflow-cache-materialize.schema.json
+  - src/dpone/ports/artifact_registry.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py
+  - src/dpone/ports/__init__.py
+  - src/dpone/adapters/object_storage_artifact_registry.py
+  - src/dpone/adapters/__init__.py
+  - src/dpone/storage/protocols.py
+  - src/dpone/storage/models.py
+  - src/dpone/storage/local.py
+  - src/dpone/storage/local_fs.py
+  - src/dpone/storage/adapters.py
+  - src/dpone/storage/azure_adapter.py
+  - src/dpone/storage/checksum.py
+  - src/dpone/storage/__init__.py
+  - src/dpone/runtime/immutable_local_tree.py
+  - src/dpone/runtime/immutable_local_release.py
+  - src/dpone/runtime/airflow_artifact_delivery.py
+  - src/dpone/runtime/airflow_artifact_delivery_support.py
+  - src/dpone/runtime/airflow_artifact_publication.py
+  - src/dpone/runtime/airflow_artifact_materialization.py
+  - src/dpone/runtime/airflow_artifact_delivery_models.py
+  - src/dpone/runtime/airflow_artifact_inventory.py
+  - src/dpone/runtime/object_storage_connection_resolver.py
+  - src/dpone/runtime/credentials/manager.py
+  - src/dpone/runtime/credentials/vault_provider.py
+  - src/dpone/readiness/airflow_artifact_delivery.py
+  - src/dpone/commands/airflow_artifact_delivery_cmd.py
+  - src/dpone/commands/airflow_artifact_delivery_rendering.py
+  - src/dpone/commands/airflow_self_service_cmd.py
+  - src/dpone/commands/airflow_self_service_output.py
+  - src/dpone/gitops/schema_airflow_artifact_delivery_contracts.py
+  - src/dpone/gitops/schema_airflow_contracts.py
+  - test_artifacts/agent-policy/2026-07-16-v07210-airflow-remote-artifact-materialization.yml
+  - test_artifacts/airflow-self-service-v07210-remote-delivery/**
+  - tests/test_airflow_remote_artifact_delivery.py
+  - tests/test_airflow_deployment_index_provider.py
+  - tests/test_object_storage_artifact_registry.py
+  - tests/test_object_storage_fast_path_access.py
+  - tests/test_oss_release_readiness.py
+  - tests/test_runtime_credentials_contracts.py
+  - tests/test_airflow_self_service_cli.py
+  - tests/test_gitops_schema_contracts.py
+  - tests/test_lazy_imports.py
+  - tests/test_docs_language_contracts.py
+
+read_only_paths:
+  - docs/engineering-standards.md
+  - docs/feature-design-standard.md
+  - docs/import-rules.md
+  - docs/benchmarks/quality_budgets.yml
+  - docs/adr/0008-airflow-parse-safe-provider.md
+  - docs/adr/0009-artifact-delivery-and-cache-materializer.md
+  - docs/adr/0013-reproducible-rerun-and-retention.md
+  - src/dpone/contracts/airflow_deployment.py
+  - src/dpone/contracts/airflow_deployment_projection.py
+  - src/dpone/runtime/deployment_cache_projection_validator.py
+  - src/dpone/runtime/deployment_cache_materializer.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_sync.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/artifact_store.py
+
+forbidden_paths:
+  - mkdocs.yml
+  - .github/workflows
+  - .cursor/
+
+shared_file_owner: "Codex integrator"
+
+dependencies:
+  - "ADR 0009"
+  - "v0.72.5 local cache promotion integrity"
+  - "v0.72.6 route attestation integrity"
+  - "v0.72.9 retained connection Secret GC"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_remote_artifact_delivery.py tests/test_object_storage_artifact_registry.py tests/test_airflow_cache_materializer.py -q"
+    - "uv run pytest tests/test_airflow_self_service_cli.py tests/test_gitops_schema_contracts.py tests/test_lazy_imports.py -q"
+    - "PYTHONPATH=packages/dpone-airflow-pack/src .venv-airflow/bin/python -m pytest tests/test_airflow_dag_loader_contract.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run dpone docs check-architecture-fitness"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  packaging:
+    - "uv build"
+    - "uv build packages/dpone-airflow-pack --out-dir dist"
+    - "uv tool run twine check dist/*"
+    - "Install root/provider wheels in an isolated Python 3.12 environment and run base-help plus local-registry delivery smoke"
+  live:
+    - "Approved S3/GCS/Azure conditional-create certification"
+    - "Approved Airflow/Kubernetes materializer/init-fetch/cache-sync/KPO certification"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+  - validation_evidence
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Implementation resolves current/latest or performs remote discovery for executable content."
+  - "Implementation overwrites or deletes a content-addressed remote object."
+  - "Implementation mutates local current during publication or materialization."
+  - "Implementation performs storage, network, credential, or secret I/O during Airflow parse or base CLI help."
+  - "Implementation treats ETag/MD5 or remote metadata as the final SHA-256 content proof."
+  - "Implementation permits production attestation policy bypass."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

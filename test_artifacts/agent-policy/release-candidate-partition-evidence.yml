@@ -1,0 +1,114 @@
+schema_version: 1
+task_id: "DPONE-V074-RC-PARTITION-EVIDENCE"
+title: "Restore frozen MSSQL stress partition evidence"
+goal: >-
+  Make the canonical PostgreSQL -> MSSQL -> ClickHouse stress producer
+  establish a safe seekable MSSQL id boundary so the unchanged four-partition
+  release-evidence contract is observable and fail-closed.
+specification: "docs/release-evidence.md"
+base_commit: "0aacebbbfa22d78fbd80dbff2c8a5e91354ea419"
+integrator: "/root"
+
+acceptance_criteria:
+  - "After a successful PostgreSQL -> MSSQL load, dbo.bench_orders receives a deterministic unique clustered index on id before MSSQL -> ClickHouse extraction."
+  - "Index preparation is part of target_load_finalize and fails closed; a load or DDL error cannot be reported as successful benchmark evidence."
+  - "The runtime heap fallback, source-scan safety policy, physical-chunk implementation, workflows, and release validator remain unchanged."
+  - "The frozen four-partition campaign produces a PartitionedFileExportArtifact with four positive regular-file partitions and row estimates reconciling to the frozen row count."
+  - "Regression tests verify exact index SQL, successful-load ordering, and continued rejection of the observed PhysicalChunkedFileExportArtifact zero-partition shape."
+  - "Release documentation explains the producer precondition; generated developer metrics and the changelog are reconciled by the integrator."
+  - "A new provider-bound Release candidate evidence dispatch passes on the exact merged master commit before any release decision."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "release-candidate stress benchmark evidence"
+  migration_required: false
+
+owned_paths:
+  - tools/mssql_stress.py
+  - tests/test_tools_mssql_stress_config.py
+  - tests/agent_policy/test_release_candidate_evidence_route_validation.py
+  - docs/release-evidence.md
+
+integrator_owned_paths:
+  - CHANGELOG.md
+  - docs/quality-metrics.md
+  - test_artifacts/agent-policy/release-candidate-partition-evidence.yml
+
+read_only_paths:
+  - .github/workflows/live-certification.yml
+  - .github/workflows/release-candidate-evidence.yml
+  - tools/mssql_clickhouse_fault_injection.py
+  - tools/agent_policy/release_candidate_evidence_stress_validation.py
+  - src/dpone/runtime/source_scan.py
+  - src/dpone/runtime/physical_chunking.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_source_shape.py
+  - src/dpone/strategy_intelligence/transfer_diagnostics.py
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - mkdocs.yml
+  - .github/workflows
+  - tools/agent_policy
+  - src/dpone/runtime
+  - src/dpone/strategy_intelligence
+  - tests/conftest.py
+  - CHANGELOG.md
+  - docs/quality-metrics.md
+  - test_artifacts/agent-policy/release-candidate-partition-evidence.yml
+  - test_artifacts/agent-policy/agent_governance_gate.json
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "The exact implementation base is merged master 0aacebbbfa22d78fbd80dbff2c8a5e91354ea419."
+  - "Run 31838449882 and diagnostic artifact 9233460298 prove the sole observed authority-builder blocker was the zero-partition PhysicalChunkedFileExportArtifact stress projection."
+  - "The existing strict four-partition validator and source-scan safety policy are security boundaries and remain byte-identical."
+
+required_checks:
+  focused:
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/release-candidate-partition-evidence.yml --format json"
+    - "uv run pytest tests/test_tools_mssql_stress_config.py tests/test_tools_mssql_benchmark_suite.py tests/test_physical_chunking.py tests/test_native_snapshot_optimization.py tests/agent_policy/test_release_candidate_evidence_route_validation.py -q"
+    - "uv run ruff check tools/mssql_stress.py tests/test_tools_mssql_stress_config.py tests/agent_policy/test_release_candidate_evidence_route_validation.py"
+    - "uv run ruff format --check tools/mssql_stress.py tests/test_tools_mssql_stress_config.py tests/agent_policy/test_release_candidate_evidence_route_validation.py"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref 0aacebbbfa22d78fbd80dbff2c8a5e91354ea419 and execute every selected non-live check."
+    - "uv run ruff check . and uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "Run the exact-base/exact-head module-size command emitted by select_checks.py after committing the reviewed head."
+    - "uv run dpone docs update-dev-metrics --check; uv run dpone docs check-docs; uv run dpone docs check-generated-references; uv run pytest tests/test_docs_language_contracts.py -q; and uv run mkdocs build --strict."
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "On Darwin only, the two previously proven S_ISGID tests may be N/A for local PR preparation when clean exact base and candidate reproduce the identical chmod 02777 -> 0777 behavior; hosted Linux full non-live remains mandatory PASS."
+    - "git diff --check"
+  live:
+    - "After merge, dispatch Release candidate evidence once for v0.74.0 on exact merged master; require terminal PASS and one unique unexpired attempt-bound authority artifact."
+    - "Require all protected contexts, Agent PR receipt, governance evidence, and post-merge closure PASS on the exact final commits."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "The implementation branch merge-base with protected master is not exact 0aacebbbfa22d78fbd80dbff2c8a5e91354ea419, implementation HEAD is not its descendant, or protected master moves before integration."
+  - "The release validator, workflow, runtime source-scan policy, or physical-chunk implementation would need to be weakened or edited."
+  - "The producer cannot prove four positive range partitions from the indexed id boundary."
+  - "The final changed-path set relative to exact base is not exactly the four owned paths plus the three integrator-owned paths (seven paths total)."
+  - "Any focused, broad, hosted, receipt, governance, post-merge, or new exact-master live authority evidence is missing, stale, foreign, bypassed, or non-PASS, except the explicitly baseline-equivalent Darwin-only local N/A above."

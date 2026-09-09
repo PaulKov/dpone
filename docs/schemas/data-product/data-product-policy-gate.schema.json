@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-policy-gate.schema.json",
+  "title": "Data Product Policy Gate",
+  "type": "object",
+  "required": ["schema_version", "status", "policy_gate_id", "policy_evaluation_id", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_policy_gate.v1"},
+    "status": {"enum": ["allowed", "warning", "blocked", "waived"]},
+    "policy_gate_id": {"type": "string"},
+    "policy_evaluation_id": {"type": ["string", "null"]},
+    "profile": {"type": "string"},
+    "rules": {"type": "array", "items": {"type": "object"}},
+    "waived_rules": {"type": "array", "items": {"type": "string"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

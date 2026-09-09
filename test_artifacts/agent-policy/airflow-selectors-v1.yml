@@ -1,0 +1,110 @@
+schema_version: 1
+task_id: "AIRFLOW-SELECTORS-V1"
+title: "Explainable project workload selectors v1"
+goal: >-
+  Implement one deterministic workload selector engine shared by self-service
+  check, Airflow preview, and safe sample planning without scheduler-side
+  selection or a second graph policy.
+specification: "docs/feature-design-airflow-selectors-v1.md"
+base_commit: "801e2f7e"
+integrator: "codex-integrator"
+
+acceptance_criteria:
+  - "Exact metadata, graph, named, and state selectors use one pure engine."
+  - "Every selected/excluded node has deterministic safe reasons."
+  - "Check, preview, and safe sample planning select identical workload ids."
+  - "Airflow provider performs no selector parsing, source scanning, or state I/O."
+  - "Existing single-pipeline commands and run --selector remain compatible."
+  - "Selected preview artifacts are static, bounded, pinned, and checksum verified."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone check --select/--exclude/--state/--selectors"
+    - "dpone airflow preview --select/--exclude/--state/--selectors"
+    - "dpone run --select/--exclude/--state/--selectors"
+    - "dpone.selectors.v1"
+    - "dpone.selection-state.v1"
+    - "dpone.selection-report.v1"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/manifest/selection*.py"
+  - "src/dpone/manifest/project_selection*.py"
+  - "src/dpone/readiness/project_selection*.py"
+  - "src/dpone/readiness/airflow_authoring_check_service.py"
+  - "src/dpone/readiness/airflow_self_service*.py"
+  - "src/dpone/commands/airflow_self_service*.py"
+  - "src/dpone/commands/run*.py"
+  - "src/dpone/commands/selection_arguments.py"
+  - "src/dpone/services/safe_sample_policy.py"
+  - "src/dpone/schema/selectors.schema.json"
+  - "docs/schemas/gitops/selection-*.schema.json"
+  - "docs/schemas/gitops/release-set.schema.json"
+  - "tests/test_airflow_selectors_v1.py"
+  - "tools/airflow_selectors_benchmark.py"
+  - "docs/feature-design-airflow-selectors-v1.md"
+  - "docs/adr/0017-canonical-workload-selection.md"
+  - "docs/adr-index.md"
+  - "docs/airflow-self-service*.md"
+  - "docs/cli-reference.md"
+  - "docs/errors/DPONE_SELECTION*.md"
+  - "docs/errors/DPONE_PIPELINE_PROCESS_*.md"
+  - "docs/reference/configuration.md"
+  - "docs/compatibility.md"
+  - "test_artifacts/airflow-selectors-v1/**"
+read_only_paths:
+  - "packages/dpone-airflow-pack/**"
+  - "src/dpone/runtime/**"
+  - "src/dpone/gitops/airflow_dag_spec*.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - ".github/workflows/**"
+  - ".cursor/**"
+
+shared_file_owner: "codex-integrator"
+integrator_owned_shared_paths:
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - "docs/quality-metrics.md"
+  - "src/dpone/gitops/schema_airflow_authoring_contracts.py"
+  - "src/dpone/gitops/schema_airflow_contracts.py"
+  - "src/dpone/gitops/schema_release_deployment_contracts.py"
+  - "tests/test_gitops_schema_contracts.py"
+
+dependencies:
+  - "docs/feature-design-airflow-selectors-v1.md"
+  - "docs/adr/0017-canonical-workload-selection.md"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_selectors_v1.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - validation_report
+  - benchmark
+
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

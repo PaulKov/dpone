@@ -1,0 +1,80 @@
+schema_version: 1
+task_id: "SS-57"
+title: "Safe-sample result and exit-status fail closure"
+goal: >
+  Reject inconsistent or malformed copy outcomes so a failed/blocked sample
+  operation can never become execution_status=succeeded or CLI exit code zero.
+specification: >
+  Isolated release-blocking bug fix to the approved safe-sample status/error/
+  budget contract. No new command or DSL field is introduced.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "Copy status failed or blocked is always execution failure even when the external copier returns no errors."
+  - "Malformed/missing status fields and inconsistent error/count combinations fail closed."
+  - "Budget excess and source/copied/target row-count mismatches cannot exit zero."
+  - "A stable bounded structured error is synthesized when an external copier omits diagnostics."
+  - "Existing passed, no-data, quarantine, and quality-failure outcomes retain documented behavior."
+  - "Secret-bearing external error details remain redacted."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - safe-sample runtime result
+    - safe-sample CLI exit status
+    - structured safe-sample errors
+  migration_required: false
+
+owned_paths:
+  - src/dpone/services/safe_sample_runtime_executor.py
+  - src/dpone/services/ops/command_handlers_safe_sample.py
+  - tests/test_airflow_safe_sample_runtime_executor.py
+  - tests/test_airflow_safe_sample_runtime_runner.py
+  - tests/test_cli_safe_sample_runtime_run_command.py
+read_only_paths:
+  - src/dpone/services/safe_sample_runtime_evidence.py
+  - src/dpone/services/safe_sample_redaction.py
+  - src/dpone/contracts/quality_failure.py
+  - docs/airflow-self-service.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "parent Codex agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_safe_sample_runtime_executor.py tests/test_airflow_safe_sample_runtime_runner.py tests/test_cli_safe_sample_runtime_run_command.py -q"
+  broad:
+    - "uv run ruff check <owned Python paths>"
+    - "uv run mypy --config-file mypy.ini src/dpone/services/safe_sample_runtime_executor.py src/dpone/services/ops/command_handlers_safe_sample.py"
+  live:
+    - "MSSQL/ClickHouse sample run remains UNVERIFIED unless actually executed"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "The fix requires a new public result schema version."
+  - "A live route result would need to be manufactured."
+  - "Another writer owns the same semantic contract."

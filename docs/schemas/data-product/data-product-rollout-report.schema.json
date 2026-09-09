@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-rollout-report.schema.json",
+  "title": "dpone data product rollout report",
+  "type": "object",
+  "required": ["schema_version", "status", "rollout_report_id", "markdown", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_rollout_report.v1"},
+    "status": {"type": "string"},
+    "rollout_report_id": {"type": "string"},
+    "rollout_promotion_id": {"type": ["string", "null"]},
+    "ring_gate_id": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "markdown": {"type": "string"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

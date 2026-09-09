@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-correlation.schema.json",
+  "title": "dpone GitOps Airflow attempt correlation contract",
+  "type": "object",
+  "required": [
+    "schema",
+    "correlation_id",
+    "attempt_ref",
+    "airflow",
+    "dpone",
+    "artifacts",
+    "pod"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.airflow-correlation.v1"
+    },
+    "correlation_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "attempt_ref": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "airflow": {
+      "type": "object",
+      "required": [
+        "dag_id",
+        "task_id",
+        "run_id",
+        "try_number",
+        "map_index"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "dag_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "try_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "map_index": {
+          "type": "integer",
+          "minimum": -1
+        }
+      }
+    },
+    "dpone": {
+      "type": "object",
+      "required": [
+        "run_id",
+        "process"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "process": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "required": [
+        "release_id",
+        "deployment_id",
+        "workload_id",
+        "workload_pack_sha256",
+        "runtime_evidence_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "release_id": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "deployment_id": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "workload_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "workload_pack_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "runtime_evidence_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "pod": {
+      "type": "object",
+      "required": [
+        "name",
+        "uid",
+        "namespace",
+        "image_digest"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uid": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "namespace": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "image_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

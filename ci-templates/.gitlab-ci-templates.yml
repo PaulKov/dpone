@@ -1,0 +1,293 @@
+.uv_job_template:
+  image: $UV_IMAGE
+  variables:
+    UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
+  cache:
+    policy: pull
+    key: "uv-${CI_PROJECT_ID}"
+    paths:
+      - .cache/uv/
+
+.vault_jwt_job_template:
+  variables:
+    ENV_CODE: "dev"
+    VAULT_AUTH_METHOD: "jwt"
+    VAULT_AUTH_PATH: "jwt_v2"
+  id_tokens:
+    VAULT_ID_TOKEN:
+      aud: $VAULT_JWT_AUDIENCE
+
+.uv_dev_job_template:
+  extends: .uv_job_template
+  before_script:
+    - set -euxo pipefail
+    - uv --version
+    - python --version
+    - uv sync --group dev
+
+.uv_dev_postgres_job_template:
+  extends: .uv_job_template
+  before_script:
+    - set -euxo pipefail
+    - uv --version
+    - python --version
+    - uv sync --group dev --extra postgres
+
+.uv_dev_clickhouse_job_template:
+  extends: .uv_job_template
+  before_script:
+    - set -euxo pipefail
+    - uv --version
+    - python --version
+    - uv sync --group dev --extra clickhouse
+
+.uv_dev_vault_job_template:
+  extends:
+    - .uv_job_template
+    - .vault_jwt_job_template
+  before_script:
+    - set -euxo pipefail
+    - uv --version
+    - python --version
+    - |
+      test -n "${VAULT_ADDR:-}"
+      test -n "${VAULT_ID_TOKEN:-}"
+      if [ -z "${VAULT_AUTH_ROLE:-}" ]; then
+        case "${ENV_CODE:-dev}" in
+          dev)
+            test -n "${VAULT_AUTH_ROLE_DEV:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_DEV}"
+            ;;
+          prod)
+            test -n "${VAULT_AUTH_ROLE_PROD:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_PROD}"
+            ;;
+          *)
+            echo "Unsupported ENV_CODE='${ENV_CODE:-}'. Expected dev or prod." >&2
+            exit 1
+            ;;
+        esac
+      fi
+      test -n "${VAULT_AUTH_ROLE:-}"
+    - python tools/ci/vault_jwt_preflight.py
+    - uv sync --group dev --extra vault -P vault-kv-client
+
+.uv_dev_vault_google_ads_job_template:
+  extends:
+    - .uv_job_template
+    - .vault_jwt_job_template
+  before_script:
+    - set -euxo pipefail
+    - uv --version
+    - python --version
+    - |
+      test -n "${VAULT_ADDR:-}"
+      test -n "${VAULT_ID_TOKEN:-}"
+      if [ -z "${VAULT_AUTH_ROLE:-}" ]; then
+        case "${ENV_CODE:-dev}" in
+          dev)
+            test -n "${VAULT_AUTH_ROLE_DEV:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_DEV}"
+            ;;
+          prod)
+            test -n "${VAULT_AUTH_ROLE_PROD:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_PROD}"
+            ;;
+          *)
+            echo "Unsupported ENV_CODE='${ENV_CODE:-}'. Expected dev or prod." >&2
+            exit 1
+            ;;
+        esac
+      fi
+      test -n "${VAULT_AUTH_ROLE:-}"
+    - python tools/ci/vault_jwt_preflight.py
+    - uv sync --group dev --extra vault --extra google_ads -P vault-kv-client
+
+.uv_dev_vault_gcp_job_template:
+  extends:
+    - .uv_job_template
+    - .vault_jwt_job_template
+  before_script:
+    - set -euxo pipefail
+    - uv --version
+    - python --version
+    - |
+      test -n "${VAULT_ADDR:-}"
+      test -n "${VAULT_ID_TOKEN:-}"
+      if [ -z "${VAULT_AUTH_ROLE:-}" ]; then
+        case "${ENV_CODE:-dev}" in
+          dev)
+            test -n "${VAULT_AUTH_ROLE_DEV:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_DEV}"
+            ;;
+          prod)
+            test -n "${VAULT_AUTH_ROLE_PROD:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_PROD}"
+            ;;
+          *)
+            echo "Unsupported ENV_CODE='${ENV_CODE:-}'. Expected dev or prod." >&2
+            exit 1
+            ;;
+        esac
+      fi
+      test -n "${VAULT_AUTH_ROLE:-}"
+    - python tools/ci/vault_jwt_preflight.py
+    - uv sync --group dev --extra vault --extra gcp -P vault-kv-client
+
+.rules_release_tag:
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: on_success
+    - when: never
+
+.rules_standard:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: on_success
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: on_success
+    - when: never
+
+.rules_main_and_mr:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: on_success
+    - when: never
+
+.rules_develop_or_mr:
+  rules:
+    - if: '($CI_COMMIT_BRANCH == "develop") || ($CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"))'
+      when: on_success
+    - when: never
+
+.rules_snapshot_publish:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && ($CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop")'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: on_success
+    - when: never
+
+.rules_integration_main_auto_mr_manual:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: manual
+      allow_failure: true
+    - when: never
+
+.rules_schedule_main_mr_manual:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: manual
+      allow_failure: true
+    - when: never
+
+.rules_vault_live_schedule_main_manual:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: on_success
+    - if: '($CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop") && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: manual
+      allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop") && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: manual
+      allow_failure: true
+    - when: never
+
+.rules_appsflyer_live_schedule_main_manual:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $DPONE_IT_AF_APP_IDS && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: on_success
+    - if: '($CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop") && $DPONE_IT_AF_APP_IDS && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: manual
+      allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop") && $DPONE_IT_AF_APP_IDS && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: manual
+      allow_failure: true
+    - when: never
+
+.rules_similarweb_live_main_manual:
+  rules:
+    - if: '($CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop") && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: manual
+      allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop") && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: manual
+      allow_failure: true
+    - when: never
+
+.rules_google_sheets_live_main_manual:
+  rules:
+    - if: '($CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop") && ($DPONE_IT_GS_SPREADSHEET_ID || $DPONE_IT_GS_SPREADSHEET_URL) && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: manual
+      allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop") && ($DPONE_IT_GS_SPREADSHEET_ID || $DPONE_IT_GS_SPREADSHEET_URL) && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: manual
+      allow_failure: true
+    - when: never
+
+.rules_yandex_webmaster_live_main_manual:
+  rules:
+    - if: '($CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop") && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: manual
+      allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop") && $VAULT_ADDR && $VAULT_AUTH_ROLE_DEV && $VAULT_JWT_AUDIENCE'
+      when: manual
+      allow_failure: true
+    - when: never
+
+.rules_schedule_develop_or_mr_manual:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: manual
+      allow_failure: true
+    - when: never
+
+.rules_develop_or_mr_manual:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: manual
+      allow_failure: true
+    - when: never
+
+.rules_docs_validate:
+  rules:
+    - if: '$DPONE_DOCS_AUTOCOMMIT == "1"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: on_success
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: on_success
+    - when: never
+
+.rules_docs_autoupdate:
+  rules:
+    - if: '$DPONE_DOCS_AUTOCOMMIT == "1" && $DPONE_GIT_PUSH_TOKEN && $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: on_success
+    - when: never

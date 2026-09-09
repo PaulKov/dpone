@@ -1,0 +1,46 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-release-integrity.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "file_count": {
+      "maximum": 50000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "no_op": {
+      "type": "boolean"
+    },
+    "passed": {
+      "const": true
+    },
+    "schema": {
+      "const": "dpone.dbt-release-integrity.v1"
+    },
+    "subject_path": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
+    "subject_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "total_bytes": {
+      "maximum": 2147483648,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "subject_path",
+    "subject_sha256",
+    "file_count",
+    "total_bytes",
+    "no_op"
+  ],
+  "type": "object"
+}

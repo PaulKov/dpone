@@ -1,0 +1,53 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-prod-mirror-prepare.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "descriptor_path": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
+    "mirror_path": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
+    "no_op": {
+      "type": "boolean"
+    },
+    "passed": {
+      "const": true
+    },
+    "promotion_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.dbt-prod-mirror-prepare.v1"
+    },
+    "source_snapshot_path": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "release_id",
+    "promotion_id",
+    "mirror_path",
+    "source_snapshot_path",
+    "descriptor_path",
+    "no_op"
+  ],
+  "type": "object"
+}

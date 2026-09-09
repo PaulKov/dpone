@@ -1,0 +1,60 @@
+schema_version: 1
+task_id: "SS-REVIEW-AUTHORING-SNAPSHOT-PINNING"
+title: "Pin primary authoring source through pack and release construction"
+goal: "Prevent mixed-generation preview, selected preview, and safe-sample artifacts when authoring files change during build."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Root source bytes and SHA-256 are captured from one confined stable read."
+  - "Preview and safe-sample builders verify the primary manifest digest before publishing artifacts."
+  - "Selected-project preview uses its captured source digest rather than a second independent read."
+  - "Primary-source drift emits DPONE_AUTHORING_SOURCE_CHANGED_DURING_BUILD."
+  - "No release, deployment, or current pointer is promoted after detected drift."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["dpone airflow preview", "selected preview", "safe sample deployment"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/readiness/airflow_authoring_check_service.py"
+  - "src/dpone/readiness/airflow_preview_service.py"
+  - "src/dpone/readiness/airflow_local_workload_pack.py"
+  - "src/dpone/readiness/airflow_local_safe_sample_deployment.py"
+  - "src/dpone/readiness/airflow_authoring_dependency_integrity.py"
+  - "src/dpone/readiness/project_selection_preview.py"
+  - "src/dpone/manifest/project_selection_loader.py"
+  - "tests/test_airflow_authoring_v1.py"
+  - "tests/test_airflow_folder_authoring_v1.py"
+  - "tests/test_airflow_authoring_snapshot_pinning.py"
+read_only_paths:
+  - "src/dpone/gitops/airflow_compact_pack.py"
+  - "src/dpone/gitops/workload_dependencies.py"
+  - "src/dpone/readiness/airflow_pipeline_source_reader.py"
+  - "src/dpone/manifest/project_selection_contracts.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_authoring_v1.py tests/test_airflow_folder_authoring_v1.py tests/test_airflow_authoring_snapshot_pinning.py -q"
+  broad:
+    - "uv run pytest tests/test_airflow_self_service_cli.py tests/test_safe_sample_runtime.py tests/test_airflow_authoring_v1.py tests/test_airflow_folder_authoring_v1.py -q"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-legal-hold.schema.json",
+  "title": "Data Product Legal Hold",
+  "type": "object",
+  "required": ["schema_version", "status", "legal_hold_id", "audit_archive_run_id", "reason", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_legal_hold.v1"},
+    "status": {"enum": ["held", "blocked"]},
+    "legal_hold_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "audit_archive_run_id": {"type": ["string", "null"]},
+    "archive_uri": {"type": ["string", "null"]},
+    "reason": {"type": "string"},
+    "authority_gate_id": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

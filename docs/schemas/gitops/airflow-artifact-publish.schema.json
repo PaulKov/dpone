@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-artifact-publish.schema.json",
+  "title": "dpone GitOps Airflow artifact publication report",
+  "type": "object",
+  "required": [
+    "schema",
+    "passed",
+    "changes",
+    "errors",
+    "status",
+    "release_id",
+    "deployment_id",
+    "environment",
+    "artifact_registry_ref",
+    "created_objects",
+    "existing_equal_objects",
+    "published_release",
+    "published_deployment"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.airflow-artifact-publish.v1"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "status": {
+      "enum": [
+        "published",
+        "no_op",
+        "failed"
+      ]
+    },
+    "release_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "deployment_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "environment": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "artifact_registry_ref": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "created_objects": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "existing_equal_objects": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "published_release": {
+      "type": "boolean"
+    },
+    "published_deployment": {
+      "type": "boolean"
+    }
+  }
+}

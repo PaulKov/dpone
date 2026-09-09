@@ -1,0 +1,158 @@
+schema_version: 1
+owner: dpone maintainers
+last_reviewed: "2026-07-11"
+purpose: >
+  Machine-readable permission profile for repository-local AI agents. The
+  governance gate validates this file before agent-control changes merge.
+
+profiles:
+  - id: read_only_reviewer
+    owner: maintainers
+    applies_to:
+      - dpone_explorer
+      - dpone_architect
+      - dpone_docs_ux_reviewer
+    description: >
+      Read-only analysis role for code, architecture, documentation, and UX
+      review. It gathers evidence and recommendations but does not edit files.
+    sandbox_modes:
+      - read-only
+    allowed_tools:
+      - filesystem_read
+      - git_local_read
+      - github_read
+      - web_official_sources
+      - docs_quality_tools
+    forbidden_tools:
+      - filesystem.write
+      - git.push
+      - github.admin_merge
+      - secrets.read
+      - live.production
+    protected_actions:
+      - git.push
+      - github.pr.create
+      - github.admin_merge
+      - secrets.read
+      - live.production
+    evidence_required:
+      - file references and line-specific findings
+      - command output for any claimed validation result
+      - explicit SKIP or UNVERIFIED status for unavailable checks
+    escalation:
+      - Switch to path_scoped_writer only after an approved task contract and isolated worktree exist.
+      - Route shared-file or workflow changes to the integrator.
+
+  - id: path_scoped_writer
+    owner: maintainers
+    applies_to:
+      - dpone_implementer
+      - dpone_test_certifier
+    description: >
+      Writer role for approved, path-scoped implementation or test work. It may
+      edit only owned paths from the task contract.
+    sandbox_modes:
+      - workspace-write
+    allowed_tools:
+      - filesystem_read
+      - filesystem_write_owned
+      - shell_local
+      - git_local_read
+      - docs_quality_tools
+    forbidden_tools:
+      - shared.semantic.write_without_integrator
+      - git.push
+      - github.admin_merge
+      - secrets.read
+      - live.production
+    protected_actions:
+      - git.push
+      - github.pr.create
+      - github.admin_merge
+      - secrets.read
+      - live.production
+    evidence_required:
+      - approved feature specification or concise impact plan
+      - task contract with owned, read-only, and forbidden paths
+      - red-green evidence for changed behavior
+      - focused validation commands for owned paths
+    escalation:
+      - Stop on path-ownership conflicts and ask the integrator to re-partition work.
+      - Mark live checks SKIP or UNVERIFIED unless a live environment is explicitly approved.
+
+  - id: integrator
+    owner: maintainers
+    applies_to:
+      - dpone_integrator
+      - main Codex session acting as integrator
+    description: >
+      Writer role that reconciles findings, owns shared semantic files, prepares
+      the final reviewable branch, and opens PRs when explicitly requested.
+    sandbox_modes:
+      - workspace-write
+      - danger-full-access
+    allowed_tools:
+      - filesystem_read
+      - filesystem_write_owned
+      - shell_local
+      - git_local_read
+      - git_remote
+      - github_read
+      - github_pr
+      - web_official_sources
+      - mcp_connector
+      - docs_quality_tools
+    forbidden_tools:
+      - github.admin_merge_without_break_glass
+      - secrets.read
+      - live.production
+    protected_actions:
+      - git.push
+      - github.pr.create
+      - github.admin_merge
+      - secrets.read
+      - live.production
+    evidence_required:
+      - reconciled diff with public-contract and compatibility impact
+      - change-aware validation plan from select_checks.py
+      - focused and broad validation results
+      - PR description with residual risk and artifact paths
+    escalation:
+      - Use break-glass only with a GitHub issue, rollback plan, and follow-up owner.
+      - Require explicit user intent before push, PR creation, admin merge, live checks, or secret access.
+
+  - id: release_auditor
+    owner: maintainers
+    applies_to:
+      - dpone_release_auditor
+    description: >
+      Read-only release gate role for a named version and frozen commit. It
+      audits R1-R9 evidence and returns GO, NO-GO, or UNVERIFIED.
+    sandbox_modes:
+      - read-only
+    allowed_tools:
+      - filesystem_read
+      - git_local_read
+      - github_read
+      - web_official_sources
+      - docs_quality_tools
+    forbidden_tools:
+      - filesystem.write
+      - git.push
+      - github.admin_merge
+      - release.publish
+      - secrets.read
+      - live.production
+    protected_actions:
+      - git.push
+      - github.pr.create
+      - github.admin_merge
+      - secrets.read
+      - live.production
+    evidence_required:
+      - frozen commit SHA and target version
+      - R1-R9 gate table with PASS, FAIL, SKIP, N/A, or UNVERIFIED
+      - package, docs, security, Airflow, dbt, and recovery artifact links
+    escalation:
+      - Return NO-GO when release evidence is stale, unavailable, mocked, or not tied to the frozen commit.
+      - Never perform release publication or admin merge from the auditor role.

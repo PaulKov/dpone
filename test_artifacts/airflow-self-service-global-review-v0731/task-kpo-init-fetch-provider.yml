@@ -1,0 +1,68 @@
+schema_version: 1
+task_id: "SS-REVIEW-KPO-INIT-FETCH-PROVIDER"
+title: "Compose strict init-fetch KPOs in the lightweight provider"
+goal: "Thread one immutable delivery context through indexed provider paths and force fixed init/base commands."
+specification: "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "local_preview and init_fetch are the only executable indexed modes."
+  - "Unsupported and incomplete modes fail before any DAG is installed."
+  - "Runtime, pre-hook and mapped tasks receive the same immutable delivery context."
+  - "init_fetch replaces pack-owned image, command, args, init containers, reserved volumes/mounts, service account and namespace."
+  - "The plan is deterministic, bounded to 16KiB, secret-free and hash-pinned."
+  - "The generated base container cannot consume scheduler runtime_command or inline bootstrap."
+  - "Provider parse performs no network, secret, DB, Variable, Connection, Vault or Kubernetes configuration I/O."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["airflow.providers.dpone", "dpone-airflow-pack", "KPO pod spec", "LoadReport"]
+  migration_required: true
+
+owned_paths:
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack"
+  - "tests/test_airflow_deployment_index_provider.py"
+  - "tests/test_airflow_dag_loader.py"
+  - "tests/test_airflow_dag_loader_contract.py"
+  - "tests/test_airflow_runtime_adapter.py"
+  - "tests/test_airflow_provider_init_fetch_execution.py"
+  - "tests/test_airflow_provider_compatibility_matrix.py"
+  - "tests/test_airflow_public_sdk_preference.py"
+read_only_paths:
+  - "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+  - "docs/schemas/gitops/airflow-deployment-index.schema.json"
+  - "docs/schemas/gitops/airflow-pack.schema.json"
+  - "src/dpone/runtime"
+  - "src/dpone/gitops"
+forbidden_paths:
+  - "src"
+  - "docs"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+shared_file_owner: "integrator"
+dependencies:
+  - "SS-REVIEW-KPO-INIT-FETCH-CONTRACT"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_deployment_index_provider.py tests/test_airflow_dag_loader.py tests/test_airflow_runtime_adapter.py tests/test_airflow_provider_init_fetch_execution.py -q"
+    - "uv run ruff check packages/dpone-airflow-pack/src/dpone_airflow_pack"
+  broad:
+    - "uv run pytest -k airflow -q"
+    - "uv run dpone docs check-airflow-public-contracts"
+  live: []
+required_outputs:
+  [implementation, tests, compatibility_impact, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Required edit falls outside owned_paths."
+  - "Provider would need to import core dpone, cloud SDKs, Vault or Kubernetes configuration."
+  - "A fallback to scheduler-copied runtime command remains in init_fetch."

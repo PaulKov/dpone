@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-consumer-lineage.schema.json",
+  "title": "dpone schema contract consumer lineage",
+  "type": "object",
+  "required": ["schema_version", "status", "contract_id", "evidence", "summary", "blockers", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_consumer_lineage.v1"},
+    "consumer_lineage_id": {"type": "string", "pattern": "^sha256:"},
+    "status": {"enum": ["discovered", "blocked"]},
+    "contract_id": {"type": ["string", "null"]},
+    "contract_version_id": {"type": ["string", "null"]},
+    "version": {"type": ["string", "null"]},
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["consumer_id", "dataset", "source", "confidence"],
+        "additionalProperties": true,
+        "properties": {
+          "consumer_id": {"type": "string"},
+          "consumer_type": {"type": "string"},
+          "owner": {"type": ["string", "null"]},
+          "dataset": {"type": "string"},
+          "column": {"type": ["string", "null"]},
+          "source": {"type": "string"},
+          "confidence": {"enum": ["explicit", "parsed", "inferred", "table_only"]},
+          "path": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

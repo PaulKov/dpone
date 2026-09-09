@@ -1,0 +1,20 @@
+{
+  "orders::order_lines": {
+    "committed": {
+      "root_table": "orders",
+      "child_table": "order_lines",
+      "unique_key": [
+        "order_id",
+        "sku"
+      ],
+      "keys": [
+        {
+          "order_id": 1,
+          "sku": "A"
+        }
+      ],
+      "load_id": "load-1",
+      "status": "committed"
+    }
+  }
+}

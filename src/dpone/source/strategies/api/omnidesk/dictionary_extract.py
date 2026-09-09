@@ -1,0 +1,6 @@
+"""Auto-generated shim module.
+
+DEPRECATED: use `dpone.runtime.sources.strategies.api.omnidesk.dictionary_extract` instead.
+"""
+
+from dpone.runtime.sources.strategies.api.omnidesk.dictionary_extract import *  # noqa: F401,F403

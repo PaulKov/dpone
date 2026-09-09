@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+# Step 8: use a convention/preset to bootstrap naming + required metadata.
+convention: landing_raw_v1
+
+# Step 9: you can keep source host/type in a central registry instead of repeating
+# them in every batch manifest.
+registry: ../registry/sources.yaml
+
+# Example (landing/raw naming convention) — can be adapted to any project.
+#
+# Key idea:
+# - move shared config to defaults
+# - list tables once
+# - use naming templates + vars for DRY
+
+vars:
+  src_system: monolite
+  src_database: demo_source
+  owner_team: data-platform-team
+  owner_contact: data-platform@example.com
+  sla: "daily"
+
+defaults:
+  source:
+    type: postgres
+    connection_type: vault
+    connection_id: postgres-demo
+    vault_path: postgres/demo-source
+    options:
+      batch_size: 1000000
+      export_format: csv
+
+  sink:
+    type: bigquery
+    connection_type: vault
+    connection_id: bigquery-demo
+    vault_path: gcp/demo-project-prod/bq/example-etl-service
+    staging:
+      schema: stg
+    strategy:
+      mode: full_refresh
+      overwrite_type: exchange
+    options:
+      log_sample_rows: 5
+
+  bigquery_proxy:
+    proxy_enable: true
+
+schemas:
+  public:
+    tables:
+      - core_city
+      - core_citydiscountcommission

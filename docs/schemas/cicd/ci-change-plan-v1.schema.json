@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/cicd/ci-change-plan-v1.schema.json",
+  "title": "dpone.ci-change-plan.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "repository_id", "pr_number", "base_sha", "head_sha", "merge_sha", "changed_paths", "route_policy_digest", "jobs", "plan_digest"],
+  "properties": {
+    "schema_version": {"const": "dpone.ci-change-plan.v1"},
+    "repository_id": {"type": "integer", "minimum": 1}, "pr_number": {"type": "integer", "minimum": 1},
+    "base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "merge_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "changed_paths": {"type": "array", "maxItems": 4096, "items": {"type": "string", "minLength": 1, "maxLength": 4096}},
+    "route_policy_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}, "plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "jobs": {"type": "object", "additionalProperties": false, "required": ["static", "contracts", "docs", "python-3.11", "python-3.12", "packaging", "postgresql", "airflow", "runtime-wheel-smoke"], "properties": {"static":{"enum":["RUN","N/A"]},"contracts":{"enum":["RUN","N/A"]},"docs":{"enum":["RUN","N/A"]},"python-3.11":{"enum":["RUN","N/A"]},"python-3.12":{"enum":["RUN","N/A"]},"packaging":{"enum":["RUN","N/A"]},"postgresql":{"enum":["RUN","N/A"]},"airflow":{"enum":["RUN","N/A"]},"runtime-wheel-smoke":{"enum":["RUN","N/A"]}}}
+  }
+}

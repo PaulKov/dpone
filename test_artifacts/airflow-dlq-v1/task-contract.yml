@@ -1,0 +1,118 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-DLQ-V1"
+title: "First-class DLQ contract"
+goal: "Implement safe reasoned quarantine, plan-first replay, retention, and PII-safe evidence without a second runtime engine."
+specification: "docs/feature-design-airflow-dlq-v1.md"
+base_commit: "803e9552"
+integrator: "current Codex task"
+
+acceptance_criteria:
+  - "Every canonical DLQ record has a stable reason code, record reference, checksum, expiry, and safe payload policy."
+  - "Default artifacts and evidence contain no row values or actual invalid values."
+  - "DLQ write failure blocks finalization and source-state advancement."
+  - "Replay is plan-first, uses injected resolver/sink ports and stable idempotency keys, and records acknowledgements before reporting success."
+  - "Retention is mark-and-sweep, plan-first, and protects pending/active/evidence-pinned records."
+  - "Legacy QuarantineService remains import-compatible while generic --yes can no longer claim an unapplied replay."
+
+public_contract_impact:
+  level: deprecation
+  surfaces:
+    - manifest_schema
+    - runtime_state
+    - evidence
+    - artifact_schema
+    - python_api
+    - ops_cli
+    - documentation
+  migration_required: true
+
+owned_paths:
+  - src/dpone/contracts/dlq.py
+  - src/dpone/ports/dlq.py
+  - src/dpone/ops/dlq.py
+  - src/dpone/ops/dlq_models.py
+  - src/dpone/ops/dlq_safety.py
+  - src/dpone/ops/dlq_store.py
+  - src/dpone/ops/dlq_store_io.py
+  - src/dpone/ops/dlq_store_paths.py
+  - src/dpone/ops/dlq_replay.py
+  - src/dpone/ops/dlq_retention.py
+  - src/dpone/ops/quarantine.py
+  - src/dpone/ops/__init__.py
+  - src/dpone/ops/catalog_core_package.py
+  - src/dpone/type_system/enforcement.py
+  - src/dpone/runtime/etl/lifecycle.py
+  - src/dpone/runtime/etl/contract_artifacts.py
+  - src/dpone/ops/data_contract_evidence.py
+  - src/dpone/commands/ops_parsers_core.py
+  - src/dpone/services/ops/command_handlers_core.py
+  - src/dpone/schema/etl-config.schema.json
+  - src/dpone/schema/etl-batch-manifest.schema.json
+  - docs/schemas/dlq/
+  - tests/test_airflow_dlq_v1.py
+  - tests/test_data_contract_runtime_maturity.py
+  - tests/test_operations_maturity_services.py
+  - tests/test_etl_processor_runtime_lifecycle_gates.py
+  - docs/feature-design-airflow-dlq-v1.md
+  - docs/data-contract-runtime.md
+  - docs/run.md
+  - docs/runtime-fast-path-contracts.md
+  - docs/ops-cli.md
+  - docs/cli-reference.md
+  - docs/errors/DPONE_DLQ_REPLAY_EXECUTOR_REQUIRED.md
+  - docs/airflow-self-service.md
+  - docs/airflow-self-service-backlog.md
+  - docs/compatibility.md
+  - CHANGELOG.md
+  - tools/airflow_dlq_benchmark.py
+  - test_artifacts/airflow-dlq-v1/
+read_only_paths:
+  - docs/architecture.md
+  - docs/engineering-standards.md
+  - docs/airflow-industrial-self-service-specification.md
+  - src/dpone/runtime/cdc/
+forbidden_paths:
+  - .cursor/
+  - pyproject.toml
+  - uv.lock
+  - mkdocs.yml
+  - .github/workflows/
+
+shared_file_owner: "current Codex task"
+dependencies:
+  - "Airflow Authoring v1"
+  - "runtime data contracts"
+  - "structured execution/data outcomes"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_dlq_v1.py tests/test_data_contract_runtime_maturity.py tests/test_etl_processor_runtime_lifecycle_gates.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "Route-specific replay resolver/sink only in approved environment; otherwise UNVERIFIED"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - validation_report
+  - benchmark
+  - completion_report
+
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

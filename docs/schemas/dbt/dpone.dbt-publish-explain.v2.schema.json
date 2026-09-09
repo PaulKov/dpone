@@ -1,0 +1,202 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-publish-explain.v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "intent": {
+      "type": "object"
+    },
+    "model": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "model_path": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
+    "resolved_physical_design": {
+      "type": "object"
+    },
+    "resolved_strategy": {
+      "type": "object"
+    },
+    "route_capability": {
+      "type": "object"
+    },
+    "schema": {
+      "const": "dpone.dbt-publish-explain.v2"
+    },
+    "semantic_refresh": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_lifecycle_policy": {
+          "enum": [
+            "FROZEN",
+            "UNVERIFIED"
+          ]
+        },
+        "dbt_core": {
+          "const": "1.12.3"
+        },
+        "dbt_sqlserver": {
+          "const": "1.11.1"
+        },
+        "effective_key_policy": {
+          "const": "non_null_injective_exact"
+        },
+        "ephemeral_nodes": {
+          "const": "none"
+        },
+        "event_time_policy": {
+          "const": "immutable_effective_key_member"
+        },
+        "model_archetype": {
+          "const": "scope_stable_event_fact"
+        },
+        "profile_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "publication": {
+          "const": "sequential_model_atomic"
+        },
+        "recovery": {
+          "const": "evidence_driven"
+        },
+        "replay_mutation": {
+          "const": "upsert_only"
+        },
+        "row_removal": {
+          "const": "unsupported"
+        },
+        "runtime_adapter_lifecycle": {
+          "enum": [
+            "RUNTIME_REQUIRED",
+            "PROVEN",
+            "UNVERIFIED"
+          ]
+        },
+        "runtime_dependency_closure": {
+          "enum": [
+            "RUNTIME_REQUIRED",
+            "PROVEN",
+            "UNVERIFIED"
+          ]
+        },
+        "scope": {
+          "const": "UTC day [start,end)"
+        },
+        "source_side_pruning": {
+          "enum": [
+            "PROVEN",
+            "NOT_PROVEN"
+          ]
+        },
+        "static_dependency_closure": {
+          "enum": [
+            "PROVEN",
+            "NONCONFORMANT",
+            "UNVERIFIED"
+          ]
+        },
+        "utc_assurance": {
+          "enum": [
+            "PROVEN",
+            "RUNTIME_REQUIRED",
+            "UNVERIFIED"
+          ]
+        },
+        "workflow_mode": {
+          "enum": [
+            "normal",
+            "failed_precommit_replacement",
+            "complete_scope_replay"
+          ]
+        },
+        "writer_assurance": {
+          "enum": [
+            "PROVEN",
+            "RUNTIME_REQUIRED",
+            "UNVERIFIED"
+          ]
+        }
+      },
+      "required": [
+        "workflow_mode",
+        "model_archetype",
+        "scope",
+        "static_dependency_closure",
+        "runtime_dependency_closure",
+        "ephemeral_nodes",
+        "adapter_lifecycle_policy",
+        "runtime_adapter_lifecycle",
+        "dbt_core",
+        "dbt_sqlserver",
+        "writer_assurance",
+        "source_side_pruning",
+        "event_time_policy",
+        "effective_key_policy",
+        "utc_assurance",
+        "publication",
+        "recovery",
+        "replay_mutation",
+        "row_removal",
+        "profile_sha256"
+      ],
+      "type": "object"
+    },
+    "source_relation": {
+      "additionalProperties": false,
+      "properties": {
+        "database": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "name"
+      ],
+      "type": "object"
+    },
+    "warnings": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "workload_id": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "model",
+    "model_path",
+    "source_relation",
+    "intent",
+    "resolved_strategy",
+    "resolved_physical_design",
+    "route_capability",
+    "workload_id",
+    "warnings",
+    "semantic_refresh"
+  ],
+  "type": "object"
+}

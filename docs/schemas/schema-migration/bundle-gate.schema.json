@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/bundle-gate.schema.json",
+  "title": "dpone schema migration bundle gate",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "gate_id",
+    "status",
+    "profile",
+    "bundle_id",
+    "pack_id",
+    "target",
+    "checks",
+    "blockers",
+    "warnings",
+    "recommendations"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_bundle_gate.v1"
+    },
+    "gate_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "profile": {
+      "enum": ["advisory", "pr_review", "stage_certified", "prod_strict", "regulated"]
+    },
+    "bundle_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "target": {"type": "object"},
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "details"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string"},
+          "status": {"enum": ["passed", "warning", "blocked"]},
+          "details": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  }
+}

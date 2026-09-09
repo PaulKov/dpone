@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/post-apply-plan.schema.json",
+  "title": "dpone schema migration post-apply plan",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "post_apply_plan_id",
+    "pack_id",
+    "environment",
+    "target",
+    "status",
+    "checks",
+    "canaries",
+    "blockers",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_post_apply_plan.v1"},
+    "post_apply_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "bundle_id": {"type": ["string", "null"]},
+    "environment": {"type": "string", "minLength": 1},
+    "target": {
+      "type": "object",
+      "required": ["sink_type", "table"],
+      "additionalProperties": true,
+      "properties": {
+        "sink_type": {"type": "string"},
+        "table": {"type": "string"}
+      }
+    },
+    "status": {"enum": ["planned", "blocked"]},
+    "mode": {"enum": ["observe", "gate"]},
+    "profile": {"enum": ["advisory", "stage", "prod_strict", "regulated"]},
+    "checks": {"type": "object"},
+    "canaries": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

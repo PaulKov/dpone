@@ -1,0 +1,84 @@
+name: Release readiness
+description: Track scoped readiness or retrospective publication evidence for exact source/controller identities
+title: "release: v"
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Follow docs/release.md and docs/agent-release-protocol.md. Separate readiness from publication observation. A GO recommendation does not authorize upload. SKIP, mocked, stale, or unavailable evidence is not PASS.
+  - type: dropdown
+    id: operation
+    attributes:
+      label: Requested operation
+      options: [readiness audit, authorized publication, retrospective verification, scoped certification]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: vX.Y.Z
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Frozen commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: release_type
+    attributes:
+      label: Release type
+      options: [patch, minor, major]
+    validations:
+      required: true
+  - type: textarea
+    id: controller
+    attributes:
+      label: Controller identity and authorization
+      description: Reviewed controller SHA; exact run/attempt and artifact identities when published; publication authorization reference, or not dispatched/N/A with reason. Never paste credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Changed scope
+      description: Packages, CLI/API surfaces, schemas, connectors, strategies, Airflow/dbt, docs, and operations.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: R1-R9 evidence report
+      description: Link the report created from docs/agent-templates/release-evidence-report.md.
+    validations:
+      required: true
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Gate acknowledgement
+      options:
+        - label: R1 CLI correctness and UX has evidence, an explicit blocker, or a scope-based N/A rationale.
+          required: true
+        - label: R2 run CLI/Python parity has evidence, an explicit blocker, or a scope-based N/A rationale.
+          required: true
+        - label: R3 hierarchical identity is evidenced or explicitly N/A.
+          required: true
+        - label: R4 route/strategy matrix is evidenced or explicitly N/A.
+          required: true
+        - label: R5 source contracts and guardrails have evidence or an explicit blocker; observation-only scope is identified separately.
+          required: true
+        - label: R6 docs and CJM has evidence, an explicit blocker, or a scope-based N/A rationale.
+          required: true
+        - label: R7 Airflow/dbt is evidenced or explicitly N/A.
+          required: true
+        - label: R8 packaging/security/supply chain evidence is scoped, with unverified items explicit.
+          required: true
+        - label: Exact-commit Agent PR merge receipt is reconciled for readiness GO, or its absence is explicit; a publication observation does not prove source readiness.
+          required: true
+        - label: R9 recovery/observability/performance is evidenced or explicitly N/A.
+          required: true
+        - label: Readiness and publication observation are reported separately; no retry upload or provider change is implied by this report.
+          required: true

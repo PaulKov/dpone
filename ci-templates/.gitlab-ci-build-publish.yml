@@ -1,0 +1,100 @@
+pre-build:
+  extends:
+    - .uv_job_template
+    - .rules_standard
+  stage: pre-build
+  script:
+    - |
+      set -euo pipefail
+      uv --version
+      python --version
+      ls -la
+
+build:
+  extends:
+    - .uv_job_template
+    - .rules_main_and_mr
+  stage: build
+  script:
+    - |
+      set -euo pipefail
+      rm -rf dist
+      uv build -v
+      ls -la dist
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
+
+create_release_and_publish:
+  extends:
+    - .uv_job_template
+    - .rules_release_tag
+  stage: publish
+  variables:
+    TARGET_PROJECT_ID: "$CI_PROJECT_ID"
+    PYPI_PUBLISH_URL: "$CI_API_V4_URL/projects/$TARGET_PROJECT_ID/packages/pypi"
+    PYPI_SIMPLE_URL: "$CI_API_V4_URL/projects/$TARGET_PROJECT_ID/packages/pypi/simple"
+    UV_PUBLISH_USERNAME: "gitlab-ci-token"
+    UV_PUBLISH_PASSWORD: "$CI_JOB_TOKEN"
+  script:
+    - |
+      set -euo pipefail
+
+      TAG_VER="${CI_COMMIT_TAG#v}"
+      echo "Release tag: $CI_COMMIT_TAG -> version: $TAG_VER"
+
+      if curl -fsS -u "$UV_PUBLISH_USERNAME:$UV_PUBLISH_PASSWORD" "$PYPI_SIMPLE_URL/$LIB_NAME/" | grep -q "${LIB_NAME}-${TAG_VER}"; then
+        echo "ERROR: ${LIB_NAME} ${TAG_VER} уже есть в registry, публикацию пропускаю."
+        exit 1
+      fi
+
+      uv version "$TAG_VER" --frozen
+      rm -rf dist
+      uv build --no-sources -v
+      ls -la dist
+
+      uv publish         --publish-url "$PYPI_PUBLISH_URL"         --username "$UV_PUBLISH_USERNAME"         --password "$UV_PUBLISH_PASSWORD"         -v
+
+publish_dev_snapshot:
+  extends:
+    - .uv_job_template
+    - .rules_snapshot_publish
+  stage: publish
+  variables:
+    TARGET_PROJECT_ID: "$CI_PROJECT_ID"
+    PYPI_PUBLISH_URL: "$CI_API_V4_URL/projects/$TARGET_PROJECT_ID/packages/pypi"
+    PYPI_SIMPLE_URL: "$CI_API_V4_URL/projects/$TARGET_PROJECT_ID/packages/pypi/simple"
+    UV_PUBLISH_USERNAME: "gitlab-ci-token"
+    UV_PUBLISH_PASSWORD: "$CI_JOB_TOKEN"
+    SNAPSHOT_ENV_FILE: "snapshot.env"
+  script:
+    - |
+      set -euo pipefail
+
+      SNAPSHOT_VER="$(python tools/compute_snapshot_version.py --pyproject pyproject.toml --pipeline-iid "$CI_PIPELINE_IID")"
+      echo "Publishing dev snapshot: ${SNAPSHOT_VER}"
+
+      {
+        echo "DPONE_SNAPSHOT_VERSION=${SNAPSHOT_VER}"
+        echo "DPONE_SNAPSHOT_SHA=${CI_COMMIT_SHORT_SHA}"
+        echo "DPONE_PACKAGE_SPEC=${LIB_NAME}==${SNAPSHOT_VER}"
+      } > "$SNAPSHOT_ENV_FILE"
+
+      if curl -fsS -u "$UV_PUBLISH_USERNAME:$UV_PUBLISH_PASSWORD" "$PYPI_SIMPLE_URL/$LIB_NAME/" | grep -q "${LIB_NAME}-${SNAPSHOT_VER}"; then
+        echo "Snapshot ${SNAPSHOT_VER} already exists in registry; skipping publish."
+        exit 0
+      fi
+
+      uv version "$SNAPSHOT_VER" --frozen
+      rm -rf dist
+      uv build --no-sources -v
+      ls -la dist
+
+      uv publish         --publish-url "$PYPI_PUBLISH_URL"         --username "$UV_PUBLISH_USERNAME"         --password "$UV_PUBLISH_PASSWORD"         -v
+  artifacts:
+    paths:
+      - snapshot.env
+    reports:
+      dotenv: snapshot.env
+    expire_in: 1 week

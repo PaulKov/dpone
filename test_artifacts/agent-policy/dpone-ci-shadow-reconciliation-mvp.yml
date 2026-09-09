@@ -1,0 +1,300 @@
+schema_version: 1
+policy_id: "dpone.ci-shadow-reconciliation-mvp.v1"
+artifact_kind: "design_fixture"
+status: "APPROVED_DESIGN"
+runtime_consumable: false
+
+runtime_contract:
+  owner: "dpone.contracts.ci_shadow_reconciliation.ReconciliationPolicyV1"
+  child_contract_must_freeze_exact_bytes: true
+  external_policy_cli_argument: false
+  producer_workflow_id: 343714753
+  auditor_workflow_id: 343909056
+
+schedule:
+  utc: "03:15"
+  observation_window_days: 14
+  grace_minutes: 30
+
+scan:
+  lower_bound: "safe_scan_through - 14 days"
+  upper_bound: "floor_to_utc_second(observation_started_at) - 30 minutes"
+  interval: "closed_utc_seconds"
+  timestamp_field: "workflow_run.created_at"
+  timestamp_format: "RFC3339_UTC_seconds"
+  provider_scope: "provider-observable exact interval"
+  producer_query: "/actions/workflows/{producer_workflow_id}/runs?event=pull_request&created={lo}..{hi}&per_page=100&page={page}"
+  auditor_query: "/actions/workflows/{auditor_workflow_id}/runs?event=workflow_run&created={scan_from}..{observation_started_at}&per_page=100&page={page}"
+  split_trigger: "total_count >= 1000"
+  split_rule: "lo==hi is irreducible; hi==lo+1s splits to [lo,lo] and [hi,hi]; otherwise [lo,mid] and [mid,hi] overlap at mid"
+  seam_rule: "deduplicate identical stable keys; changed bytes are UNVERIFIED"
+  completeness_rule: "two consecutive complete whole-tree observations independently acquire every listed provider input; topology, canonical records, and digests must match"
+  complete_observation_includes:
+    - "producer and auditor run plus every attempt record"
+    - "exact producer run lookup for every auditor record"
+    - "exact-attempt Jobs pages"
+    - "artifact inventory metadata"
+    - "bounded downloaded artifact bytes and digests"
+  report_observation_boundary: "completion of the second matching whole-tree observation"
+  provider_reads_after_boundary: false
+  enumerate_all_run_attempts: true
+  same_second_overflow: "UNVERIFIED"
+  incomplete_pagination: "UNVERIFIED"
+
+cross_window_auditor_policy:
+  producer_timestamp_authority: "producer root workflow_run.created_at; rerun attempts do not change it"
+  exact_producer_run_lookup_required: true
+  before_scan_from:
+    outcome: "OUT_OF_SCOPE_OLD_PRODUCER_RERUN"
+    affects_current_root: false
+    recovery: "CREATE_NEW_PRODUCER_RUN"
+  inside_interval:
+    outcome: "EVALUATE_NORMALLY"
+    affects_current_root: true
+  after_safe_through_not_after_observation_start:
+    outcome: "DEFER_TO_NEXT_REPORT"
+    affects_current_root: false
+  after_observation_start:
+    outcome: "UNVERIFIED"
+    code: "RECONCILIATION_FUTURE_PRODUCER"
+    affects_current_root: true
+    recovery: "RECONCILIATION_RETRY"
+  inside_interval_missing_from_producer_query:
+    outcome: "UNVERIFIED"
+    code: "RECONCILIATION_PRODUCER_QUERY_OMISSION"
+    affects_current_root: true
+    recovery: "RECONCILIATION_RETRY"
+  missing_foreign_or_unresolvable:
+    outcome: "UNVERIFIED"
+    code: "RECONCILIATION_PRODUCER_IDENTITY_UNRESOLVABLE"
+    affects_current_root: true
+    recovery: "VERIFY_PRODUCER_IDENTITY_OR_CREATE_NEW_RUN"
+  report_every_classification: true
+
+identity:
+  producer_key:
+    - repository_id
+    - workflow_id
+    - run_id
+    - run_attempt
+  audit_receipt_key:
+    - producer_repository_id
+    - producer_workflow_id
+    - producer_run_id
+    - producer_run_attempt
+  audit_rerun_selection: "highest_observed_attempt_must_be_terminal"
+  higher_nonterminal_auditor_attempt: "UNVERIFIED"
+  independent_auditor_run_ids: "UNVERIFIED"
+  conflicting_decisions: "UNVERIFIED"
+
+fork_approval:
+  contract_status: "empirical_unverified_until_live_canary"
+  incoming_action_required_event: "receipt_free_pending_observer"
+  current_api_action_required_run: "UNVERIFIED"
+  auditable_input: "independently_authenticated_post_start_completed_attempt"
+  same_run_or_attempt_continuity_required: false
+  unknown_or_moved_identity: "UNVERIFIED"
+
+decision:
+  coverage_status:
+    - PASS
+    - UNVERIFIED
+  product_status:
+    - PASS
+    - FAIL
+    - UNVERIFIED
+  root_precedence:
+    - UNVERIFIED
+    - FAIL
+    - PASS
+  pass_requires:
+    - complete_interval_pagination
+    - every_observed_attempt_terminal
+    - exactly_one_authenticated_audit_receipt_per_attempt
+    - highest_observed_auditor_attempt_terminal
+    - no_identity_or_resource_uncertainty
+  fail_requires:
+    - authenticated_terminal_failure
+    - no_uncertainty_blocker
+  in_window_canary_handling: "fold_as_ordinary_producer_attempt"
+
+artifact:
+  schema: "dpone.pr-gate-shadow-reconciliation.v1"
+  name: "pr-gate-shadow-reconciliation-<observer_run_id>-<observer_run_attempt>.json"
+  archive: false
+  overwrite: false
+  retention_days: 90
+  max_bytes: 1048576
+  content: "bounded_direct_utf8_json"
+  payload_self_digest: false
+  post_upload_provider_digest_is_transport_identity: true
+  writer_port: "dpone.ports.evidence.CreateOnlyEvidenceWriterV1"
+  writer_adapter: "dpone.adapters.filesystem_evidence.DescriptorPinnedCreateOnlyEvidenceWriter"
+  existing_helper_reuse: "forbidden until compatibility-preserving adapter extraction is proved"
+  write_transaction: "confined stage -> file fsync -> atomic no-replace commit -> parent fsync"
+  existing_identical_target: "descriptor-pin and revalidate root/parent/leaf/inode/bytes; current file+parent fsync required before idempotent success"
+  existing_different_target: "UNVERIFIED"
+  partial_stage_recovery: "remove only authenticated same-attempt stage, then retry"
+  scope_disclaimer: "provider-observable exact interval; not proof that no hidden or deleted run ever existed"
+
+retention:
+  repository_settings_are_authority: false
+  repository_settings_observation_owner: "PR7_optional_telemetry"
+  trusted_workflow_upload_retention_days: 90
+  producer_upload_authority: "workflow path/mode/blob identical in authenticated B/H/M"
+  auditor_upload_authority: "allowlisted default-branch workflow ID/path/revision/ref/event/run/attempt"
+  reconciler_upload_authority: "allowlisted default-branch workflow ID/path/revision/ref/event/run/attempt"
+  expires_at_is_availability_deadline_only: true
+  require_created_at: true
+  require_expires_at: true
+  require_not_expired: true
+  exact_expires_minus_created_required: false
+  missing_or_expired: "UNVERIFIED"
+  window_history_loss: "RECONCILIATION_RETENTION_HISTORY_LOST"
+  current_head_recovery: "a fresh auditable attempt may establish new exact-head evidence but never repairs an overlapping daily interval"
+  daily_root_recovery: "wait until the lost attempt leaves a later complete clean window; never relabel an old report"
+
+limits:
+  max_runs_per_slice: 1000
+  max_partition_depth: 32
+  max_api_requests: 800
+  max_raw_run_records: 65536
+  max_raw_artifact_records: 65536
+  max_response_bytes: 134217728
+  response_byte_scope: "API response bodies plus downloaded artifact bytes across both observations"
+  max_wall_seconds: 900
+  max_producer_attempts: 4096
+  max_auditor_receipts: 4096
+  max_json_depth: 32
+  max_object_members: 256
+  max_array_items: 4096
+  max_string_bytes: 65536
+
+request_accounting:
+  increment: "before every outbound HTTP dispatch"
+  includes: "REST, Git object, pull-request identity, artifact download endpoint, redirect follow-up, polling, and retry dispatches"
+  redirect_rule: "initial download endpoint and each followed redirect are separate requests"
+  response_byte_rule: "count response-body octets delivered to the application before archive decompression"
+  retry_rule: "each retry increments total_http_requests and its functional request class"
+  request_class_conservation: "total_http_requests equals the sum of all dispatch classes except retry_requests, which is an intersecting subset"
+  counter_semantics: "exact below limits; saturating lower bounds at a crossed hard limit"
+  wall_time_scope: "injected monotonic seconds from immediately before first provider dispatch through final observation evaluation"
+  dispatch_timeout_rule: "min(adapter timeout, remaining wall budget); do not dispatch when no budget remains"
+
+capacity_calibration:
+  probe_child_requires_prior_approval: true
+  required_before_reconciler_child_approval: true
+  current_limits_are_parent_hard_maxima: true
+  command: "uv run python tools/ci/calibrate_pr_gate_shadow_capacity.py --event <trusted-event.json> --output <capacity.json>"
+  workflow_path: ".github/workflows/pr-gate-shadow-capacity.yml"
+  workflow_event: "workflow_dispatch"
+  evidence_schema: "dpone.ci-shadow-reconciliation-capacity.v1"
+  schema_path: "test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-capacity.schema.json"
+  artifact_name: "pr-gate-shadow-reconciliation-capacity-<observer_run_id>-<observer_run_attempt>.json"
+  artifact_max_bytes: 8388608
+  decision: "UNVERIFIED"
+  code: "RECONCILIATION_CAPACITY_CALIBRATION_ONLY"
+  observation_bundle_digest_required: true
+  observation_bundle_manifest_schema: "dpone.ci-shadow-reconciliation-observation-bundle.v1"
+  observation_bundle_domain: "dpone.ci-shadow-reconciliation-observation-bundle.v1"
+  observation_bundle_closure: "capacity workflow, CLI composition root, shared canonical acquisition service, policy, ports, adapters, their transitive local imports/reads/called scripts, pyproject.toml, uv.lock, and the separately hashed manifest"
+  wrapper_source_bound_separately: false
+  execution_configuration_must_match: true
+  observation_bundle_entry_order: "strict ascending UTF-8 repo-relative path bytes; duplicates forbidden"
+  observation_bundle_entry_bytes: "u32be(path length) || path UTF-8 || six ASCII mode bytes || raw 32-byte SHA-256"
+  observation_bundle_digest_rule: "SHA256(domain UTF-8 || 0x00 || u64be(manifest length) || u32be(entry count) || repeated u32be(entry length) || entry bytes || raw 32-byte manifest SHA-256)"
+  observation_bundle_reject: "absolute/dot-dot/non-UTF-8 paths, symlinks, dynamic or unresolved local imports/reads/called scripts"
+  observation_bundle_max_entries: 4096
+  observation_bundle_max_path_utf8_bytes: 1024
+  reconciler_bundle_must_match: true
+  history_window_days: 14
+  complete_double_observation_required: true
+  current_observation_rule: "0 <= evidence_observed_through - observation_started_at <= calibration_observed_at - observation_started_at <= 900 seconds"
+  maximum_age_hours_at_limit_approval: 24
+  approval_expiry_rule: "approval_time must be greater than or equal to calibration_observed_at and strictly less than valid_until"
+  provider_transport_binding: "select exact repository/run/attempt/artifact ID/name, reject provider ZIP archive size above 8388608 before a max+1 archive read, verify archive length and SHA256 against provider size/digest, then accept exactly one expected confined regular JSON member with separate bounded payload SHA256/size before duplicate-free/non-finite strict-parse at depth 32 and 50000 nodes; reject duplicate/extra/directory/symlink/encrypted/traversal/unsupported-compression entries"
+  crossed_counter_rule: "limits_crossed is in hard-maxima order and each named counter equals its saturated hard maximum; retry_requests is at most total_http_requests"
+  required_fields:
+    - "producer_runs"
+    - "producer_attempts"
+    - "auditor_runs"
+    - "producer_list_page_requests"
+    - "auditor_list_page_requests"
+    - "exact_producer_run_requests"
+    - "attempt_run_requests"
+    - "jobs_page_requests"
+    - "artifact_metadata_requests"
+    - "artifact_download_requests"
+    - "redirect_requests"
+    - "git_object_requests"
+    - "pull_request_identity_requests"
+    - "polling_requests"
+    - "retry_requests"
+    - "api_response_body_bytes"
+    - "artifact_download_body_bytes"
+    - "total_response_body_bytes"
+    - "total_http_requests"
+    - "execution_wall_seconds"
+  minimum_safety_factor: 2
+  hard_maxima:
+    total_http_requests: 800
+    total_response_body_bytes: 134217728
+    execution_wall_seconds: 900
+  approval_thresholds:
+    total_http_requests: 400
+    total_response_body_bytes: 67108864
+    execution_wall_seconds: 450
+  approval_rule: "complete observed request, response-byte, and wall-time usage must each be at most half the parent hard maximum"
+  failure: "RECONCILIATION_PR4C_IMPLEMENTATION_BLOCKED"
+  amendment_rule: "exceeding a threshold requires an approved parent amendment; a child cannot raise a hard maximum"
+
+overflow:
+  stop_immediately: true
+  complete: false
+  observed_count_field: "observed_at_least"
+  last_complete_slice_field: "last_complete_slice"
+  full_set_digest_allowed: false
+  decision: "UNVERIFIED"
+  code: "RECONCILIATION_RESOURCE_LIMIT"
+  recovery: "transient API or wall-time failure may retry; a deterministic cap waits for a clean window or approved contract amendment"
+
+permissions:
+  allowed:
+    - "contents:read"
+    - "actions:read"
+    - "pull-requests:read"
+  forbidden:
+    - "administration:read"
+    - "administration:write"
+    - "checks:write"
+    - "id-token:write"
+
+stateful_features:
+  cursor: false
+  predecessor_state: false
+  unresolved_ledger: false
+  genesis_state: false
+  dag_replay: false
+  aci_lattice: false
+  tombstones: false
+  external_sort: false
+  checkpoint_promotion: false
+  manifest_state_finalization_transaction: false
+
+acceptance_live_canaries:
+  are_daily_pass_prerequisites: false
+  in_window_attempts_affect_daily_root: true
+  pre_pr4c_fork_lifecycle:
+    timing: "after PR4B safe-fallback merge; before PR4C reconciler child contract and implementation"
+    observations:
+      - "public-fork event journal before approval"
+      - "public-fork REST run and complete Jobs API before approval"
+      - "public-fork observations after approval, while running, and after completion"
+      - "public-fork rerun and close/reopen observations"
+      - "public-fork deletion observation"
+  post_pr4c_goal_acceptance:
+    timing: "after PR4C implementation; before goal acceptance"
+    observations:
+      - "eight route canaries evaluated by expected per-attempt oracle"
+      - "deliberate FAIL, cancellation, and burst recovery oracles"
+      - "two distinct-SHA completed full runs"

@@ -1,0 +1,59 @@
+schema_version: 1
+task_id: "DPONE-DBT-MSSQL-GRAPH-POLICY"
+title: "Pure SQL Server selected-graph capability policy"
+goal: "Implement and unit-test the canonical fail-closed graph evaluator without wiring shared contracts."
+specification: "docs/feature-design-dbt-mssql-adapter-guardrails-v1.md"
+base_commit: "5b515cf7"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "One pure policy evaluates every selected graph ID with stable actionable issues."
+  - "The approved model, table, incremental, test and unit-test matrix is enforced."
+  - "Seed, snapshot, hooks, grants, custom and unknown behavior fail closed."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "new canonical SQL Server graph policy"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/contracts/dbt_sqlserver_graph_policy.py"
+  - "tests/test_dbt_sqlserver_graph_policy.py"
+read_only_paths:
+  - "src/dpone/contracts/dbt_graph_contract.py"
+  - "src/dpone/adapters/dbt_workflow_selection.py"
+  - "src/dpone/runtime/dbt_preflight.py"
+  - "tests/test_dbt_selection_resolution.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/contracts/dbt_execution_pack.py"
+  - "src/dpone/contracts/dbt_selection_lock.py"
+
+shared_file_owner: "Codex parent agent"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_sqlserver_graph_policy.py -q"
+  broad:
+    - "uv run ruff check src/dpone/contracts/dbt_sqlserver_graph_policy.py tests/test_dbt_sqlserver_graph_policy.py"
+    - "uv run mypy --config-file mypy.ini src/dpone/contracts/dbt_sqlserver_graph_policy.py"
+  live:
+    - "N/A"
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

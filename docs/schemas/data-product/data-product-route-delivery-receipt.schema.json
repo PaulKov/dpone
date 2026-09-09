@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/data-product/data-product-route-delivery-receipt.schema.json",
+  "title": "dpone data product route delivery receipt",
+  "type": "object",
+  "required": ["schema_version", "route_delivery_receipt_id", "status", "provider", "network_writes", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_route_delivery_receipt.v1"},
+    "route_delivery_receipt_id": {"type": "string"},
+    "status": {"enum": ["dry_run", "blocked"]},
+    "provider": {"enum": ["slack", "jira", "pagerduty", "webhook"]},
+    "payload_id": {"type": ["string", "null"]},
+    "incident_id": {"type": ["string", "null"]},
+    "network_writes": {"type": "array"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

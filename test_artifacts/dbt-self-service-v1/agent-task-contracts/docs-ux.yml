@@ -1,0 +1,57 @@
+schema_version: 1
+task_id: "DPONE-DBT-003"
+title: "Complete dbt self-service documentation and executable example"
+goal: "Document the two-command author journey, multi-repo promotion and safe operational recovery."
+specification: "docs/feature-design-dbt-inline-self-service-v1.md"
+base_commit: "04bb048639641c9d6fb55fbfead21cec3345c70c"
+integrator: "parent"
+
+acceptance_criteria:
+  - "Beginner docs use dbt model, publish profile, workflow, DAG and environment terminology."
+  - "Demo performs a real dbt parse when dependencies are installed and keeps the deterministic fixture path."
+  - "Dev-to-prod promotion and rollback are documented without generated artifact commits."
+  - "Cosmos is described only as optional coexistence, not a dependency."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["documentation", "examples"]
+  migration_required: false
+
+owned_paths:
+  - "docs/dbt.md"
+  - "docs/dbt-inline-publishing.md"
+  - "docs/dbt-self-service-*.md"
+  - "examples/dbt-inline-publishing/**"
+  - "packages/dbt-dpone/**"
+read_only_paths:
+  - "docs/feature-design-dbt-inline-self-service-v1.md"
+  - "docs/documentation-standard.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "docs/schemas/**"
+  - "src/**"
+  - "tests/conftest.py"
+
+shared_file_owner: "parent"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run dpone docs check-docs"
+  broad:
+    - "uv run mkdocs build --strict"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Navigation, changelog or schema edit is required."

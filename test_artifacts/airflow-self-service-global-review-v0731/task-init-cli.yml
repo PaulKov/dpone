@@ -1,0 +1,49 @@
+schema_version: 1
+task_id: "SS-REVIEW-INIT-CLI"
+title: "Reject target-inapplicable init options before side effects"
+goal: "Give project, pipeline, and legacy init distinct parser surfaces without breaking legacy init."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Project/pipeline reject irrelevant options with argparse exit 2 before writes."
+  - "Pipeline name is parser-required."
+  - "Legacy dpone init options remain accepted when no beginner target is selected."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["dpone init CLI parsing and help"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/commands/init_cmd.py"
+  - "tests/test_init_cli_contract.py"
+read_only_paths:
+  - "src/dpone/cli/main.py"
+  - "tests/test_airflow_self_service_cli.py"
+  - "docs/cli-reference.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_self_service_cli.py -q"
+  broad:
+    - "uv run pytest tests/test_init_cli_contract.py tests/test_airflow_self_service_cli.py -q"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: echo quality
+
+  governance-source:
+    needs: [quality]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      artifact_id: "${{ steps.governance-upload.outputs.artifact-id }}"
+      artifact_digest: "${{ steps.governance-upload.outputs.artifact-digest }}"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - run: |
+          mkdir -p test_artifacts/agent-policy
+          printf '{"status":"PASS"}\n' > test_artifacts/agent-policy/agent_governance_gate.json
+      - name: Upload agent governance evidence
+        id: governance-upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: agent-governance-gate
+          path: test_artifacts/agent-policy/agent_governance_gate.json
+          if-no-files-found: error
+          retention-days: 90
+          archive: true
+          overwrite: false
+          include-hidden-files: false
+
+  governance-attestation:
+    needs: [governance-source]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: "${{ needs.governance-source.outputs.artifact_id }}"
+          path: test_artifacts/agent-policy/attested-governance
+          digest-mismatch: error
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be
+        with:
+          subject-path: test_artifacts/agent-policy/attested-governance/agent_governance_gate.json

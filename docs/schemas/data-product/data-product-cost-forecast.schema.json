@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-cost-forecast.schema.json",
+  "title": "dpone data product cost forecast",
+  "type": "object",
+  "required": ["schema_version", "status", "cost_forecast_id"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_cost_forecast.v1"},
+    "status": {"type": "string"},
+    "cost_forecast_id": {"type": "string"},
+    "summary": {"type": "object"},
+    "latest": {"type": "object"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  },
+  "additionalProperties": true
+}

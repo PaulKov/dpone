@@ -1,0 +1,550 @@
+schema: dpone.airflow-self-service-public-contracts.v1
+target_release: 1.0.0
+
+policy:
+  semver: 2.0.0
+  additions: compatible
+  removals: next_major_after_deprecation
+  provider_legacy_window:
+    minimum_minor_releases: 2
+    minimum_days: 365
+
+cli:
+  - id: init-project
+    tier: beginner
+    lane: flat
+    path: [init]
+    required_positionals:
+      - name: init_target
+        accepted_value: project
+    required_options: [--airflow]
+    example_arguments: [--airflow]
+  - id: init-project-domain-first
+    tier: beginner
+    lane: domain_first
+    path: [init]
+    required_positionals:
+      - name: init_target
+        accepted_value: project
+    required_options: [--airflow, --layout]
+    example_arguments: [--airflow, --layout, domain-first]
+  - id: init-domain
+    tier: beginner
+    lane: domain_first
+    path: [init]
+    required_positionals:
+      - name: init_target
+        accepted_value: domain
+      - name: name
+    required_options: [--owner-team, --owner-contact, --approver-team]
+    example_arguments:
+      - --owner-team
+      - data-crm
+      - --owner-contact
+      - crm@example.com
+      - --approver-team
+      - data-platform
+  - id: init-pipeline
+    tier: beginner
+    lane: flat
+    path: [init]
+    required_positionals:
+      - name: init_target
+        accepted_value: pipeline
+      - name: name
+    required_options: [--airflow, --recipe]
+    example_arguments:
+      - --recipe
+      - mssql-to-clickhouse-incremental
+      - --airflow
+  - id: init-domain-first-pipeline
+    tier: beginner
+    lane: domain_first
+    path: [init]
+    required_positionals:
+      - name: init_target
+        accepted_value: pipeline
+      - name: name
+    required_options: [--route, --domain, --from, --to, --key]
+    example_arguments:
+      - --domain
+      - crm
+      - --route
+      - mssql:clickhouse:incremental_merge
+      - --from
+      - mssql_dev:dbo.orders
+      - --to
+      - clickhouse_dev:analytics.orders
+      - --key
+      - order_id
+  - id: static-check
+    tier: beginner
+    path: [check]
+    required_positionals:
+      - name: target
+    required_options: [--connections, --live]
+    example_arguments: []
+  - id: airflow-preview
+    tier: beginner
+    path: [airflow, preview]
+    required_positionals:
+      - name: pipeline
+    required_options: []
+    example_arguments: []
+  - id: safe-sample
+    tier: beginner
+    path: [run]
+    required_positionals:
+      - name: path
+    required_options: [--sample, --target]
+    example_arguments: [--sample, "1000", --target, temporary]
+  - id: airflow-explain
+    tier: diagnostic
+    path: [airflow, explain]
+    required_positionals:
+      - name: pipeline
+    required_options: [--format]
+    example_arguments: []
+  - id: workload-index
+    tier: platform
+    path: [workload, index]
+    required_positionals: []
+    required_options: [--root]
+    example_arguments: []
+  - id: workload-impact
+    tier: platform
+    path: [workload, impact]
+    required_positionals: []
+    required_options: [--root, --baseline, --current]
+    example_arguments:
+      [--baseline, workload-index.json, --current, workload-index.candidate.json]
+  - id: workload-promote
+    tier: platform
+    path: [workload, promote]
+    required_positionals: []
+    required_options:
+      - --root
+      - --candidate
+      - --baseline
+      - --approved-candidate-sha256
+      - --approved-current-fingerprint
+    example_arguments:
+      - --candidate
+      - workload-index.candidate.json
+      - --baseline
+      - workload-index.json
+      - --approved-candidate-sha256
+      - sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - --approved-current-fingerprint
+      - sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      - --expect-baseline-absent
+  - id: airflow-build
+    tier: platform
+    path: [airflow, build]
+    required_positionals: []
+    required_options:
+      - --release-id
+      - --environment
+      - --runtime-image-digest
+      - --artifact-registry-ref
+    example_arguments: []
+  - id: airflow-publish
+    tier: platform
+    path: [airflow, publish]
+    required_positionals: []
+    required_options:
+      - --release-id
+      - --deployment-id
+      - --environment
+      - --artifact-registry-ref
+      - --registry-uri
+    example_arguments: []
+  - id: cache-materialize
+    tier: platform
+    path: [airflow, cache-materialize]
+    required_positionals: []
+    required_options:
+      - --release-id
+      - --deployment-id
+      - --environment
+      - --artifact-registry-ref
+      - --registry-uri
+    example_arguments: []
+  - id: cache-sync
+    tier: platform
+    path: [airflow, cache-sync]
+    required_positionals: []
+    required_options:
+      - --deployment-dir
+      - --environment
+      - --promoted-by
+      - --allowed-promoter
+    example_arguments: []
+  - id: cache-retention-plan
+    tier: platform
+    path: [airflow, cache-retention-plan]
+    required_positionals: []
+    required_options: [--cache-root, --environment]
+    example_arguments: []
+  - id: cache-retention-apply
+    tier: platform
+    path: [airflow, cache-retention-apply]
+    required_positionals: []
+    required_options:
+      # This baseline list freezes supported option names. At runtime the plan
+      # digest, review id, and ACK are required only when the fresh plan has delete candidates.
+      - --confirm-delete
+      - --promoted-by
+      - --expected-plan-sha256
+      - --review-id
+      - --loader-ack-file
+      - --allowed-promoter
+      - --evidence-version
+    example_arguments: []
+  - id: cache-recovery-plan
+    tier: platform
+    path: [airflow, cache-recovery-plan]
+    required_positionals: []
+    required_options: [--cache-root, --environment]
+    example_arguments: []
+  - id: cache-status-publish
+    tier: platform
+    path: [airflow, cache-status-publish]
+    required_positionals: []
+    required_options:
+      - --status-root
+      - --source
+      - --target
+      - --failure-marker
+      - --expected-schema
+    example_arguments: []
+  - id: cache-recovery-apply
+    tier: platform
+    path: [airflow, cache-recovery-apply]
+    required_positionals: []
+    required_options:
+      - --deployment-id
+      - --promoted-by
+      - --allowed-promoter
+      - --confirm-repair
+    example_arguments: []
+  - id: runtime-pod-retention-plan
+    tier: platform
+    path: [airflow, runtime-pod-retention-plan]
+    required_positionals: []
+    required_options:
+      - --namespace
+      - --minimum-age-seconds
+      - --page-size
+      - --kube-auth
+      - --kube-context
+      - --format
+    example_arguments: []
+  - id: runtime-pod-retention-apply
+    tier: platform
+    path: [airflow, runtime-pod-retention-apply]
+    required_positionals: []
+    required_options:
+      - --namespace
+      - --minimum-age-seconds
+      - --page-size
+      - --max-delete-count
+      - --actor
+      - --allowed-actor
+      - --confirm-delete
+      - --kube-auth
+      - --kube-context
+      - --format
+    example_arguments: []
+  - id: runtime-pod-retention-render
+    tier: platform
+    path: [airflow, runtime-pod-retention-render]
+    required_positionals: []
+    required_options:
+      - --namespace
+      - --image
+      - --schedule
+      - --mode
+      - --minimum-age-seconds
+      - --page-size
+      - --max-delete-count
+      - --actor
+      - --allowed-actor
+      - --confirm-delete
+      - --alerts
+      - --stale-after-seconds
+      - --format
+    example_arguments: []
+  - id: self-service-certification
+    tier: platform
+    path: [certify, self-service]
+    required_positionals: []
+    required_options:
+      - --commit-sha
+      - --output-dir
+    example_arguments: []
+
+python:
+  namespace: airflow.providers.dpone
+  exports:
+    - AcknowledgedDagLoad
+    - AirflowDeploymentIndex
+    - AirflowDeploymentIndexError
+    - AirflowIndexArtifact
+    - CacheResolution
+    - CacheResolver
+    - DponeDag
+    - DponeTaskGroup
+    - LoadReport
+    - LoaderAcknowledgement
+    - LoaderAcknowledgementError
+    - get_provider_info
+    - load_airflow_deployment_index
+    - load_and_acknowledge_dpone_dags
+    - load_dpone_dags
+    - write_dpone_loader_ack
+  callables:
+    - name: DponeDag.from_spec
+      parameters:
+        - {name: spec_ref, kind: positional_or_keyword, required: true}
+        - {name: index_path, kind: keyword_only, required: false}
+        - {name: globals_dict, kind: keyword_only, required: false}
+      returns: _AirflowDAG
+    - name: DponeTaskGroup.from_pack
+      parameters:
+        - {name: pack_ref, kind: positional_or_keyword, required: true}
+        - {name: dag, kind: keyword_only, required: false}
+        - {name: index_path, kind: keyword_only, required: false}
+        - {name: deployment_id, kind: keyword_only, required: false}
+        - {name: operator_overrides, kind: keyword_only, required: false}
+      returns: _AirflowTaskGroup
+    - name: get_provider_info
+      parameters: []
+      returns: dict[str, Any]
+    - name: load_and_acknowledge_dpone_dags
+      parameters:
+        - {name: globals_dict, kind: positional_or_keyword, required: true}
+        - {name: index_path, kind: keyword_only, required: true}
+        - {name: ack_path, kind: keyword_only, required: true}
+        - {name: ack_root, kind: keyword_only, required: false}
+        - {name: operator_overrides, kind: keyword_only, required: false}
+        - name: duplicate_policy
+          kind: keyword_only
+          required: false
+          literal_values: [skip_and_report, fail_all, replace_if_same_fingerprint]
+        - name: invalid_dag_policy
+          kind: keyword_only
+          required: false
+          literal_values: [skip_and_report, fail_all, create_diagnostic_dag]
+      returns: AcknowledgedDagLoad
+    - name: load_dpone_dags
+      parameters:
+        - {name: globals_dict, kind: positional_or_keyword, required: true}
+        - {name: repo_root, kind: positional_or_keyword, required: false}
+        - {name: index_path, kind: keyword_only, required: false}
+        - {name: domains, kind: keyword_only, required: false}
+        - {name: operator_overrides, kind: keyword_only, required: false}
+        - name: duplicate_policy
+          kind: keyword_only
+          required: false
+          literal_values: [skip_and_report, fail_all, replace_if_same_fingerprint]
+        - name: invalid_dag_policy
+          kind: keyword_only
+          required: false
+          literal_values: [skip_and_report, fail_all, create_diagnostic_dag]
+      returns: LoadReport
+    - name: write_dpone_loader_ack
+      parameters:
+        - {name: report, kind: positional_or_keyword, required: true}
+        - {name: index_path, kind: keyword_only, required: true}
+        - {name: ack_path, kind: keyword_only, required: true}
+        - {name: ack_root, kind: keyword_only, required: false}
+      returns: LoaderAcknowledgement
+  modules:
+    - module: dpone.readiness.airflow_cache_retention
+      source: src/dpone/readiness/airflow_cache_retention.py
+      callables:
+        - name: AirflowCacheRetentionService.apply
+          parameters:
+            - {name: environment, kind: keyword_only, required: true}
+            - {name: confirm_delete, kind: keyword_only, required: true}
+            - {name: promoted_by, kind: keyword_only, required: true}
+            - {name: allowed_promoters, kind: keyword_only, required: true}
+            - {name: expected_plan_sha256, kind: keyword_only, required: false}
+            - {name: review_id, kind: keyword_only, required: false}
+            - {name: loader_ack_file, kind: keyword_only, required: false}
+            - {name: evidence_version, kind: keyword_only, required: false}
+            - {name: protected_deployment_ids, kind: keyword_only, required: false}
+            - {name: evidence_files, kind: keyword_only, required: false}
+          returns: dict[str, Any]
+    - module: dpone.readiness.airflow_self_service_cache
+      source: src/dpone/readiness/airflow_self_service_cache.py
+      callables:
+        - name: cache_retention_apply_result
+          parameters:
+            - {name: cache_root, kind: keyword_only, required: true}
+            - {name: environment, kind: keyword_only, required: true}
+            - {name: confirm_delete, kind: keyword_only, required: true}
+            - {name: promoted_by, kind: keyword_only, required: true}
+            - {name: allowed_promoters, kind: keyword_only, required: true}
+            - {name: expected_plan_sha256, kind: keyword_only, required: false}
+            - {name: review_id, kind: keyword_only, required: false}
+            - {name: loader_ack_file, kind: keyword_only, required: false}
+            - {name: evidence_version, kind: keyword_only, required: false}
+            - {name: protected_deployment_ids, kind: keyword_only, required: false}
+            - {name: evidence_files, kind: keyword_only, required: false}
+          returns: SelfServiceResult
+    - module: dpone.readiness.airflow_self_service_application
+      source: src/dpone/readiness/airflow_self_service_application.py
+      callables:
+        - name: AirflowSelfServiceService.cache_retention_apply
+          parameters:
+            - {name: cache_root, kind: keyword_only, required: true}
+            - {name: environment, kind: keyword_only, required: true}
+            - {name: confirm_delete, kind: keyword_only, required: true}
+            - {name: promoted_by, kind: keyword_only, required: true}
+            - {name: allowed_promoters, kind: keyword_only, required: true}
+            - {name: expected_plan_sha256, kind: keyword_only, required: false}
+            - {name: review_id, kind: keyword_only, required: false}
+            - {name: loader_ack_file, kind: keyword_only, required: false}
+            - {name: evidence_version, kind: keyword_only, required: false}
+            - {name: protected_deployment_ids, kind: keyword_only, required: false}
+            - {name: evidence_files, kind: keyword_only, required: false}
+          returns: SelfServiceResult
+    - module: dpone.contracts.airflow_runtime_pod_retention
+      source: src/dpone/contracts/airflow_runtime_pod_retention.py
+      callables:
+        - name: AirflowRuntimePodRetentionPlanRequest.__init__
+          parameters:
+            - {name: namespace, kind: positional_or_keyword, required: true}
+            - {name: minimum_age_seconds, kind: positional_or_keyword, required: false}
+            - {name: page_size, kind: positional_or_keyword, required: false}
+          returns: None
+        - name: AirflowRuntimePodRetentionApplyRequest.__init__
+          parameters:
+            - {name: namespace, kind: positional_or_keyword, required: true}
+            - {name: minimum_age_seconds, kind: positional_or_keyword, required: false}
+            - {name: page_size, kind: positional_or_keyword, required: false}
+            - {name: max_delete_count, kind: positional_or_keyword, required: false}
+            - {name: actor, kind: positional_or_keyword, required: false}
+            - {name: allowed_actors, kind: positional_or_keyword, required: false}
+            - {name: confirm_delete, kind: positional_or_keyword, required: false}
+            - {name: kube_auth_mode, kind: positional_or_keyword, required: false}
+          returns: None
+        - name: AirflowRuntimePodRetentionApplyRequest.require_authorized
+          parameters: []
+          returns: None
+    - module: dpone.services.airflow_runtime_pod_retention
+      source: src/dpone/services/airflow_runtime_pod_retention.py
+      callables:
+        - name: AirflowRuntimePodRetentionService.__init__
+          parameters:
+            - {name: inventory, kind: keyword_only, required: true}
+            - {name: ownership, kind: keyword_only, required: true}
+            - {name: deletion, kind: keyword_only, required: false}
+            - {name: credentials, kind: keyword_only, required: false}
+            - {name: evidence, kind: keyword_only, required: false}
+            - {name: now, kind: keyword_only, required: false}
+          returns: None
+        - name: AirflowRuntimePodRetentionService.plan
+          parameters:
+            - {name: request, kind: positional_or_keyword, required: true}
+          returns: dict[str, Any]
+        - name: AirflowRuntimePodRetentionService.apply
+          parameters:
+            - {name: request, kind: positional_or_keyword, required: true}
+          returns: dict[str, Any]
+
+schemas:
+  required_kinds:
+    - dpone.airflow-artifact-publish.v1
+    - dpone.airflow-authoring-fix.v1
+    - dpone.airflow-authoring-migration-plan.v1
+    - dpone.airflow-cache-materialize.v1
+    - dpone.airflow-cache-status-publication-failure.v1
+    - dpone.airflow-cache-status-publication.v1
+    - dpone.airflow-connection-secret-gc-apply.v1
+    - dpone.airflow-connection-secret-gc-plan.v1
+    - dpone.airflow-correlation.v1
+    - dpone.airflow-deployment-index.v1
+    - dpone.airflow-deployment-identity.v1
+    - dpone.airflow-explain.v1
+    - dpone.airflow-mapping-item.v1
+    - dpone.airflow-mapping-plan.v1
+    - dpone.airflow-operator-diagnostics.v1
+    - dpone.airflow-rerun-plan.v1
+    - dpone.airflow-run-identity.v1
+    - dpone.airflow-runtime-pod-retention-apply.v1
+    - dpone.airflow-runtime-pod-retention-event.v1
+    - dpone.airflow-runtime-pod-retention-plan.v1
+    - dpone.airflow-runtime-pod-retention-render.v1
+    - dpone.airflow_loader_ack.v1
+    - dpone.airflow_loader_ack.v2
+    - dpone.binding-set.v1
+    - dpone.clickhouse-safe-sample-insert-plan.v1
+    - dpone.connection-check.v1
+    - dpone.connection-registry-migration-plan.v1
+    - dpone.connection-registry.v1
+    - dpone.credential-runtime.v1
+    - dpone.current-pointer.v1
+    - dpone.dbt-airflow-attempt-evidence.v2
+    - dpone.dbt-workflow-evidence-outcome.v2
+    - dpone.deployment-cache-activation-history.v2
+    - dpone.deployment-cache-recovery-apply.v1
+    - dpone.deployment-cache-recovery-plan.v1
+    - dpone.deployment-cache-retention-apply.v1
+    - dpone.deployment-cache-retention-apply.v2
+    - dpone.deployment-cache-retention-apply.v3
+    - dpone.deployment-cache-retention-plan.v1
+    - dpone.deployment-cache-retention-recovery.v1
+    - dpone.deployment-cache-retention-recovery.v2
+    - dpone.deployment-set.v1
+    - dpone.domain-ownership.v1
+    - dpone.error.v1
+    - dpone.live-preflight.v1
+    - dpone.mssql-clickhouse-safe-sample-copy-config.v1
+    - dpone.mssql-safe-sample-read-plan.v1
+    - dpone.project.v1
+    - dpone.release-set.v1
+    - dpone.route-attestation-policy.v1
+    - dpone.route-attestation-verification.v1
+    - dpone.route-attestation.v1
+    - dpone.safe-sample-airflow-deployment-context.v1
+    - dpone.safe-sample-certified-copy-request.v1
+    - dpone.safe-sample-cli-argument-validation.v1
+    - dpone.safe-sample-data-copier-registry.v1
+    - dpone.safe-sample-data-copy.v1
+    - dpone.safe-sample-execution-plan.v1
+    - dpone.safe-sample-runtime-evidence-write.v1
+    - dpone.safe-sample-runtime-execution.v1
+    - dpone.safe-sample-runtime-handoff.v1
+    - dpone.safe-sample-runtime-readiness.v1
+    - dpone.safe-sample-runtime-run.v1
+    - dpone.safe-sample-source-request.v1
+    - dpone.selected-safe-sample-report.v1
+    - dpone.selection-report.v1
+    - dpone.selection-state.v1
+    - dpone.self-service-certification.v1
+    - dpone.self-service-usability-study.v1
+    - dpone.test-report.v1
+    - dpone.test-suite-report.v1
+    - dpone.test.v1
+    - dpone.workload-change-impact.v1
+    - dpone.workload-index.v1
+    - dpone.workload-index-promotion.v1
+
+packages:
+  core_distribution: dpone
+  reader_distribution: dpone-airflow-pack
+  provider_distribution: apache-airflow-providers-dpone
+  provider_airflow_requirement: apache-airflow>=2.10,<3.4
+  provider_namespace: airflow.providers.dpone
+  legacy_namespace: dpone_airflow_pack
+
+compatibility:
+  provider_legacy:
+    namespace: dpone_airflow_pack
+    announced_release: 0.72.0
+    announced_date: 2026-07-13
+    minimum_minor_releases: 2
+    minimum_days: 365

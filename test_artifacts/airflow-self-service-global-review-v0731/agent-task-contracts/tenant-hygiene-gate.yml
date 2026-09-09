@@ -1,0 +1,74 @@
+schema_version: 1
+task_id: "SS-40-HYGIENE"
+title: "Add bounded frozen-source and archive tenant hygiene gate"
+goal: >-
+  Certify a frozen commit and exact wheel/sdist inputs for protected tenant
+  identifiers and defaults without extracting archives, following links,
+  reading unbounded content, or disclosing protected values.
+specification: "docs/feature-design-runtime-connection-authority-and-hygiene-v0732.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent-agent"
+
+acceptance_criteria:
+  - "Source mode reads only blobs from one full commit SHA and never reads the worktree."
+  - "Archive mode accepts explicit regular wheel/tar.gz inputs, opens them no-follow, detects replacement, and never extracts them."
+  - "Absolute/traversal paths, links, devices, nested archives, unsupported formats, excessive compression, count limits, per-item limits, and aggregate limits fail closed."
+  - "Protected patterns are supplied by a caller-owned policy file and are never emitted in reports, exceptions, stdout, or stderr."
+  - "Reports contain only a stable schema, mode, status, and deterministic safe code/path findings."
+  - "Exit codes are 0 clean, 2 finding, and 3 unable to certify."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "release source hygiene evidence"
+    - "built package hygiene evidence"
+  migration_required: false
+
+owned_paths:
+  - "tools/agent_policy/tenant_hygiene.py"
+  - "tests/agent_policy/test_tenant_hygiene.py"
+read_only_paths:
+  - "docs/feature-design-runtime-connection-authority-and-hygiene-v0732.md"
+  - "tools/agent_policy/package_archive_gate.py"
+  - "tools/pypi_release_smoke_dist.py"
+  - ".github/workflows/release.yml"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "parent-agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/agent_policy/test_tenant_hygiene.py -q"
+    - "uv run ruff check tools/agent_policy/tenant_hygiene.py tests/agent_policy/test_tenant_hygiene.py"
+    - "uv run ruff format --check tools/agent_policy/tenant_hygiene.py tests/agent_policy/test_tenant_hygiene.py"
+    - "uv run mypy --config-file mypy.ini tools/agent_policy/tenant_hygiene.py"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

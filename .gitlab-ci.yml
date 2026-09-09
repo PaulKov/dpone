@@ -1,0 +1,9 @@
+include:
+  - local: 'ci-templates/.gitlab-ci-docker.yml'
+  - local: 'ci-templates/.gitlab-ci-workflow.yml'
+  - local: 'ci-templates/.gitlab-ci-templates.yml'
+  - local: 'ci-templates/.gitlab-ci-validate.yml'
+  - local: 'ci-templates/.gitlab-ci-integration.yml'
+  - local: 'ci-templates/.gitlab-ci-build-publish.yml'
+  - local: 'ci-templates/.gitlab-ci-smoke.yml'
+  - local: 'ci-templates/.gitlab-ci-promote.yml'

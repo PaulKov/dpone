@@ -1,0 +1,120 @@
+schema_version: 1
+task_id: "DPONE-V0724-SAFE-SAMPLE-LIVE-RUNTIME"
+title: "Close Phase 1B live safe-sample runtime integrity gaps"
+goal: >-
+  Re-authorize live sample plans, verify pinned runtime input fingerprints,
+  verify that the primary source matches the immutable workload pack, and
+  execute real ClickHouse temporary-target lifecycle through one workload-scoped
+  credential resolver.
+specification: "docs/feature-design-safe-sample-live-runtime-integrity-v0724.md"
+base_commit: "4880c52d30b10222520e8181ab2deb61b69f329d"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Live copy reaches no credential or database I/O before policy and fingerprint validation pass."
+  - "The exact pipeline source bytes match the manifest dependency in the pinned workload pack."
+  - "Live source verification requires an explicit project root and never derives it from the cache root."
+  - "ClickHouse create, TTL configuration, bounded copy, and drop execute in order."
+  - "ClickHouse Python-row insertion uses the native VALUES contract and exact row-count parity."
+  - "Sink credentials are resolved once per workload and reused across target lifecycle and copy."
+  - "Production serialized proof cannot authorize execution without an injected trusted verification decision."
+  - "Evidence and errors contain no credentials, sampled rows, Vault paths, or secret topology."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - cli
+    - python_api
+    - evidence
+    - structured_errors
+    - documentation
+  migration_required: false
+
+owned_paths:
+  - "docs/feature-design-safe-sample-live-runtime-integrity-v0724.md"
+  - "src/dpone/services/safe_sample_live_authorization.py"
+  - "src/dpone/services/safe_sample_policy.py"
+  - "src/dpone/runtime/credentials/workload_scope.py"
+  - "src/dpone/readiness/safe_sample_clickhouse_target.py"
+  - "src/dpone/readiness/safe_sample_live_runtime.py"
+  - "src/dpone/readiness/safe_sample_pinned_source.py"
+  - "src/dpone/readiness/safe_sample_runtime_handoff.py"
+  - "src/dpone/services/safe_sample_cli_runtime.py"
+  - "src/dpone/services/ops/command_handlers_safe_sample.py"
+  - "src/dpone/runtime/safe_sample_sql_clients.py"
+  - "src/dpone/services/clickhouse_safe_sample_sql_writer.py"
+  - "src/dpone/gitops/schema_safe_sample_route_execution_contracts.py"
+  - "src/dpone/gitops/workload_dependencies.py"
+  - "src/dpone/services/safe_sample_clickhouse_target.py"
+  - "tests/test_safe_sample_live_authorization.py"
+  - "tests/test_runtime_workload_scoped_credential_resolver.py"
+  - "tests/test_runtime_safe_sample_clickhouse_target.py"
+  - "tests/test_safe_sample_live_runtime_assembly.py"
+  - "tests/test_safe_sample_pinned_source.py"
+  - "tests/test_airflow_safe_sample_runtime_executor.py"
+  - "tests/test_airflow_self_service_cli.py"
+  - "tests/test_sql_query_workloads.py"
+  - "tests/test_runtime_safe_sample_sql_clients.py"
+  - "tests/test_airflow_mssql_clickhouse_safe_sample_copier.py"
+  - "tests/test_airflow_runtime_phase1b_contracts.py"
+  - "docs/schemas/gitops/clickhouse-safe-sample-insert-plan.schema.json"
+  - "tests/test_cli_safe_sample_runtime_run_command.py"
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "docs/getting-started/first-airflow-dag.md"
+  - "CHANGELOG.md"
+  - "test_artifacts/airflow-self-service-v0724-live-runtime/**"
+  - "test_artifacts/agent-policy/2026-07-15-v0724-safe-sample-live-runtime-integrity.yml"
+read_only_paths:
+  - "docs/engineering-standards.md"
+  - "docs/architecture.md"
+  - "docs/benchmarks/quality_budgets.yml"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - ".cursor/"
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "PR #328 / v0.72.3 self-service hardening"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_safe_sample_live_authorization.py tests/test_runtime_workload_scoped_credential_resolver.py tests/test_runtime_safe_sample_clickhouse_target.py tests/test_safe_sample_live_runtime_assembly.py tests/test_safe_sample_pinned_source.py tests/test_runtime_safe_sample_sql_clients.py tests/test_cli_safe_sample_runtime_run_command.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "Approved MSSQL to ClickHouse local-live safe-sample certification"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+  - validation_evidence
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

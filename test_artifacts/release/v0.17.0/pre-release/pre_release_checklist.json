@@ -1,0 +1,102 @@
+{
+  "blockers": [],
+  "checks": [
+    {
+      "blocker": null,
+      "name": "cli_help_surface",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "cli_output_contracts",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "run_cli_manifest",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "run_python_api_manifest",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "nested_hierarchical_identity",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "nested_parent_child_integrity",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "source_sink_strategy_matrix",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "source_sink_artifacts",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "docker_live_routes",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "contracts_guardrails",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "documentation_yaml_examples",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "documentation_links",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "documentation_mkdocs",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "ci_cd_quality",
+      "passed": true,
+      "required": true
+    },
+    {
+      "blocker": null,
+      "name": "package",
+      "passed": true,
+      "required": true
+    }
+  ],
+  "generated_at": "2026-06-19T06:32:07.775399+00:00",
+  "json_path": "test_artifacts/release/v0.17.0/pre-release/pre_release_checklist.json",
+  "markdown_path": "test_artifacts/release/v0.17.0/pre-release/pre_release_checklist.md",
+  "output_dir": "test_artifacts/release/v0.17.0/pre-release",
+  "passed": true,
+  "release": "v0.17.0",
+  "release_type": "minor"
+}

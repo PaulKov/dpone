@@ -1,0 +1,429 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/safe-sample-data-copy.schema.json",
+  "title": "dpone GitOps safe sample data copy",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "source_request",
+    "copy_request",
+    "rows_read",
+    "rows_written",
+    "bytes_read",
+    "pii_policy",
+    "diagnostics",
+    "errors"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.safe-sample-data-copy.v1"
+    },
+    "status": {
+      "enum": [
+        "blocked",
+        "copied",
+        "copied_with_quarantine",
+        "failed"
+      ]
+    },
+    "source_request": {
+      "type": "object",
+      "required": [
+        "schema",
+        "status",
+        "mode",
+        "sample_rows",
+        "max_bytes",
+        "timeout_seconds",
+        "source_read_only",
+        "full_scan_allowed",
+        "pii_policy",
+        "target",
+        "errors"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "const": "dpone.safe-sample-source-request.v1"
+        },
+        "status": {
+          "enum": [
+            "planned",
+            "blocked"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "pushdown",
+            "full_scan",
+            "blocked"
+          ]
+        },
+        "sample_rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_read_only": {
+          "const": true
+        },
+        "full_scan_allowed": {
+          "type": "boolean"
+        },
+        "estimated_read_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "proof": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pii_policy": {
+          "enum": [
+            "masked",
+            "not_logged"
+          ]
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "connection_ref": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+              "maxLength": 128
+            }
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/error"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "planned"
+              },
+              "mode": {
+                "const": "full_scan"
+              }
+            },
+            "required": [
+              "status",
+              "mode"
+            ]
+          },
+          "then": {
+            "required": [
+              "estimated_read_bytes"
+            ],
+            "properties": {
+              "estimated_read_bytes": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "copy_request": {
+      "type": "object",
+      "required": [
+        "schema",
+        "certification_id",
+        "source",
+        "sink",
+        "strategy",
+        "sample_rows",
+        "max_bytes",
+        "timeout_seconds",
+        "source_read_only",
+        "pii_policy",
+        "proof"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "const": "dpone.safe-sample-certified-copy-request.v1"
+        },
+        "certification_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "object",
+          "required": [
+            "type",
+            "connection_ref",
+            "table"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "mssql"
+            },
+            "connection_ref": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+              "maxLength": 128
+            },
+            "table": {
+              "$ref": "#/$defs/table"
+            }
+          }
+        },
+        "sink": {
+          "type": "object",
+          "required": [
+            "type",
+            "connection_ref",
+            "temporary_table"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "clickhouse"
+            },
+            "connection_ref": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+              "maxLength": 128
+            },
+            "temporary_table": {
+              "$ref": "#/$defs/table"
+            }
+          }
+        },
+        "strategy": {
+          "const": "incremental_merge"
+        },
+        "sample_rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_read_only": {
+          "const": true
+        },
+        "pii_policy": {
+          "enum": [
+            "masked",
+            "not_logged"
+          ]
+        },
+        "proof": {
+          "type": "string",
+          "pattern": "^route_certification:[A-Za-z0-9_\\-]+$"
+        }
+      }
+    },
+    "rows_read": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rows_written": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "quarantined_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bytes_read": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "pii_policy": {
+      "enum": [
+        "masked",
+        "not_logged"
+      ]
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/json_value"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/error"
+      }
+    }
+  },
+  "$defs": {
+    "error": {
+      "type": "object",
+      "required": [
+        "schema",
+        "code",
+        "stage",
+        "severity",
+        "message"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "const": "dpone.error.v1"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^DPONE_[A-Z0-9_]+$"
+        },
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixes": {
+          "type": "array"
+        }
+      }
+    },
+    "json_value": {
+      "anyOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/json_value"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/json_value"
+          }
+        }
+      ]
+    },
+    "table": {
+      "type": "object",
+      "required": [
+        "schema",
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "copied"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "quarantined_rows": {
+            "const": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "copied_with_quarantine"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "quarantined_rows"
+        ],
+        "properties": {
+          "quarantined_rows": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "copied",
+              "copied_with_quarantine"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "pii_policy": {
+            "const": "masked"
+          }
+        }
+      }
+    }
+  ]
+}

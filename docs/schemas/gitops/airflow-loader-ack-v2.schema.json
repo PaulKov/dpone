@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-loader-ack-v2.schema.json",
+  "title": "dpone GitOps exact Airflow loader acknowledgement",
+  "type": "object",
+  "required": [
+    "schema",
+    "release_id",
+    "deployment_id",
+    "airflow_index_sha256",
+    "activation_id",
+    "loaded_dag_ids",
+    "skipped_dag_ids",
+    "error_codes",
+    "fatal",
+    "acknowledged_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.airflow_loader_ack.v2"
+    },
+    "release_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "deployment_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "airflow_index_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "activation_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "loaded_dag_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_.~-]+$"
+      },
+      "uniqueItems": true
+    },
+    "skipped_dag_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_.~-]+$"
+      },
+      "uniqueItems": true
+    },
+    "error_codes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^DPONE_[A-Z0-9_]+$"
+      },
+      "uniqueItems": true
+    },
+    "fatal": {
+      "type": "boolean"
+    },
+    "acknowledged_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

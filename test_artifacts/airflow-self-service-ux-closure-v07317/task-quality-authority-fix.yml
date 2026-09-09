@@ -1,0 +1,54 @@
+schema_version: 1
+task_id: "SS-QUALITY-AUTHORITY-FIX"
+title: "Fail closed on estimated rows and preserve wrapper authority"
+goal: "Remove a confirmed row-count false success and preserve exact authority through contract wrappers."
+specification: "docs/feature-design-airflow-self-service-ux-closure-v07317.md"
+base_commit: "d9bb630dc691257b8efe6f00a38f5da171e06c04"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Columnar manifests and windows never expose estimated_rows as exact row_count."
+  - "Quality source snapshots unwrap contract artifacts only to recover exact completed authority."
+  - "Estimate-only artifacts fail row-count reconciliation closed."
+  - "No row values are copied into evidence or errors."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "runtime quality-gate source-row authority"
+  migration_required: false
+
+owned_paths:
+  - src/dpone/runtime/governance/quality_probe_snapshots.py
+  - src/dpone/runtime/columnar_fast_path_models.py
+  - src/dpone/runtime/columnar_object_storage_windows.py
+  - tests/test_quality_artifact_authority_regressions.py
+read_only_paths:
+  - src/dpone/runtime/etl/contract_artifacts.py
+  - src/dpone/runtime/native_transfer_row_authority.py
+  - tests/test_quality_probe_snapshot_validation.py
+  - tests/test_native_transfer_row_authority.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+shared_file_owner: "Codex"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_quality_artifact_authority_regressions.py tests/test_quality_probe_snapshot_validation.py -q"
+  broad:
+    - "uv run ruff check src/dpone/runtime/governance/quality_probe_snapshots.py src/dpone/runtime/columnar_fast_path_models.py src/dpone/runtime/columnar_object_storage_windows.py tests/test_quality_artifact_authority_regressions.py"
+    - "uv run mypy --config-file mypy.ini"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

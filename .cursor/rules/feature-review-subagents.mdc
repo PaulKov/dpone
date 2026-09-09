@@ -1,0 +1,20 @@
+---
+description: After any feature implementation, run review subagents and fix Important+ findings before merge.
+alwaysApply: true
+---
+
+# Feature implementation review gate
+
+After implementing any feature (or material public-contract change), before claiming
+ready for merge/review:
+
+1. Work in the feature worktree; verify `git diff origin/master...HEAD` includes the
+   implementation files (not changelog-only).
+2. Launch in parallel:
+   - Bugbot (`subagent_type: bugbot`, `Diff: branch changes`, Base Branch `master`)
+   - Security Review (`subagent_type: security-review`, same diff scope)
+   - Fresh-context code review (`generalPurpose` against the feature design / AC)
+3. Run change-aware validation (`select_checks.py`) and fix CI failures.
+4. Fix all **Critical** and **Important** findings before merge; record **Minor**
+   follow-ups. Do not treat SKIP/N/A live checks as PASS.
+5. Re-run Bugbot (and code review if wire/type semantics changed) after fixes.

@@ -1,0 +1,625 @@
+{
+  "$comment": "dbt_warning_count must equal the number of warn nodes and node unique_id values must be unique; the canonical Python parser enforces these cross-item invariants.",
+  "$id": "https://dpone.dev/schemas/dpone.dbt-execution-evidence.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "else": {
+        "not": {
+          "required": [
+            "recovery"
+          ]
+        }
+      },
+      "if": {
+        "properties": {
+          "code": {
+            "const": "COMMIT_UNKNOWN"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "then": {
+        "properties": {
+          "build_started": {
+            "const": true
+          },
+          "recovery": {
+            "additionalProperties": false,
+            "properties": {
+              "checkpoint_state": {
+                "const": "not_advanced"
+              },
+              "failure_boundary": {
+                "const": "target_invocation"
+              },
+              "operator_verification_required": {
+                "const": true
+              },
+              "recovery_action": {
+                "const": "operator_verification_required"
+              },
+              "safe_to_retry": {
+                "const": false
+              },
+              "source_state": {
+                "const": "not_advanced"
+              },
+              "status": {
+                "const": "COMMIT_UNKNOWN"
+              },
+              "target_state": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "status",
+              "failure_boundary",
+              "target_state",
+              "checkpoint_state",
+              "source_state",
+              "safe_to_retry",
+              "operator_verification_required",
+              "recovery_action"
+            ],
+            "type": "object"
+          },
+          "status": {
+            "const": "failed"
+          }
+        },
+        "required": [
+          "recovery"
+        ]
+      }
+    }
+  ],
+  "oneOf": [
+    {
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "nodes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "execution_time": {
+                      "type": "number"
+                    },
+                    "status": {
+                      "enum": [
+                        "success",
+                        "pass",
+                        "no-op",
+                        "warn"
+                      ]
+                    },
+                    "unique_id": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "unique_id",
+                    "status",
+                    "execution_time"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "dbt_warning_policy": {
+                "const": "fail"
+              }
+            },
+            "required": [
+              "dbt_warning_policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "dbt_warning_count": {
+                "const": 0
+              },
+              "nodes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "execution_time": {
+                      "type": "number"
+                    },
+                    "status": {
+                      "enum": [
+                        "success",
+                        "pass",
+                        "no-op"
+                      ]
+                    },
+                    "unique_id": {
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "unique_id",
+                    "status",
+                    "execution_time"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "build_started": {
+          "const": true
+        },
+        "code": {
+          "const": "DPONE_DBT_EXECUTION_PASSED"
+        },
+        "dbt_exit_code": {
+          "const": 0
+        },
+        "dbt_schema_version": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "dbt_version": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "invocation_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "nodes": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "execution_time": {
+                "type": "number"
+              },
+              "status": {
+                "enum": [
+                  "error",
+                  "fail",
+                  "no-op",
+                  "partial success",
+                  "pass",
+                  "runtime error",
+                  "skipped",
+                  "success",
+                  "warn"
+                ]
+              },
+              "unique_id": {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "unique_id",
+              "status",
+              "execution_time"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "preflight_status": {
+          "const": "passed"
+        },
+        "status": {
+          "const": "passed"
+        }
+      },
+      "required": [
+        "status",
+        "code",
+        "dbt_exit_code",
+        "dbt_schema_version",
+        "dbt_version",
+        "invocation_id"
+      ]
+    },
+    {
+      "properties": {
+        "code": {
+          "not": {
+            "const": "DPONE_DBT_EXECUTION_PASSED"
+          }
+        },
+        "status": {
+          "const": "failed"
+        }
+      },
+      "required": [
+        "status",
+        "code"
+      ]
+    }
+  ],
+  "properties": {
+    "adapter_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "adapter_runtime": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_runtime_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "backend": {
+          "const": "pyodbc"
+        },
+        "login_timeout_seconds": {
+          "const": 15
+        },
+        "query_timeout_seconds": {
+          "maximum": 86100,
+          "minimum": 300,
+          "type": "integer"
+        },
+        "retries": {
+          "const": 1
+        },
+        "schema": {
+          "const": "dpone.dbt-sqlserver-runtime-policy.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "backend",
+        "retries",
+        "login_timeout_seconds",
+        "query_timeout_seconds",
+        "adapter_runtime_sha256"
+      ],
+      "type": "object"
+    },
+    "airflow": {
+      "additionalProperties": false,
+      "properties": {
+        "dag_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "map_index": {
+          "type": "integer"
+        },
+        "run_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "try_number": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dag_id",
+        "task_id",
+        "run_id",
+        "try_number",
+        "map_index"
+      ],
+      "type": "object"
+    },
+    "build_started": {
+      "type": "boolean"
+    },
+    "code": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "credential_versions": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "connection_ref": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "resolved_version": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resolver": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_ref",
+          "resolver",
+          "resolved_version"
+        ],
+        "type": "object"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "dbt_exit_code": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "dbt_schema_version": {
+      "anyOf": [
+        {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "dbt_version": {
+      "anyOf": [
+        {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "dbt_warning_count": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "dbt_warning_policy": {
+      "enum": [
+        "fail",
+        "allow"
+      ]
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "graph_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "invocation_context_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "invocation_id": {
+      "anyOf": [
+        {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "logical_target_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "manifest_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "execution_time": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "error",
+              "fail",
+              "no-op",
+              "partial success",
+              "pass",
+              "runtime error",
+              "skipped",
+              "success",
+              "warn"
+            ]
+          },
+          "unique_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "unique_id",
+          "status",
+          "execution_time"
+        ],
+        "type": "object"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "preflight_status": {
+      "enum": [
+        "not_started",
+        "passed",
+        "failed"
+      ]
+    },
+    "project_bundle_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "recovery": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_state": {
+          "const": "not_advanced"
+        },
+        "failure_boundary": {
+          "const": "target_invocation"
+        },
+        "operator_verification_required": {
+          "const": true
+        },
+        "recovery_action": {
+          "const": "operator_verification_required"
+        },
+        "safe_to_retry": {
+          "const": false
+        },
+        "source_state": {
+          "const": "not_advanced"
+        },
+        "status": {
+          "const": "COMMIT_UNKNOWN"
+        },
+        "target_state": {
+          "const": "unknown"
+        }
+      },
+      "required": [
+        "status",
+        "failure_boundary",
+        "target_state",
+        "checkpoint_state",
+        "source_state",
+        "safe_to_retry",
+        "operator_verification_required",
+        "recovery_action"
+      ],
+      "type": "object"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.dbt-execution-evidence.v1"
+    },
+    "selection_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "started_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    },
+    "target_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "toolchain_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_id": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "workload_pack_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "status",
+    "code",
+    "workflow_id",
+    "release_id",
+    "deployment_id",
+    "workload_pack_sha256",
+    "project_bundle_sha256",
+    "manifest_sha256",
+    "selection_sha256",
+    "toolchain_sha256",
+    "invocation_context_sha256",
+    "logical_target_sha256",
+    "target_binding_sha256",
+    "adapter_policy_sha256",
+    "graph_policy_sha256",
+    "adapter_runtime",
+    "preflight_status",
+    "build_started",
+    "dbt_exit_code",
+    "dbt_warning_policy",
+    "dbt_warning_count",
+    "started_at",
+    "finished_at",
+    "airflow",
+    "credential_versions",
+    "nodes"
+  ],
+  "type": "object",
+  "x-dpone-semantic-invariants": [
+    "dbt_warning_count_equals_warn_node_count",
+    "node_unique_ids_are_unique",
+    "commit_unknown_requires_non_retryable_recovery"
+  ]
+}

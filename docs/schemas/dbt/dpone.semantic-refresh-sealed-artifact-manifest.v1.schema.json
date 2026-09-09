@@ -1,0 +1,180 @@
+{
+  "$comment": "Python validation requires contiguous ordinals, unique version-pinned keys, and exact total counts.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-sealed-artifact-manifest.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_format": {
+      "const": "dpone_parquet_v1"
+    },
+    "artifact_manifest_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "artifact_prefix": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "attempt_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "chunk_count": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "chunks": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "byte_count": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "chunk_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "object_key": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "ordinal": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "provider_version": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "row_count": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "byte_count",
+          "chunk_sha256",
+          "object_key",
+          "ordinal",
+          "provider_version",
+          "row_count"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "clickhouse_input_mapping_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "codec_mapping_certification_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "effective_key_mapping_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "effective_key_template_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "encryption_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "model_build_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "model_unique_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "operation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "operation_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "ordered_writable_schema_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "parquet_schema_mapping_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "provider": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "publication_order": {
+      "const": "MANIFEST_LAST"
+    },
+    "retention_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "route_certification_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-sealed-artifact-manifest.v1"
+    },
+    "seal_authorization_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "serializer_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "total_bytes": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "total_rows": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "workflow_execution_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "artifact_format",
+    "artifact_manifest_sha256",
+    "artifact_prefix",
+    "attempt_binding_sha256",
+    "chunk_count",
+    "chunks",
+    "clickhouse_input_mapping_sha256",
+    "codec_mapping_certification_sha256",
+    "effective_key_mapping_sha256",
+    "effective_key_template_sha256",
+    "encryption_policy_sha256",
+    "model_build_receipt_sha256",
+    "model_unique_id",
+    "operation_id",
+    "operation_plan_sha256",
+    "ordered_writable_schema_sha256",
+    "parquet_schema_mapping_sha256",
+    "provider",
+    "publication_order",
+    "retention_policy_sha256",
+    "route_certification_receipt_sha256",
+    "schema",
+    "seal_authorization_receipt_sha256",
+    "serializer_sha256",
+    "total_bytes",
+    "total_rows",
+    "workflow_execution_binding_sha256"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,73 @@
+schema_version: 1
+task_id: "SS-REVIEW-QUALITY-ACCEPTANCE-RUNTIME"
+title: "Enforce quality acceptance on staged, legacy and resume-only load paths"
+goal: "Prevent false success and source-state advancement when required acceptance evidence is invalid, unavailable or skipped."
+specification: "docs/feature-design-quality-acceptance-fail-closed-v0731.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "One strict AcceptanceMetricPolicy is used by staged, legacy and resume-only paths."
+  - "Required unavailable sides and probes fail before target mutation when knowable."
+  - "Legacy target metric failure after sink success fails before source-state persistence and is identified as post-commit."
+  - "Legacy and resume paths never synthesize a staged success snapshot."
+  - "Resume-only required acceptance runs without sink mutation or rewriting committed native checkpoints."
+  - "Cleanup/evidence failures preserve the primary exception and record a safe failure classification where possible."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["quality.acceptance runtime", "load-step evidence", "LoadResult reconciliation_metrics"]
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/runtime/governance/acceptance_metrics.py"
+  - "src/dpone/runtime/governance/legacy_acceptance.py"
+  - "src/dpone/runtime/governance/finalization.py"
+  - "src/dpone/runtime/governance/service.py"
+  - "src/dpone/runtime/etl/payload_loader.py"
+  - "tests/test_quality_acceptance_runtime.py"
+  - "tests/test_native_load_governance_finalization.py"
+read_only_paths:
+  - "docs/feature-design-quality-acceptance-fail-closed-v0731.md"
+  - "src/dpone/runtime/etl/processor.py"
+  - "src/dpone/runtime/native_transfer.py"
+  - "src/dpone/runtime/etl/source_state.py"
+  - "src/dpone/config/load_config.py"
+  - "src/dpone/schema/etl-batch-manifest.schema.json"
+  - "src/dpone/schema/etl-flow-manifest.schema.json"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "docs/source-sink"
+
+shared_file_owner: "integrator"
+dependencies: ["SS-REVIEW-QUALITY-FINALIZATION-CLOSURE"]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_quality_acceptance_runtime.py tests/test_native_load_governance_finalization.py -q"
+    - "uv run ruff check src/dpone/runtime/governance/acceptance_metrics.py src/dpone/runtime/governance/legacy_acceptance.py src/dpone/runtime/governance/finalization.py src/dpone/runtime/governance/service.py src/dpone/runtime/etl/payload_loader.py tests/test_quality_acceptance_runtime.py tests/test_native_load_governance_finalization.py"
+    - "uv run mypy --config-file mypy.ini src/dpone/runtime/governance/acceptance_metrics.py src/dpone/runtime/governance/legacy_acceptance.py src/dpone/runtime/governance/finalization.py src/dpone/runtime/governance/service.py src/dpone/runtime/etl/payload_loader.py"
+  broad:
+    - "uv run pytest -k 'acceptance or governance or native_transfer' -q"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A durable target-commit journal or connector transaction redesign becomes necessary."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+
+# Integrator handoff, 2026-07-18:
+# SS-REVIEW-QUALITY-FINALIZATION-CLOSURE is complete and its writer is closed.
+# Its current uncommitted changes are the baseline for this task. Ownership of
+# the overlapping paths is explicitly transferred to this follow-up contract;
+# those changes must be extended in place and never reverted.

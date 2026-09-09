@@ -1,0 +1,81 @@
+schema_version: 1
+task_id: "SS-65"
+title: "Immutable PyPI candidate inventory handoff"
+goal: >
+  Prevent archive replacement, addition, or removal after candidate inventory
+  from producing a successful release-smoke decision.
+specification: >
+  Isolated release-blocking integrity bug fix. Keep the existing closed,
+  no-follow, bounded inventory contract and bind the final GO decision to the
+  exact complete filename/digest set observed before network checks.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "The complete candidate filename, size, and SHA-256 set is revalidated immediately before a GO exit."
+  - "Replacement, addition, removal, symlink substitution, and file-type change after initial inventory fail closed."
+  - "Final verification retains closed-directory, no-follow, bounded-read, and descriptor-cleanup guarantees."
+  - "Rendered blockers expose only bounded, control-safe, redacted candidate identifiers."
+  - "The inventory domain DTO lives in a dependency-neutral module importable without sys.path mutation."
+  - "Existing valid four-package/eight-artifact inventory and exact-version behavior remains compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - PyPI release candidate inventory
+    - release-smoke exit status
+    - bounded release diagnostics
+  migration_required: false
+
+owned_paths:
+  - tools/pypi_release_smoke_dist.py
+  - tools/pypi_candidate_inventory.py
+  - tools/pypi_candidate_contract.py
+  - tests/test_pypi_release_smoke_dist.py
+  - tests/test_pypi_release_smoke.py
+read_only_paths:
+  - docs/release.md
+  - docs/agent-release-protocol.md
+forbidden_paths:
+  - tools/agent_policy/release_identity_gate.py
+  - tests/agent_policy/test_release_identity_gate.py
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "parent Codex agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_pypi_release_smoke_dist.py tests/test_pypi_release_smoke.py -q"
+  broad:
+    - "uv run ruff check tools/pypi_release_smoke_dist.py tools/pypi_candidate_inventory.py tools/pypi_candidate_contract.py tests/test_pypi_release_smoke_dist.py tests/test_pypi_release_smoke.py"
+    - "uv run ruff format --check tools/pypi_release_smoke_dist.py tools/pypi_candidate_inventory.py tools/pypi_candidate_contract.py tests/test_pypi_release_smoke_dist.py tests/test_pypi_release_smoke.py"
+    - "uv run mypy --config-file mypy.ini tools/pypi_release_smoke_dist.py tools/pypi_candidate_inventory.py tools/pypi_candidate_contract.py"
+  live:
+    - "Live PyPI publication remains UNVERIFIED unless actually queried against a frozen candidate"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "A live check requires unapproved credentials or environment."
+  - "The fix requires changing release workflow authority or protected-base policy."
+  - "Public-contract impact is larger than declared."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,83 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-model-definition-proof.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "catalog_observation_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "compiled_sql_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "macro_closure_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "manifest_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "model_definition_proof_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "model_unique_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "parser_runtime_policy_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "raw_code_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "resolved_module_dependency_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "resolved_relation_dependency_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-model-definition-proof.v1"
+    },
+    "status": {
+      "enum": [
+        "PROVEN",
+        "NONCONFORMANT",
+        "UNVERIFIED"
+      ],
+      "type": "string"
+    },
+    "target_independence_policy_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "toolchain_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "catalog_observation_digest",
+    "compiled_sql_sha256",
+    "macro_closure_sha256",
+    "manifest_sha256",
+    "model_definition_proof_sha256",
+    "model_unique_id",
+    "parser_runtime_policy_digest",
+    "raw_code_sha256",
+    "resolved_module_dependency_digest",
+    "resolved_relation_dependency_digest",
+    "schema",
+    "status",
+    "target_independence_policy_digest",
+    "toolchain_sha256"
+  ],
+  "type": "object"
+}

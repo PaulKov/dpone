@@ -1,0 +1,92 @@
+schema_version: 1
+task_id: "SS-67"
+title: "Airflow parse benchmark certification integrity"
+goal: >
+  Make parse evidence certify an actually valid strict-v2 deployment through a
+  sterile process-cold provider import and bind PASS to exact candidate wheels,
+  source commit, topology, time budget, and redacted bounded evidence.
+specification: >
+  Follow-up release-blocking bug fix to the documented Airflow parse SLO and
+  matrix certification contract. Do not weaken the 5-second cold budget or
+  claim installed-wheel PASS without exact candidate identity.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "The synthetic strict-v2 fixture includes checksum-bound binding-set, connection-registry, and credential-runtime artifacts and loads 100 DAGs/500 workloads."
+  - "The certifying cold clock starts in a sterile subprocess before any Airflow, provider, dpone_airflow_pack, fixture, or Kubernetes provider import."
+  - "Every worker has a bounded timeout and termination path that emits redacted failure evidence."
+  - "PASS requires an exact candidate manifest binding source commit, wheel filenames/digests/versions, constraints digest, CNCF provider version, installed distributions, and import origins."
+  - "PASS requires exact expected DAG namespace, IDs, spec fingerprints, task IDs, edges, workload count, and deterministic topology digest; extras and omissions fail."
+  - "Every caller-controlled evidence field is canonical or recursively redacted before persistence."
+  - "CLI success requires a schema-valid evidence payload with both status=PASS and passed=true."
+  - "All eight Airflow/Python matrix cells remain UNVERIFIED locally unless exact wheels are actually installed and benchmarked."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - Airflow parse benchmark fixture
+    - parse SLO evidence and exit status
+    - installed-wheel matrix certification
+  migration_required: false
+
+owned_paths:
+  - tools/airflow_provider_parse_benchmark.py
+  - tools/airflow_provider_parse_benchmark_evidence.py
+  - tools/airflow_provider_parse_benchmark_fixture.py
+  - tools/airflow_provider_parse_benchmark_support.py
+  - tools/airflow_provider_parse_benchmark_tripwire.py
+  - tools/airflow_provider_parse_benchmark_worker.py
+  - docs/schemas/gitops/airflow-provider-parse-benchmark.schema.json
+  - tests/test_airflow_provider_parse_benchmark.py
+  - tests/test_airflow_provider_parse_slo.py
+read_only_paths:
+  - docs/airflow-self-service-architecture.md
+  - docs/schemas/gitops/airflow-deployment-index-v2.schema.json
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py
+  - src/dpone/security_redaction.py
+  - .github/workflows/airflow-pack-compat.yml
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - src/dpone/security_redaction.py
+
+shared_file_owner: "parent Codex agent"
+
+dependencies:
+  - "SS-55A exact credential artifact handoff may extend the strict-v2 fixture contract; preserve its fields."
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_provider_parse_benchmark.py tests/test_airflow_provider_parse_slo.py -q"
+  broad:
+    - "uv run ruff check tools/airflow_provider_parse_benchmark*.py tests/test_airflow_provider_parse_benchmark.py tests/test_airflow_provider_parse_slo.py"
+    - "uv run ruff format --check tools/airflow_provider_parse_benchmark*.py tests/test_airflow_provider_parse_benchmark.py tests/test_airflow_provider_parse_slo.py"
+    - "uv run mypy --config-file mypy.ini -m tools.airflow_provider_parse_benchmark -m tools.airflow_provider_parse_benchmark_evidence -m tools.airflow_provider_parse_benchmark_fixture -m tools.airflow_provider_parse_benchmark_support -m tools.airflow_provider_parse_benchmark_worker"
+  live:
+    - "Exact installed Airflow 2.10/2.11/3.2/3.3 by Python 3.11/3.12 matrix remains UNVERIFIED unless actually executed"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "A live check requires unapproved credentials or environment."
+  - "The documented 5-second budget would need to be weakened."
+  - "A matrix PASS would need to be manufactured without exact installed wheels."
+  - "Public-contract impact is larger than declared."
+  - "Another writer owns the same semantic contract."

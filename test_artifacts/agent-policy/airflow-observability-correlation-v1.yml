@@ -1,0 +1,132 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-OBSERVABILITY-CORRELATION-V1"
+title: "Correlate Airflow, dpone runtime, immutable artifacts, evidence and pod telemetry"
+goal: "Emit one validated non-secret identity across Airflow evidence, OpenLineage and OpenTelemetry-compatible artifacts."
+specification: "docs/feature-design-airflow-observability-correlation-v1.md"
+base_commit: "a8d64e25"
+integrator: "current Codex task"
+
+acceptance_criteria:
+  - "One deterministic correlation ID joins Airflow attempt, release, deployment and workload pack."
+  - "Complete release evidence also proves dpone run ID, runtime evidence digest and observed pod UID."
+  - "OpenLineage and OTel artifacts project the same correlation without network I/O."
+  - "No synthetic OTel trace/span IDs, arbitrary baggage or high-cardinality Prometheus labels are emitted."
+  - "Existing exporter behavior remains compatible when no Airflow evidence bundle is supplied."
+  - "Airflow provider parsing imports no OpenLineage, OTel, Vault or Kubernetes runtime client."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone.airflow-correlation.v1"
+    - "gitops.airflow_xcom_summary additive dpone_run projection"
+    - "gitops.airflow_evidence_bundle additive correlation section"
+    - "dpone ops lineage-export optional --airflow-evidence-bundle"
+    - "dpone observability metrics-export optional --airflow-evidence-bundle"
+  migration_required: false
+
+owned_paths:
+  - "docs/feature-design-airflow-observability-correlation-v1.md"
+  - "docs/adr/0020-airflow-observability-correlation.md"
+  - "docs/adr-index.md"
+  - "src/dpone/contracts/airflow_correlation.py"
+  - "src/dpone/contracts/__init__.py"
+  - "src/dpone/gitops/airflow_xcom_inline_evidence.py"
+  - "src/dpone/gitops/airflow_xcom_outcome.py"
+  - "src/dpone/gitops/airflow_runtime_profile_models.py"
+  - "src/dpone/gitops/airflow_evidence_bundle.py"
+  - "src/dpone/gitops/airflow_evidence_bundle_models.py"
+  - "src/dpone/gitops/airflow_correlation_evidence.py"
+  - "src/dpone/gitops/schema_airflow_correlation_contracts.py"
+  - "src/dpone/gitops/schema_airflow_contracts.py"
+  - "src/dpone/gitops/schema_airflow_evidence_bundle_contracts.py"
+  - "src/dpone/gitops/schema_airflow_runtime_contracts.py"
+  - "src/dpone/ops/openlineage_export.py"
+  - "src/dpone/observability/correlation.py"
+  - "src/dpone/observability/export.py"
+  - "src/dpone/observability/opentelemetry.py"
+  - "src/dpone/commands/observability_cmd.py"
+  - "src/dpone/commands/ops_parsers_artifacts.py"
+  - "src/dpone/services/ops/command_handlers_artifacts.py"
+  - "docs/schemas/gitops/**"
+  - "docs/schemas/openlineage/dpone-airflow-correlation-run-facet-v1.schema.json"
+  - "docs/reference/gitops-schema-catalog.md"
+  - "docs/cli-reference.md"
+  - "docs/airflow-self-service.md"
+  - "docs/airflow-pack-provider.md"
+  - "docs/observability.md"
+  - "docs/lineage.md"
+  - "docs/compatibility.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "tests/test_airflow_observability_correlation.py"
+  - "tests/test_gitops_airflow_evidence_bundle.py"
+  - "tests/test_gitops_airflow_xcom_inline_evidence.py"
+  - "tests/test_observability.py"
+  - "tests/test_operations_maturity_services.py"
+  - "tests/test_cli_operations_commands.py"
+  - "tests/test_gitops_schema_contracts.py"
+  - "test_artifacts/airflow-observability-correlation-v1/**"
+  - "test_artifacts/agent-policy/airflow-observability-correlation-v1.yml"
+  - "docs/quality-metrics.md"
+  - "CHANGELOG.md"
+
+read_only_paths:
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/adr/0008-airflow-parse-safe-provider.md"
+  - "docs/adr/0013-reproducible-rerun-and-retention.md"
+  - "src/dpone/contracts/airflow_run_identity.py"
+  - "packages/dpone-airflow-pack/**"
+
+forbidden_paths:
+  - ".cursor/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+
+shared_file_owner: "current Codex task"
+
+dependencies:
+  - "Airflow run identity and reproducible rerun implementation"
+  - "Bounded mapping implementation at commit b4255dd1"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_observability_correlation.py tests/test_gitops_airflow_evidence_bundle.py tests/test_gitops_airflow_xcom_inline_evidence.py tests/test_observability.py tests/test_operations_maturity_services.py tests/test_cli_operations_commands.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "UNVERIFIED until an approved Airflow/Kubernetes run produces pod, evidence, OpenLineage and OTel backend artifacts"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Correlation is added to mutable AirflowRunIdentity."
+  - "Exporter performs network I/O or provider parse imports an observability SDK."
+  - "Synthetic trace/span IDs or arbitrary baggage are introduced."
+  - "A required edit touches user-owned .cursor files."

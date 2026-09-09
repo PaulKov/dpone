@@ -1,0 +1,36 @@
+{
+  "determinism": {
+    "fingerprint_sets": 1,
+    "passed": true
+  },
+  "fixture": {
+    "dags": 100,
+    "nodes": 500,
+    "repetitions": 30,
+    "visibility_modes": [
+      "inline",
+      "task",
+      "group"
+    ]
+  },
+  "live_certification": "N/A: scheduler-static build-plane capability",
+  "passed": true,
+  "performance": {
+    "budget_p95_ms": 250.0,
+    "max_ms": 5.063,
+    "p50_ms": 2.962,
+    "p95_ms": 4.635,
+    "passed": true
+  },
+  "runner": {
+    "platform": "macOS-15.3-arm64-arm-64bit",
+    "processor": "arm64",
+    "python": "3.11.14"
+  },
+  "schema": "dpone.airflow-step-visibility-benchmark.v1",
+  "side_effects": {
+    "network_calls": 0,
+    "passed": true,
+    "provider_parse_slo_test": "tests/test_airflow_provider_parse_slo.py"
+  }
+}

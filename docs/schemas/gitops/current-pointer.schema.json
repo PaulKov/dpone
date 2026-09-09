@@ -1,0 +1,71 @@
+{
+  "$defs": {
+    "identity": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/current-pointer.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "activation_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "attestation_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "deployment_id": {
+      "$ref": "#/$defs/identity"
+    },
+    "environment": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "previous_deployment_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "promoted_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "promoted_by": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "release_id": {
+      "$ref": "#/$defs/identity"
+    },
+    "schema": {
+      "const": "dpone.current-pointer.v1"
+    },
+    "source_commit": {
+      "type": "string"
+    },
+    "workspace_authority_connection_ref": {
+      "pattern": "^[a-z][a-z0-9_]{0,127}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "environment",
+    "deployment_id",
+    "release_id",
+    "promoted_by",
+    "promoted_at"
+  ],
+  "title": "dpone GitOps current deployment pointer",
+  "type": "object"
+}

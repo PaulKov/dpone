@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/bundle.schema.json",
+  "title": "dpone schema migration evidence bundle",
+  "type": "object",
+  "required": ["schema_version", "bundle_id", "pack_id", "status", "target", "artifacts", "summary"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_bundle.v1"
+    },
+    "bundle_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["ready", "blocked", "warning"]},
+    "target": {
+      "type": "object",
+      "required": ["sink_type", "table"],
+      "additionalProperties": false,
+      "properties": {
+        "sink_type": {"type": "string"},
+        "table": {"type": "string"}
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "path", "sha256", "required"],
+        "additionalProperties": true,
+        "properties": {
+          "kind": {"type": "string"},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "required": {"type": "boolean"},
+          "schema_version": {"type": ["string", "null"]},
+          "pack_id": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}},
+    "attestation": {
+      "type": "object",
+      "required": ["hash_algorithm", "artifact_digests", "bundle_digest"],
+      "additionalProperties": true,
+      "properties": {
+        "hash_algorithm": {"const": "sha256"},
+        "artifact_digests": {"type": "array"},
+        "bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

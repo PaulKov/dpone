@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/domain-dag.schema.json",
+  "title": "dpone GitOps domain-colocated Airflow DAG authoring",
+  "type": "object",
+  "required": [
+    "schema",
+    "dag_id",
+    "domain",
+    "start_date",
+    "pipelines"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.domain-dag.v1"
+    },
+    "dag_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^DAG__[A-Za-z0-9_]+$"
+    },
+    "domain": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{1,127}$"
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "start_date": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timezone": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schedule": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "required": [
+            "assets"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "assets": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              },
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    },
+    "catchup": {
+      "type": "boolean"
+    },
+    "max_active_runs": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "default_args": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "operator_overrides": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "pipelines": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9_-]{1,127}$"
+      },
+      "minItems": 1
+    },
+    "wiring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "waves",
+            "explicit",
+            "assets"
+          ]
+        },
+        "max_parallel_workloads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dependencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "visible_task_budget": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,60 @@
+schema_version: 1
+task_id: "SS-REVIEW-QUALITY-ACCEPTANCE-SCHEMA-DOCS"
+title: "Make quality acceptance schema-valid, strict and documented"
+goal: "Reject malformed acceptance authoring consistently in batch and flow schemas and document physical-side semantics truthfully."
+specification: "docs/feature-design-quality-acceptance-fail-closed-v0731.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Batch and flow schemas expose the same strict quality.acceptance object."
+  - "Missing enabled, misspelled mode, unknown keys, invalid booleans and invalid selectors fail schema validation."
+  - "Correct staged and legacy examples validate against the official schemas."
+  - "Documentation identifies staged as physically unavailable on legacy and resume-only paths."
+  - "Lifecycle order is truthful about target commit, metric capture, cleanup, source state and post-hooks."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["dpone.batch.v1 schema", "dpone.flow.v1 schema", "load governance documentation"]
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/schema/etl-batch-manifest.schema.json"
+  - "src/dpone/schema/etl-flow-manifest.schema.json"
+  - "docs/load-governance.md"
+  - "tests/test_quality_acceptance_schema_contract.py"
+read_only_paths:
+  - "docs/feature-design-quality-acceptance-fail-closed-v0731.md"
+  - "src/dpone/runtime/governance/acceptance_metrics.py"
+  - "tests/test_load_governance_manifest_contracts.py"
+  - "tests/test_docs_language_contracts.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "docs/source-sink"
+  - "src/dpone/runtime"
+
+shared_file_owner: "integrator"
+dependencies: ["SS-REVIEW-QUALITY-ACCEPTANCE-RUNTIME"]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_quality_acceptance_schema_contract.py tests/test_load_governance_manifest_contracts.py tests/test_docs_language_contracts.py -q"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  broad:
+    - "uv run pytest -k 'manifest or schema or compatibility' -q"
+    - "uv run dpone docs check-generated-references"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Schema and runtime semantics cannot be made identical without an integrator decision."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-remediation-report.schema.json",
+  "title": "dpone data product remediation report",
+  "type": "object",
+  "required": ["schema_version", "status", "remediation_report_id"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_remediation_report.v1"},
+    "status": {"type": "string"},
+    "remediation_report_id": {"type": "string"},
+    "remediation_gate_id": {"type": ["string", "null"]},
+    "remediation_closeout_id": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "markdown": {"type": "string"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  },
+  "additionalProperties": true
+}

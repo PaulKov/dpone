@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/data-product/data-product-assertion-evaluation.schema.json",
+  "title": "dpone data product assertion evaluation",
+  "type": "object",
+  "required": ["schema_version", "assertion_evaluation_id", "status", "assertions", "summary", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_assertion_evaluation.v1"},
+    "assertion_evaluation_id": {"type": "string"},
+    "assertion_plan_id": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "status": {"enum": ["disabled", "passed", "warning", "blocked"]},
+    "target": {"type": "object"},
+    "assertions": {"type": "array", "items": {"type": "object"}},
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  }
+}

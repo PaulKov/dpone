@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/agent-governance-gate-v1.json",
+  "title": "dpone agent governance gate receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "status",
+    "base_ref",
+    "head_commit",
+    "changed_paths",
+    "control_surface_changed",
+    "checks",
+    "standards",
+    "risks"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "generated_at": {"type": "string", "minLength": 20},
+    "status": {"enum": ["PASS", "FAIL"]},
+    "base_ref": {"type": "string", "minLength": 1},
+    "head_commit": {"type": "string", "minLength": 7},
+    "changed_paths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "control_surface_changed": {"type": "boolean"},
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status", "details", "artifact"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "status": {"enum": ["PASS", "FAIL", "N/A"]},
+          "details": {"type": "string", "minLength": 1},
+          "artifact": {
+            "anyOf": [
+              {"type": "string", "minLength": 1},
+              {"type": "null"}
+            ]
+          }
+        }
+      }
+    },
+    "standards": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "version", "url"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "version": {"type": "string", "minLength": 1},
+          "url": {"type": "string", "format": "uri"}
+        }
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^AG-[0-9]{3}$"},
+      "uniqueItems": true
+    }
+  }
+}

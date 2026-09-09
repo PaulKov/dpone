@@ -1,0 +1,70 @@
+name: Route certification release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Release candidate id, for example v0.9.0-rc1
+        required: true
+        default: v0.9.0-rc1
+      profile:
+        description: Release certification profile
+        required: true
+        type: choice
+        options:
+          - oss_ci
+          - vendor_live
+        default: oss_ci
+      postgres_mssql_bundle:
+        description: Postgres -> MSSQL route_certification_bundle.json path
+        required: true
+        default: test_artifacts/route_certify/postgres_to_mssql/route_certification_bundle.json
+      mssql_clickhouse_bundle:
+        description: MSSQL -> ClickHouse route_certification_bundle.json path
+        required: true
+        default: test_artifacts/route_certify/mssql_to_clickhouse/route_certification_bundle.json
+
+permissions:
+  contents: read
+
+jobs:
+  route-certification-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Build route certification release report
+        run: |
+          mkdir -p test_artifacts/route_certification_release
+          uv run dpone ops route-certify-release \
+            --release "${{ inputs.release }}" \
+            --profile "${{ inputs.profile }}" \
+            --output-dir test_artifacts/route_certification_release \
+            --route-bundle postgres_to_mssql__incremental_merge="${{ inputs.postgres_mssql_bundle }}" \
+            --route-bundle mssql_to_clickhouse__incremental_merge="${{ inputs.mssql_clickhouse_bundle }}" \
+            --format json
+          test -f test_artifacts/route_certification_release/route_certification_release.json
+
+      - name: Upload route certification release artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: route-certification-release
+          path: |
+            test_artifacts/route_certification_release/
+            test_artifacts/route_certification_release/route_certification_release.json
+          if-no-files-found: warn

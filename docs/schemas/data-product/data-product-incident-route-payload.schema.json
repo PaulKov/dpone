@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-incident-route-payload.schema.json",
+  "title": "dpone data product incident route payload",
+  "type": "object",
+  "required": ["schema_version", "status", "route_payload_id", "provider", "payload", "network_writes"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_incident_route_payload.v1"},
+    "status": {"const": "rendered"},
+    "route_payload_id": {"type": "string", "pattern": "^sha256:"},
+    "provider": {"type": "string"},
+    "payload": {"type": "object"},
+    "network_writes": {"type": "array", "maxItems": 0}
+  }
+}

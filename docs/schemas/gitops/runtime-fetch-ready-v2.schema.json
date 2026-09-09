@@ -1,0 +1,233 @@
+{
+  "$defs": {
+    "readyArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ref": {
+          "pattern": "^cache://(?!(?:[^/\\\\\\s?#%]+/)*(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?!(?:[^/\\\\\\s?#%]+/)*(?:\\.|\\.\\.)(?:/|$))[^/\\\\\\s?#%]+(?:/[^/\\\\\\s?#%]+)*$",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "locator": {
+          "not": {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          },
+          "pattern": "^payload/[^\\s\\\\]+$",
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "artifact_ref",
+        "locator",
+        "sha256",
+        "bytes"
+      ],
+      "type": "object"
+    },
+    "sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/runtime-fetch-ready-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "trust_tier": {
+            "const": "production"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "trust_policy_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "artifact_registry_ref": {
+      "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$",
+      "type": "string"
+    },
+    "artifacts": {
+      "additionalProperties": false,
+      "properties": {
+        "deployment": {
+          "$ref": "#/$defs/readyArtifact"
+        },
+        "release": {
+          "$ref": "#/$defs/readyArtifact"
+        },
+        "workload_pack": {
+          "$ref": "#/$defs/readyArtifact"
+        }
+      },
+      "required": [
+        "release",
+        "deployment",
+        "workload_pack"
+      ],
+      "type": "object"
+    },
+    "deployment_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "pack_fingerprint": {
+      "$ref": "#/$defs/sha256"
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "registry_config_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "release_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "runtime_image_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "schema": {
+      "const": "dpone.runtime-fetch-ready.v2"
+    },
+    "trust_policy_sha256": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "trust_tier": {
+      "enum": [
+        "production",
+        "non_production"
+      ]
+    },
+    "verification": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_attestation": {
+          "additionalProperties": false,
+          "properties": {
+            "attestation_id": {
+              "$ref": "#/$defs/sha256"
+            },
+            "backend": {
+              "const": "cosign_public_key"
+            },
+            "observed_claims": {
+              "items": {
+                "enum": [
+                  "release_id",
+                  "deployment_id",
+                  "environment",
+                  "artifact_registry_ref",
+                  "registry_scope_id",
+                  "release_set_sha256",
+                  "deployment_sha256",
+                  "airflow_index_sha256",
+                  "runtime_image_digest"
+                ]
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "subject_kind": {
+              "const": "airflow_deployment"
+            },
+            "unobserved_claims": {
+              "items": {
+                "enum": [
+                  "release_id",
+                  "deployment_id",
+                  "environment",
+                  "artifact_registry_ref",
+                  "registry_scope_id",
+                  "release_set_sha256",
+                  "deployment_sha256",
+                  "airflow_index_sha256",
+                  "runtime_image_digest"
+                ]
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "verification_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "required": [
+            "subject_kind",
+            "backend",
+            "attestation_id",
+            "verification_sha256",
+            "observed_claims",
+            "unobserved_claims"
+          ],
+          "type": "object"
+        },
+        "attestation_decision_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "attestations": {
+          "const": "passed"
+        },
+        "checksums": {
+          "const": "passed"
+        },
+        "effective_attestation_requirement": {
+          "const": "required"
+        },
+        "runtime_payload_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "checksums",
+        "effective_attestation_requirement",
+        "attestations",
+        "attestation_decision_sha256",
+        "runtime_payload_sha256",
+        "artifact_attestation"
+      ],
+      "type": "object"
+    },
+    "workload_id": {
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "plan_sha256",
+    "release_id",
+    "deployment_id",
+    "runtime_image_digest",
+    "trust_tier",
+    "artifact_registry_ref",
+    "registry_config_sha256",
+    "trust_policy_sha256",
+    "workload_id",
+    "pack_fingerprint",
+    "artifacts",
+    "verification"
+  ],
+  "title": "dpone GitOps attested runtime fetch ready manifest",
+  "type": "object"
+}

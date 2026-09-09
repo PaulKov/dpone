@@ -1,0 +1,55 @@
+schema_version: 1
+task_id: "SS-REVIEW-RUNTIME-INIT-FETCH-SNAPSHOT"
+title: "Make runtime init_fetch consume one bounded verified snapshot"
+goal: "Ensure the runtime fetches exactly the bytes declared by the pinned deployment and never publishes a partial or mutable-alias result."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "RuntimeArtifactRef preserves mandatory declared bytes from the deployment index."
+  - "Local artifact reads use one no-follow descriptor snapshot with positive size bounds."
+  - "The executor validates declared bytes and sha256 against the exact bytes it publishes."
+  - "current/latest and case variants are rejected in artifact references and registry aliases."
+  - "A failed fetch leaves no final manifest or partial destination."
+  - "An identical repeated fetch is deterministic and does not weaken an existing verified result."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["runtime init_fetch plan", "safe-sample init_fetch", "init-fetch evidence"]
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/runtime/artifact_delivery.py"
+  - "src/dpone/runtime/safe_sample_init_fetch.py"
+  - "tests/test_airflow_runtime_phase1b_contracts.py"
+  - "tests/test_airflow_safe_sample_runtime_executor.py"
+read_only_paths:
+  - "src/dpone/contracts/runtime_artifact_delivery.py"
+  - "docs/schemas/gitops/airflow-deployment-index.schema.json"
+  - "docs/airflow-self-service-architecture.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies: ["SS-REVIEW-PROVIDER-SNAPSHOT-ATOMICITY"]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_runtime_phase1b_contracts.py -k 'init_fetch or local_artifact_registry' -q"
+    - "uv run pytest tests/test_airflow_safe_sample_runtime_executor.py -k init_fetch -q"
+  broad:
+    - "uv run pytest tests/test_airflow_runtime_phase1b_contracts.py tests/test_airflow_safe_sample_runtime_executor.py -q"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

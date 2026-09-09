@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-k8s-manifests.schema.json",
+  "title": "dpone GitOps Airflow Kubernetes manifests report",
+  "type": "object",
+  "required": [
+    "kind",
+    "schema_version",
+    "producer",
+    "artifact_dir",
+    "manifest_path",
+    "runtime_profile_path",
+    "pod_contract_path",
+    "gitops_controller",
+    "namespace",
+    "service_account",
+    "objects",
+    "controller_hints",
+    "warnings",
+    "blockers"
+  ],
+  "properties": {
+    "kind": {
+      "const": "gitops.airflow_k8s_manifests"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "artifact_dir": {
+      "type": "string"
+    },
+    "manifest_path": {
+      "type": "string"
+    },
+    "runtime_profile_path": {
+      "type": "string"
+    },
+    "pod_contract_path": {
+      "type": "string"
+    },
+    "connection_bridge_plan_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "gitops_controller": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "service_account": {
+      "type": "string"
+    },
+    "objects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "api_version",
+          "kind",
+          "name",
+          "namespace",
+          "source",
+          "required"
+        ],
+        "properties": {
+          "api_version": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "controller_hints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "code",
+        "message",
+        "path",
+        "source"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

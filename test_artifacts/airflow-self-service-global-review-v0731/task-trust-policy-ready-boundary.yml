@@ -1,0 +1,75 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-REVIEW-TRUST-READY"
+title: "Remove base-container trust-policy reread from strict v2 init-fetch"
+goal: "Persist the init-verified effective attestation decision in the immutable ready manifest and let the base launcher validate that decision without reading the init-only trust-policy ConfigMap."
+specification: "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+base_commit: "ef88ae7f"
+integrator: "Codex main agent"
+
+acceptance_criteria:
+  - "The init container is the only runtime container that reads the mounted trust-policy snapshot."
+  - "RuntimeFetchReady binds the pinned trust-policy digest and the effective attestation requirement selected by trusted init composition."
+  - "The base launcher rejects a missing, malformed, downgraded, or plan-mismatched ready decision without trust-policy filesystem I/O."
+  - "Separate init/base filesystem-view tests prove optional and required policy behavior."
+  - "Existing retry/reuse behavior remains deterministic and fail-closed."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone.runtime-fetch-ready.v1 internal runtime wire"
+    - "strict v2 init-fetch launcher behavior"
+  migration_required: false
+
+owned_paths:
+  - src/dpone/readiness/airflow_runtime_init_fetch.py
+  - src/dpone/runtime/runtime_init_fetch_ready.py
+  - src/dpone/runtime/runtime_init_fetch_service.py
+  - src/dpone/runtime/verified_pack_launcher.py
+  - tests/test_airflow_runtime_init_fetch_cli.py
+  - tests/test_init_fetch_trust_boundary.py
+  - tests/test_runtime_init_fetch_security.py
+read_only_paths:
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/init_fetch_pod.py
+  - docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md
+  - docs/adr/0024-airflow-executable-init-fetch-wire-boundary.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs
+  - packages
+
+shared_file_owner: "Codex main agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_runtime_init_fetch_cli.py tests/test_init_fetch_trust_boundary.py tests/test_runtime_init_fetch_security.py -q"
+    - "uv run ruff check src/dpone/readiness/airflow_runtime_init_fetch.py src/dpone/runtime/runtime_init_fetch_ready.py src/dpone/runtime/runtime_init_fetch_service.py src/dpone/runtime/verified_pack_launcher.py tests/test_airflow_runtime_init_fetch_cli.py tests/test_init_fetch_trust_boundary.py tests/test_runtime_init_fetch_security.py"
+  broad:
+    - "uv run pytest -k 'airflow and init_fetch' -q"
+  live:
+    - "UNVERIFIED unless an approved Kubernetes environment is available"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

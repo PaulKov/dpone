@@ -1,0 +1,114 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-artifact-attestation-verification.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attestation_id": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "code": {
+      "maxLength": 512,
+      "minLength": 1,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "verified",
+        "invalid",
+        "unverified"
+      ]
+    },
+    "decision_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "errors": {
+      "items": {
+        "type": "object"
+      },
+      "maxItems": 1,
+      "type": "array"
+    },
+    "message": {
+      "maxLength": 512,
+      "minLength": 1,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+      "type": "string"
+    },
+    "policy_fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "public_key_id": {
+      "anyOf": [
+        {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "public_key_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schema": {
+      "const": "dpone.airflow-artifact-attestation-verification.v1"
+    },
+    "verified_at": {
+      "maxLength": 512,
+      "minLength": 1,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+      "type": "string"
+    },
+    "verifier_version": {
+      "anyOf": [
+        {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "decision",
+    "code",
+    "message",
+    "decision_sha256",
+    "attestation_id",
+    "policy_fingerprint",
+    "public_key_id",
+    "public_key_sha256",
+    "verifier_version",
+    "verified_at",
+    "errors"
+  ],
+  "title": "dpone GitOps Airflow artifact-attestation verification receipt",
+  "type": "object"
+}

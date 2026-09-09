@@ -1,0 +1,306 @@
+name: Reusable dbt self-service dev evidence
+
+on:
+  workflow_call:
+    inputs:
+      dpone-version:
+        required: true
+        type: string
+      release-repository:
+        description: Repository containing the attested dev release
+        required: true
+        type: string
+      release-run-id:
+        description: Exact dev release workflow run id
+        required: true
+        type: number
+      release-artifact-name:
+        default: dpone-dbt-release
+        required: false
+        type: string
+      release-source-commit:
+        description: Exact source digest proven by the release attestation
+        required: true
+        type: string
+      release-source-ref:
+        description: Exact source ref proven by the release attestation
+        required: true
+        type: string
+      expected-release-id:
+        required: true
+        type: string
+      expected-deployment-id:
+        required: true
+        type: string
+      expected-activation-id:
+        description: Exact dev cache activation produced by the activation workflow
+        required: true
+        type: string
+      evidence-artifact-name:
+        description: Immutable artifact name consumed by prod promotion
+        default: dpone-dbt-dev-evidence
+        required: false
+        type: string
+    secrets:
+      release-artifact-token:
+        description: Read-only token for the exact dev release workflow artifact
+        required: true
+      airflow-api-token:
+        description: Short-lived bearer token allowed to trigger and read dev DAG runs
+        required: true
+    outputs:
+      evidence-subject-sha256:
+        value: ${{ jobs.finalize.outputs.evidence-subject-sha256 }}
+      evidence-set-id:
+        value: ${{ jobs.finalize.outputs.evidence-set-id }}
+      source-commit:
+        value: ${{ jobs.finalize.outputs.source-commit }}
+      source-ref:
+        value: ${{ jobs.finalize.outputs.source-ref }}
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  finalize:
+    runs-on: [self-hosted, dpone-dbt-dev]
+    environment: development
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      evidence-subject-sha256: ${{ steps.finalize.outputs.subject-sha256 }}
+      evidence-set-id: ${{ steps.request.outputs.evidence-set-id }}
+      source-commit: ${{ steps.finalize.outputs.source-commit }}
+      source-ref: ${{ steps.finalize.outputs.source-ref }}
+    env:
+      DPONE_TRUSTED_VERSION: ${{ vars.DPONE_DBT_TOOLING_VERSION }}
+      DPONE_COMPILED_ROOT: ${{ github.workspace }}/.dpone-ci/dev-release/release-a
+      DPONE_EVIDENCE_SOURCE_ROOT: ${{ vars.DPONE_DBT_EVIDENCE_EXPORT_ROOT }}
+      DPONE_EVIDENCE_OUTPUT: ${{ github.workspace }}/.dpone-ci/trusted-dev-evidence
+      DPONE_RELEASE_ID: ${{ inputs.expected-release-id }}
+      DPONE_DEPLOYMENT_ID: ${{ inputs.expected-deployment-id }}
+      DPONE_ACTIVATION_ID: ${{ inputs.expected-activation-id }}
+      DPONE_RELEASE_REPOSITORY: ${{ inputs.release-repository }}
+      DPONE_RELEASE_SOURCE_COMMIT: ${{ inputs.release-source-commit }}
+      DPONE_RELEASE_SOURCE_REF: ${{ inputs.release-source-ref }}
+      DPONE_AIRFLOW_API_URL: ${{ vars.DPONE_DBT_AIRFLOW_API_URL }}
+      DPONE_AIRFLOW_API_VERSION: ${{ vars.DPONE_DBT_AIRFLOW_API_VERSION }}
+      DPONE_TRUSTED_RELEASE_WORKFLOW: ${{ vars.DPONE_DBT_TRUSTED_SIGNER_WORKFLOW }}
+      DPONE_TRUSTED_RELEASE_SIGNER_DIGEST: ${{ vars.DPONE_DBT_TRUSTED_SIGNER_DIGEST }}
+      GH_TOKEN: ${{ secrets.release-artifact-token }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install exact dpone evidence tooling
+        env:
+          DPONE_VERSION: ${{ inputs.dpone-version }}
+          DPONE_RELEASE_ID: ${{ inputs.expected-release-id }}
+          DPONE_DEPLOYMENT_ID: ${{ inputs.expected-deployment-id }}
+          DPONE_RELEASE_REPOSITORY: ${{ inputs.release-repository }}
+          DPONE_RELEASE_SOURCE_COMMIT: ${{ inputs.release-source-commit }}
+          DPONE_RELEASE_SOURCE_REF: ${{ inputs.release-source-ref }}
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          rules = {
+              "DPONE_VERSION": r"^[0-9]+\.[0-9]+\.[0-9]+(?:[0-9A-Za-z._+-]*)?$",
+              "DPONE_RELEASE_ID": r"^sha256:[0-9a-f]{64}$",
+              "DPONE_DEPLOYMENT_ID": r"^sha256:[0-9a-f]{64}$",
+              "DPONE_ACTIVATION_ID": r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "DPONE_RELEASE_REPOSITORY": r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+              "DPONE_RELEASE_SOURCE_COMMIT": r"^[0-9a-f]{40}$",
+              "DPONE_RELEASE_SOURCE_REF": r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$",
+          }
+          failed = False
+          for name, pattern in rules.items():
+              value = os.environ.get(name, "")
+              if not re.fullmatch(pattern, value):
+                  print(f"{name}: rejected by allowlist", file=sys.stderr)
+                  failed = True
+          if os.environ.get("DPONE_VERSION") != os.environ.get("DPONE_TRUSTED_VERSION"):
+              print("DPONE_VERSION: differs from protected DPONE_DBT_TOOLING_VERSION", file=sys.stderr)
+              failed = True
+          raise SystemExit(4 if failed else 0)
+          PY
+          python -m pip install "dpone==${DPONE_TRUSTED_VERSION}"
+
+      - name: Download exact dev release
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.release-artifact-name }}
+          path: ${{ github.workspace }}/.dpone-ci/dev-release
+          repository: ${{ inputs.release-repository }}
+          run-id: ${{ inputs.release-run-id }}
+          github-token: ${{ secrets.release-artifact-token }}
+
+      - name: Require trusted evidence authority
+        run: |
+          if [ -z "${DPONE_TRUSTED_RELEASE_WORKFLOW}" ]; then
+            echo "trusted repository variable DPONE_DBT_TRUSTED_SIGNER_WORKFLOW is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_TRUSTED_RELEASE_SIGNER_DIGEST}" ]; then
+            echo "trusted repository variable DPONE_DBT_TRUSTED_SIGNER_DIGEST is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_EVIDENCE_SOURCE_ROOT}" ]; then
+            echo "protected development-environment variable DPONE_DBT_EVIDENCE_EXPORT_ROOT is required" >&2
+            exit 4
+          fi
+          if [ -z "${DPONE_AIRFLOW_API_URL}" ]; then
+            echo "protected environment variable DPONE_DBT_AIRFLOW_API_URL is required" >&2
+            exit 4
+          fi
+          if [ "${DPONE_AIRFLOW_API_VERSION}" != "v1" ] && [ "${DPONE_AIRFLOW_API_VERSION}" != "v2" ]; then
+            echo "protected environment variable DPONE_DBT_AIRFLOW_API_VERSION must be v1 or v2" >&2
+            exit 4
+          fi
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          source = Path(os.environ["DPONE_EVIDENCE_SOURCE_ROOT"])
+          workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve(strict=True)
+          if not source.is_absolute():
+              raise SystemExit("evidence export root must be absolute")
+          if source.is_symlink():
+              raise SystemExit("evidence export root must not be a symlink")
+          if not source.is_dir():
+              raise SystemExit("evidence export root must be an existing directory")
+          resolved = source.resolve(strict=True)
+          if resolved != Path(os.path.abspath(source)):
+              raise SystemExit("evidence export root must not traverse symlinks")
+          if resolved == workspace or workspace in resolved.parents:
+              raise SystemExit("evidence export root must not be inside GITHUB_WORKSPACE")
+          PY
+
+      - name: Verify release producer and every release byte
+        run: |
+          gh attestation verify \
+            "${DPONE_COMPILED_ROOT}/release-subjects.sha256" \
+            --repo "${DPONE_RELEASE_REPOSITORY}" \
+            --signer-workflow "${DPONE_TRUSTED_RELEASE_WORKFLOW}" \
+            --signer-digest "${DPONE_TRUSTED_RELEASE_SIGNER_DIGEST}" \
+            --source-digest "${DPONE_RELEASE_SOURCE_COMMIT}" \
+            --source-ref "${DPONE_RELEASE_SOURCE_REF}" \
+            --format json > "${GITHUB_WORKSPACE}/.dpone-ci/release-attestation.json"
+          dpone dbt verify-release-checksums \
+            --compiled-root "${DPONE_COMPILED_ROOT}" \
+            --format json > "${GITHUB_WORKSPACE}/.dpone-ci/release-integrity.json"
+
+      - name: Derive immutable evidence campaign request
+        id: request
+        run: |
+          dpone dbt prepare-dev-evidence-request \
+            --compiled-root "${DPONE_COMPILED_ROOT}" \
+            --expected-release-id "${DPONE_RELEASE_ID}" \
+            --expected-deployment-id "${DPONE_DEPLOYMENT_ID}" \
+            --producer-repository "${GITHUB_REPOSITORY}" \
+            --producer-workflow "${GITHUB_WORKFLOW_REF}" \
+            --source-commit "${GITHUB_SHA}" \
+            --orchestration-run-id "${GITHUB_RUN_ID}" \
+            --orchestration-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --format json > "${GITHUB_WORKSPACE}/.dpone-ci/evidence-request.json"
+          python - <<'PY' >> "${GITHUB_OUTPUT}"
+          import json
+          import os
+          from pathlib import Path
+          from dpone_airflow_pack.dev_evidence_store import (
+              DevEvidenceConfinedStore,
+              evidence_set_directory_parts,
+          )
+
+          request = json.loads(Path(".dpone-ci/evidence-request.json").read_text())
+          DevEvidenceConfinedStore(
+              Path(os.environ["DPONE_EVIDENCE_SOURCE_ROOT"])
+          ).ensure_directory(directory_parts=("dbt-spool",))
+          parts = evidence_set_directory_parts(
+              request["release_id"],
+              request["deployment_id"],
+              request["evidence_set_id"],
+          )
+          print("evidence-set-id=" + request["evidence_set_id"])
+          print("source-relative=" + "/".join(parts))
+          PY
+
+      - name: Trigger and wait for exact Airflow evidence DAG runs
+        env:
+          DPONE_AIRFLOW_API_TOKEN: ${{ secrets.airflow-api-token }}
+        run: |
+          dpone dbt run-dev-evidence-campaign \
+            --request "${GITHUB_WORKSPACE}/.dpone-ci/evidence-request.json" \
+            --evidence-root "${DPONE_EVIDENCE_SOURCE_ROOT}" \
+            --airflow-api-url "${DPONE_AIRFLOW_API_URL}" \
+            --airflow-api-version "${DPONE_AIRFLOW_API_VERSION}" \
+            --format json > "${GITHUB_WORKSPACE}/.dpone-ci/evidence-campaign.json"
+
+      - name: Finalize exact release-bound dev evidence
+        id: finalize
+        env:
+          DPONE_EVIDENCE_SOURCE: ${{ env.DPONE_EVIDENCE_SOURCE_ROOT }}/${{ steps.request.outputs.source-relative }}
+          DPONE_EVIDENCE_SET_ID: ${{ steps.request.outputs.evidence-set-id }}
+          DPONE_FINALIZER_REPOSITORY: ${{ github.repository }}
+          DPONE_FINALIZER_WORKFLOW: ${{ github.workflow_ref }}
+          DPONE_FINALIZER_SOURCE_COMMIT: ${{ github.workflow_sha }}
+        run: |
+          dpone dbt finalize-dev-evidence \
+            --compiled-root "${DPONE_COMPILED_ROOT}" \
+            --source-evidence-root "${DPONE_EVIDENCE_SOURCE}" \
+            --output-root "${DPONE_EVIDENCE_OUTPUT}" \
+            --expected-release-id "${DPONE_RELEASE_ID}" \
+            --expected-deployment-id "${DPONE_DEPLOYMENT_ID}" \
+            --expected-activation-id "${DPONE_ACTIVATION_ID}" \
+            --expected-evidence-set-id "${DPONE_EVIDENCE_SET_ID}" \
+            --campaign-request "${GITHUB_WORKSPACE}/.dpone-ci/evidence-request.json" \
+            --producer-repository "${DPONE_FINALIZER_REPOSITORY}" \
+            --producer-workflow "${DPONE_FINALIZER_WORKFLOW}" \
+            --source-commit "${DPONE_FINALIZER_SOURCE_COMMIT}" \
+            --format json > "${GITHUB_WORKSPACE}/.dpone-ci/evidence-finalization.json"
+          {
+            python -c "import json; p=json.load(open('.dpone-ci/evidence-finalization.json')); print('subject-sha256='+p['subject_sha256'])"
+            echo "source-commit=${GITHUB_SHA}"
+            echo "source-ref=${GITHUB_REF}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Upload immutable dev evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ inputs.evidence-artifact-name }}
+          path: |
+            ${{ github.workspace }}/.dpone-ci/trusted-dev-evidence
+            ${{ github.workspace }}/.dpone-ci/evidence-finalization.json
+            ${{ github.workspace }}/.dpone-ci/release-attestation.json
+            ${{ github.workspace }}/.dpone-ci/release-integrity.json
+            ${{ github.workspace }}/.dpone-ci/evidence-request.json
+            ${{ github.workspace }}/.dpone-ci/evidence-campaign.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 180
+
+  attest:
+    needs: finalize
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      artifact-metadata: write
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - name: Download immutable dev evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.evidence-artifact-name }}
+          path: ${{ github.workspace }}/.dpone-ci/dev-evidence
+
+      - name: Attest complete dev evidence checksum subject
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ github.workspace }}/.dpone-ci/dev-evidence/trusted-dev-evidence/evidence-subjects.sha256

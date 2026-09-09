@@ -1,0 +1,78 @@
+schema_version: 1
+task_id: "SS-58"
+title: "Quality execution responsibility decomposition"
+goal: >
+  Restore the 400-SLOC hard module budget by extracting cohesive pure
+  normalization/fingerprint/evidence helpers from quality_execution.py without
+  changing the locked authority state machine or any public behavior.
+specification: >
+  Internal behavior-neutral refactor required by the canonical module-size
+  budget. The current state-machine bug tests are authoritative.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "quality_execution.py is below 400 SLOC with no allowlist or threshold change."
+  - "The stateful QualityGateExecution authority remains cohesive in quality_execution.py."
+  - "Only pure immutable normalization, fingerprint or evidence projection helpers move."
+  - "No compatibility re-export, error code, state transition or receipt identity changes."
+  - "All quality receipt, finalization, native transfer and nested caller tests retain behavior."
+
+public_contract_impact:
+  level: none
+  surfaces: []
+  migration_required: false
+
+owned_paths:
+  - src/dpone/runtime/governance/quality_execution.py
+  - src/dpone/runtime/governance/quality_execution_support.py
+  - tests/test_quality_gate_receipt_binding.py
+read_only_paths:
+  - docs/adr/0025-process-local-quality-gate-authority.md
+  - src/dpone/runtime/governance/quality_receipt.py
+  - src/dpone/runtime/governance/finalization.py
+  - tests/test_native_transfer_quality_evidence.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/benchmarks/quality_budgets.yml
+
+shared_file_owner: "parent Codex agent"
+
+dependencies:
+  - "Terminal evaluate-once fix already present in quality_execution.py and its tests"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_quality_gate_receipt_binding.py -q"
+  broad:
+    - "uv run ruff check src/dpone/runtime/governance/quality_execution.py src/dpone/runtime/governance/quality_execution_support.py tests/test_quality_gate_receipt_binding.py"
+    - "uv run mypy --config-file mypy.ini src/dpone/runtime/governance/quality_execution.py src/dpone/runtime/governance/quality_execution_support.py"
+    - "uv run dpone docs check-module-size --package src/dpone/runtime/governance --no-baseline"
+  live:
+    - "N/A"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "The state machine or public contract would need to change."
+  - "A quality threshold or allowlist would need to be weakened."
+  - "Another writer owns the same semantic contract."

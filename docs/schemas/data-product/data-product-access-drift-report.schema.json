@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-access-drift-report.schema.json",
+  "title": "Data Product Access Drift Report",
+  "type": "object",
+  "required": ["schema_version", "status", "access_drift_report_id", "plan_id", "desired_state", "actual_state", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_access_drift_report.v1"},
+    "status": {"enum": ["clean", "warning", "blocked"]},
+    "access_drift_report_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "plan_id": {"type": ["string", "null"]},
+    "product_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "target": {"type": "object"},
+    "desired_state": {"type": "object"},
+    "actual_state": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

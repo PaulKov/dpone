@@ -1,0 +1,58 @@
+schema_version: 1
+task_id: "SS-72"
+title: "Runtime connection context full schema validation"
+goal: >
+  Reject pinned binding-set, connection-registry, and credential-runtime
+  artifacts that have valid top-level tags but violate their complete public
+  JSON Schema contracts.
+specification: >
+  Release-blocking fail-closed validation defect under approved ADR 0027.
+  Runtime uses the dependency-neutral registered GitOps schema validator after
+  checksum verification and before constructing any credential resolver.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "All three verified runtime context artifacts pass their complete registered schemas."
+  - "Nested resolver omissions and forbidden properties fail before backend construction."
+  - "Schema failures return one bounded safe authority error without payload values."
+  - "Environment equality remains an explicit cross-artifact invariant."
+  - "Valid strict-v2 fixtures use the same public contracts as build-time validation."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - strict runtime connection context validation
+  migration_required: false
+
+owned_paths:
+  - src/dpone/runtime/credentials/runtime_context.py
+  - tests/test_runtime_connection_context_loader.py
+read_only_paths:
+  - src/dpone/gitops/schema_validation.py
+  - src/dpone/gitops/schema_environment_contracts.py
+  - docs/adr/0027-single-runtime-connection-authority.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "parent Codex agent"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_runtime_connection_context_loader.py -q"
+  broad:
+    - "uv run ruff check <owned Python paths>"
+    - "uv run ruff format --check <owned Python paths>"
+    - "uv run mypy --config-file mypy.ini src/dpone/runtime/credentials/runtime_context.py"
+    - "uv run dpone docs check-import-rules"
+  live:
+    - "N/A: validation is deterministic and credential-free."
+
+stop_conditions:
+  - "Validation requires reading a mutable or remote schema."
+  - "Validation error exposes registry or credential payload values."
+  - "Another writer owns the same path."

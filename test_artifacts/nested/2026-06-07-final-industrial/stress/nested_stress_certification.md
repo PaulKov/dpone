@@ -1,0 +1,33 @@
+# Nested Stress Certification
+
+Status: **passed**
+
+```json
+{
+  "status": "passed",
+  "row_count": 1000,
+  "normalized_rows": 255750,
+  "row_counts": {
+    "orders": 1000,
+    "orders__customer": 1000,
+    "orders__attrs": 1000,
+    "order_lines": 252750
+  },
+  "spill_formats": {
+    "orders": "json_each_row",
+    "orders__customer": "json_each_row",
+    "orders__attrs": "json_each_row",
+    "order_lines": "json_each_row"
+  },
+  "skew_pattern": [
+    0,
+    1,
+    10,
+    1000
+  ],
+  "max_child_rows_per_parent": 1000,
+  "elapsed_seconds": 7.691973917011637,
+  "root_rows_per_second": 130.00564104727283,
+  "normalized_rows_per_second": 33248.94269784002
+}
+```

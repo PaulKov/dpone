@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-rollout-plan.schema.json",
+  "title": "dpone data product rollout plan",
+  "type": "object",
+  "required": ["schema_version", "status", "rollout_plan_id", "rings", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_rollout_plan.v1"},
+    "status": {"type": "string"},
+    "rollout_plan_id": {"type": "string"},
+    "product_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "rings": {"type": "array"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

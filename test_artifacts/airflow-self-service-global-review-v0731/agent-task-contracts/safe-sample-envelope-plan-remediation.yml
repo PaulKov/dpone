@@ -1,0 +1,99 @@
+schema_version: 1
+task_id: "SS-64"
+title: "Safe-sample envelope, target-plan, and diagnostic fail closure"
+goal: >
+  Close the independently confirmed safe-sample false-success paths so unsafe
+  target plans, malformed data-copy envelopes, contradictory quarantine
+  counts, production-shaped diagnostic mismatches, and non-JSON diagnostics
+  cannot produce execution_status=succeeded or CLI exit code zero.
+specification: >
+  Follow-up isolated release-blocking bug fix under the APPROVED safe-sample
+  live-runtime integrity contract. Reconcile the existing v1 schema and
+  producer; do not introduce a new command, DSL field, or schema major.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "Live authorization rejects a non-temporary target, cleanup_required=false, or a non-masked PII policy before I/O."
+  - "Every successful copy result has the exact v1 schema identity and all required request, diagnostic, count, error, status, and PII fields."
+  - "Diagnostic counters emitted by the production MSSQL reader and ClickHouse writer are reconciled with top-level counts."
+  - "copied rejects any non-zero quarantine count; copied_with_quarantine requires a positive integer and exact row reconciliation."
+  - "Executor enforces equality between the plan row budget and policy-request row budget."
+  - "Diagnostics contain only finite JSON-safe values; unsupported objects fail with DPONE_SAFE_SAMPLE_DATA_COPY_RESULT_INVALID."
+  - "The standalone v1 data-copy schema and embedded runtime schema both accept the canonical quarantine result and reject malformed results."
+  - "Existing passed, no-data, quality-failure, cleanup, and redaction behavior remains compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - safe-sample live authorization
+    - safe-sample runtime data-copy result
+    - safe-sample structured errors and CLI exit status
+    - dpone.safe-sample-data-copy.v1 schema
+  migration_required: false
+
+owned_paths:
+  - src/dpone/services/safe_sample_live_authorization.py
+  - src/dpone/services/safe_sample_data_copy_validation.py
+  - src/dpone/services/safe_sample_runtime_executor.py
+  - src/dpone/services/ops/command_handlers_safe_sample.py
+  - src/dpone/gitops/schema_safe_sample_route_execution_contracts.py
+  - src/dpone/gitops/schema_safe_sample_runtime_contracts.py
+  - docs/schemas/gitops/safe-sample-data-copy.schema.json
+  - docs/schemas/gitops/safe-sample-runtime-execution.schema.json
+  - tests/test_safe_sample_live_authorization.py
+  - tests/test_airflow_safe_sample_runtime_executor.py
+  - tests/test_airflow_safe_sample_runtime_runner.py
+  - tests/test_cli_safe_sample_runtime_run_command.py
+  - tests/test_airflow_mssql_clickhouse_safe_sample_copier.py
+  - tests/test_airflow_runtime_phase1b_contracts.py
+read_only_paths:
+  - docs/feature-design-safe-sample-live-runtime-integrity-v0724.md
+  - src/dpone/services/mssql_safe_sample_sql_reader.py
+  - src/dpone/services/clickhouse_safe_sample_sql_writer.py
+  - src/dpone/services/safe_sample_runtime_evidence.py
+  - src/dpone/services/safe_sample_redaction.py
+  - src/dpone/output_json.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "parent Codex agent"
+
+dependencies:
+  - "SS-57 initial safe-sample result fail-closure patch"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_safe_sample_live_authorization.py tests/test_airflow_safe_sample_runtime_executor.py tests/test_airflow_safe_sample_runtime_runner.py tests/test_cli_safe_sample_runtime_run_command.py tests/test_airflow_mssql_clickhouse_safe_sample_copier.py tests/test_airflow_runtime_phase1b_contracts.py -q"
+  broad:
+    - "uv run ruff check <owned Python paths>"
+    - "uv run ruff format --check <owned Python paths>"
+    - "uv run mypy --config-file mypy.ini src/dpone/services/safe_sample_live_authorization.py src/dpone/services/safe_sample_runtime_executor.py src/dpone/services/ops/command_handlers_safe_sample.py src/dpone/gitops/schema_safe_sample_route_execution_contracts.py src/dpone/gitops/schema_safe_sample_runtime_contracts.py"
+  live:
+    - "MSSQL/ClickHouse sample run remains UNVERIFIED unless actually executed"
+
+required_outputs:
+  - implementation
+  - tests
+  - schema_reconciliation
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "The fix requires a new public result schema version."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

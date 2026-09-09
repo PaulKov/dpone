@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-cost-evaluation.schema.json",
+  "title": "dpone data product cost evaluation",
+  "type": "object",
+  "required": ["schema_version", "status", "cost_evaluation_id"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_cost_evaluation.v1"},
+    "status": {"type": "string"},
+    "cost_evaluation_id": {"type": "string"},
+    "cost_plan_id": {"type": ["string", "null"]},
+    "estimated_costs": {"type": "object"},
+    "capacity": {"type": "object"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  },
+  "additionalProperties": true
+}

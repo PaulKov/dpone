@@ -1,0 +1,59 @@
+name: PR Gate shadow capacity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  calibrate:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out trusted default-branch source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.sha }}
+
+      - name: Set up locked capacity runtime
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Calibrate diagnostic reconciliation capacity
+        id: calibrate
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DPONE_CAPACITY_RUNNER_LABEL: ubuntu-24.04
+        run: |
+          set -euo pipefail
+          uv sync --frozen
+          uv run --frozen python tools/ci/calibrate_pr_gate_shadow_capacity.py \
+            --event "${GITHUB_EVENT_PATH}" \
+            --output "${RUNNER_TEMP}/pr-gate-shadow-reconciliation-capacity-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json"
+
+      - name: Upload immutable capacity receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: pr-gate-shadow-reconciliation-capacity-${{ github.run_id }}-${{ github.run_attempt }}.json
+          path: ${{ runner.temp }}/pr-gate-shadow-reconciliation-capacity-${{ github.run_id }}-${{ github.run_attempt }}.json
+          if-no-files-found: error
+          archive: true
+          overwrite: false
+          retention-days: 90
+
+      - name: Preserve diagnostic unverified outcome
+        if: steps.calibrate.outcome == 'failure'
+        run: exit 1

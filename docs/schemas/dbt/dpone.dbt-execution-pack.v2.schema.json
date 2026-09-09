@@ -1,0 +1,383 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-execution-pack.v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adapter_policy": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_policy_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "required_project_flags": {
+          "additionalProperties": false,
+          "properties": {
+            "dbt_sqlserver_enable_safe_type_expansion": {
+              "const": false
+            },
+            "dbt_sqlserver_use_dbt_transactions": {
+              "const": true
+            },
+            "dbt_sqlserver_use_default_schema_concat": {
+              "const": true
+            },
+            "dbt_sqlserver_use_native_string_types": {
+              "const": true
+            }
+          },
+          "required": [
+            "dbt_sqlserver_enable_safe_type_expansion",
+            "dbt_sqlserver_use_dbt_transactions",
+            "dbt_sqlserver_use_default_schema_concat",
+            "dbt_sqlserver_use_native_string_types"
+          ],
+          "type": "object"
+        },
+        "schema": {
+          "const": "dpone.dbt-sqlserver-capability-policy.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "required_project_flags",
+        "adapter_policy_sha256"
+      ],
+      "type": "object"
+    },
+    "adapter_runtime": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_runtime_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "backend": {
+          "const": "pyodbc"
+        },
+        "login_timeout_seconds": {
+          "const": 15
+        },
+        "query_timeout_seconds": {
+          "maximum": 86100,
+          "minimum": 300,
+          "type": "integer"
+        },
+        "retries": {
+          "const": 1
+        },
+        "schema": {
+          "const": "dpone.dbt-sqlserver-runtime-policy.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "backend",
+        "retries",
+        "login_timeout_seconds",
+        "query_timeout_seconds",
+        "adapter_runtime_sha256"
+      ],
+      "type": "object"
+    },
+    "dbt_adapter_version": {
+      "const": "1.11.1"
+    },
+    "dbt_core_version": {
+      "const": "1.12.3"
+    },
+    "dbt_warning_policy": {
+      "enum": [
+        "fail",
+        "allow"
+      ]
+    },
+    "invocation_context": {
+      "additionalProperties": false,
+      "properties": {
+        "dynamic_vars": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "const": "dpone_data_interval_end"
+            },
+            {
+              "const": "dpone_data_interval_start"
+            }
+          ],
+          "type": "array"
+        },
+        "environment_policy": {
+          "const": "isolated_v1"
+        },
+        "indirect_selection": {
+          "const": "eager"
+        },
+        "invocation_context_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "schema": {
+          "const": "dpone.dbt-invocation-context.v1"
+        },
+        "static_environment": {
+          "additionalProperties": false,
+          "properties": {
+            "DBT_SEND_ANONYMOUS_USAGE_STATS": {
+              "const": "false"
+            },
+            "LANG": {
+              "const": "C.UTF-8"
+            },
+            "LC_ALL": {
+              "const": "C.UTF-8"
+            }
+          },
+          "required": [
+            "DBT_SEND_ANONYMOUS_USAGE_STATS",
+            "LANG",
+            "LC_ALL"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "schema",
+        "environment_policy",
+        "indirect_selection",
+        "static_environment",
+        "dynamic_vars",
+        "invocation_context_sha256"
+      ],
+      "type": "object"
+    },
+    "invocation_target": {
+      "additionalProperties": false,
+      "properties": {
+        "database": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "database",
+        "schema"
+      ],
+      "type": "object"
+    },
+    "manifest_schema_version": {
+      "const": "v12"
+    },
+    "pack_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "profile": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_type": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "connection_ref": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "database": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "profile_name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "target_name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "threads": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "profile_name",
+        "target_name",
+        "connection_ref",
+        "adapter_type",
+        "database",
+        "schema",
+        "threads"
+      ],
+      "type": "object"
+    },
+    "project_bundle_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "project_subdir": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
+    "run_results_schema_version": {
+      "const": "v6"
+    },
+    "schema": {
+      "const": "dpone.dbt-execution-pack.v2"
+    },
+    "selection_lock": {
+      "$comment": "publish_model_unique_ids must be a subset of expected_run_result_unique_ids, which must be a subset of selected_graph_unique_ids; selection_sha256 must match the canonical semantic payload.",
+      "additionalProperties": false,
+      "properties": {
+        "expected_run_result_unique_ids": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "graph_contract_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "graph_policy_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "graph_policy_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "invocation_context_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "manifest_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "publish_model_unique_ids": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "schema": {
+          "const": "dpone.dbt-selection-lock.v1"
+        },
+        "selected_graph_unique_ids": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "selection_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "selectors": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "toolchain_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "manifest_sha256",
+        "toolchain_sha256",
+        "invocation_context_sha256",
+        "graph_policy_id",
+        "graph_policy_sha256",
+        "graph_contract_sha256",
+        "selectors",
+        "selected_graph_unique_ids",
+        "expected_run_result_unique_ids",
+        "publish_model_unique_ids",
+        "selection_sha256"
+      ],
+      "type": "object",
+      "x-dpone-semantic-invariants": [
+        "expected_run_result_unique_ids_subset_of_selected_graph_unique_ids",
+        "publish_model_unique_ids_subset_of_expected_run_result_unique_ids",
+        "selection_sha256_matches_canonical_payload"
+      ]
+    },
+    "target_path": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
+    "timeout_seconds": {
+      "maximum": 86400,
+      "minimum": 600,
+      "type": "integer"
+    },
+    "workflow_id": {
+      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "workflow_id",
+    "project_bundle_sha256",
+    "project_subdir",
+    "target_path",
+    "profile",
+    "selection_lock",
+    "invocation_context",
+    "adapter_runtime",
+    "adapter_policy",
+    "dbt_core_version",
+    "dbt_adapter_version",
+    "manifest_schema_version",
+    "run_results_schema_version",
+    "dbt_warning_policy",
+    "timeout_seconds",
+    "pack_sha256",
+    "invocation_target"
+  ],
+  "type": "object"
+}

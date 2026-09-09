@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/clickhouse-safe-sample-insert-plan.schema.json",
+  "title": "dpone GitOps ClickHouse safe sample insert plan",
+  "type": "object",
+  "required": [
+    "schema",
+    "sql",
+    "row_count",
+    "temporary_table",
+    "sink"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.clickhouse-safe-sample-insert-plan.v1"
+    },
+    "sql": {
+      "type": "string",
+      "pattern": "^INSERT INTO .+ VALUES$"
+    },
+    "row_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "temporary_table": {
+      "$ref": "#/$defs/table"
+    },
+    "sink": {
+      "type": "object",
+      "required": [
+        "type",
+        "connection_ref",
+        "temporary_table"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "clickhouse"
+        },
+        "connection_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+          "maxLength": 128
+        },
+        "temporary_table": {
+          "$ref": "#/$defs/table"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "table": {
+      "type": "object",
+      "required": [
+        "schema",
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

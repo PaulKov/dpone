@@ -1,0 +1,64 @@
+schema_version: 1
+task_id: "SEMREF-V2-MSSQL"
+title: "SQL Server guard, journal, scoped merge, images, outcome, and replacement"
+goal: "Implement additive SQL Server ports/adapters and the trusted dbt strategy for the approved existing-table cell."
+specification: "docs/feature-design-semantic-refresh-runtime-v2.md"
+base_commit: "76ec08dfac57e80fccb63487cf4bc63d6e5172cc"
+integrator: "root"
+
+acceptance_criteria:
+  - "Writer admission, full guard set, fencing epochs, reservations, and PREPARING journals commit atomically."
+  - "The strategy performs same-transaction fence validation, before/after images, gates, UPDATE then INSERT, and receipt."
+  - "Outcome reconciliation never infers rollback from receipt absence."
+  - "Workflow replacement uses one successor CAS and restore-then-rebuild from the clean logical base."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["runtime state", "receipts", "dbt strategy", "operator recovery"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/ports/semantic_refresh_*.py"
+  - "src/dpone/runtime/semantic_refresh_mssql_*.py"
+  - "src/dpone/services/semantic_refresh_mssql_*.py"
+  - "src/dpone/adapters/semantic_refresh_mssql_*.py"
+  - "packages/dbt-dpone/macros/semantic_refresh_*.sql"
+  - "tests/test_semantic_refresh_mssql_*.py"
+  - "tests/test_semantic_refresh_workflow_failure.py"
+  - "tests/fixtures/semantic-refresh-v2/mssql/**"
+read_only_paths:
+  - "src/dpone/ops/route_execution.py"
+  - "src/dpone/runtime/source_materialization.py"
+  - "src/dpone/runtime/etl/lifecycle.py"
+  - "src/dpone/runtime/sources/mssql_source_materialization.py"
+  - "docs/adr/0022-target-commit-terminal-failures.md"
+  - "docs/feature-design-semantic-refresh-runtime-v2.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/ops/**"
+  - "src/dpone/runtime/source_materialization.py"
+
+shared_file_owner: "root"
+dependencies: ["SEMREF-V2-CONTRACTS"]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_semantic_refresh_mssql_contracts.py tests/test_semantic_refresh_mssql_recovery.py -q"
+  broad:
+    - "uv run ruff check ."
+  live:
+    - "UNVERIFIED until an approved MSSQL environment exists"
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "The pinned adapter branch cannot preserve the specified transaction boundary."
+  - "Live credentials or destructive recovery would be required."

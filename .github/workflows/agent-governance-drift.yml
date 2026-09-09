@@ -1,0 +1,98 @@
+name: Agent Governance Drift
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "19 4 * * 1"
+  push:
+    branches:
+      - master
+    paths:
+      - ".agents/policy/**"
+      - ".github/workflows/**"
+      - "evals/agent/**"
+      - "tools/agent_policy/**"
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Agent governance drift
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Prepare evidence directory
+        run: mkdir -p test_artifacts/agent-policy
+
+      - name: Workflow security policy
+        run: |
+          uv run python tools/agent_policy/workflow_security.py . --format json \
+            > test_artifacts/agent-policy/workflow-security.json
+
+      - name: GitHub ruleset drift
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run python tools/agent_policy/github_settings_drift.py \
+            --policy .agents/policy/github-branch-protection.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --skip-branch-protection \
+            --format json \
+            > test_artifacts/agent-policy/github-ruleset-drift.json
+
+      - name: Classic branch protection drift
+        env:
+          DPONE_GOVERNANCE_GITHUB_TOKEN: ${{ secrets.DPONE_GOVERNANCE_GITHUB_TOKEN }}
+        run: |
+          if [ -z "${DPONE_GOVERNANCE_GITHUB_TOKEN:-}" ]; then
+            printf '%s\n' \
+              '{' \
+              '  "errors": [],' \
+              '  "status": "unverified",' \
+              '  "warnings": [' \
+              '    "DPONE_GOVERNANCE_GITHUB_TOKEN is not configured; classic branch protection drift was not checked."' \
+              '  ]' \
+              '}' \
+              > test_artifacts/agent-policy/github-classic-branch-protection-drift.json
+            echo "::warning::DPONE_GOVERNANCE_GITHUB_TOKEN is not configured; classic branch protection drift is UNVERIFIED."
+            exit 0
+          fi
+
+          GH_TOKEN="$DPONE_GOVERNANCE_GITHUB_TOKEN" \
+            uv run python tools/agent_policy/github_settings_drift.py \
+              --policy .agents/policy/github-branch-protection.yml \
+              --repo "$GITHUB_REPOSITORY" \
+              --format json \
+              > test_artifacts/agent-policy/github-classic-branch-protection-drift.json
+
+      - name: Governance drift summary
+        if: always()
+        run: |
+          uv run python tools/agent_policy/governance_drift_summary.py \
+            --evidence-dir test_artifacts/agent-policy \
+            --output test_artifacts/agent-policy/agent-governance-drift-summary.json
+
+      - name: Upload drift evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: agent-governance-drift
+          path: test_artifacts/agent-policy/
+          if-no-files-found: error
+          retention-days: 90

@@ -1,0 +1,188 @@
+{
+  "$defs": {
+    "identity": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/deployment-set.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "airflow_bundle_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "binding_set_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "connection_registry_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "credential_runtime_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "deployment_id": {
+      "$ref": "#/$defs/identity"
+    },
+    "deployment_type": {
+      "enum": [
+        "preview",
+        "environment"
+      ]
+    },
+    "environment": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "release_ref": {
+      "$ref": "#/$defs/identity"
+    },
+    "runnable": {
+      "type": "boolean"
+    },
+    "runtime_artifact_delivery": {
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "init_fetch"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "required": [
+              "artifact_registry_ref",
+              "identity",
+              "source",
+              "verify"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "artifact_registry_ref": {
+          "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$",
+          "type": "string"
+        },
+        "identity": {
+          "additionalProperties": true,
+          "properties": {
+            "method": {
+              "enum": [
+                "kubernetes_workload_identity"
+              ]
+            },
+            "service_account": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "method",
+            "service_account"
+          ],
+          "type": "object"
+        },
+        "mode": {
+          "enum": [
+            "local_preview",
+            "init_fetch",
+            "shared_pvc",
+            "embedded_bundle",
+            "csi_volume",
+            "inline"
+          ]
+        },
+        "source": {
+          "additionalProperties": true,
+          "properties": {
+            "artifact_registry_ref": {
+              "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "artifact_registry_ref"
+          ],
+          "type": "object"
+        },
+        "verify": {
+          "additionalProperties": true,
+          "properties": {
+            "attestations": {
+              "enum": [
+                "optional",
+                "required_for_prod"
+              ]
+            },
+            "checksums": {
+              "enum": [
+                "required"
+              ]
+            }
+          },
+          "required": [
+            "checksums",
+            "attestations"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "type": "object"
+    },
+    "runtime_image_digest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schema": {
+      "const": "dpone.deployment-set.v1"
+    }
+  },
+  "required": [
+    "schema",
+    "deployment_id",
+    "environment",
+    "release_ref",
+    "runtime_artifact_delivery"
+  ],
+  "title": "dpone GitOps deployment-set",
+  "type": "object"
+}

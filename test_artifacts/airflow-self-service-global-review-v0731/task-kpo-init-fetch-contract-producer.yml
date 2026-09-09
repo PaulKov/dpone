@@ -1,0 +1,92 @@
+schema_version: 1
+task_id: "SS-REVIEW-KPO-INIT-FETCH-CONTRACT"
+title: "Produce the complete pinned init-fetch deployment contract"
+goal: "Emit an executable, secret-free init-fetch projection with a runnable image and structured pack bootstrap."
+specification: "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Strict executable init_fetch is emitted only as deployment-set.v2 and airflow-deployment-index.v2."
+  - "V1 schemas remain backward-compatible; no strict field is retroactively required."
+  - "init_fetch requires runtime_image_ref whose digest equals runtime_image_digest."
+  - "Deployment index carries exact release/deployment/workload descriptors with positive bytes and canonical digests."
+  - "Registry and trust policy ConfigMap refs are bounded, digest-pinned and secret-free."
+  - "The pack exposes structured runtime bootstrap data; init_fetch never depends on parsing inline shell."
+  - "local_preview remains compatible and incomplete old init_fetch projections fail migration-required."
+  - "Both generated JSON Schema and Python validation reject unknown or secret-bearing contract fields."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["deployment-set", "airflow deployment index", "airflow pack", "runtime artifact delivery"]
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/contracts/runtime_artifact_delivery.py"
+  - "src/dpone/gitops/schema_runtime_artifact_delivery.py"
+  - "src/dpone/gitops/schema_release_deployment_contracts.py"
+  - "src/dpone/gitops/schema_airflow_preflight_contracts.py"
+  - "src/dpone/gitops/schema_airflow_pack_contracts.py"
+  - "src/dpone/gitops/airflow_compact_pack.py"
+  - "src/dpone/gitops/airflow_compact_pack_bootstrap.py"
+  - "src/dpone/readiness/airflow_deployment_projection.py"
+  - "src/dpone/readiness/airflow_deployment_projection_errors.py"
+  - "src/dpone/readiness/airflow_deployment_artifacts.py"
+  - "src/dpone/readiness/airflow_init_fetch_projection.py"
+  - "docs/schemas/gitops/airflow-deployment-index.schema.json"
+  - "docs/schemas/gitops/airflow-deployment-index-v2.schema.json"
+  - "docs/schemas/gitops/deployment-set.schema.json"
+  - "docs/schemas/gitops/deployment-set-v2.schema.json"
+  - "docs/schemas/gitops/airflow-pack.schema.json"
+  - "tests/test_airflow_environment_deployment_projection.py"
+  - "tests/test_airflow_runtime_artifact_delivery_contract.py"
+  - "tests/test_airflow_pack_runtime_v3.py"
+read_only_paths:
+  - "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+  - "packages/dpone-airflow-pack"
+  - "src/dpone/runtime"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "packages"
+shared_file_owner: "task contract explicitly delegates the two schemas to this worker"
+dependencies:
+  - "SS-REVIEW-PROVIDER-SNAPSHOT-ATOMICITY"
+  - "SS-REVIEW-PROVIDER-FRESH-REVIEW-CLOSURE"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_environment_deployment_projection.py tests/test_airflow_runtime_artifact_delivery_contract.py tests/test_airflow_pack_runtime_v3.py -q"
+    - "uv run ruff check src/dpone/contracts/runtime_artifact_delivery.py src/dpone/gitops/schema_runtime_artifact_delivery.py src/dpone/gitops/airflow_compact_pack.py src/dpone/gitops/airflow_compact_pack_bootstrap.py src/dpone/readiness/airflow_deployment_projection.py"
+  broad:
+    - "uv run dpone docs check-airflow-public-contracts"
+    - "uv run pytest -k 'airflow and (deployment or pack)' -q"
+  live: []
+required_outputs:
+  [implementation, tests, migration_impact, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Required edit falls outside owned_paths."
+  - "The provider or runtime needs an incompatible contract not defined in the approved specification."
+  - "A secret or physical registry URI would enter the index or pack."
+
+# Integrator handoff, 2026-07-19:
+# SS-REVIEW-PROVIDER-SNAPSHOT-ATOMICITY and
+# SS-REVIEW-PROVIDER-FRESH-REVIEW-CLOSURE are complete and their writers are
+# closed. Their current uncommitted changes are the baseline for this contract.
+# Ownership of the explicitly listed overlapping core schema/test paths is
+# transferred to this task; prior behavior must be extended in place and never
+# reverted.
+#
+# Fresh-review amendment, 2026-07-19:
+# Existing v1 wire contracts must remain readable and must not be tightened in
+# place. The executable init-fetch projection uses index/deployment v2. The
+# verified pack also carries a structured, digest-pinned runtime payload so the
+# runtime never parses or executes the legacy inline bootstrap shell.

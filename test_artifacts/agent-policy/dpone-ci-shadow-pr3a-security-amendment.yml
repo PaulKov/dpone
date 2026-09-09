@@ -1,0 +1,106 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-PR3A-SECURITY-AMENDMENT"
+title: "Amend PR3A provider host and label evidence authority"
+goal: >-
+  Amend the merged PR3A design before implementation so Pages freshness is
+  explicitly bound to github.com and label readiness uses only the exact
+  ordered names while retaining bounded diagnostic receipt bytes.
+specification: "docs/feature-design-ci-shadow-pr3a-ci-hygiene.md"
+base_commit: "dd45dd85b3c807a439f5917ad09fe147a9a8bce7"
+integrator: "/root"
+
+acceptance_criteria:
+  - "The amendment stays RESEARCHED until exact-head review and owner authorization transition the same content to APPROVED."
+  - "The Pages freshness command uses literal gh api --hostname github.com and hostile ambient GH_HOST cannot redirect it."
+  - "Label readiness PASS depends only on authenticated github.com GETs, the exact repository paths, and the exact ordered label-name projection."
+  - "Raw response bytes, digests, numeric and node IDs, echoed URLs, mutable metadata, gh version, time, PR, and base correlation are diagnostic only."
+  - "The gh version observation is best-effort and unavailable, malformed, or changed output cannot affect names-only readiness."
+  - "Offline verification proves receipt integrity without claiming current provider PASS; live verification re-reads github.com and compares names only."
+  - "Malformed, missing, foreign, ambiguous, or unavailable evidence returns one controlled UNVERIFIED result without traceback or partial output."
+  - "The implementation PR cannot modify this amended specification; after merge it must bind the amendment merge as base and prove byte identity."
+  - "No workflow, required check, release, App, protection, package, runtime, source, or repository-setting mutation is introduced."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "PR3A repository CI security specification"
+    - "read-only label readiness evidence and operator recovery"
+  migration_required: false
+
+owned_paths:
+  - docs/feature-design-ci-shadow-pr3a-ci-hygiene.md
+  - docs/feature-design-ci-pr-gate-exact-sha-evidence.md
+  - docs/cicd/runbooks.md
+  - docs/quality-metrics.md
+  - tools/ci/pr3a_label_readback_evidence.py
+  - tests/test_ci_shadow_pr3a_contracts.py
+  - tests/test_ci_shadow_pr3a_pages_guard.py
+  - tests/test_ci_shadow_pr3a_label_evidence.py
+  - tests/agent_policy/test_ci_shadow_pr3a_security_amendment_contract.py
+  - test_artifacts/agent-policy/dpone-ci-shadow-pr3a-security-amendment.yml
+
+read_only_paths:
+  - docs/adr/0048-exact-sha-readiness-evidence.md
+  - docs/feature-design-standard.md
+  - docs/documentation-standard.md
+  - docs/agent-development.md
+  - docs/agent-task-contracts.md
+  - docs/benchmarks/quality_budgets.yml
+  - tools/agent_policy/task_contract.py
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - .github/dependabot.yml
+  - .agents/policy
+  - src
+  - packages
+  - .github/workflows/release.yml
+  - .github/workflows/runtime-image.yml
+  - .github/workflows/certification-release-summary.yml
+  - .github/workflows/route-certification-release.yml
+  - .github/workflows/route-release-finalize.yml
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "Merged PR3A design commit dd45dd85b3c807a439f5917ad09fe147a9a8bce7 is the exact amendment base."
+  - "PR531 remains draft and cannot consume this contract until the exact APPROVED amendment merges without bypass."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_ci_shadow_pr3a_contracts.py tests/test_ci_shadow_pr3a_pages_guard.py tests/test_ci_shadow_pr3a_label_probe.py tests/test_ci_shadow_pr3a_label_evidence.py tests/agent_policy/test_ci_shadow_pr3a_security_amendment_contract.py tests/agent_policy/test_task_contract.py -q"
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/dpone-ci-shadow-pr3a-security-amendment.yml"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref dd45dd85b3c807a439f5917ad09fe147a9a8bce7"
+    - "Execute every selected non-live check, including the full non-live xdist suite, and report skips accurately."
+    - "uv run dpone docs check-docs && uv run pytest tests/test_docs_language_contracts.py -q && uv run mkdocs build --strict"
+  live:
+    - "Require all nineteen unchanged exact-head checks, owner attestation, Agent PR receipt, and no bypass before amendment merge."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Another writer owns the same semantic contract."
+  - "The amendment base differs from dd45dd85b3c807a439f5917ad09fe147a9a8bce7."
+  - "The implementation PR is used as the amendment authority."
+  - "A workflow, required-check, release, App, protection, package, runtime, source, or repository-setting mutation is required."
+  - "A live check requires unapproved credentials or environment."

@@ -1,0 +1,84 @@
+{
+  "$comment": "Selected nodes equal the disjoint mutating/read-only closure; PROVEN has no unclassified mutation.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-mutation-closure.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "indirect_selection": {
+      "const": "empty"
+    },
+    "mutation_closure_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-mutation-closure.v1"
+    },
+    "selected_mutating_node_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "selected_node_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "selected_read_only_node_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "selectors": {
+      "items": {
+        "minLength": 1,
+        "not": {
+          "pattern": "\\+"
+        },
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "status": {
+      "enum": [
+        "PROVEN",
+        "NONCONFORMANT",
+        "UNVERIFIED"
+      ],
+      "type": "string"
+    },
+    "unclassified_mutating_node_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "indirect_selection",
+    "mutation_closure_sha256",
+    "schema",
+    "selected_mutating_node_ids",
+    "selected_node_ids",
+    "selected_read_only_node_ids",
+    "selectors",
+    "status",
+    "unclassified_mutating_node_ids"
+  ],
+  "type": "object"
+}

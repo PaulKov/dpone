@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/dbt-publish-intent.schema.json",
+  "title": "dpone dbt publish intent v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "enabled", "profile", "workflow", "target", "strategy", "physical_design", "execution", "quality", "lineage"],
+  "properties": {
+    "schema": {"const": "dpone.dbt_publish_intent.v1"},
+    "enabled": {"type": "boolean"},
+    "profile": {"type": "string", "minLength": 1},
+    "workflow": {"type": "string", "minLength": 1},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"schema": {"type": ["string", "null"]}, "table": {"type": ["string", "null"]}}
+    },
+    "strategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {"enum": ["auto", "full_refresh", "incremental_merge", "partition_replace"]},
+        "unique_key": {"type": "array", "items": {"type": "string"}},
+        "partition_key": {"type": ["string", "null"]},
+        "window_days": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "physical_design": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {"type": ["string", "null"]},
+        "engine": {"type": ["string", "null"]},
+        "order_by": {"type": "array", "items": {"type": "string"}},
+        "partition_by": {"type": ["string", "null"]}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {"type": ["string", "null"]},
+        "max_parallelism": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"preset": {"enum": ["standard", "strict"]}}
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"enabled": {"type": "boolean"}}
+    }
+  }
+}

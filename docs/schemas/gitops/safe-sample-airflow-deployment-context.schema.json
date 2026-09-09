@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/safe-sample-airflow-deployment-context.schema.json",
+  "title": "dpone GitOps safe sample Airflow deployment context",
+  "type": "object",
+  "required": [
+    "schema",
+    "release_id",
+    "deployment_id",
+    "environment",
+    "deployment_type",
+    "runnable",
+    "runtime_artifact_delivery",
+    "workload_packs",
+    "binding_set_ref",
+    "connection_registry_ref",
+    "credential_runtime_ref",
+    "runtime_image_digest",
+    "airflow_bundle_ref",
+    "index_path",
+    "deployment_path",
+    "parse_side_effects"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.safe-sample-airflow-deployment-context.v1"
+    },
+    "release_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "deployment_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "environment": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "deployment_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runnable": {
+      "type": "boolean"
+    },
+    "runtime_artifact_delivery": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "mode": {
+          "enum": [
+            "local_preview",
+            "init_fetch",
+            "shared_pvc",
+            "embedded_bundle",
+            "csi_volume",
+            "inline"
+          ]
+        },
+        "artifact_registry_ref": {
+          "type": "string",
+          "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$"
+        },
+        "identity": {
+          "type": "object",
+          "required": [
+            "method",
+            "service_account"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "method": {
+              "enum": [
+                "kubernetes_workload_identity"
+              ]
+            },
+            "service_account": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "source": {
+          "type": "object",
+          "required": [
+            "artifact_registry_ref"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "artifact_registry_ref": {
+              "type": "string",
+              "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$"
+            }
+          }
+        },
+        "verify": {
+          "type": "object",
+          "required": [
+            "checksums",
+            "attestations"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "checksums": {
+              "enum": [
+                "required"
+              ]
+            },
+            "attestations": {
+              "enum": [
+                "optional",
+                "required_for_prod"
+              ]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "init_fetch"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "required": [
+              "artifact_registry_ref",
+              "identity",
+              "source",
+              "verify"
+            ]
+          }
+        }
+      ],
+      "required": [
+        "mode"
+      ]
+    },
+    "workload_packs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "binding_set_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "connection_registry_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "credential_runtime_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "runtime_image_digest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "airflow_bundle_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "index_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "deployment_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "parse_side_effects": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "required": [
+        "id",
+        "artifact_ref",
+        "sha256",
+        "bytes"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_ref": {
+          "type": "string",
+          "pattern": "^cache://(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?![^\\s]*/(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))[^\\s]+$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

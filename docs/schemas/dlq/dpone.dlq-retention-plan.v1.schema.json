@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PaulKov/dpone/docs/schemas/dlq/dpone.dlq-retention-plan.v1.schema.json",
+  "title": "dpone DLQ retention plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "plan_id",
+    "snapshot_fingerprint",
+    "delete_record_ids",
+    "protected_record_ids",
+    "planned_at"
+  ],
+  "properties": {
+    "schema": {"const": "dpone.dlq-retention-plan.v1"},
+    "plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "snapshot_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "delete_record_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "protected_record_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "planned_at": {"type": "string", "format": "date-time"}
+  }
+}

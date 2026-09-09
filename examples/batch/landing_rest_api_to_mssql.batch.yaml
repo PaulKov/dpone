@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+convention: landing_raw_v1
+
+vars:
+  src_database: demo_source
+  src_system: example_provider
+  owner_team: data-platform-team
+  owner_contact: data-platform@example.com
+  sla: "daily"
+
+defaults:
+  source:
+    type: api
+    api_type: rest
+    connection_type: vault
+    vault_path: api/example_provider
+    options:
+      method: GET
+      path: /v1/orders
+      records_path: data.items
+      pagination:
+        type: cursor
+        cursor_param: cursor
+        next_cursor_path: data.next_cursor
+        max_pages: 100
+      columns:
+        - {name: id, type: bigint}
+        - {name: updated_at, type: datetime2}
+        - {name: payload, type: nvarchar(max)}
+  sink:
+    type: mssql
+    connection_type: vault
+    connection_id: mssql-dwh
+    vault_path: mssql/demo-dwh
+    staging: {schema: stg}
+    strategy:
+      mode: incremental_append
+      only_new_rows: true
+      unique_key: [id]
+    options:
+      bulk:
+        mode: bcp
+        bcp:
+          batch_size: 50000
+
+schemas:
+  api:
+    tables:
+      - example_orders

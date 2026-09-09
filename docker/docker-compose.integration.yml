@@ -1,0 +1,276 @@
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:44c4ee9810eff91f7eab4d822642e01115b1a9eccce4bcbdde7604752d68eac6
+    container_name: dpone-it-postgres
+    environment:
+      POSTGRES_DB: ${DPONE_IT_PG_DATABASE:-dpone_it}
+      POSTGRES_USER: ${DPONE_IT_PG_USER:-dpone}
+      POSTGRES_PASSWORD: ${DPONE_IT_PG_PASSWORD:-dpone}
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=8", "-c", "max_wal_senders=8"]
+    ports:
+      - "${DPONE_IT_PG_PORT_FORWARD:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DPONE_IT_PG_USER:-dpone} -d ${DPONE_IT_PG_DATABASE:-dpone_it}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  postgis:
+    # Spatial certification is deliberately separate from vanilla PostgreSQL:
+    # extension availability must never change the default mapper silently.
+    image: postgis/postgis:16-3.5-alpine@sha256:b193e996618e9e632e2c6e268462b350c28a9c871cb0352b32905fc01e0299bd
+    platform: linux/amd64
+    container_name: dpone-it-postgis
+    environment:
+      POSTGRES_DB: ${DPONE_IT_POSTGIS_DATABASE:-dpone_it}
+      POSTGRES_USER: ${DPONE_IT_POSTGIS_USER:-dpone}
+      POSTGRES_PASSWORD: ${DPONE_IT_POSTGIS_PASSWORD:-dpone}
+    ports:
+      - "${DPONE_IT_POSTGIS_PORT_FORWARD:-55433}:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DPONE_IT_POSTGIS_USER:-dpone} -d ${DPONE_IT_POSTGIS_DATABASE:-dpone_it}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  postgres-authority-primary:
+    # Dedicated physical topology for source system/timeline authority. It is
+    # never shared with the ordinary integration source database.
+    image: postgres:16-alpine@sha256:44c4ee9810eff91f7eab4d822642e01115b1a9eccce4bcbdde7604752d68eac6
+    container_name: dpone-it-postgres-authority-primary
+    environment:
+      POSTGRES_DB: dpone_authority
+      POSTGRES_USER: dpone
+      POSTGRES_PASSWORD: dpone
+    command:
+      [
+        "postgres",
+        "-c",
+        "wal_level=replica",
+        "-c",
+        "max_wal_senders=4",
+        "-c",
+        "max_replication_slots=4",
+        "-c",
+        "hot_standby=on",
+        "-c",
+        "hba_file=/etc/postgresql-authority/pg_hba.conf",
+      ]
+    ports:
+      - "${DPONE_IT_PG_AUTHORITY_PRIMARY_PORT_FORWARD:-55434}:5432"
+    volumes:
+      - ./postgres-authority/pg_hba.conf:/etc/postgresql-authority/pg_hba.conf:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U dpone -d dpone_authority",
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  postgres-authority-standby:
+    image: postgres:16-alpine@sha256:44c4ee9810eff91f7eab4d822642e01115b1a9eccce4bcbdde7604752d68eac6
+    container_name: dpone-it-postgres-authority-standby
+    depends_on:
+      postgres-authority-primary:
+        condition: service_healthy
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      PGUSER: dpone
+      PGPASSWORD: dpone
+      PGDATABASE: dpone_authority
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        install -d -m 0700 -o postgres -g postgres "$${PGDATA}"
+        gosu postgres pg_basebackup \
+          --host=postgres-authority-primary \
+          --username="$${PGUSER}" \
+          --pgdata="$${PGDATA}" \
+          --format=plain \
+          --wal-method=stream \
+          --write-recovery-conf \
+          --checkpoint=fast \
+          --no-password
+        exec docker-entrypoint.sh postgres -c hot_standby=on
+    ports:
+      - "${DPONE_IT_PG_AUTHORITY_STANDBY_PORT_FORWARD:-55435}:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U dpone -d dpone_authority && test \"$$(psql -Atqc 'SELECT pg_is_in_recovery()')\" = t",
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 10s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: dpone-it-clickhouse
+    environment:
+      CLICKHOUSE_DB: ${DPONE_IT_CH_DATABASE:-dpone_it}
+      CLICKHOUSE_USER: ${DPONE_IT_CH_USER:-default}
+      CLICKHOUSE_PASSWORD: ${DPONE_IT_CH_PASSWORD:-dpone}
+      DPONE_IT_MINIO_ACCESS_KEY: ${DPONE_IT_MINIO_ACCESS_KEY:-minioadmin}
+      DPONE_IT_MINIO_SECRET_KEY: ${DPONE_IT_MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "${DPONE_IT_CH_PORT_FORWARD:-59000}:9000"
+      - "${DPONE_IT_CH_HTTP_PORT_FORWARD:-58123}:8123"
+    volumes:
+      - ./clickhouse/config.d/backups.xml:/etc/clickhouse-server/config.d/backups.xml:ro
+      - ./clickhouse/config.d/local-object-storage.xml:/etc/clickhouse-server/config.d/local-object-storage.xml:ro
+      - ./clickhouse/users.d/local-object-storage.xml:/etc/clickhouse-server/users.d/local-object-storage.xml:ro
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+
+  minio:
+    image: minio/minio:latest
+    container_name: dpone-it-minio
+    environment:
+      MINIO_ROOT_USER: ${DPONE_IT_MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${DPONE_IT_MINIO_SECRET_KEY:-minioadmin}
+    command: server /data --console-address ":9001"
+    ports:
+      - "${DPONE_IT_MINIO_PORT_FORWARD:-59090}:9000"
+      - "${DPONE_IT_MINIO_CONSOLE_PORT_FORWARD:-59091}:9001"
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    environment:
+      DPONE_IT_MINIO_ACCESS_KEY: ${DPONE_IT_MINIO_ACCESS_KEY:-minioadmin}
+      DPONE_IT_MINIO_SECRET_KEY: ${DPONE_IT_MINIO_SECRET_KEY:-minioadmin}
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        until mc alias set local http://minio:9000 "$${DPONE_IT_MINIO_ACCESS_KEY}" "$${DPONE_IT_MINIO_SECRET_KEY}" >/dev/null 2>&1 && mc ready local >/dev/null 2>&1; do sleep 1; done
+        mc mb --ignore-existing local/dpone-stage >/dev/null
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89
+    platform: linux/amd64
+    container_name: dpone-it-mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${DPONE_IT_MSSQL_PASSWORD:-Dp0ne.Strong.Pw.2026!}
+    ports:
+      - "${DPONE_IT_MSSQL_PORT_FORWARD:-51433}:1433"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${DPONE_IT_MSSQL_PASSWORD:-Dp0ne.Strong.Pw.2026!}' -C -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  mssql-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89
+    platform: linux/amd64
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      DPONE_IT_MSSQL_DATABASE: ${DPONE_IT_MSSQL_DATABASE:-dpone_it}
+      MSSQL_SA_PASSWORD: ${DPONE_IT_MSSQL_PASSWORD:-Dp0ne.Strong.Pw.2026!}
+    entrypoint:
+      - /bin/bash
+      - -ec
+      - |
+        database="$${DPONE_IT_MSSQL_DATABASE}"
+        if [[ ! "$${database}" =~ ^[A-Za-z][A-Za-z0-9_]{0,127}$ ]]; then
+          echo "DPONE_IT_MSSQL_DATABASE must be a safe SQL identifier" >&2
+          exit 2
+        fi
+        /opt/mssql-tools18/bin/sqlcmd \
+          -S mssql -U sa -P "$${MSSQL_SA_PASSWORD}" -C -b \
+          -Q "IF DB_ID(N'$${database}') IS NULL EXEC(N'CREATE DATABASE [' + '$${database}' + N']')"
+
+  mysql:
+    image: mysql:8.4
+    container_name: dpone-it-mysql
+    environment:
+      MYSQL_DATABASE: ${DPONE_IT_MYSQL_DATABASE:-dpone_it}
+      MYSQL_USER: ${DPONE_IT_MYSQL_USER:-dpone}
+      MYSQL_PASSWORD: ${DPONE_IT_MYSQL_PASSWORD:-dpone}
+      MYSQL_ROOT_PASSWORD: ${DPONE_IT_MYSQL_ROOT_PASSWORD:-dpone_root}
+    ports:
+      - "${DPONE_IT_MYSQL_PORT_FORWARD:-53306}:3306"
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: dpone-it-kafka
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:59092,CONTROLLER://kafka:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://127.0.0.1:59092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "${DPONE_IT_KAFKA_PORT_FORWARD:-59092}:59092"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:59092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.7.1
+    container_name: dpone-it-schema-registry
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports:
+      - "${DPONE_IT_SCHEMA_REGISTRY_PORT_FORWARD:-58081}:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/subjects >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s

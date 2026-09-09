@@ -1,0 +1,88 @@
+schema_version: 1
+task_id: "SS-66"
+title: "Runtime-image registry identity and replay hardening"
+goal: >
+  Close false PASS and unrecoverable partial-publication paths in digest-first
+  runtime-image alias reconciliation.
+specification: >
+  Follow-up release-blocking bug fix under the APPROVED digest-first runtime
+  image promotion specification. Preserve digest-first certification and
+  create-or-compare semantics while making every registry observation,
+  mutation, postcondition, and transition receipt digest-bound and replayable.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "Version metadata is inspected through IMAGE@observed_digest, never through a mutable tag."
+  - "A newer latest digest is PRESERVED_NEWER only with a trusted validated certification binding that digest to its stable version; absence of such proof blocks."
+  - "Alias creation uses Docker semantics that preserve the exact certified source manifest digest and supports OCI plus Docker schema2 manifest/index media types."
+  - "Every successful alias mutation is fsync-durably journaled before the next transition; interruption leaves bounded machine-readable repair evidence."
+  - "Retry against the same certified digest is idempotent; a different fixed-alias digest remains blocked."
+  - "Registry errors and journal output contain only bounded safe codes, refs, versions, and digests."
+  - "Registry/policy modules are split by stable responsibility before exceeding quality budgets."
+  - "Mocked adversarial tests cover tag movement, uncertified newer versions, wrapper-index prevention, postcondition mismatch, interruption, and retry."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - runtime-image publication policy
+    - registry lookup and alias reconciliation
+    - runtime-image publication evidence
+  migration_required: false
+
+owned_paths:
+  - tools/agent_policy/runtime_image_registry.py
+  - tools/agent_policy/runtime_image_promotion.py
+  - tools/agent_policy/runtime_image_registry_transport.py
+  - tools/agent_policy/runtime_image_publication_journal.py
+  - tests/agent_policy/test_runtime_image_registry.py
+  - tests/agent_policy/test_runtime_image_promotion.py
+read_only_paths:
+  - docs/feature-design-runtime-image-digest-first-promotion-v0732.md
+  - docs/schemas/release/runtime-image-certification.schema.json
+  - docs/schemas/release/runtime-image-publication.schema.json
+  - .github/workflows/runtime-image.yml
+forbidden_paths:
+  - tools/agent_policy/runtime_image_certification.py
+  - tests/agent_policy/test_runtime_image_certification.py
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "parent Codex agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/agent_policy/test_runtime_image_registry.py tests/agent_policy/test_runtime_image_promotion.py -q"
+  broad:
+    - "uv run ruff check tools/agent_policy/runtime_image_registry.py tools/agent_policy/runtime_image_promotion.py tools/agent_policy/runtime_image_registry_transport.py tools/agent_policy/runtime_image_publication_journal.py tests/agent_policy/test_runtime_image_registry.py tests/agent_policy/test_runtime_image_promotion.py"
+    - "uv run ruff format --check tools/agent_policy/runtime_image_registry.py tools/agent_policy/runtime_image_promotion.py tools/agent_policy/runtime_image_registry_transport.py tools/agent_policy/runtime_image_publication_journal.py tests/agent_policy/test_runtime_image_registry.py tests/agent_policy/test_runtime_image_promotion.py"
+    - "uv run mypy --config-file mypy.ini tools/agent_policy/runtime_image_registry.py tools/agent_policy/runtime_image_promotion.py tools/agent_policy/runtime_image_registry_transport.py tools/agent_policy/runtime_image_publication_journal.py"
+    - "uv run dpone docs check-module-size --package tools/agent_policy --no-baseline --warn-lines 350 --max-lines 400 --warn-sloc 300 --max-sloc 350"
+  live:
+    - "Ephemeral OCI registry and GHCR promotion remain UNVERIFIED unless actually executed"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "A live check requires unapproved credentials or environment."
+  - "The fix requires changing workflow job identity or artifact naming."
+  - "Public-contract impact is larger than declared."
+  - "Another writer owns the same semantic contract."

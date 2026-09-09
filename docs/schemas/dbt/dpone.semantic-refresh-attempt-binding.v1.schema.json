@@ -1,0 +1,70 @@
+{
+  "$comment": "Python validation requires workflow_execution_id to equal dag_run_id exactly.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-attempt-binding.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempt_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "dag_run_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "fencing_epoch": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "operation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "operation_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "owner_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "pod_uid": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-attempt-binding.v1"
+    },
+    "task_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "try_number": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "workflow_execution_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_execution_id": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "attempt_binding_sha256",
+    "dag_run_id",
+    "fencing_epoch",
+    "operation_id",
+    "operation_plan_sha256",
+    "owner_id",
+    "pod_uid",
+    "schema",
+    "task_id",
+    "try_number",
+    "workflow_execution_binding_sha256",
+    "workflow_execution_id"
+  ],
+  "type": "object"
+}

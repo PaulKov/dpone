@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-authoring-fix.schema.json",
+  "title": "dpone GitOps Airflow authoring fix report",
+  "type": "object",
+  "required": [
+    "kind",
+    "schema",
+    "passed",
+    "changes",
+    "errors",
+    "mode",
+    "apply",
+    "applied",
+    "target",
+    "summary"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "kind": {
+      "const": "dpone.airflow-authoring-fix.v1"
+    },
+    "schema": {
+      "const": "dpone.airflow-authoring-fix.v1"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "action",
+          "path",
+          "message",
+          "diff"
+        ],
+        "properties": {
+          "action": {
+            "enum": [
+              "plan_modify",
+              "modify"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "diff": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "mode": {
+      "enum": [
+        "plan",
+        "apply"
+      ]
+    },
+    "apply": {
+      "type": "boolean"
+    },
+    "applied": {
+      "type": "boolean"
+    },
+    "target": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "legacy_sections",
+        "applied_sections",
+        "no_op"
+      ],
+      "properties": {
+        "legacy_sections": {
+          "type": "integer"
+        },
+        "applied_sections": {
+          "type": "integer"
+        },
+        "no_op": {
+          "type": "boolean"
+        }
+      }
+    },
+    "migration_plan": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-authoring-migration-plan.schema.json",
+      "title": "dpone GitOps Airflow authoring migration plan",
+      "type": "object",
+      "required": [
+        "kind",
+        "schema",
+        "mode",
+        "apply",
+        "source_path",
+        "summary",
+        "changes"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "const": "dpone.airflow-authoring-migration-plan.v1"
+        },
+        "schema": {
+          "const": "dpone.airflow-authoring-migration-plan.v1"
+        },
+        "mode": {
+          "const": "plan"
+        },
+        "apply": {
+          "const": false
+        },
+        "source_path": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "legacy_sections",
+            "manual_review_required",
+            "apply_supported"
+          ],
+          "properties": {
+            "legacy_sections": {
+              "type": "integer"
+            },
+            "manual_review_required": {
+              "type": "boolean"
+            },
+            "apply_supported": {
+              "type": "boolean"
+            }
+          }
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "action",
+              "path",
+              "suggested_connection_ref",
+              "detected",
+              "proposed_section",
+              "manual_review_required",
+              "unified_diff"
+            ],
+            "properties": {
+              "action": {
+                "const": "replace_legacy_connection_config"
+              },
+              "path": {
+                "type": "string"
+              },
+              "suggested_connection_ref": {
+                "type": "string"
+              },
+              "detected": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "proposed_section": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "manual_review_required": {
+                "type": "boolean"
+              },
+              "unified_diff": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,44 @@
+schema_version: dpone.ci-shadow-bundle.v1
+files:
+  - path: .github/workflows/pr-gate-shadow.yml
+    role: EXECUTION_WORKFLOW
+    sha256: 8b9341aea2b15d380a97fccb5dd5368f44ac81dd77ac3b90ec5ac6ef634d0968
+  - path: .github/workflows/pr-gate-shadow-audit.yml
+    role: TRUST_CORE
+    sha256: d74714b1228038b11583cd38eca6cddc871ecafd898e9e0d18dedd22e546e415
+  - path: src/dpone/contracts/ci_shadow.py
+    role: TRUST_CORE
+    sha256: db85f578c1770eeba34065a069c67b2629d6df9f47ae50313fc11fb899585b2e
+  - path: src/dpone/contracts/ci_shadow_audit.py
+    role: TRUST_CORE
+    sha256: 163b08ca845643498add7514a2c56c2203160ebd72a62e96769e254cd5e0adce
+  - path: src/dpone/contracts/strict_json.py
+    role: TRUST_CORE
+    sha256: 5f0ac685e4ab7a2640c4eb00c92faf75e8b004ceb33c8745c7879ca1e0ac233b
+  - path: src/dpone/ports/ci_shadow_audit.py
+    role: TRUST_CORE
+    sha256: 603760011f9138b222bd7c0045227e7d692fe8d2f1e5d799989468d9c11aa3b6
+  - path: src/dpone/services/ci/shadow.py
+    role: TRUST_CORE
+    sha256: bd84dc8a5f40535b504d2d13c24474167e1f336b92b357751c1ccecbcc3aa151
+  - path: src/dpone/services/ci/shadow_audit.py
+    role: TRUST_CORE
+    sha256: 85473dce55371ca244c217d22d2162b9e0697280288520c779c4187906300c9b
+  - path: src/dpone/services/ci/shadow_audit_identity.py
+    role: TRUST_CORE
+    sha256: 091dad0e88d91a11408294e50ed30f89cafe0ca7e1c5ae5028cc32b2c12f54cc
+  - path: src/dpone/services/ci/shadow_bundle.py
+    role: TRUST_CORE
+    sha256: 84fd0b2e91f1f3f03eb9f2445c13c4f559f760ba52b60fc1cf986ab93b5fedea
+  - path: src/dpone/adapters/ci_shadow_audit_github.py
+    role: TRUST_CORE
+    sha256: 5981b6c8f21e88a579ffed336ac90f536548e05fb0eb6323834b5335bea5eb32
+  - path: tools/ci/change_plan.py
+    role: TRUST_CORE
+    sha256: 1adbc799a043fe918dd13b74c6635ade95e468e3b6ff4569625677e66fa05474
+  - path: tools/ci/gate_evaluator.py
+    role: TRUST_CORE
+    sha256: 24d72576dbda151445593cd697e7cc8107f7993dfffb1a57ba76207e2e4dcd7d
+  - path: tools/ci/audit_pr_gate_shadow.py
+    role: TRUST_CORE
+    sha256: 9895927ffb98bd56c1d03eb47d9e3016ca625637122318bba453256f26ce0344

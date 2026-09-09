@@ -1,0 +1,83 @@
+schema_version: 1
+task_id: "DPONE-V07328-RECEIPT-RESOURCE-LIMITS"
+title: "Bound merge-receipt provider and archive resource consumption"
+goal: "Reject oversized or amplified receipt evidence before it can consume unbounded memory or produce PASS."
+specification: "docs/feature-design-release-blocker-remediation-v07328.md"
+base_commit: "8f32637714f6c7c9c57372c72b5ce087aff8d861"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Provider metadata above the compressed limit is rejected before download."
+  - "API and artifact responses are streamed only to their declared limit plus one byte."
+  - "ZIP member count, individual size, 100:1 compression ratio and aggregate uncompressed size are validated before extraction."
+  - "Truncation, oversized redirects and compression amplification cannot produce partial PASS."
+  - "Existing exact receipt and merge-binding schemas and successful small artifacts remain compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "agent PR receipt ingestion"
+    - "release merge receipt gate"
+  migration_required: false
+
+owned_paths:
+  - "tools/agent_policy/artifact_resource_limits.py"
+  - "tools/agent_policy/governance_artifact_content.py"
+  - "tools/agent_policy/pr_receipt_github.py"
+  - "tools/agent_policy/pr_receipt_github_api.py"
+  - "tools/agent_policy/pr_receipt_source.py"
+  - "tools/agent_policy/pr_receipt_source_archive.py"
+  - "tools/agent_policy/release_merge_receipt_gate.py"
+  - "tests/agent_policy/test_artifact_resource_limits.py"
+  - "tests/agent_policy/test_governance_artifact_content.py"
+  - "tests/agent_policy/test_governance_receipt_resource_limits.py"
+  - "tests/agent_policy/test_pr_receipt_github_api.py"
+  - "tests/agent_policy/test_receipt_resource_limit_regressions.py"
+  - "tests/agent_policy/test_pr_receipt_source.py"
+  - "tests/agent_policy/test_pr_receipt_source_archive.py"
+  - "tests/agent_policy/test_pr_receipt_source_resilience.py"
+  - "tests/agent_policy/test_release_merge_receipt_gate.py"
+read_only_paths:
+  - "evals/agent"
+  - ".agents/policy/workflow-security.yml"
+  - ".github/workflows/agent-pr-receipt.yml"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "evals/agent"
+  - "docs/feature-design-release-blocker-remediation-v07328.md"
+
+shared_file_owner: "Codex"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/agent_policy/test_artifact_resource_limits.py tests/agent_policy/test_pr_receipt_github_api.py tests/agent_policy/test_pr_receipt_source.py tests/agent_policy/test_pr_receipt_source_archive.py tests/agent_policy/test_release_merge_receipt_gate.py -q"
+  broad:
+    - "uv run ruff check owned paths"
+    - "uv run dpone docs check-module-size --package tools/agent_policy --no-baseline"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

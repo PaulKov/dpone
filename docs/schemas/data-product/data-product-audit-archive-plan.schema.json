@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-audit-archive-plan.schema.json",
+  "title": "Data Product Audit Archive Plan",
+  "type": "object",
+  "required": ["schema_version", "status", "audit_archive_plan_id", "artifact_refs", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_audit_archive_plan.v1"},
+    "status": {"enum": ["disabled", "ready", "warning", "blocked"]},
+    "audit_archive_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "product": {"type": "object"},
+    "archive": {"type": "object"},
+    "retention": {"type": "object"},
+    "artifact_refs": {"type": "array", "items": {"type": "object"}},
+    "hash_chain": {"type": "array", "items": {"type": "object"}},
+    "merkle_root": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

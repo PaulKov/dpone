@@ -1,0 +1,3 @@
+gitops:
+  includes:
+    - path: domains/*.yaml

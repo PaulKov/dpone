@@ -1,0 +1,146 @@
+schema_version: 1
+task_id: "DPONE-V0727-BEGINNER-AUTO-LIVE-SAMPLE"
+title: "Execute verified live safe samples from the beginner facade"
+goal: >-
+  Complete the fifth self-service command by automatically selecting the
+  existing signed, deployment-pinned live runtime when platform-owned inputs
+  are complete, while preserving network-free fallback and fail-closed trust
+  ordering without adding beginner flags or a second execution engine.
+specification: "docs/feature-design-beginner-auto-live-safe-sample-v0727.md"
+base_commit: "2d7bc688"
+integrator: "codex/v0.72.7-beginner-live-sample"
+
+acceptance_criteria:
+  - "The five-command beginner path needs no additional command or platform-only argument for a prepared environment."
+  - "A complete deployment-scoped authorization overlay invokes the existing live assembly and runtime runner exactly once."
+  - "An absent overlay preserves the network-free local handoff; a partial or unsafe overlay fails closed with a structured blocker."
+  - "Signature, subject, source pin, environment fingerprints, schemas, route binding, and policy are verified before credentials or database I/O."
+  - "CLI output distinguishes live_copy, local_handoff, and blocked; runtime evidence records executed live_copy/local_handoff modes without exposing secrets or infrastructure-sensitive registry content."
+  - "Explicit platform safe-sample runtime commands and all existing authoring/release/deployment schemas remain compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - cli
+    - structured_errors
+    - runtime_evidence
+    - documentation
+    - platform_cache_layout
+  migration_required: false
+  migration: "Platform CI may materialize the documented deployment-scoped route-authorization overlay to opt into automatic live execution."
+
+owned_paths:
+  - docs/feature-design-beginner-auto-live-safe-sample-v0727.md
+  - docs/adr/0014-route-attestation-production-trust.md
+  - docs/getting-started/first-airflow-dag.md
+  - docs/airflow-self-service-architecture.md
+  - docs/airflow-self-service-backlog.md
+  - docs/airflow-route-attestation.md
+  - docs/compatibility.md
+  - CHANGELOG.md
+  - test_artifacts/agent-policy/2026-07-15-v0727-beginner-auto-live-safe-sample.yml
+  - test_artifacts/airflow-self-service-v0727-beginner-live-sample/**
+  - src/dpone/readiness/safe_sample_live_input_discovery.py
+  - src/dpone/contracts/safe_sample_live_authorization.py
+  - src/dpone/readiness/safe_sample_auto_live_runtime.py
+  - src/dpone/readiness/safe_sample_live_runtime.py
+  - src/dpone/readiness/safe_sample_runtime_handoff.py
+  - src/dpone/commands/run_safe_sample_cmd.py
+  - src/dpone/commands/run_safe_sample_rendering.py
+  - src/dpone/commands/run_safe_sample_runtime_selection.py
+  - src/dpone/services/safe_sample_cli_result.py
+  - src/dpone/services/safe_sample_runtime_handoff_plan.py
+  - src/dpone/services/safe_sample_runtime_evidence.py
+  - src/dpone/services/safe_sample_runtime_executor.py
+  - src/dpone/services/safe_sample_runtime_result.py
+  - src/dpone/services/safe_sample_cli_runtime.py
+  - src/dpone/services/safe_sample_policy.py
+  - src/dpone/gitops/schema_safe_sample_runtime_contracts.py
+  - docs/schemas/gitops/safe-sample-runtime-execution.schema.json
+  - docs/reference/gitops-schema-catalog.md
+  - tests/test_safe_sample_live_input_discovery.py
+  - tests/test_safe_sample_auto_live_runtime.py
+  - tests/test_airflow_self_service_cli.py
+  - tests/test_airflow_safe_sample_cli_result.py
+  - tests/test_airflow_safe_sample_runtime_handoff.py
+  - tests/test_airflow_safe_sample_runtime_executor.py
+  - tests/test_airflow_safe_sample_runtime_evidence.py
+  - tests/test_gitops_schema_contracts.py
+  - tests/test_safe_sample_live_runtime_assembly.py
+  - tests/test_run_safe_sample_rendering.py
+  - tests/test_docs_language_contracts.py
+
+read_only_paths:
+  - docs/engineering-standards.md
+  - docs/feature-design-standard.md
+  - docs/architecture.md
+  - docs/benchmarks/quality_budgets.yml
+  - docs/adr/0007-release-set-and-deployment-set.md
+  - docs/adr/0011-canonical-fingerprints.md
+  - docs/adr/0013-reproducible-rerun-and-retention.md
+  - src/dpone/readiness/airflow_verified_current_deployment.py
+  - src/dpone/readiness/airflow_local_safe_sample_deployment.py
+  - src/dpone/readiness/route_attestation.py
+  - src/dpone/readiness/route_attestation_files.py
+  - src/dpone/services/safe_sample_execution_plan.py
+  - src/dpone/services/safe_sample_runtime_runner.py
+  - src/dpone/services/safe_sample_live_authorization.py
+  - src/dpone/runtime/artifact_delivery.py
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - mkdocs.yml
+  - .github/workflows
+  - packages/dpone-airflow-pack
+  - .cursor/
+
+shared_file_owner: "Codex integrator"
+
+dependencies:
+  - "ADR 0014"
+  - "DPONE-V0724-SAFE-SAMPLE-LIVE-RUNTIME"
+  - "DPONE-V0725-LOCAL-PROMOTION"
+  - "DPONE-V0726-ROUTE-ATTESTATION"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_safe_sample_live_input_discovery.py tests/test_airflow_self_service_cli.py tests/test_airflow_safe_sample_cli_result.py tests/test_safe_sample_live_runtime_assembly.py tests/test_airflow_safe_sample_runtime_executor.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live:
+    - "Approved signed-overlay KPO/Vault/MSSQL/ClickHouse safe-sample certification"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+  - validation_evidence
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "The change adds a beginner golden-path command or flag."
+  - "The implementation resolves current, credentials, Vault, or a database before trust verification."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

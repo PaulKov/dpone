@@ -1,0 +1,509 @@
+{
+  "$defs": {
+    "exactArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ref": {
+          "pattern": "^cache://(?!(?:[^/\\\\\\s?#%]+/)*(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?!(?:[^/\\\\\\s?#%]+/)*(?:\\.|\\.\\.)(?:/|$))[^/\\\\\\s?#%]+(?:/[^/\\\\\\s?#%]+)*$",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "artifact_ref",
+        "sha256",
+        "bytes"
+      ],
+      "type": "object"
+    },
+    "runtimePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ref": {
+          "pattern": "^cache://(?!(?:[^/\\\\\\s?#%]+/)*(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?!(?:[^/\\\\\\s?#%]+/)*(?:\\.|\\.\\.)(?:/|$))[^/\\\\\\s?#%]+(?:/[^/\\\\\\s?#%]+)*$",
+          "type": "string"
+        },
+        "bytes": {
+          "maximum": 268435456,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "id": {
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "dbt_project_bundle",
+            "dbt_manifest",
+            "dbt_selection_lock"
+          ]
+        },
+        "media_type": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "artifact_ref",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "type": "object"
+    },
+    "sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workloadPack": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ref": {
+          "pattern": "^cache://(?!(?:[^/\\\\\\s?#%]+/)*(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?!(?:[^/\\\\\\s?#%]+/)*(?:\\.|\\.\\.)(?:/|$))[^/\\\\\\s?#%]+(?:/[^/\\\\\\s?#%]+)*$",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "id": {
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+          "type": "string"
+        },
+        "pack_fingerprint": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "id",
+        "artifact_ref",
+        "sha256",
+        "bytes",
+        "pack_fingerprint"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-runtime-init-fetch-plan-v3.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "trust_tier": {
+            "const": "production"
+          }
+        },
+        "required": [
+          "trust_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "trust_policy": {
+            "not": {
+              "type": "null"
+            }
+          },
+          "verify": {
+            "properties": {
+              "attestations": {
+                "const": "required_for_prod"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "binding_set": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/exactArtifact"
+        },
+        {
+          "properties": {
+            "artifact_ref": {
+              "pattern": "^cache://runtime-connection-contexts/sha256-[0-9a-f]{64}/binding-set[.]json$"
+            }
+          }
+        }
+      ]
+    },
+    "connection_registry": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/exactArtifact"
+        },
+        {
+          "properties": {
+            "artifact_ref": {
+              "pattern": "^cache://runtime-connection-contexts/sha256-[0-9a-f]{64}/connection-registry[.]json$"
+            }
+          }
+        }
+      ]
+    },
+    "credential_runtime": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/exactArtifact"
+        },
+        {
+          "properties": {
+            "artifact_ref": {
+              "pattern": "^cache://runtime-connection-contexts/sha256-[0-9a-f]{64}/credential-runtime[.]json$"
+            }
+          }
+        }
+      ]
+    },
+    "deployment": {
+      "$ref": "#/$defs/exactArtifact"
+    },
+    "deployment_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "environment": {
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$",
+      "type": "string"
+    },
+    "execution": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "runtime"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "hook_name": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "pre_hook"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "hook_execution": {
+                "const": "externalized"
+              },
+              "hook_name": {
+                "maxLength": 256,
+                "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "scope": {
+                "const": "workload"
+              }
+            },
+            "required": [
+              "scope"
+            ]
+          },
+          "then": {
+            "properties": {
+              "hook_execution": {
+                "const": "externalized"
+              },
+              "process_selector": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "hook_execution": {
+          "enum": [
+            "inline",
+            "externalized"
+          ]
+        },
+        "hook_name": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "enum": [
+            "runtime",
+            "pre_hook"
+          ]
+        },
+        "process_selector": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scope": {
+          "enum": [
+            "workload",
+            "process"
+          ]
+        },
+        "selector": {
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "selector",
+        "hook_name",
+        "scope",
+        "process_selector",
+        "hook_execution"
+      ],
+      "type": "object"
+    },
+    "identity": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "enum": [
+            "kubernetes_workload_identity"
+          ]
+        },
+        "namespace": {
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "type": "string"
+        },
+        "service_account": {
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method",
+        "service_account",
+        "namespace"
+      ],
+      "type": "object"
+    },
+    "registry": {
+      "additionalProperties": false,
+      "properties": {
+        "configuration": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "maxLength": 253,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+              "type": "string"
+            },
+            "kind": {
+              "const": "kubernetes_config_map"
+            },
+            "name": {
+              "maxLength": 63,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+              "type": "string"
+            },
+            "sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "key",
+            "sha256"
+          ],
+          "type": "object"
+        },
+        "logical_ref": {
+          "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "logical_ref",
+        "configuration"
+      ],
+      "type": "object"
+    },
+    "release": {
+      "$ref": "#/$defs/exactArtifact"
+    },
+    "release_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "runtime_image": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "ref": {
+          "pattern": "^(?!.*(?:\\s|://|\\?|#|=))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::(?!0+/)(?:[0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?/[a-z0-9]+(?:[._/-][a-z0-9]+)*@sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "runtime_payloads": {
+      "items": {
+        "$ref": "#/$defs/runtimePayload"
+      },
+      "maxItems": 16,
+      "minItems": 0,
+      "type": "array"
+    },
+    "schema": {
+      "const": "dpone.airflow-runtime-init-fetch-plan.v3"
+    },
+    "trust_policy": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "maxLength": 253,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+              "type": "string"
+            },
+            "kind": {
+              "const": "kubernetes_config_map"
+            },
+            "name": {
+              "maxLength": 63,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+              "type": "string"
+            },
+            "sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "key",
+            "sha256"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "trust_tier": {
+      "enum": [
+        "production",
+        "non_production"
+      ]
+    },
+    "verify": {
+      "additionalProperties": false,
+      "properties": {
+        "attestations": {
+          "enum": [
+            "optional",
+            "required_for_prod"
+          ]
+        },
+        "checksums": {
+          "const": "required"
+        }
+      },
+      "required": [
+        "checksums",
+        "attestations"
+      ],
+      "type": "object"
+    },
+    "workload_pack": {
+      "$ref": "#/$defs/workloadPack"
+    }
+  },
+  "required": [
+    "schema",
+    "environment",
+    "trust_tier",
+    "release_id",
+    "deployment_id",
+    "runtime_image",
+    "registry",
+    "trust_policy",
+    "identity",
+    "release",
+    "deployment",
+    "binding_set",
+    "connection_registry",
+    "credential_runtime",
+    "workload_pack",
+    "execution",
+    "verify",
+    "runtime_payloads"
+  ],
+  "title": "dpone GitOps Airflow runtime init-fetch plan v3",
+  "type": "object"
+}

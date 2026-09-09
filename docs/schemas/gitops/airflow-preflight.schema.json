@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-preflight.schema.json",
+  "title": "dpone GitOps Airflow preflight contract",
+  "type": "object",
+  "required": [
+    "kind",
+    "schema_version",
+    "producer",
+    "artifact_dir",
+    "artifact_index_path",
+    "runner_policy",
+    "artifact_index",
+    "pod_doctor",
+    "checks",
+    "next_actions"
+  ],
+  "properties": {
+    "kind": {
+      "const": "gitops.airflow_preflight"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "artifact_dir": {
+      "type": "string"
+    },
+    "artifact_index_path": {
+      "type": "string"
+    },
+    "runner_policy": {
+      "type": "string"
+    },
+    "artifact_index": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "pod_doctor": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "name",
+          "passed",
+          "severity",
+          "message",
+          "path",
+          "source"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "code",
+        "message",
+        "path",
+        "source"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

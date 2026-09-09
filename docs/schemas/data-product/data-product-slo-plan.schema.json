@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/data-product/data-product-slo-plan.schema.json",
+  "title": "dpone data product SLO plan",
+  "type": "object",
+  "required": ["schema_version", "slo_plan_id", "status", "product", "objectives", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_slo_plan.v1"},
+    "slo_plan_id": {"type": "string"},
+    "status": {"enum": ["disabled", "ready", "blocked"]},
+    "mode": {"enum": ["observe", "gate"]},
+    "profile": {"enum": ["advisory", "stage", "prod_strict", "regulated"]},
+    "product": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string"},
+        "owner": {"type": ["string", "null"]},
+        "tier": {"type": "string"},
+        "criticality": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "target": {"type": "object"},
+    "objectives": {"type": "object"},
+    "consumer_policy": {"type": "object"},
+    "incident": {"type": "object"},
+    "contract_gate_id": {"type": ["string", "null"]},
+    "consumer_gate_id": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

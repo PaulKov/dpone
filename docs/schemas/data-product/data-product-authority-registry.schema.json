@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-authority-registry.schema.json",
+  "title": "dpone data product authority registry",
+  "type": "object",
+  "required": ["schema_version", "authority_registry_id", "status", "product", "identities", "roles", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_authority_registry.v1"},
+    "authority_registry_id": {"type": "string"},
+    "status": {"enum": ["disabled", "ready", "blocked", "warning"]},
+    "mode": {"type": "string"},
+    "profile": {"type": "string"},
+    "product": {"type": "object"},
+    "identities": {"type": "array"},
+    "roles": {"type": "array"},
+    "approval": {"type": "object"},
+    "separation_of_duties": {"type": "object"},
+    "signing": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

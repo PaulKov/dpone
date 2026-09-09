@@ -1,0 +1,57 @@
+name: mssql_to_clickhouse_native
+
+source:
+  type: mssql
+  connection_id: mssql_oltp
+  connection_type: env
+  table:
+    schema: dbo
+    name: orders
+  options:
+    extract_mode: bcp_queryout
+    mssql_export_mode: bcp
+    bulk:
+      mode: bcp
+      bcp:
+        file_format: native
+        batch_size: 100000
+        packet_size: 65535
+        timeout_seconds: 3600
+    partitioning:
+      strategy: auto
+      column: order_id
+      bounds: auto
+      target_rows_per_partition: 1000000
+      max_partitions: 64
+      export_workers: 8
+      load_workers: 8
+    native_transfer:
+      wire:
+        mode: typed_binary
+        source_native_format: bcp_native
+        binary_format: native
+        block_rows: 65536
+        block_bytes: 64MiB
+
+sink:
+  type: clickhouse
+  connection_id: clickhouse_dwh
+  connection_type: env
+  table:
+    schema: analytics
+    name: orders
+  strategy:
+    mode: incremental_merge
+    unique_key: [order_id]
+    merge_policy: lightweight_delete_insert
+  options:
+    clickhouse_bulk:
+      mode: auto
+      ingest_contract: typed_binary_staging
+      insert_settings:
+        async_insert: 1
+        wait_for_async_insert: 1
+        max_insert_block_size: 1000000
+        input_format_parallel_parsing: 1
+    idempotency:
+      enabled: true

@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+defaults:
+  name: postgres_to_mssql_example
+  source:
+    type: postgres
+    connection_id: postgres_source
+    options:
+      batch_size: 50000
+      export_format: csv
+  sink:
+    type: mssql
+    connection_id: mssql_dwh
+    table:
+      schema: dbo
+      name: orders
+    strategy:
+      mode: incremental_merge
+      unique_key: order_id
+      merge_policy: delete_insert
+      duplicate_policy: fail
+
+quality:
+  gates:
+    - id: source_target_rows
+      type: row_count_reconciliation
+      severity: error
+      tolerance:
+        mode: pct
+        value: 0.1
+
+schemas:
+  public:
+    tables:
+      - orders

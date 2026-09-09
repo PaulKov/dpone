@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-cost-report.schema.json",
+  "title": "dpone data product cost report",
+  "type": "object",
+  "required": ["schema_version", "status", "cost_report_id"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_cost_report.v1"},
+    "status": {"type": "string"},
+    "cost_report_id": {"type": "string"},
+    "cost_gate_id": {"type": ["string", "null"]},
+    "markdown": {"type": "string"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  },
+  "additionalProperties": true
+}

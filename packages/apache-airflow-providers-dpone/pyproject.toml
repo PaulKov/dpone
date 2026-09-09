@@ -1,0 +1,41 @@
+[build-system]
+requires = ["uv_build>=0.9.18,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "airflow.providers.dpone"
+
+[project]
+name = "apache-airflow-providers-dpone"
+version = "0.74.33"
+description = "Formal Apache Airflow provider facade for dpone self-service DAGs"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = "Apache-2.0"
+authors = [{ name = "PaulKov" }]
+maintainers = [{ name = "PaulKov" }]
+keywords = ["airflow", "provider", "dpone", "gitops", "data-engineering"]
+dependencies = [
+  "apache-airflow>=2.10,<3.4",
+  "apache-airflow-providers-cncf-kubernetes>=10.1,<11",
+  "dpone-airflow-pack==0.74.33",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Framework :: Apache Airflow",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/PaulKov/dpone"
+Repository = "https://github.com/PaulKov/dpone"
+Issues = "https://github.com/PaulKov/dpone/issues"
+Documentation = "https://paulkov.github.io/dpone/airflow-pack-provider/"
+
+[project.entry-points."apache_airflow_provider"]
+provider_info = "airflow.providers.dpone:get_provider_info"

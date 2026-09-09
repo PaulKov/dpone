@@ -1,0 +1,119 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-read-dependency-proof.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_relation_object_ids": {
+      "items": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "catalog_snapshot_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "compiled_sql_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "database_name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "dependency_edges": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "dependency_kind": {
+            "enum": [
+              "BASE_TABLE",
+              "SCHEMABOUND_VIEW",
+              "SCHEMABOUND_INLINE_TVF"
+            ],
+            "type": "string"
+          },
+          "from_object_id": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "to_object_id": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dependency_kind",
+          "from_object_id",
+          "to_object_id"
+        ],
+        "type": "object"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "max_definition_bytes": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "max_depth": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "max_edges": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "max_nodes": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "model_unique_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "normalized_definitions_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "read_dependency_proof_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-read-dependency-proof.v1"
+    },
+    "status": {
+      "enum": [
+        "PROVEN",
+        "NONCONFORMANT",
+        "UNVERIFIED"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "base_relation_object_ids",
+    "catalog_snapshot_sha256",
+    "compiled_sql_sha256",
+    "database_name",
+    "dependency_edges",
+    "max_definition_bytes",
+    "max_depth",
+    "max_edges",
+    "max_nodes",
+    "model_unique_id",
+    "normalized_definitions_sha256",
+    "policy_sha256",
+    "read_dependency_proof_sha256",
+    "schema",
+    "status"
+  ],
+  "type": "object"
+}

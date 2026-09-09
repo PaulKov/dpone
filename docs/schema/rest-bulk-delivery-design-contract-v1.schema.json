@@ -1,0 +1,559 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schema/rest-bulk-delivery-design-contract-v1.schema.json",
+  "title": "dpone governed REST bulk-delivery design authority V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "status",
+    "implementation_gate",
+    "schema_document",
+    "namespaces",
+    "identities",
+    "receiver_binding",
+    "authentication",
+    "generation_fence",
+    "parent_plan",
+    "journal",
+    "effect_authority_retention",
+    "state_machine",
+    "continuations",
+    "async_execution",
+    "failure_scenarios",
+    "stable_error_codes",
+    "error_catalog",
+    "promotion_strategy",
+    "invariants"
+  ],
+  "properties": {
+    "schema": {"const": "dpone.rest-bulk-delivery-design.v1"},
+    "version": {"const": 1},
+    "status": {"const": "RESEARCHED"},
+    "implementation_gate": {"const": "BLOCKED_UNTIL_ADR_AND_SECURITY_APPROVAL"},
+    "schema_document": {"const": "docs/schema/rest-bulk-delivery-design-contract-v1.schema.json"},
+    "namespaces": {"$ref": "#/$defs/namespaces"},
+    "identities": {"$ref": "#/$defs/identities"},
+    "receiver_binding": {"$ref": "#/$defs/receiverBinding"},
+    "authentication": {"$ref": "#/$defs/authentication"},
+    "generation_fence": {"$ref": "#/$defs/generationFence"},
+    "parent_plan": {"$ref": "#/$defs/parentPlan"},
+    "journal": {"$ref": "#/$defs/journal"},
+    "effect_authority_retention": {"$ref": "#/$defs/effectRetention"},
+    "state_machine": {"$ref": "#/$defs/stateMachine"},
+    "continuations": {"$ref": "#/$defs/continuations"},
+    "async_execution": {"$ref": "#/$defs/asyncExecution"},
+    "failure_scenarios": {"$ref": "#/$defs/failureScenarios"},
+    "stable_error_codes": {"$ref": "#/$defs/stableErrorCodes"},
+    "error_catalog": {"$ref": "#/$defs/errorCatalog"},
+    "promotion_strategy": {"$ref": "#/$defs/promotionStrategy"},
+    "invariants": {"$ref": "#/$defs/nonEmptyUniqueStrings"}
+  },
+  "$defs": {
+    "nonEmptyString": {"type": "string", "minLength": 1},
+    "nonEmptyStrings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/nonEmptyString"}
+    },
+    "nonEmptyUniqueStrings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonEmptyString"}
+    },
+    "stableErrorCodes": {
+      "type": "array",
+      "prefixItems": [
+        {"const": "REST_DELIVERY_INTENT_CONFLICT"},
+        {"const": "REST_DELIVERY_REMOTE_EFFECT_UNKNOWN"},
+        {"const": "REST_DELIVERY_PARTIALLY_APPLIED"},
+        {"const": "REST_DELIVERY_UNSAFE_RETRY"},
+        {"const": "REST_DELIVERY_SCOPE_EXCEEDS_LIMIT"},
+        {"const": "REST_DELIVERY_COUNT_MISMATCH"},
+        {"const": "REST_DELIVERY_RECEIPT_EXPIRED"},
+        {"const": "REST_DELIVERY_PROTOCOL_UNKNOWN"},
+        {"const": "REST_DELIVERY_STALE_GENERATION"},
+        {"const": "REST_DELIVERY_OVERLAPPING_EFFECT_IN_FLIGHT"},
+        {"const": "REST_DELIVERY_RETRY_AFTER_EXCEEDS_BUDGET"},
+        {"const": "REST_DELIVERY_APPEND_SCOPE_ALREADY_APPLIED"},
+        {"const": "REST_DELIVERY_JOURNAL_EPOCH_BLOCKED"}
+      ],
+      "items": false,
+      "minItems": 13,
+      "maxItems": 13,
+      "uniqueItems": true
+    },
+    "closedFields": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fields"],
+      "properties": {"fields": {"$ref": "#/$defs/nonEmptyUniqueStrings"}}
+    },
+    "namespaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_namespace", "unique_admission_key"],
+      "properties": {
+        "operation_namespace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["encoding", "digest", "fields"],
+          "properties": {
+            "encoding": {"$ref": "#/$defs/nonEmptyString"},
+            "digest": {"$ref": "#/$defs/nonEmptyString"},
+            "fields": {"$ref": "#/$defs/nonEmptyUniqueStrings"}
+          }
+        },
+        "unique_admission_key": {"$ref": "#/$defs/nonEmptyUniqueStrings"}
+      }
+    },
+    "identities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "delivery_key",
+        "receiver_mutation_key",
+        "receiver_binding_semantics_digest",
+        "mutation_intent_digest",
+        "operation_semantics_digest",
+        "rendered_request_semantics_digest",
+        "execution_policy_digest",
+        "profile_contract_digest",
+        "parent_plan_digest"
+      ],
+      "properties": {
+        "delivery_key": {"$ref": "#/$defs/closedFields"},
+        "receiver_mutation_key": {"$ref": "#/$defs/closedFields"},
+        "receiver_binding_semantics_digest": {"$ref": "#/$defs/closedFields"},
+        "mutation_intent_digest": {"$ref": "#/$defs/closedFields"},
+        "operation_semantics_digest": {"$ref": "#/$defs/closedFields"},
+        "rendered_request_semantics_digest": {"$ref": "#/$defs/closedFields"},
+        "execution_policy_digest": {"$ref": "#/$defs/closedFields"},
+        "profile_contract_digest": {"$ref": "#/$defs/closedFields"},
+        "parent_plan_digest": {"$ref": "#/$defs/closedFields"}
+      }
+    },
+    "remoteIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_assurance_modes", "required_fields", "platform_attested_requires"],
+      "properties": {
+        "allowed_assurance_modes": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "required_fields": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "platform_attested_requires": {"$ref": "#/$defs/nonEmptyUniqueStrings"}
+      }
+    },
+    "receiverBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_non_secret_identity_fields", "certification"],
+      "properties": {
+        "stable_non_secret_identity_fields": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "certification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "secret_rotation_changes_identity", "principal_swap_changes_identity", "remote_identity"],
+          "properties": {
+            "source": {"$ref": "#/$defs/nonEmptyString"},
+            "secret_rotation_changes_identity": {"type": "boolean"},
+            "principal_swap_changes_identity": {"type": "boolean"},
+            "remote_identity": {"$ref": "#/$defs/remoteIdentity"}
+          }
+        }
+      }
+    },
+    "authentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supported", "api_key_query"],
+      "properties": {
+        "supported": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "api_key_query": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["production_default", "exception_requires"],
+          "properties": {
+            "production_default": {"const": "FORBIDDEN"},
+            "exception_requires": {"$ref": "#/$defs/nonEmptyUniqueStrings"}
+          }
+        }
+      }
+    },
+    "mutationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope_conflict_mode", "correction_revision_allowed", "already_applied_action"],
+      "properties": {
+        "scope_conflict_mode": {"enum": ["exact", "overlap"]},
+        "correction_revision_allowed": {"type": "boolean"},
+        "already_applied_action": {"$ref": "#/$defs/nonEmptyString"},
+        "already_applied_error": {"$ref": "#/$defs/nonEmptyString"},
+        "exception_requires": {"$ref": "#/$defs/nonEmptyUniqueStrings"}
+      }
+    },
+    "generationFence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "effect_conflict_domain_fields",
+        "mutation_policies",
+        "linearization",
+        "admission_rules",
+        "unresolved_effect_states",
+        "errors"
+      ],
+      "properties": {
+        "value": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ordered_fields", "correction_revision_type"],
+          "properties": {
+            "ordered_fields": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+            "correction_revision_type": {"$ref": "#/$defs/nonEmptyString"}
+          }
+        },
+        "effect_conflict_domain_fields": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "mutation_policies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["incremental_append", "partition_replace"],
+          "properties": {
+            "incremental_append": {"$ref": "#/$defs/mutationPolicy"},
+            "partition_replace": {"$ref": "#/$defs/mutationPolicy"}
+          }
+        },
+        "linearization": {"$ref": "#/$defs/linearization"},
+        "admission_rules": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "unresolved_effect_states": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "errors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stale", "overlap_in_flight", "append_scope_already_applied"],
+          "properties": {
+            "stale": {"$ref": "#/$defs/nonEmptyString"},
+            "overlap_in_flight": {"$ref": "#/$defs/nonEmptyString"},
+            "append_scope_already_applied": {"$ref": "#/$defs/nonEmptyString"}
+          }
+        }
+      }
+    },
+    "linearization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority", "isolation_level", "domain_lock", "scope_range", "admission_transaction_steps", "watermark"],
+      "properties": {
+        "authority": {"const": "postgresql"},
+        "isolation_level": {"$ref": "#/$defs/nonEmptyString"},
+        "domain_lock": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["table", "key_fields", "acquisition", "lock_order"],
+          "properties": {
+            "table": {"$ref": "#/$defs/nonEmptyString"},
+            "key_fields": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+            "acquisition": {"$ref": "#/$defs/nonEmptyString"},
+            "lock_order": {"$ref": "#/$defs/nonEmptyString"}
+          }
+        },
+        "scope_range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["canonical_form", "postgres_types", "overlap_operator", "index"],
+          "properties": {
+            "canonical_form": {"const": "half_open"},
+            "postgres_types": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["date", "timestamp"],
+              "properties": {"date": {"const": "daterange"}, "timestamp": {"const": "tstzrange"}}
+            },
+            "overlap_operator": {"const": "&&"},
+            "index": {"const": "gist"}
+          }
+        },
+        "admission_transaction_steps": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "watermark": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["representation", "fields", "update"],
+          "properties": {
+            "representation": {"const": "normalized_non_overlapping_interval_map"},
+            "fields": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+            "update": {"$ref": "#/$defs/nonEmptyString"}
+          }
+        }
+      }
+    },
+    "parentPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["states", "admission_transaction_contains", "barriers"],
+      "properties": {
+        "states": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "admission_transaction_contains": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "barriers": {"$ref": "#/$defs/nonEmptyUniqueStrings"}
+      }
+    },
+    "preAttemptMarker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "create_if_absent_key", "fields"],
+      "properties": {
+        "kind": {"const": "MAY_ATTEMPT"},
+        "create_if_absent_key": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "fields": {"$ref": "#/$defs/nonEmptyUniqueStrings"}
+      }
+    },
+    "remoteJobSemaphore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority", "reservation_scope", "atomic_submit_transaction_contains", "release_policy", "orphan_recovery"],
+      "properties": {
+        "authority": {"const": "same_postgresql_control_plane"},
+        "reservation_scope": {"$ref": "#/$defs/nonEmptyString"},
+        "atomic_submit_transaction_contains": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "release_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["accepted_or_running", "unknown_or_partial", "request_not_started"],
+          "properties": {
+            "accepted_or_running": {"$ref": "#/$defs/nonEmptyString"},
+            "unknown_or_partial": {"$ref": "#/$defs/nonEmptyString"},
+            "request_not_started": {"$ref": "#/$defs/nonEmptyString"}
+          }
+        },
+        "orphan_recovery": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "journal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "production_adapter",
+        "mutation_admission_rpo",
+        "submit_attempt_rpo",
+        "critical_transition_commit_policy",
+        "immutable_pre_attempt_marker",
+        "remote_job_semaphore",
+        "mutation_gate"
+      ],
+      "properties": {
+        "production_adapter": {"const": "postgresql_15_plus"},
+        "mutation_admission_rpo": {"const": "zero"},
+        "submit_attempt_rpo": {"const": "zero"},
+        "critical_transition_commit_policy": {"const": "synchronous_remote_apply_quorum"},
+        "immutable_pre_attempt_marker": {"$ref": "#/$defs/preAttemptMarker"},
+        "remote_job_semaphore": {"$ref": "#/$defs/remoteJobSemaphore"},
+        "mutation_gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["default", "blocked_after", "unblock_requires"],
+          "properties": {
+            "default": {"const": "ENABLED"},
+            "blocked_after": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+            "unblock_requires": {"$ref": "#/$defs/nonEmptyUniqueStrings"}
+          }
+        }
+      }
+    },
+    "effectRetention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["append", "partition_replace", "unknown_or_partial", "large_payload", "reset"],
+      "properties": {
+        "append": {"$ref": "#/$defs/nonEmptyString"},
+        "partition_replace": {"$ref": "#/$defs/nonEmptyString"},
+        "unknown_or_partial": {"$ref": "#/$defs/nonEmptyString"},
+        "large_payload": {"$ref": "#/$defs/nonEmptyString"},
+        "reset": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "cas"],
+      "properties": {
+        "from": {"$ref": "#/$defs/nonEmptyString"},
+        "to": {"$ref": "#/$defs/nonEmptyString"},
+        "cas": {"$ref": "#/$defs/nonEmptyString"},
+        "guards": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "effects": {"$ref": "#/$defs/nonEmptyUniqueStrings"}
+      }
+    },
+    "stateMachine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "axes",
+        "initial_tuple",
+        "legal_tuples",
+        "automatic_transitions",
+        "operator_only_transitions",
+        "terminal_for_automatic_execution",
+        "monotonic_fields",
+        "forbidden_combinations"
+      ],
+      "properties": {
+        "axes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["execution", "remote_effect", "acknowledgement", "verification", "checkpoint"],
+          "properties": {
+            "execution": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+            "remote_effect": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+            "acknowledgement": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+            "verification": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+            "checkpoint": {"$ref": "#/$defs/nonEmptyUniqueStrings"}
+          }
+        },
+        "initial_tuple": {"$ref": "#/$defs/nonEmptyString"},
+        "legal_tuples": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_]*$": {
+              "type": "array",
+              "prefixItems": [
+                {"type": "string"},
+                {"type": "string"},
+                {"type": "string"},
+                {"type": "string"},
+                {"type": "string"}
+              ],
+              "items": false,
+              "minItems": 5,
+              "maxItems": 5
+            }
+          }
+        },
+        "automatic_transitions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/transition"}},
+        "operator_only_transitions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/transition"}},
+        "terminal_for_automatic_execution": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "monotonic_fields": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "forbidden_combinations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "continuations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["automatic", "internal_automatic_states", "poll_receipt_terminal_observations", "blocked_without_receipt", "active_remote_cancel_supported"],
+      "properties": {
+        "automatic": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "internal_automatic_states": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "poll_receipt_terminal_observations": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "blocked_without_receipt": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "active_remote_cancel_supported": {"const": false}
+      }
+    },
+    "executionFamily": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_in_flight_children"],
+      "properties": {
+        "max_in_flight_children": {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "string", "minLength": 1}]},
+        "parent_continuation": {"$ref": "#/$defs/nonEmptyString"},
+        "bounded_parallel_deferred_to": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "asyncExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sync_batch", "async_bulk_job"],
+      "properties": {
+        "sync_batch": {"$ref": "#/$defs/executionFamily"},
+        "async_bulk_job": {"$ref": "#/$defs/executionFamily"}
+      }
+    },
+    "failureScenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "acknowledgement_preserved"],
+      "properties": {
+        "from": {"$ref": "#/$defs/nonEmptyString"},
+        "to": {"$ref": "#/$defs/nonEmptyString"},
+        "acknowledgement_preserved": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "failureScenarios": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {"^[a-z][a-z0-9_]*$": {"$ref": "#/$defs/failureScenario"}}
+    },
+    "errorMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exit_class", "retryability", "operator_action", "alert_severity", "evidence_schema"],
+      "properties": {
+        "exit_class": {"type": "integer", "minimum": 2, "maximum": 5},
+        "retryability": {"$ref": "#/$defs/nonEmptyString"},
+        "operator_action": {"$ref": "#/$defs/nonEmptyString"},
+        "alert_severity": {"enum": ["info", "warning", "critical"]},
+        "evidence_schema": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "errorCatalog": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {"^REST_DELIVERY_[A-Z0-9_]+$": {"$ref": "#/$defs/errorMetadata"}}
+    },
+    "promotionStrategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["researched_contract", "approval_receipt", "production_certification"],
+      "properties": {
+        "researched_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["immutable", "status", "digest_algorithm"],
+          "properties": {
+            "immutable": {"const": true},
+            "status": {"const": "RESEARCHED"},
+            "digest_algorithm": {"const": "sha256"}
+          }
+        },
+        "approval_receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "schema_document",
+            "references",
+            "mutates_researched_contract",
+            "required_before_implementation"
+          ],
+          "properties": {
+            "schema": {"const": "dpone.rest-bulk-delivery-approval.v1"},
+            "schema_document": {"const": "docs/schema/rest-bulk-delivery-approval-v1.schema.json"},
+            "references": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+            "mutates_researched_contract": {"const": false},
+            "required_before_implementation": {"const": true}
+          }
+        },
+        "production_certification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["separate_receipt_required", "required_before_cutover"],
+          "properties": {
+            "separate_receipt_required": {"const": true},
+            "required_before_cutover": {"const": true}
+          }
+        }
+      }
+    }
+  }
+}

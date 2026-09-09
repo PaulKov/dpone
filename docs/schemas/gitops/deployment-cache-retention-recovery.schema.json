@@ -1,0 +1,192 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/deployment-cache-retention-recovery.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "recovered"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "pending_deployment_ids": {
+            "maxItems": 0
+          },
+          "quarantined_paths": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "recovering"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "pending_deployment_ids": {
+            "minItems": 1
+          },
+          "quarantined_paths": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "quarantined_paths": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "pending_deployment_ids": {
+      "items": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "maxItems": 10000,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "quarantined_paths": {
+      "items": {
+        "maxLength": 4096,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 10000,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "restored_deployment_ids": {
+      "items": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "maxItems": 10000,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "revision": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.deployment-cache-retention-recovery.v1"
+    },
+    "status": {
+      "enum": [
+        "recovering",
+        "blocked",
+        "recovered"
+      ]
+    },
+    "transactions": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "activation_path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "deployment_id": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "detached_path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "environment": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "expected_device": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "expected_inode": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "original_path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "activation_deleted",
+              "blocked",
+              "committed",
+              "deletion_started",
+              "deployment_deleted",
+              "detached",
+              "prepared",
+              "restored"
+            ]
+          }
+        },
+        "required": [
+          "deployment_id",
+          "environment",
+          "phase",
+          "original_path",
+          "detached_path",
+          "activation_path",
+          "expected_device",
+          "expected_inode"
+        ],
+        "type": "object"
+      },
+      "maxProperties": 10000,
+      "propertyNames": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema",
+    "revision",
+    "status",
+    "restored_deployment_ids",
+    "pending_deployment_ids",
+    "transactions"
+  ],
+  "title": "dpone GitOps deployment cache retention recovery journal",
+  "type": "object"
+}

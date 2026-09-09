@@ -1,0 +1,325 @@
+{
+  "policy_path": ".agents/policy/github-branch-protection.yml",
+  "policy_projection_sha256": "64edf0774f3400ef37ee2a452efef46e9eeaf149ae337e35fe78bb17e3eb8376",
+  "policy_sha256": "df93dbe54e31549c6106bfa5911767fff39968e8037393c3b62ca130fbb0d039",
+  "privileged_baseline": {
+    "bypass_actors": [
+      {
+        "actor_id": 5,
+        "actor_type": "RepositoryRole",
+        "bypass_mode": "always"
+      }
+    ],
+    "updated_at": "2026-08-24T06:50:40.161000Z",
+    "version_id": 47422853
+  },
+  "required_check_producers": [
+    {
+      "context": "Agent PR receipt",
+      "integration_id": 15368
+    },
+    {
+      "context": "Airflow 2.10.5 / py3.11",
+      "integration_id": 15368
+    },
+    {
+      "context": "Airflow 2.10.5 / py3.12",
+      "integration_id": 15368
+    },
+    {
+      "context": "Airflow 2.11.0 / py3.11",
+      "integration_id": 15368
+    },
+    {
+      "context": "Airflow 2.11.0 / py3.12",
+      "integration_id": 15368
+    },
+    {
+      "context": "Airflow 3.2.0 / py3.11",
+      "integration_id": 15368
+    },
+    {
+      "context": "Airflow 3.2.0 / py3.12",
+      "integration_id": 15368
+    },
+    {
+      "context": "Airflow 3.3.0 / py3.11",
+      "integration_id": 15368
+    },
+    {
+      "context": "Airflow 3.3.0 / py3.12",
+      "integration_id": 15368
+    },
+    {
+      "context": "Analyze Python",
+      "integration_id": 15368
+    },
+    {
+      "context": "Build Airflow distribution artifacts",
+      "integration_id": 15368
+    },
+    {
+      "context": "Build GitHub Pages documentation",
+      "integration_id": 15368
+    },
+    {
+      "context": "Dependency Review",
+      "integration_id": 15368
+    },
+    {
+      "context": "Doctor import Windows (3.11)",
+      "integration_id": 15368
+    },
+    {
+      "context": "Doctor import Windows (3.12)",
+      "integration_id": 15368
+    },
+    {
+      "context": "PostgreSQL XMin integration",
+      "integration_id": 15368
+    },
+    {
+      "context": "Quality checks (3.11)",
+      "integration_id": 15368
+    },
+    {
+      "context": "Quality checks (3.12)",
+      "integration_id": 15368
+    },
+    {
+      "context": "Runtime wheel smoke / py3.11",
+      "integration_id": 15368
+    },
+    {
+      "context": "Runtime wheel smoke / py3.12",
+      "integration_id": 15368
+    },
+    {
+      "context": "TruffleHog verified secrets",
+      "integration_id": 15368
+    }
+  ],
+  "ruleset_id": 18806829,
+  "ruleset_projection": {
+    "conditions": {
+      "exclude": [],
+      "include": [
+        "refs/heads/master"
+      ]
+    },
+    "enforcement": "active",
+    "id": 18806829,
+    "name": "protect-master",
+    "required_status_checks": {
+      "checks": [
+        {
+          "context": "Agent PR receipt",
+          "integration_id": 15368
+        },
+        {
+          "context": "Airflow 2.10.5 / py3.11",
+          "integration_id": 15368
+        },
+        {
+          "context": "Airflow 2.10.5 / py3.12",
+          "integration_id": 15368
+        },
+        {
+          "context": "Airflow 2.11.0 / py3.11",
+          "integration_id": 15368
+        },
+        {
+          "context": "Airflow 2.11.0 / py3.12",
+          "integration_id": 15368
+        },
+        {
+          "context": "Airflow 3.2.0 / py3.11",
+          "integration_id": 15368
+        },
+        {
+          "context": "Airflow 3.2.0 / py3.12",
+          "integration_id": 15368
+        },
+        {
+          "context": "Airflow 3.3.0 / py3.11",
+          "integration_id": 15368
+        },
+        {
+          "context": "Airflow 3.3.0 / py3.12",
+          "integration_id": 15368
+        },
+        {
+          "context": "Analyze Python",
+          "integration_id": 15368
+        },
+        {
+          "context": "Build Airflow distribution artifacts",
+          "integration_id": 15368
+        },
+        {
+          "context": "Build GitHub Pages documentation",
+          "integration_id": 15368
+        },
+        {
+          "context": "Dependency Review",
+          "integration_id": 15368
+        },
+        {
+          "context": "Doctor import Windows (3.11)",
+          "integration_id": 15368
+        },
+        {
+          "context": "Doctor import Windows (3.12)",
+          "integration_id": 15368
+        },
+        {
+          "context": "PostgreSQL XMin integration",
+          "integration_id": 15368
+        },
+        {
+          "context": "Quality checks (3.11)",
+          "integration_id": 15368
+        },
+        {
+          "context": "Quality checks (3.12)",
+          "integration_id": 15368
+        },
+        {
+          "context": "Runtime wheel smoke / py3.11",
+          "integration_id": 15368
+        },
+        {
+          "context": "Runtime wheel smoke / py3.12",
+          "integration_id": 15368
+        },
+        {
+          "context": "TruffleHog verified secrets",
+          "integration_id": 15368
+        }
+      ],
+      "strict": true
+    },
+    "rules": [
+      {
+        "parameters": {},
+        "type": "deletion"
+      },
+      {
+        "parameters": {},
+        "type": "non_fast_forward"
+      },
+      {
+        "parameters": {
+          "allowed_merge_methods": [
+            "merge",
+            "squash"
+          ],
+          "dismiss_stale_reviews_on_push": true,
+          "require_code_owner_review": false,
+          "require_extra_approval_for_unattributed_changes": true,
+          "require_last_push_approval": false,
+          "required_approving_review_count": 0,
+          "required_review_thread_resolution": true,
+          "required_reviewers": []
+        },
+        "type": "pull_request"
+      },
+      {
+        "parameters": {
+          "do_not_enforce_on_create": false,
+          "required_status_checks": [
+            {
+              "context": "Agent PR receipt",
+              "integration_id": 15368
+            },
+            {
+              "context": "Airflow 2.10.5 / py3.11",
+              "integration_id": 15368
+            },
+            {
+              "context": "Airflow 2.10.5 / py3.12",
+              "integration_id": 15368
+            },
+            {
+              "context": "Airflow 2.11.0 / py3.11",
+              "integration_id": 15368
+            },
+            {
+              "context": "Airflow 2.11.0 / py3.12",
+              "integration_id": 15368
+            },
+            {
+              "context": "Airflow 3.2.0 / py3.11",
+              "integration_id": 15368
+            },
+            {
+              "context": "Airflow 3.2.0 / py3.12",
+              "integration_id": 15368
+            },
+            {
+              "context": "Airflow 3.3.0 / py3.11",
+              "integration_id": 15368
+            },
+            {
+              "context": "Airflow 3.3.0 / py3.12",
+              "integration_id": 15368
+            },
+            {
+              "context": "Analyze Python",
+              "integration_id": 15368
+            },
+            {
+              "context": "Build Airflow distribution artifacts",
+              "integration_id": 15368
+            },
+            {
+              "context": "Build GitHub Pages documentation",
+              "integration_id": 15368
+            },
+            {
+              "context": "Dependency Review",
+              "integration_id": 15368
+            },
+            {
+              "context": "Doctor import Windows (3.11)",
+              "integration_id": 15368
+            },
+            {
+              "context": "Doctor import Windows (3.12)",
+              "integration_id": 15368
+            },
+            {
+              "context": "PostgreSQL XMin integration",
+              "integration_id": 15368
+            },
+            {
+              "context": "Quality checks (3.11)",
+              "integration_id": 15368
+            },
+            {
+              "context": "Quality checks (3.12)",
+              "integration_id": 15368
+            },
+            {
+              "context": "Runtime wheel smoke / py3.11",
+              "integration_id": 15368
+            },
+            {
+              "context": "Runtime wheel smoke / py3.12",
+              "integration_id": 15368
+            },
+            {
+              "context": "TruffleHog verified secrets",
+              "integration_id": 15368
+            }
+          ],
+          "strict_required_status_checks_policy": true
+        },
+        "type": "required_status_checks"
+      }
+    ],
+    "target": "branch",
+    "updated_at": "2026-08-24T06:50:40.161000Z"
+  },
+  "schema": "dpone.release_authority_baseline.v1"
+}

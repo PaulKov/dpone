@@ -1,0 +1,79 @@
+schema_version: 1
+owner: PaulKov
+last_reviewed: "2026-08-24"
+mode: solo_maintainer
+purpose: "Keep master protected without requiring impossible self-approval in a one-owner repository."
+
+ruleset:
+  id: 18806829
+  version_id: 47422853
+  updated_at: "2026-08-24T06:50:40.161000Z"
+  name: protect-master
+  target: branch
+  enforcement: active
+  conditions:
+    include:
+      - refs/heads/master
+    exclude: []
+  branches:
+    - master
+  pull_request:
+    required: true
+    allowed_merge_methods:
+      - merge
+      - squash
+    dismiss_stale_reviews_on_push: true
+    require_code_owner_review: false
+    require_last_push_approval: false
+    require_extra_approval_for_unattributed_changes: true
+    required_approving_review_count: 0
+    required_review_thread_resolution: true
+    required_reviewers: []
+  required_status_checks:
+    strict: true
+    do_not_enforce_on_create: false
+    integration_id: 15368
+    checks:
+      - Agent PR receipt
+      - Build Airflow distribution artifacts
+      - Airflow 2.10.5 / py3.11
+      - Airflow 2.10.5 / py3.12
+      - Airflow 2.11.0 / py3.11
+      - Airflow 2.11.0 / py3.12
+      - Airflow 3.2.0 / py3.11
+      - Airflow 3.2.0 / py3.12
+      - Airflow 3.3.0 / py3.11
+      - Airflow 3.3.0 / py3.12
+      - Runtime wheel smoke / py3.11
+      - Runtime wheel smoke / py3.12
+      - Analyze Python
+      - Build GitHub Pages documentation
+      - Dependency Review
+      - Doctor import Windows (3.11)
+      - Doctor import Windows (3.12)
+      - PostgreSQL XMin integration
+      - Quality checks (3.11)
+      - Quality checks (3.12)
+      - TruffleHog verified secrets
+  protected_actions:
+    block_deletion: true
+    block_force_push: true
+  bypass:
+    allowed_repository_roles:
+      - admin
+    actors:
+      - actor_id: 5
+        actor_type: RepositoryRole
+        bypass_mode: always
+    disallowed_for:
+      - agent
+      - automation
+      - broad_team
+
+owner_attestation:
+  required_when_no_independent_reviewer: true
+  evidence_required:
+    - PR summary states the owner decision.
+    - Required GitHub checks are green on the reviewed head commit.
+    - Agent governance receipt is attached for agent-control-plane changes.
+    - Admin bypass is not used for normal solo-maintainer merges.

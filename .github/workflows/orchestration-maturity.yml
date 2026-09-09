@@ -1,0 +1,67 @@
+name: Orchestration maturity
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  orchestration-maturity-report:
+    name: Run orchestration maturity gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run orchestration tests
+        run: uv run pytest tests/test_orchestration.py -q
+
+      - name: Run docs link checks
+        run: uv run dpone docs check-docs
+
+      - name: Build docs strictly
+        run: uv run mkdocs build --strict
+
+      - name: Build orchestration maturity artifact
+        run: |
+          mkdir -p test_artifacts/orchestration_maturity
+          cat > test_artifacts/orchestration_maturity/orchestration_maturity.json <<'JSON'
+          {
+            "passed": true,
+            "gate": "orchestration_maturity",
+            "tests": [
+              "tests/test_orchestration.py",
+              "dpone docs check-docs",
+              "mkdocs build --strict"
+            ]
+          }
+          JSON
+          cat > test_artifacts/orchestration_maturity/orchestration_maturity.md <<'MD'
+          # dpone orchestration maturity
+
+          - Passed: `true`
+          - Gate: `orchestration_maturity`
+          - Coverage: locks, durable job state, resume policy, scheduler handoff, CLI, docs contracts.
+          MD
+
+      - name: Upload orchestration maturity report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: orchestration-maturity-report
+          path: test_artifacts/orchestration_maturity

@@ -1,0 +1,615 @@
+install_test:
+  extends:
+    - .uv_job_template
+    - .rules_release_tag
+  stage: smoke-test
+  script:
+    - |
+      set -euo pipefail
+      TAG_VER="${CI_COMMIT_TAG#v}"
+      echo "Smoke-test установки пакета из GitLab Package Registry (release only)"
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install "$LIB_NAME==$TAG_VER" --index-url "$PACK_REGISTRY"
+      python tools/package_smoke.py --project-root "$CI_PROJECT_DIR"
+
+wheel_smoke_test:
+  extends:
+    - .uv_job_template
+    - .rules_main_and_mr
+  stage: smoke-test
+  dependencies:
+    - build
+  script:
+    - |
+      set -euo pipefail
+      echo "Smoke-test установки из wheel (master/develop/MR)"
+      ls -la dist
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install dist/*.whl
+      python tools/package_smoke.py --project-root "$CI_PROJECT_DIR"
+
+snapshot_install_smoke:
+  extends:
+    - .uv_job_template
+    - .rules_develop_or_mr
+  stage: smoke-test
+  needs:
+    - job: publish_dev_snapshot
+      artifacts: true
+  script:
+    - |
+      set -euo pipefail
+      echo "Smoke-test установки dev snapshot из GitLab Package Registry"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+      test -n "${DPONE_PACKAGE_SPEC:-}"
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install "$DPONE_PACKAGE_SPEC" --index-url "$PACK_REGISTRY"
+      python tools/package_smoke.py --project-root "$CI_PROJECT_DIR"
+
+snapshot_runtime_install_smoke:
+  extends:
+    - .uv_job_template
+    - .rules_develop_or_mr
+  stage: smoke-test
+  needs:
+    - job: build
+      artifacts: true
+    - job: publish_dev_snapshot
+      artifacts: true
+  script:
+    - |
+      set -euo pipefail
+      echo "Smoke-test dev install mode without image rebuild"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+      test -n "${DPONE_PACKAGE_SPEC:-}"
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install dist/*.whl
+
+      export DPONE_INSTALL_MODE=snapshot
+      export DPONE_PACKAGE_SPEC="$DPONE_PACKAGE_SPEC"
+      export DPONE_PACKAGE_INDEX_URL="$PACK_REGISTRY"
+      export DPONE_PACKAGE_TARGET=/tmp/dpone-runtime-site
+
+      dpone-runtime-exec python tools/package_smoke.py --project-root "$CI_PROJECT_DIR"
+
+snapshot_appsflyer_live_smoke:
+  extends:
+    - .uv_job_template
+    - .vault_jwt_job_template
+    - .rules_appsflyer_live_schedule_main_manual
+  stage: smoke-test
+  needs:
+    - job: build
+      artifacts: true
+    - job: publish_dev_snapshot
+      artifacts: true
+  script:
+    - |
+      set -euo pipefail
+      echo "Live AppsFlyer smoke via snapshot overlay install"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+      test -n "${DPONE_IT_AF_APP_IDS:-}"
+      test -n "${VAULT_ADDR:-}"
+      if [ -z "${VAULT_AUTH_ROLE:-}" ]; then
+        case "${ENV_CODE:-dev}" in
+          dev)
+            test -n "${VAULT_AUTH_ROLE_DEV:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_DEV}"
+            ;;
+          prod)
+            test -n "${VAULT_AUTH_ROLE_PROD:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_PROD}"
+            ;;
+          *)
+            echo "Unsupported ENV_CODE='${ENV_CODE:-}'. Expected dev or prod." >&2
+            exit 1
+            ;;
+        esac
+      fi
+      test -n "${VAULT_ID_TOKEN:-}"
+      test -n "${VAULT_AUTH_ROLE:-}"
+      python tools/ci/vault_jwt_preflight.py
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install dist/*.whl
+
+      export DPONE_INSTALL_MODE=snapshot
+      export DPONE_PACKAGE_SPEC="${LIB_NAME}[vault,gcp]==${DPONE_SNAPSHOT_VERSION}"
+      export DPONE_PACKAGE_INDEX_URL="$PACK_REGISTRY"
+      export DPONE_PACKAGE_EXTRA_INDEX_URL="$PUBLIC_PYPI_SIMPLE"
+      export DPONE_PACKAGE_EXTRA_INDEX_URLS="https://pypi.org/simple"
+      export DPONE_PACKAGE_TARGET=/tmp/dpone-runtime-site
+      export DPONE_PROJECT_DIR="$CI_PROJECT_DIR"
+
+      dpone-runtime-exec python tools/appsflyer_live_smoke.py --project-root "$CI_PROJECT_DIR" --mode manifest-run --format json
+
+snapshot_cbr_public_smoke:
+  extends:
+    - .uv_job_template
+    - .rules_schedule_main_mr_manual
+  stage: smoke-test
+  needs:
+    - job: build
+      artifacts: true
+    - job: publish_dev_snapshot
+      artifacts: true
+  script:
+    - |
+      set -euo pipefail
+      echo "Public CBR smoke via snapshot overlay install"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install dist/*.whl
+
+      export DPONE_INSTALL_MODE=snapshot
+      export DPONE_PACKAGE_SPEC="${LIB_NAME}==${DPONE_SNAPSHOT_VERSION}"
+      export DPONE_PACKAGE_INDEX_URL="$PACK_REGISTRY"
+      export DPONE_PACKAGE_TARGET=/tmp/dpone-runtime-site
+      export DPONE_PROJECT_DIR="$CI_PROJECT_DIR"
+
+      dpone-runtime-exec python tools/cbr_public_smoke.py --project-root "$CI_PROJECT_DIR" --mode connector --format json
+
+snapshot_mindbox_live_smoke:
+  extends:
+    - .uv_job_template
+    - .vault_jwt_job_template
+    - .rules_vault_live_schedule_main_manual
+  stage: smoke-test
+  needs:
+    - job: build
+      artifacts: true
+    - job: publish_dev_snapshot
+      artifacts: true
+  variables:
+    DPONE_IT_MB_EXPORT_TIMEOUT: "3000"
+  script:
+    - |
+      set -euo pipefail
+      echo "Live Mindbox smoke via snapshot overlay install"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+      test -n "${VAULT_ADDR:-}"
+      if [ -z "${VAULT_AUTH_ROLE:-}" ]; then
+        case "${ENV_CODE:-dev}" in
+          dev)
+            test -n "${VAULT_AUTH_ROLE_DEV:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_DEV}"
+            ;;
+          prod)
+            test -n "${VAULT_AUTH_ROLE_PROD:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_PROD}"
+            ;;
+          *)
+            echo "Unsupported ENV_CODE='${ENV_CODE:-}'. Expected dev or prod." >&2
+            exit 1
+            ;;
+        esac
+      fi
+      test -n "${VAULT_ID_TOKEN:-}"
+      test -n "${VAULT_AUTH_ROLE:-}"
+      python tools/ci/vault_jwt_preflight.py
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install dist/*.whl
+
+      export DPONE_INSTALL_MODE=snapshot
+      export DPONE_PACKAGE_SPEC="${LIB_NAME}[vault,gcp]==${DPONE_SNAPSHOT_VERSION}"
+      export DPONE_PACKAGE_INDEX_URL="$PACK_REGISTRY"
+      export DPONE_PACKAGE_EXTRA_INDEX_URL="$PUBLIC_PYPI_SIMPLE"
+      export DPONE_PACKAGE_EXTRA_INDEX_URLS="https://pypi.org/simple"
+      export DPONE_PACKAGE_TARGET=/tmp/dpone-runtime-site
+      export DPONE_PROJECT_DIR="$CI_PROJECT_DIR"
+
+      dpone-runtime-exec python tools/mindbox_live_smoke.py --project-root "$CI_PROJECT_DIR" --mode manifest-run --format json
+
+snapshot_fasttrack_live_smoke:
+  extends:
+    - .uv_job_template
+    - .vault_jwt_job_template
+    - .rules_vault_live_schedule_main_manual
+  stage: smoke-test
+  needs:
+    - job: build
+      artifacts: true
+    - job: publish_dev_snapshot
+      artifacts: true
+  script:
+    - |
+      set -euo pipefail
+      echo "Live Fasttrack smoke via snapshot overlay install"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+      test -n "${VAULT_ADDR:-}"
+      if [ -z "${VAULT_AUTH_ROLE:-}" ]; then
+        case "${ENV_CODE:-dev}" in
+          dev)
+            test -n "${VAULT_AUTH_ROLE_DEV:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_DEV}"
+            ;;
+          prod)
+            test -n "${VAULT_AUTH_ROLE_PROD:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_PROD}"
+            ;;
+          *)
+            echo "Unsupported ENV_CODE='${ENV_CODE:-}'. Expected dev or prod." >&2
+            exit 1
+            ;;
+        esac
+      fi
+      test -n "${VAULT_ID_TOKEN:-}"
+      test -n "${VAULT_AUTH_ROLE:-}"
+      python tools/ci/vault_jwt_preflight.py
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install dist/*.whl
+
+      export DPONE_INSTALL_MODE=snapshot
+      export DPONE_PACKAGE_SPEC="${LIB_NAME}[vault,gcp]==${DPONE_SNAPSHOT_VERSION}"
+      export DPONE_PACKAGE_INDEX_URL="$PACK_REGISTRY"
+      export DPONE_PACKAGE_EXTRA_INDEX_URL="$PUBLIC_PYPI_SIMPLE"
+      export DPONE_PACKAGE_EXTRA_INDEX_URLS="https://pypi.org/simple"
+      export DPONE_PACKAGE_TARGET=/tmp/dpone-runtime-site
+      export DPONE_PROJECT_DIR="$CI_PROJECT_DIR"
+
+      dpone-runtime-exec python tools/fasttrack_live_smoke.py --project-root "$CI_PROJECT_DIR" --mode manifest-run --format json
+
+snapshot_similarweb_live_smoke:
+  extends:
+    - .uv_job_template
+    - .vault_jwt_job_template
+    - .rules_similarweb_live_main_manual
+  stage: smoke-test
+  needs:
+    - job: build
+      artifacts: true
+    - job: publish_dev_snapshot
+      artifacts: true
+  variables:
+    DPONE_IT_SW_DOMAINS: "travel.example.com"
+    DPONE_IT_SW_LIMIT: "5"
+    DPONE_IT_SW_PAGE_SIZE: "5"
+    DPONE_IT_SW_MIN_KEYWORDS_COUNT: "1"
+  script:
+    - |
+      set -euo pipefail
+      echo "Live SimilarWeb smoke via snapshot overlay install"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+      test -n "${VAULT_ADDR:-}"
+      if [ -z "${VAULT_AUTH_ROLE:-}" ]; then
+        case "${ENV_CODE:-dev}" in
+          dev)
+            test -n "${VAULT_AUTH_ROLE_DEV:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_DEV}"
+            ;;
+          prod)
+            test -n "${VAULT_AUTH_ROLE_PROD:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_PROD}"
+            ;;
+          *)
+            echo "Unsupported ENV_CODE='${ENV_CODE:-}'. Expected dev or prod." >&2
+            exit 1
+            ;;
+        esac
+      fi
+      test -n "${VAULT_ID_TOKEN:-}"
+      test -n "${VAULT_AUTH_ROLE:-}"
+      python tools/ci/vault_jwt_preflight.py
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install dist/*.whl
+
+      export DPONE_INSTALL_MODE=snapshot
+      export DPONE_PACKAGE_SPEC="${LIB_NAME}[vault,gcp]==${DPONE_SNAPSHOT_VERSION}"
+      export DPONE_PACKAGE_INDEX_URL="$PACK_REGISTRY"
+      export DPONE_PACKAGE_EXTRA_INDEX_URL="$PUBLIC_PYPI_SIMPLE"
+      export DPONE_PACKAGE_EXTRA_INDEX_URLS="https://pypi.org/simple"
+      export DPONE_PACKAGE_TARGET=/tmp/dpone-runtime-site
+      export DPONE_PROJECT_DIR="$CI_PROJECT_DIR"
+
+      dpone-runtime-exec python tools/similarweb_live_smoke.py --project-root "$CI_PROJECT_DIR" --mode manifest-run --format json
+
+snapshot_openexchangerates_live_smoke:
+  extends:
+    - .uv_job_template
+    - .vault_jwt_job_template
+    - .rules_vault_live_schedule_main_manual
+  stage: smoke-test
+  needs:
+    - job: build
+      artifacts: true
+    - job: publish_dev_snapshot
+      artifacts: true
+  variables:
+    DPONE_IT_OXR_SYMBOLS: "ARS,RUB,EUR"
+  script:
+    - |
+      set -euo pipefail
+      echo "Live OpenExchangeRates smoke via snapshot overlay install"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+      test -n "${VAULT_ADDR:-}"
+      if [ -z "${VAULT_AUTH_ROLE:-}" ]; then
+        case "${ENV_CODE:-dev}" in
+          dev)
+            test -n "${VAULT_AUTH_ROLE_DEV:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_DEV}"
+            ;;
+          prod)
+            test -n "${VAULT_AUTH_ROLE_PROD:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_PROD}"
+            ;;
+          *)
+            echo "Unsupported ENV_CODE='${ENV_CODE:-}'. Expected dev or prod." >&2
+            exit 1
+            ;;
+        esac
+      fi
+      test -n "${VAULT_ID_TOKEN:-}"
+      test -n "${VAULT_AUTH_ROLE:-}"
+      python tools/ci/vault_jwt_preflight.py
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install dist/*.whl
+
+      export DPONE_INSTALL_MODE=snapshot
+      export DPONE_PACKAGE_SPEC="${LIB_NAME}[vault,gcp]==${DPONE_SNAPSHOT_VERSION}"
+      export DPONE_PACKAGE_INDEX_URL="$PACK_REGISTRY"
+      export DPONE_PACKAGE_EXTRA_INDEX_URL="$PUBLIC_PYPI_SIMPLE"
+      export DPONE_PACKAGE_EXTRA_INDEX_URLS="https://pypi.org/simple"
+      export DPONE_PACKAGE_TARGET=/tmp/dpone-runtime-site
+      export DPONE_PROJECT_DIR="$CI_PROJECT_DIR"
+
+      dpone-runtime-exec python tools/openexchangerates_live_smoke.py --project-root "$CI_PROJECT_DIR" --mode manifest-run --format json
+
+snapshot_google_sheets_live_smoke:
+  extends:
+    - .uv_job_template
+    - .vault_jwt_job_template
+    - .rules_google_sheets_live_main_manual
+  stage: smoke-test
+  needs:
+    - job: build
+      artifacts: true
+    - job: publish_dev_snapshot
+      artifacts: true
+  script:
+    - |
+      set -euo pipefail
+      echo "Live Google Sheets smoke via snapshot overlay install"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+      test -n "${DPONE_IT_GS_SPREADSHEET_ID:-}${DPONE_IT_GS_SPREADSHEET_URL:-}"
+      test -n "${VAULT_ADDR:-}"
+      if [ -z "${VAULT_AUTH_ROLE:-}" ]; then
+        case "${ENV_CODE:-dev}" in
+          dev)
+            test -n "${VAULT_AUTH_ROLE_DEV:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_DEV}"
+            ;;
+          prod)
+            test -n "${VAULT_AUTH_ROLE_PROD:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_PROD}"
+            ;;
+          *)
+            echo "Unsupported ENV_CODE='${ENV_CODE:-}'. Expected dev or prod." >&2
+            exit 1
+            ;;
+        esac
+      fi
+      test -n "${VAULT_ID_TOKEN:-}"
+      test -n "${VAULT_AUTH_ROLE:-}"
+      python tools/ci/vault_jwt_preflight.py
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install dist/*.whl
+
+      export DPONE_INSTALL_MODE=snapshot
+      export DPONE_PACKAGE_SPEC="${LIB_NAME}[vault,gcp]==${DPONE_SNAPSHOT_VERSION}"
+      export DPONE_PACKAGE_INDEX_URL="$PACK_REGISTRY"
+      export DPONE_PACKAGE_EXTRA_INDEX_URL="$PUBLIC_PYPI_SIMPLE"
+      export DPONE_PACKAGE_EXTRA_INDEX_URLS="https://pypi.org/simple"
+      export DPONE_PACKAGE_TARGET=/tmp/dpone-runtime-site
+      export DPONE_PROJECT_DIR="$CI_PROJECT_DIR"
+
+      dpone-runtime-exec python tools/google_sheets_live_smoke.py --project-root "$CI_PROJECT_DIR" --mode manifest-run --format json
+
+snapshot_google_ads_live_smoke:
+  extends:
+    - .uv_job_template
+    - .vault_jwt_job_template
+    - .rules_vault_live_schedule_main_manual
+  stage: smoke-test
+  needs:
+    - job: build
+      artifacts: true
+    - job: publish_dev_snapshot
+      artifacts: true
+  script:
+    - |
+      set -euo pipefail
+      echo "Live Google Ads smoke via snapshot overlay install"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+      test -n "${VAULT_ADDR:-}"
+      if [ -z "${VAULT_AUTH_ROLE:-}" ]; then
+        case "${ENV_CODE:-dev}" in
+          dev)
+            test -n "${VAULT_AUTH_ROLE_DEV:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_DEV}"
+            ;;
+          prod)
+            test -n "${VAULT_AUTH_ROLE_PROD:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_PROD}"
+            ;;
+          *)
+            echo "Unsupported ENV_CODE='${ENV_CODE:-}'. Expected dev or prod." >&2
+            exit 1
+            ;;
+        esac
+      fi
+      test -n "${VAULT_ID_TOKEN:-}"
+      test -n "${VAULT_AUTH_ROLE:-}"
+      python tools/ci/vault_jwt_preflight.py
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install dist/*.whl
+
+      export DPONE_INSTALL_MODE=snapshot
+      export DPONE_PACKAGE_SPEC="${LIB_NAME}[vault,gcp,google_ads]==${DPONE_SNAPSHOT_VERSION}"
+      export DPONE_PACKAGE_INDEX_URL="$PACK_REGISTRY"
+      export DPONE_PACKAGE_EXTRA_INDEX_URL="$PUBLIC_PYPI_SIMPLE"
+      export DPONE_PACKAGE_EXTRA_INDEX_URLS="https://pypi.org/simple"
+      export DPONE_PACKAGE_TARGET=/tmp/dpone-runtime-site
+      export DPONE_PROJECT_DIR="$CI_PROJECT_DIR"
+
+      dpone-runtime-exec python tools/google_ads_live_smoke.py --project-root "$CI_PROJECT_DIR" --mode manifest-run --format json
+
+snapshot_yandex_webmaster_live_smoke:
+  extends:
+    - .uv_job_template
+    - .vault_jwt_job_template
+    - .rules_yandex_webmaster_live_main_manual
+  stage: smoke-test
+  needs:
+    - job: build
+      artifacts: true
+    - job: publish_dev_snapshot
+      artifacts: true
+  variables:
+    DPONE_IT_YANDEX_WEBMASTER_HOST_ID: "https:travel.example.com:443"
+  script:
+    - |
+      set -euo pipefail
+      echo "Live Yandex Webmaster smoke via snapshot overlay install"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+      test -n "${VAULT_ADDR:-}"
+      if [ -z "${VAULT_AUTH_ROLE:-}" ]; then
+        case "${ENV_CODE:-dev}" in
+          dev)
+            test -n "${VAULT_AUTH_ROLE_DEV:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_DEV}"
+            ;;
+          prod)
+            test -n "${VAULT_AUTH_ROLE_PROD:-}"
+            export VAULT_AUTH_ROLE="${VAULT_AUTH_ROLE_PROD}"
+            ;;
+          *)
+            echo "Unsupported ENV_CODE='${ENV_CODE:-}'. Expected dev or prod." >&2
+            exit 1
+            ;;
+        esac
+      fi
+      test -n "${VAULT_ID_TOKEN:-}"
+      test -n "${VAULT_AUTH_ROLE:-}"
+      python tools/ci/vault_jwt_preflight.py
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install dist/*.whl
+
+      export DPONE_INSTALL_MODE=snapshot
+      export DPONE_PACKAGE_SPEC="${LIB_NAME}[vault,gcp]==${DPONE_SNAPSHOT_VERSION}"
+      export DPONE_PACKAGE_INDEX_URL="$PACK_REGISTRY"
+      export DPONE_PACKAGE_EXTRA_INDEX_URL="$PUBLIC_PYPI_SIMPLE"
+      export DPONE_PACKAGE_EXTRA_INDEX_URLS="https://pypi.org/simple"
+      export DPONE_PACKAGE_TARGET=/tmp/dpone-runtime-site
+      export DPONE_PROJECT_DIR="$CI_PROJECT_DIR"
+
+      dpone-runtime-exec python tools/yandex_webmaster_live_smoke.py --project-root "$CI_PROJECT_DIR" --mode manifest-run --format json
+
+snapshot_installed_integration:
+  extends:
+    - .uv_job_template
+    - .rules_schedule_develop_or_mr_manual
+  stage: smoke-test
+  needs:
+    - job: publish_dev_snapshot
+      artifacts: true
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+      command: ["postgres"]
+      variables:
+        PGDATA: /tmp/postgres-data
+        POSTGRES_DB: dpone_it
+        POSTGRES_USER: dpone
+        POSTGRES_PASSWORD: dpone
+        POSTGRES_HOST_AUTH_METHOD: trust
+        HEALTHCHECK_TCP_PORT: "5432"
+    - name: clickhouse/clickhouse-server:24.8
+      alias: clickhouse
+  variables:
+    CLICKHOUSE_DB: dpone_it
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_TEST_USE_INSTALLED_PACKAGE: "1"
+    DPONE_IT_PG_HOST: postgres
+    DPONE_IT_PG_PORT: "5432"
+    DPONE_IT_PG_DATABASE: dpone_it
+    DPONE_IT_PG_USER: dpone
+    DPONE_IT_PG_PASSWORD: dpone
+    DPONE_IT_PG_CONNECT_TIMEOUT: "60"
+    DPONE_IT_PG_POLL_INTERVAL: "1"
+    DPONE_IT_CH_HOST: clickhouse
+    DPONE_IT_CH_PORT: "9000"
+    DPONE_IT_CH_DATABASE: dpone_it
+    DPONE_IT_CH_USER: default
+    DPONE_IT_CH_PASSWORD: ""
+    DPONE_IT_CH_CONNECT_TIMEOUT: "90"
+    DPONE_IT_CH_POLL_INTERVAL: "2"
+  script:
+    - |
+      set -euo pipefail
+      echo "Installed-package integration tests against snapshot package"
+      test -n "${DPONE_SNAPSHOT_VERSION:-}"
+      test -n "${DPONE_PACKAGE_SPEC:-}"
+      echo "Resolving postgres service host"
+      getent hosts postgres || true
+      python - <<'PY'
+      import socket
+      import time
+
+      targets = [("postgres", 5432), ("127.0.0.1", 5432)]
+      deadline = time.time() + 60
+      last_error = None
+      while time.time() < deadline:
+          for host, port in targets:
+              try:
+                  with socket.create_connection((host, port), timeout=1):
+                      print(f"postgres service is reachable at {host}:{port}")
+                      raise SystemExit(0)
+              except OSError as exc:
+                  last_error = f"{host}:{port} -> {exc}"
+          time.sleep(1)
+      raise SystemExit(f"PostgreSQL service did not accept TCP connections: {last_error}")
+      PY
+
+      python -m venv /tmp/venv
+      . /tmp/venv/bin/activate
+      pip install --upgrade pip
+      pip install pytest "$LIB_NAME[postgres,clickhouse]==$DPONE_SNAPSHOT_VERSION" --index-url "$PACK_REGISTRY" --extra-index-url "$PUBLIC_PYPI_SIMPLE"
+      python -m pytest -m "integration and not integration_extended" tests/integration/postgres tests/integration/clickhouse

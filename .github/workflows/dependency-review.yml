@@ -1,0 +1,49 @@
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Validate push comparison base
+        if: github.event_name == 'push'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "${BEFORE_SHA}" =~ ^[0-9a-f]{40}$ ]] || \
+             [[ "${BEFORE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+            echo "::error::Dependency Review requires a nonzero 40-character push before SHA."
+            exit 1
+          fi
+
+      - name: Dependency Review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: never
+
+      - name: Dependency Review
+        if: github.event_name == 'push'
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: never
+          base-ref: ${{ github.event.before }}
+          head-ref: ${{ github.sha }}

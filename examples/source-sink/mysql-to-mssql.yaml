@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+defaults:
+  name: mysql_to_mssql_example
+  source:
+    type: mysql
+    connection_id: mysql_source
+    options:
+      batch_size: 50000
+      export_format: csv
+  sink:
+    type: mssql
+    connection_id: mssql_dwh
+    table:
+      schema: dbo
+      name: orders
+    strategy:
+      mode: full_refresh
+    options:
+      bulk:
+        mode: bcp
+        bcp:
+          batch_size: 100000
+          packet_size: 65535
+
+quality:
+  gates:
+    - id: source_target_rows
+      type: row_count_reconciliation
+      severity: error
+      tolerance:
+        mode: pct
+        value: 0.1
+
+schemas:
+  app:
+    tables:
+      - orders

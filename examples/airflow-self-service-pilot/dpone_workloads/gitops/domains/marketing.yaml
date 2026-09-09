@@ -1,0 +1,22 @@
+domain: marketing
+workloads:
+  sample_web_sync:
+    manifest: ../../../workloads/marketing/dpone/manifests/sample_web_sync.yaml
+dags:
+  DAG__marketing__sample_web_sync__sync:
+    description: Governed sync for sample_web_sync
+    schedule: "0 6 * * *"
+    start_date: "2026-01-01"
+    timezone: Europe/Moscow
+    catchup: false
+    max_active_runs: 1
+    tags: [dpone, marketing]
+    default_args:
+      retries: 0
+      owner: marketing_team
+    operator_overrides:
+      in_cluster: true
+    workloads: [sample_web_sync]
+    wiring:
+      mode: waves
+      max_parallel_workloads: 1

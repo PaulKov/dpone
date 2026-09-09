@@ -1,0 +1,345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-artifact-publish-v2.schema.json",
+  "title": "dpone GitOps verified Airflow artifact publication report",
+  "type": "object",
+  "required": [
+    "schema",
+    "passed",
+    "changes",
+    "errors",
+    "status",
+    "release_id",
+    "deployment_id",
+    "environment",
+    "artifact_registry_ref",
+    "created_objects",
+    "existing_equal_objects",
+    "verified_objects",
+    "published_release",
+    "published_deployment",
+    "publication_commitment"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.airflow-artifact-publish.v2"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "status": {
+      "enum": [
+        "published",
+        "no_op",
+        "failed"
+      ]
+    },
+    "release_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "deployment_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "environment": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "artifact_registry_ref": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "created_objects": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "existing_equal_objects": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "verified_objects": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "published_release": {
+      "type": "boolean"
+    },
+    "published_deployment": {
+      "type": "boolean"
+    },
+    "publication_commitment": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "schema",
+            "verification_mode",
+            "registry_scope_id",
+            "projection_verified",
+            "release",
+            "deployment",
+            "airflow_index"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "schema": {
+              "const": "dpone.airflow-publication-commitment.v1"
+            },
+            "verification_mode": {
+              "const": "remote_readback_sha256"
+            },
+            "registry_scope_id": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "projection_verified": {
+              "const": true
+            },
+            "release": {
+              "type": "object",
+              "required": [
+                "object_key",
+                "sha256",
+                "bytes"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "object_key": {
+                  "type": "string",
+                  "pattern": "^(?:releases|deployments)/[A-Za-z0-9._/-]+$",
+                  "maxLength": 512
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "deployment": {
+              "type": "object",
+              "required": [
+                "object_key",
+                "sha256",
+                "bytes"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "object_key": {
+                  "type": "string",
+                  "pattern": "^(?:releases|deployments)/[A-Za-z0-9._/-]+$",
+                  "maxLength": 512
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "airflow_index": {
+              "type": "object",
+              "required": [
+                "object_key",
+                "sha256",
+                "bytes"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "object_key": {
+                  "type": "string",
+                  "pattern": "^(?:releases|deployments)/[A-Za-z0-9._/-]+$",
+                  "maxLength": 512
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "published",
+              "no_op"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "publication_commitment": {
+            "type": "object",
+            "required": [
+              "schema",
+              "verification_mode",
+              "registry_scope_id",
+              "projection_verified",
+              "release",
+              "deployment",
+              "airflow_index"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "schema": {
+                "const": "dpone.airflow-publication-commitment.v1"
+              },
+              "verification_mode": {
+                "const": "remote_readback_sha256"
+              },
+              "registry_scope_id": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "projection_verified": {
+                "const": true
+              },
+              "release": {
+                "type": "object",
+                "required": [
+                  "object_key",
+                  "sha256",
+                  "bytes"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "object_key": {
+                    "type": "string",
+                    "pattern": "^(?:releases|deployments)/[A-Za-z0-9._/-]+$",
+                    "maxLength": 512
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              "deployment": {
+                "type": "object",
+                "required": [
+                  "object_key",
+                  "sha256",
+                  "bytes"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "object_key": {
+                    "type": "string",
+                    "pattern": "^(?:releases|deployments)/[A-Za-z0-9._/-]+$",
+                    "maxLength": 512
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              "airflow_index": {
+                "type": "object",
+                "required": [
+                  "object_key",
+                  "sha256",
+                  "bytes"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "object_key": {
+                    "type": "string",
+                    "pattern": "^(?:releases|deployments)/[A-Za-z0-9._/-]+$",
+                    "maxLength": 512
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "publication_commitment": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}

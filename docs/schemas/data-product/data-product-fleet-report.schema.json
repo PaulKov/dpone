@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/data-product/data-product-fleet-report.schema.json",
+  "title": "dpone data product fleet report",
+  "type": "object",
+  "required": ["schema_version", "fleet_report_id", "status", "markdown", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_fleet_report.v1"},
+    "fleet_report_id": {"type": "string"},
+    "status": {"type": "string"},
+    "fleet_evaluation_id": {"type": ["string", "null"]},
+    "markdown": {"type": "string"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,19 @@
+{
+  "artifact_schema": "dpone.test-artifact.v1",
+  "artifact_type": "integration.mssql_cdc_change_tracking",
+  "artifact_label": "2026-06-01T181200Z-mssql-cdc-live",
+  "created_by": "Codex GPT-5",
+  "executed_by_os_user": "macbook",
+  "executed_at": "2026-06-01T18:12:00Z",
+  "command": "DPONE_IT_MSSQL_CDC_HOST=127.0.0.1 DPONE_IT_MSSQL_CDC_PORT=15436 DPONE_IT_MSSQL_CDC_DATABASE=dpone DPONE_IT_MSSQL_CDC_USER=sa DPONE_IT_MSSQL_CDC_PASSWORD=*** DPONE_IT_MSSQL_TRUST_SERVER_CERTIFICATE=yes DPONE_IT_MSSQL_BCP_PATH=/opt/homebrew/bin/bcp uv run pytest tests/integration/mssql/test_mssql_cdc_integration.py -q",
+  "environment": {
+    "mssql_container": "dpone-it-mssql-cdc",
+    "mssql_port": 15436,
+    "sql_server_agent": "enabled"
+  },
+  "result": "passed",
+  "summary": {
+    "tests": "2 passed",
+    "coverage": "SQL Server CDC insert/update/delete, Change Tracking insert/update/delete, MSSQL CDC offset storage roundtrip"
+  }
+}

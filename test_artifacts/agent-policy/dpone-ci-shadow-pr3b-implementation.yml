@@ -1,0 +1,223 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-PR3B-IMPLEMENTATION"
+title: "Implement the approved PR 3B semantic privilege boundary"
+goal: >-
+  Implement the merged APPROVED PR 3B specification exactly: a bounded and
+  deterministic semantic scanner for pull-request-reachable authority, closed
+  policy and evidence schemas, compatible umbrella integration, action-only
+  CodeQL, an atomic read-only governance producer/source-free attestation
+  split, adversarial tests, and self-service documentation.
+specification: "docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md"
+base_commit: "b3200e89ef375eeead7213e2c13d7c0fb33ff659"
+integrator: "/root"
+
+acceptance_criteria:
+  - "The exact implementation base is the receipt-proven squash integration b3200e89ef375eeead7213e2c13d7c0fb33ff659; it contains the APPROVED child and public-output amendment, the ACCEPTED ADR 0037 amendment, and the frozen authority blobs recorded by the implementation contract test."
+  - "The standalone semantic scanner implements the approved fixed paths, formats, canonical bytes, streams, exits, stable statuses, finding codes, recovery IDs, no-write/no-network behavior, and schema-valid deterministic v1 report without adding a supported Python-package API."
+  - "Snapshot acquisition, duplicate-safe parsing, graph construction, closed three-valued expressions, effective authority, exact profiles, report validation/rendering, orchestration, and CLI composition remain separate cohesive modules below repository quality budgets and do not import production runtime packages or tests."
+  - "Every normalized root and graph-derived route has complete route-specific authority evidence; cycles, unsupported or external edges, unknown privileged guards or permissions, resource limits, concurrent mutation, and incomplete identities fail closed without false PASS or partial output."
+  - "The exact CodeQL, governance-source, governance-attestation, and merge-closure profiles match only their approved trigger, route, permission, runner, action, input, artifact, and resolved-envelope fingerprints; missing, duplicate, copied, renamed, moved, weakened, or drifted variants block integration."
+  - "The pre-split base quality job and legacy CodeQL config remain reproducible RED fixtures; the implementation atomically makes quality read-only, adds one read-only governance-source producer and one source-free governance-attestation finalizer, narrows CodeQL, and deletes the custom config."
+  - "The repaired legacy workflow-security schema validates the checked-in policy, supports mutually exclusive workflow-level or job-scoped exceptions, requires all approved controls, and cannot override a semantic finding."
+  - "The existing workflow_security.py JSON fields, text ordering, summary, and exit behavior remain compatible; semantic findings append atomically after legacy errors, ordinary internal failures map to the one fixed umbrella error, and BaseException subclasses propagate unchanged."
+  - "The agent-pr-receipt, merge-closure, release, runtime, package, source, dependency, required-context, protection, App, secret, environment, tag, variable, and publication authorities remain unchanged."
+  - "Focused unit, integration, mutation, limits, compatibility, current-repository, docs, broad non-live, and hosted exact-head evidence all pass; mocked, skipped, unavailable, or stale provider evidence remains explicitly non-PASS."
+  - "The workflow-author, security-reviewer, contributor, and operator journey covers Discover through Upgrade, including the stable semantic-pr-privilege-boundary runbook anchor, all finding/recovery pairs, exact recheck commands, internal-failure escalation, safe rollback, and CodeQL migration."
+  - "The certification artifact is produced only from the standalone CLI's canonical JSON stdout at the approved path, validates against the exact v1 report schema, and adds no wrapper fields or independent decision authority."
+  - "The cumulative implementation diff is confined to owned_paths plus integrator_owned_paths; frozen specifications, ADR 0037, design/amendment tasks, receipt workflow, release workflows, runtime/data-plane code, packages, dependency files, and repository settings stay byte-identical to the implementation base."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "repository semantic workflow-security scanner, policy, schemas, and report"
+    - "existing workflow-security umbrella output and exit behavior"
+    - "CodeQL repository profile and governance evidence topology"
+    - "workflow-author, security-reviewer, contributor, and operator documentation"
+  migration_required: true
+
+owned_paths:
+  - tests/agent_policy/workflow_privilege_fixtures.py
+  - tests/agent_policy/test_workflow_privilege_snapshot.py
+  - tests/agent_policy/test_workflow_privilege_parser.py
+  - tests/agent_policy/test_workflow_privilege_graph.py
+  - tests/agent_policy/test_workflow_privilege_expressions.py
+  - tests/agent_policy/test_workflow_privilege_permissions.py
+  - tests/agent_policy/test_workflow_privilege_profiles.py
+  - tests/agent_policy/test_workflow_privilege_report.py
+  - tests/agent_policy/test_workflow_privilege_service.py
+  - tests/agent_policy/test_workflow_security_privileged_cli.py
+  - tests/agent_policy/test_workflow_security_pr3b_compatibility.py
+  - tests/agent_policy/test_workflow_privilege_mutations.py
+  - tests/agent_policy/test_workflow_privilege_limits.py
+  - tests/fixtures/ci-shadow-pr3b
+  - docs/ci-cd.md
+  - docs/cicd/workflows.md
+  - docs/developer-ci-cd.md
+  - docs/cicd/runbooks.md
+  - docs/testing/overview.md
+  - docs/testing/index.md
+  - docs/agent-governance.md
+  - docs/agent-security-mapping.md
+  - docs/agent-risk-register.md
+  - docs/github-branch-protection.md
+
+integrator_owned_paths:
+  - test_artifacts/agent-policy/dpone-ci-shadow-pr3b-implementation.yml
+  - test_artifacts/agent-policy/pr3b-semantic-privilege-certification.json
+  - test_artifacts/agent-policy/agent_governance_gate.json
+  - tools/agent_policy/workflow_privilege_contracts.py
+  - tools/agent_policy/workflow_privilege_snapshot.py
+  - tools/agent_policy/workflow_privilege_parser.py
+  - tools/agent_policy/workflow_privilege_graph.py
+  - tools/agent_policy/workflow_privilege_expressions.py
+  - tools/agent_policy/workflow_privilege_permissions.py
+  - tools/agent_policy/workflow_privilege_profiles.py
+  - tools/agent_policy/workflow_privilege_report.py
+  - tools/agent_policy/workflow_privilege_service.py
+  - tools/agent_policy/workflow_security_privileged.py
+  - tools/agent_policy/workflow_security.py
+  - tools/agent_policy/setup_inventory.py
+  - tools/agent_policy/validate_setup.py
+  - .agents/policy/workflow-security.yml
+  - .agents/policy/workflow-security-privileged.yml
+  - evals/agent/workflow-security.schema.json
+  - evals/agent/workflow-security-privileged-policy.schema.json
+  - evals/agent/workflow-security-privileged-report.schema.json
+  - .github/workflows/ci.yml
+  - .github/workflows/codeql.yml
+  - .github/codeql/codeql-config.yml
+  - tests/agent_policy/test_ci_shadow_pr3b_implementation_contract.py
+  - tests/agent_policy/test_agent_policy.py
+  - tests/agent_policy/test_workflow_security.py
+  - tests/agent_policy/test_workflow_security_fail_closed.py
+  - tests/agent_policy/test_workflow_security_job_scope.py
+  - tests/agent_policy/test_governance_gate.py
+  - tests/test_github_workflow_governance.py
+  - tests/test_cicd_docs_contracts.py
+  - tests/test_ci_shadow_pr3b_docs_contracts.py
+  - CHANGELOG.md
+  - docs/quality-metrics.md
+
+read_only_paths:
+  - docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md
+  - docs/feature-design-ci-pr-gate-exact-sha-evidence.md
+  - docs/adr/0037-immutable-agent-pr-merge-closure.md
+  - docs/adr/0048-exact-sha-readiness-evidence.md
+  - docs/feature-design-standard.md
+  - docs/documentation-standard.md
+  - docs/engineering-standards.md
+  - docs/agent-development.md
+  - docs/agent-task-contracts.md
+  - docs/benchmarks/quality_budgets.yml
+  - docs/agent-pr-merge-receipt-runbook.md
+  - test_artifacts/agent-policy/dpone-ci-shadow-pr3b-spec.yml
+  - test_artifacts/agent-policy/dpone-ci-shadow-pr3b-public-output-amendment.yml
+  - tests/test_ci_shadow_pr3b_spec_contracts.py
+  - tests/test_ci_shadow_pr3b_scope_contracts.py
+  - tests/test_ci_shadow_pr3b_schema_contracts.py
+  - tests/ci_shadow_pr3b_report_contract_model.py
+  - tests/ci_shadow_pr3b_report_contract_support.py
+  - tests/ci_shadow_pr3b_report_route_model.py
+  - tests/ci_shadow_pr3b_report_examples.py
+  - tests/test_ci_shadow_pr3b_report_contracts.py
+  - tests/test_ci_shadow_pr3b_report_routes_contracts.py
+  - tests/test_ci_shadow_pr3b_report_limits_contracts.py
+  - tests/test_ci_shadow_pr3b_output_amendment_contracts.py
+  - tests/test_ci_shadow_pr3b_squash_receipt_contracts.py
+  - tests/test_ci_shadow_pr3b_squash_receipt_failures.py
+  - .github/workflows/agent-pr-receipt.yml
+  - .github/workflows/agent-pr-merge-closure.yml
+  - .github/workflows/release.yml
+  - .github/workflows/runtime-image.yml
+  - .github/workflows/certification-release-summary.yml
+  - .github/workflows/route-certification-release.yml
+  - .github/workflows/route-release-finalize.yml
+  - src
+  - packages
+  - pyproject.toml
+  - uv.lock
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - docs/quality-metrics.md
+  - .github
+  - .github/workflows
+  - .agents/policy
+  - evals/agent
+  - tools/agent_policy
+  - test_artifacts/agent-policy/dpone-ci-shadow-pr3b-implementation.yml
+  - test_artifacts/agent-policy/pr3b-semantic-privilege-certification.json
+  - test_artifacts/agent-policy/agent_governance_gate.json
+  - tests/agent_policy/test_ci_shadow_pr3b_implementation_contract.py
+  - tests/agent_policy/test_agent_policy.py
+  - tests/agent_policy/test_workflow_security.py
+  - tests/agent_policy/test_workflow_security_fail_closed.py
+  - tests/agent_policy/test_workflow_security_job_scope.py
+  - tests/agent_policy/test_governance_gate.py
+  - tests/test_github_workflow_governance.py
+  - tests/test_cicd_docs_contracts.py
+  - tests/test_ci_shadow_pr3b_docs_contracts.py
+  - src
+  - packages
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "PR 539 reviewed head a27ccabaff70ea5506b2972decede11bffd4fc48 squash-merged as b3200e89ef375eeead7213e2c13d7c0fb33ff659 with identical tree dd63f92532f438d7a72502815d5655ba52d6e11c and base parent f18298c14af247225758f7fe8901bc8462994dd4."
+  - "Provider post-merge run 31510473308 produced PASS artifact 9108834368 with provider digest sha256:8ceba2f1b6bea1e1d056fb5bceaf9cbbeeff16140383d0fca45a0e4bfabf7eba and raw receipt SHA-256 1eb177ac319b371f45daf4980f42a10786a77b4fdc72d66cab33f605087df944."
+  - "The receipt canonical binding is sha256:58f1b8499ad55d9794346d0bba927667cec3354e789d4dff4a568aff121648c6; the frozen verifier exited 0 with exactly PASS: PR 539 squash receipt identity verified on stdout and empty stderr."
+  - "The base freezes specification blob 44816f5e13719e5bb6455b817f2e3295f96ec963, ADR 0037 blob 04705ee802cae434246c779945691a724c5c8851, design-task blob 46ff48b63710630570ca292fc763117414eb9a8e, amendment-task blob 04c705226ae0c533a85d8f06709ccdbb2933622d, and agent-pr-receipt workflow blob ba0db5cffbacc77038da9b5d804703bafb2a75f7."
+  - "The current pre-split quality and CodeQL workflows are required RED fixtures; no current PASS or migration authority may be inferred from the legacy scanner."
+  - "PR 540 reviewed head d0fcf7d99d79b85ea5a2681166db59645c50d7ce from exact base 4f2b924230ae90eb32a82db9e3510338eafa07ef with base tree efbb5fc284c58ddf26ab1d64459f7f2e439af6de was merge-integrated as 0250d99a6c3b1344aebbe80a54455feda25a730d with tree 6e9eb6485c46933a8d90a00e6f9ffdc4a8599314."
+  - "Provider post-merge run 31777266874 attempt 1 produced PASS artifact 9210346362 named agent-pr-receipt with provider digest sha256:2e01d33a642afaaff2c1b0d799f5f34f8ab544b7b0157bbb658fdd96f441d231 and size 15974 bytes, archive SHA-256 sha256:2e01d33a642afaaff2c1b0d799f5f34f8ab544b7b0157bbb658fdd96f441d231, agent_pr_merge_receipt.json SHA-256 sha256:c9b607200641afbda7718678d505354b27351a028a908b4ad46477b1e5526fff, and binding_id sha256:2098e24e3ee21d33a9e889a4cc09e4115544bbd1e83040f6da5957fe6cc15e79; exact-C check-run 94695293503 used GitHub Actions App id 15368, external_id agent-pr-merge-closure:31777266874:1, and conclusion success."
+  - "The lifecycle-retirement contract freezes the historical implementation diff to the exact rename-disabled range 4f2b924230ae90eb32a82db9e3510338eafa07ef..0250d99a6c3b1344aebbe80a54455feda25a730d and requires that integration commit to remain an ancestor of the current checkout; future commits cannot expand or rewrite the historical scope."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/agent_policy/test_workflow_privilege_snapshot.py tests/agent_policy/test_workflow_privilege_parser.py tests/agent_policy/test_workflow_privilege_graph.py tests/agent_policy/test_workflow_privilege_expressions.py tests/agent_policy/test_workflow_privilege_permissions.py tests/agent_policy/test_workflow_privilege_profiles.py tests/agent_policy/test_workflow_privilege_report.py tests/agent_policy/test_workflow_privilege_service.py tests/agent_policy/test_workflow_security_privileged_cli.py tests/agent_policy/test_workflow_security_pr3b_compatibility.py tests/agent_policy/test_workflow_privilege_mutations.py tests/agent_policy/test_workflow_privilege_limits.py tests/agent_policy/test_ci_shadow_pr3b_implementation_contract.py tests/agent_policy/test_agent_policy.py tests/agent_policy/test_workflow_security.py tests/agent_policy/test_workflow_security_fail_closed.py tests/agent_policy/test_workflow_security_job_scope.py tests/agent_policy/test_governance_gate.py tests/test_github_workflow_governance.py tests/test_ci_shadow_pr3b_spec_contracts.py tests/test_ci_shadow_pr3b_schema_contracts.py tests/test_ci_shadow_pr3b_report_contracts.py tests/test_ci_shadow_pr3b_report_routes_contracts.py tests/test_ci_shadow_pr3b_report_limits_contracts.py tests/test_ci_shadow_pr3b_output_amendment_contracts.py -q"
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/dpone-ci-shadow-pr3b-implementation.yml"
+    - "uv run python tools/agent_policy/workflow_security_privileged.py --root . --format text && uv run python tools/agent_policy/workflow_security_privileged.py --root . --format json && uv run python tools/agent_policy/workflow_security.py . --format json"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref b3200e89ef375eeead7213e2c13d7c0fb33ff659"
+    - "Execute every selected non-live check, including Ruff, format, mypy, import rules, layer metrics, exact-base module-size checks, and the full non-live xdist suite; report every skip accurately."
+    - "Validate both closed privileged schemas and the repaired legacy schema, require the checked-in policy instances to pass, run the standalone scan twice with byte-identical text and JSON output, and validate the JSON report against the exact schema."
+    - "Regenerate test_artifacts/agent-policy/pr3b-semantic-privilege-certification.json only by capturing exact stdout from uv run python tools/agent_policy/workflow_security_privileged.py --root . --format json; validate it against evals/agent/workflow-security-privileged-report.schema.json, require status PASS, and cmp it byte-for-byte with a second fresh invocation and the tracked artifact."
+    - "Use the checksum-pinned actionlint 1.7.12 installation from the approved PR3A protocol; require the first version line to equal 1.7.12, then run actionlint -no-color -format '{{json .}}' -shellcheck '' -pyflakes '' on every changed workflow and require exit 0, stdout exactly [] followed by one newline, and empty stderr. Prove the agent-pr-receipt and release-sensitive workflows byte-identical to the implementation base, and require the current repository semantic scan plus existing governance gate to PASS."
+    - "uv run dpone docs check-docs && uv run dpone docs check-generated-references && uv run dpone docs update-dev-metrics --check && uv run pytest tests/test_docs_language_contracts.py tests/test_cicd_docs_contracts.py -q && uv run mkdocs build --strict"
+    - "uv build && uv build packages/dpone-native-accel --out-dir dist && uv build packages/dpone-airflow-pack --out-dir dist && uv build packages/apache-airflow-providers-dpone --out-dir dist && uv tool run twine check dist/*"
+    - "git diff --check"
+  live:
+    - "Require exact-head CodeQL and all protected checks, current governance source/attestation artifact identity, owner attestation, Agent PR receipt, and no bypass before merge."
+    - "Mocked or local policy tests never count as hosted CodeQL, governance, or provider PASS; unavailable live evidence is UNVERIFIED."
+    - "After merge, run the standalone JSON command on exact master, validate its schema and PASS status, and verify the existing exact-master governance and CodeQL evidence without creating a new required context."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "A delegated writer edits integrator_owned_paths, or the declared integrator differs from shared_file_owner."
+  - "The exact implementation base, receipt-proven squash identity, approved specification blob, accepted ADR 0037 blob, or frozen task/workflow blobs differ from this contract."
+  - "Any frozen specification, ADR, design/amendment task, agent receipt, merge closure, release workflow, runtime/data-plane source, package, dependency, required context, protection, App, secret, environment, tag, variable, or publication authority must change."
+  - "Any graph-derived route, route authority, mandatory profile, finding, or snapshot identity can be omitted, duplicated, collapsed across event variants, or serialized from unvalidated data."
+  - "The implementation requires a new dependency, public dpone CLI or Python-package API, policy override, network/live/write mode, ignore flag, new required check, new publisher, restored legacy attestation authority, or fixture widening."
+  - "The pre-split quality/CodeQL RED fixtures cannot be made PASS by the exact atomic migration, or an approved currently safe workflow becomes unclassifiable."
+  - "Any module exceeds repository quality budgets or combines CLI, I/O, graph, policy, report, and orchestration responsibilities contrary to the approved architecture."

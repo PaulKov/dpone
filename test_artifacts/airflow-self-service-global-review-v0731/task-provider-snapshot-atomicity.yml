@@ -1,0 +1,71 @@
+schema_version: 1
+task_id: "SS-REVIEW-PROVIDER-SNAPSHOT-ATOMICITY"
+title: "Make provider artifact consumption snapshot-safe and fail_all atomic"
+goal: "Eliminate provider TOCTOU, partial fail_all publication, mutable init_fetch aliases, invalid error codes, and secret-bearing parse errors."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Each DAG spec and workload pack is consumed from the exact bounded byte snapshot whose size and digest were verified."
+  - "Deployment-index artifact bytes are mandatory and validated before consumption."
+  - "fail_all stages all DAGs and leaves caller namespace unchanged on any late failure."
+  - "init_fetch rejects mutable aliases including case variants and latest/current URI segments."
+  - "Every emitted parse error uses a canonical DPONE_* code and validates against dpone.error.v1."
+  - "Exception text is redacted before LoadReport or diagnostic DAG output."
+  - "Default isolated mode continues loading unaffected DAGs."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["Airflow deployment-index", "load_dpone_dags", "LoadReport", "runtime artifact delivery"]
+  migration_required: true
+
+owned_paths:
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_artifact_contract.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_artifact_resolver.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_loader.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_spec_loader.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_wiring.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_tasks.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/runtime_artifact_delivery_contract.py"
+  - "src/dpone/contracts/runtime_artifact_delivery.py"
+  - "src/dpone/gitops/schema_airflow_preflight_contracts.py"
+  - "docs/schemas/gitops/airflow-deployment-index.schema.json"
+  - "docs/schemas/gitops/deployment-set.schema.json"
+  - "docs/schemas/gitops/airflow-operator-diagnostics.schema.json"
+  - "docs/schemas/gitops/safe-sample-airflow-deployment-context.schema.json"
+  - "docs/schemas/gitops/safe-sample-execution-plan.schema.json"
+  - "docs/schemas/gitops/safe-sample-runtime-execution.schema.json"
+  - "tests/test_airflow_deployment_index_provider.py"
+  - "tests/test_airflow_dag_loader.py"
+  - "tests/test_airflow_pack_cache.py"
+  - "tests/test_airflow_runtime_artifact_delivery_contract.py"
+read_only_paths:
+  - "docs/schemas/gitops/error.schema.json"
+  - "docs/adr/0008-airflow-parse-safe-provider.md"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/provider.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies: ["SS-REVIEW-PROVIDER-PARSE-HARDENING"]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_deployment_index_provider.py tests/test_airflow_dag_loader.py tests/test_airflow_pack_cache.py -q"
+  broad:
+    - "uv run pytest tests/test_airflow_provider_parse_slo.py tests/test_airflow_run_identity.py tests/test_airflow_runtime_adapter.py tests/test_airflow_deployment_index_provider.py tests/test_airflow_dag_loader.py tests/test_airflow_pack_cache.py -q"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

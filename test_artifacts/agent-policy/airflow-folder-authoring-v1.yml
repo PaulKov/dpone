@@ -1,0 +1,81 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-FOLDER-AUTHORING-V1"
+title: "Add bounded folder authoring to the canonical compiler"
+goal: "Split multi-process sources into explicit confined fragments while preserving one canonical IR and exact runtime pinning."
+specification: "docs/feature-design-airflow-folder-authoring-v1.md"
+base_commit: "30e95886"
+integrator: "current Codex task"
+
+acceptance_criteria:
+  - "Folder, flow, and classic equivalents produce the same semantic fingerprint."
+  - "Only explicitly declared confined fragments are read."
+  - "Every fragment is included and verified in compact-pack dependencies."
+  - "Scaffold, check, manifest list, preview, and sample planning support folder mode."
+  - "Traversal, symlink, mutation, YAML abuse, and resource overflow fail closed before generated artifacts or external I/O."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone init pipeline --authoring folder"
+    - "dpone.flow.v1 fragments"
+    - "dpone.flow-fragment.v1"
+    - "AuthoringCompilation.dependencies"
+    - "compact pack workload_dependencies"
+    - "safe-sample pinned source verification"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/manifest/authoring*"
+  - "src/dpone/manifest/loader.py"
+  - "src/dpone/manifest/models.py"
+  - "src/dpone/readiness/airflow_*"
+  - "src/dpone/readiness/safe_sample_*"
+  - "src/dpone/services/safe_sample_policy.py"
+  - "src/dpone/gitops/workload_dependencies.py"
+  - "src/dpone/schema/etl-flow*-manifest.schema.json"
+  - "src/dpone/commands/init_cmd.py"
+  - "tests/test_airflow_folder_authoring_v1.py"
+  - "tests/test_airflow_authoring_v1.py"
+  - "tests/test_airflow_self_service_cli.py"
+  - "tests/test_safe_sample_*"
+  - "tests/test_gitops_workload_dependencies.py"
+  - "docs/feature-design-airflow-folder-authoring-v1.md"
+  - "docs/airflow-authoring.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "docs/reference/manifest-schemas.md"
+  - "docs/compatibility.md"
+  - "docs/cli-reference.md"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - "test_artifacts/airflow-folder-authoring-v1/**"
+
+forbidden_paths:
+  - ".cursor/**"
+  - "uv.lock"
+  - ".github/workflows/**"
+
+shared_file_owner: "current Codex task"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_folder_authoring_v1.py tests/test_airflow_authoring_v1.py tests/test_airflow_self_service_cli.py -q"
+    - "uv run pytest tests/test_safe_sample_live_runtime_assembly.py tests/test_airflow_safe_sample_policy.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "N/A: bounded authoring and pin verification are local build/runtime guards with no connector I/O."
+
+stop_conditions:
+  - "Implementation would require recursive discovery or scheduler-side authoring compilation."
+  - "A fragment could become an independent editable pipeline authority."
+  - "Safe-sample execution could proceed without pinning every declared fragment."
+  - "A required edit touches user-owned .cursor files."

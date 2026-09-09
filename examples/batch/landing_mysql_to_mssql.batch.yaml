@@ -1,0 +1,48 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+convention: landing_raw_v1
+
+vars:
+  src_database: demo_source
+  src_system: demo_mysql
+  owner_team: data-platform-team
+  owner_contact: data-platform@example.com
+  sla: "daily"
+
+defaults:
+  source:
+    type: mysql
+    connection_type: vault
+    connection_id: mysql-demo
+    vault_path: mysql/demo-source
+    options:
+      batch_size: 100000
+      incremental_column: updated_at
+      export_format: mssql-delimited
+      compress_export: false
+  sink:
+    type: mssql
+    connection_type: vault
+    connection_id: mssql-demo-dwh
+    vault_path: mssql/demo-dwh
+    staging: {schema: stg}
+    strategy: {mode: incremental_merge, unique_key: id, merge_policy: delete_insert}
+    options:
+      bulk:
+        mode: bcp
+        bcp:
+          field_terminator: "\t"
+          row_terminator: "\n"
+          batch_size: 100000
+          packet_size: 65535
+  state:
+    type: mssql
+    connection_id: mssql-demo-dwh
+    connection_type: vault
+    vault_path: mssql/demo-dwh
+    table: {schema: etl_state, name: dpone_state}
+
+schemas:
+  app:
+    tables:
+      - orders

@@ -1,0 +1,150 @@
+schema_version: 1
+owner: PaulKov
+last_reviewed: "2026-08-23"
+purpose: "Keep GitHub Actions least-privilege and resistant to agent-driven workflow tampering."
+
+required_controls:
+  forbid_pull_request_target: true
+  require_top_level_permissions: true
+  require_pinned_external_actions: true
+  forbid_pr_workflow_secrets: true
+  require_audit_artifact_retention: true
+  require_hidden_ci_artifact_transport: true
+  isolate_dbt_execution_from_oidc: true
+  require_platform_owned_prod_trust_policy: true
+
+allowed_workflow_write_permissions:
+  agent-pr-receipt.yml:
+    jobs:
+      merge-closure:
+        - checks
+    reason: "The merged-closed job projects the immutable merge receipt onto the exact integration commit as the required GitHub Actions check."
+  ci.yml:
+    jobs:
+      governance-attestation:
+        - attestations
+        - id-token
+    reason: "The source-free finalizer attests the immutable artifact after the read-only governance producer completes."
+  codeql.yml:
+    permissions:
+      - security-events
+    reason: "CodeQL uploads SARIF results to GitHub code scanning."
+  dbt-self-service-dev.yml:
+    permissions:
+      - attestations
+      - artifact-metadata
+      - id-token
+    reason: "A source-free attestation job uses GitHub OIDC to attest build artifacts after the unprivileged dbt job completes."
+  dbt-self-service-dev-evidence.yml:
+    permissions:
+      - attestations
+      - artifact-metadata
+      - id-token
+    reason: "The environment-owned evidence finalizer attests the complete release-bound dev evidence checksum subject."
+  oss-code-quality-benchmark.yml:
+    permissions:
+      - contents
+      - pull-requests
+    reason: "Benchmark automation may update benchmark artifacts and related pull request metadata."
+  pages.yml:
+    jobs:
+      deploy:
+        - id-token
+        - pages
+    reason: "Only the protected GitHub Pages deploy job receives OIDC and Pages write permissions."
+  release.yml:
+    permissions:
+      - attestations
+      - contents
+      - id-token
+    reason: "Release publishing creates artifact attestations, release notes, and trusted-publishing identity."
+  runtime-image.yml:
+    permissions:
+      - attestations
+      - id-token
+      - packages
+    reason: "Release-tag runtime image publication writes GHCR packages and emits OIDC-backed image provenance and SBOM attestations."
+  scorecard.yml:
+    permissions:
+      - id-token
+      - security-events
+    reason: "OpenSSF Scorecard publishes SARIF and uses OIDC for score submission."
+
+required_audit_artifacts:
+  agent-pr-receipt.yml:
+    agent-pr-receipt:
+      retention_days: 90
+      reason: "Keep agent PR receipt evidence long enough for governance and incident audits."
+    agent-pr-merge-check:
+      retention_days: 90
+      reason: "Keep the exact integration check projection identity for release reconciliation and incident audits."
+  agent-governance-drift.yml:
+    agent-governance-drift:
+      retention_days: 90
+      reason: "Keep scheduled governance drift evidence long enough for repository control audits."
+  ci.yml:
+    agent-governance-gate:
+      retention_days: 90
+      reason: "Keep per-PR governance gate evidence long enough to audit merge decisions."
+  release-candidate-evidence.yml:
+    release-candidate-evidence-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep the exact-attempt provider-bound release evidence used by both package and runtime-image preflights."
+  release.yml:
+    release-verifier-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep the provider-attempt-bound closed ordinary-release verifier before any dependency or candidate execution."
+    release-preflight-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep exact tag, source commit, package identity, and live required-check evidence for release audits."
+    release-candidates:
+      retention_days: 90
+      reason: "Keep the immutable candidate distributions and checksums used by publication and verification jobs."
+    release-supply-chain-local:
+      retention_days: 90
+      reason: "Keep local supply-chain evidence produced without repository checkout before privileged attestation."
+    release-attestation-evidence-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep dpone and GitHub attestation receipts for every published release candidate."
+    release-pre-publication-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep the fresh provider gate and immutable tag recheck receipts around the PyPI mutation boundary."
+    release-github-publication-evidence-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep the fresh provider gate and immutable tag recheck receipts around the GitHub Release mutation boundary."
+    pypi-resolver-smoke-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep exact public wheel and sdist identity plus fresh resolver evidence for release audits."
+  pypi-breakglass.yml:
+    pypi-breakglass-verifier-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep the provider-attempt-bound closed verifier manifest and exact source-free verifier bytes used at publication."
+    pypi-breakglass-authorization-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep provider-attempt-bound tag, failed ordinary run, change approval, release authority, and candidate validation evidence."
+    pypi-breakglass-publication-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep provider-attempt-bound environment, reviewer policy, tag, and exact-subset receipts surrounding token publication."
+    pypi-breakglass-verification-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep provider-attempt-bound public filename, SHA-256, and resolver readback evidence after emergency publication."
+    pypi-breakglass-audit-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep one immutable attempt outcome bound to the change issue, source candidates, and workflow results."
+  runtime-image.yml:
+    runtime-image-evidence-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep image digest, SBOM, candidate checksums, package inventories, and exact-commit runtime evidence."
+    runtime-image-preflight-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep the exact-attempt runtime identity, common tag-push cutoff, and closed verifier handoff."
+    runtime-image-push-evidence-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep the fresh provider gate and attestation receipts around the first GHCR mutation boundary."
+    runtime-image-publication-${{ github.run_id }}-${{ github.run_attempt }}:
+      retention_days: 90
+      reason: "Keep the fresh provider gate and registry journal around the certified alias mutation boundary."
+  dbt-self-service-dev-evidence.yml:
+    dpone-dbt-dev-evidence:
+      retention_days: 180
+      reason: "Keep attested dev runtime evidence for promotion and reproducible-run audit retention."

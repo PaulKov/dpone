@@ -1,0 +1,140 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-artifact-attestation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attestation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "claims": {
+      "additionalProperties": false,
+      "properties": {
+        "issued_at": {
+          "maxLength": 40,
+          "minLength": 1,
+          "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+          "type": "string"
+        },
+        "publication": {
+          "additionalProperties": false,
+          "properties": {
+            "evidence_sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+              "type": "string"
+            },
+            "verification_mode": {
+              "const": "remote_readback_sha256"
+            }
+          },
+          "required": [
+            "evidence_sha256",
+            "verification_mode"
+          ],
+          "type": "object"
+        },
+        "source": {
+          "additionalProperties": false,
+          "properties": {
+            "git_sha": {
+              "pattern": "^[0-9a-f]{40,64}(?![\\s\\S])",
+              "type": "string"
+            },
+            "project": {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+              "type": "string"
+            },
+            "ref": {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project",
+            "ref",
+            "git_sha"
+          ],
+          "type": "object"
+        },
+        "subject": {
+          "additionalProperties": false,
+          "properties": {
+            "airflow_index_sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+              "type": "string"
+            },
+            "artifact_registry_ref": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+              "type": "string"
+            },
+            "deployment_id": {
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+              "type": "string"
+            },
+            "deployment_sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+              "type": "string"
+            },
+            "environment": {
+              "maxLength": 63,
+              "minLength": 1,
+              "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+              "type": "string"
+            },
+            "registry_scope_id": {
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+              "type": "string"
+            },
+            "release_id": {
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+              "type": "string"
+            },
+            "release_set_sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+              "type": "string"
+            },
+            "runtime_image_digest": {
+              "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+              "type": "string"
+            }
+          },
+          "required": [
+            "release_id",
+            "deployment_id",
+            "environment",
+            "artifact_registry_ref",
+            "registry_scope_id",
+            "release_set_sha256",
+            "deployment_sha256",
+            "airflow_index_sha256",
+            "runtime_image_digest"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "subject",
+        "source",
+        "publication",
+        "issued_at"
+      ],
+      "type": "object"
+    },
+    "schema": {
+      "const": "dpone.airflow-artifact-attestation.v1"
+    }
+  },
+  "required": [
+    "schema",
+    "attestation_id",
+    "claims"
+  ],
+  "title": "dpone GitOps signed Airflow artifact statement",
+  "type": "object"
+}

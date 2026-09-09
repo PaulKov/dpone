@@ -1,0 +1,127 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-workspace-promotion-verification.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "code": {
+          "const": "DPONE_DBT_PROMOTION_SOURCE_VERIFIED"
+        },
+        "passed": {
+          "const": true
+        },
+        "status": {
+          "const": "passed"
+        }
+      },
+      "required": [
+        "status",
+        "passed",
+        "code"
+      ]
+    },
+    {
+      "properties": {
+        "code": {
+          "const": "DPONE_DBT_PROMOTION_SOURCE_DRIFT"
+        },
+        "passed": {
+          "const": false
+        },
+        "status": {
+          "const": "failed"
+        }
+      },
+      "required": [
+        "status",
+        "passed",
+        "code"
+      ]
+    }
+  ],
+  "properties": {
+    "code": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "projects": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "expected_project_bundle_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "observed_project_bundle_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "project_path": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_path",
+          "expected_project_bundle_sha256",
+          "observed_project_bundle_sha256",
+          "passed",
+          "code"
+        ],
+        "type": "object"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.dbt-workspace-promotion-verification.v1"
+    },
+    "source_snapshot_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "status",
+    "passed",
+    "code",
+    "release_id",
+    "source_snapshot_sha256",
+    "projects"
+  ],
+  "type": "object"
+}

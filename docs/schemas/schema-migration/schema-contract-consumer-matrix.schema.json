@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-consumer-matrix.schema.json",
+  "title": "dpone schema contract consumer compatibility matrix",
+  "type": "object",
+  "required": ["schema_version", "status", "contract_id", "consumers", "summary", "blockers", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_consumer_matrix.v1"},
+    "consumer_matrix_id": {"type": "string", "pattern": "^sha256:"},
+    "status": {"enum": ["compatible", "warning", "blocked"]},
+    "contract_id": {"type": "string"},
+    "base_version": {"type": ["string", "null"]},
+    "head_version": {"type": ["string", "null"]},
+    "head_contract_version_id": {"type": ["string", "null"]},
+    "compatibility_plan_id": {"type": ["string", "null"]},
+    "required_bump": {"type": ["string", "null"]},
+    "consumers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "blockers"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {"type": "string"},
+          "status": {"enum": ["compatible", "blocked"]},
+          "blockers": {"type": "array", "items": {"type": "string"}},
+          "confidence": {"enum": ["explicit", "parsed", "inferred", "table_only"]},
+          "lineage_sources": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "reviewer_actions": {"type": "array", "items": {"type": "string"}}
+  }
+}

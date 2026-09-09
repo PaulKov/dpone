@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="360" viewBox="0 0 920 360" role="img">
+<rect width="920" height="360" fill="#ffffff"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">LOC/SLOC without tests</text>
+<line x1="48" y1="295" x2="884" y2="295" stroke="#cbd5e1"/>
+<rect x="70" y="246" width="40" height="49" fill="#0f766e"/>
+<rect x="114" y="254" width="40" height="41" fill="#f59e0b"/>
+<text x="60" y="322" font-size="11" fill="#334155">dpone</text>
+<text x="70" y="238" font-size="10" fill="#334155">233810</text>
+<rect x="236" y="234" width="40" height="61" fill="#0f766e"/>
+<rect x="280" y="249" width="40" height="46" fill="#f59e0b"/>
+<text x="226" y="322" font-size="11" fill="#334155">Airbyte</text>
+<text x="236" y="226" font-size="10" fill="#334155">295493</text>
+<rect x="402" y="266" width="40" height="29" fill="#0f766e"/>
+<rect x="446" y="273" width="40" height="22" fill="#f59e0b"/>
+<text x="392" y="322" font-size="11" fill="#334155">dlt</text>
+<text x="402" y="258" font-size="10" fill="#334155">140090</text>
+<rect x="568" y="85" width="40" height="210" fill="#0f766e"/>
+<rect x="612" y="152" width="40" height="143" fill="#f59e0b"/>
+<text x="558" y="322" font-size="11" fill="#334155">Pentaho Kettle</text>
+<text x="568" y="77" font-size="10" fill="#334155">1001584</text>
+<rect x="734" y="106" width="40" height="189" fill="#0f766e"/>
+<rect x="778" y="161" width="40" height="134" fill="#f59e0b"/>
+<text x="724" y="322" font-size="11" fill="#334155">Apache Hop</text>
+<text x="734" y="98" font-size="10" fill="#334155">902641</text>
+<rect x="900" y="274" width="40" height="21" fill="#0f766e"/>
+<rect x="944" y="279" width="40" height="16" fill="#f59e0b"/>
+<text x="890" y="322" font-size="11" fill="#334155">Sling</text>
+<text x="900" y="266" font-size="10" fill="#334155">102799</text>
+<text x="710" y="54" font-size="12" fill="#0f766e">green = LOC</text>
+<text x="810" y="54" font-size="12" fill="#b45309">amber = SLOC</text>
+</svg>

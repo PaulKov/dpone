@@ -1,0 +1,20 @@
+name: dpone_runtime_fixture
+version: 1.0.0
+config-version: 2
+profile: dpone_runtime_fixture
+model-paths: ["models"]
+
+flags:
+  dbt_sqlserver_enable_safe_type_expansion: false
+  dbt_sqlserver_use_native_string_types: true
+  dbt_sqlserver_use_dbt_transactions: true
+  dbt_sqlserver_use_default_schema_concat: true
+
+models:
+  dpone_runtime_fixture:
+    +database: DWH_Stage
+    +schema: dpone_fixture
+    +as_columnstore: false
+    +indexes: []
+    +drop_unmanaged_indexes: false
+    +prefer_single_alter_column: false

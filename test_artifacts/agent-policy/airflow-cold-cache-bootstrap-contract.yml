@@ -1,0 +1,97 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-COLD-CACHE-BOOTSTRAP"
+title: "Recover canonical Airflow packs after disposable cache loss"
+goal: >-
+  Allow a clean Airflow cache to activate the latest protected desired
+  deployment while retaining fail-closed recovery for ambiguous surviving
+  local state.
+specification: >-
+  User-approved Canonical Airflow Pack Recovery And Deployment plan;
+  docs/feature-design-airflow-s3-desired-state-pull-v1.md
+base_commit: "6cc4c0118bb9fa596957fde3c6d6c2f8199a2369"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Empty current and checkpoint activate an authoritative successor desired state."
+  - "Registry/source validation, immutable materialization, remote revision recheck, and local CAS remain mandatory."
+  - "A surviving current without a matching checkpoint or valid recovery record fails before remote fetch."
+  - "Checkpoint failure after activation recovers without a second activation."
+  - "Documentation explains cold-start, ambiguous-state, and operator recovery behavior."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "Airflow desired-state reconciliation behavior"
+    - "Airflow desired-state operator documentation"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/services/airflow_desired_state_reconcile.py"
+  - "tests/test_airflow_desired_state_cold_start.py"
+  - "docs/airflow-desired-state.md"
+  - "test_artifacts/agent-policy/airflow-cold-cache-bootstrap-contract.yml"
+
+read_only_paths:
+  - "docs/architecture.md"
+  - "docs/import-rules.md"
+  - "docs/engineering-standards.md"
+  - "docs/release.md"
+  - "docs/agent-release-protocol.md"
+
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - ".cursor/**"
+  - ".github/workflows/**"
+  - "test_artifacts/release/v0.73.21/**"
+  - "test_artifacts/release/v0.73.23/**"
+
+shared_file_owner: "Codex"
+
+dependencies:
+  - "dpone package suite 0.73.31"
+  - "existing immutable Airflow desired-state publication and activation contracts"
+  - "The integrator alone owns release metadata, package versions, pins, and shared documentation."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_desired_state_cold_start.py tests/test_airflow_desired_state_reconcile.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "Restart dev Airflow DAG processor with an empty cache and reconcile the exact protected desired deployment."
+    - "Verify desired/current identity, loader ACK, eight expected DAG IDs, and runtime smoke through Airflow REST API."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - validation_report
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,77 @@
+schema_version: 1
+task_id: "AIRFLOW-SS-36"
+title: "Canonical derived Airflow workload-pack identity"
+goal: >
+  Implement the one pure workload-pack identity contract used by producer,
+  materializer, provider and runtime, with whole-pack default binding and strict
+  canonical JSON validation.
+specification: "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "Codex parent"
+
+acceptance_criteria:
+  - "identity_payload excludes only pack_fingerprint and the approved advisory top-level fields."
+  - "compute_pack_fingerprint preserves array order and binds all unknown/new fields by default."
+  - "verify_pack_fingerprint requires dpone.airflow-pack-identity.v1 and a canonical lowercase SHA-256 claim."
+  - "Duplicate JSON keys, NaN/Infinity and non-JSON values fail deterministically."
+  - "Object key order and source JSON whitespace do not change identity."
+  - "Mutation tests cover steps, airflow execution, runtime selection, mapping, xcom, outcome gate, provider execution and legacy execution surfaces."
+
+public_contract_impact:
+  level: deprecation
+  surfaces:
+    - workload-pack identity
+  migration_required: true
+
+owned_paths:
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_identity.py
+  - tests/test_airflow_pack_identity.py
+read_only_paths:
+  - docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md
+  - docs/adr/0011-canonical-fingerprints.md
+  - src/dpone/gitops/airflow_compact_pack.py
+  - src/dpone/readiness/airflow_deployment_artifacts_io.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_provenance.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_tasks.py
+  - src/dpone/runtime/runtime_init_fetch_receipts.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - .codex/config.toml
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "ADR 0011 and approved strict-v2 hardening amendment"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_pack_identity.py -q"
+    - "uv run ruff check packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_identity.py tests/test_airflow_pack_identity.py"
+    - "uv run mypy --config-file mypy.ini packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_identity.py"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

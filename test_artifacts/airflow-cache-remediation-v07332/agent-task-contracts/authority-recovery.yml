@@ -1,0 +1,72 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-CACHE-07332-A"
+title: "Legacy cache authority and byte-verified recovery"
+goal: "Unify legacy cache authority reads and reject corrupted or split-brain generations before activation."
+specification: "docs/feature-design-airflow-legacy-pack-cache-hardening-v07332.md"
+base_commit: "b58295232540ddc869a6af1310770e2f9ba9c722"
+integrator: "Codex parent integrator"
+
+acceptance_criteria:
+  - "Recovery rehashes the actual index and full generation inventory before pointer mutation."
+  - "Loader and status reject disagreement among receipt, current text pointer, and compatibility symlink."
+  - "Existing valid unmanaged cache can be adopted without losing last-known-good when remote storage is unavailable."
+  - "Changed and new Python modules remain at or below 400 SLOC."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - artifacts-evidence
+    - Airflow-provider
+    - state-checkpoint
+  migration_required: true
+
+owned_paths:
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_generation_store.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_authority.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_status.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_spec_cache_paths.py
+  - tests/test_airflow_cache_authority_remediation.py
+read_only_paths:
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_sync.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_generation_retention.py
+  - docs/feature-design-airflow-legacy-pack-cache-hardening-v07332.md
+  - docs/adr/0040-airflow-legacy-pack-cache-authority.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_sync.py
+
+shared_file_owner: "Codex parent integrator"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_cache_authority_remediation.py -q"
+  broad:
+    - "uv run ruff check <owned Python paths>"
+    - "uv run ruff format --check <owned Python paths>"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

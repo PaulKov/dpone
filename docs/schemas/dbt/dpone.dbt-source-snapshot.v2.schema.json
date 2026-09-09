@@ -1,0 +1,119 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-source-snapshot.v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "projects": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "manifest_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "project_bundle_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "project_name": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,255}$",
+            "type": "string"
+          },
+          "project_path": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+            "type": "string"
+          },
+          "toolchain_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "workflows": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "dag_id": {
+                  "maxLength": 250,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "runtime_payload_ids": {
+                  "items": false,
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "prefixItems": [
+                    {
+                      "pattern": "^dbt_project_sha256_[0-9a-f]{64}$",
+                      "type": "string"
+                    },
+                    {
+                      "pattern": "^dbt_manifest_sha256_[0-9a-f]{64}$",
+                      "type": "string"
+                    },
+                    {
+                      "pattern": "^dbt_selection_sha256_[0-9a-f]{64}$",
+                      "type": "string"
+                    }
+                  ],
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "selection_lock_sha256": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "workflow_id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "workload_id": {
+                  "pattern": "^dbt__[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workflow_id",
+                "dag_id",
+                "workload_id",
+                "runtime_payload_ids",
+                "selection_lock_sha256"
+              ],
+              "type": "object"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "project_path",
+          "project_name",
+          "project_bundle_sha256",
+          "manifest_sha256",
+          "toolchain_sha256",
+          "workflows"
+        ],
+        "type": "object"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema": {
+      "const": "dpone.dbt-source-snapshot.v2"
+    },
+    "snapshot_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "projects",
+    "snapshot_sha256"
+  ],
+  "type": "object"
+}

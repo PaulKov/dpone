@@ -1,0 +1,15 @@
+{
+  "artifact_schema": "dpone.test-artifact.v1",
+  "artifact_type": "certification.type_matrix",
+  "artifact_label": "2026-06-02T000200Z-type-matrix-pg-mssql-ch-certification",
+  "created_by": "Codex GPT-5",
+  "executed_by_os_user": "macbook",
+  "started_at": "2026-06-02T06:59:10Z",
+  "rows": 25,
+  "definition": "lossless canonical serialization for cross-engine exotic/system-specific types",
+  "status": "failed",
+  "result": "failed",
+  "error_type": "SyntaxError",
+  "error": "syntax error at or near \")\"\nLINE 1: ... || E'\\t' || COALESCE((xmlserialize(CONTENT pg_xml)::text, '...\n                                                             ^",
+  "finished_at": "2026-06-02T06:59:10Z"
+}

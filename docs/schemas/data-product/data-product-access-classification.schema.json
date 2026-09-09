@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-access-classification.schema.json",
+  "title": "Data Product Access Classification",
+  "type": "object",
+  "required": ["schema_version", "status", "access_classification_id", "columns", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_access_classification.v1"},
+    "status": {"enum": ["classified", "disabled", "warning", "blocked"]},
+    "access_classification_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "product": {"type": "object"},
+    "product_id": {"type": ["string", "null"]},
+    "default_class": {"type": "string"},
+    "columns": {"type": "array", "items": {"type": "object"}},
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

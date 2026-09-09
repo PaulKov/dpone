@@ -1,0 +1,84 @@
+schema_version: 1
+task_id: "DPONE-512-PR4A"
+title: "CI shadow PR4A classifier and diagnostic producer"
+goal: "Create the approved exact-head, read-only PR4A producer without changing legacy merge authority."
+specification: "docs/feature-design-ci-shadow-pr4a-classifier-evaluator.md"
+base_commit: "0fd111aa6c7e2494f3bb3ffa7d6da2f31f923c17"
+integrator: "dpone-integrator"
+
+acceptance_criteria:
+  - "Specification status is APPROVED before any production-code write."
+  - "Exactly one diagnostic context is PR Gate shadow; PR Gate and branch-protection changes are prohibited."
+  - "Product execution proves clean exact H checkout; collector is read-only and checkout/cache/download-free."
+  - "Schemas are closed; unknown or ambiguous input cannot select less work."
+  - "Claims are create-only, attempt-specific and untrusted until PR4B."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["diagnostic GitHub check", "CLI/schema", "attempt-bound claims artifact"]
+  migration_required: false
+
+owned_paths:
+  - "docs/feature-design-ci-shadow-pr4a-classifier-evaluator.md"
+  - "test_artifacts/agent-policy/ci-shadow-pr4a-task-contract.yml"
+integrator_owned_paths:
+  - ".github/workflows/pr-gate-shadow.yml"
+  - "docs/schemas/cicd"
+  - "docs/cicd"
+  - "mkdocs.yml"
+  - "src/dpone/contracts"
+  - "src/dpone/services/ci"
+  - "src/dpone/ports"
+  - "src/dpone/adapters"
+  - "tools/ci"
+  - "tests"
+read_only_paths:
+  - "docs/feature-design-ci-pr-gate-exact-sha-evidence.md"
+  - "docs/adr/0046-component-aware-pr-gate-authority.md"
+  - "docs/adr/0048-exact-sha-readiness-evidence.md"
+  - ".github/workflows/ci.yml"
+  - ".agents/policy/github-branch-protection.yml"
+forbidden_paths:
+  - ".github/workflows"
+  - ".github/workflows/pr-gate-shadow.yml"
+  - "docs/schemas/cicd"
+  - "docs/cicd"
+  - "src/dpone/contracts"
+  - "src/dpone/services/ci"
+  - "src/dpone/ports"
+  - "src/dpone/adapters"
+  - "tools/ci"
+  - "tests"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/ci.yml"
+  - ".agents/policy/github-branch-protection.yml"
+
+shared_file_owner: "dpone-integrator"
+dependencies:
+  - "Specification status APPROVED"
+  - "Fresh real base_commit at implementation handoff"
+  - "PR4B and PR5A stay blocked on merged PR4A"
+required_checks:
+  focused:
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/ci-shadow-pr4a-task-contract.yml"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live:
+    - "Exact-head hosted canaries; UNVERIFIED without authorized evidence"
+required_outputs: ["implementation", "tests", "documentation_impact", "completion_report"]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Specification is not APPROVED."
+  - "Base commit is stale at implementation handoff."
+  - "Change alters legacy authority, secrets, write/OIDC scope, or branch protection."
+  - "Required shared path lacks integrator ownership."
+  - "Live certification lacks approved environment or exact-head evidence."

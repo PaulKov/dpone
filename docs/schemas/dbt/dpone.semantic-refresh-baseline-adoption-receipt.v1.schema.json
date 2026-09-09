@@ -1,0 +1,233 @@
+{
+  "$comment": "Both baseline paths bind protected engine authorities and complete source/MSSQL/ClickHouse state. Only ClickHouse-internal multiset conformance is PROVEN; historical cross-engine payload value equivalence remains NOT_CLAIMED and is never inferred from counts.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-baseline-adoption-receipt.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adopted_at": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "baseline_adoption_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "baseline_kind": {
+      "enum": [
+        "certified_initial_load",
+        "adopted_complete_relation_conformant"
+      ],
+      "type": "string"
+    },
+    "certified_codec_mapping_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "clickhouse_assurance_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "clickhouse_cluster_authority_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "clickhouse_coverage_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "clickhouse_generation": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "clickhouse_key_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "clickhouse_physical_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "clickhouse_relation_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "clickhouse_schema_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "clickhouse_target_authority_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "clickhouse_target_uuid": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "coverage_end": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "coverage_start": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "ddl_assurance_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "historical_clickhouse_internal_multiset_conformance": {
+      "const": "PROVEN"
+    },
+    "historical_clickhouse_internal_multiset_evidence_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "historical_cross_engine_payload_value_equivalence": {
+      "const": "NOT_CLAIMED"
+    },
+    "model_unique_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "mssql_assurance_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "mssql_connection_authority_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "mssql_coverage_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "mssql_generation": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "mssql_key_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "mssql_physical_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "mssql_relation_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "mssql_schema_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "mssql_target_authority_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-baseline-adoption-receipt.v1"
+    },
+    "source_assurance_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "source_coverage_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "source_generation": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "source_key_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "source_physical_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "source_relation_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "source_schema_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "source_snapshot_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "status": {
+      "const": "COMPLETE"
+    },
+    "utc_assurance_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "writer_assurance_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "adopted_at",
+    "baseline_adoption_receipt_sha256",
+    "baseline_kind",
+    "certified_codec_mapping_sha256",
+    "clickhouse_assurance_sha256",
+    "clickhouse_cluster_authority_id",
+    "clickhouse_coverage_sha256",
+    "clickhouse_generation",
+    "clickhouse_key_sha256",
+    "clickhouse_physical_sha256",
+    "clickhouse_relation_id",
+    "clickhouse_schema_sha256",
+    "clickhouse_target_authority_id",
+    "clickhouse_target_uuid",
+    "coverage_end",
+    "coverage_start",
+    "ddl_assurance_sha256",
+    "deployment_id",
+    "historical_clickhouse_internal_multiset_conformance",
+    "historical_clickhouse_internal_multiset_evidence_sha256",
+    "historical_cross_engine_payload_value_equivalence",
+    "model_unique_id",
+    "mssql_assurance_sha256",
+    "mssql_connection_authority_id",
+    "mssql_coverage_sha256",
+    "mssql_generation",
+    "mssql_key_sha256",
+    "mssql_physical_sha256",
+    "mssql_relation_id",
+    "mssql_schema_sha256",
+    "mssql_target_authority_id",
+    "release_id",
+    "schema",
+    "source_assurance_sha256",
+    "source_coverage_sha256",
+    "source_generation",
+    "source_key_sha256",
+    "source_physical_sha256",
+    "source_relation_id",
+    "source_schema_sha256",
+    "source_snapshot_sha256",
+    "status",
+    "utc_assurance_sha256",
+    "writer_assurance_sha256"
+  ],
+  "type": "object"
+}

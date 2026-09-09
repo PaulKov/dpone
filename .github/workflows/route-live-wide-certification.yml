@@ -1,0 +1,653 @@
+name: Route live wide certification
+
+# Phase D: gated live CI for postgres/mysql/mssql → sink wide vendor-live suites.
+# Docker legs: schedule + workflow_dispatch. BigQuery: dispatch-only with secrets.
+# SKIP ≠ PASS: preflight fail-closed + junit executed gate after pytest.
+# Matrix filtering uses a plan job (matrix context is not allowed in job-level if).
+
+on:
+  schedule:
+    # Nightly Docker matrix only (BQ never scheduled).
+    - cron: "15 3 * * *"
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Source system filter for wide-cert legs.
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - postgres
+          - mysql
+          - mssql
+      sink:
+        description: Sink system filter. bigquery requires include_bigquery=true.
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - postgres
+          - mssql
+          - clickhouse
+          - kafka
+          - bigquery
+      include_bigquery:
+        description: Run BigQuery legs (requires BIGQUERY_DWH_* secrets). Never used on schedule.
+        required: false
+        default: false
+        type: boolean
+      release_authoritative:
+        description: Produce manual PostgreSQL→MSSQL authority; never blocks a package tag.
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      source:
+        required: true
+        type: string
+      sink:
+        required: true
+        type: string
+      include_bigquery:
+        required: false
+        default: false
+        type: boolean
+      release_authoritative:
+        required: true
+        type: boolean
+      expected_commit_sha:
+        required: true
+        type: string
+      authoritative_artifact_name:
+        required: true
+        type: string
+    outputs:
+      artifact_id:
+        description: Immutable provider artifact identifier for the consolidated authority.
+        value: ${{ jobs.consolidate-postgres-mssql.outputs.artifact_id }}
+      artifact_digest:
+        description: Provider SHA-256 digest for the consolidated authority archive.
+        value: ${{ jobs.consolidate-postgres-mssql.outputs.artifact_digest }}
+      artifact_name:
+        description: Exact provider artifact name.
+        value: ${{ jobs.consolidate-postgres-mssql.outputs.artifact_name }}
+      manifest_sha256:
+        description: Canonical route certification manifest digest.
+        value: ${{ jobs.consolidate-postgres-mssql.outputs.manifest_sha256 }}
+
+permissions:
+  contents: read
+
+env:
+  DPONE_RUN_INTEGRATION: "1"
+  DPONE_RUN_INTEGRATION_LIVE: "1"
+
+jobs:
+  plan-matrix:
+    name: Plan route live wide matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ROUTE_EVENT_NAME: ${{ github.event_name }}
+      ROUTE_INPUT_SOURCE: ${{ inputs.source || 'all' }}
+      ROUTE_INPUT_SINK: ${{ inputs.sink || 'all' }}
+      ROUTE_INCLUDE_BIGQUERY: ${{ inputs.include_bigquery }}
+    outputs:
+      docker_matrix: ${{ steps.plan.outputs.docker_matrix }}
+      bq_matrix: ${{ steps.plan.outputs.bq_matrix }}
+      run_docker: ${{ steps.plan.outputs.run_docker }}
+      run_bq: ${{ steps.plan.outputs.run_bq }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Plan matrix legs
+        id: plan
+        run: |
+          set -euo pipefail
+          args=(
+            --event-name "$ROUTE_EVENT_NAME"
+            --source "$ROUTE_INPUT_SOURCE"
+            --sink "$ROUTE_INPUT_SINK"
+            --github-output
+          )
+          if [ "$ROUTE_EVENT_NAME" != "schedule" ] && [ "$ROUTE_INCLUDE_BIGQUERY" = "true" ]; then
+            args+=(--include-bigquery)
+          fi
+          python tools/ci/plan_route_live_wide_matrix.py "${args[@]}" | tee -a "$GITHUB_OUTPUT"
+
+  docker-route-live-wide:
+    name: ${{ matrix.source }}→${{ matrix.sink }} wide live
+    needs: [plan-matrix]
+    if: ${{ needs.plan-matrix.outputs.run_docker == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan-matrix.outputs.docker_matrix) }}
+    env:
+      ROUTE_SOURCE: ${{ matrix.source }}
+      ROUTE_SINK: ${{ matrix.sink }}
+      ROUTE_EXPECTED_COMMIT_SHA: ${{ inputs.expected_commit_sha || github.sha }}
+      ARTIFACT_ROOT: test_artifacts/route_live_wide/${{ matrix.source }}-${{ matrix.sink }}
+      DPONE_IT_POSTGIS_HOST: 127.0.0.1
+      DPONE_IT_POSTGIS_DATABASE: dpone_it
+      DPONE_IT_POSTGIS_USER: dpone
+      DPONE_IT_POSTGIS_PASSWORD: dpone
+      DPONE_IT_PG_AUTHORITY_HOST: 127.0.0.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Bind route-live temporary roots
+        run: |
+          set -euo pipefail
+          certification_root="${RUNNER_TEMP}/dpone-route-live-certification"
+          printf 'MATRIX_UPLOAD_ROOT=%s\n' "${RUNNER_TEMP}/dpone-route-live-upload" >> "$GITHUB_ENV"
+          printf 'ROUTE_CERTIFICATION_ROOT=%s\n' "$certification_root" >> "$GITHUB_ENV"
+          printf 'DPONE_ROUTE_LIVE_EVIDENCE_ROOT=%s\n' "$certification_root/evidence" >> "$GITHUB_ENV"
+          printf 'DPONE_ROUTE_LIVE_JUNIT_ROOT=%s\n' "$certification_root/junit" >> "$GITHUB_ENV"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Install SQL Server ODBC and bcp tooling
+        if: ${{ matrix.source == 'mssql' || matrix.sink == 'mssql' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg unixodbc-dev
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+            | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+          . /etc/os-release
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/${VERSION_ID}/prod ${VERSION_CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 mssql-tools18
+          echo "/opt/mssql-tools18/bin" >> "$GITHUB_PATH"
+
+      - name: Start disposable local services
+        env:
+          # Existing Compose interpolation appends the container port, so this
+          # renders 127.0.0.1::PORT and delegates allocation to Docker.
+          DPONE_IT_PG_PORT_FORWARD: "127.0.0.1:"
+          DPONE_IT_POSTGIS_PORT_FORWARD: "127.0.0.1:"
+          DPONE_IT_PG_AUTHORITY_PRIMARY_PORT_FORWARD: "127.0.0.1:"
+          DPONE_IT_PG_AUTHORITY_STANDBY_PORT_FORWARD: "127.0.0.1:"
+          DPONE_IT_MSSQL_PORT_FORWARD: "127.0.0.1:"
+        run: |
+          set -euo pipefail
+          services=()
+          case "$ROUTE_SOURCE" in
+            mysql) services+=(mysql) ;;
+            postgres)
+              services+=(postgres)
+              if [ "$ROUTE_SINK" = "mssql" ]; then
+                services+=(postgis postgres-authority-primary postgres-authority-standby)
+              fi
+              ;;
+            mssql) services+=(mssql) ;;
+            *) echo "unsupported source: $ROUTE_SOURCE"; exit 1 ;;
+          esac
+          case "$ROUTE_SINK" in
+            postgres) services+=(postgres) ;;
+            mssql) services+=(mssql) ;;
+            clickhouse) services+=(clickhouse) ;;
+            kafka) services+=(kafka schema-registry) ;;
+            *) echo "unsupported sink: $ROUTE_SINK"; exit 1 ;;
+          esac
+          uniq_services=()
+          for svc in "${services[@]}"; do
+            skip=0
+            for seen in "${uniq_services[@]:-}"; do
+              if [ "$seen" = "$svc" ]; then skip=1; break; fi
+            done
+            if [ "$skip" -eq 0 ]; then uniq_services+=("$svc"); fi
+          done
+          echo "Starting services: ${uniq_services[*]}"
+          docker compose -f docker/docker-compose.integration.yml up -d --wait "${uniq_services[@]}"
+          dynamic_services=()
+          for svc in "${uniq_services[@]}"; do
+            case "$svc" in
+              postgres|postgis|postgres-authority-primary|postgres-authority-standby|mssql)
+                dynamic_services+=("$svc")
+                ;;
+            esac
+          done
+          if [ "${#dynamic_services[@]}" -gt 0 ]; then
+            uv run python tools/ci/export_route_live_compose_ports.py \
+              --compose-file docker/docker-compose.integration.yml \
+              --github-env "$GITHUB_ENV" \
+              --services "${dynamic_services[@]}"
+          fi
+
+      - name: Prepare MSSQL database
+        if: ${{ matrix.source == 'mssql' || matrix.sink == 'mssql' }}
+        env:
+          DPONE_IT_MSSQL_HOST: 127.0.0.1
+          DPONE_IT_MSSQL_USER: sa
+          DPONE_IT_MSSQL_PASSWORD: Dp0ne.Strong.Pw.2026!
+          DPONE_IT_MSSQL_DATABASE: dpone_it
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if /opt/mssql-tools18/bin/sqlcmd \
+              -S "${DPONE_IT_MSSQL_HOST},${DPONE_IT_MSSQL_PORT}" \
+              -U "$DPONE_IT_MSSQL_USER" \
+              -P "$DPONE_IT_MSSQL_PASSWORD" \
+              -C \
+              -Q "SELECT 1" >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "MSSQL did not become ready for route live wide certification."
+              exit 1
+            fi
+            sleep 2
+          done
+          cat > /tmp/dpone_prepare_route_live_mssql.sql <<'SQL'
+          IF DB_ID(N'$(db)') IS NULL
+          BEGIN
+              DECLARE @sql nvarchar(max) = N'CREATE DATABASE ' + QUOTENAME(N'$(db)');
+              EXEC(@sql);
+          END
+          SQL
+          /opt/mssql-tools18/bin/sqlcmd \
+            -S "${DPONE_IT_MSSQL_HOST},${DPONE_IT_MSSQL_PORT}" \
+            -U "$DPONE_IT_MSSQL_USER" \
+            -P "$DPONE_IT_MSSQL_PASSWORD" \
+            -C \
+            -v db="$DPONE_IT_MSSQL_DATABASE" \
+            -i /tmp/dpone_prepare_route_live_mssql.sql
+
+      - name: Preflight integration env
+        run: |
+          set -euo pipefail
+          if [ "${DPONE_RUN_INTEGRATION}" != "1" ]; then
+            echo "DPONE_RUN_INTEGRATION must be 1 for intentional live CI (SKIP≠PASS)."
+            exit 1
+          fi
+          docker compose -f docker/docker-compose.integration.yml ps
+          mkdir -p "$ARTIFACT_ROOT"
+          rm -rf "$MATRIX_UPLOAD_ROOT"
+          mkdir -p "$MATRIX_UPLOAD_ROOT"
+          if [ "$ROUTE_SOURCE" = "postgres" ] && [ "$ROUTE_SINK" = "mssql" ]; then
+            rm -rf "$ROUTE_CERTIFICATION_ROOT"
+            mkdir -p "$DPONE_ROUTE_LIVE_EVIDENCE_ROOT" "$DPONE_ROUTE_LIVE_JUNIT_ROOT"
+          fi
+
+      - name: Capture reviewed PostgreSQL to MSSQL inventory
+        if: matrix.source == 'postgres' && matrix.sink == 'mssql' && (github.event_name == 'workflow_call' || inputs.release_authoritative)
+        env:
+          DPONE_IT_MSSQL_HOST: 127.0.0.1
+          DPONE_IT_MSSQL_USER: sa
+          DPONE_IT_MSSQL_PASSWORD: Dp0ne.Strong.Pw.2026!
+        run: |
+          set -euo pipefail
+          compose=(docker compose -f docker/docker-compose.integration.yml)
+
+          image_digest() {
+            local service="$1"
+            local image_id
+            local repo_digest
+            image_id="$("${compose[@]}" images -q "$service")"
+            if [ -z "$image_id" ]; then
+              echo "::error::No image ID resolved for $service." >&2
+              return 1
+            fi
+            repo_digest="$(docker image inspect "$image_id" --format '{{json .RepoDigests}}' \
+              | jq -r '[.[] | select(contains("@sha256:"))][0] // empty')"
+            repo_digest="${repo_digest##*@}"
+            if ! printf '%s\n' "$repo_digest" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+              echo "::error::Service $service is not resolved to one immutable repository digest." >&2
+              return 1
+            fi
+            printf '%s' "$repo_digest"
+          }
+
+          export ROUTE_POSTGRES_VERSION="$("${compose[@]}" exec -T postgres \
+            psql -U dpone -d dpone_it -Atc 'SHOW server_version')"
+          export ROUTE_POSTGRES_DIGEST="$(image_digest postgres)"
+          authority_primary_digest="$(image_digest postgres-authority-primary)"
+          authority_standby_digest="$(image_digest postgres-authority-standby)"
+          if [ "$authority_primary_digest" != "$ROUTE_POSTGRES_DIGEST" ] || \
+             [ "$authority_standby_digest" != "$ROUTE_POSTGRES_DIGEST" ]; then
+            echo "::error::PostgreSQL authority topology image drifted from the reviewed source digest."
+            exit 1
+          fi
+          "${compose[@]}" exec -T postgis \
+            psql -U dpone -d dpone_it -Atc 'CREATE EXTENSION IF NOT EXISTS postgis' >/dev/null
+          export ROUTE_POSTGIS_VERSION="$("${compose[@]}" exec -T postgis \
+            psql -U dpone -d dpone_it -Atc 'SELECT postgis_lib_version()')"
+          export ROUTE_POSTGIS_DIGEST="$(image_digest postgis)"
+          export ROUTE_MSSQL_VERSION="$(/opt/mssql-tools18/bin/sqlcmd \
+            -S "${DPONE_IT_MSSQL_HOST},${DPONE_IT_MSSQL_PORT}" \
+            -U "$DPONE_IT_MSSQL_USER" -P "$DPONE_IT_MSSQL_PASSWORD" -C -W -h -1 \
+            -Q "SET NOCOUNT ON; SELECT CAST(SERVERPROPERTY('ProductVersion') AS nvarchar(128));" \
+            | tr -d '\r' | sed '/^[[:space:]]*$/d')"
+          export ROUTE_MSSQL_BUILD="$(/opt/mssql-tools18/bin/sqlcmd \
+            -S "${DPONE_IT_MSSQL_HOST},${DPONE_IT_MSSQL_PORT}" \
+            -U "$DPONE_IT_MSSQL_USER" -P "$DPONE_IT_MSSQL_PASSWORD" -C -W -h -1 \
+            -Q "SET NOCOUNT ON; SELECT CONCAT(SERVERPROPERTY('ProductLevel'), N'|', SERVERPROPERTY('Edition'));" \
+            | tr -d '\r' | sed '/^[[:space:]]*$/d')"
+          export ROUTE_MSSQL_DIGEST="$(image_digest mssql)"
+          export ROUTE_ODBC_VERSION="$(dpkg-query -W -f='${Version}' msodbcsql18)"
+          export ROUTE_BCP_VERSION="$(/opt/mssql-tools18/bin/bcp -v 2>&1 | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+          export ROUTE_PYTHON_VERSION="$(uv run python -c 'import platform; print(platform.python_version())')"
+          export ROUTE_DPONE_VERSION="$(uv run python -c 'from importlib.metadata import version; print(version("dpone"))')"
+          vendor_metadata="$ROUTE_CERTIFICATION_ROOT/vendor_metadata.json"
+          inventory="$ROUTE_CERTIFICATION_ROOT/inventory.json"
+          uv run python - "$vendor_metadata" <<'PY'
+          import json
+          import os
+          import sys
+
+          payload = {
+              "postgresql": {
+                  "version": os.environ["ROUTE_POSTGRES_VERSION"],
+                  "image_digest": os.environ["ROUTE_POSTGRES_DIGEST"],
+              },
+              "postgis": {
+                  "version": os.environ["ROUTE_POSTGIS_VERSION"],
+                  "image_digest": os.environ["ROUTE_POSTGIS_DIGEST"],
+              },
+              "mssql": {
+                  "version": os.environ["ROUTE_MSSQL_VERSION"],
+                  "build": os.environ["ROUTE_MSSQL_BUILD"],
+                  "image_digest": os.environ["ROUTE_MSSQL_DIGEST"],
+              },
+              "transport": {
+                  "odbc_driver": os.environ["ROUTE_ODBC_VERSION"],
+                  "bcp_version": os.environ["ROUTE_BCP_VERSION"],
+              },
+              "runtime": {
+                  "python_version": os.environ["ROUTE_PYTHON_VERSION"],
+                  "dpone_version": os.environ["ROUTE_DPONE_VERSION"],
+              },
+          }
+          with open(sys.argv[1], "x", encoding="utf-8") as handle:
+              json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+              handle.write("\n")
+          PY
+          uv run python -m tools.route_live_certification.inventory_writer \
+            --vendor-metadata "$vendor_metadata" \
+            --output "$inventory"
+          printf 'DPONE_ROUTE_LIVE_VENDOR_METADATA=%s\n' "$vendor_metadata" >> "$GITHUB_ENV"
+          printf 'DPONE_ROUTE_LIVE_INVENTORY=%s\n' "$inventory" >> "$GITHUB_ENV"
+
+      - name: Run route wide vendor-live suite
+        run: |
+          set -euo pipefail
+          export DPONE_ROUTE_LIVE_PROGRESS_JSONL="$ARTIFACT_ROOT/pytest-progress.jsonl"
+          module="tests/integration/${ROUTE_SOURCE}/test_${ROUTE_SOURCE}_to_${ROUTE_SINK}_vendor_live_integration.py"
+          modules=("$module")
+          if [ "$ROUTE_SOURCE" = "postgres" ] && [ "$ROUTE_SINK" = "mssql" ]; then
+            modules+=("tests/integration/postgres/test_postgres_mssql_artifact_integrity_faults_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_backfill_orchestration_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_explicit_types_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_lineage_parity_live.py")
+            modules+=("tests/integration/postgres/test_postgres_xmin_mssql_snapshot_reconciliation_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_physical_design_matrix_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_schema_evolution_matrix_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_source_identity_authority_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_strategy_capability_matrix_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_text_key_lifecycle_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_production_hydration_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_transaction_governance_matrix_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_target_database_authority_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_target_behavior_live.py")
+            modules+=("tests/integration/postgres/test_postgres_mssql_wide_performance_soak_live.py")
+            modules+=("tests/integration/postgres/test_postgres_xmin_mssql_identity_authority_live.py")
+          fi
+          pytest_status=0
+          .venv/bin/python tools/ci/run_bounded_process_tree.py \
+            --timeout-seconds 2700 \
+            --term-grace-seconds 30 \
+            --kill-grace-seconds 10 \
+            -- .venv/bin/python -m pytest "${modules[@]}" -vv -rs --maxfail=1 --durations=25 \
+            -o faulthandler_timeout=60 \
+            --junitxml="$ARTIFACT_ROOT/junit.xml" || pytest_status=$?
+          printf '{"schema":"dpone.route_live.pytest_exit.v1","diagnostic_only":true,"release_ready":false,"exit_code":%s,"commit_sha":"%s","workflow_run_id":"%s","workflow_run_attempt":"%s"}\n' \
+            "$pytest_status" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" \
+            > "$ARTIFACT_ROOT/pytest-exit.json"
+          exit "$pytest_status"
+
+      - name: Assert junit executed (SKIP≠PASS)
+        if: always()
+        run: |
+          set -euo pipefail
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$ARTIFACT_ROOT/junit.xml" \
+            --min-passed 1 \
+            --max-skipped 0 \
+            --evidence-json "$ARTIFACT_ROOT/junit-gate.json" \
+            --profile "${ROUTE_SOURCE}_to_${ROUTE_SINK}_real_local" \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+
+      - name: Consolidate strict PostgreSQL to MSSQL release evidence
+        if: matrix.source == 'postgres' && matrix.sink == 'mssql' && (github.event_name == 'workflow_call' || inputs.release_authoritative)
+        run: |
+          set -euo pipefail
+          expected_sha="$ROUTE_EXPECTED_COMMIT_SHA"
+          if [ "$expected_sha" != "${GITHUB_SHA}" ]; then
+            echo "::error::Route certification must execute the exact requested commit."
+            exit 1
+          fi
+          uv run python tools/validate_route_live_certification.py \
+            --inventory "$DPONE_ROUTE_LIVE_INVENTORY" \
+            --evidence-root "$DPONE_ROUTE_LIVE_EVIDENCE_ROOT" \
+            --junit-root "$DPONE_ROUTE_LIVE_JUNIT_ROOT" \
+            --commit-sha "$GITHUB_SHA" \
+            --workflow-run-id "$GITHUB_RUN_ID" \
+            --workflow-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --output "$ROUTE_CERTIFICATION_ROOT/postgres_mssql_route_certification.json"
+
+      - name: Stop disposable local services
+        if: always()
+        env:
+          DPONE_IT_PG_PORT_FORWARD: "127.0.0.1:"
+          DPONE_IT_POSTGIS_PORT_FORWARD: "127.0.0.1:"
+          DPONE_IT_PG_AUTHORITY_PRIMARY_PORT_FORWARD: "127.0.0.1:"
+          DPONE_IT_PG_AUTHORITY_STANDBY_PORT_FORWARD: "127.0.0.1:"
+          DPONE_IT_MSSQL_PORT_FORWARD: "127.0.0.1:"
+        run: >-
+          timeout --signal=TERM --kill-after=15s 180s
+          docker compose -f docker/docker-compose.integration.yml
+          down -v --timeout 30
+
+      - name: Assemble single-root matrix artifact
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p "$MATRIX_UPLOAD_ROOT/diagnostics"
+          if [ -d "$ARTIFACT_ROOT" ]; then
+            cp -R "$ARTIFACT_ROOT"/. "$MATRIX_UPLOAD_ROOT/diagnostics/"
+          fi
+          if [ -d "$ROUTE_CERTIFICATION_ROOT" ]; then
+            mkdir -p "$MATRIX_UPLOAD_ROOT/dpone-route-live-certification"
+            cp -R "$ROUTE_CERTIFICATION_ROOT"/. \
+              "$MATRIX_UPLOAD_ROOT/dpone-route-live-certification/"
+          fi
+
+      - name: Upload route live wide artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: route-live-wide-${{ matrix.source }}-${{ matrix.sink }}
+          path: ${{ runner.temp }}/dpone-route-live-upload/
+          if-no-files-found: error
+
+  consolidate-postgres-mssql:
+    name: Consolidate provider-bound PostgreSQL→MSSQL authority
+    needs: [plan-matrix, docker-route-live-wide]
+    if: ${{ always() && needs.docker-route-live-wide.result == 'success' && (github.event_name == 'workflow_call' || inputs.release_authoritative) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+      artifact_name: ${{ steps.identity.outputs.name }}
+      manifest_sha256: ${{ steps.verify.outputs.manifest_sha256 }}
+    steps:
+      - name: Checkout exact workflow commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Download exact PostgreSQL→MSSQL matrix artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: route-live-wide-postgres-mssql
+          path: ${{ runner.temp }}/route-live-input
+
+      - name: Revalidate exact case authority
+        id: verify
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/route-live-input/dpone-route-live-certification"
+          output="${RUNNER_TEMP}/route-live-authority/postgres_mssql_route_certification.json"
+          mkdir -p "$(dirname "$output")"
+          uv run python tools/validate_route_live_certification.py \
+            --inventory "$root/inventory.json" \
+            --evidence-root "$root/evidence" \
+            --junit-root "$root/junit" \
+            --commit-sha "$GITHUB_SHA" \
+            --workflow-run-id "$GITHUB_RUN_ID" \
+            --workflow-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --output "$output" \
+            > "${RUNNER_TEMP}/manifest.sha256"
+          cmp "$output" "$root/postgres_mssql_route_certification.json"
+          manifest_sha256="$(tr -d '\n' < "${RUNNER_TEMP}/manifest.sha256")"
+          printf 'manifest_sha256=%s\n' "$manifest_sha256" >> "$GITHUB_OUTPUT"
+          cp -R "$root/evidence" "${RUNNER_TEMP}/route-live-authority/evidence"
+          cp -R "$root/junit" "${RUNNER_TEMP}/route-live-authority/junit"
+          cp "$root/inventory.json" "${RUNNER_TEMP}/route-live-authority/inventory.json"
+
+      - name: Bind artifact name
+        id: identity
+        env:
+          ROUTE_AUTHORITY_ARTIFACT_NAME: ${{ inputs.authoritative_artifact_name || format('postgres-mssql-route-certification-{0}-{1}-{2}', github.sha, github.run_id, github.run_attempt) }}
+        run: |
+          set -euo pipefail
+          name="$ROUTE_AUTHORITY_ARTIFACT_NAME"
+          printf 'name=%s\n' "$name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload immutable PostgreSQL→MSSQL route authority
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.identity.outputs.name }}
+          path: ${{ runner.temp }}/route-live-authority/
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+
+  bigquery-route-live-wide:
+    name: ${{ matrix.source }}→bigquery wide live
+    needs: [plan-matrix]
+    if: ${{ needs.plan-matrix.outputs.run_bq == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan-matrix.outputs.bq_matrix) }}
+    env:
+      ROUTE_SOURCE: ${{ matrix.source }}
+      ARTIFACT_ROOT: test_artifacts/route_live_wide/${{ matrix.source }}-bigquery
+      BIGQUERY_DWH_PROJECT_ID: ${{ secrets.BIGQUERY_DWH_PROJECT_ID }}
+      BIGQUERY_DWH_SERVICE_ACCOUNT_JSON: ${{ secrets.BIGQUERY_DWH_SERVICE_ACCOUNT_JSON }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Start source service
+        run: |
+          set -euo pipefail
+          docker compose -f docker/docker-compose.integration.yml up -d --wait "$ROUTE_SOURCE"
+
+      - name: Preflight BigQuery secrets
+        run: |
+          set -euo pipefail
+          if [ -z "${BIGQUERY_DWH_PROJECT_ID:-}" ]; then
+            echo "SKIP≠PASS: BIGQUERY_DWH_PROJECT_ID secret is required for BigQuery legs."
+            exit 1
+          fi
+          if [ -z "${BIGQUERY_DWH_SERVICE_ACCOUNT_JSON:-}" ]; then
+            echo "SKIP≠PASS: BIGQUERY_DWH_SERVICE_ACCOUNT_JSON secret is required for BigQuery legs."
+            exit 1
+          fi
+          key_dir="${RUNNER_TEMP}/dpone-bq"
+          mkdir -p "$key_dir"
+          printf '%s' "$BIGQUERY_DWH_SERVICE_ACCOUNT_JSON" > "$key_dir/sa.json"
+          echo "BIGQUERY_DWH_SERVICE_ACCOUNT_KEY_FILE=$key_dir/sa.json" >> "$GITHUB_ENV"
+          if [ "$ROUTE_SOURCE" = "postgres" ]; then
+            echo "DPONE_IT_BQ_DATASET=dpone_it_postgres" >> "$GITHUB_ENV"
+          else
+            echo "DPONE_IT_BQ_DATASET=dpone_it_mysql" >> "$GITHUB_ENV"
+          fi
+          mkdir -p "$ARTIFACT_ROOT"
+
+      - name: Run BigQuery wide vendor-live suite
+        run: |
+          set -euo pipefail
+          module="tests/integration/${ROUTE_SOURCE}/test_${ROUTE_SOURCE}_to_bigquery_vendor_live_integration.py"
+          uv run pytest "$module" -q -rs \
+            --junitxml="$ARTIFACT_ROOT/junit.xml"
+
+      - name: Assert junit executed (SKIP≠PASS)
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ ! -f "$ARTIFACT_ROOT/junit.xml" ]; then
+            echo "SKIP≠PASS: junit.xml was not produced for ${ROUTE_SOURCE}→bigquery"
+            exit 1
+          fi
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$ARTIFACT_ROOT/junit.xml" \
+            --min-passed 1
+
+      - name: Stop disposable local services
+        if: always()
+        run: docker compose -f docker/docker-compose.integration.yml down -v
+
+      - name: Upload route live wide BigQuery artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: route-live-wide-${{ matrix.source }}-bigquery
+          path: test_artifacts/route_live_wide/${{ matrix.source }}-bigquery/
+          if-no-files-found: warn

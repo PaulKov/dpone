@@ -1,0 +1,172 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-PR3A-IMPLEMENTATION"
+title: "Implement the approved PR 3A CI-hygiene contract"
+goal: >-
+  Implement the merged APPROVED PR 3A specification exactly: deterministic
+  locked installs, bounded Dependabot and compatibility work, scoped
+  concurrency, least-privilege Pages and Dependency Review, fail-closed
+  recovery, executable governance tests, and self-service documentation.
+specification: "docs/feature-design-ci-shadow-pr3a-ci-hygiene.md"
+base_commit: "bc3d56093b4adb2eae94a475f20d5e3e1721b1ec"
+integrator: "/root"
+
+acceptance_criteria:
+  - "The merged PR 3A security amendment is APPROVED at base bc3d56093b4adb2eae94a475f20d5e3e1721b1ec and its exact specification blob remains the implementation authority."
+  - "Dependabot, locked-sync, PR cancellation, nightly queue, Airflow matrix ceilings, Pages ordering/recovery, and Dependency Review match the approved exact values and failure semantics."
+  - "Every Pages/Dependency Review permission, event, run-attempt, SHA, job, step, and provider-evidence boundary fails closed under missing, stale, foreign, duplicate, rerun, partial-pagination, and API-error cases."
+  - "The temporary actionlint 1.7.12 queue waiver is checksum-pinned, exact-file/exact-message scoped, executable on Linux and Darwin, and guarded by the removal tripwire."
+  - "All five release-sensitive workflows remain byte-identical to the implementation base; no required-check, protection, App, release, package, source, or runtime authority changes."
+  - "The exact contributor/workflow/runbook/Pages/branch-protection/testing docs and CHANGELOG are updated, and quality metrics are regenerated through their producer."
+  - "The github-actions, dependencies, and python:uv labels are read back exactly before implementation tests and merge."
+  - "Hosted evidence covers PR cancellation, nightly queue/rerun, Pages PR and monotonic current-master deployment, native Dependency Review on PR and exact master, all required checks, owner attestation, Agent PR receipt, and no bypass."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "repository CI and dependency automation"
+    - "GitHub Pages build and deployment recovery"
+    - "Dependency Review evidence"
+    - "contributor and operator documentation"
+  migration_required: false
+
+owned_paths:
+  - docs/ci-cd.md
+  - docs/cicd/workflows.md
+  - docs/cicd/runbooks.md
+  - docs/developer-ci-cd.md
+  - docs/cicd/release-and-pages.md
+  - docs/github-pages.md
+  - docs/github-branch-protection.md
+  - docs/testing/overview.md
+  - docs/testing/index.md
+  - tests/test_github_workflow_governance.py
+  - tests/test_github_ci_postgres_xmin.py
+  - tests/test_oss_release_readiness.py
+  - tests/agent_policy/test_workflow_security.py
+  - tests/test_ci_shadow_pr3a_contracts.py
+  - tests/test_ci_shadow_pr3a_actionlint.py
+  - tests/test_ci_shadow_pr3a_dependabot_and_sync.py
+  - tests/test_ci_shadow_pr3a_workflow_concurrency.py
+  - tests/test_ci_shadow_pr3a_pages_implementation.py
+  - tests/test_ci_shadow_pr3a_pages_guard.py
+  - tests/test_ci_shadow_pr3a_label_probe.py
+  - tests/test_ci_shadow_pr3a_label_evidence.py
+  - tests/test_ci_shadow_pr3a_dependency_review.py
+  - tests/agent_policy/test_ci_shadow_pr3a_implementation_contract.py
+  - test_artifacts/agent-policy/dpone-ci-shadow-closure-pr3a-ci-hygiene.yml
+
+read_only_paths:
+  - docs/feature-design-ci-pr-gate-exact-sha-evidence.md
+  - docs/adr/0048-exact-sha-readiness-evidence.md
+  - docs/feature-design-standard.md
+  - docs/documentation-standard.md
+  - docs/engineering-standards.md
+  - docs/agent-development.md
+  - docs/agent-task-contracts.md
+  - docs/benchmarks/quality_budgets.yml
+  - tools/agent_policy/task_contract.py
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - src
+  - packages
+  - .github/dependabot.yml
+  - .github/workflows
+  - .agents/policy/workflow-security.yml
+  - docs/quality-metrics.md
+  - test_artifacts/agent-policy/agent_governance_gate.json
+  - docs/feature-design-ci-shadow-pr3a-ci-hygiene.md
+  - tools/ci/pr3a_label_readback_evidence.py
+  - test_artifacts/ci-shadow-pr3a-live/label-readback-evidence.json
+  - .github/workflows/release.yml
+  - .github/workflows/runtime-image.yml
+  - .github/workflows/certification-release-summary.yml
+  - .github/workflows/route-certification-release.yml
+  - .github/workflows/route-release-finalize.yml
+  - .github/workflows/agent-pr-receipt.yml
+  - .github/workflows/agent-pr-merge-closure.yml
+  - .agents/policy/ci-shadow-bundle-v1.yml
+
+shared_file_owner: "/root"
+
+# These paths stay forbidden to every delegated writer above. The declared
+# shared-file owner integrates them only after the disjoint test/docs branches
+# have been reviewed and the RED contract suite has been recorded.
+integrator_owned_paths:
+  - .github/dependabot.yml
+  - .github/workflows/ci.yml
+  - .github/workflows/airflow-pack-compat.yml
+  - .github/workflows/airflow-pack-compat-nightly.yml
+  - .github/workflows/pages.yml
+  - .github/workflows/dependency-review.yml
+  - .agents/policy/workflow-security.yml
+  - CHANGELOG.md
+  - docs/quality-metrics.md
+  - docs/feature-design-ci-shadow-pr3a-ci-hygiene.md
+  - tools/ci/pr3a_label_readback_evidence.py
+  - test_artifacts/agent-policy/agent_governance_gate.json
+  - test_artifacts/ci-shadow-pr3a-live/label-readback-evidence.json
+
+certification_evidence:
+  label_readback:
+    mode: "owner-authorized read-only github.com provider observation; no label mutation"
+    command_source: "docs/cicd/runbooks.md#collect-and-verify-pr3a-label-evidence"
+    producer: "tools/ci/pr3a_label_readback_evidence.py"
+    local_output: "test_artifacts/ci-shadow-pr3a-live/label-readback-evidence.json"
+    durable_binding: "The v3 producer preserves bounded diagnostic response bytes and metadata; offline verification proves receipt integrity, live verification re-reads github.com and decides readiness only from the three exact ordered names, and the PR body plus issue 512 record the exact Git blob and file SHA-256."
+  pages_deployment:
+    mode: "certification-only read-only observer; no production observer is introduced by PR 3A"
+    command_source: "docs/cicd/runbooks.md#verify-pages-deployment-evidence"
+    local_output: "test_artifacts/ci-shadow-pr3a-live/pages-deployment-evidence.json"
+    durable_binding: "The PR body records the exact output SHA-256 and authenticated GitHub run/jobs URLs; mocked tests never count as hosted PASS."
+
+dependencies:
+  - "Merged approved PR 3A security-amendment commit bc3d56093b4adb2eae94a475f20d5e3e1721b1ec is the exact implementation base; dd45dd85b3c807a439f5917ad09fe147a9a8bce7 remains historical only."
+  - "Owner-authorized live labels dependencies, python:uv, and github-actions were read back exactly on 2026-08-10."
+  - "Existing release-sensitive workflow blobs at the implementation base are the immutable comparison authority."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_ci_shadow_pr3a_actionlint.py tests/test_ci_shadow_pr3a_dependabot_and_sync.py tests/test_ci_shadow_pr3a_workflow_concurrency.py tests/test_ci_shadow_pr3a_pages_implementation.py tests/test_ci_shadow_pr3a_label_probe.py tests/test_ci_shadow_pr3a_label_evidence.py tests/test_ci_shadow_pr3a_dependency_review.py tests/test_github_workflow_governance.py tests/test_github_ci_postgres_xmin.py tests/test_oss_release_readiness.py tests/agent_policy/test_workflow_security.py tests/test_ci_shadow_pr3a_contracts.py tests/agent_policy/test_ci_shadow_pr3a_implementation_contract.py -q"
+    - "uv run python tools/ci/pr3a_label_readback_evidence.py verify --input test_artifacts/ci-shadow-pr3a-live/label-readback-evidence.json"
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/dpone-ci-shadow-closure-pr3a-ci-hygiene.yml"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref bc3d56093b4adb2eae94a475f20d5e3e1721b1ec"
+    - "Execute every selected non-live check, including the full non-live xdist suite, and report skips accurately."
+    - "Run pinned actionlint 1.7.12 with the approved exact-file queue waiver, native syntax checks for every changed workflow, and the removal tripwire."
+    - "git diff --exit-code bc3d56093b4adb2eae94a475f20d5e3e1721b1ec HEAD -- .github/workflows/release.yml .github/workflows/runtime-image.yml .github/workflows/certification-release-summary.yml .github/workflows/route-certification-release.yml .github/workflows/route-release-finalize.yml"
+    - "uv run dpone docs check-docs && uv run dpone docs check-generated-references && uv run dpone docs update-dev-metrics --check && uv run mkdocs build --strict"
+  live:
+    - "Read back exact dependencies, python:uv, and github-actions labels with the approved github.com-bound probe."
+    - "Run pr3a_label_readback_evidence.py verify-live on the final artifact and require the three current github.com names in their exact approved order; diagnostic metadata or response-byte drift cannot recolor the decision, and offline verification alone is not provider PASS."
+    - "Record authenticated PR cancellation, nightly queue-100/rerun, Pages PR/current-master ordering, and native PR/exact-master Dependency Review evidence; unavailable evidence is UNVERIFIED, never PASS."
+    - "Require every protected exact-head check, owner attestation, Agent PR receipt, and no bypass before merge."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Approved specification status is not APPROVED."
+  - "The exact implementation base is not bc3d56093b4adb2eae94a475f20d5e3e1721b1ec."
+  - "Any required live label is missing, inaccessible, or non-exact."
+  - "Any release-sensitive workflow differs from the implementation base."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Any required-check, branch-protection, ruleset, App, release, package, source, or runtime authority change is required."

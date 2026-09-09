@@ -1,0 +1,6 @@
+project: uv-dpone
+configVersion: 1
+---
+image: uv-dpone
+context: .
+dockerfile: docker/uv/Dockerfile

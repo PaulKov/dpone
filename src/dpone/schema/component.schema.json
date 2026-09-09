@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://paulkov.github.io/dpone/schemas/component.schema.json",
+  "title": "dpone declarative recipe component",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "version", "owner", "status", "processes"],
+  "properties": {
+    "schema": {"const": "dpone.component.v1"},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "owner": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}$"},
+    "status": {"enum": ["experimental", "stable", "deprecated"]},
+    "processes": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"$ref": "#/definitions/process"}}
+  },
+  "definitions": {
+    "process": {
+      "type": "object",
+      "required": ["name", "source", "sink"],
+      "propertyNames": {"$ref": "#/definitions/safe_property_name"},
+      "properties": {
+        "name": {"$ref": "#/definitions/declarative_value"},
+        "source": {"$ref": "#/definitions/declarative_object"},
+        "sink": {"$ref": "#/definitions/declarative_object"}
+      },
+      "additionalProperties": {"$ref": "#/definitions/declarative_value"}
+    },
+    "declarative_object": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/definitions/safe_property_name"},
+      "additionalProperties": {"$ref": "#/definitions/declarative_value"}
+    },
+    "declarative_value": {
+      "oneOf": [
+        {"type": ["string", "number", "integer", "boolean", "null"]},
+        {"type": "array", "items": {"$ref": "#/definitions/declarative_value"}},
+        {"$ref": "#/definitions/declarative_object"}
+      ]
+    },
+    "safe_property_name": {
+      "not": {
+        "enum": [
+          "python", "module", "entrypoint", "callable", "shell", "command", "jinja", "template",
+          "vault_path", "password", "token", "secret"
+        ]
+      }
+    }
+  }
+}

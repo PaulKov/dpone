@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/data-product/data-product-reliability-export.schema.json",
+  "title": "dpone data product reliability export",
+  "type": "object",
+  "required": ["schema_version", "export_id", "target", "status", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_reliability_export.v1"},
+    "export_id": {"type": "string"},
+    "target": {"enum": ["prometheus", "opentelemetry", "openlineage", "datahub", "json"]},
+    "status": {"enum": ["rendered", "blocked"]},
+    "fleet_evaluation_id": {"type": ["string", "null"]},
+    "content": {"type": "string"},
+    "payload": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

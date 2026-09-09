@@ -1,0 +1,6 @@
+# Intentionally empty.
+#
+# Tracked repository files are already present in a Git worktree.
+# Never copy .env files, credentials, service-account keys, local databases,
+# .venv directories, or production connection material into managed worktrees.
+# Add only a demonstrably necessary ignored, non-secret developer file.

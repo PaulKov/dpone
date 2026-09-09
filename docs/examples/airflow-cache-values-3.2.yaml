@@ -1,0 +1,101 @@
+airflowVersion: 3.2.0
+images:
+  airflow:
+    repository: registry.example/airflow
+    tag: "3.2.0-dpone-0.73.32"
+    digest: sha256:REPLACE_WITH_AIRFLOW_IMAGE_DIGEST
+
+dagProcessor:
+  enabled: true
+  securityContexts:
+    pod:
+      fsGroup: 50000
+      fsGroupChangePolicy: OnRootMismatch
+  extraVolumes:
+    - name: dpone-airflow-cache
+      emptyDir:
+        sizeLimit: 2Gi
+    - name: dpone-airflow-loader-ack
+      emptyDir:
+        sizeLimit: 16Mi
+    - name: dpone-desired-state-authority
+      configMap:
+        name: dpone-airflow-desired-state-authority
+    - name: dpone-airflow-cache-scripts
+      configMap:
+        name: dpone-airflow-cache-scripts
+  extraVolumeMounts:
+    - name: dpone-airflow-cache
+      mountPath: /opt/airflow/.dpone-cache
+      readOnly: true
+  extraInitContainers:
+    - name: dpone-cache-init
+      image: registry.example/dpone-sync@sha256:REPLACE_WITH_DPONE_SYNC_DIGEST
+      resources:
+        requests: {cpu: 50m, memory: 128Mi, ephemeral-storage: 64Mi}
+        limits: {cpu: 500m, memory: 512Mi, ephemeral-storage: 256Mi}
+      command: [/bin/sh]
+      args: ["/opt/dpone/bin/cache-init-fail-open.sh"]
+      env:
+        - {name: DPONE_AIRFLOW_DESIRED_STATE_AUTHORITY_FILE, value: /etc/dpone/airflow-authority/airflow-desired-state-authority.json}
+        - {name: DPONE_AIRFLOW_PACK_CACHE_DIR, value: /opt/airflow/.dpone-cache}
+        - {name: DPONE_AIRFLOW_PACK_READER_CONNECTION_ID, value: s3_dpone_artifacts_reader}
+        - {name: DPONE_PACK_SYNC_TIMEOUT_SECONDS, value: "20"}
+        - {name: DPONE_PACK_CACHE_MAX_TOTAL_BYTES, value: "536870912"}
+      envFrom:
+        - secretRef: {name: dpone-airflow-artifacts-reader}
+      volumeMounts:
+        - {name: dpone-airflow-cache, mountPath: /opt/airflow/.dpone-cache}
+        - {name: dpone-desired-state-authority, mountPath: /etc/dpone/airflow-authority, readOnly: true}
+        - {name: dpone-airflow-cache-scripts, mountPath: /opt/dpone/bin, readOnly: true}
+  extraContainers:
+    - name: dpone-cache-status-projector
+      image: registry.example/airflow@sha256:REPLACE_WITH_AIRFLOW_IMAGE_DIGEST
+      resources:
+        requests: {cpu: 10m, memory: 64Mi, ephemeral-storage: 32Mi}
+        limits: {cpu: 100m, memory: 192Mi, ephemeral-storage: 128Mi}
+      command: [/bin/sh, -c]
+      args:
+        - >-
+          set +e; trap 'exit 0' TERM INT;
+          while :; do
+          dpone-airflow-pack-cache-status --cache-dir /opt/airflow/.dpone-cache
+          --ack-path /opt/airflow/.dpone-ack/loader-ack.json
+          --ack-root /opt/airflow/.dpone-ack
+          --airflow-variable-key dpone_airflow_pack_cache_status --json;
+          echo "projector exit=$?";
+          sleep "${DPONE_CACHE_STATUS_INTERVAL_SECONDS:-60}" & wait $!;
+          done
+      env:
+        - {name: DPONE_CACHE_STATUS_INTERVAL_SECONDS, value: "60"}
+      envFrom:
+        - secretRef: {name: dpone-airflow-status-projector}
+      volumeMounts:
+        - {name: dpone-airflow-cache, mountPath: /opt/airflow/.dpone-cache, readOnly: true}
+        - {name: dpone-airflow-loader-ack, mountPath: /opt/airflow/.dpone-ack, readOnly: true}
+    - name: dpone-cache-watch
+      image: registry.example/dpone-sync@sha256:REPLACE_WITH_DPONE_SYNC_DIGEST
+      resources:
+        requests: {cpu: 25m, memory: 128Mi, ephemeral-storage: 64Mi}
+        limits: {cpu: 500m, memory: 512Mi, ephemeral-storage: 256Mi}
+      command: [/bin/sh]
+      args: ["/opt/dpone/bin/cache-watch.sh"]
+      env:
+        - {name: DPONE_AIRFLOW_DESIRED_STATE_AUTHORITY_FILE, value: /etc/dpone/airflow-authority/airflow-desired-state-authority.json}
+        - {name: DPONE_AIRFLOW_PACK_CACHE_DIR, value: /opt/airflow/.dpone-cache}
+        - {name: DPONE_AIRFLOW_PACK_READER_CONNECTION_ID, value: s3_dpone_artifacts_reader}
+        - {name: DPONE_PACK_SYNC_TIMEOUT_SECONDS, value: "20"}
+        - {name: DPONE_PACK_SYNC_INTERVAL_SECONDS, value: "60"}
+        - {name: DPONE_PACK_CACHE_MAX_TOTAL_BYTES, value: "536870912"}
+        - {name: DPONE_PACK_RETENTION_INTERVAL_CYCLES, value: "60"}
+        - {name: DPONE_CACHE_RETENTION_IDENTITY, value: airflow-cache-controller/dev}
+        - {name: DPONE_CACHE_RETENTION_APPROVED_PLAN_SHA256, value: ""}
+        - {name: DPONE_CACHE_RETENTION_REVIEW_ID, value: ""}
+        - {name: DPONE_ENVIRONMENT, value: dev}
+      envFrom:
+        - secretRef: {name: dpone-airflow-artifacts-reader}
+      volumeMounts:
+        - {name: dpone-airflow-cache, mountPath: /opt/airflow/.dpone-cache}
+        - {name: dpone-airflow-loader-ack, mountPath: /opt/airflow/.dpone-ack, readOnly: true}
+        - {name: dpone-desired-state-authority, mountPath: /etc/dpone/airflow-authority, readOnly: true}
+        - {name: dpone-airflow-cache-scripts, mountPath: /opt/dpone/bin, readOnly: true}

@@ -1,0 +1,54 @@
+schema_version: 1
+task_id: "DPONE-512-PR6A-DESIGN"
+title: "CI shadow PR6A dormant readiness core design"
+goal: "Freeze the approved dormant decision and pair-journal design before implementation."
+specification: "docs/feature-design-ci-shadow-pr6a-readiness-core.md"
+base_commit: "0fd111aa6c7e2494f3bb3ffa7d6da2f31f923c17"
+integrator: "dpone-integrator"
+
+acceptance_criteria:
+  - "No public CLI/schema/adapter/migration or PASS authority is introduced."
+  - "Pair journal recovery retains actual prior bytes and never reports a mixed pair committed."
+  - "Implementation only reuses confined mutation primitives through a pair-specific contract."
+public_contract_impact:
+  level: compatible
+  surfaces: ["future internal readiness transaction"]
+  migration_required: false
+owned_paths:
+  - "docs/feature-design-ci-shadow-pr6a-readiness-core.md"
+  - "test_artifacts/agent-policy/ci-shadow-pr6a-design-task-contract.yml"
+integrator_owned_paths: []
+read_only_paths:
+  - "docs/feature-design-ci-pr-gate-exact-sha-evidence.md"
+  - "docs/adr/0048-exact-sha-readiness-evidence.md"
+  - "src/dpone/manifest/confined_mutations.py"
+  - "src/dpone/manifest/confined_transaction_journal.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "tools"
+  - "docs/schemas"
+  - "src/dpone/commands"
+shared_file_owner: "dpone-integrator"
+dependencies: ["PR2 merged"]
+required_checks:
+  focused:
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/ci-shadow-pr6a-design-task-contract.yml"
+  broad:
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live: ["N/A: dormant internal design"]
+required_outputs: ["implementation", "tests", "documentation_impact", "completion_report"]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Implementation introduces a public PR6B surface or authority."

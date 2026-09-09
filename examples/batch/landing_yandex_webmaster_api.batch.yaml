@@ -1,0 +1,80 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+convention: landing_raw_v1
+
+vars:
+  src_system: yandex_webmaster
+  src_database: api
+  host: api_webmaster_yandex_net
+  owner_team: seo-analytics
+  owner_contact: seo-analytics@example.com
+  sla: daily
+
+defaults:
+  source:
+    type: api
+    api_type: yandex_webmaster
+    connection_type: vault
+    connection_id: api__yandex_webmaster
+    vault_path: api/yandex_webmaster
+    options:
+      resource: "{{ src_table }}"
+      host_id: https:example.com:443
+      host_url: https://example.com
+      initial_start_date: 2025-01-01
+      pages_in_search_daily_agg: last
+      timeout: 60
+      max_retries: 3
+      rate_limit_delay: 0.5
+
+  sink:
+    type: bigquery
+    connection_type: vault
+    connection_id: bigquery-demo
+    vault_path: gcp/demo-project-{{ env_code }}/bq/example-etl-service
+    staging:
+      schema: stg
+    strategy:
+      mode: incremental_merge
+      key_columns: [date]
+    options:
+      log_sample_rows: 5
+
+  bigquery_proxy:
+    proxy_enable: true
+
+schemas:
+  app:
+    tables:
+      - table: host_metrics_daily
+        overrides:
+          sink:
+            table:
+              name: app__host_metrics_daily
+            strategy:
+              mode: incremental_merge
+              key_columns: [date]
+      - table: search_queries_history_daily
+        overrides:
+          source:
+            options:
+              lookback_days: 14
+              device_types: DESKTOP,MOBILE,TABLET
+          sink:
+            table:
+              name: app__search_queries_history_daily
+            strategy:
+              mode: replace
+              key_columns: [date, query_id, device_type]
+      - table: query_analytics_by_region_daily
+        overrides:
+          source:
+            options:
+              lookback_days: 14
+          sink:
+            table:
+              name: app__query_analytics_by_region_daily
+            strategy:
+              mode: replace
+              key_columns: [date, region_id, query, url]

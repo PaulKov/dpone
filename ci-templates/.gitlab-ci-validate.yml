@@ -1,0 +1,182 @@
+debug-variables:
+  extends:
+    - .uv_job_template
+    - .rules_standard
+  stage: debug
+  script:
+    - |
+      set -euo pipefail
+      echo "=== Debug variables ==="
+      echo "UV_IMAGE: ${UV_IMAGE:-}"
+      echo "CI_PIPELINE_SOURCE: ${CI_PIPELINE_SOURCE:-}"
+      echo "CI_COMMIT_BRANCH: ${CI_COMMIT_BRANCH:-}"
+      echo "CI_COMMIT_REF_NAME: ${CI_COMMIT_REF_NAME:-}"
+      echo "CI_COMMIT_TAG: ${CI_COMMIT_TAG:-}"
+      echo "CI_COMMIT_SHORT_SHA: ${CI_COMMIT_SHORT_SHA:-}"
+      echo "CI_PIPELINE_IID: ${CI_PIPELINE_IID:-}"
+      echo "MR source: ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
+      echo "MR target: ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}"
+      echo "======================="
+
+lint_ruff:
+  extends:
+    - .uv_dev_job_template
+    - .rules_standard
+  stage: pre-test
+  script:
+    - uv run ruff check .
+    - uv run ruff format --check .
+
+typecheck_mypy:
+  extends:
+    - .uv_dev_job_template
+    - .rules_standard
+  stage: pre-test
+  script:
+    - uv run mypy --config-file mypy.ini
+
+unit_tests:
+  extends:
+    - .uv_dev_job_template
+    - .rules_standard
+  stage: pre-test
+  artifacts:
+    when: always
+    reports:
+      junit: reports/unit-tests.xml
+    paths:
+      - reports/unit-tests.xml
+  script:
+    - |
+      if [ ! -d tests ] || ! find tests -type f -name 'test_*.py' -print -quit | grep -q .; then
+        echo "tests/ is missing or does not contain pytest test files" >&2
+        exit 1
+      fi
+    - mkdir -p reports
+    - uv run pytest tests --ignore=tests/integration -ra --junitxml=reports/unit-tests.xml
+
+quality_gates:
+  extends:
+    - .uv_dev_job_template
+    - .rules_standard
+  stage: pre-test
+  script:
+    - uv run dpone docs check-docs
+    - uv run dpone docs check-compatibility
+    - uv run dpone docs check-removal-readiness
+    - uv run dpone docs check-import-rules
+    - uv run dpone docs check-layer-metrics
+
+.docs_generated_validate_rules:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"
+           && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID
+           && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: on_success
+    - when: never
+
+validate_docs_cli_reference:
+  extends:
+    - .uv_dev_job_template
+    - .docs_generated_validate_rules
+  stage: pre-test
+  script:
+    - uv run dpone docs update-cli-reference --check
+
+validate_docs_dev_metrics:
+  extends:
+    - .uv_dev_job_template
+    - .docs_generated_validate_rules
+  stage: pre-test
+  script:
+    - uv run dpone docs update-dev-metrics --check
+
+validate_docs_deprecation_roadmap:
+  extends:
+    - .uv_dev_job_template
+    - .docs_generated_validate_rules
+  stage: pre-test
+  script:
+    - uv run dpone docs update-deprecation-roadmap --check
+
+validate_docs_shim_removal_plan:
+  extends:
+    - .uv_dev_job_template
+    - .docs_generated_validate_rules
+  stage: pre-test
+  script:
+    - uv run dpone docs update-shim-removal-plan --check
+
+.docs_autoupdate_job:
+  extends: .uv_dev_job_template
+  stage: pre-test
+  variables:
+    GIT_STRATEGY: fetch
+    GIT_DEPTH: "0"
+    DPONE_GIT_PUSH_USER: "gitlab-ci-token"
+    DPONE_GIT_USER_NAME: "dpone-docs-bot"
+    DPONE_GIT_USER_EMAIL: "dpone-docs-bot@example.com"
+
+docs_autoupdate_push:
+  extends: .docs_autoupdate_job
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"
+           && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID
+           && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: on_success
+    - when: never
+  script:
+    - |
+      set -euo pipefail
+
+      BRANCH="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-${CI_COMMIT_BRANCH:-}}"
+      if [ -z "$BRANCH" ]; then
+        echo "No branch detected -> skip"
+        exit 0
+      fi
+
+      PUSH_USER="${DPONE_GIT_PUSH_USER:-gitlab-ci-token}"
+      PUSH_TOKEN="${DPONE_GIT_PUSH_TOKEN:-$CI_JOB_TOKEN}"
+      if [ -z "$PUSH_TOKEN" ]; then
+        echo "No push token available -> skip"
+        exit 0
+      fi
+
+      git fetch origin "$BRANCH" || true
+
+      uv run dpone docs update-cli-reference
+      uv run dpone docs update-dev-metrics
+      uv run dpone docs update-deprecation-roadmap
+      uv run dpone docs update-shim-removal-plan
+
+      if git diff --quiet -- \
+          docs/CLI_REFERENCE.md \
+          docs/DEVELOPERS.md \
+          docs/DEVELOPERS_CONFLUENCE.md \
+          docs/DEPRECATION_ROADMAP.md \
+          docs/SHIM_REMOVAL_PLAN.md; then
+        echo "No generated docs changes"
+        exit 0
+      fi
+
+      git checkout -B "$BRANCH" "${CI_COMMIT_SHA}"
+
+      git config user.email "${DPONE_GIT_USER_EMAIL:-dpone-docs-bot@example.com}"
+      git config user.name "${DPONE_GIT_USER_NAME:-dpone-docs-bot}"
+
+      git add \
+        docs/CLI_REFERENCE.md \
+        docs/DEVELOPERS.md \
+        docs/DEVELOPERS_CONFLUENCE.md \
+        docs/DEPRECATION_ROADMAP.md \
+        docs/SHIM_REMOVAL_PLAN.md
+
+      git commit -m "docs: autoupdate generated docs [skip ci]" || true
+
+      REMOTE_URL="https://${PUSH_USER}:${PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      git remote set-url origin "${REMOTE_URL}"
+      git push origin "HEAD:${BRANCH}"

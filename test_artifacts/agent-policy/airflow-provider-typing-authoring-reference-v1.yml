@@ -1,0 +1,79 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-PROVIDER-TYPING-AUTHORING-REFERENCE-V1"
+title: "Complete typed Airflow provider and generated Authoring v1 schema reference"
+goal: "Close the final Phase 2 contract with PEP 561 provider typing and one generated source of truth for public authoring schemas."
+specification: "docs/airflow-provider-api.md"
+base_commit: "70d859eb"
+integrator: "current Codex task"
+
+acceptance_criteria:
+  - "The canonical airflow.providers.dpone namespace ships py.typed and a complete public API stub."
+  - "DponeDag.from_spec, DponeTaskGroup.from_pack, and load_dpone_dags expose non-variadic typed signatures."
+  - "Importing the runtime provider remains Airflow-optional and parse-safe."
+  - "The generated manifest schema reference includes every public src/dpone/schema contract, including dpone.test.v1."
+  - "dpone docs check-generated-references fails when the manifest schema reference drifts."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "airflow.providers.dpone typing metadata"
+    - "dpone docs update-manifest-schema-reference"
+    - "dpone docs check-generated-references"
+    - "docs/reference/manifest-schemas.md"
+  migration_required: false
+
+owned_paths:
+  - "packages/dpone-airflow-pack/src/airflow/providers/dpone/**"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/provider.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/py.typed"
+  - "src/dpone/services/docs/*manifest_schema_reference*"
+  - "src/dpone/services/docs/check_generated_references_service.py"
+  - "src/dpone/commands/docs/*manifest_schema_reference*"
+  - "src/dpone/commands/docs/check_generated_references_cmd.py"
+  - "src/dpone/commands/docs/__init__.py"
+  - "src/dpone/commands/registry_docs_updates.py"
+  - "src/dpone/schema/*.schema.json"
+  - "docs/reference/manifest-schemas.md"
+  - "docs/airflow-provider-api.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "docs/cli-reference.md"
+  - "docs/compatibility.md"
+  - "CHANGELOG.md"
+  - "mypy.ini"
+  - "tests/test_airflow_provider_typing.py"
+  - "tests/test_manifest_schema_reference_docs.py"
+  - "tests/test_generated_docs_check_cli.py"
+  - "tests/test_airflow_pack_provider_package.py"
+  - "test_artifacts/airflow-provider-typing-v1/**"
+read_only_paths:
+  - "src/dpone/runtime/**"
+  - "src/dpone/manifest/**"
+forbidden_paths:
+  - ".cursor/**"
+
+shared_file_owner: "current Codex task"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_provider_typing.py tests/test_manifest_schema_reference_docs.py tests/test_generated_docs_check_cli.py tests/test_airflow_pack_provider_package.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-generated-references"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv build packages/dpone-airflow-pack --out-dir dist"
+    - "uv tool run twine check dist/*"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "N/A: typing and generated documentation have no live connector behavior"
+
+stop_conditions:
+  - "Typing requires importing Airflow, Vault, Kubernetes, or network clients at provider import time."
+  - "Generated docs introduce a second manually maintained schema registry."
+  - "A required edit touches user-owned .cursor files."

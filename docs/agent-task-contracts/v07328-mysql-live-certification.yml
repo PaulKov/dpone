@@ -1,0 +1,87 @@
+schema_version: 1
+task_id: "DPONE-V07328-MYSQL-LIVE-CERTIFICATION"
+title: "Make local MySQL certification executable and fail closed"
+goal: "Keep the generated plan, workflow execution and retained evidence aligned for every selected local MySQL route."
+specification: "docs/feature-design-release-blocker-remediation-v07328.md"
+base_commit: "9b02763ff9a8b6351d7ce0397b07bfe4d1faecb0"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "The generated real_local certification plan includes the supported local Docker MySQL route cells."
+  - "Workflow success is derived from executed JUnit outcomes; skipped or missing MySQL cells cannot become PASS."
+  - "Retained JSON evidence is derived from the exact JUnit cases and commit SHA rather than hand-authored PASS payloads."
+  - "Unexecuted performance, reconciliation, release-pack and related domains remain explicitly UNVERIFIED."
+  - "Retained live executor configuration and evidence artifacts never contain connection passwords."
+  - "Existing non-MySQL plan cells and public plan schema remain backward compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "live-certification plan contents"
+    - "live-certification workflow result semantics"
+    - "retained local live evidence"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/ops/live_certification.py"
+  - "src/dpone/ops/live_certification_local.py"
+  - "src/dpone/ops/live_certification_native_transfer.py"
+  - "tools/ci/assert_junit_executed.py"
+  - ".github/workflows/live-certification.yml"
+  - "docs/live-certification.md"
+  - "docs/release-evidence.md"
+  - "docs/operational-control-plane.md"
+  - "docs/testing/integration-matrix.md"
+  - "tests/test_live_certification_automation.py"
+  - "tests/test_assert_junit_executed.py"
+  - "tests/integration/mssql/test_mssql_clickhouse_refresh_executor_live_integration.py"
+  - "tests/integration/mssql/test_mssql_optional_integration.py"
+  - "tests/integration/mssql/test_postgres_mssql_refresh_executor_live_integration.py"
+  - "tests/test_live_evidence_credential_hygiene.py"
+read_only_paths:
+  - "docker/docker-compose.integration.yml"
+  - "docs/testing/integration-docker.md"
+  - "docs/connector-certification.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - "src/dpone/schema"
+
+shared_file_owner: "Codex"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_live_certification_automation.py tests/test_live_evidence_credential_hygiene.py tests/test_assert_junit_executed.py -q"
+  broad:
+    - "uv run ruff check owned paths"
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "exact-commit real_local MySQL route JUnit with zero skipped tests"
+
+required_outputs:
+  - implementation
+  - tests
+  - credential-hygiene evidence
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "A selected MySQL route needs credentials outside the approved local Docker environment."
+  - "Another writer owns the same semantic contract."

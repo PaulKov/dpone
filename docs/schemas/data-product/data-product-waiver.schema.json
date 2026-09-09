@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-waiver.schema.json",
+  "title": "Data Product Waiver",
+  "type": "object",
+  "required": ["schema_version", "status", "waiver_id", "rule_id", "expires_at", "actor"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_waiver.v1"},
+    "status": {"enum": ["approved", "blocked"]},
+    "waiver_id": {"type": "string"},
+    "rule_id": {"type": ["string", "null"]},
+    "expires_at": {"type": ["string", "null"]},
+    "actor": {"type": "string"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

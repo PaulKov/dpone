@@ -1,0 +1,430 @@
+# Connector certification — scheduled hygiene + manual strict evidence.
+#
+# Authority model (do NOT add this workflow to required status checks):
+# - Required for merge: `.github/workflows/ci.yml` (and the other branch-protection
+#   contexts). This workflow is NEVER a merge/release required check.
+# - Schedule (daily): hygiene evidence. Offline must pass. Local-live must pass
+#   for disposable Docker markers. Vendor-live is fail-soft when GitHub secrets
+#   are incomplete (skips are allowed; hard pytest failures still fail the job).
+# - workflow_dispatch: stricter operator evidence. Vendor-live (when enabled)
+#   requires configured secrets and zero skipped tests (`--max-skipped 0`).
+#
+# See docs/connector-certification.md § "GitHub Actions gates".
+
+name: Connector certification
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      run_local_live:
+        description: Run disposable local integration markers for Postgres/MSSQL/ClickHouse/Kafka when runner services are available.
+        required: false
+        default: true
+        type: boolean
+      run_vendor_live:
+        description: "Run vendor/API live tests that require configured secrets (strict: zero skips)."
+        required: false
+        default: false
+        type: boolean
+      run_dbt_toolchain_candidate:
+        description: "Run the exact-ref disposable dbt SQL Server candidate certification."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  DPONE_RUN_INTEGRATION: '1'
+  DPONE_CERTIFICATION_ARTIFACT_DIR: test_artifacts/connectors
+
+jobs:
+  dbt-toolchain-candidate-certification:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_dbt_toolchain_candidate == true }}
+    uses: ./.github/workflows/dbt-toolchain-candidate-certification.yml
+
+  offline-certification:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_dbt_toolchain_candidate != true }}
+    name: Offline connector certification contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run certification contract tests
+        run: >-
+          uv run pytest
+          tests/test_mssql_manifest_examples.py
+          tests/test_runtime_mssql_contracts.py
+          tests/test_runtime_kafka_contracts.py
+          tests/test_runtime_rest_and_clickhouse_contracts.py
+          tests/test_runtime_schema_evolution_contracts.py
+          tests/test_runtime_state_and_reconciliation_contracts.py
+          tests/test_runtime_cdc_readers.py
+          tests/test_runtime_parallel_partitioning.py
+          tests/test_managed_ux_contracts.py
+          -q
+
+      - name: Generate connector certification matrix artifact
+        run: |
+          mkdir -p "$DPONE_CERTIFICATION_ARTIFACT_DIR"
+          set +e
+          uv run dpone certify --format json > "$DPONE_CERTIFICATION_ARTIFACT_DIR/matrix.json"
+          json_exit_code=$?
+          uv run dpone certify --format markdown > "$DPONE_CERTIFICATION_ARTIFACT_DIR/matrix.md"
+          markdown_exit_code=$?
+          set -e
+          cat > "$DPONE_CERTIFICATION_ARTIFACT_DIR/exit-codes.json" <<EOF
+          {"json_exit_code": ${json_exit_code}, "markdown_exit_code": ${markdown_exit_code}}
+          EOF
+          echo "Certification matrix exit codes are recorded as evidence, not used as workflow failure criteria."
+
+      - name: Build connector strategy certification bundle
+        if: always()
+        run: |
+          mkdir -p test_artifacts/strategy_certification/connectors
+          cat > test_artifacts/strategy_certification/connectors/workflow_summary.json <<EOF
+          {
+            "passed": ${{ job.status == 'success' }},
+            "workflow": "connector-certification.yml",
+            "job": "offline-certification",
+            "run_id": "${{ github.run_id }}",
+            "run_attempt": "${{ github.run_attempt }}"
+          }
+          EOF
+          uv run dpone strategy certification-bundle \
+            --bundle-id "connectors-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --output-dir test_artifacts/strategy_certification/connectors \
+            --connector-artifact test_artifacts/strategy_certification/connectors/workflow_summary.json \
+            --connector-artifact "$DPONE_CERTIFICATION_ARTIFACT_DIR/matrix.json" \
+            --docs-link docs/connector-certification.md \
+            --docs-link docs/certification-suite.md \
+            --format json || true
+
+      - name: Build connector certification suite
+        if: always()
+        run: |
+          mkdir -p test_artifacts/certification/suite/connectors
+          uv run dpone ops certification-suite \
+            --output-dir test_artifacts/certification/suite/connectors \
+            --suite-id "connectors-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --certification-report "$DPONE_CERTIFICATION_ARTIFACT_DIR/matrix.json" \
+            --strategy-certification-bundle test_artifacts/strategy_certification/connectors/strategy_certification_bundle.json \
+            --require-strategy-certification \
+            --format json || true
+
+      - name: Build connector artifact index
+        if: always()
+        run: |
+          uv run dpone ops artifact-index \
+            --output-dir test_artifacts/certification/evidence-index/connectors \
+            --root test_artifacts/connectors \
+            --root test_artifacts/strategy_certification/connectors \
+            --root test_artifacts/certification/suite/connectors \
+            --release "connectors-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --format json || true
+
+      - name: Build connector evidence chain
+        if: always()
+        run: |
+          uv run dpone ops evidence-chain \
+            --chain-dir test_artifacts/certification/evidence-chain/connectors \
+            --release "connectors-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --artifact-index test_artifacts/certification/evidence-index/connectors/artifact_index.json \
+            --format json || true
+
+      - name: Verify connector evidence chain
+        if: always()
+        run: |
+          uv run dpone ops evidence-chain-verify \
+            --chain-dir test_artifacts/certification/evidence-chain/connectors \
+            --format json
+
+      - name: Upload certification artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: connector-certification-offline
+          path: test_artifacts/connectors/
+
+      - name: Upload connector strategy certification bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: strategy-certification-connectors
+          path: test_artifacts/strategy_certification/connectors
+          if-no-files-found: warn
+
+      - name: Upload connector certification suite
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: connector-certification-suite
+          path: test_artifacts/certification/suite/connectors
+          if-no-files-found: warn
+
+      - name: Upload connector evidence chain
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: connector-evidence-chain
+          path: |
+            test_artifacts/certification/evidence-index/connectors
+            test_artifacts/certification/evidence-chain/connectors
+          if-no-files-found: warn
+
+  local-live-certification:
+    name: Local live connector certification
+    runs-on: ubuntu-latest
+    needs: offline-certification
+    if: ${{ github.event_name == 'schedule' || inputs.run_local_live == true }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+
+      - name: Install SQL Server ODBC and bcp tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg unixodbc-dev
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+            | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+          . /etc/os-release
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/${VERSION_ID}/prod ${VERSION_CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 mssql-tools18
+          echo "/opt/mssql-tools18/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Start disposable integration services
+        run: docker compose -f docker/docker-compose.integration.yml up -d postgres clickhouse minio mssql kafka schema-registry
+
+      - name: Prepare local MSSQL database
+        env:
+          DPONE_IT_MSSQL_HOST: 127.0.0.1
+          DPONE_IT_MSSQL_PORT: '51433'
+          DPONE_IT_MSSQL_DATABASE: dpone_it
+          DPONE_IT_MSSQL_USER: sa
+          DPONE_IT_MSSQL_PASSWORD: Dp0ne.Strong.Pw.2026!
+        run: |
+          set -euo pipefail
+          for attempt in {1..60}; do
+            if /opt/mssql-tools18/bin/sqlcmd \
+              -S "${DPONE_IT_MSSQL_HOST},${DPONE_IT_MSSQL_PORT}" \
+              -U "$DPONE_IT_MSSQL_USER" \
+              -P "$DPONE_IT_MSSQL_PASSWORD" \
+              -C \
+              -Q "SELECT 1" >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "MSSQL did not become ready for local connector certification."
+              exit 1
+            fi
+            sleep 2
+          done
+          cat > /tmp/dpone_prepare_mssql.sql <<'SQL'
+          IF DB_ID(N'$(db)') IS NULL
+          BEGIN
+              DECLARE @sql nvarchar(max) = N'CREATE DATABASE ' + QUOTENAME(N'$(db)');
+              EXEC(@sql);
+          END
+          SQL
+          /opt/mssql-tools18/bin/sqlcmd \
+            -S "${DPONE_IT_MSSQL_HOST},${DPONE_IT_MSSQL_PORT}" \
+            -U "$DPONE_IT_MSSQL_USER" \
+            -P "$DPONE_IT_MSSQL_PASSWORD" \
+            -C \
+            -v db="$DPONE_IT_MSSQL_DATABASE" \
+            -i /tmp/dpone_prepare_mssql.sql
+
+      - name: Run local optional integration markers
+        env:
+          DPONE_RUN_INTEGRATION_EXTENDED: '1'
+          DPONE_IT_MSSQL_HOST: 127.0.0.1
+          DPONE_IT_MSSQL_PORT: '51433'
+          DPONE_IT_MSSQL_PORT_FORWARD: '51433'
+          DPONE_IT_MSSQL_DATABASE: dpone_it
+          DPONE_IT_MSSQL_USER: sa
+          DPONE_IT_MSSQL_PASSWORD: Dp0ne.Strong.Pw.2026!
+          DPONE_IT_MSSQL_TRUST_SERVER_CERTIFICATE: 'yes'
+          DPONE_IT_MSSQL_BCP_PATH: /opt/mssql-tools18/bin/bcp
+          DPONE_KAFKA_BOOTSTRAP_SERVERS: 127.0.0.1:59092
+          DPONE_SCHEMA_REGISTRY_URL: http://127.0.0.1:58081
+        run: >-
+          uv run pytest
+          -m "integration_clickhouse or integration_mssql or integration_kafka"
+          tests/integration/clickhouse
+          tests/integration/mssql
+          tests/integration/kafka
+          -q
+
+      - name: Stop disposable integration services
+        if: always()
+        run: docker compose -f docker/docker-compose.integration.yml down -v
+
+  vendor-live-certification:
+    name: Vendor live certification
+    runs-on: ubuntu-latest
+    needs: offline-certification
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_vendor_live == true) }}
+    env:
+      DPONE_RUN_INTEGRATION_LIVE: '1'
+      APPSFLYER_API_TOKEN: ${{ secrets.APPSFLYER_API_TOKEN }}
+      GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+      GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON }}
+      MINDBOX_SECRET_KEY: ${{ secrets.MINDBOX_SECRET_KEY }}
+      SIMILARWEB_API_KEY: ${{ secrets.SIMILARWEB_API_KEY }}
+      YANDEX_WEBMASTER_OAUTH_TOKEN: ${{ secrets.YANDEX_WEBMASTER_OAUTH_TOKEN }}
+      OPENEXCHANGERATES_APP_ID: ${{ secrets.OPENEXCHANGERATES_APP_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Detect vendor secret readiness
+        id: vendor_secrets
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p test_artifacts/connectors/vendor-live
+          python3 <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          required = [
+              "APPSFLYER_API_TOKEN",
+              "GOOGLE_ADS_DEVELOPER_TOKEN",
+              "GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON",
+              "MINDBOX_SECRET_KEY",
+              "SIMILARWEB_API_KEY",
+              "YANDEX_WEBMASTER_OAUTH_TOKEN",
+              "OPENEXCHANGERATES_APP_ID",
+          ]
+          present = [name for name in required if os.environ.get(name)]
+          missing = [name for name in required if not os.environ.get(name)]
+          payload = {
+              "event_name": os.environ["GITHUB_EVENT_NAME"],
+              "complete": not missing,
+              "any_present": bool(present),
+              "present_count": len(present),
+              "missing_count": len(missing),
+              "present": present,
+              "missing": missing,
+          }
+          out = Path("test_artifacts/connectors/vendor-live/secret-readiness.json")
+          out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps(payload, indent=2, sort_keys=True))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"complete={'true' if payload['complete'] else 'false'}\n")
+              handle.write(f"any_present={'true' if payload['any_present'] else 'false'}\n")
+              handle.write(f"missing={','.join(missing)}\n")
+              handle.write(f"present={','.join(present)}\n")
+          PY
+
+      - name: Skip vendor live on schedule when no secrets are configured
+        if: ${{ github.event_name == 'schedule' && steps.vendor_secrets.outputs.any_present != 'true' }}
+        run: |
+          echo "::notice::Vendor live skipped on schedule: no vendor secrets configured. This is schedule hygiene, not a merge/release required check. Configure secrets or run workflow_dispatch with run_vendor_live=true for strict vendor evidence."
+          cat > test_artifacts/connectors/vendor-live/schedule-skip.json <<EOF
+          {
+            "status": "SKIPPED",
+            "reason": "no_vendor_secrets_configured",
+            "event_name": "schedule"
+          }
+          EOF
+
+      - name: Fail closed when manual vendor live lacks complete secrets
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.vendor_secrets.outputs.complete != 'true' }}
+        run: |
+          echo "::error::workflow_dispatch vendor live is strict and requires complete secrets. Missing: ${{ steps.vendor_secrets.outputs.missing }}"
+          exit 1
+
+      - name: Install uv
+        if: ${{ steps.vendor_secrets.outputs.any_present == 'true' && (github.event_name == 'schedule' || steps.vendor_secrets.outputs.complete == 'true') }}
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        if: ${{ steps.vendor_secrets.outputs.any_present == 'true' && (github.event_name == 'schedule' || steps.vendor_secrets.outputs.complete == 'true') }}
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        if: ${{ steps.vendor_secrets.outputs.any_present == 'true' && (github.event_name == 'schedule' || steps.vendor_secrets.outputs.complete == 'true') }}
+        run: uv sync --all-extras
+
+      - name: Run vendor live tests
+        if: ${{ steps.vendor_secrets.outputs.any_present == 'true' && (github.event_name == 'schedule' || steps.vendor_secrets.outputs.complete == 'true') }}
+        run: |
+          mkdir -p test_artifacts/connectors/vendor-live
+          uv run pytest \
+            -m integration_live \
+            tests/integration/appsflyer \
+            tests/integration/cbr \
+            tests/integration/fasttrack \
+            tests/integration/google_ads \
+            tests/integration/google_sheets \
+            tests/integration/mindbox \
+            tests/integration/openexchangerates \
+            tests/integration/similarweb \
+            tests/integration/yandex_webmaster \
+            --junitxml=test_artifacts/connectors/vendor-live/junit.xml \
+            -q
+
+      # Schedule hygiene: allow credential-gated skips when some secrets are present.
+      # workflow_dispatch: fail closed on any skip (`--max-skipped 0`).
+      # Hard failures/errors always fail the job on both triggers.
+      - name: Enforce vendor live junit policy
+        if: ${{ always() && steps.vendor_secrets.outputs.any_present == 'true' && (github.event_name == 'schedule' || steps.vendor_secrets.outputs.complete == 'true') }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            uv run python tools/ci/assert_junit_executed.py \
+              --junit test_artifacts/connectors/vendor-live/junit.xml \
+              --min-passed 1 \
+              --max-skipped 0
+          else
+            echo "Schedule vendor-live gate: allow credential skips; still fail on failures/errors."
+            uv run python tools/ci/assert_junit_executed.py \
+              --junit test_artifacts/connectors/vendor-live/junit.xml \
+              --min-passed 1
+          fi
+
+      - name: Upload vendor live execution evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: connector-vendor-live-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/connectors/vendor-live
+          if-no-files-found: warn

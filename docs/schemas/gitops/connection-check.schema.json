@@ -1,0 +1,417 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/connection-check.schema.json",
+  "title": "dpone GitOps connection check report",
+  "type": "object",
+  "required": [
+    "schema",
+    "passed",
+    "changes",
+    "errors",
+    "mode",
+    "network",
+    "secrets",
+    "source_queries",
+    "handshake",
+    "environment",
+    "connection_refs",
+    "resolved_connection_refs",
+    "airflow_connection_bridge",
+    "binding_set_path",
+    "connection_registry_path",
+    "credential_runtime_path"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "dpone.connection-check.v1"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "action",
+          "path",
+          "message",
+          "diff"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "diff": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/error"
+      }
+    },
+    "mode": {
+      "enum": [
+        "connections",
+        "live"
+      ]
+    },
+    "network": {
+      "type": "boolean"
+    },
+    "secrets": {
+      "type": "boolean"
+    },
+    "source_queries": {
+      "type": "boolean"
+    },
+    "planned_network": {
+      "type": "boolean"
+    },
+    "planned_secrets": {
+      "type": "boolean"
+    },
+    "planned_source_queries": {
+      "type": "string"
+    },
+    "live_preflight": {
+      "type": "string"
+    },
+    "live_preflight_report": {
+      "type": "object"
+    },
+    "handshake": {
+      "const": "configuration_only"
+    },
+    "environment": {
+      "type": "string",
+      "minLength": 1
+    },
+    "connection_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+        "maxLength": 128
+      }
+    },
+    "resolved_connection_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+        "maxLength": 128
+      }
+    },
+    "airflow_connection_bridge": {
+      "$ref": "#/$defs/airflow_connection_bridge"
+    },
+    "binding_set_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "connection_registry_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "credential_runtime_path": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "airflow_connection_bridge": {
+      "type": "object",
+      "required": [
+        "required",
+        "execution_mode",
+        "resolver_location",
+        "parse_safe",
+        "secrets",
+        "required_connection_ids",
+        "connections",
+        "projection",
+        "next_actions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "execution_mode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "operator_bridge",
+            null
+          ]
+        },
+        "resolver_location": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "operator_execution",
+            null
+          ]
+        },
+        "parse_safe": {
+          "const": true
+        },
+        "secrets": {
+          "const": false
+        },
+        "required_connection_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          }
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/airflow_connection_bridge_entry"
+          }
+        },
+        "projection": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/airflow_connection_bridge_projection"
+            }
+          ]
+        },
+        "next_actions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "airflow_connection_bridge_entry": {
+      "type": "object",
+      "required": [
+        "connection_ref",
+        "registry_connection_ref",
+        "connection_id",
+        "env_name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "connection_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+          "maxLength": 128
+        },
+        "registry_connection_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+          "maxLength": 128
+        },
+        "connection_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "env_name": {
+          "type": "string",
+          "pattern": "^AIRFLOW_CONN_[A-Z0-9_]+$"
+        }
+      }
+    },
+    "airflow_connection_bridge_projection": {
+      "type": "object",
+      "required": [
+        "mode",
+        "secret_name",
+        "mount_path",
+        "payload_format",
+        "secret_values",
+        "connections"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "kubernetes_secret_volume"
+        },
+        "secret_name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "mount_path": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^/run/secrets/dpone/\\S+$",
+              "not": {
+                "pattern": "(^|/)\\.\\.(/|$)"
+              }
+            },
+            {
+              "const": "$ABSOLUTE_PATH"
+            }
+          ]
+        },
+        "payload_format": {
+          "const": "airflow_connection_uri"
+        },
+        "secret_values": {
+          "const": false
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/airflow_connection_bridge_projection_entry"
+          }
+        }
+      }
+    },
+    "airflow_connection_bridge_projection_entry": {
+      "type": "object",
+      "required": [
+        "connection_ref",
+        "registry_connection_ref",
+        "connection_id",
+        "secret_key",
+        "mount_path",
+        "fields"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "connection_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+          "maxLength": 128
+        },
+        "registry_connection_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+          "maxLength": 128
+        },
+        "connection_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "secret_key": {
+          "type": "string",
+          "pattern": "^AIRFLOW_CONN_[A-Z0-9_]+$"
+        },
+        "mount_path": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^/run/secrets/dpone/\\S+$",
+              "not": {
+                "pattern": "(^|/)\\.\\.(/|$)"
+              }
+            },
+            {
+              "const": "$ABSOLUTE_PATH"
+            }
+          ]
+        },
+        "fields": {
+          "type": "object",
+          "required": [
+            "uri"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "uri": {
+              "const": "uri"
+            }
+          }
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": [
+        "schema",
+        "code",
+        "stage",
+        "severity",
+        "message"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "const": "dpone.error.v1"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^DPONE_[A-Z0-9_]+$"
+        },
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entity": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "fixes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "safety"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "safety": {
+                "enum": [
+                  "safe",
+                  "manual",
+                  "destructive"
+                ]
+              },
+              "description": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

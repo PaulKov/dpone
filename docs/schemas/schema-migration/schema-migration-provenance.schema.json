@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-migration-provenance.schema.json",
+  "title": "dpone schema migration provenance",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "producer",
+    "bundle_id",
+    "pack_id",
+    "provenance_id",
+    "subject",
+    "statement",
+    "blockers",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_provenance.v1"
+    },
+    "status": {"enum": ["attested", "blocked"]},
+    "producer": {"const": "dpone schema migration bundle attest"},
+    "bundle_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "provenance_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "subject": {
+      "type": "object",
+      "required": ["bundle_id", "pack_id", "target", "artifact_digests", "subject_digest"],
+      "additionalProperties": true,
+      "properties": {
+        "bundle_id": {"type": ["string", "null"]},
+        "pack_id": {"type": ["string", "null"]},
+        "target": {"type": "object"},
+        "bundle_digest": {"type": ["string", "null"]},
+        "artifact_digests": {"type": "array"},
+        "subject_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "statement": {
+      "type": "object",
+      "required": ["_type", "predicateType", "subject", "predicate"],
+      "additionalProperties": true,
+      "properties": {
+        "_type": {"const": "https://in-toto.io/Statement/v1"},
+        "predicateType": {"const": "https://slsa.dev/provenance/v1"},
+        "subject": {"type": "array"},
+        "predicate": {"type": "object"}
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": ["algorithm", "key_id", "signed_sha256", "signature"],
+      "additionalProperties": true,
+      "properties": {
+        "algorithm": {"const": "HMAC-SHA256"},
+        "key_id": {"type": "string"},
+        "signed_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "signature": {"type": "string"}
+      }
+    },
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

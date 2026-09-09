@@ -1,0 +1,102 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-desired-state-publish-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "committed_revision": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "desired_state_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "environment": {
+      "not": {
+        "enum": [
+          "current",
+          "latest"
+        ]
+      },
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$",
+      "type": "string"
+    },
+    "occurrence_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "created",
+        "replaced",
+        "idempotent"
+      ]
+    },
+    "passed": {
+      "const": true
+    },
+    "preparation_job_id": {
+      "pattern": "^[0-9]{1,32}$",
+      "type": "string"
+    },
+    "previous_revision": {
+      "anyOf": [
+        {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "published_at": {
+      "format": "date-time",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?Z$",
+      "type": "string"
+    },
+    "publisher_job_id": {
+      "pattern": "^[0-9]{1,32}$",
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.airflow-desired-state-publish.v2"
+    },
+    "state_may_have_changed": {
+      "const": false
+    },
+    "status": {
+      "const": "published"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "status",
+    "outcome",
+    "environment",
+    "occurrence_id",
+    "preparation_job_id",
+    "publisher_job_id",
+    "release_id",
+    "deployment_id",
+    "desired_state_sha256",
+    "previous_revision",
+    "committed_revision",
+    "published_at",
+    "state_may_have_changed"
+  ],
+  "title": "dpone GitOps Airflow desired-state publication evidence with job provenance",
+  "type": "object"
+}

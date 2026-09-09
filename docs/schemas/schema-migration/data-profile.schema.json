@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/data-profile.schema.json",
+  "title": "dpone schema migration data profile",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "profile_id",
+    "pack_id",
+    "fixture_build_id",
+    "stage",
+    "status",
+    "checks",
+    "metrics",
+    "blockers",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_data_profile.v1"},
+    "profile_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "fixture_build_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "stage": {"enum": ["before", "after"]},
+    "status": {"enum": ["profiled", "blocked"]},
+    "checks": {"type": "object"},
+    "metrics": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

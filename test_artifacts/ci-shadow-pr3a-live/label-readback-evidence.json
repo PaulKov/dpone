@@ -1,0 +1,69 @@
+{
+  "authority": {
+    "host": "github.com",
+    "labels": [
+      "dependencies",
+      "python:uv",
+      "github-actions"
+    ],
+    "repository": "PaulKov/dpone"
+  },
+  "collector": {
+    "ambient_gh_host": "attacker.example",
+    "command": "uv run python tools/ci/pr3a_label_readback_evidence.py collect --output <path> --pull-request 531 --implementation-base bc3d56093b4adb2eae94a475f20d5e3e1721b1ec",
+    "operation_class": "repository metadata GETs only",
+    "path": "tools/ci/pr3a_label_readback_evidence.py",
+    "tool": "gh"
+  },
+  "diagnostics": {
+    "gh_version_first_line": "gh version 2.93.0 (2026-05-27)",
+    "provider_responses": [
+      {
+        "body_base64": "eyJpZCI6MTExMTA4NTc2NjQsIm5vZGVfaWQiOiJMQV9rd0RPU3R5cWhNOEFBQUFDbGtJN3dBIiwidXJsIjoiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9QYXVsS292L2Rwb25lL2xhYmVscy9kZXBlbmRlbmNpZXMiLCJuYW1lIjoiZGVwZW5kZW5jaWVzIiwiY29sb3IiOiIwMzY2ZDYiLCJkZWZhdWx0IjpmYWxzZSwiZGVzY3JpcHRpb24iOiJQdWxsIHJlcXVlc3RzIHRoYXQgdXBkYXRlIGEgZGVwZW5kZW5jeSBmaWxlIn0=",
+        "body_bytes": 242,
+        "body_sha256": "sha256:fbe2072864145ec354c5170a6d599d214faba1d53ace58464f69cdcb5187ad27",
+        "echoed_url": "https://api.github.com/repos/PaulKov/dpone/labels/dependencies",
+        "label_id": 11110857664,
+        "method": "GET",
+        "name": "dependencies",
+        "node_id": "LA_kwDOStyqhM8AAAAClkI7wA",
+        "request_path": "repos/PaulKov/dpone/labels/dependencies"
+      },
+      {
+        "body_base64": "eyJpZCI6MTExMTA4NTc2NzgsIm5vZGVfaWQiOiJMQV9rd0RPU3R5cWhNOEFBQUFDbGtJN3pnIiwidXJsIjoiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9QYXVsS292L2Rwb25lL2xhYmVscy9weXRob246dXYiLCJuYW1lIjoicHl0aG9uOnV2IiwiY29sb3IiOiIyYjY3YzYiLCJkZWZhdWx0IjpmYWxzZSwiZGVzY3JpcHRpb24iOiJQdWxsIHJlcXVlc3RzIHRoYXQgdXBkYXRlIHB5dGhvbjp1diBjb2RlIn0=",
+        "body_bytes": 233,
+        "body_sha256": "sha256:e62246ca18f9ccd9d6ef2eb0fc31e1ee77ee779724c8a121a526a84b5fe01bb5",
+        "echoed_url": "https://api.github.com/repos/PaulKov/dpone/labels/python:uv",
+        "label_id": 11110857678,
+        "method": "GET",
+        "name": "python:uv",
+        "node_id": "LA_kwDOStyqhM8AAAAClkI7zg",
+        "request_path": "repos/PaulKov/dpone/labels/python%3Auv"
+      },
+      {
+        "body_base64": "eyJpZCI6MTE3OTExNDU3NTAsIm5vZGVfaWQiOiJMQV9rd0RPU3R5cWhNOEFBQUFDdnM2YkZnIiwidXJsIjoiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9QYXVsS292L2Rwb25lL2xhYmVscy9naXRodWItYWN0aW9ucyIsIm5hbWUiOiJnaXRodWItYWN0aW9ucyIsImNvbG9yIjoiMDM2NmQ2IiwiZGVmYXVsdCI6ZmFsc2UsImRlc2NyaXB0aW9uIjoiUHVsbCByZXF1ZXN0cyB0aGF0IHVwZGF0ZSBHaXRIdWIgQWN0aW9ucyBkZXBlbmRlbmNpZXMifQ==",
+        "body_bytes": 256,
+        "body_sha256": "sha256:0f6cb47fea408c4e67c0bc3bd4e56f827e7bb3411247fdbda1d548f1779a609c",
+        "echoed_url": "https://api.github.com/repos/PaulKov/dpone/labels/github-actions",
+        "label_id": 11791145750,
+        "method": "GET",
+        "name": "github-actions",
+        "node_id": "LA_kwDOStyqhM8AAAACvs6bFg",
+        "request_path": "repos/PaulKov/dpone/labels/github-actions"
+      }
+    ],
+    "stdout_bytes": 38,
+    "stdout_sha256": "sha256:7ab4d0a463257d59aebbc114f6bbdc908f92c778e833650cf2d5488fc9cb8c61",
+    "stdout_utf8": "dependencies\npython:uv\ngithub-actions\n"
+  },
+  "evidence_type": "dpone.ci-shadow-pr3a-label-readback.v3",
+  "label_readiness": "PASS",
+  "observed_at": "2026-08-10T19:28:16Z",
+  "receipt_status": "VERIFIED",
+  "schema_version": 3,
+  "source": "docs/feature-design-ci-shadow-pr3a-ci-hygiene.md#dependabot",
+  "subject": {
+    "implementation_base": "bc3d56093b4adb2eae94a475f20d5e3e1721b1ec",
+    "pull_request": 531
+  }
+}

@@ -1,0 +1,282 @@
+integration_postgres:
+  extends:
+    - .uv_dev_postgres_job_template
+    - .rules_integration_main_auto_mr_manual
+  stage: integration-test
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+      command: ["postgres"]
+      variables:
+        PGDATA: /tmp/postgres-data
+        POSTGRES_DB: dpone_it
+        POSTGRES_USER: dpone
+        POSTGRES_PASSWORD: dpone
+        POSTGRES_HOST_AUTH_METHOD: trust
+        HEALTHCHECK_TCP_PORT: "5432"
+  variables:
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_IT_PG_HOST: postgres
+    DPONE_IT_PG_PORT: "5432"
+    DPONE_IT_PG_DATABASE: dpone_it
+    DPONE_IT_PG_USER: dpone
+    DPONE_IT_PG_PASSWORD: dpone
+    DPONE_IT_PG_CONNECT_TIMEOUT: "60"
+    DPONE_IT_PG_POLL_INTERVAL: "1"
+  script:
+    - |
+      set -euo pipefail
+      echo "Resolving postgres service host"
+      getent hosts postgres || true
+      python - <<'PY'
+      import socket
+      import time
+
+      targets = [("postgres", 5432), ("127.0.0.1", 5432)]
+      deadline = time.time() + 60
+      last_error = None
+      while time.time() < deadline:
+          for host, port in targets:
+              try:
+                  with socket.create_connection((host, port), timeout=1):
+                      print(f"postgres service is reachable at {host}:{port}")
+                      raise SystemExit(0)
+              except OSError as exc:
+                  last_error = f"{host}:{port} -> {exc}"
+          time.sleep(1)
+      raise SystemExit(f"PostgreSQL service did not accept TCP connections: {last_error}")
+      PY
+      uv run pytest -m integration tests/integration/postgres
+
+integration_clickhouse:
+  extends:
+    - .uv_dev_clickhouse_job_template
+    - .rules_integration_main_auto_mr_manual
+  stage: integration-test
+  services:
+    - name: clickhouse/clickhouse-server:24.8
+      alias: clickhouse
+  variables:
+    CLICKHOUSE_DB: dpone_it
+    CLICKHOUSE_USER: default
+    CLICKHOUSE_PASSWORD: dpone
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_IT_CH_HOST: clickhouse
+    DPONE_IT_CH_PORT: "9000"
+    DPONE_IT_CH_DATABASE: dpone_it
+    DPONE_IT_CH_USER: default
+    DPONE_IT_CH_PASSWORD: dpone
+    DPONE_IT_CH_CONNECT_TIMEOUT: "90"
+    DPONE_IT_CH_POLL_INTERVAL: "2"
+  script:
+    - uv run pytest -m integration_clickhouse tests/integration/clickhouse
+
+integration_fasttrack_mock:
+  extends:
+    - .uv_dev_job_template
+    - .rules_main_and_mr
+  stage: integration-test
+  script:
+    - uv run pytest -m integration tests/integration/fasttrack/test_fasttrack_mock_integration.py
+
+integration_similarweb_mock:
+  extends:
+    - .uv_dev_job_template
+    - .rules_main_and_mr
+  stage: integration-test
+  script:
+    - uv run pytest -m integration tests/integration/similarweb/test_similarweb_mock_integration.py
+
+integration_openexchangerates_mock:
+  extends:
+    - .uv_dev_job_template
+    - .rules_main_and_mr
+  stage: integration-test
+  script:
+    - uv run pytest -m integration tests/integration/openexchangerates/test_openexchangerates_mock_integration.py
+
+integration_google_sheets_mock:
+  extends:
+    - .uv_dev_job_template
+    - .rules_main_and_mr
+  stage: integration-test
+  script:
+    - uv run pytest -m integration tests/integration/google_sheets/test_google_sheets_mock_integration.py
+
+integration_google_ads_mock:
+  extends:
+    - .uv_dev_job_template
+    - .rules_main_and_mr
+  stage: integration-test
+  script:
+    - uv run pytest -m integration tests/integration/google_ads/test_google_ads_mock_integration.py
+
+integration_yandex_webmaster_mock:
+  extends:
+    - .uv_dev_job_template
+    - .rules_main_and_mr
+  stage: integration-test
+  script:
+    - uv run pytest -m integration tests/integration/yandex_webmaster/test_yandex_webmaster_mock_integration.py
+
+integration_google_sheets_live:
+  extends:
+    - .uv_dev_vault_gcp_job_template
+    - .rules_google_sheets_live_main_manual
+  stage: integration-test
+  variables:
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_RUN_INTEGRATION_LIVE: "1"
+  script:
+    - test -n "${DPONE_IT_GS_SPREADSHEET_ID:-}${DPONE_IT_GS_SPREADSHEET_URL:-}"
+    - uv run pytest -m integration_live tests/integration/google_sheets
+
+integration_google_ads_live:
+  extends:
+    - .uv_dev_vault_google_ads_job_template
+    - .rules_vault_live_schedule_main_manual
+  stage: integration-test
+  variables:
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_RUN_INTEGRATION_LIVE: "1"
+  script:
+    - uv run pytest -m integration_live tests/integration/google_ads
+
+integration_yandex_webmaster_live:
+  extends:
+    - .uv_dev_vault_job_template
+    - .rules_yandex_webmaster_live_main_manual
+  stage: integration-test
+  variables:
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_RUN_INTEGRATION_LIVE: "1"
+    DPONE_IT_YANDEX_WEBMASTER_HOST_ID: "https:travel.example.com:443"
+  script:
+    - uv run pytest -m integration_live tests/integration/yandex_webmaster
+
+integration_clickhouse_export:
+  extends:
+    - .uv_dev_clickhouse_job_template
+    - .rules_schedule_main_mr_manual
+  stage: integration-test
+  before_script:
+    - set -euxo pipefail
+    - uv --version
+    - python --version
+    - uv sync --group dev --extra clickhouse --extra gcp
+  services:
+    - name: clickhouse/clickhouse-server:24.8
+      alias: clickhouse
+    - name: minio/minio:latest
+      alias: minio
+      command: ["server", "/tmp/minio-data", "--address", ":9001", "--console-address", ":9002"]
+      variables:
+        MINIO_ROOT_USER: minioadmin
+        MINIO_ROOT_PASSWORD: minioadmin
+        HEALTHCHECK_TCP_PORT: "9001"
+  variables:
+    CI_DEBUG_SERVICES: "true"
+    CLICKHOUSE_DB: dpone_it
+    CLICKHOUSE_USER: default
+    CLICKHOUSE_PASSWORD: dpone
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_RUN_INTEGRATION_EXTENDED: "1"
+    DPONE_IT_CH_HOST: clickhouse
+    DPONE_IT_CH_PORT: "9000"
+    DPONE_IT_CH_DATABASE: dpone_it
+    DPONE_IT_CH_USER: default
+    DPONE_IT_CH_PASSWORD: dpone
+    DPONE_IT_CH_CONNECT_TIMEOUT: "90"
+    DPONE_IT_CH_POLL_INTERVAL: "2"
+    DPONE_IT_MINIO_HOST: minio
+    DPONE_IT_MINIO_PORT: "9001"
+    DPONE_IT_MINIO_INTERNAL_URL: "http://minio:9001"
+    DPONE_IT_MINIO_ACCESS_KEY: minioadmin
+    DPONE_IT_MINIO_SECRET_KEY: minioadmin
+    DPONE_IT_MINIO_BUCKET: dpone-it
+  script:
+    - |
+      set -euo pipefail
+      echo "Resolving minio service host"
+      getent hosts minio || true
+      echo "Probing MinIO on service alias and loopback"
+      for _ in $(seq 1 60); do
+        curl -fsS http://minio:9001/minio/health/live >/dev/null && break
+        curl -fsS http://127.0.0.1:9001/minio/health/live >/dev/null && break
+        sleep 1
+      done
+      curl -fsS http://minio:9001/minio/health/live >/dev/null
+      uv run pytest -m integration_extended tests/integration/clickhouse/test_clickhouse_export_integration.py
+
+integration_appsflyer_live:
+  extends:
+    - .uv_dev_vault_job_template
+    - .rules_appsflyer_live_schedule_main_manual
+  stage: integration-test
+  variables:
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_RUN_INTEGRATION_LIVE: "1"
+  script:
+    - test -n "${DPONE_IT_AF_APP_IDS:-}"
+    - uv run pytest -m integration_live tests/integration/appsflyer
+
+integration_cbr_live_public:
+  extends:
+    - .uv_dev_job_template
+    - .rules_schedule_main_mr_manual
+  stage: integration-test
+  variables:
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_RUN_INTEGRATION_LIVE: "1"
+  script:
+    - uv run pytest -m integration_live tests/integration/cbr/test_cbr_live_integration.py
+
+integration_mindbox_live:
+  extends:
+    - .uv_dev_vault_job_template
+    - .rules_vault_live_schedule_main_manual
+  stage: integration-test
+  variables:
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_RUN_INTEGRATION_LIVE: "1"
+    DPONE_IT_MB_EXPORT_TIMEOUT: "3000"
+  script:
+    - uv run pytest -m integration_live tests/integration/mindbox
+
+integration_fasttrack_live:
+  extends:
+    - .uv_dev_vault_job_template
+    - .rules_vault_live_schedule_main_manual
+  stage: integration-test
+  variables:
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_RUN_INTEGRATION_LIVE: "1"
+  script:
+    - uv run pytest -m integration_live tests/integration/fasttrack/test_fasttrack_live_integration.py
+
+integration_similarweb_live:
+  extends:
+    - .uv_dev_vault_job_template
+    - .rules_similarweb_live_main_manual
+  stage: integration-test
+  variables:
+    DPONE_IT_SW_DOMAINS: "travel.example.com"
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_RUN_INTEGRATION_LIVE: "1"
+    DPONE_IT_SW_LIMIT: "5"
+    DPONE_IT_SW_PAGE_SIZE: "5"
+    DPONE_IT_SW_MIN_KEYWORDS_COUNT: "1"
+  script:
+    - uv run pytest -m integration_live tests/integration/similarweb
+
+integration_openexchangerates_live:
+  extends:
+    - .uv_dev_vault_job_template
+    - .rules_vault_live_schedule_main_manual
+  stage: integration-test
+  variables:
+    DPONE_IT_OXR_SYMBOLS: "ARS,RUB,EUR"
+    DPONE_RUN_INTEGRATION: "1"
+    DPONE_RUN_INTEGRATION_LIVE: "1"
+  script:
+    - uv run pytest -m integration_live tests/integration/openexchangerates

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-governance-export-plan.schema.json",
+  "title": "dpone data product governance export plan",
+  "type": "object",
+  "required": ["schema_version", "governance_export_plan_id", "status", "product", "export_items", "evidence_refs", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_governance_export_plan.v1"},
+    "governance_export_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["disabled", "ready", "warning", "blocked"]},
+    "mode": {"type": "string"},
+    "profile": {"type": "string"},
+    "product": {"type": "object"},
+    "contract": {"type": "object"},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "export_items": {"type": "array", "items": {"type": "object"}},
+    "evidence_refs": {"type": "array", "items": {"type": "object"}},
+    "registry_summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

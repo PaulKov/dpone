@@ -1,0 +1,58 @@
+schema_version: 1
+task_id: "SS-REVIEW-STRUCTURED-REDACTION"
+title: "Close URI, YAML diff, and migration-plan secret leaks"
+goal: "Apply a fail-closed structured redaction boundary to self-service JSON, evidence, diffs, and migration diagnostics."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "All URI authority userinfo forms are removed, including empty-user, token-only, percent-encoded, and IPv6-host cases."
+  - "Final safe-sample JSON and persisted evidence pass through recursive redaction."
+  - "YAML block/folded scalar secrets cannot survive scaffold conflict diffs."
+  - "Unparseable untrusted content is omitted behind bounded safe diagnostics."
+  - "Legacy vault_path is not exposed in text or JSON migration plans."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["safe-sample JSON/evidence", "scaffold conflict diffs", "authoring migration plan"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/security_redaction.py"
+  - "src/dpone/services/safe_sample_redaction.py"
+  - "src/dpone/services/safe_sample_cli_runtime.py"
+  - "src/dpone/commands/run_safe_sample_cmd.py"
+  - "src/dpone/readiness/airflow_scaffold_apply.py"
+  - "src/dpone/readiness/airflow_authoring_migration_plan.py"
+  - "tests/test_safe_sample_runtime.py"
+  - "tests/test_airflow_self_service_security.py"
+  - "tests/test_airflow_connection_migration_plan.py"
+read_only_paths:
+  - "src/dpone/services/safe_sample_runtime_executor.py"
+  - "src/dpone/services/safe_sample_runtime_evidence.py"
+  - "src/dpone/output_json.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_safe_sample_runtime.py tests/test_airflow_self_service_security.py tests/test_airflow_connection_migration_plan.py -q"
+  broad:
+    - "uv run pytest tests/test_safe_sample_runtime.py tests/test_airflow_self_service_cli.py tests/test_airflow_self_service_security.py tests/test_airflow_connection_migration_plan.py -q"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

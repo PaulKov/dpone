@@ -1,0 +1,341 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/self-service-certification.schema.json",
+  "title": "dpone GitOps self-service certification",
+  "type": "object",
+  "required": [
+    "schema",
+    "expected_commit",
+    "evaluated_at",
+    "overall_status",
+    "has_input_failures",
+    "usability",
+    "reference_deployments"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.self-service-certification.v1"
+    },
+    "expected_commit": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "overall_status": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "UNVERIFIED"
+      ]
+    },
+    "has_input_failures": {
+      "type": "boolean"
+    },
+    "usability": {
+      "$ref": "#/$defs/usability"
+    },
+    "reference_deployments": {
+      "$ref": "#/$defs/references"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "nullable_sha256": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullable_text": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullable_number": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "UNVERIFIED"
+      ]
+    },
+    "thresholds": {
+      "type": "object",
+      "required": [
+        "minimum_participants",
+        "minimum_success_rate",
+        "maximum_first_dag_seconds",
+        "maximum_safe_sample_seconds",
+        "maximum_commands"
+      ],
+      "properties": {
+        "minimum_participants": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_success_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_first_dag_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_safe_sample_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_commands": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "usability": {
+      "type": "object",
+      "required": [
+        "status",
+        "supplied",
+        "source_sha256",
+        "valid_sessions",
+        "successful_sessions",
+        "complete_success_rate",
+        "first_dag_target_rate",
+        "safe_sample_target_rate",
+        "no_airflow_python_rate",
+        "p50_first_dag_seconds",
+        "p50_safe_sample_seconds",
+        "thresholds",
+        "blockers"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "supplied": {
+          "type": "boolean"
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "valid_sessions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "successful_sessions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "thresholds": {
+          "$ref": "#/$defs/thresholds"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "complete_success_rate": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "first_dag_target_rate": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "safe_sample_target_rate": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "no_airflow_python_rate": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "p50_first_dag_seconds": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "p50_safe_sample_seconds": {
+          "$ref": "#/$defs/nullable_number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "reference_proof": {
+      "type": "object",
+      "required": [
+        "evidence_set",
+        "status",
+        "release_id",
+        "deployment_id",
+        "signer_identity",
+        "correlation_id",
+        "release_set_sha256",
+        "deployment_set_sha256",
+        "airflow_evidence_sha256",
+        "blockers"
+      ],
+      "properties": {
+        "evidence_set": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "signer_identity": {
+          "$ref": "#/$defs/nullable_text"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        },
+        "release_id": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "deployment_id": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "correlation_id": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "release_set_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "deployment_set_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "airflow_evidence_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        }
+      },
+      "additionalProperties": false
+    },
+    "references": {
+      "type": "object",
+      "required": [
+        "status",
+        "supplied_count",
+        "valid_count",
+        "distinct_deployment_count",
+        "distinct_signer_count",
+        "proofs",
+        "blockers"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "supplied_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "distinct_deployment_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "distinct_signer_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "proofs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reference_proof"
+          },
+          "maxItems": 100
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "uniqueItems": true,
+          "maxItems": 1000
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-evidence-signature.schema.json",
+  "title": "dpone data product evidence signature",
+  "type": "object",
+  "required": ["schema_version", "evidence_signature_id", "status", "actor", "algorithm", "artifact_sha256", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_evidence_signature.v1"},
+    "evidence_signature_id": {"type": "string"},
+    "source_evidence_signature_id": {"type": ["string", "null"]},
+    "status": {"enum": ["signed", "verified", "warning", "blocked"]},
+    "authority_registry_id": {"type": ["string", "null"]},
+    "actor": {"type": "string"},
+    "signed_by": {"type": "string"},
+    "algorithm": {"type": "string"},
+    "artifact_schema_version": {"type": ["string", "null"]},
+    "artifact_id": {"type": ["string", "null"]},
+    "artifact_sha256": {"type": "string"},
+    "signature": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

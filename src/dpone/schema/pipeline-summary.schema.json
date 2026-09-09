@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/pipeline-summary.schema.json",
+  "title": "dpone pipeline summary v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "source_path",
+    "valid",
+    "operational_status",
+    "authoring_mode",
+    "recipe",
+    "processes",
+    "quality_gates",
+    "schedule",
+    "artifact_state",
+    "support",
+    "certification",
+    "next_actions",
+    "errors"
+  ],
+  "properties": {
+    "schema": {"const": "dpone.pipeline-summary.v1"},
+    "id": {"type": "string", "minLength": 1},
+    "source_path": {"type": "string", "minLength": 1},
+    "valid": {"type": "boolean"},
+    "operational_status": {"enum": ["ready", "blocked", "not_applicable"]},
+    "authoring_mode": {"type": ["string", "null"]},
+    "recipe": {"type": ["string", "null"]},
+    "processes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "source", "sink", "strategy"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "source": {"type": "string", "minLength": 1},
+          "sink": {"type": "string", "minLength": 1},
+          "strategy": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "quality_gates": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/qualityGate"}
+    },
+    "schedule": {"type": ["string", "null"]},
+    "artifact_state": {"$ref": "#/$defs/artifactState"},
+    "support": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/routeSupport"}
+      ]
+    },
+    "certification": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/routeCertification"}
+      ]
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "argv"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "label": {"type": "string", "minLength": 1},
+          "argv": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/dponeError"}
+    }
+  },
+  "$defs": {
+    "qualityGate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "type"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "type": {"type": "string", "minLength": 1},
+        "severity": {"enum": ["info", "warning", "error", "critical"]}
+      }
+    },
+    "artifactState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest",
+        "dag_spec",
+        "airflow_pack",
+        "published_deployment_id",
+        "published_generation"
+      ],
+      "properties": {
+        "manifest": {"enum": ["source", "invalid", "missing"]},
+        "dag_spec": {"enum": ["planned", "materialized", "stale", "unavailable"]},
+        "airflow_pack": {"enum": ["planned", "materialized", "stale", "unavailable"]},
+        "published_deployment_id": {"type": ["string", "null"]},
+        "published_generation": {"type": ["string", "null"]}
+      }
+    },
+    "routeSupport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "limitations", "docs_link", "install_extras"],
+      "properties": {
+        "status": {"enum": ["supported", "conditional", "not_supported"]},
+        "limitations": {"type": "array", "items": {"type": "string"}},
+        "docs_link": {"type": "string"},
+        "install_extras": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "certificationVariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "route_id",
+        "transport",
+        "schema_evolution",
+        "airflow_runtime_mode",
+        "level",
+        "evidence_status",
+        "evidence_refs",
+        "reason_codes"
+      ],
+      "properties": {
+        "id": {"type": "string"},
+        "route_id": {"type": "string"},
+        "transport": {"type": "string"},
+        "schema_evolution": {"type": "string"},
+        "airflow_runtime_mode": {"type": "string"},
+        "level": {
+          "enum": [
+            "experimental",
+            "route-certified",
+            "production-certified",
+            "enterprise-certified"
+          ]
+        },
+        "evidence_status": {"enum": ["PASS", "FAIL", "SKIP", "UNVERIFIED"]},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}},
+        "reason_codes": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "routeCertification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "evidence_status", "reason_codes", "variants"],
+      "properties": {
+        "level": {
+          "enum": [
+            "experimental",
+            "route-certified",
+            "production-certified",
+            "enterprise-certified"
+          ]
+        },
+        "evidence_status": {"enum": ["PASS", "FAIL", "SKIP", "UNVERIFIED"]},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "variants": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/certificationVariant"}
+        }
+      }
+    },
+    "errorFix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "safety"],
+      "properties": {
+        "id": {"type": "string"},
+        "safety": {"enum": ["safe", "manual", "destructive"]},
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "dponeError": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["schema", "code", "stage", "severity", "message", "fixes"],
+      "properties": {
+        "schema": {"const": "dpone.error.v1"},
+        "code": {"type": "string"},
+        "stage": {"type": "string"},
+        "severity": {"enum": ["info", "warning", "error", "critical"]},
+        "message": {"type": "string"},
+        "fixes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/errorFix"}
+        }
+      }
+    }
+  }
+}

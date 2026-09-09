@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+defaults:
+  name: kafka_to_postgres_example
+  source:
+    type: kafka
+    connection_id: kafka_source
+    topic: orders.events
+    options:
+      group_id: dpone.orders.batch
+      read_mode: max_records
+      max_records: 50000
+      offset_storage: dpone
+      start_from: stored
+      message_format: json
+  sink:
+    type: postgres
+    connection_id: postgres_dwh
+    table:
+      schema: public
+      name: orders
+    strategy:
+      mode: incremental_append
+
+quality:
+  gates:
+    - id: source_target_rows
+      type: row_count_reconciliation
+      severity: error
+      tolerance:
+        mode: pct
+        value: 0.1
+
+schemas:
+  kafka:
+    tables:
+      - orders_events

@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/bundle.schema.json",
+  "title": "dpone GitOps bundle contract",
+  "type": "object",
+  "required": [
+    "kind",
+    "output_dir",
+    "affected_path",
+    "summary_path",
+    "entries",
+    "policy"
+  ],
+  "properties": {
+    "kind": {
+      "const": "gitops.bundle"
+    },
+    "output_dir": {
+      "type": "string"
+    },
+    "affected_path": {
+      "type": "string"
+    },
+    "summary_path": {
+      "type": "string"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "manifest",
+          "plan_path",
+          "verify_path",
+          "passed"
+        ],
+        "properties": {
+          "manifest": {
+            "type": "string"
+          },
+          "plan_path": {
+            "type": "string"
+          },
+          "verify_path": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "profile"
+      ],
+      "properties": {
+        "profile": {
+          "type": "string"
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "schema_version",
+        "producer",
+        "hash_algorithm",
+        "bundle_digest",
+        "provenance",
+        "artifacts"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "string"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "hash_algorithm": {
+          "const": "sha256"
+        },
+        "bundle_digest": {
+          "type": "string"
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "path",
+              "sha256",
+              "bytes"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "bytes": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "code",
+        "message",
+        "path",
+        "source"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

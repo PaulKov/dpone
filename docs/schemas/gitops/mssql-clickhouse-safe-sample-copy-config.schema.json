@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/mssql-clickhouse-safe-sample-copy-config.schema.json",
+  "title": "dpone GitOps MSSQL ClickHouse safe sample copy config",
+  "type": "object",
+  "required": [
+    "schema",
+    "source_connection_ref",
+    "source_table"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.mssql-clickhouse-safe-sample-copy-config.v1"
+    },
+    "source_connection_ref": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+      "maxLength": 128
+    },
+    "source_table": {
+      "$ref": "#/$defs/table"
+    }
+  },
+  "$defs": {
+    "table": {
+      "type": "object",
+      "required": [
+        "schema",
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

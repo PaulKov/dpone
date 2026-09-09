@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/cicd/compatibility-candidate-v1.schema.json",
+  "title": "dpone.compatibility-candidate.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "entries", "inventory_digest"],
+  "properties": {
+    "schema_version": {"const": "dpone.compatibility-candidate.v1"},
+    "inventory_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "entries": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["filename", "distribution", "version", "sha256", "size_bytes"],
+        "properties": {
+          "filename": {"type": "string", "minLength": 1, "maxLength": 255, "pattern": "^[^/\\\\\u0000-\u001f]+\\.whl$"},
+          "distribution": {"enum": ["dpone", "dpone-airflow-pack", "apache-airflow-providers-dpone"]},
+          "version": {"type": "string", "minLength": 1, "maxLength": 128},
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "size_bytes": {"type": "integer", "minimum": 0, "maximum": 536870912}
+        }
+      }
+    }
+  }
+}

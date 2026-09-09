@@ -1,0 +1,162 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/runtime-artifact-attestation-verification.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "passed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "errors": {
+            "maxItems": 0
+          },
+          "passed": {
+            "const": true
+          }
+        },
+        "required": [
+          "subject_sha256",
+          "verifier",
+          "verifier_version",
+          "verified_attestations"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "errors": {
+            "minItems": 1
+          },
+          "passed": {
+            "const": false
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "changes": {
+      "maxItems": 0,
+      "type": "array"
+    },
+    "errors": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "code": {
+            "pattern": "^DPONE_(?:ARTIFACT_ATTESTATION|ARTIFACT_TRUST_POLICY)_[A-Z0-9_]+$",
+            "type": "string"
+          },
+          "docs_url": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "fixes": {
+            "items": {
+              "additionalProperties": true,
+              "properties": {
+                "id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "safety": {
+                  "enum": [
+                    "safe",
+                    "manual",
+                    "destructive"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "safety"
+              ],
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "message": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "schema": {
+            "const": "dpone.error.v1"
+          },
+          "severity": {
+            "const": "error"
+          },
+          "stage": {
+            "const": "airflow_artifact_attestation_verify"
+          }
+        },
+        "required": [
+          "schema",
+          "code",
+          "stage",
+          "severity",
+          "message",
+          "fixes"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "schema": {
+      "const": "dpone.runtime-artifact-attestation-verification.v1"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    },
+    "subject_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "verified_attestations": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "verifier": {
+      "const": "github_artifact_attestation_v1"
+    },
+    "verifier_version": {
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "changes",
+    "errors",
+    "status"
+  ],
+  "title": "dpone GitOps runtime artifact attestation verification",
+  "type": "object"
+}

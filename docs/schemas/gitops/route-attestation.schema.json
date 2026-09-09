@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/route-attestation.schema.json",
+  "title": "dpone GitOps route attestation",
+  "type": "object",
+  "required": [
+    "schema",
+    "attestation_id",
+    "claims"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.route-attestation.v1"
+    },
+    "attestation_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "claims": {
+      "type": "object",
+      "required": [
+        "route",
+        "certification",
+        "subject",
+        "validity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "route": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "route_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "sink": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "strategy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "transport": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "schema_evolution": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "airflow_runtime_mode": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "sampling_mode": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          },
+          "required": [
+            "route_id",
+            "source",
+            "sink",
+            "strategy",
+            "transport",
+            "schema_evolution",
+            "airflow_runtime_mode",
+            "sampling_mode"
+          ]
+        },
+        "certification": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bundle_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "profile": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "level": {
+              "const": "certified"
+            }
+          },
+          "required": [
+            "bundle_sha256",
+            "profile",
+            "level"
+          ]
+        },
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "release_id": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "deployment_id": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "environment": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "runtime_image_digest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "authorization_profile": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          },
+          "required": [
+            "release_id",
+            "deployment_id",
+            "environment",
+            "runtime_image_digest",
+            "authorization_profile"
+          ]
+        },
+        "validity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "issued_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "not_before": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "expires_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "issued_at",
+            "not_before",
+            "expires_at"
+          ]
+        }
+      }
+    }
+  }
+}

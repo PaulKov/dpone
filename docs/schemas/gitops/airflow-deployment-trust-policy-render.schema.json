@@ -1,0 +1,61 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-deployment-trust-policy-render.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "changes": {
+      "maxItems": 0,
+      "type": "array"
+    },
+    "errors": {
+      "maxItems": 0,
+      "type": "array"
+    },
+    "output_path": {
+      "maxLength": 512,
+      "minLength": 1,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?(?![\\s\\S])",
+      "type": "string"
+    },
+    "passed": {
+      "const": true
+    },
+    "policy_bytes": {
+      "maximum": 262144,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "policy_fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.airflow-deployment-trust-policy-render.v1"
+    },
+    "status": {
+      "const": "rendered"
+    },
+    "warnings": {
+      "maxItems": 0,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "passed",
+    "changes",
+    "errors",
+    "status",
+    "policy_fingerprint",
+    "policy_sha256",
+    "policy_bytes",
+    "output_path",
+    "warnings"
+  ],
+  "title": "dpone GitOps canonical Airflow deployment trust-policy render receipt",
+  "type": "object"
+}

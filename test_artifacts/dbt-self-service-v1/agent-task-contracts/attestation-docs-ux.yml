@@ -1,0 +1,67 @@
+schema_version: 1
+task_id: "DBT-SS-V1-ATTESTATION-DOCS"
+title: "Align dbt self-service operator documentation with stock production attestation"
+goal: "Remove stale blocked-production guidance, publish an executable v2 trust-policy example, and protect the documented production ordering with contract tests."
+specification: "docs/feature-design-dbt-inline-self-service-v1.md"
+base_commit: "7141afaa"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "All owned pages describe the implemented fail-closed stock v2 verifier and keep exact-environment live certification UNVERIFIED."
+  - "The operator trust-policy example is valid against JSON Schema and the production parser."
+  - "Multi-repository examples use coherent job identifiers and do not imply cross-workflow or cross-repository needs outputs."
+  - "The documented production order is verification, build/parse-smoke, immutable publish, then CAS current."
+  - "Contract tests reject stale verifier language and validate the documented v2 policy example."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dbt self-service operator documentation"
+    - "runtime artifact trust-policy v2 operator example"
+  migration_required: false
+
+owned_paths:
+  - "docs/dbt-inline-publishing.md"
+  - "docs/dbt-self-service-platform-workflows.md"
+  - "docs/airflow-pack-provider.md"
+  - "docs/airflow-cache-sync.md"
+  - "tests/test_dbt_self_service_docs_contracts.py"
+read_only_paths:
+  - ".github/workflows/dbt-self-service-dev.yml"
+  - ".github/workflows/dbt-self-service-dev-activation.yml"
+  - ".github/workflows/dbt-self-service-open-prod-pr.yml"
+  - ".github/workflows/dbt-self-service-prod.yml"
+  - "src/dpone/contracts/runtime_artifact_attestation.py"
+  - "docs/schemas/gitops/runtime-artifact-trust-policy-v2.schema.json"
+  - "docs/dbt-self-service-errors.md"
+  - "docs/feature-design-dbt-inline-self-service-v1.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_self_service_docs_contracts.py tests/test_dbt_self_service_workflows.py -q"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live: []
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

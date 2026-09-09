@@ -1,0 +1,82 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-publish-explain.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "intent": {
+      "type": "object"
+    },
+    "model": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "model_path": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$",
+      "type": "string"
+    },
+    "resolved_physical_design": {
+      "type": "object"
+    },
+    "resolved_strategy": {
+      "type": "object"
+    },
+    "route_capability": {
+      "type": "object"
+    },
+    "schema": {
+      "const": "dpone.dbt-publish-explain.v1"
+    },
+    "source_relation": {
+      "additionalProperties": false,
+      "properties": {
+        "database": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "name"
+      ],
+      "type": "object"
+    },
+    "warnings": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "workload_id": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "model",
+    "model_path",
+    "source_relation",
+    "intent",
+    "resolved_strategy",
+    "resolved_physical_design",
+    "route_capability",
+    "workload_id",
+    "warnings"
+  ],
+  "type": "object"
+}

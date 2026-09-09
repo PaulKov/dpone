@@ -1,0 +1,5 @@
+schema_version,generated_at,release_version,release_tag,release_sha,project_id,claim_id,claim_type,status,confidence,freshness,gate_impact
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dpone,release_quality_gate,release-readiness,verified,95,fresh,blocker
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dpone,module_size_budget,architecture-quality,verified,95,fresh,blocker
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dpone,nested_lineage_runtime_contract,runtime-certification,verified,95,fresh,blocker
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dpone,public_auditability,auditability,verified,95,fresh,warning

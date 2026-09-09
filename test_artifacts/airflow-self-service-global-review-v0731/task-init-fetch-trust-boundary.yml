@@ -1,0 +1,75 @@
+schema_version: 1
+task_id: "SS-REVIEW-INIT-FETCH-TRUST-BOUNDARY"
+title: "Validate and bound init-fetch at its final runtime trust boundary"
+goal: "Make direct InitFetchPlan construction and execution as strict, immutable, release-bound and resource-bounded as the canonical builder."
+specification: "docs/adr/0009-artifact-delivery-and-cache-materializer.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Direct InitFetchPlan construction rejects invalid digests, mutable registry aliases, invalid policies, unsafe refs, duplicate IDs/paths and release mismatches."
+  - "Plan identity/verify mappings and artifact collection are defensively immutable."
+  - "InitFetchExecutor revalidates the complete plan before registry or destination I/O."
+  - "The executor depends on the connector-neutral ArtifactRegistry read boundary; local registry compatibility remains available through an adapter."
+  - "Artifact count and declared aggregate bytes fail before the first registry read."
+  - "Fetched artifacts are staged and verified incrementally; the executor does not retain the complete release body set in memory."
+  - "required_for_prod attestations fail closed unless an injected verifier accepts the exact pinned plan and staged artifacts."
+  - "Failed fetch/verification/publication leaves no partial final destination and retry is deterministic."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["InitFetchPlan", "InitFetchExecutor", "LocalArtifactRegistry compatibility", "init-fetch evidence"]
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/runtime/artifact_delivery.py"
+  - "src/dpone/runtime/init_fetch_contract.py"
+  - "src/dpone/runtime/init_fetch_execution.py"
+  - "src/dpone/runtime/safe_sample_init_fetch.py"
+  - "tests/test_airflow_runtime_phase1b_contracts.py"
+  - "tests/test_airflow_safe_sample_runtime_executor.py"
+  - "tests/test_init_fetch_trust_boundary.py"
+read_only_paths:
+  - "docs/adr/0009-artifact-delivery-and-cache-materializer.md"
+  - "docs/airflow-self-service-architecture.md"
+  - "src/dpone/ports/artifact_registry.py"
+  - "src/dpone/runtime/airflow_artifact_delivery_support.py"
+  - "src/dpone/runtime/immutable_local_tree.py"
+  - "src/dpone/adapters/object_storage_artifact_registry.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "packages"
+  - "docs"
+
+shared_file_owner: "integrator"
+dependencies: ["SS-REVIEW-RUNTIME-INIT-FETCH-SNAPSHOT"]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_init_fetch_trust_boundary.py tests/test_airflow_runtime_phase1b_contracts.py -k 'init_fetch or local_artifact_registry' -q"
+    - "uv run pytest tests/test_airflow_safe_sample_runtime_executor.py -k init_fetch -q"
+    - "uv run ruff check src/dpone/runtime/artifact_delivery.py src/dpone/runtime/init_fetch_contract.py src/dpone/runtime/init_fetch_execution.py src/dpone/runtime/safe_sample_init_fetch.py tests/test_init_fetch_trust_boundary.py"
+    - "uv run mypy --config-file mypy.ini src/dpone/runtime/artifact_delivery.py src/dpone/runtime/init_fetch_contract.py src/dpone/runtime/init_fetch_execution.py src/dpone/runtime/safe_sample_init_fetch.py"
+  broad:
+    - "uv run pytest tests/test_airflow_runtime_phase1b_contracts.py tests/test_airflow_safe_sample_runtime_executor.py tests/test_airflow_remote_artifact_delivery.py -q"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "The fix requires mutable current/latest resolution or static credentials."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+
+# Integrator handoff, 2026-07-18:
+# SS-REVIEW-RUNTIME-INIT-FETCH-SNAPSHOT is complete and its current changes are
+# the baseline. Ownership of its overlapping paths is transferred to this
+# fresh-review closure; prior safety fixes must be preserved.

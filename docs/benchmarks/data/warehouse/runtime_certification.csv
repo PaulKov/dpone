@@ -1,0 +1,5 @@
+schema_version,generated_at,release_version,release_tag,release_sha,project_id,scenario_id,source,strategy,sink,status,last_error
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dpone,release_gate_certification,dpone,release_gate,benchmark evidence,passed,
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dpone,python_api_payload_contract,dpone,python_api,raw evidence JSON,passed,
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dpone,nested_lineage_contract,nested objects,nested_normalization,lineage tables,passed,
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dpone,benchmark_artifact_contract,benchmark,artifact_generation,docs/benchmarks,passed,

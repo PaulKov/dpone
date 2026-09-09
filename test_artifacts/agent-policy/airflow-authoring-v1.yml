@@ -1,0 +1,101 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-AUTHORING-V1"
+title: "Unify classic and flow authoring behind the canonical manifest compiler"
+goal: "Make every self-service pipeline source canonical-loader compatible and establish the Phase 2 Authoring v1 compiler boundary."
+specification: "docs/feature-design-airflow-authoring-v1.md"
+base_commit: "054e100302be20fa7b6cc3ced4d68c6be5c3a03f"
+integrator: "current Codex task"
+
+acceptance_criteria:
+  - "New classic scaffolds are valid dpone.batch.v1 manifests for ManifestLoaderRouter."
+  - "Explicit flow scaffolds compile through the same canonical batch compiler."
+  - "Equivalent classic and flow sources have the same semantic fingerprint."
+  - "Released batch-plus-processes sources remain readable with one structured deprecation code."
+  - "Static check and preview reuse one compilation result and perform no network or secret I/O."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone init pipeline --authoring"
+    - "dpone.flow.v1"
+    - "dpone check JSON details"
+    - "ManifestLoaderRouter"
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/manifest/authoring*"
+  - "src/dpone/manifest/loader.py"
+  - "src/dpone/manifest/batch_loader.py"
+  - "src/dpone/readiness/airflow_*"
+  - "src/dpone/commands/init_cmd.py"
+  - "src/dpone/schema/etl-*-manifest.schema.json"
+  - "src/dpone/services/safe_sample_policy.py"
+  - "docs/schemas/authoring/**"
+  - "docs/feature-design-airflow-authoring-v1.md"
+  - "docs/adr/0015-single-authoring-compiler.md"
+  - "docs/adr-index.md"
+  - "docs/airflow-self-service*.md"
+  - "docs/getting-started/first-airflow-dag.md"
+  - "docs/reference/manifest-schemas.md"
+  - "docs/cli-reference.md"
+  - "docs/compatibility.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - "tests/test_airflow_authoring_v1.py"
+  - "tests/test_airflow_self_service_cli.py"
+  - "tests/test_cli_route_attestation_commands.py"
+  - "test_artifacts/airflow-authoring-v1/**"
+read_only_paths:
+  - "src/dpone/runtime/**"
+  - "packages/dpone-airflow-pack/**"
+forbidden_paths:
+  - ".cursor/**"
+  - "uv.lock"
+  - ".github/workflows/**"
+
+shared_file_owner: "current Codex task"
+
+dependencies:
+  - "ADR 0006 authority and canonical IR"
+  - "ADR 0008 parse-safe provider"
+  - "ADR 0011 canonical fingerprints"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_authoring_v1.py tests/test_airflow_self_service_cli.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "N/A: compilation is credential-free and has no live side effects"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+validation_repairs:
+  - "Replace the unrelated expired fixed route-attestation test window discovered by the full gate with a bounded current-time window; production validity policy is unchanged."
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "The compiler would need Airflow, runtime, Vault, Kubernetes, or connector imports."
+  - "A change would create a second editable source of truth."
+  - "Compatibility with a released Phase 1 scaffold cannot be preserved."
+  - "A required edit touches user-owned .cursor files."

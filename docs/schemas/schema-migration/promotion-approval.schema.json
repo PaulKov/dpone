@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/promotion-approval.schema.json",
+  "title": "dpone schema migration promotion approval",
+  "type": "object",
+  "required": ["schema_version", "pack_id", "from_environment", "to_environment", "approved_by", "approved_risks"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_promotion_approval.v1"
+    },
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "from_environment": {"type": "string"},
+    "to_environment": {"type": "string"},
+    "approved_by": {"type": "string", "minLength": 1},
+    "approved_at": {"type": "string"},
+    "expires_at": {"type": "string"},
+    "approved_risks": {
+      "type": "array",
+      "items": {"type": "string"},
+      "contains": {"const": "prod_promotion"}
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "artifact_paths": [],
+  "category": "schema_evolution",
+  "contract_checks": [
+    {
+      "actual": "accepted",
+      "check_id": "additive_schema_accepted",
+      "expected": "accepted",
+      "message": "Additive nullable-compatible columns are accepted.",
+      "status": "passed"
+    },
+    {
+      "actual": "blocked",
+      "check_id": "incompatible_schema_blocked",
+      "expected": "blocked",
+      "message": "Type narrowing or incompatible changes are blocked.",
+      "status": "passed"
+    },
+    {
+      "actual": [
+        "amount: number -> string"
+      ],
+      "check_id": "clear_blocker_message",
+      "expected": "field-specific blocker",
+      "message": "Blocked evolution exposes a clear field-level reason.",
+      "status": "passed"
+    }
+  ],
+  "input_hash": "f7a04a82319488f6ee257501f13d1e074699c2fb539bcc2b1d3fda31c3c1e0a5",
+  "output_hash": "f7a04a82319488f6ee257501f13d1e074699c2fb539bcc2b1d3fda31c3c1e0a5",
+  "required": true,
+  "row_counts": {
+    "records": 3
+  },
+  "runner": "python_api",
+  "scenario_id": "schema-evolution",
+  "status": "passed"
+}

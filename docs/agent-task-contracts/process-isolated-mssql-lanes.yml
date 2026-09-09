@@ -1,0 +1,144 @@
+schema_version: 1
+task_id: "DPONE-PROCESS-ISOLATED-MSSQL-LANES"
+title: "Process-isolated MSSQL initial-load lanes"
+goal: "Run parallel target-atomic MSSQL backfill lanes in spawned interpreters with serialized parent-owned ledger I/O and crash-safe cleanup."
+specification: "docs/feature-design-resumable-shadow-initial-load.md"
+base_commit: "fa1e02e53"
+integrator: "/root"
+
+acceptance_criteria:
+  - "No Python interpreter executes concurrent pyodbc calls during a parallel target-atomic MSSQL backfill."
+  - "Exactly one long-lived spawned process owns each active source/sink lane and is reused across chunks."
+  - "The parent serializes lease, heartbeat, ledger completion, dispatch, stop, and result IPC."
+  - "An abrupt lane exit stops new dispatch, bounds peer work, preserves durable receipts, and leaves non-success chunks resumable."
+  - "Unsupported or non-serializable process bootstrap fails before chunk source or target I/O."
+  - "Native crash diagnostics include Python faulthandler output without exposing row payloads or credentials."
+  - "When the dead process parent's exact MSSQL session closes, campaign, chunk, and generic operation ownership is reclaimable before the five-minute scheduler retry; a partition that preserves the server session remains fenced and fails closed."
+  - "A finite generic operation lease is registered and parent renewal starts immediately after successful admission, before post-admission source-boundary or schema-preplan work."
+  - "Every POSIX lane completes READY, parent containment ACK, then runtime-ready before the first claim; cleanup proves that the interpreter and inherited native descendants left the validated process group."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "parallel target-atomic MSSQL backfill runtime behavior"
+    - "backfill failure, lease, and resume semantics"
+    - "operator diagnostics for native lane crashes"
+  migration_required: false
+
+owned_paths:
+  - "docs/agent-task-contracts/process-isolated-mssql-lanes.yml"
+  - "docs/feature-design-resumable-shadow-initial-load.md"
+  - "docs/adr/0051-resumable-mssql-shadow-initial-publication.md"
+  - "docs/backfill.md"
+  - "docs/source-sink/postgres-to-mssql.md"
+  - "src/dpone/backfill/parallel_execution.py"
+  - "src/dpone/backfill/process_chunk_execution.py"
+  - "src/dpone/backfill/process_lane_contracts.py"
+  - "src/dpone/backfill/process_lane_group.py"
+  - "src/dpone/backfill/process_lane_lease.py"
+  - "src/dpone/backfill/process_lane_operation.py"
+  - "src/dpone/backfill/process_lane_parent.py"
+  - "src/dpone/backfill/process_lane_processes.py"
+  - "src/dpone/backfill/process_lane_worker.py"
+  - "src/dpone/backfill/runtime_execution.py"
+  - "src/dpone/backfill/worker_runtime.py"
+  - "src/dpone/runtime/bootstrap_runner.py"
+  - "src/dpone/runtime/etl/backfill_dispatch.py"
+  - "src/dpone/runtime/etl/backfill_process_runtime.py"
+  - "tests/test_backfill_parallel_execution.py"
+  - "tests/test_backfill_orchestrator.py"
+  - "tests/test_runtime_bootstrap_runner.py"
+
+integrator_owned_paths:
+  - "CHANGELOG.md"
+  - "src/dpone/backfill/campaign_lease.py"
+  - "src/dpone/backfill/file_state.py"
+  - "src/dpone/backfill/mssql_receipt_recovery.py"
+  - "src/dpone/backfill/sql_locks.py"
+  - "src/dpone/backfill/sql_state.py"
+  - "src/dpone/runtime/etl/backfill_orchestrator.py"
+  - "src/dpone/runtime/etl/mssql_operation_lease.py"
+  - "src/dpone/runtime/etl/mssql_transaction_admission.py"
+  - "src/dpone/runtime/etl/mssql_transaction_identity.py"
+  - "src/dpone/runtime/etl/mssql_transaction_wire_identity.py"
+  - "src/dpone/runtime/etl/processor.py"
+  - "tests/test_backfill_campaign_lease.py"
+  - "tests/test_backfill_audit_schema_state.py"
+  - "tests/test_mssql_operation_lease.py"
+  - "tests/test_mssql_generic_transaction_governance.py"
+
+read_only_paths:
+  - "src/dpone/backfill/state.py"
+  - "src/dpone/backfill/state_factory.py"
+  - "src/dpone/runtime/state/mssql_backfill_state.py"
+  - "src/dpone/runtime/sinks/mssql_transaction_state.py"
+  - "tests/integration/backfill/test_postgres_mssql_shadow_initial_integration.py"
+
+forbidden_paths:
+  - "CHANGELOG.md"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/schema"
+  - "tests/conftest.py"
+  - "src/dpone/backfill/campaign_lease.py"
+  - "src/dpone/backfill/file_state.py"
+  - "src/dpone/backfill/mssql_receipt_recovery.py"
+  - "src/dpone/backfill/sql_locks.py"
+  - "src/dpone/backfill/sql_state.py"
+  - "src/dpone/runtime/etl/backfill_orchestrator.py"
+  - "src/dpone/runtime/etl/mssql_operation_lease.py"
+  - "src/dpone/runtime/etl/mssql_transaction_admission.py"
+  - "src/dpone/runtime/etl/mssql_transaction_identity.py"
+  - "src/dpone/runtime/etl/mssql_transaction_wire_identity.py"
+  - "src/dpone/runtime/etl/processor.py"
+  - "tests/test_backfill_audit_schema_state.py"
+  - "tests/test_backfill_campaign_lease.py"
+  - "tests/test_mssql_operation_lease.py"
+  - "tests/test_mssql_generic_transaction_governance.py"
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "fa1e02e53 work-conserving pending-queue and single-scan PostgreSQL COPY implementation"
+  - "a2905627f operation-lease controller dependency injection"
+  - "50c0dd1c3 receipt recovery and synchronous campaign lease"
+  - "f18588567 exact receipt/operation identity hardening"
+  - "immutable MSSQL transaction receipts remain the target commit authority"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_backfill_parallel_execution.py tests/test_backfill_orchestrator.py tests/test_runtime_bootstrap_runner.py tests/test_backfill_campaign_lease.py tests/test_backfill_audit_schema_state.py tests/test_mssql_operation_lease.py tests/test_mssql_generic_transaction_governance.py -q"
+  broad:
+    - "uv run ruff check on changed Python files"
+    - "uv run ruff format --check on changed Python files"
+    - "uv run mypy --config-file mypy.ini on changed runtime modules"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-architecture-fitness"
+    - "uv run dpone docs check-module-size with exact branch base and head"
+    - "uv run mkdocs build --strict"
+  live:
+    - "10-chunk four-lane PostgreSQL-to-MSSQL crash/resume certification is owned by the integrator before release"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

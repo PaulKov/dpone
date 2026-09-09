@@ -1,0 +1,60 @@
+schema_version: 1
+task_id: "DBT-SS-V1-ATTESTATION-PUBLICATION"
+title: "Prove immutable attestation publication ordering and replay"
+goal: "Add mocked integration coverage for positive production publication, replay, immutable conflicts, partial failure recovery, and zero-I/O rejection."
+specification: "docs/feature-design-dbt-inline-self-service-v1.md"
+base_commit: "7141afaa"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Detached bundle is created before the release completion marker."
+  - "Identical replay converges to no-op without duplicate bytes."
+  - "Different bundle bytes at the same digest-derived key fail with immutable conflict before completion markers are attempted."
+  - "Failure after bundle creation and before release marker produces no false success and a retry converges."
+  - "Missing, empty, or oversized bundle fails before any registry call."
+
+public_contract_impact:
+  level: none
+  surfaces: []
+  migration_required: false
+
+owned_paths:
+  - "tests/test_airflow_remote_artifact_delivery.py"
+read_only_paths:
+  - "src/dpone/runtime/airflow_artifact_attestation_inventory.py"
+  - "src/dpone/runtime/airflow_artifact_inventory.py"
+  - "src/dpone/runtime/airflow_artifact_publication.py"
+  - "tests/test_airflow_environment_deployment_projection.py"
+forbidden_paths:
+  - "src/**"
+  - "docs/**"
+  - ".github/workflows/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+
+shared_file_owner: "Codex parent agent delegates the owned test file exclusively to this task"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_remote_artifact_delivery.py -q"
+    - "uv run ruff check tests/test_airflow_remote_artifact_delivery.py"
+    - "uv run ruff format --check tests/test_airflow_remote_artifact_delivery.py"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live: []
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "A production-code change appears necessary."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

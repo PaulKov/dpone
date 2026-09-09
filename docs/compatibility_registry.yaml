@@ -1,0 +1,127 @@
+version: 1
+policy:
+  canonical_packages:
+  - dpone.manifest
+  - dpone.dag
+  - dpone.runtime
+  - dpone.contracts
+  - dpone.ports
+  - dpone.adapters
+  removal_rule: Remove compatibility shims only after one dedicated deprecation release
+    and zero internal usages.
+entries:
+- deprecated: dpone.yaml_config_handler
+  canonical: dpone.dag
+  scope: package
+  status: deprecated-shim
+  removal: after one dedicated deprecation release
+  notes: Legacy DAG package kept as re-export shim during migration.
+  removal_batch: cleanup-release-1
+- deprecated: dpone.source
+  canonical: dpone.runtime.sources
+  scope: package
+  status: deprecated-shim
+  removal: after one dedicated deprecation release
+  removal_batch: cleanup-release-1
+- deprecated: dpone.sink
+  canonical: dpone.runtime.sinks
+  scope: package
+  status: deprecated-shim
+  removal: after one dedicated deprecation release
+  removal_batch: cleanup-release-1
+- deprecated: dpone.etl
+  canonical: dpone.runtime.etl
+  scope: package
+  status: deprecated-shim
+  removal: after one dedicated deprecation release
+  removal_batch: cleanup-release-1
+- deprecated: dpone.etl_logging
+  canonical: dpone.runtime.etl_logging
+  scope: package
+  status: deprecated-shim
+  removal: after one dedicated deprecation release
+  removal_batch: cleanup-release-1
+- deprecated: dpone.credentials
+  canonical: dpone.runtime.credentials
+  scope: package
+  status: deprecated-shim
+  removal: after one dedicated deprecation release
+  removal_batch: cleanup-release-1
+- deprecated: dpone.state
+  canonical: dpone.runtime.state
+  scope: package
+  status: deprecated-shim
+  removal: after one dedicated deprecation release
+  removal_batch: cleanup-release-1
+- deprecated: dpone.reconciliation
+  canonical: dpone.runtime.reconciliation
+  scope: package
+  status: deprecated-shim
+  removal: after one dedicated deprecation release
+  removal_batch: cleanup-release-1
+- deprecated: dpone.sql_helpers
+  canonical: dpone.runtime.sql_helpers
+  scope: package
+  status: deprecated-shim
+  removal: after one dedicated deprecation release
+  removal_batch: cleanup-release-1
+- deprecated: dpone.xmin
+  canonical: dpone.runtime.xmin
+  scope: package
+  status: deprecated-shim
+  removal: after one dedicated deprecation release
+  removal_batch: cleanup-release-1
+- deprecated: dpone.lib.connectors
+  canonical: dpone.runtime.connectors
+  scope: package
+  status: deprecated-shim
+  removal: after one dedicated deprecation release
+  removal_batch: cleanup-release-1
+- deprecated: dpone.core.artifacts
+  canonical: dpone.runtime.artifacts
+  scope: module
+  status: transitional-shim
+  removal: after internal callers migrate to runtime.artifacts
+  removal_batch: cleanup-release-1
+- deprecated: dpone.core.errors
+  canonical: dpone.contracts.errors
+  scope: module
+  status: transitional-shim
+  removal: after internal callers migrate to contracts.errors
+  removal_batch: cleanup-release-1
+- deprecated: dpone.core.etl_types
+  canonical: dpone.contracts.process_types
+  scope: module
+  status: transitional-shim
+  removal: after internal callers migrate to contracts.process_types
+  removal_batch: cleanup-release-1
+- deprecated: dpone.core.runtime
+  canonical: dpone.contracts.run_context
+  scope: module
+  status: transitional-shim
+  removal: after internal callers migrate to contracts.run_context
+  removal_batch: cleanup-release-1
+- deprecated: dpone.lib.technical_columns
+  canonical: dpone.contracts.technical_columns
+  scope: module
+  status: transitional-shim
+  removal: after internal callers migrate to contracts.technical_columns
+  removal_batch: cleanup-release-1
+- deprecated: dpone.lib.connectors.base
+  canonical: dpone.ports.db_connector
+  scope: module
+  status: transitional-shim
+  removal: after internal callers migrate to ports.db_connector
+  removal_batch: cleanup-release-1
+- deprecated: dpone.lib.utils.data_type_mapper
+  canonical: dpone.runtime.support.data_type_mapper
+  scope: module
+  status: transitional-shim
+  removal: after internal callers migrate to runtime.support.data_type_mapper
+  removal_batch: cleanup-release-1
+- deprecated: dpone.lib.utils.timezone_converter
+  canonical: dpone.runtime.support.timezone
+  scope: module
+  status: transitional-shim
+  removal: after internal callers migrate to runtime.support.timezone
+  removal_batch: cleanup-release-1

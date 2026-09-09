@@ -1,0 +1,93 @@
+schema_version: 1
+task_id: "SS-68"
+title: "Release-trust specification architecture revision"
+# Completion note (2026-07-19): docs revision accepted (architect APPROVE_SPEC);
+# maintainer marked feature APPROVED and ADR 0028 Accepted. Follow-on work is
+# SS-46-47-CUTOVER. This contract remains historical evidence of the docs slice.
+goal: >
+  Reconcile every fresh architecture-review blocker in the release trust
+  feature specification and ADR without starting production implementation.
+specification: >
+  Documentation-only design revision. Completed: feature APPROVED and ADR
+  Accepted after independent architect APPROVE_SPEC; live inventories remain
+  activation blockers for the cutover contract.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "Choose one DRY migration for the existing governance policy and cover every current consumer atomically."
+  - "Define bounded stable governance snapshots A, B, and closure C with start/end metadata and coherent protected-base ancestry semantics."
+  - "Select a trusted privileged composition root outside candidate-controlled code and publish an exact job/permission/input/output matrix."
+  - "Acquire publication serialization before the first provider mutation and define queue, cancellation, recovery, candidate, authorization, and attempt identities."
+  - "Define schema-complete append-only receipt envelopes, canonical domain-separated IDs, producer tagged unions, durable store, retention, and incident hold."
+  - "Use AUTHORIZED before publication and reserve final PASS for CLOSED."
+  - "Require Trusted Publisher plus Integrity API provenance for v2 closure; token bootstrap is LEGACY_UNVERIFIED only."
+  - "Make draft staging depend on verified deterministic public bundle/attestation handoff."
+  - "Clarify provider-exact GitHub immutable release semantics and preserve/deprecate every existing supply-chain artifact explicitly."
+  - "Use only valid feature lifecycle vocabulary; live IDs remain UNVERIFIED and block policy activation, not design review."
+
+public_contract_impact:
+  level: none
+  surfaces:
+    - design documentation only
+  migration_required: false
+
+owned_paths:
+  - docs/feature-design-release-trust-boundary-v0732.md
+  - docs/adr/0028-frozen-release-policy-and-publication-boundary.md
+read_only_paths:
+  - docs/feature-design-standard.md
+  - docs/agent-release-protocol.md
+  - docs/supply-chain.md
+  - docs/adr/0011-canonical-fingerprints.md
+  - docs/adr/0013-reproducible-rerun-and-retention.md
+  - .agents/policy/github-branch-protection.yml
+  - tools/agent_policy/branch_protection.py
+  - .github/workflows/release.yml
+  - .github/workflows/runtime-image.yml
+forbidden_paths:
+  - docs/adr-index.md
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .agents/policy
+  - .github/workflows
+  - tools
+  - src
+
+shared_file_owner: "parent Codex agent"
+
+dependencies:
+  - "Fresh architecture review findings returned by agent 019f79a7-3cc0-7ad1-91d8-bdc36514c5f0"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+  broad:
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "GitHub ruleset, immutable-release, and PyPI Trusted Publisher parity remain UNVERIFIED"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "A live check requires unapproved credentials or environment."
+  - "Public-contract impact is larger than declared."
+  - "A placeholder would need to be replaced with an invented live identifier."
+  - "The feature would need to be marked APPROVED or the ADR Accepted without fresh review."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/post-apply-certificate.schema.json",
+  "title": "dpone schema migration post-apply certificate",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "certificate_id",
+    "post_apply_run_id",
+    "pack_id",
+    "environment",
+    "target",
+    "status",
+    "profile",
+    "checks",
+    "blockers",
+    "warnings",
+    "metrics"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_post_apply_certificate.v1"},
+    "certificate_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "post_apply_run_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "bundle_id": {"type": ["string", "null"]},
+    "environment": {"type": "string", "minLength": 1},
+    "target": {
+      "type": "object",
+      "required": ["sink_type", "table"],
+      "additionalProperties": true,
+      "properties": {
+        "sink_type": {"type": "string"},
+        "table": {"type": "string"}
+      }
+    },
+    "status": {"enum": ["verified", "warning", "blocked"]},
+    "profile": {"enum": ["advisory", "stage", "prod_strict", "regulated"]},
+    "checks": {"type": "array", "items": {"type": "object"}},
+    "rollback_window": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "metrics": {"type": "object"}
+  }
+}

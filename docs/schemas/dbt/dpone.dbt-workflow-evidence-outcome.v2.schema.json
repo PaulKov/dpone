@@ -1,0 +1,143 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-workflow-evidence-outcome.v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "bytes": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "category": {
+            "enum": [
+              "airflow",
+              "dbt"
+            ]
+          },
+          "logical_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "logical_id",
+          "sha256",
+          "bytes"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "code": {
+      "const": "DPONE_DBT_WORKFLOW_PASSED"
+    },
+    "dag_run_id": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "deployment_identity": {
+      "additionalProperties": false,
+      "properties": {
+        "activation_id": {
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "deployment_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "release_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "schema": {
+          "const": "dpone.airflow-deployment-identity.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "release_id",
+        "deployment_id",
+        "activation_id"
+      ],
+      "type": "object"
+    },
+    "evidence_set_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.dbt-workflow-evidence-outcome.v2"
+    },
+    "status": {
+      "const": "passed"
+    },
+    "tasks": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "mapped_instances": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "state": {
+            "const": "success"
+          },
+          "task_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "state"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "workflow_id": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "status",
+    "code",
+    "workflow_id",
+    "release_id",
+    "deployment_id",
+    "dag_run_id",
+    "tasks",
+    "evidence_set_id",
+    "artifacts",
+    "deployment_identity"
+  ],
+  "type": "object",
+  "x-dpone-semantic-validator": "dpone.services.dbt_dev_airflow_evidence_contracts.validate_workflow_outcome_contract"
+}

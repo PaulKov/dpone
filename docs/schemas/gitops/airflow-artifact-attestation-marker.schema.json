@@ -1,0 +1,47 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-artifact-attestation-marker.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attestation_bytes": {
+      "maximum": 262144,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "attestation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "attestation_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.airflow-artifact-attestation-marker.v1"
+    },
+    "sigstore_bundle_bytes": {
+      "maximum": 2097152,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "sigstore_bundle_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}(?![\\s\\S])",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "deployment_id",
+    "attestation_id",
+    "attestation_sha256",
+    "attestation_bytes",
+    "sigstore_bundle_sha256",
+    "sigstore_bundle_bytes"
+  ],
+  "title": "dpone GitOps immutable Airflow artifact-attestation completion marker",
+  "type": "object"
+}

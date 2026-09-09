@@ -1,0 +1,166 @@
+# ci-templates/.gitlab-ci-docker.yml
+
+.uv_image_common:
+  image: registry.werf.io/werf/werf:2-stable
+  # Configure this synthetic runner tag and namespace for your own environment.
+  tags: [example-werf-runner]
+  variables:
+    WERF_NAMESPACE: example-image-build
+    WERF_SET_BACKUP: "werf.backup=false"
+    DOCKER_BUILDKIT: "1"
+    GIT_DEPTH: "0"
+
+    CONFIG_FILE: "werf-uv.yaml"
+    UV_IMAGE_NAME: "uv-dpone"
+    UV_IMAGE_REPO: "uv-dpone"
+    UV_DOCKERFILE_PATH: "docker/uv/Dockerfile"
+  before_script:
+    - werf version
+    - source "$(werf ci-env gitlab --verbose --as-file)"
+
+.uv_image_rules: &uv_image_rules
+  - if: '$CI_COMMIT_TAG'
+    when: on_success
+  - if: '$CI_COMMIT_BRANCH == "master"'
+    when: on_success
+  - if: '$CI_COMMIT_BRANCH == "develop"'
+    when: on_success
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+    when: on_success
+  - when: never
+
+build-uv-image:
+  extends: .uv_image_common
+  stage: docker-build
+  resource_group: uv_image_build
+  rules: *uv_image_rules
+  script:
+    - |
+      set -euo pipefail
+      mkdir -p .werf
+
+      # dotenv для trivy
+      cat > build.env <<EOF
+      TRIVY_SHOULD_RUN=1
+      TRIVY_TARGET_IMAGE=$CI_REGISTRY_IMAGE/${UV_IMAGE_REPO}:$CI_COMMIT_SHORT_SHA
+      EOF
+
+      WATCH_FILES=("$CONFIG_FILE" "$UV_DOCKERFILE_PATH")
+
+      need_build=0
+      reason=""
+
+      # На MR — всегда (чтобы гарантировать тег $CI_COMMIT_SHORT_SHA для uv-job’ов)
+      if [[ "${CI_PIPELINE_SOURCE:-}" == "merge_request_event" ]]; then
+        need_build=1
+        reason="mr-always"
+      elif [[ -n "${CI_COMMIT_TAG:-}" ]]; then
+        need_build=1
+        reason="release-tag"
+      else
+        # master/develop: только по изменениям файлов сборки
+        base_sha="${CI_COMMIT_BEFORE_SHA:-}"
+        if [[ -z "$base_sha" || "$base_sha" == "0000000000000000000000000000000000000000" ]]; then
+          base_sha="$(git rev-list --max-count=1 "${CI_COMMIT_SHA}^" 2>/dev/null || true)"
+        fi
+
+        if [[ -n "$base_sha" ]]; then
+          echo "Diff base: $base_sha -> $CI_COMMIT_SHA"
+          if git diff --name-only "$base_sha" "$CI_COMMIT_SHA" -- "${WATCH_FILES[@]}" | grep -q .; then
+            need_build=1
+            reason="branch-changes"
+          fi
+        else
+          need_build=1
+          reason="branch-no-base"
+        fi
+      fi
+
+      if [[ "$need_build" -eq 0 ]]; then
+        echo "No changes in ${WATCH_FILES[*]} → skip image build."
+        # В этом случае trivy тоже не нужен
+        cat > build.env <<EOF
+      TRIVY_SHOULD_RUN=0
+      TRIVY_TARGET_IMAGE=$CI_REGISTRY_IMAGE/${UV_IMAGE_REPO}:$CI_COMMIT_SHORT_SHA
+      EOF
+        exit 0
+      fi
+
+      tag_args=(--add-custom-tag "$CI_COMMIT_SHORT_SHA")
+
+      # latest только на master
+      if [[ "${CI_COMMIT_BRANCH:-}" == "master" ]]; then
+        tag_args+=(--add-custom-tag "latest")
+      fi
+
+      # На теге vX.Y.Z добавляем X.Y.Z
+      if [[ -n "${CI_COMMIT_TAG:-}" ]]; then
+        tag_args+=(--add-custom-tag "${CI_COMMIT_TAG#v}")
+      fi
+
+      echo "Building/publishing uv image via werf (reason: $reason)"
+      echo "Custom tags: ${tag_args[*]}"
+
+      werf build "$UV_IMAGE_NAME" \
+        --config "$CONFIG_FILE" \
+        --repo "$CI_REGISTRY_IMAGE/${UV_IMAGE_REPO}" \
+        "${tag_args[@]}"
+
+  artifacts:
+    paths:
+      - .werf/
+    reports:
+      dotenv: build.env
+    expire_in: 1 week
+
+trivy-scan:
+  stage: docker-build
+  image:
+    name: ghcr.io/aquasecurity/trivy:latest
+    entrypoint: [""]
+  needs:
+    - job: build-uv-image
+      artifacts: true
+  rules: *uv_image_rules
+  variables:
+    TRIVY_USERNAME: "$CI_REGISTRY_USER"
+    TRIVY_PASSWORD: "$CI_REGISTRY_PASSWORD"
+  script:
+    - |
+      set -euo pipefail
+
+      if [[ "${TRIVY_SHOULD_RUN:-0}" != "1" ]]; then
+        echo "Skipping trivy scan (no image build this pipeline)."
+        exit 0
+      fi
+
+      echo "Remote scan: $TRIVY_TARGET_IMAGE"
+      trivy image \
+        --image-src remote \
+        --timeout 10m \
+        --format sarif \
+        --output trivy-results.sarif \
+        --exit-code 0 \
+        --severity HIGH,CRITICAL \
+        "$TRIVY_TARGET_IMAGE"
+  artifacts:
+    reports:
+      sast: trivy-results.sarif
+    expire_in: 1 week
+
+cleanup-images:
+  extends: .uv_image_common
+  stage: cleanup
+  rules:
+    # По расписанию — выполняем автоматически
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: on_success
+
+    # На master — кнопка, но НЕ блокирует пайплайн
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: manual
+      allow_failure: true
+
+    - when: never
+  script:
+    - werf cleanup --config "$CONFIG_FILE" --repo "$CI_REGISTRY_IMAGE/${UV_IMAGE_REPO}"

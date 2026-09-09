@@ -1,0 +1,568 @@
+name: PR Gate shadow
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-gate-shadow-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: PR Gate shadow plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      static: ${{ steps.select.outputs.static }}
+      docs: ${{ steps.select.outputs.docs }}
+      contracts: ${{ steps.select.outputs.contracts }}
+      python_311: ${{ steps.select.outputs.python_311 }}
+      python_312: ${{ steps.select.outputs.python_312 }}
+      packaging: ${{ steps.select.outputs.packaging }}
+      postgresql: ${{ steps.select.outputs.postgresql }}
+      runtime_wheel_smoke: ${{ steps.select.outputs.runtime_wheel_smoke }}
+      airflow: ${{ steps.select.outputs.airflow }}
+      plan_digest: ${{ steps.select.outputs.plan_digest }}
+      repository_id: ${{ steps.select.outputs.repository_id }}
+      pr_number: ${{ steps.select.outputs.pr_number }}
+      base_sha: ${{ steps.select.outputs.base_sha }}
+      head_sha: ${{ steps.select.outputs.head_sha }}
+      merge_sha: ${{ steps.select.outputs.merge_sha }}
+      implementation_bundle_digest: ${{ steps.select.outputs.implementation_bundle_digest }}
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Build immutable diagnostic plan
+        env:
+          MERGE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          mkdir -p test_artifacts/pr-gate-shadow
+          printf '%s\n' '{"schema_version":"dpone.ci-shadow-route-policy.v1","default_route":"full"}' > test_artifacts/pr-gate-shadow/route-policy.json
+          uv run --frozen python tools/ci/change_plan.py \
+            --github-event "${GITHUB_EVENT_PATH}" \
+            --merge-sha "${MERGE_SHA}" \
+            --repository-root . \
+            --policy test_artifacts/pr-gate-shadow/route-policy.json \
+            --output test_artifacts/pr-gate-shadow/change-plan.json
+
+      - name: Publish closed plan selections
+        id: select
+        run: |
+          set -euo pipefail
+          uv run --frozen python - <<'PY' >> "${GITHUB_OUTPUT}"
+          import json
+          from pathlib import Path
+
+          jobs = json.loads(Path("test_artifacts/pr-gate-shadow/change-plan.json").read_text(encoding="utf-8"))["jobs"]
+          for key, job in (("static", "static"), ("contracts", "contracts"), ("docs", "docs"), ("python_311", "python-3.11"), ("python_312", "python-3.12"), ("packaging", "packaging"), ("postgresql", "postgresql"), ("runtime_wheel_smoke", "runtime-wheel-smoke"), ("airflow", "airflow")):
+              print(f"{key}={jobs[job]}")
+          plan = json.loads(Path("test_artifacts/pr-gate-shadow/change-plan.json").read_text(encoding="utf-8"))
+          print(f"plan_digest={plan['plan_digest']}")
+          from dpone.services.ci.shadow_bundle import load_bundle_digest
+          print(f"implementation_bundle_digest={load_bundle_digest(Path('.agents/policy/ci-shadow-bundle-v1.yml'))}")
+          for key in ("repository_id", "pr_number", "base_sha", "head_sha", "merge_sha"):
+              print(f"{key}={plan[key]}")
+          PY
+
+      - name: Upload immutable diagnostic plan
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: pr-gate-shadow-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/pr-gate-shadow/change-plan.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+
+  static:
+    name: PR Gate shadow static
+    needs: plan
+    if: needs.plan.outputs.static == 'RUN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Run static shadow route
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          uv sync --locked --all-extras
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run mypy --config-file mypy.ini
+          uv run dpone docs check-import-rules
+          uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json
+
+  docs:
+    name: PR Gate shadow docs
+    needs: plan
+    if: needs.plan.outputs.docs == 'RUN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Run docs shadow route
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          uv sync --locked --all-extras
+          uv run dpone docs check-docs
+          uv run pytest tests/test_docs_language_contracts.py -q
+          uv run mkdocs build --strict
+
+  contracts:
+    name: PR Gate shadow contracts
+    needs: plan
+    if: needs.plan.outputs.contracts == 'RUN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Run contract shadow route
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          uv sync --locked --all-extras
+          uv run pytest tests/agent_policy -q
+
+  python_311:
+    name: PR Gate shadow Python 3.11
+    needs: plan
+    if: needs.plan.outputs.python_311 == 'RUN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+      - run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          uv sync --locked --all-extras
+          uv run pytest -m "not integration_live" -n auto --dist loadfile -q
+
+  python_312:
+    name: PR Gate shadow Python 3.12
+    needs: plan
+    if: needs.plan.outputs.python_312 == 'RUN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          uv sync --locked --all-extras
+          uv run pytest -m "not integration_live" -n auto --dist loadfile -q
+
+  packaging:
+    name: PR Gate shadow packaging
+    needs: plan
+    if: needs.plan.outputs.packaging == 'RUN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+      - name: Build and check exact candidate packages
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          rm -rf dist
+          uv build
+          uv build packages/dpone-native-accel --out-dir dist
+          uv build packages/dpone-airflow-pack --out-dir dist
+          uv build packages/apache-airflow-providers-dpone --out-dir dist
+          uv tool run twine check dist/*
+
+  postgresql:
+    name: PR Gate shadow PostgreSQL XMin
+    needs: plan
+    if: needs.plan.outputs.postgresql == 'RUN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: dpone_it
+          POSTGRES_USER: dpone
+          POSTGRES_PASSWORD: dpone
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dpone -d dpone_it"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DPONE_TEST_USE_INSTALLED_PACKAGE: "1"
+      DPONE_RUN_INTEGRATION: "1"
+      DPONE_IT_PG_HOST: 127.0.0.1
+      DPONE_IT_PG_PORT: "5432"
+      DPONE_IT_PG_DATABASE: dpone_it
+      DPONE_IT_PG_USER: dpone
+      DPONE_IT_PG_PASSWORD: dpone
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+      - name: Run exact PostgreSQL XMin integration route
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          uv sync --locked --all-extras
+          uv run pytest -m integration_postgres_xmin tests/integration/postgres -q
+
+  runtime_wheel_smoke:
+    name: PR Gate shadow runtime wheel smoke
+    needs: plan
+    if: needs.plan.outputs.runtime_wheel_smoke == 'RUN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+      - name: Build and install one exact runtime wheel
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          rm -rf dist .venv-shadow-wheel
+          uv build --wheel --out-dir dist
+          uv build packages/dpone-airflow-pack --wheel --out-dir dist
+          wheel=(dist/dpone-*.whl)
+          pack_wheel=(dist/dpone_airflow_pack-*.whl)
+          test "${#wheel[@]}" -eq 1
+          test "${#pack_wheel[@]}" -eq 1
+          uv venv .venv-shadow-wheel
+          uv pip install --python .venv-shadow-wheel/bin/python "${pack_wheel[0]}" "${wheel[0]}"
+          .venv-shadow-wheel/bin/python -c 'import dpone; print(dpone.__version__)'
+
+  airflow:
+    name: PR Gate shadow Airflow ${{ matrix.airflow_version }} / py${{ matrix.python_version }}
+    needs: plan
+    if: needs.plan.outputs.airflow == 'RUN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      DPONE_AIRFLOW_SCHEDULER_ONLY: "1"
+      DPONE_TEST_USE_INSTALLED_PACKAGE: "1"
+      PYTHONNOUSERSITE: "1"
+      PYTHONPATH: ""
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - airflow_version: "2.10.5"
+            python_version: "3.11"
+            cncf_provider_version: "10.1.0"
+          - airflow_version: "2.10.5"
+            python_version: "3.12"
+            cncf_provider_version: "10.1.0"
+          - airflow_version: "2.11.0"
+            python_version: "3.11"
+            cncf_provider_version: "10.5.0"
+          - airflow_version: "2.11.0"
+            python_version: "3.12"
+            cncf_provider_version: "10.5.0"
+          - airflow_version: "3.2.0"
+            python_version: "3.11"
+            cncf_provider_version: "10.14.0"
+          - airflow_version: "3.2.0"
+            python_version: "3.12"
+            cncf_provider_version: "10.14.0"
+          - airflow_version: "3.3.0"
+            python_version: "3.11"
+            cncf_provider_version: "10.20.0"
+          - airflow_version: "3.3.0"
+            python_version: "3.12"
+            cncf_provider_version: "10.20.0"
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+      - name: Set up exact matrix Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python_version }}
+      - name: Build and test exact Airflow provider cell
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          rm -rf dist-shadow-airflow .venv-shadow-airflow
+          mkdir -p dist-shadow-airflow
+          uv build --wheel --out-dir dist-shadow-airflow
+          uv build packages/dpone-airflow-pack --wheel --out-dir dist-shadow-airflow
+          uv build packages/apache-airflow-providers-dpone --wheel --out-dir dist-shadow-airflow
+          constraints="${RUNNER_TEMP}/airflow-constraints.txt"
+          install_constraints="${RUNNER_TEMP}/airflow-install-constraints.txt"
+          override_evidence="${RUNNER_TEMP}/airflow-constraints-override.json"
+          curl --disable --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            --output "${constraints}" -- "https://raw.githubusercontent.com/apache/airflow/constraints-${{ matrix.airflow_version }}/constraints-${{ matrix.python_version }}.txt"
+          python tools/airflow_constraints_override.py \
+            --source "${constraints}" --output "${install_constraints}" \
+            --distribution apache-airflow-providers-cncf-kubernetes \
+            --requested-version "${{ matrix.cncf_provider_version }}" \
+            --evidence "${override_evidence}"
+          uv venv .venv-shadow-airflow
+          uv pip install --python .venv-shadow-airflow/bin/python --constraint "${install_constraints}" \
+            "apache-airflow==${{ matrix.airflow_version }}" \
+            "apache-airflow-providers-cncf-kubernetes==${{ matrix.cncf_provider_version }}"
+          uv pip install --python .venv-shadow-airflow/bin/python \
+            dist-shadow-airflow/dpone_airflow_pack-*.whl \
+            dist-shadow-airflow/apache_airflow_providers_dpone-*.whl
+          uv pip install --python .venv-shadow-airflow/bin/python --constraint "${install_constraints}" pytest
+          uv pip check --python .venv-shadow-airflow/bin/python
+          .venv-shadow-airflow/bin/python -c 'import airflow; import airflow.providers.dpone'
+          .venv-shadow-airflow/bin/python -m pytest \
+            tests/test_airflow_pack_cache.py \
+            tests/test_airflow_interval_env_rendering.py \
+            tests/test_airflow_dag_loader_contract.py -q
+
+  collector:
+    name: PR Gate shadow
+    needs: [plan, static, contracts, docs, python_311, python_312, packaging, postgresql, runtime_wheel_smoke, airflow]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Derive attempt-bound diagnostic claims from the Jobs API
+        id: claims
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          PLAN_DIGEST: ${{ needs.plan.outputs.plan_digest }}
+          REPOSITORY_ID: ${{ needs.plan.outputs.repository_id }}
+          PR_NUMBER: ${{ needs.plan.outputs.pr_number }}
+          BASE_SHA: ${{ needs.plan.outputs.base_sha }}
+          HEAD_SHA: ${{ needs.plan.outputs.head_sha }}
+          MERGE_SHA: ${{ needs.plan.outputs.merge_sha }}
+          IMPLEMENTATION_BUNDLE_DIGEST: ${{ needs.plan.outputs.implementation_bundle_digest }}
+          STATIC: ${{ needs.plan.outputs.static }}
+          CONTRACTS: ${{ needs.plan.outputs.contracts }}
+          DOCS: ${{ needs.plan.outputs.docs }}
+          PYTHON_311: ${{ needs.plan.outputs.python_311 }}
+          PYTHON_312: ${{ needs.plan.outputs.python_312 }}
+          PACKAGING: ${{ needs.plan.outputs.packaging }}
+          POSTGRESQL: ${{ needs.plan.outputs.postgresql }}
+          RUNTIME_WHEEL_SMOKE: ${{ needs.plan.outputs.runtime_wheel_smoke }}
+          AIRFLOW: ${{ needs.plan.outputs.airflow }}
+        with:
+          script: |
+            const fs = require('fs');
+            const pullRequest = context.payload.pull_request;
+            const directIdentity = {
+              repository_id: context.payload.repository?.id,
+              pr_number: context.payload.number,
+              base_sha: pullRequest?.base?.sha,
+              head_sha: pullRequest?.head?.sha,
+            };
+            const identity = {
+              repository_id: Number(process.env.REPOSITORY_ID),
+              pr_number: Number(process.env.PR_NUMBER),
+              base_sha: process.env.BASE_SHA,
+              head_sha: process.env.HEAD_SHA,
+              merge_sha: process.env.MERGE_SHA,
+            };
+            if (!Number.isInteger(identity.repository_id) || identity.repository_id < 1 || !Number.isInteger(identity.pr_number) || identity.pr_number < 1 || !Object.values(identity).slice(2).every((value) => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value))) {
+              throw new Error('PR Gate shadow plan identity is incomplete or invalid');
+            }
+            if (directIdentity.repository_id !== identity.repository_id || directIdentity.pr_number !== identity.pr_number || directIdentity.base_sha !== identity.base_sha || directIdentity.head_sha !== identity.head_sha) {
+              throw new Error('PR Gate shadow event identity does not match the exact plan');
+            }
+            const selected = {
+              'static': process.env.STATIC,
+              'contracts': process.env.CONTRACTS,
+              'docs': process.env.DOCS,
+              'python-3.11': process.env.PYTHON_311,
+              'python-3.12': process.env.PYTHON_312,
+              'packaging': process.env.PACKAGING,
+              'postgresql': process.env.POSTGRESQL,
+              'airflow': process.env.AIRFLOW,
+              'runtime-wheel-smoke': process.env.RUNTIME_WHEEL_SMOKE,
+            };
+            const expected = {
+              'static': ['PR Gate shadow static'],
+              'contracts': ['PR Gate shadow contracts'],
+              'docs': ['PR Gate shadow docs'],
+              'python-3.11': ['PR Gate shadow Python 3.11'],
+              'python-3.12': ['PR Gate shadow Python 3.12'],
+              'packaging': ['PR Gate shadow packaging'],
+              'postgresql': ['PR Gate shadow PostgreSQL XMin'],
+              'airflow': ['PR Gate shadow Airflow 2.10.5 / py3.11', 'PR Gate shadow Airflow 2.10.5 / py3.12', 'PR Gate shadow Airflow 2.11.0 / py3.11', 'PR Gate shadow Airflow 2.11.0 / py3.12', 'PR Gate shadow Airflow 3.2.0 / py3.11', 'PR Gate shadow Airflow 3.2.0 / py3.12', 'PR Gate shadow Airflow 3.3.0 / py3.11', 'PR Gate shadow Airflow 3.3.0 / py3.12'],
+              'runtime-wheel-smoke': ['PR Gate shadow runtime wheel smoke'],
+            };
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
+              owner: context.repo.owner, repo: context.repo.repo,
+              run_id: Number(process.env.GITHUB_RUN_ID),
+              attempt_number: Number(process.env.GITHUB_RUN_ATTEMPT), per_page: 100,
+            });
+            const byName = new Map();
+            for (const job of jobs) {
+              const rows = byName.get(job.name) || [];
+              rows.push(job);
+              byName.set(job.name, rows);
+            }
+            const claims = {};
+            for (const product of Object.keys(selected)) {
+              if (selected[product] !== 'RUN') {
+                claims[product] = {selection: 'N/A', outcome: 'N/A'};
+                continue;
+              }
+              const rows = expected[product].flatMap((name) => byName.get(name) || []);
+              let outcome = 'UNVERIFIED';
+              if (rows.length === expected[product].length && rows.every((job) => job.status === 'completed')) {
+                const conclusions = rows.map((job) => job.conclusion);
+                outcome = conclusions.every((value) => value === 'success') ? 'PASS' : conclusions.includes('failure') ? 'FAIL' : 'UNVERIFIED';
+              }
+              claims[product] = {selection: 'RUN', outcome};
+            }
+            const outcomes = Object.values(claims).map((claim) => claim.outcome);
+            const status = outcomes.includes('UNVERIFIED') ? 'UNVERIFIED' : outcomes.includes('FAIL') ? 'FAIL' : 'PASS';
+            const evidence = {schema_version: 'dpone.pr-gate-shadow-evidence.v1', ...identity, plan_digest: process.env.PLAN_DIGEST, implementation_bundle_digest: process.env.IMPLEMENTATION_BUNDLE_DIGEST, jobs: claims, status};
+            const output = `${process.env.RUNNER_TEMP}/pr-gate-shadow-evidence.json`;
+            fs.writeFileSync(output, `${JSON.stringify(evidence)}\n`, {encoding: 'utf8', flag: 'wx'});
+            core.setOutput('path', output);
+            core.setOutput('status', status);
+      - name: Upload immutable diagnostic claims
+        if: always() && steps.claims.outputs.path != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: pr-gate-shadow-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.claims.outputs.path }}
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+      - name: Publish diagnostic outcome
+        if: always()
+        run: |
+          test "${{ steps.claims.outputs.status }}" = "PASS"

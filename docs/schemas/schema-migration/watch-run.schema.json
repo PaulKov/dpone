@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/watch-run.schema.json",
+  "title": "dpone schema migration release watch run",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "watch_run_id",
+    "watch_plan_id",
+    "pack_id",
+    "post_apply_certificate_id",
+    "environment",
+    "target",
+    "status",
+    "executed",
+    "samples",
+    "remediation",
+    "checks",
+    "blockers",
+    "warnings",
+    "metrics"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_watch_run.v1"},
+    "watch_run_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "watch_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "post_apply_certificate_id": {"type": ["string", "null"]},
+    "environment": {"type": "string", "minLength": 1},
+    "target": {
+      "type": "object",
+      "required": ["sink_type", "table"],
+      "additionalProperties": true,
+      "properties": {
+        "sink_type": {"type": "string"},
+        "table": {"type": "string"}
+      }
+    },
+    "status": {"enum": ["passed", "dry_run", "blocked"]},
+    "executed": {"type": "boolean"},
+    "samples": {"type": "object"},
+    "sample_results": {"type": "array", "items": {"type": "object"}},
+    "remediation": {"type": "object"},
+    "checks": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "metrics": {"type": "object"}
+  }
+}

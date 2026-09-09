@@ -1,0 +1,149 @@
+schema_version: 1
+task_id: "DPONE-V0726-ROUTE-ATTESTATION"
+title: "Bind production safe-sample trust to signed route attestations"
+goal: >-
+  Replace raw CLI-context route-ID trust with content-addressed, exact-identity
+  Sigstore verification bound to the certified route and actual immutable
+  release/deployment subject before any credential or data-system I/O.
+specification: "docs/feature-design-route-attestation-integrity-v0726.md"
+base_commit: "078ff2bc"
+integrator: "codex/v0.72.6-route-attestation-integrity"
+
+acceptance_criteria:
+  - "Production live safe-sample requires a verified route-attestation decision and never consumes raw CLI-context route IDs."
+  - "The signed claims bind route tuple, certification digest/profile/level, release, deployment, environment, authorization profile, and runtime image."
+  - "Exact certificate identity/issuer, pinned trusted root, supported cosign version, validity, and revocation policy fail closed."
+  - "No credential resolution, artifact fetch, DDL, source read, or sink write occurs before verification succeeds."
+  - "Runtime evidence contains safe route-attestation lineage and no signature, certificate, trust-root, Vault, credential, or row data."
+  - "The five-command beginner journey and non-live rehearsal remain unchanged."
+
+public_contract_impact:
+  level: deprecation
+  surfaces:
+    - cli
+    - python_api
+    - schemas
+    - structured_errors
+    - runtime_evidence
+    - platform_runbook
+  migration_required: true
+  migration: "Platform automation must build/sign/mount route-attestation inputs; raw verified_safe_sample_route_ids no longer authorizes production."
+
+owned_paths:
+  - docs/adr/0014-route-attestation-production-trust.md
+  - docs/adr-index.md
+  - docs/feature-design-route-attestation-integrity-v0726.md
+  - test_artifacts/agent-policy/2026-07-15-v0726-route-attestation-integrity.yml
+  - src/dpone/contracts/route_attestation.py
+  - src/dpone/ports/route_attestation.py
+  - src/dpone/adapters/cosign_route_attestation.py
+  - src/dpone/services/route_attestation_builder.py
+  - src/dpone/services/route_attestation_policy.py
+  - src/dpone/services/route_attestation_verification.py
+  - src/dpone/readiness/route_attestation.py
+  - src/dpone/readiness/route_attestation_files.py
+  - src/dpone/readiness/airflow_deployment_projection.py
+  - src/dpone/readiness/safe_sample_live_runtime.py
+  - src/dpone/readiness/safe_sample_live_errors.py
+  - src/dpone/readiness/safe_sample_live_integrity.py
+  - src/dpone/services/safe_sample_live_authorization.py
+  - src/dpone/services/safe_sample_runtime_executor.py
+  - src/dpone/services/safe_sample_route_attestation_evidence.py
+  - src/dpone/services/safe_sample_runtime_evidence.py
+  - src/dpone/services/safe_sample_cli_runtime.py
+  - src/dpone/services/ops/command_handlers_safe_sample.py
+  - src/dpone/services/ops/command_handlers_route_attestation.py
+  - src/dpone/services/ops/__init__.py
+  - src/dpone/commands/ops_parsers_safe_sample.py
+  - src/dpone/commands/ops_parsers_route_attestation.py
+  - src/dpone/commands/ops_cmd.py
+  - src/dpone/commands/registry_ops.py
+  - src/dpone/gitops/schema_route_attestation_contracts.py
+  - src/dpone/gitops/schema_contracts.py
+  - docs/schemas/gitops/route-attestation.schema.json
+  - docs/schemas/gitops/route-attestation-policy.schema.json
+  - docs/schemas/gitops/route-attestation-verification.schema.json
+  - tests/test_route_attestation_contracts.py
+  - tests/test_route_attestation_builder.py
+  - tests/test_cosign_route_attestation.py
+  - tests/test_route_attestation_verification.py
+  - tests/test_cli_route_attestation_commands.py
+  - tests/test_safe_sample_live_runtime_assembly.py
+  - tests/test_cli_safe_sample_runtime_run_command.py
+  - tests/test_airflow_safe_sample_runtime_executor.py
+  - tests/test_gitops_schema_contracts.py
+  - docs/airflow-route-attestation.md
+  - docs/airflow-self-service-architecture.md
+  - docs/airflow-self-service-backlog.md
+  - docs/compatibility.md
+  - test_artifacts/airflow-self-service-v0726-route-attestation/**
+
+read_only_paths:
+  - docs/engineering-standards.md
+  - docs/feature-design-standard.md
+  - docs/architecture.md
+  - docs/benchmarks/quality_budgets.yml
+  - docs/adr/0007-release-set-and-deployment-set.md
+  - docs/adr/0011-canonical-fingerprints.md
+  - docs/adr/0013-reproducible-rerun-and-retention.md
+  - src/dpone/services/sample_route_certifications.py
+  - src/dpone/ops/routes/certify_models.py
+  - src/dpone/contracts/airflow_deployment.py
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - packages/dpone-airflow-pack
+  - .cursor/
+
+shared_file_owner: "Codex integrator"
+
+dependencies:
+  - "ADR 0014"
+  - "DPONE-V0724-SAFE-SAMPLE-LIVE-RUNTIME"
+  - "DPONE-V0725-LOCAL-PROMOTION"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_route_attestation_contracts.py tests/test_route_attestation_builder.py tests/test_cosign_route_attestation.py tests/test_route_attestation_verification.py tests/test_cli_route_attestation_commands.py tests/test_safe_sample_live_runtime_assembly.py tests/test_cli_safe_sample_runtime_run_command.py tests/test_airflow_safe_sample_runtime_executor.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live:
+    - "Approved keyless Sigstore plus KPO/Vault/MSSQL/ClickHouse route-attestation certification"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+  - validation_evidence
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "The change adds a beginner golden-path command."
+  - "The implementation needs a private signing key, OIDC token, or network trust-root refresh."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

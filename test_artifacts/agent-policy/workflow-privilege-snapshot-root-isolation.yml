@@ -1,0 +1,114 @@
+schema_version: 1
+task_id: "DPONE-WORKFLOW-PRIVILEGE-SNAPSHOT-ROOT-ISOLATION"
+title: "Isolate workflow privilege snapshots from unrelated repository-root artifacts"
+goal: >-
+  Preserve fail-closed workflow and policy snapshot validation while preventing
+  unrelated repository-root files, such as pytest-cov worker artifacts, from
+  being misclassified as mutations of the fixed scanner inputs.
+specification: "docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md"
+base_commit: "6d5960d62fd6cafdf054674908e73cf26bd0c773"
+integrator: "/root"
+
+acceptance_criteria:
+  - "The repository root remains descriptor-pinned and every reopened path component must retain the same device and inode; permanent root-path rebinding still fails closed."
+  - "Only repository-root entry metadata is excluded from mutation tracking because root entries are outside the fixed scanner inputs."
+  - "The .agents, .agents/policy, .github, and .github/workflows directories and every acquired policy/workflow file retain strict inventory, metadata, descriptor, and byte revalidation."
+  - "Creating an unrelated .coverage.* file at repository root between snapshot acquisition and finalization remains complete, manifest-bound, and finding-free."
+  - "Fixed-input additions, removals, renames, hardlinks, inventory ABA mutations, symlink/path rebinding, descriptor changes, and byte changes remain UNVERIFIED and never PASS."
+  - "The approved privilege model, workflow bytes, policy bytes, required contexts, permissions, profiles, and public report schema remain unchanged."
+  - "Canonical quality metrics are regenerated after the focused regression test is added."
+  - "The full non-live xdist suite runs through the repository uv environment with pytest-cov and does not reproduce PRIVILEGE_CONCURRENT_MUTATION from unrelated worker artifacts."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "workflow privilege scanner concurrent-mutation semantics"
+    - "agent governance reliability under pytest-cov and xdist"
+  migration_required: false
+
+owned_paths:
+  - tools/agent_policy/workflow_privilege_snapshot.py
+  - tests/agent_policy/test_workflow_privilege_snapshot.py
+  - tests/agent_policy/test_workflow_privilege_snapshot_isolation.py
+
+integrator_owned_paths:
+  - docs/quality-metrics.md
+  - test_artifacts/agent-policy/workflow-privilege-snapshot-root-isolation.yml
+
+read_only_paths:
+  - docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md
+  - docs/agent-task-contracts.md
+  - docs/benchmarks/quality_budgets.yml
+  - evals/agent/agent-task-contract.schema.json
+  - tools/agent_policy/task_contract.py
+  - .agents/policy/github-branch-protection.yml
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - .agents/policy
+  - src
+  - packages
+  - docs/quality-metrics.md
+  - test_artifacts/agent-policy/workflow-privilege-snapshot-root-isolation.yml
+  - test_artifacts/agent-policy/agent_governance_gate.json
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "The exact implementation base is retirement integration 6d5960d62fd6cafdf054674908e73cf26bd0c773 with parents 0250d99a6c3b1344aebbe80a54455feda25a730d and e96ad66ac44abae498f4e7bd143041f9fc6aacad."
+  - "The exact-base release commit gate is PASS/GO for all 19 protected contexts under ruleset 18806829 and frozen policy SHA-256 f314ec6b6d6d3818ca9595fbba9615db539dcff2466e0de7e53f6412373eae3a."
+  - "The exact-base merge receipt gate is PASS with check 94718847713, GitHub App 15368, run 31784974199 attempt 1, artifact 9213133873, provider/archive digest sha256:acdecea20a9d3eb0ed2cc44d62eb6a57086ff6c7bd5693e637bc71e363893086, artifact size 12561, merge receipt SHA-256 3497ad6ef9b10cf8bf865540485e29c7beac224fdf871e133766e88f870b1806, preserved source archive SHA-256 6460c98f09fc048774ca6181f3e9e075efe22be0ea8c349e63ff9e5390957a55 with size 11582, and binding sha256:de439e62cec83058ce1459a6d6c1f12992f343944ba8b5787834fca5d71cfb37."
+  - "The approved specification blob is 44816f5e13719e5bb6455b817f2e3295f96ec963 and the base snapshot implementation blob is b6e4ddf6a4940c2397b1a7ea4c9750e6c1dcbbe4."
+  - "All .github/workflows and .agents/policy bytes remain identical to the exact implementation base."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/agent_policy/test_workflow_privilege_snapshot.py tests/agent_policy/test_workflow_privilege_snapshot_isolation.py -q"
+    - "uv run pytest -n 2 --cov=tools.agent_policy.workflow_privilege_snapshot tests/agent_policy/test_workflow_privilege_snapshot.py tests/agent_policy/test_workflow_privilege_snapshot_isolation.py -q"
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/workflow-privilege-snapshot-root-isolation.yml --format json"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref 6d5960d62fd6cafdf054674908e73cf26bd0c773 and execute every selected non-live check."
+    - "uv run pytest tests/agent_policy tests/test_module_size_gate.py -q"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile --cov=src/dpone --cov=packages/dpone-airflow-pack/src/dpone_airflow_pack --cov-report=xml"
+    - "uv run ruff check tools/agent_policy/workflow_privilege_snapshot.py tests/agent_policy/test_workflow_privilege_snapshot.py tests/agent_policy/test_workflow_privilege_snapshot_isolation.py && uv run ruff format --check tools/agent_policy/workflow_privilege_snapshot.py tests/agent_policy/test_workflow_privilege_snapshot.py tests/agent_policy/test_workflow_privilege_snapshot_isolation.py"
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs update-dev-metrics --check && uv run dpone docs check-docs && uv run dpone docs check-generated-references && uv run mkdocs build --strict"
+    - "uv run python tools/agent_policy/workflow_security.py . --format json"
+    - "uv run python tools/agent_policy/governance_gate.py --root . --base-ref 6d5960d62fd6cafdf054674908e73cf26bd0c773 --format json"
+    - "All hard and baseline module-size gates plus git diff --check pass."
+  live:
+    - "Require all 19 protected contexts on the exact final PR head from GitHub Actions App 15368."
+    - "Require exact-head governance source content verification and GitHub artifact attestation PASS."
+    - "Require a fresh final-body Agent PR receipt and immutable source artifact on the exact final head with no bypass."
+    - "After merge, require exact integration topology/tree, all 19 exact-commit contexts, and a PASS release merge receipt gate before the release train advances."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "The exact implementation base is not 6d5960d62fd6cafdf054674908e73cf26bd0c773 or public master advances before integration."
+  - "Any fixed scanner input loses inventory, metadata, descriptor, path, or byte revalidation."
+  - "The repository root is no longer descriptor-pinned or permanent root-path rebinding can PASS."
+  - "Any workflow, policy, required-context, permission, profile, release, package, source, runtime, or public report contract changes."
+  - "The final changed-path set is not exactly the three owned implementation/test paths plus the two integrator-owned task/metrics paths."
+  - "Any exact-head governance evidence, artifact attestation, Agent PR receipt, protected context, or post-merge receipt is missing, stale, foreign, bypassed, or non-PASS."

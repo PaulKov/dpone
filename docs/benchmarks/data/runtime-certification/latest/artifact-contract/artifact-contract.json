@@ -1,0 +1,36 @@
+{
+  "artifact_paths": [],
+  "category": "artifact_contract",
+  "contract_checks": [
+    {
+      "actual": 0,
+      "check_id": "cli_help_exit_zero",
+      "expected": 0,
+      "message": "dpone CLI help is executable in the local release environment.",
+      "status": "passed"
+    },
+    {
+      "actual": "usage: dpone [-h] [-v]\n             {doctor,init,plan,run,resync,resume,run-report,studio,certify,schema-plan,cdc-plan,state,normalize,connectors,ops,orchestrate,observability,supply-chain,strategy,pe",
+      "check_id": "cli_help_mentions_run",
+      "expected": "run command visible",
+      "message": "CLI command catalog includes run UX.",
+      "status": "passed"
+    },
+    {
+      "actual": true,
+      "check_id": "markdown_artifact_written",
+      "expected": true,
+      "message": "Scenario can write a human-readable artifact.",
+      "status": "passed"
+    }
+  ],
+  "input_hash": "147b6d07ff85cc6f61b29279f4c13dea9a93827a69a7afd90a8b7771da9fb993",
+  "output_hash": "4979c567d6fef50cf1d8bf1d694e64eb4b20e61dd238c28f851aa825454ce756",
+  "required": true,
+  "row_counts": {
+    "records": 1
+  },
+  "runner": "cli",
+  "scenario_id": "artifact-contract",
+  "status": "passed"
+}

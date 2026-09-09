@@ -1,0 +1,61 @@
+schema_version: 1
+task_id: "SS-REVIEW-QUALITY-FINALIZATION-CLOSURE"
+title: "Preserve v1 quality compatibility and close staged finalization failures"
+goal: "Keep origin/master-valid quality manifests compatible while preventing false success and incorrect abort/evidence ordering."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Previously schema-valid v1 quality objects remain schema-valid unless a recognized contract is semantically invalid."
+  - "Known quality gates/checks are normalized and validated fail-closed."
+  - "Missing, non-integer, boolean, or negative staged_rows never becomes zero."
+  - "Pre-commit failure aborts before evidence delivery and preserves the primary exception."
+  - "Post-commit evidence failure never aborts an already finalized load."
+  - "Quality, abort, finalize, and evidence failure combinations have regression tests."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["dpone.flow.v1", "dpone.batch.v1", "quality gates", "staged load finalization evidence"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/schema/etl-flow-manifest.schema.json"
+  - "src/dpone/schema/etl-batch-manifest.schema.json"
+  - "src/dpone/governance/quality.py"
+  - "src/dpone/governance/quality_normalize.py"
+  - "src/dpone/runtime/governance/finalization.py"
+  - "src/dpone/runtime/governance/service.py"
+  - "tests/test_load_governance_manifest_contracts.py"
+  - "tests/test_quality_checks_gates_adapter.py"
+  - "tests/test_native_load_governance_finalization.py"
+read_only_paths:
+  - "docs/feature-design-quality-checks-gates-adapter-v1.md"
+  - "docs/load-governance.md"
+  - "src/dpone/ports/staged_load.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_load_governance_manifest_contracts.py tests/test_quality_checks_gates_adapter.py tests/test_native_load_governance_finalization.py -q"
+  broad:
+    - "uv run pytest tests/test_load_governance_hooks.py tests/test_load_governance_quality.py tests/test_load_governance_runtime_service.py tests/test_native_load_governance_finalization.py tests/test_quality_checks_gates_adapter.py -q"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Public-contract impact becomes breaking."
+  - "A cross-sink transaction redesign becomes necessary."
+  - "Another writer owns the same semantic contract."

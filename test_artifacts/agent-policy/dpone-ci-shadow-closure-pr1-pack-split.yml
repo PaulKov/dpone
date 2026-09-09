@@ -1,0 +1,84 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-CLOSURE-PR1-PACK-SPLIT"
+title: "Split compact-pack release runtime payload responsibility"
+goal: >-
+  Move runtime-payload identity and materialization into one cohesive helper so
+  airflow_compact_pack_release.py stays below the global module budget, then let
+  the integrator close compact-v1 validation drift under the umbrella contract.
+specification: >-
+  Approved DPONE-CI-SHADOW-CLOSURE plan tracked in GitHub issue #512 and the
+  responsibility boundary documented by the PR1 architecture review.
+base_commit: "e1d93822b47234e940829319cac0dc9678f6906c"
+integrator: "/root"
+
+acceptance_criteria:
+  - "airflow_compact_pack_release.py is below 400 SLOC and 450 LOC."
+  - "The extracted helper owns runtime payload IDs, canonical dbt ordering, location and bytes/descriptors."
+  - "The extraction handoff preserves public functions, __all__, immutable release identity and ordering."
+  - "Integrator hardening rejects unsafe IDs, more than 64 descriptors, payloads above 268435456 bytes, more than 536870912 aggregate actual bytes, and unsafe or changing files."
+  - "Duplicate compact-v1 runtime payload references count once; equality with the per-payload and release-wide aggregate byte limits passes, while either limit plus one fails before immutable release publication."
+  - "The public release-materialize JSON contract reports aggregate overflow with exit 2, passed=false, the stable full blocker code, empty release identity/path, and no cache release publication."
+  - "No new source module exceeds warning thresholds."
+
+public_contract_impact:
+  level: breaking
+  surfaces:
+    - "compact release-set v1 optional runtime-payload validation"
+    - "invalid runtime-payload error codes"
+  migration_required: true
+
+owned_paths:
+  - src/dpone/readiness/airflow_compact_pack_release.py
+  - src/dpone/readiness/airflow_compact_pack_runtime_payloads.py
+  - tests/test_airflow_compact_pack_runtime_payload_limits.py
+  - tests/*gitops_airflow_compact_pack_release.py
+  - test_artifacts/agent-policy/dpone-ci-shadow-closure-pr1-pack-split.yml
+read_only_paths:
+  - src/dpone/runtime/airflow_artifact_inventory.py
+  - tests/*airflow_release_runtime_payload_inventory.py
+  - docs/benchmarks/quality_budgets.yml
+  - tests/*module_size_gate.py
+  - tests/*architecture_warning_debt_contracts.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/module_size_baseline.json
+  - docs/benchmarks/quality_budgets.yml
+
+shared_file_owner: "/root"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_compact_pack_runtime_payload_limits.py -q"
+    - "uv run pytest tests/*gitops_airflow_compact_pack_release.py tests/*airflow_release_runtime_payload_inventory.py -q"
+    - "uv run pytest tests/*module_size_gate.py tests/*architecture_warning_debt_contracts.py -q"
+  broad:
+    - "uv run ruff check src/dpone/readiness/airflow_compact_pack_release.py src/dpone/readiness/airflow_compact_pack_runtime_payloads.py tests/test_airflow_compact_pack_runtime_payload_limits.py tests/*gitops_airflow_compact_pack_release.py"
+    - "uv run mypy --config-file mypy.ini"
+  live:
+    - "N/A: credential-free artifact validation changes no external data-movement path and requires no live environment"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

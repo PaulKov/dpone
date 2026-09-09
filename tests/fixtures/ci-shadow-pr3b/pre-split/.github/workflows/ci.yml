@@ -1,0 +1,362 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    env:
+      # Match GitLab CI: pytest must exercise the uv-installed editable wheel only.
+      # Without this, tests/conftest.py prepends src/ and duplicates dpone modules under xdist.
+      DPONE_TEST_USE_INSTALLED_PACKAGE: "1"
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Validate changed workflows with pinned actionlint
+        if: matrix.python-version == '3.12'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTIONLINT_VERSION=1.7.12
+          ACTIONLINT_DIR="${RUNNER_TEMP}/actionlint-${ACTIONLINT_VERSION}"
+          ACTIONLINT_ARCHIVE="${RUNNER_TEMP}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          ACTIONLINT_BIN="${ACTIONLINT_DIR}/actionlint"
+          mkdir "${ACTIONLINT_DIR}"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output "${ACTIONLINT_ARCHIVE}" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          printf '%s  %s\n' \
+            '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8' \
+            "${ACTIONLINT_ARCHIVE}" | sha256sum --check --status
+          LC_ALL=C tar -xOf "${ACTIONLINT_ARCHIVE}" actionlint > "${ACTIONLINT_BIN}.tmp"
+          test "$(wc -c < "${ACTIONLINT_BIN}.tmp" | tr -d ' ')" = "6074530"
+          printf '%s  %s\n' \
+            'c872d6db8c6bf83a8eaa704fc93999f027d55dffbc63b8a6abdccb47df5f4cd4' \
+            "${ACTIONLINT_BIN}.tmp" | sha256sum --check --status
+          chmod 0755 "${ACTIONLINT_BIN}.tmp"
+          mv "${ACTIONLINT_BIN}.tmp" "${ACTIONLINT_BIN}"
+          test "$("${ACTIONLINT_BIN}" -version | sed -n '1p')" = "${ACTIONLINT_VERSION}"
+
+          actionlint_flags=(-no-color -format '{{json .}}' -shellcheck '' -pyflakes '')
+          expected_empty="${RUNNER_TEMP}/actionlint-empty.json"
+          nonqueue_stdout="${RUNNER_TEMP}/actionlint-nonqueue.stdout"
+          nonqueue_stderr="${RUNNER_TEMP}/actionlint-nonqueue.stderr"
+          nightly_stdout="${RUNNER_TEMP}/actionlint-nightly.stdout"
+          nightly_stderr="${RUNNER_TEMP}/actionlint-nightly.stderr"
+          waived_stdout="${RUNNER_TEMP}/actionlint-nightly-waived.stdout"
+          waived_stderr="${RUNNER_TEMP}/actionlint-nightly-waived.stderr"
+          printf '[]\n' > "${expected_empty}"
+
+          "${ACTIONLINT_BIN}" "${actionlint_flags[@]}" \
+            .github/workflows/ci.yml \
+            .github/workflows/airflow-pack-compat.yml \
+            .github/workflows/pages.yml \
+            .github/workflows/dependency-review.yml \
+            > "${nonqueue_stdout}" 2> "${nonqueue_stderr}"
+          cmp "${expected_empty}" "${nonqueue_stdout}"
+          test ! -s "${nonqueue_stderr}"
+
+          set +e
+          "${ACTIONLINT_BIN}" "${actionlint_flags[@]}" \
+            .github/workflows/airflow-pack-compat-nightly.yml \
+            > "${nightly_stdout}" 2> "${nightly_stderr}"
+          nightly_status=$?
+          set -e
+          if [[ "${nightly_status}" -eq 0 ]]; then
+            echo "ACTIONLINT_QUEUE_WAIVER_OBSOLETE" >&2
+            exit 1
+          fi
+          test "${nightly_status}" -eq 1
+          test ! -s "${nightly_stderr}"
+          python - "${nightly_stdout}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          diagnostics = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          expected = {
+              "filepath": ".github/workflows/airflow-pack-compat-nightly.yml",
+              "kind": "syntax-check",
+              "message": 'unexpected key "queue" for "concurrency" section. expected one of "cancel-in-progress", "group"',
+          }
+          assert isinstance(diagnostics, list) and len(diagnostics) == 1
+          assert {key: diagnostics[0].get(key) for key in expected} == expected
+          PY
+
+          "${ACTIONLINT_BIN}" "${actionlint_flags[@]}" \
+            -ignore '^unexpected key "queue" for "concurrency" section\. expected one of "cancel-in-progress", "group"$' \
+            .github/workflows/airflow-pack-compat-nightly.yml \
+            > "${waived_stdout}" 2> "${waived_stderr}"
+          cmp "${expected_empty}" "${waived_stdout}"
+          test ! -s "${waived_stderr}"
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Mypy
+        run: uv run mypy --config-file mypy.ini
+
+      - name: Import rules
+        run: uv run dpone docs check-import-rules
+
+      - name: Layer metrics
+        run: uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json
+
+      - name: Architecture fitness
+        if: matrix.python-version == '3.12'
+        run: |
+          mkdir -p test_artifacts/architecture-fitness
+          uv run dpone docs check-architecture-fitness --format json \
+            > test_artifacts/architecture-fitness/architecture_fitness.json
+
+      - name: Upload architecture fitness evidence
+        if: always() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: architecture-fitness
+          path: test_artifacts/architecture-fitness/architecture_fitness.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Module size
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          BASE_SHA="$EVENT_BASE_SHA"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE_SHA="$(git merge-base "$HEAD_SHA" "$EVENT_BASE_SHA")"
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            BASE_SHA="$(git merge-base "$HEAD_SHA" "origin/$DEFAULT_BRANCH")"
+            if [ "$BASE_SHA" = "$HEAD_SHA" ]; then
+              BASE_SHA="$(git rev-parse "${HEAD_SHA}^")"
+            fi
+          fi
+          test -n "$BASE_SHA"
+          uv run dpone docs check-module-size \
+            --baseline docs/module_size_baseline.json \
+            --base-ref "$BASE_SHA" \
+            --head-ref "$HEAD_SHA"
+
+      - name: Airflow provider module size
+        run: >
+          uv run dpone docs check-module-size
+          --package packages/dpone-airflow-pack/src/dpone_airflow_pack
+          --no-baseline
+
+      - name: Formal Airflow provider module size
+        run: >
+          uv run dpone docs check-module-size
+          --package packages/apache-airflow-providers-dpone/src/airflow/providers/dpone
+          --no-baseline
+
+      - name: Agent policy module size
+        run: >
+          uv run dpone docs check-module-size
+          --package tools/agent_policy
+          --no-baseline
+          --warn-lines 350
+          --max-lines 400
+          --warn-sloc 300
+          --max-sloc 350
+
+      - name: Agent policy test module size
+        run: >
+          uv run dpone docs check-module-size
+          --package tests/agent_policy
+          --no-baseline
+          --warn-lines 350
+          --max-lines 400
+          --warn-sloc 300
+          --max-sloc 350
+
+      - name: Validate agent control plane
+        if: matrix.python-version == '3.12'
+        run: uv run python tools/agent_policy/validate_setup.py .
+
+      - name: Workflow security policy
+        if: matrix.python-version == '3.12'
+        run: uv run python tools/agent_policy/workflow_security.py .
+
+      - name: Agent governance gate
+        if: matrix.python-version == '3.12'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            mapfile -d '' -t changed_paths < <(git diff --no-renames --name-only --diff-filter=ACDMRT -z "$BASE_SHA...$HEAD_SHA")
+          else
+            changed_paths=()
+          fi
+          uv run python tools/agent_policy/governance_gate.py \
+            "${changed_paths[@]}" \
+            --base-ref origin/master \
+            --head-commit "$HEAD_SHA" \
+            --output test_artifacts/agent-policy/agent_governance_gate.json
+
+      - name: Attest agent governance evidence
+        if: matrix.python-version == '3.12'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: test_artifacts/agent-policy/agent_governance_gate.json
+
+      - name: Upload agent governance evidence
+        if: always() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: agent-governance-gate
+          path: test_artifacts/agent-policy/agent_governance_gate.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Test agent policy tooling
+        if: matrix.python-version == '3.12'
+        run: uv run pytest tests/agent_policy tests/test_module_size_gate.py -q
+
+      - name: Build documentation strictly
+        if: matrix.python-version == '3.12'
+        run: uv run mkdocs build --strict
+
+      - name: Generated references
+        if: matrix.python-version == '3.12'
+        run: uv run dpone docs check-generated-references
+
+      - name: Frozen Airflow public contract
+        if: matrix.python-version == '3.12'
+        run: |
+          mkdir -p test_artifacts/airflow-v1-public-contract-freeze
+          uv run dpone docs check-airflow-public-contracts --format json \
+            > test_artifacts/airflow-v1-public-contract-freeze/airflow-v1-public-contract-report.json
+          uv run dpone docs update-airflow-public-contract-reference --check
+
+      - name: Upload Airflow public contract evidence
+        if: always() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: airflow-v1-public-contract
+          path: test_artifacts/airflow-v1-public-contract-freeze/
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Generated developer metrics
+        run: uv run dpone docs update-dev-metrics --check
+
+      # Unit/contract layer runs in parallel via pytest-xdist. Coverage
+      # fail_under (see [tool.coverage.report]) is enforced by pytest-cov;
+      # the ratchet policy lives in pyproject.toml.
+      - name: Pytest
+        run: >
+          uv run pytest -m "not integration_live" -n auto --dist loadfile
+          --cov=src/dpone
+          --cov=packages/dpone-airflow-pack/src/dpone_airflow_pack
+          --cov-report=xml
+
+      - name: Build package
+        run: |
+          uv build
+          uv build packages/dpone-native-accel --out-dir dist
+          uv build packages/dpone-airflow-pack --out-dir dist
+          uv build packages/apache-airflow-providers-dpone --out-dir dist
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage
+          path: coverage.xml
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dist
+          path: dist/
+
+
+  postgres-xmin:
+    name: PostgreSQL XMin integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: dpone_it
+          POSTGRES_USER: dpone
+          POSTGRES_PASSWORD: dpone
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dpone -d dpone_it"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DPONE_TEST_USE_INSTALLED_PACKAGE: "1"
+      DPONE_RUN_INTEGRATION: "1"
+      DPONE_IT_PG_HOST: 127.0.0.1
+      DPONE_IT_PG_PORT: "5432"
+      DPONE_IT_PG_DATABASE: dpone_it
+      DPONE_IT_PG_USER: dpone
+      DPONE_IT_PG_PASSWORD: dpone
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Run PostgreSQL XMin integration tests
+        run: uv run pytest -m integration_postgres_xmin tests/integration/postgres -q

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/PaulKov/dpone/v0.73.0/docs/schemas/openlineage/dpone-airflow-correlation-run-facet-v1.schema.json",
+  "title": "dpone Airflow correlation OpenLineage run facet v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "_producer",
+    "_schemaURL",
+    "correlationId",
+    "airflow",
+    "dpone",
+    "artifacts",
+    "pod"
+  ],
+  "properties": {
+    "_producer": {
+      "const": "https://github.com/PaulKov/dpone"
+    },
+    "_schemaURL": {
+      "const": "https://raw.githubusercontent.com/PaulKov/dpone/v0.73.0/docs/schemas/openlineage/dpone-airflow-correlation-run-facet-v1.schema.json"
+    },
+    "correlationId": {
+      "$ref": "#/$defs/digest"
+    },
+    "airflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dagId", "taskId", "runId", "tryNumber", "mapIndex"],
+      "properties": {
+        "dagId": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "taskId": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "runId": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "tryNumber": {"type": "integer", "minimum": 1},
+        "mapIndex": {"type": "integer", "minimum": -1}
+      }
+    },
+    "dpone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "process"],
+      "properties": {
+        "runId": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "process": {"type": "string", "minLength": 1, "maxLength": 253}
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "releaseId",
+        "deploymentId",
+        "workloadId",
+        "workloadPackSha256",
+        "runtimeEvidenceSha256"
+      ],
+      "properties": {
+        "releaseId": {"$ref": "#/$defs/digest"},
+        "deploymentId": {"$ref": "#/$defs/digest"},
+        "workloadId": {"type": "string", "minLength": 1, "maxLength": 253},
+        "workloadPackSha256": {"$ref": "#/$defs/digest"},
+        "runtimeEvidenceSha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "pod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "uid", "namespace", "imageDigest"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 253},
+        "uid": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "namespace": {"type": "string", "minLength": 1, "maxLength": 253},
+        "imageDigest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

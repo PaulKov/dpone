@@ -1,0 +1,156 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-PR3B-PUBLIC-OUTPUT-AMENDMENT"
+title: "Close the PR3B v1 diagnostic and umbrella-output contract"
+goal: >-
+  Clarify the already approved PR3B design before implementation so a read-only
+  unknown expression cannot invent public proof-trace bytes and every blocking
+  semantic finding or internal semantic failure has one deterministic,
+  fail-closed legacy umbrella mapping.
+  This amendment changes specification, contract tests, and generated metrics
+  only; it changes no workflow, policy, scanner, runtime, package, release, or
+  GitHub setting.
+specification: "docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md"
+base_commit: "f18298c14af247225758f7fe8901bc8462994dd4"
+integrator: "/root"
+
+acceptance_criteria:
+  - "The original PR3B design remains APPROVED and ADR0037 remains ACCEPTED; the public-output amendment is independently RESEARCHED until an exact-head maintainer changes only its lifecycle status to APPROVED."
+  - "An unknown expression on a read-only job is bounded ephemeral analysis metadata only: it is not serialized, logged, counted as a finding, appended to umbrella output, or allowed to change report bytes, status, or exit."
+  - "An unknown expression that is the only barrier to privileged authority remains the exact PRIVILEGE_UNKNOWN_EXPRESSION/UNVERIFIED finding."
+  - "Every standalone FAIL and UNVERIFIED finding is appended after legacy errors, in standalone report order, as semantic-pr-privilege=<canonical compact complete-finding JSON>; no semantic finding is appended to warnings."
+  - "Canonical finding JSON uses sorted keys, compact separators, ensure_ascii true, allow_nan false, and no newline; the existing umbrella status is failed, errors are non-empty, warnings are unchanged, no ok field exists, and exit is 1 for both FAIL and UNVERIFIED."
+  - "Any ordinary semantic service, report-validation, identity, or finding-serialization exception maps atomically to the sole error semantic-pr-privilege-internal=PRIVILEGE_INTERNAL_REPORT_INVALID after legacy errors; warnings are unchanged, no partial semantic findings or traceback are published, status is failed, and umbrella exit is 1."
+  - "The umbrella internal boundary catches Exception but never KeyboardInterrupt, SystemExit, or another BaseException; standalone internal-report-invalid behavior remains exit 3 with no stdout."
+  - "Contract tests reject warning-based mapping, reordered findings, incomplete objects, non-canonical escaping, changed prefix, partial projection, read-only public diagnostics, lifecycle mismatches, and implementation before the amendment merges."
+  - "The historical design-scope regression is bound to immutable integration commit f18298c14af247225758f7fe8901bc8462994dd4 rather than future ambient HEAD."
+  - "While the amendment is RESEARCHED, its latest task-changing scope head equals HEAD and the cumulative committed scope from base_commit equals owned_paths plus integrator_owned_paths; dirty and untracked bytes do not affect it and undeclared committed paths or a non-ancestor base fail closed."
+  - "A successor after the last task-changing commit may change only the exact RESEARCHED-to-APPROVED status and checklist bytes in the specification; after squash, the first commit that adds the task with an APPROVED lifecycle becomes the immutable scope head, its specification and task blobs remain byte-identical, and later unrelated work does not accumulate into this historical gate."
+  - "PR 539 MUST be integrated with the squash method: the post-merge receipt must report method=squash, a one-parent integration commit, and that commit as the first-parent APPROVED task introduction; merge-commit, rebase/fast-forward, or unverifiable integration is rejected."
+  - "The specification provides a fail-closed copyable post-merge receipt check and maps missing, malformed, incomplete, readable non-PASS, shallow, or otherwise locally unavailable evidence to one controlled UNVERIFIED stream and bounded rerun; only a complete PASS receipt with a proven wrong method, parent count, tree, ancestry, lifecycle, or history is deterministic FAIL (preserve evidence, keep implementation blocked, never reuse v1, and require a separately approved versioned v2 recovery amendment with its own squash receipt)."
+  - "A receipt can authorize implementation only after provider-authenticated selection under the existing runbook; one isolated interpreter reads the artifact path as exact bytes, rejects NUL, invalid UTF-8, duplicate/non-finite/multiple JSON, ignores checkout/PYTHONPATH shadow modules, validates the full closed schema from the exact integration commit, emits canonical validated JSON, and recomputes binding_id over every frozen binding field including source_receipt; incomplete provenance or binding is UNVERIFIED."
+  - "Receipt-intrinsic repository/base/PR/method/SHA/tree equality and integration commit-header tree/parent equality are checked before referenced-object availability, and integration-only parent-count, lifecycle, and canonical task-introduction failures precede reviewed-object availability; proven mismatches cannot be downgraded to transient UNVERIFIED."
+  - "History authority exports GIT_NO_REPLACE_OBJECTS=1, rejects a non-empty local graft file, requires a non-shallow repository, then pins GIT_GRAFT_FILE and GIT_SHALLOW_FILE to an immutable empty view before ancestry or canonical task-introduction proof; hidden prior add/delete/reuse or concurrent metadata mutation cannot become PASS."
+  - "The receipt check runs immediately after clarification integration and before implementation-task creation or production edits; only receipt PASS authorizes the exact integration commit as the implementation base."
+  - "Executable receipt-command tests bind provider fields to local reviewed/integration trees, base parent, ancestry, full schema/binding, and exact APPROVED lifecycle/checklist; reject self-consistent forged metadata, truncated provenance, binding drift, NUL/invalid UTF-8/duplicate JSON, checkout/PYTHONPATH import shadowing, replacement/graft ancestry, concurrent graft mutation, hidden pre-boundary task reuse, zero/two-parent commits, and RESEARCHED integration; accept large integration/reviewed commit messages without SIGPIPE; classify empty/truncated/multiple JSON, failure receipts, shallow history, missing objects, and missing specification bytes without leaking jq/git diagnostics; and assert exact PASS/FAIL/UNVERIFIED streams plus parent/tree/lifecycle/history mismatch precedence over later object unavailability."
+  - "No ADR, production workflow, policy, tool, schema, runtime, package, dependency, release, provider, or live setting changes."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "planned PR3B standalone v1 report observability"
+    - "planned legacy workflow-security umbrella errors and exits"
+    - "PR3B implementation lifecycle"
+  migration_required: false
+
+owned_paths:
+  - docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md
+  - tests/test_ci_shadow_pr3b_scope_contracts.py
+  - tests/test_ci_shadow_pr3b_output_amendment_contracts.py
+  - tests/ci_shadow_pr3b_squash_receipt_support.py
+  - tests/test_ci_shadow_pr3b_squash_receipt_contracts.py
+  - tests/test_ci_shadow_pr3b_squash_receipt_failures.py
+  - test_artifacts/agent-policy/dpone-ci-shadow-pr3b-public-output-amendment.yml
+
+integrator_owned_paths:
+  - docs/quality-metrics.md
+
+read_only_paths:
+  - docs/feature-design-ci-pr-gate-exact-sha-evidence.md
+  - docs/adr/0037-immutable-agent-pr-merge-closure.md
+  - docs/adr/0048-exact-sha-readiness-evidence.md
+  - docs/feature-design-standard.md
+  - docs/documentation-standard.md
+  - docs/engineering-standards.md
+  - docs/agent-development.md
+  - docs/agent-task-contracts.md
+  - docs/benchmarks/quality_budgets.yml
+  - test_artifacts/agent-policy/dpone-ci-shadow-pr3b-spec.yml
+  - tests/test_ci_shadow_pr3b_spec_contracts.py
+  - tests/test_ci_shadow_pr3b_schema_contracts.py
+  - tests/ci_shadow_pr3b_report_contract_model.py
+  - tests/ci_shadow_pr3b_report_contract_support.py
+  - tests/ci_shadow_pr3b_report_route_model.py
+  - tests/ci_shadow_pr3b_report_examples.py
+  - tests/test_ci_shadow_pr3b_report_contracts.py
+  - tests/test_ci_shadow_pr3b_report_routes_contracts.py
+  - tests/test_ci_shadow_pr3b_report_limits_contracts.py
+  - tools/agent_policy/task_contract.py
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - docs/quality-metrics.md
+  - docs/adr
+  - .github
+  - .github/workflows
+  - .agents/policy
+  - evals/agent
+  - src
+  - packages
+  - tools/agent_policy
+  - tools/ci
+  - docs/ci-cd.md
+  - docs/cicd
+  - docs/developer-ci-cd.md
+  - docs/agent-governance.md
+  - docs/agent-security-mapping.md
+  - docs/agent-risk-register.md
+  - docs/github-branch-protection.md
+  - docs/testing
+  - test_artifacts/agent-policy/agent_governance_gate.json
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "PR538 integration commit f18298c14af247225758f7fe8901bc8462994dd4 is the exact amendment base and contains the approved design plus accepted ADR0037 amendment."
+  - "The approved specification blob at the amendment base is ec162f1a3d82d785ab680b299005e8bba13cb432 and ADR0037 blob is 04705ee802cae434246c779945691a724c5c8851."
+  - "Fresh architecture review classified the missing v1 diagnostic and umbrella encoding as P1 and requires this prior merged approved amendment before implementation."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_ci_shadow_pr3b_output_amendment_contracts.py tests/test_ci_shadow_pr3b_squash_receipt_contracts.py tests/test_ci_shadow_pr3b_squash_receipt_failures.py tests/test_ci_shadow_pr3b_spec_contracts.py tests/test_ci_shadow_pr3b_scope_contracts.py tests/test_ci_shadow_pr3b_schema_contracts.py tests/test_ci_shadow_pr3b_report_contracts.py tests/test_ci_shadow_pr3b_report_routes_contracts.py tests/test_ci_shadow_pr3b_report_limits_contracts.py tests/agent_policy/test_task_contract.py tests/test_docs_language_contracts.py -q"
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/dpone-ci-shadow-pr3b-public-output-amendment.yml"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref f18298c14af247225758f7fe8901bc8462994dd4"
+    - "Execute every selected non-live check and report unavailable live evidence as UNVERIFIED."
+    - "uv run ruff check tests/test_ci_shadow_pr3b_output_amendment_contracts.py tests/test_ci_shadow_pr3b_scope_contracts.py && uv run ruff format --check tests/test_ci_shadow_pr3b_output_amendment_contracts.py tests/test_ci_shadow_pr3b_scope_contracts.py"
+    - "uv run dpone docs check-docs && uv run dpone docs check-generated-references && uv run dpone docs update-dev-metrics --check && uv run mkdocs build --strict"
+    - "git diff --check"
+  live:
+    - "N/A for design clarification semantics; merge still requires every exact-head protected check, owner attestation, Agent PR receipt, and no bypass."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "A delegated writer edits integrator_owned_paths, or integrator differs from shared_file_owner."
+  - "Approved specification is missing or contradicted."
+  - "Approved PR3B design, accepted ADR0037, or exact amendment base/blob authority is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Any production workflow, policy, tool, schema, runtime, package, dependency, release, provider, or live setting change is required."
+  - "The amendment adds a public warning/proof-trace field or allows semantic UNVERIFIED to remain only a warning."
+  - "An internal semantic failure can raise through the umbrella, become a warning or success, change the umbrella exit from 1, leak a traceback, or publish any partial semantic finding."
+  - "The active task-changing scope head has a non-ancestor base or a committed path set different from owned_paths plus integrator_owned_paths; while RESEARCHED it differs from HEAD, a later successor changes bytes beyond the exact lifecycle pair, or any reachable post-squash commit touches the approved specification/task paths even if their final blobs are restored."
+  - "The PR 539 integration method is not receipt-proven squash with one parent and the APPROVED task introduced on the canonical first-parent chain."
+  - "The post-merge journey cannot select exact squash evidence or tells the operator that rerunning can repair a deterministic integration-identity failure."
+  - "The receipt check emits raw jq/git diagnostics, classifies unavailable or incomplete evidence as deterministic FAIL, or classifies a complete proven identity mismatch as transient UNVERIFIED."
+  - "A raw-byte, schema, binding, isolated-import, pinned-history, graft/replace, or shallow-history violation can authorize implementation, or any proven receipt/header/lifecycle/history mismatch is hidden behind later local-object unavailability."
+  - "An implementation task or production edit can begin before the clarification post-merge squash receipt is PASS."
+  - "Deterministic recovery deletes, re-adds, or reuses the v1 task path instead of requiring a separately approved versioned v2 recovery amendment and receipt."
+  - "PR3B implementation begins before this amendment is APPROVED and merged."

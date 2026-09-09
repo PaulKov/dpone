@@ -1,0 +1,52 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-dev-evidence-authority.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "dag_id": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "dag_run_id": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "evidence_set_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "request_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.dbt-dev-evidence-authority.v1"
+    },
+    "workflow_id": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "request_id",
+    "evidence_set_id",
+    "release_id",
+    "deployment_id",
+    "workflow_id",
+    "dag_id",
+    "dag_run_id"
+  ],
+  "type": "object"
+}

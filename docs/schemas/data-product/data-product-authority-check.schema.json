@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-authority-check.schema.json",
+  "title": "dpone data product authority check",
+  "type": "object",
+  "required": ["schema_version", "authority_check_id", "status", "actor", "action", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_authority_check.v1"},
+    "authority_check_id": {"type": "string"},
+    "authority_registry_id": {"type": ["string", "null"]},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "actor": {"type": "string"},
+    "action": {"type": "string"},
+    "subject": {"type": "object"},
+    "granted_roles": {"type": "array", "items": {"type": "string"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

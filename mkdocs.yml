@@ -1,0 +1,610 @@
+site_name: dpone
+site_description: Production-grade batch ELT framework for databases, APIs, Kafka, state, schema evolution, reconciliation, and quality gates.
+site_url: https://paulkov.github.io/dpone/
+repo_url: https://github.com/PaulKov/dpone
+repo_name: PaulKov/dpone
+edit_uri: edit/master/docs/
+strict: true
+
+docs_dir: docs
+site_dir: site
+exclude_docs: |
+  README.md
+
+theme:
+  name: material
+  language: en
+  logo: assets/images/logo.svg
+  favicon: assets/images/favicon.svg
+  palette:
+    - scheme: default
+      primary: white
+      accent: teal
+  font:
+    text: IBM Plex Sans
+    code: IBM Plex Mono
+  features:
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.copy
+    - content.tabs.link
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - search.share
+    - search.suggest
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+validation:
+  nav:
+    omitted_files: ignore
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: ignore
+    absolute_links: relative_to_docs
+    unrecognized_links: warn
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Runtime Docker image: runtime-image.md
+      - Running pipelines: run.md
+      - First local pipeline: getting-started/first-local-pipeline.md
+      - First Airflow DAG: getting-started/first-airflow-dag.md
+      - First dbt mart: dbt-inline-publishing.md
+      - Semantic refresh V2 (0.74 local preview):
+          - Author journey: dbt-semantic-refresh-v2.md
+          - Baseline adoption: dbt-semantic-refresh-v2-baseline.md
+          - Platform operations: dbt-semantic-refresh-v2-platform.md
+      - Domain-first Airflow project: getting-started/domain-first-airflow.md
+      - Airflow pipeline glossary: getting-started/airflow-pipeline-glossary.md
+      - Credentials quickstart: getting-started/credentials-quickstart.md
+      - Manifest basics: getting-started/manifest-basics.md
+      - CLI examples: cli-examples.md
+      - Examples gallery: getting-started/examples-gallery.md
+  - Core concepts:
+      - Architecture: architecture.md
+      - Conventions: conventions.md
+      - Connections and credentials: connections.md
+      - Manifests: manifests-variant-c.md
+      - Manifest sparse paths: manifest-sparse-paths.md
+      - GitOps control plane: gitops-control-plane.md
+      - GitOps Airflow runner pack: gitops-airflow-runner-pack.md
+      - Airflow self-service: airflow-self-service.md
+      - Airflow self-service evidence: airflow-self-service-evidence.md
+      - Airflow pipeline authoring: airflow-authoring.md
+      - Domain-first discovery and CI: domain-first-discovery-ci.md
+      - Authoring-mode migration: airflow-authoring-migration.md
+      - Recipes, profiles, and components: airflow-recipes.md
+      - Studio local API: studio.md
+      - Studio operations: studio-operations.md
+      - Signed catalog bundles: signed-catalog-bundles.md
+      - Extension conformance: extension-conformance.md
+      - Lightweight Airflow pack provider: airflow-pack-provider.md
+      - Legacy Airflow pack cache hardening design: feature-design-airflow-legacy-pack-cache-hardening-v07332.md
+      - Exact Airflow desired-state delivery: airflow-desired-state.md
+      - Airflow artifact trust (preview): airflow-artifact-trust.md
+      - Airflow artifact attestation operations (preview): airflow-artifact-attestation-operations.md
+      - Industrial Airflow self-service architecture: airflow-self-service-architecture.md
+      - Production route attestation: airflow-route-attestation.md
+      - Airflow cache promotion integrity design: feature-design-airflow-cache-promotion-integrity.md
+      - Airflow cache status publication design: feature-design-airflow-cache-status-publication-v0732.md
+      - Airflow retention apply receipt design: feature-design-airflow-retention-apply-receipt-v0732.md
+      - Airflow runtime pod retention control design: feature-design-airflow-runtime-pod-retention-control-v0732.md
+      - Airflow runtime activation evidence design: feature-design-airflow-runtime-activation-evidence-v0732.md
+      - Airflow provider API: airflow-provider-api.md
+      - Init-fetch pod retention design: feature-design-airflow-init-fetch-pod-retention-v0732.md
+      - Init-fetch connection bridge design: feature-design-airflow-init-fetch-connection-bridge-v0732.md
+      - Registry: registry.md
+      - Load strategies: load-strategies.md
+      - Backfill: backfill.md
+      - Source preparation and load governance: load-governance.md
+      - Runtime decision audit: runtime-decision-audit.md
+      - SQL file transform workloads: sql-file-workloads.md
+      - Strategy intelligence: strategy-intelligence.md
+      - Load profile advisor: load-profile-advisor.md
+      - Load lineage: load-lineage.md
+      - Extraction lifecycle: extraction-lifecycle.md
+      - Nested normalization: nested-normalization.md
+      - OpenLineage and run history: lineage.md
+      - dbt integration:
+          - Overview: dbt.md
+          - Author and platform reference: dbt-self-service-reference.md
+          - Invocation, selection, and target identity: dbt-self-service-runtime-identity.md
+          - Promotion and rollback: dbt-self-service-promotion.md
+          - Platform workflows: dbt-self-service-platform-workflows.md
+          - Operations runbook: dbt-self-service-runbook.md
+          - Error catalog: dbt-self-service-errors.md
+          - Threat model: dbt-self-service-threat-model.md
+          - Multi-project release design: feature-design-dbt-multi-project-release.md
+          - Workspace source verification: dbt-workspace-source-verification.md
+          - Workspace authoring: dbt-workspace-authoring.md
+          - Workspace promotion: dbt-workspace-promotion.md
+      - Runtime observability: observability.md
+      - Data Product SLO and incidents: data-product-slo.md
+      - Data Product Cost Governance: data-product-cost-governance.md
+      - Data Product Progressive Delivery: data-product-progressive-delivery.md
+      - Data Product Trust Center: data-product-trust-center.md
+      - Data Product Remediation Runbooks: data-product-remediation.md
+      - Adaptive native transfer: native-transfer-industrial-runtime.md
+      - Object storage staging: object-storage-staging.md
+      - Supply-chain evidence: supply-chain.md
+      - SLSA release self-assessment: supply-chain-slsa.md
+      - Release evidence: release-evidence.md
+      - Postgres XMin deep dive: postgres-xmin.md
+      - State: state.md
+      - Schema evolution: schema-evolution.md
+      - Schema Identity: schema-identity.md
+      - Schema impact: schema-impact.md
+      - Online schema evolution: online-schema-evolution.md
+      - Type inference: type-inference.md
+      - Temporal fidelity: temporal-fidelity.md
+      - Schema contracts: schema-contracts.md
+      - Physical design: physical-design.md
+      - Runtime data contracts: data-contract-runtime.md
+      - Streaming-safe contracts: runtime-fast-path-contracts.md
+      - Physical DDL apply: physical-ddl-apply.md
+      - Schema migration control: schema-migration-control.md
+      - Production profiles: production-profiles.md
+      - Unified run evidence: unified-run-evidence.md
+      - Type mapping matrix: type-mapping-matrix.md
+      - Source -> sink matrix: source-sink-matrix.md
+      - Route certification matrix: route-certification-matrix.md
+      - Route bootstrap and doctor: route-bootstrap-doctor.md
+      - Route Conformance Lab: route-conformance-lab.md
+      - Route readiness: route-readiness.md
+      - Route schema evolution: route-schema-evolution.md
+      - Route reconciliation repair: route-reconciliation-repair.md
+      - Route run supervisor: route-run-supervisor.md
+      - Route data quality: route-data-quality.md
+      - Route refresh plan: route-refresh-plan.md
+      - Route refresh execute: route-refresh-execute.md
+      - Route execution ledger: route-execution-ledger.md
+      - Route state promotion: route-state-promotion.md
+      - Route certification pack: route-certification-pack.md
+      - Route live certification: route-live-certification.md
+      - Route capability certification: route-capability-certification.md
+      - Route certify: route-certify.md
+      - Route certify release: route-certify-release.md
+      - Route release finalize: route-release-finalize.md
+      - Route release candidate orchestrator: route-rc-orchestrator.md
+      - Route release candidate executor (route-rc-execute): route-rc-executor.md
+      - Release RC collector: release-rc-collector.md
+      - Release RC finalizer: release-rc-finalizer.md
+      - Route release gate: route-release-gate.md
+      - CDC apply certification: cdc-apply-certification.md
+      - CDC snapshot handoff: cdc-handoff.md
+      - CDC observability evidence: cdc-observability-evidence.md
+      - CDC recovery evidence: cdc-recovery-evidence.md
+      - CDC schema evolution evidence: cdc-schema-evolution-evidence.md
+      - CDC schema apply: cdc-schema-apply.md
+      - CDC promotion gate: cdc-promotion-gate.md
+      - CDC runtime orchestrator: cdc-runtime-orchestrator.md
+      - CDC poison quarantine and replay: cdc-poison-quarantine.md
+      - CDC compare and repair: cdc-compare-repair.md
+      - CDC retention gap auto-resync: cdc-retention-resync.md
+      - CDC live runtime adapters: cdc-live-runtime-adapters.md
+      - ClickHouse CDC materialization: cdc-clickhouse-materialization.md
+      - ClickHouse CDC typed materialization: cdc-clickhouse-typed-materialization.md
+      - Reconciliation and CDC: cdc.md
+      - Run orchestration: orchestration.md
+      - Quality metrics: quality-metrics.md
+      - OSS code quality benchmark: benchmarks/oss-code-quality-benchmark-2026-06-12.md
+      - dpone trust center snapshot: benchmarks/dpone-trust-center-snapshot-2026-06-12.md
+      - Performance: performance.md
+  - Connectors:
+      - Connector overview: connectors.md
+      - Connector SDK: connector-sdk.md
+      - PostgreSQL: postgres.md
+      - MSSQL: mssql.md
+      - ClickHouse: clickhouse.md
+      - BigQuery: bigquery.md
+      - Kafka: kafka.md
+      - REST API: rest-api.md
+      - Google Ads: google-ads.md
+      - Google Sheets: google-sheets.md
+      - Appsflyer: appsflyer.md
+      - CBR: cbr.md
+      - FastTrack: fasttrack.md
+      - Mindbox: mindbox.md
+      - OpenExchangeRates: openexchangerates.md
+      - SimilarWeb: similarweb.md
+      - Yandex Webmaster: yandex-webmaster.md
+  - Source -> sink guides:
+      - Postgres -> MSSQL: source-sink/postgres-to-mssql.md
+      - MySQL -> MSSQL: source-sink/mysql-to-mssql.md
+      - MySQL -> Postgres: source-sink/mysql-to-postgres.md
+      - MySQL -> ClickHouse: source-sink/mysql-to-clickhouse.md
+      - MySQL -> BigQuery: source-sink/mysql-to-bigquery.md
+      - MySQL -> Kafka: source-sink/mysql-to-kafka.md
+      - Postgres -> Postgres: source-sink/postgres-to-postgres.md
+      - Postgres -> ClickHouse: source-sink/postgres-to-clickhouse.md
+      - Postgres -> BigQuery: source-sink/postgres-to-bigquery.md
+      - Postgres -> Kafka: source-sink/postgres-to-kafka.md
+      - MSSQL -> MSSQL: source-sink/mssql-to-mssql.md
+      - MSSQL -> Postgres: source-sink/mssql-to-postgres.md
+      - MSSQL -> ClickHouse: source-sink/mssql-to-clickhouse.md
+      - MSSQL/dbt -> ClickHouse wide release certification: mssql-clickhouse-wide-release-certification.md
+      - MSSQL -> BigQuery: source-sink/mssql-to-bigquery.md
+      - MSSQL -> Kafka: source-sink/mssql-to-kafka.md
+      - ClickHouse -> MSSQL: source-sink/clickhouse-to-mssql.md
+      - ClickHouse -> Postgres: source-sink/clickhouse-to-postgres.md
+      - ClickHouse -> ClickHouse: source-sink/clickhouse-to-clickhouse.md
+      - ClickHouse -> BigQuery: source-sink/clickhouse-to-bigquery.md
+      - ClickHouse -> Kafka: source-sink/clickhouse-to-kafka.md
+      - REST API -> MSSQL: source-sink/api-to-mssql.md
+      - REST API -> Postgres: source-sink/api-to-postgres.md
+      - REST API -> ClickHouse: source-sink/api-to-clickhouse.md
+      - REST API -> BigQuery: source-sink/api-to-bigquery.md
+      - REST API -> Kafka: source-sink/api-to-kafka.md
+      - Kafka -> MSSQL: source-sink/kafka-to-mssql.md
+      - Kafka -> Postgres: source-sink/kafka-to-postgres.md
+      - Kafka -> ClickHouse: source-sink/kafka-to-clickhouse.md
+      - Kafka -> BigQuery: source-sink/kafka-to-bigquery.md
+      - Kafka -> Kafka: source-sink/kafka-to-kafka.md
+  - Advanced Airflow:
+      - Advanced Data Engineer CJM: airflow-self-service-advanced-cjm.md
+      - GitOps workload catalog: gitops-workload-catalog.md
+      - Airflow reconcile and recovery: gitops-airflow-reconcile.md
+      - Workload selectors: airflow-self-service-selectors.md
+  - Reference:
+      - Airflow v1 public contract: reference/airflow-public-contracts.md
+      - CLI reference: cli-reference.md
+      - Manifest schemas: reference/manifest-schemas.md
+      - GitOps schema catalog: reference/gitops-schema-catalog.md
+      - Configuration reference: reference/configuration.md
+      - Extras and dependencies: reference/extras.md
+  - Operations:
+      - Production readiness: production-readiness.md
+      - Enterprise readiness: enterprise-readiness.md
+      - Domain-first operations and recovery: domain-first-operations.md
+      - Airflow cache sync and recovery:
+          - Overview: airflow-cache-sync.md
+          - Materialize an exact cache: airflow-cache-sync-materialization.md
+          - Strict-v2 init-fetch Pods: airflow-cache-sync-strict-v2.md
+          - Promote a deployment: airflow-cache-sync-promotion.md
+          - Verify and recover: airflow-cache-sync-recovery.md
+          - Cache retention: airflow-cache-retention.md
+          - Retention approval and withdrawal: airflow-cache-retention-approval.md
+          - Retention state downgrade: airflow-cache-retention-state-downgrade.md
+          - Python API: airflow-cache-sync-python-api.md
+      - Airflow cache diagnostics without kubectl: airflow-cache-diagnostics-without-kubectl.md
+      - Deploy the Airflow cache on Kubernetes:
+          - Overview: airflow-cache-kubernetes-deployment.md
+          - Prerequisites: airflow-cache-kubernetes-prerequisites.md
+          - Runtime wrappers: airflow-cache-kubernetes-runtime-wrappers.md
+          - Wrapper delivery and rollback: airflow-cache-kubernetes-wrapper-delivery.md
+          - Helm operations: airflow-cache-kubernetes-chart-operations.md
+      - Airflow loader ACK mount policy: airflow-loader-ack-mount-policy.md
+      - Legacy Airflow pack cache operations: airflow-legacy-pack-cache-operations.md
+      - Airflow runtime pod retention:
+          - Overview: airflow-runtime-pod-retention.md
+          - Architecture: airflow-runtime-pod-retention-architecture.md
+          - Manual operations: airflow-runtime-pod-retention-manual.md
+          - Python API: airflow-runtime-pod-retention-python-api.md
+          - Kubernetes deployment: airflow-runtime-pod-retention-kubernetes.md
+          - Upgrade and rollback: airflow-runtime-pod-retention-upgrade.md
+          - Recovery and withdrawal: airflow-runtime-pod-retention-operations.md
+          - Full withdrawal: airflow-runtime-pod-retention-withdrawal.md
+      - Error DPONE_ARTIFACT_ATTESTATION_REQUIRED: errors/DPONE_ARTIFACT_ATTESTATION_REQUIRED.md
+      - Airflow provider/cache v1 to v2 migration: airflow-provider-cache-migration.md
+      - Error DPONE_CACHE_CHECKSUM_MISMATCH: errors/DPONE_CACHE_CHECKSUM_MISMATCH.md
+      - Error DPONE_WORKLOAD_INIT_SCAFFOLD_CONFLICT: errors/DPONE_WORKLOAD_INIT_SCAFFOLD_CONFLICT.md
+      - Error DPONE_WORKLOAD_INIT_DOMAIN_CONFLICT: errors/DPONE_WORKLOAD_INIT_DOMAIN_CONFLICT.md
+      - Error DPONE_WORKLOAD_INIT_OWNERSHIP_CONFLICT: errors/DPONE_WORKLOAD_INIT_OWNERSHIP_CONFLICT.md
+      - Error DPONE_WORKLOAD_INIT_MANIFEST_INVALID: errors/DPONE_WORKLOAD_INIT_MANIFEST_INVALID.md
+      - Error DPONE_WORKLOAD_INIT_BATCH_VAR_RESERVED: errors/DPONE_WORKLOAD_INIT_BATCH_VAR_RESERVED.md
+      - Error DPONE_WORKLOAD_INIT_INVALID_REFERENCE: errors/DPONE_WORKLOAD_INIT_INVALID_REFERENCE.md
+      - Domain-first self-service errors:
+          - Overview: errors/index.md
+          - CLICKHOUSE_MSSQL_TARGET_MAX_CURSOR_UNSAFE: errors/CLICKHOUSE_MSSQL_TARGET_MAX_CURSOR_UNSAFE.md
+          - MYSQL_MSSQL_TARGET_MAX_CURSOR_UNSAFE: errors/MYSQL_MSSQL_TARGET_MAX_CURSOR_UNSAFE.md
+          - MSSQL_MSSQL_TARGET_MAX_CURSOR_UNSAFE: errors/MSSQL_MSSQL_TARGET_MAX_CURSOR_UNSAFE.md
+          - POSTGRES_MSSQL_COLUMN_CURSOR_UNSAFE: errors/POSTGRES_MSSQL_COLUMN_CURSOR_UNSAFE.md
+          - DPONE_AIRFLOW_DISABLED: errors/DPONE_AIRFLOW_DISABLED.md
+          - DPONE_DISCOVERY_FILE_NOT_FOUND: errors/DPONE_DISCOVERY_FILE_NOT_FOUND.md
+          - DPONE_DISCOVERY_LIMIT_EXCEEDED: errors/DPONE_DISCOVERY_LIMIT_EXCEEDED.md
+          - DPONE_DISCOVERY_PATH_INVALID: errors/DPONE_DISCOVERY_PATH_INVALID.md
+          - DPONE_DOMAIN_ID_INVALID: errors/DPONE_DOMAIN_ID_INVALID.md
+          - DPONE_DOMAIN_LAYOUT_REQUIRED: errors/DPONE_DOMAIN_LAYOUT_REQUIRED.md
+          - DPONE_DOMAIN_OWNERSHIP_INVALID: errors/DPONE_DOMAIN_OWNERSHIP_INVALID.md
+          - DPONE_DOMAIN_OWNERSHIP_MISSING: errors/DPONE_DOMAIN_OWNERSHIP_MISSING.md
+          - DPONE_DOMAIN_REQUIRED: errors/DPONE_DOMAIN_REQUIRED.md
+          - DPONE_LAYOUT_ROOT_INVALID: errors/DPONE_LAYOUT_ROOT_INVALID.md
+          - DPONE_PIPELINE_COMPILATION_FAILED: errors/DPONE_PIPELINE_COMPILATION_FAILED.md
+          - DPONE_PIPELINE_DOMAIN_MISMATCH: errors/DPONE_PIPELINE_DOMAIN_MISMATCH.md
+          - DPONE_PIPELINE_ID_DUPLICATE: errors/DPONE_PIPELINE_ID_DUPLICATE.md
+          - DPONE_PIPELINE_KEY_INVALID: errors/DPONE_PIPELINE_KEY_INVALID.md
+          - DPONE_PIPELINE_LOCATOR_INVALID: errors/DPONE_PIPELINE_LOCATOR_INVALID.md
+          - DPONE_PIPELINE_SOURCE_INVALID: errors/DPONE_PIPELINE_SOURCE_INVALID.md
+          - DPONE_PIPELINE_SOURCE_NOT_FOUND: errors/DPONE_PIPELINE_SOURCE_NOT_FOUND.md
+          - DPONE_PROJECT_CONFIG_INVALID: errors/DPONE_PROJECT_CONFIG_INVALID.md
+          - DPONE_PROJECT_AUTHORING_LOCK_FAILED: errors/DPONE_PROJECT_AUTHORING_LOCK_FAILED.md
+          - DPONE_PROJECT_LAYOUT_INVALID: errors/DPONE_PROJECT_LAYOUT_INVALID.md
+          - DPONE_PROJECT_LAYOUT_MIGRATION_REQUIRED: errors/DPONE_PROJECT_LAYOUT_MIGRATION_REQUIRED.md
+          - DPONE_RECIPE_ROUTE_CONFLICT: errors/DPONE_RECIPE_ROUTE_CONFLICT.md
+          - DPONE_RECIPE_ANSWERS_FIELD_FORBIDDEN: errors/DPONE_RECIPE_ANSWERS_FIELD_FORBIDDEN.md
+          - DPONE_RECIPE_ANSWERS_INVALID: errors/DPONE_RECIPE_ANSWERS_INVALID.md
+          - DPONE_SELECTION_STATE_CHANGED: errors/DPONE_SELECTION_STATE_CHANGED.md
+          - DPONE_AUTHORING_SOURCE_CHANGED_DURING_BUILD: errors/DPONE_AUTHORING_SOURCE_CHANGED_DURING_BUILD.md
+          - DPONE_SCAFFOLD_APPLY_FAILED: errors/DPONE_SCAFFOLD_APPLY_FAILED.md
+          - DPONE_DOMAIN_CATALOG_MEMBERSHIP_CONFLICT: errors/DPONE_DOMAIN_CATALOG_MEMBERSHIP_CONFLICT.md
+          - DPONE_WORKLOAD_INDEX_APPROVAL_MISMATCH: errors/DPONE_WORKLOAD_INDEX_APPROVAL_MISMATCH.md
+          - DPONE_WORKLOAD_INDEX_INVALID: errors/DPONE_WORKLOAD_INDEX_INVALID.md
+          - DPONE_WORKLOAD_INDEX_PROMOTION_CONFLICT: errors/DPONE_WORKLOAD_INDEX_PROMOTION_CONFLICT.md
+          - DPONE_WORKLOAD_INDEX_PROMOTION_RECOVERY_REQUIRED: errors/DPONE_WORKLOAD_INDEX_PROMOTION_RECOVERY_REQUIRED.md
+          - DPONE_WORKLOAD_INDEX_PROMOTION_REQUEST_INVALID: errors/DPONE_WORKLOAD_INDEX_PROMOTION_REQUEST_INVALID.md
+      - Beginner safe-sample errors:
+          - DPONE_SAFE_SAMPLE_CERTIFIED_COPY_EXECUTOR_NOT_CONFIGURED: errors/DPONE_SAFE_SAMPLE_CERTIFIED_COPY_EXECUTOR_NOT_CONFIGURED.md
+          - DPONE_SAFE_SAMPLE_LIVE_INPUTS_INCOMPLETE: errors/DPONE_SAFE_SAMPLE_LIVE_INPUTS_INCOMPLETE.md
+          - DPONE_SAFE_SAMPLE_LIVE_INPUT_PATH_INVALID: errors/DPONE_SAFE_SAMPLE_LIVE_INPUT_PATH_INVALID.md
+          - DPONE_SAFE_SAMPLE_ARGUMENTS_INVALID: errors/DPONE_SAFE_SAMPLE_ARGUMENTS_INVALID.md
+      - Recipe error catalog:
+          - DPONE_RECIPE_CATALOG_NOT_CONFIGURED: errors/DPONE_RECIPE_CATALOG_NOT_CONFIGURED.md
+          - DPONE_RECIPE_CATALOG_UNTRUSTED: errors/DPONE_RECIPE_CATALOG_UNTRUSTED.md
+          - DPONE_RECIPE_CATALOG_INVALID: errors/DPONE_RECIPE_CATALOG_INVALID.md
+          - DPONE_RECIPE_REF_INVALID: errors/DPONE_RECIPE_REF_INVALID.md
+          - DPONE_RECIPE_NOT_FOUND: errors/DPONE_RECIPE_NOT_FOUND.md
+          - DPONE_RECIPE_DIGEST_MISMATCH: errors/DPONE_RECIPE_DIGEST_MISMATCH.md
+          - DPONE_RECIPE_ARTIFACT_INVALID: errors/DPONE_RECIPE_ARTIFACT_INVALID.md
+          - DPONE_RECIPE_AUTHORING_MODE_UNSUPPORTED: errors/DPONE_RECIPE_AUTHORING_MODE_UNSUPPORTED.md
+          - DPONE_RECIPE_PROFILE_NOT_ALLOWED: errors/DPONE_RECIPE_PROFILE_NOT_ALLOWED.md
+          - DPONE_RECIPE_PARAMETER_SCHEMA_INVALID: errors/DPONE_RECIPE_PARAMETER_SCHEMA_INVALID.md
+          - DPONE_RECIPE_PARAMETER_REQUIRED: errors/DPONE_RECIPE_PARAMETER_REQUIRED.md
+          - DPONE_RECIPE_OVERRIDE_FORBIDDEN: errors/DPONE_RECIPE_OVERRIDE_FORBIDDEN.md
+          - DPONE_RECIPE_ANSWERS_UNSAFE: errors/DPONE_RECIPE_ANSWERS_UNSAFE.md
+          - DPONE_RECIPE_COMPONENT_INVALID: errors/DPONE_RECIPE_COMPONENT_INVALID.md
+          - DPONE_RECIPE_EXPANSION_LIMIT_EXCEEDED: errors/DPONE_RECIPE_EXPANSION_LIMIT_EXCEEDED.md
+          - DPONE_RECIPE_SOURCE_CHANGED_DURING_BUILD: errors/DPONE_RECIPE_SOURCE_CHANGED_DURING_BUILD.md
+          - DPONE_RECIPE_OPTION_UNSUPPORTED: errors/DPONE_RECIPE_OPTION_UNSUPPORTED.md
+      - Route self-service errors:
+          - DPONE_ROUTE_NOT_SUPPORTED: errors/DPONE_ROUTE_NOT_SUPPORTED.md
+          - DPONE_ROUTE_NOT_SCAFFOLDABLE: errors/DPONE_ROUTE_NOT_SCAFFOLDABLE.md
+          - DPONE_ROUTE_RECIPE_AMBIGUOUS: errors/DPONE_ROUTE_RECIPE_AMBIGUOUS.md
+          - DPONE_ROUTE_FILTER_INVALID: errors/DPONE_ROUTE_FILTER_INVALID.md
+          - DPONE_ROUTE_SELECTION_INVALID: errors/DPONE_ROUTE_SELECTION_INVALID.md
+      - Operational control plane: operational-control-plane.md
+      - Live certification: live-certification.md
+      - Route bootstrap and doctor: route-bootstrap-doctor.md
+      - Route Conformance Lab: route-conformance-lab.md
+      - Route readiness: route-readiness.md
+      - Route schema evolution: route-schema-evolution.md
+      - Route reconciliation repair: route-reconciliation-repair.md
+      - Route run supervisor: route-run-supervisor.md
+      - Route data quality: route-data-quality.md
+      - Route refresh plan: route-refresh-plan.md
+      - Route refresh execute: route-refresh-execute.md
+      - Route execution ledger: route-execution-ledger.md
+      - Route state promotion: route-state-promotion.md
+      - Route certification pack: route-certification-pack.md
+      - Route live certification: route-live-certification.md
+      - Route certify: route-certify.md
+      - Route certify release: route-certify-release.md
+      - Route release finalize: route-release-finalize.md
+      - Route release candidate orchestrator: route-rc-orchestrator.md
+      - Route release candidate executor (route-rc-execute): route-rc-executor.md
+      - Release RC collector: release-rc-collector.md
+      - Release RC finalizer: release-rc-finalizer.md
+      - Route release gate: route-release-gate.md
+      - Release evidence: release-evidence.md
+      - Production maturity gate: production-maturity.md
+      - Industrial readiness gate: industrial-readiness.md
+      - Certification suite: certification-suite.md
+      - Operations: operations.md
+      - dpone ops: ops-cli.md
+      - Runbook: runbook.md
+      - Testing:
+          - Overview: testing/index.md
+          - Hermetic pipeline tests: testing/hermetic-pipeline-tests.md
+          - Local/default gate: testing/overview.md
+          - Integration tests: testing/integration-tests.md
+          - Backfill integration: testing/backfill-integration.md
+          - Replay integration: testing/replay-integration.md
+          - Manual integration matrix: testing/manual-integration-matrix.md
+          - Source/sink matrix runbook: testing/integration-matrix.md
+          - Local MSSQL mock matrix: testing/local-mssql-mock-matrix.md
+          - Native transfer benchmarks 2026-06-11: testing/native-transfer-benchmarks-2026-06-11.md
+          - Native transfer benchmarks 2026-06-09: testing/native-transfer-benchmarks-2026-06-09.md
+          - Native transfer benchmarks 2026-06-08: testing/native-transfer-benchmarks-2026-06-08.md
+      - CI/CD:
+          - CI performance evidence: cicd/ci-performance-evidence.md
+          - Overview: ci-cd.md
+          - Workflow reference: cicd/workflows.md
+          - PR Gate shadow: cicd/pr-gate-shadow.md
+          - PR Gate shadow runbook: cicd/pr-gate-shadow-runbook.md
+          - PR Gate shadow capacity: cicd/pr-gate-shadow-capacity.md
+          - PR Gate shadow capacity runbook: cicd/pr-gate-shadow-capacity-runbook.md
+          - Exact-SHA compatibility candidate: cicd/exact-sha-compatibility.md
+          - Failure runbooks: cicd/runbooks.md
+          - Release and Pages automation: cicd/release-and-pages.md
+      - Release: release.md
+      - GitHub Pages docs: github-pages.md
+      - Compatibility: compatibility.md
+      - Connector certification: connector-certification.md
+      - DAG debugging: dag-debugging.md
+  - Developer docs:
+      - Developer guide: developers.md
+      - Agent-assisted development: agent-development.md
+      - Agent governance: agent-governance.md
+      - Agent PR merge-receipt runbook: agent-pr-merge-receipt-runbook.md
+      - Agent task contracts: agent-task-contracts.md
+      - Agent permissions and tool registry: agent-permissions.md
+      - Agent MCP connector onboarding: agent-mcp-connectors.md
+      - Agent risk register: agent-risk-register.md
+      - Agent security mapping: agent-security-mapping.md
+      - Agent release protocol: agent-release-protocol.md
+      - GitHub branch protection: github-branch-protection.md
+      - Engineering standards: engineering-standards.md
+      - Feature design standard: feature-design-standard.md
+      - Feature design - agent task contract gate: feature-design-agent-task-contract-gate.md
+      - Feature design - agent permission and tool registry: feature-design-agent-permission-tool-registry.md
+      - Feature design - immutable Agent PR merge closure: feature-design-agent-pr-merge-closure-receipt.md
+      - Feature design - MCP connector onboarding gate: feature-design-mcp-connector-onboarding-gate.md
+      - Feature design - Data Product Trust Center: feature-design-data-product-trust-center-evidence-lake.md
+      - Feature design - CI shadow closure and exact-SHA evidence: feature-design-ci-pr-gate-exact-sha-evidence.md
+      - Feature design - PR 3A CI hygiene: feature-design-ci-shadow-pr3a-ci-hygiene.md
+      - Feature design - PR 3B semantic privilege boundary: feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md
+      - Feature design - PR 4A shadow producer: feature-design-ci-shadow-pr4a-classifier-evaluator.md
+      - Feature design - domain-first self-service v1: feature-design-unified-beginner-init-v1.md
+      - Feature design - Airflow S3 desired-state pull: feature-design-airflow-s3-desired-state-pull-v1.md
+      - Feature design - semantic refresh runtime V2: feature-design-semantic-refresh-runtime-v2.md
+      - Feature design - PostgreSQL XMin key reconciliation for MSSQL: feature-design-postgres-xmin-key-reconciliation-mssql-v1.md
+      - Feature design - Airflow repair-authority dag_run.conf: feature-design-airflow-repair-authority-dag-run-conf.md
+      - Feature design - governed REST bulk delivery V1: feature-design-rest-api-sink-v1.md
+      - Governed REST bulk-delivery threat model: rest-bulk-delivery-threat-model.md
+      - Documentation standard: documentation-standard.md
+      - Agent templates:
+          - Feature design specification: agent-templates/feature-design-spec.md
+          - Release evidence report: agent-templates/release-evidence-report.md
+      - Developer workflow: developer-workflow.md
+      - Developer CI/CD guide: developer-ci-cd.md
+      - Developer observability: developer-observability.md
+      - Developer CDC guide: developer-cdc.md
+      - Developer object storage: developer-object-storage.md
+      - Developer supply-chain: developer-supply-chain.md
+      - Developer connector SDK: developer-connector-sdk.md
+      - Developer strategy intelligence: developer-strategy-intelligence.md
+      - Developer manifest sparse paths: developer-manifest-sparse-paths.md
+      - Developer GitOps control plane: developer-gitops-control-plane.md
+      - Developer GitOps Airflow runner pack: developer-gitops-airflow-runner-pack.md
+      - Developer route bootstrap and doctor: developer-route-bootstrap-doctor.md
+      - Developer Route Conformance Lab: developer-route-conformance-lab.md
+      - Developer route readiness: developer-route-readiness.md
+      - Developer route data quality: developer-route-data-quality.md
+      - Developer route refresh plan: developer-route-refresh-plan.md
+      - Developer route refresh execute: developer-route-refresh-execute.md
+      - Developer route execution ledger: developer-route-execution-ledger.md
+      - Developer route state promotion: developer-route-state-promotion.md
+      - Developer route live certification: developer-route-live-certification.md
+      - Developer route certify release: developer-route-certify-release.md
+      - Developer route release finalize: developer-route-release-finalize.md
+      - Developer route release candidate orchestrator: developer-route-rc-orchestrator.md
+      - Developer route release candidate executor (route-rc-execute): developer-route-rc-executor.md
+      - Developer Release RC collector: developer-release-rc-collector.md
+      - Developer Release RC finalizer: developer-release-rc-finalizer.md
+      - Developer route release gate: developer-route-release-gate.md
+      - Developer Data Product Trust Center: developer-data-product-trust-center.md
+      - Developer Data Product Remediation: developer-data-product-remediation.md
+      - Developer CDC observability evidence: developer-cdc-observability-evidence.md
+      - Developer CDC recovery evidence: developer-cdc-recovery-evidence.md
+      - Developer CDC schema evolution evidence: developer-cdc-schema-evolution-evidence.md
+      - Developer CDC schema apply: developer-cdc-schema-apply.md
+      - Developer schema migration control: developer-schema-migration-control.md
+      - Developer schema impact: developer-schema-impact.md
+      - Developer Schema Identity: developer-schema-identity.md
+      - Developer CDC promotion gate: developer-cdc-promotion-gate.md
+      - Developer CDC runtime orchestrator: developer-cdc-runtime-orchestrator.md
+      - Developer CDC compare and repair: developer-cdc-compare-repair.md
+      - Developer CDC retention gap auto-resync: developer-cdc-retention-resync.md
+      - Developer CDC live runtime adapters: developer-cdc-live-runtime-adapters.md
+      - Developer ClickHouse CDC materialization: developer-cdc-clickhouse-materialization.md
+      - Developer ClickHouse CDC typed materialization: developer-cdc-clickhouse-typed-materialization.md
+      - Developer type system: developer-type-system.md
+      - Developer certification suite: developer-certification-suite.md
+      - Developer integrations runbook: developer-integrations-runbook.md
+      - Dev install mode: dev-install-mode.md
+      - Import rules: import-rules.md
+      - Quality tooling: quality-tooling.md
+      - Module-size debt ratchet: module-size-ratchet.md
+      - Overrides: overrides.md
+      - Snapshot promote: snapshot-promote.md
+      - Managed UX: managed-ux.md
+      - Studio API developer contract: developer-studio-api.md
+      - UX: ux.md
+      - VS Code: vs-code.md
+      - ADR index: adr-index.md
+      - ADR 0001: adr/0001-layered-architecture.md
+      - ADR 0002: adr/0002-variant-c-batch-manifest.md
+      - ADR 0003: adr/0003-edge-resolver-single-source-of-truth.md
+      - ADR 0004: adr/0004-runtime-ports-and-bootstrap.md
+      - ADR 0005: adr/0005-production-runtime-connectors.md
+      - ADR 0006: adr/0006-authority-and-canonical-ir.md
+      - ADR 0007: adr/0007-release-set-and-deployment-set.md
+      - ADR 0008: adr/0008-airflow-parse-safe-provider.md
+      - ADR 0009: adr/0009-artifact-delivery-and-cache-materializer.md
+      - ADR 0010: adr/0010-binding-set-and-credential-resolvers.md
+      - ADR 0011: adr/0011-canonical-fingerprints.md
+      - ADR 0012: adr/0012-vault-runtime-authentication.md
+      - ADR 0013: adr/0013-reproducible-rerun-and-retention.md
+      - ADR 0014: adr/0014-route-attestation-production-trust.md
+      - ADR 0015: adr/0015-single-authoring-compiler.md
+      - ADR 0016: adr/0016-content-pinned-declarative-recipes.md
+      - ADR 0017: adr/0017-canonical-workload-selection.md
+      - ADR 0018: adr/0018-hermetic-tests-outside-runtime.md
+      - ADR 0019: adr/0019-bounded-airflow-backfill-mapping.md
+      - ADR 0020: adr/0020-airflow-observability-correlation.md
+      - ADR 0021: adr/0021-signed-catalog-bundle-conformance-boundary.md
+      - ADR 0022 (Proposed): adr/0022-target-commit-terminal-failures.md
+      - ADR 0023: adr/0023-confined-authoring-transaction-semantics.md
+      - ADR 0024: adr/0024-airflow-executable-init-fetch-wire-boundary.md
+      - ADR 0025: adr/0025-process-local-quality-gate-authority.md
+      - ADR 0026: adr/0026-digest-first-runtime-image-promotion.md
+      - ADR 0027: adr/0027-single-runtime-connection-authority.md
+      - ADR 0028: adr/0028-frozen-release-policy-and-publication-boundary.md
+      - ADR 0029: adr/0029-canonical-pipeline-identity-and-reference.md
+      - ADR 0030: adr/0030-self-service-capability-studio-boundary.md
+      - ADR 0031: adr/0031-domain-first-self-service-selection.md
+      - ADR 0032: adr/0032-airflow-exact-activation-occurrence.md
+      - ADR 0033: adr/0033-airflow-s3-desired-state-pull.md
+      - ADR 0034: adr/0034-native-dbt-self-service-multi-repo.md
+      - ADR 0035: adr/0035-airflow-production-artifact-attestation.md
+      - ADR 0036: adr/0036-runtime-image-certification-v2.md
+      - ADR 0037: adr/0037-immutable-agent-pr-merge-closure.md
+      - ADR 0038: adr/0038-nested-normalization-lossless-identity.md
+      - ADR 0039: adr/0039-airflow-activation-identity-separation.md
+      - ADR 0040: adr/0040-airflow-legacy-pack-cache-authority.md
+      - ADR 0041: adr/0041-airflow-cache-retention-transaction.md
+      - ADR 0042: adr/0042-airflow-runtime-pod-retention-evidence.md
+      - ADR 0043: adr/0043-airflow-retention-occurrence-review-identity.md
+      - ADR 0044: adr/0044-user-workloads-vs-hidden-dpone-system.md
+      - ADR 0045: adr/0045-durable-semantic-refresh-runtime.md
+      - ADR 0046: adr/0046-component-aware-pr-gate-authority.md
+      - ADR 0047: adr/0047-module-size-debt-ratchet.md
+      - ADR 0048: adr/0048-exact-sha-readiness-evidence.md
+      - ADR 0053 (Proposed): adr/0053-rest-delivery-identity-effect-journal.md
+      - ADR 0054 (Proposed): adr/0054-resumable-delivery-runtime-airflow.md
+      - ADR 0055 (Proposed): adr/0055-rest-operation-profile-authority.md
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/PaulKov/dpone
+      name: dpone on GitHub
+
+copyright: Copyright &copy; 2026 PaulKov. Licensed under Apache-2.0.

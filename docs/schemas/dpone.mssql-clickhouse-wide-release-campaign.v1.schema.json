@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/dpone.mssql-clickhouse-wide-release-campaign.v1.schema.json",
+  "title": "dpone local MSSQL/dbt to ClickHouse wide release campaign v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "dpone.mssql-clickhouse-wide-release-campaign.v1"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "release_id": {"type": "string", "minLength": 1},
+    "git_head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_snapshot_sha256": {"$ref": "#/$defs/digest"},
+    "worktree_dirty": {"const": false},
+    "environment_class": {"const": "LOCAL_DOCKER"},
+    "source_relation": {"type": "string", "minLength": 1},
+    "source_generation_sha256": {"$ref": "#/$defs/digest"},
+    "expected_rows": {"const": 10000},
+    "expected_source_columns": {"const": 201},
+    "expected_target_columns": {"const": 202},
+    "mssql_connection_sha256": {"$ref": "#/$defs/digest"},
+    "clickhouse_connection_sha256": {"$ref": "#/$defs/digest"},
+    "authority": {"$ref": "#/$defs/artifact"},
+    "dbt_evidence": {"$ref": "#/$defs/artifact"},
+    "slots": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {"allOf": [{"$ref": "#/$defs/slot"}, {"properties": {"slot": {"const": "bcp_native_required"}}}]},
+        {"allOf": [{"$ref": "#/$defs/slot"}, {"properties": {"slot": {"const": "bcp_native_off"}}}]},
+        {"allOf": [{"$ref": "#/$defs/slot"}, {"properties": {"slot": {"const": "parquet_s3_pull"}}}]}
+      ],
+      "items": false
+    },
+    "local_behavior_passed": {"const": true},
+    "local_evidence_status": {"const": "PASS"},
+    "production_certification": {"const": "UNVERIFIED"},
+    "production_certification_reason": {"type": "string", "minLength": 1},
+    "campaign_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "required": [
+    "schema_version",
+    "created_at",
+    "release_id",
+    "git_head_sha",
+    "source_snapshot_sha256",
+    "worktree_dirty",
+    "environment_class",
+    "source_relation",
+    "source_generation_sha256",
+    "expected_rows",
+    "expected_source_columns",
+    "expected_target_columns",
+    "mssql_connection_sha256",
+    "clickhouse_connection_sha256",
+    "authority",
+    "dbt_evidence",
+    "slots",
+    "local_behavior_passed",
+    "local_evidence_status",
+    "production_certification",
+    "production_certification_reason",
+    "campaign_sha256"
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      },
+      "required": ["path", "sha256"]
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "slot": {"enum": ["bcp_native_required", "bcp_native_off", "parquet_s3_pull"]},
+        "receipt": {"$ref": "#/$defs/artifact"},
+        "receipt_sha256": {"$ref": "#/$defs/digest"},
+        "target_relation": {"type": "string", "minLength": 1}
+      },
+      "required": ["slot", "receipt", "receipt_sha256", "target_relation"]
+    }
+  }
+}

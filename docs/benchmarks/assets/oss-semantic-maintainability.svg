@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="498" viewBox="0 0 920 498" role="img" aria-label="Semantic maintainability">
+<rect width="920" height="498" fill="#ffffff"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Semantic maintainability</text>
+<text x="32" y="66" font-size="13" fill="#475569">God objects, SOLID/DI, DRY/KISS and boundary discipline from static source-shape evidence.</text>
+<text x="32" y="118" font-size="13" font-weight="700" fill="#111827">dpone</text>
+<rect x="210" y="102" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="102" width="436" height="22" rx="4" fill="#2563eb"/>
+<text x="790" y="118" font-size="12" fill="#334155">78 / strong</text>
+<text x="32" y="180" font-size="13" font-weight="700" fill="#111827">Airbyte</text>
+<rect x="210" y="164" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="164" width="420" height="22" rx="4" fill="#2563eb"/>
+<text x="790" y="180" font-size="12" fill="#334155">75 / strong</text>
+<text x="32" y="242" font-size="13" font-weight="700" fill="#111827">dlt</text>
+<rect x="210" y="226" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="226" width="117" height="22" rx="4" fill="#dc2626"/>
+<text x="790" y="242" font-size="12" fill="#334155">21 / risk</text>
+<text x="32" y="304" font-size="13" font-weight="700" fill="#111827">Pentaho Kettle</text>
+<rect x="210" y="288" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="288" width="313" height="22" rx="4" fill="#f59e0b"/>
+<text x="790" y="304" font-size="12" fill="#334155">56 / watch</text>
+<text x="32" y="366" font-size="13" font-weight="700" fill="#111827">Apache Hop</text>
+<rect x="210" y="350" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="350" width="319" height="22" rx="4" fill="#f59e0b"/>
+<text x="790" y="366" font-size="12" fill="#334155">57 / watch</text>
+<text x="32" y="428" font-size="13" font-weight="700" fill="#111827">Sling</text>
+<rect x="210" y="412" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="412" width="308" height="22" rx="4" fill="#f59e0b"/>
+<text x="790" y="428" font-size="12" fill="#334155">55 / watch</text>
+</svg>

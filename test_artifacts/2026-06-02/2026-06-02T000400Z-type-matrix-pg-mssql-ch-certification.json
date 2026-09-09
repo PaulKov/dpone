@@ -1,0 +1,812 @@
+{
+  "artifact_schema": "dpone.test-artifact.v1",
+  "artifact_type": "certification.type_matrix",
+  "artifact_label": "2026-06-02T000400Z-type-matrix-pg-mssql-ch-certification",
+  "created_by": "Codex GPT-5",
+  "executed_by_os_user": "macbook",
+  "started_at": "2026-06-02T07:00:06Z",
+  "rows": 25,
+  "definition": "lossless canonical serialization for cross-engine exotic/system-specific types",
+  "status": "failed",
+  "result": "failed",
+  "postgres_to_mssql": {
+    "passed": true,
+    "rows": 25,
+    "type_count": 53,
+    "imported_rows": 25,
+    "source_hash": "sha256:9c797370d3f4e04e0f4b82206fb62384e4445716dc97a9bd37018d42a2f03031:rows:25",
+    "target_hash": "sha256:9c797370d3f4e04e0f4b82206fb62384e4445716dc97a9bd37018d42a2f03031:rows:25",
+    "metrics": [
+      {
+        "name": "prepare_postgres_exhaustive_source",
+        "seconds": 0.087,
+        "rows": 25,
+        "bytes_processed": null,
+        "rows_per_second": 287.03,
+        "mib_per_second": null
+      },
+      {
+        "name": "prepare_mssql_postgres_type_target",
+        "seconds": 0.147,
+        "rows": null,
+        "bytes_processed": null,
+        "rows_per_second": null,
+        "mib_per_second": null
+      },
+      {
+        "name": "postgres_copy_canonical_export",
+        "seconds": 0.005,
+        "rows": 25,
+        "bytes_processed": 18702,
+        "rows_per_second": 5511.72,
+        "mib_per_second": 3.93
+      },
+      {
+        "name": "mssql_bcp_import_pg_type_matrix",
+        "seconds": 0.106,
+        "rows": 25,
+        "bytes_processed": null,
+        "rows_per_second": 235.53,
+        "mib_per_second": null
+      }
+    ],
+    "export_result": {
+      "total_bytes": 18702,
+      "chunk_count": 25,
+      "elapsed": 0.00391697883605957,
+      "throughput": 4.553411650130866
+    },
+    "types": [
+      {
+        "name": "id",
+        "source_type": "bigint",
+        "target_type": "nvarchar(max)",
+        "category": "control",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_boolean",
+        "source_type": "boolean",
+        "target_type": "nvarchar(max)",
+        "category": "boolean",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_smallint",
+        "source_type": "smallint",
+        "target_type": "nvarchar(max)",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_integer",
+        "source_type": "integer",
+        "target_type": "nvarchar(max)",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_bigint",
+        "source_type": "bigint",
+        "target_type": "nvarchar(max)",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_numeric",
+        "source_type": "numeric(38,10)",
+        "target_type": "nvarchar(max)",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_real",
+        "source_type": "real",
+        "target_type": "nvarchar(max)",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_double",
+        "source_type": "double precision",
+        "target_type": "nvarchar(max)",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_money",
+        "source_type": "money",
+        "target_type": "nvarchar(max)",
+        "category": "money",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_text",
+        "source_type": "text",
+        "target_type": "nvarchar(max)",
+        "category": "text",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_varchar",
+        "source_type": "varchar(128)",
+        "target_type": "nvarchar(max)",
+        "category": "text",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_char",
+        "source_type": "char(16)",
+        "target_type": "nvarchar(max)",
+        "category": "text",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_bytea",
+        "source_type": "bytea",
+        "target_type": "nvarchar(max)",
+        "category": "binary",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_date",
+        "source_type": "date",
+        "target_type": "nvarchar(max)",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_time",
+        "source_type": "time(6)",
+        "target_type": "nvarchar(max)",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_timetz",
+        "source_type": "timetz",
+        "target_type": "nvarchar(max)",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_timestamp",
+        "source_type": "timestamp(6)",
+        "target_type": "nvarchar(max)",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_timestamptz",
+        "source_type": "timestamptz",
+        "target_type": "nvarchar(max)",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_interval",
+        "source_type": "interval",
+        "target_type": "nvarchar(max)",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_uuid",
+        "source_type": "uuid",
+        "target_type": "nvarchar(max)",
+        "category": "uuid",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_json",
+        "source_type": "json",
+        "target_type": "nvarchar(max)",
+        "category": "semi_structured",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_jsonb",
+        "source_type": "jsonb",
+        "target_type": "nvarchar(max)",
+        "category": "semi_structured",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_xml",
+        "source_type": "xml",
+        "target_type": "nvarchar(max)",
+        "category": "semi_structured",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_int_array",
+        "source_type": "integer[]",
+        "target_type": "nvarchar(max)",
+        "category": "array",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_text_array",
+        "source_type": "text[]",
+        "target_type": "nvarchar(max)",
+        "category": "array",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_numrange",
+        "source_type": "numrange",
+        "target_type": "nvarchar(max)",
+        "category": "range",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_int4range",
+        "source_type": "int4range",
+        "target_type": "nvarchar(max)",
+        "category": "range",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_int8range",
+        "source_type": "int8range",
+        "target_type": "nvarchar(max)",
+        "category": "range",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_daterange",
+        "source_type": "daterange",
+        "target_type": "nvarchar(max)",
+        "category": "range",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_tstzrange",
+        "source_type": "tstzrange",
+        "target_type": "nvarchar(max)",
+        "category": "range",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_int4multirange",
+        "source_type": "int4multirange",
+        "target_type": "nvarchar(max)",
+        "category": "multirange",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_point",
+        "source_type": "point",
+        "target_type": "nvarchar(max)",
+        "category": "geometric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_line",
+        "source_type": "line",
+        "target_type": "nvarchar(max)",
+        "category": "geometric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_lseg",
+        "source_type": "lseg",
+        "target_type": "nvarchar(max)",
+        "category": "geometric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_box",
+        "source_type": "box",
+        "target_type": "nvarchar(max)",
+        "category": "geometric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_path",
+        "source_type": "path",
+        "target_type": "nvarchar(max)",
+        "category": "geometric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_polygon",
+        "source_type": "polygon",
+        "target_type": "nvarchar(max)",
+        "category": "geometric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_circle",
+        "source_type": "circle",
+        "target_type": "nvarchar(max)",
+        "category": "geometric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_inet",
+        "source_type": "inet",
+        "target_type": "nvarchar(max)",
+        "category": "network",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_cidr",
+        "source_type": "cidr",
+        "target_type": "nvarchar(max)",
+        "category": "network",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_macaddr",
+        "source_type": "macaddr",
+        "target_type": "nvarchar(max)",
+        "category": "network",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_bit",
+        "source_type": "bit(8)",
+        "target_type": "nvarchar(max)",
+        "category": "bit_string",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_varbit",
+        "source_type": "varbit(16)",
+        "target_type": "nvarchar(max)",
+        "category": "bit_string",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_tsvector",
+        "source_type": "tsvector",
+        "target_type": "nvarchar(max)",
+        "category": "text_search",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_tsquery",
+        "source_type": "tsquery",
+        "target_type": "nvarchar(max)",
+        "category": "text_search",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_lsn",
+        "source_type": "pg_lsn",
+        "target_type": "nvarchar(max)",
+        "category": "system",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_oid",
+        "source_type": "oid",
+        "target_type": "nvarchar(max)",
+        "category": "system",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_regclass",
+        "source_type": "regclass",
+        "target_type": "nvarchar(max)",
+        "category": "system",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_regtype",
+        "source_type": "regtype",
+        "target_type": "nvarchar(max)",
+        "category": "system",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_enum",
+        "source_type": "typecert.mood",
+        "target_type": "nvarchar(max)",
+        "category": "custom",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_domain",
+        "source_type": "typecert.positive_int",
+        "target_type": "nvarchar(max)",
+        "category": "custom",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_composite",
+        "source_type": "typecert.address_type",
+        "target_type": "nvarchar(max)",
+        "category": "custom",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "pg_hstore",
+        "source_type": "hstore",
+        "target_type": "nvarchar(max)",
+        "category": "extension",
+        "insertable": true,
+        "notes": ""
+      }
+    ]
+  },
+  "mssql_to_clickhouse": {
+    "passed": false,
+    "rows": 25,
+    "type_count": 35,
+    "exported_rows": 25,
+    "inserted_rows": 25,
+    "source_export_hash": "sha256:637f9922605a853430b3cd4a95e0bc791aac68d0f28b33eccded38a2a80fa2dd:rows:25",
+    "target_hash": "sha256:5ad4b5a8e5b18f19ed2e92008e7d2b43b42057e659274626c1c3d78a0266994d:rows:25",
+    "metrics": [
+      {
+        "name": "prepare_mssql_exhaustive_source",
+        "seconds": 0.069,
+        "rows": 25,
+        "bytes_processed": null,
+        "rows_per_second": 364.81,
+        "mib_per_second": null
+      },
+      {
+        "name": "prepare_clickhouse_type_target",
+        "seconds": 0.095,
+        "rows": null,
+        "bytes_processed": null,
+        "rows_per_second": null,
+        "mib_per_second": null
+      },
+      {
+        "name": "mssql_bcp_queryout_canonical_export",
+        "seconds": 0.142,
+        "rows": 25,
+        "bytes_processed": null,
+        "rows_per_second": 176.65,
+        "mib_per_second": null
+      },
+      {
+        "name": "clickhouse_http_insert_tsv",
+        "seconds": 0.032,
+        "rows": 25,
+        "bytes_processed": null,
+        "rows_per_second": 771.49,
+        "mib_per_second": null
+      }
+    ],
+    "types": [
+      {
+        "name": "id",
+        "source_type": "bigint",
+        "target_type": "String",
+        "category": "control",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_bit",
+        "source_type": "bit",
+        "target_type": "String",
+        "category": "boolean",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_tinyint",
+        "source_type": "tinyint",
+        "target_type": "String",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_smallint",
+        "source_type": "smallint",
+        "target_type": "String",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_int",
+        "source_type": "int",
+        "target_type": "String",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_bigint",
+        "source_type": "bigint",
+        "target_type": "String",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_decimal",
+        "source_type": "decimal(38,10)",
+        "target_type": "String",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_numeric",
+        "source_type": "numeric(20,4)",
+        "target_type": "String",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_money",
+        "source_type": "money",
+        "target_type": "String",
+        "category": "money",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_smallmoney",
+        "source_type": "smallmoney",
+        "target_type": "String",
+        "category": "money",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_float",
+        "source_type": "float",
+        "target_type": "String",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_real",
+        "source_type": "real",
+        "target_type": "String",
+        "category": "numeric",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_date",
+        "source_type": "date",
+        "target_type": "String",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_time",
+        "source_type": "time(6)",
+        "target_type": "String",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_datetime",
+        "source_type": "datetime",
+        "target_type": "String",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_smalldatetime",
+        "source_type": "smalldatetime",
+        "target_type": "String",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_datetime2",
+        "source_type": "datetime2(6)",
+        "target_type": "String",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_datetimeoffset",
+        "source_type": "datetimeoffset(6)",
+        "target_type": "String",
+        "category": "date_time",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_char",
+        "source_type": "char(16)",
+        "target_type": "String",
+        "category": "text",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_varchar",
+        "source_type": "varchar(128)",
+        "target_type": "String",
+        "category": "text",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_text",
+        "source_type": "text",
+        "target_type": "String",
+        "category": "deprecated",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_nchar",
+        "source_type": "nchar(16)",
+        "target_type": "String",
+        "category": "text",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_nvarchar",
+        "source_type": "nvarchar(128)",
+        "target_type": "String",
+        "category": "text",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_ntext",
+        "source_type": "ntext",
+        "target_type": "String",
+        "category": "deprecated",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_binary",
+        "source_type": "binary(8)",
+        "target_type": "String",
+        "category": "binary",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_varbinary",
+        "source_type": "varbinary(32)",
+        "target_type": "String",
+        "category": "binary",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_varbinary_max",
+        "source_type": "varbinary(max)",
+        "target_type": "String",
+        "category": "binary",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_image",
+        "source_type": "image",
+        "target_type": "String",
+        "category": "deprecated",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_uniqueidentifier",
+        "source_type": "uniqueidentifier",
+        "target_type": "String",
+        "category": "uuid",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_xml",
+        "source_type": "xml",
+        "target_type": "String",
+        "category": "semi_structured",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_sql_variant",
+        "source_type": "sql_variant",
+        "target_type": "String",
+        "category": "system",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_hierarchyid",
+        "source_type": "hierarchyid",
+        "target_type": "String",
+        "category": "system",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_geometry",
+        "source_type": "geometry",
+        "target_type": "String",
+        "category": "spatial",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_geography",
+        "source_type": "geography",
+        "target_type": "String",
+        "category": "spatial",
+        "insertable": true,
+        "notes": ""
+      },
+      {
+        "name": "ms_rowversion",
+        "source_type": "rowversion",
+        "target_type": "String",
+        "category": "system",
+        "insertable": false,
+        "notes": "auto-generated by SQL Server"
+      }
+    ]
+  },
+  "finished_at": "2026-06-02T07:00:06Z"
+}

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="480" viewBox="0 0 920 480" role="img" aria-label="Sensitivity analysis">
+<rect width="920" height="480" fill="#f8fafc"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Sensitivity analysis</text>
+<text x="32" y="66" font-size="13" fill="#475569">Score swing when calibration thresholds move by +/-10%. Lower swing is better.</text>
+<text x="32" y="118" font-size="13" font-weight="700" fill="#111827">dpone</text>
+<rect x="218" y="102" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="102" width="2" height="22" rx="4" fill="#0f766e"/>
+<text x="792" y="118" font-size="12" font-weight="400" fill="#334155">0 pts / stable</text>
+<text x="32" y="176" font-size="13" font-weight="700" fill="#111827">airbyte</text>
+<rect x="218" y="160" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="160" width="2" height="22" rx="4" fill="#0f766e"/>
+<text x="792" y="176" font-size="12" font-weight="400" fill="#334155">0 pts / stable</text>
+<text x="32" y="234" font-size="13" font-weight="700" fill="#111827">dlt</text>
+<rect x="218" y="218" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="218" width="2" height="22" rx="4" fill="#0f766e"/>
+<text x="792" y="234" font-size="12" font-weight="400" fill="#334155">0 pts / stable</text>
+<text x="32" y="292" font-size="13" font-weight="700" fill="#111827">pentaho-kettle</text>
+<rect x="218" y="276" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="276" width="2" height="22" rx="4" fill="#0f766e"/>
+<text x="792" y="292" font-size="12" font-weight="400" fill="#334155">0 pts / stable</text>
+<text x="32" y="350" font-size="13" font-weight="700" fill="#111827">apache-hop</text>
+<rect x="218" y="334" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="334" width="72" height="22" rx="4" fill="#0f766e"/>
+<text x="792" y="350" font-size="12" font-weight="400" fill="#334155">2 pts / stable</text>
+<text x="32" y="408" font-size="13" font-weight="700" fill="#111827">sling</text>
+<rect x="218" y="392" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="392" width="2" height="22" rx="4" fill="#0f766e"/>
+<text x="792" y="408" font-size="12" font-weight="400" fill="#334155">0 pts / stable</text>
+</svg>

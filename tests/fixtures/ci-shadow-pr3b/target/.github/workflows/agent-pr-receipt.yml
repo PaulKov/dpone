@@ -1,0 +1,178 @@
+name: Agent PR receipt
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - edited
+      - closed
+
+permissions:
+  actions: read
+  attestations: read
+  checks: read
+  contents: read
+  pull-requests: read
+  statuses: read
+
+jobs:
+  receipt:
+    name: Agent PR receipt
+    if: github.event.action == 'edited'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Prepare PR receipt inputs
+        run: |
+          mkdir -p test_artifacts/agent-receipt-output
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
+          pull_request = event.get("pull_request", {})
+          body = pull_request.get("body") or ""
+          head_sha = pull_request.get("head", {}).get("sha") or os.environ["GITHUB_SHA"]
+          Path("test_artifacts/agent-receipt-output/pr-body.md").write_text(body, encoding="utf-8")
+          Path("test_artifacts/agent-receipt-output/pr-head-sha.txt").write_text(
+              head_sha + "\n",
+              encoding="utf-8",
+          )
+          PY
+          git diff --no-renames --name-only --diff-filter=ACDMRT -z \
+            "origin/${GITHUB_BASE_REF}...HEAD" \
+            > test_artifacts/agent-receipt-output/pr-changed-paths.txt
+
+      - name: Validate PR receipt
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          uv run --frozen python tools/agent_policy/pr_receipt.py \
+            --body-file test_artifacts/agent-receipt-output/pr-body.md \
+            --changed-paths-file test_artifacts/agent-receipt-output/pr-changed-paths.txt \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pull-request-number "${{ github.event.pull_request.number }}" \
+            --head-sha "$(cat test_artifacts/agent-receipt-output/pr-head-sha.txt)" \
+            --policy .agents/policy/github-branch-protection.yml \
+            --require-github-evidence \
+            --require-github-attestation \
+            --output test_artifacts/agent-receipt-output/agent_pr_receipt.json
+          printf '%s\n' "$?" > test_artifacts/agent-receipt-output/pr-receipt-exit-code.txt
+
+      - name: Build audit manifest
+        if: always()
+        run: |
+          uv run --frozen python tools/agent_policy/audit_manifest.py pr-receipt \
+            --receipt test_artifacts/agent-receipt-output/agent_pr_receipt.json \
+            --event "${GITHUB_EVENT_PATH}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --workflow "${GITHUB_WORKFLOW}" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --artifact-name agent-pr-receipt \
+            --retention-days 90 \
+            --output test_artifacts/agent-receipt-output/agent_audit_manifest.json
+
+      - name: Enforce receipt result
+        if: always()
+        run: |
+          exit "$(cat test_artifacts/agent-receipt-output/pr-receipt-exit-code.txt)"
+
+      - name: Upload PR receipt evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: agent-pr-receipt
+          path: test_artifacts/agent-receipt-output/
+          if-no-files-found: error
+          retention-days: 90
+
+  merge-closure:
+    name: Agent PR merge closure
+    if: github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: write
+      contents: read
+    steps:
+      - name: Checkout exact integration commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Derive immutable merge-closure receipt
+        env:
+          GITHUB_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p test_artifacts/agent-receipt-output
+          set +e
+          uv run --frozen python tools/agent_policy/pr_merge_receipt.py \
+            --event "${GITHUB_EVENT_PATH}" \
+            --root . \
+            --repository "${GITHUB_REPOSITORY}" \
+            --policy .agents/policy/github-branch-protection.yml \
+            --workflow "${GITHUB_WORKFLOW}" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output-dir test_artifacts/agent-receipt-output
+          printf '%s\n' "$?" > test_artifacts/agent-receipt-output/pr-receipt-exit-code.txt
+
+      - name: Upload immutable merge-closure receipt
+        id: merge-receipt-artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: agent-pr-receipt
+          path: test_artifacts/agent-receipt-output/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish exact integration check
+        if: always() && steps.merge-receipt-artifact.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p test_artifacts/agent-merge-check-output
+          uv run --frozen python tools/agent_policy/pr_merge_check.py \
+            --event "${GITHUB_EVENT_PATH}" \
+            --receipt test_artifacts/agent-receipt-output/agent_pr_merge_receipt.json \
+            --producer-exit-code test_artifacts/agent-receipt-output/pr-receipt-exit-code.txt \
+            --repository "${GITHUB_REPOSITORY}" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            > test_artifacts/agent-merge-check-output/agent_pr_merge_check.json
+
+      - name: Upload exact integration check projection
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: agent-pr-merge-check
+          path: test_artifacts/agent-merge-check-output/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce receipt result
+        if: always()
+        run: |
+          exit "$(cat test_artifacts/agent-receipt-output/pr-receipt-exit-code.txt)"

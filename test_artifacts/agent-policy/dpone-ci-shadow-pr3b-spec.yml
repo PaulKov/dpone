@@ -1,0 +1,163 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-PR3B-SPEC"
+title: "Freeze the executable PR 3B semantic privilege-boundary contract"
+goal: >-
+  Convert the merged parent PR 3B architecture row into a researched,
+  reviewable, exact-path child specification for transitive pull-request
+  reachability, effective permissions, closed CodeQL, retirement of the unsafe
+  legacy governance attestor, its exact producer/finalizer replacement, and the
+  existing merged-closure capability without changing PR3B runtime or
+  production workflow/security bytes in this design-only PR. The declared
+  root-owned task-contract schema/validator amendment is governance tooling,
+  not the planned PR3B scanner implementation.
+specification: "docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md"
+base_commit: "c5567128e6e9b847b4b2a023a74ea6d60e7ccd09"
+integrator: "/root"
+
+acceptance_criteria:
+  - "The child remains RESEARCHED with the ADR0037 amendment PROPOSED until the exact-head maintainer atomically changes them to APPROVED/ACCEPTED with the frozen identity/date; no production implementation is authorized by this task."
+  - "The public scanner command, formats, exits, streams, no-write/no-network behavior, deterministic report, stable statuses, codes, recovery IDs, and closed policy/report schemas are exact."
+  - "The algorithm strictly and stably reads bounded yml/yaml bytes, rejects duplicate/ambiguous YAML, constructs direct PR, local workflow_call, workflow_run, and needs edges, expands correlated closed-event variants into separate routes, and uses sound three-valued route proof."
+  - "Authority and approved-profile records are route-specific, fully bounded, and cannot collapse different callers or event variants into one permission result."
+  - "Effective workflow/job/caller/callee permissions, omitted-none semantics, write-all, read-all, unknown permissions, OIDC, secrets, environments, and self-hosted runners fail closed."
+  - "The exact action-only CodeQL profile requires checkout persist-credentials false and removes custom config, build, run, cache, download, install, query, local, Docker, secret, and environment authority."
+  - "The historical ADR0037 governance-source hashes remain reproducible negative fixtures and can never authorize PASS; the implementation must atomically remove write/OIDC from PR-controlled code and install the exact read-only producer plus source-free action-only finalizer."
+  - "Every mandatory profile has an exact full trigger digest, one subject occurrence, and one exact route coordinate per event variant; missing, duplicate, renamed, copied, trigger-drifted, or route-drifted profiles fail closed."
+  - "This design PR carries the proposed ADR0037 amendment that retires the unsafe legacy exception and accepts only the exact producer/finalizer replacement; it remains inactive while the child is RESEARCHED and precedes all implementation."
+  - "The ADR0037 merge-closure publisher remains a separate post-merge integrated-code capability with its exact route, checkout, permission, action/input, and resolved execution-envelope fingerprint."
+  - "The child distinguishes deterministic FAIL from unavailable/unknown UNVERIFIED, rejects fixture widening as recovery, and gives copyable operator actions."
+  - "The existing workflow-security schema/policy mismatch is named and future implementation must validate the repaired policy instance before consuming the new semantic policy."
+  - "The implementation architecture separates snapshot I/O, strict parsing, graph topology, expression proof, permission resolution, closed profiles, report/rendering, orchestration, and thin CLI/composition roots below repository quality budgets."
+  - "Current required contexts, ci.yml, agent-pr-receipt.yml, release workflows, runtime/data-plane code, rulesets, Apps, environments, secrets, tags, variables, and publication authority remain unchanged by this specification PR."
+  - "The documentation plan covers Discover through Upgrade for workflow authors, security reviewers, contributors, and operators without duplicating machine fingerprints in prose."
+  - "The closed task-contract schema and validator accept only explicit integrator_owned_paths when integrator equals shared_file_owner, those paths stay forbidden to delegated writers, and unknown ownership fields fail schema validation."
+  - "The scope contract reads only the immutable, ancestor-validated DESIGN_BASE...HEAD Git trees; dirty generated evidence and untracked files do not alter scope, while committed undeclared paths fail closed."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "repository workflow-security child architecture contract"
+    - "planned semantic privilege scanner, policy, and report"
+    - "planned CodeQL repository profile and operator recovery"
+    - "contributor, security-reviewer, and operator documentation plan"
+    - "agent task-contract root-integrator ownership boundary"
+  migration_required: true
+
+owned_paths:
+  - docs/feature-design-ci-shadow-pr3b-semantic-privilege-boundary.md
+  - docs/feature-design-ci-pr-gate-exact-sha-evidence.md
+  - docs/adr/0037-immutable-agent-pr-merge-closure.md
+  - tests/test_ci_shadow_pr3b_spec_contracts.py
+  - tests/test_ci_shadow_pr3b_scope_contracts.py
+  - tests/test_ci_shadow_pr3b_schema_contracts.py
+  - tests/ci_shadow_pr3b_report_contract_model.py
+  - tests/ci_shadow_pr3b_report_contract_support.py
+  - tests/ci_shadow_pr3b_report_route_model.py
+  - tests/ci_shadow_pr3b_report_examples.py
+  - tests/test_ci_shadow_pr3b_report_contracts.py
+  - tests/test_ci_shadow_pr3b_report_routes_contracts.py
+  - tests/test_ci_shadow_pr3b_report_limits_contracts.py
+  - test_artifacts/agent-policy/dpone-ci-shadow-pr3b-spec.yml
+
+integrator_owned_paths:
+  - docs/quality-metrics.md
+  - mkdocs.yml
+  - CHANGELOG.md
+  - evals/agent/agent-task-contract.schema.json
+  - tools/agent_policy/task_contract.py
+  - docs/agent-task-contracts.md
+  - docs/agent-templates/agent-task-contract.yml
+  - tests/agent_policy/test_task_contract.py
+
+read_only_paths:
+  - .github/workflows/ci.yml
+  - .github/workflows/codeql.yml
+  - .github/codeql/codeql-config.yml
+  - .github/workflows/agent-pr-receipt.yml
+  - .github/workflows/pages.yml
+  - .github/workflows/runtime-image.yml
+  - .agents/policy/workflow-security.yml
+  - evals/agent/workflow-security.schema.json
+  - tools/agent_policy/workflow_security.py
+  - tools/agent_policy/release_privileged_boundary.py
+  - docs/adr/0048-exact-sha-readiness-evidence.md
+  - docs/feature-design-standard.md
+  - docs/documentation-standard.md
+  - docs/engineering-standards.md
+  - docs/agent-development.md
+  - docs/benchmarks/quality_budgets.yml
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - docs/quality-metrics.md
+  - .github
+  - .github/workflows
+  - .agents/policy
+  - evals/agent
+  - src
+  - packages
+  - tools/agent_policy
+  - tools/ci
+  - docs/ci-cd.md
+  - docs/cicd
+  - docs/developer-ci-cd.md
+  - docs/agent-governance.md
+  - docs/agent-security-mapping.md
+  - docs/agent-risk-register.md
+  - docs/github-branch-protection.md
+  - docs/testing
+  - docs/agent-task-contracts.md
+  - docs/agent-templates/agent-task-contract.yml
+  - tests/agent_policy/test_task_contract.py
+  - test_artifacts/agent-policy/agent_governance_gate.json
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "Current master c5567128e6e9b847b4b2a023a74ea6d60e7ccd09 is the exact child-design base and contains PR2, approved/merged PR3A, and unchanged PR3A workflow/policy bytes."
+  - "The approved parent specification and ADR0048 remain architecture authority; the proposed ADR0037 subsection and this child transition together before implementation."
+  - "The PR2-to-current governance-source security projection is byte-canonically equal only as historical negative evidence; the current resolved quality envelope is never an approved profile."
+  - "The current CodeQL custom config and credential-persistence default are known implementation RED conditions, not accepted design evidence."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_ci_shadow_pr3b_spec_contracts.py tests/test_ci_shadow_pr3b_scope_contracts.py tests/test_ci_shadow_pr3b_schema_contracts.py tests/test_ci_shadow_pr3b_report_contracts.py tests/test_ci_shadow_pr3b_report_routes_contracts.py tests/test_ci_shadow_pr3b_report_limits_contracts.py tests/test_ci_shadow_spec_contracts.py tests/agent_policy/test_task_contract.py tests/test_docs_language_contracts.py -q"
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/dpone-ci-shadow-pr3b-spec.yml"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref c5567128e6e9b847b4b2a023a74ea6d60e7ccd09"
+    - "Execute every selected non-live check and report unavailable live evidence as UNVERIFIED."
+    - "uv run ruff check tests/test_ci_shadow_pr3b_spec_contracts.py tests/test_ci_shadow_pr3b_scope_contracts.py tests/test_ci_shadow_pr3b_schema_contracts.py tests/ci_shadow_pr3b_report_contract_model.py tests/ci_shadow_pr3b_report_contract_support.py tests/ci_shadow_pr3b_report_route_model.py tests/ci_shadow_pr3b_report_examples.py tests/test_ci_shadow_pr3b_report_contracts.py tests/test_ci_shadow_pr3b_report_routes_contracts.py tests/test_ci_shadow_pr3b_report_limits_contracts.py && uv run ruff format --check tests/test_ci_shadow_pr3b_spec_contracts.py tests/test_ci_shadow_pr3b_scope_contracts.py tests/test_ci_shadow_pr3b_schema_contracts.py tests/ci_shadow_pr3b_report_contract_model.py tests/ci_shadow_pr3b_report_contract_support.py tests/ci_shadow_pr3b_report_route_model.py tests/ci_shadow_pr3b_report_examples.py tests/test_ci_shadow_pr3b_report_contracts.py tests/test_ci_shadow_pr3b_report_routes_contracts.py tests/test_ci_shadow_pr3b_report_limits_contracts.py"
+    - "uv run dpone docs check-docs && uv run dpone docs check-generated-references && uv run dpone docs update-dev-metrics --check && uv run mkdocs build --strict"
+    - "git diff --check"
+  live:
+    - "N/A for design semantics; repository approval still requires every exact-head protected check, owner attestation, Agent PR receipt, and no bypass."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "A delegated writer edits integrator_owned_paths, or the declared integrator differs from shared_file_owner."
+  - "Approved specification is missing or contradicted."
+  - "Approved parent specification or ADR0048 is missing or contradicted, or the proposed ADR0037 amendment is not lifecycle-consistent with this child."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "The exact base is not c5567128e6e9b847b4b2a023a74ea6d60e7ccd09."
+  - "Any PR3B production workflow, CodeQL config, workflow-security policy/schema/tool, runtime source, package, release, protection, or live GitHub setting changes outside the explicitly listed root-owned task-contract schema/validator amendment."
+  - "The design deviates from the exact proposed retirement/migration, restores the legacy exception, copies either approved capability, or adds a new publisher."
+  - "The child status is changed to APPROVED without exact-head maintainer review evidence."

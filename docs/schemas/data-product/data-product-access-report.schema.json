@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-access-report.schema.json",
+  "title": "Data Product Access Report",
+  "type": "object",
+  "required": ["schema_version", "status", "access_report_id", "access_gate_id", "blockers", "warnings", "markdown"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_access_report.v1"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "access_report_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "access_gate_id": {"type": ["string", "null"]},
+    "entitlement_plan_id": {"type": ["string", "null"]},
+    "privacy_impact_id": {"type": ["string", "null"]},
+    "product": {"type": "object"},
+    "product_id": {"type": ["string", "null"]},
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "markdown": {"type": "string"}
+  },
+  "additionalProperties": true
+}

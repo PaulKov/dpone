@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-authority-gate.schema.json",
+  "title": "dpone data product authority gate",
+  "type": "object",
+  "required": ["schema_version", "authority_gate_id", "status", "profile", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_authority_gate.v1"},
+    "authority_gate_id": {"type": "string"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "profile": {"type": "string"},
+    "authority_check_id": {"type": ["string", "null"]},
+    "approval_quorum_id": {"type": ["string", "null"]},
+    "evidence_signature_ids": {"type": "array", "items": {"type": "string"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

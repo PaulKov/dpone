@@ -1,0 +1,89 @@
+schema_version: 1
+task_id: "SEMREF-V2-DBT-PROOF"
+title: "V2 exact dbt selection, mutation closure, read proof, and lifecycle authority"
+goal: "Implement additive V2 dbt graph/proof/lifecycle, versioned policy/explain, certification, and package-delivery surfaces without changing V1 behavior."
+specification: "docs/feature-design-semantic-refresh-runtime-v2.md"
+base_commit: "76ec08dfac57e80fccb63487cf4bc63d6e5172cc"
+integrator: "root"
+
+acceptance_criteria:
+  - "V2 selection uses exact FQN selectors and indirect-selection empty while V1 remains unchanged."
+  - "Selected/transitive ephemeral and unmanaged mutations fail closed."
+  - "Target-independent compiled SQL and bounded SQL Server module dependency proof are deterministic."
+  - "Pinned dbt Core 1.10.13/dbt-sqlserver 1.10.1 lifecycle policy closes every mutation-sensitive adapter option and branch."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["dbt compile policy", "selection lock", "preflight evidence", "dbt publish policy v2", "dbt explain v2", "platform macro package delivery"]
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/contracts/dbt_semantic_refresh_*.py"
+  - "src/dpone/adapters/dbt_semantic_refresh_*.py"
+  - "src/dpone/runtime/dbt_semantic_refresh_*.py"
+  - "src/dpone/runtime/dbt_execution_bootstrap.py"
+  - "src/dpone/services/dbt_semantic_refresh_*.py"
+  - "src/dpone/contracts/dbt_publish_models.py"
+  - "src/dpone/contracts/dbt_publish_schema_contract_policy.py"
+  - "src/dpone/contracts/dbt_publish_schema_contract_authoring.py"
+  - "src/dpone/contracts/dbt_publish_schema_contract_reports.py"
+  - "src/dpone/adapters/dbt_publish_artifact_reader.py"
+  - "src/dpone/adapters/dbt_sqlserver_graph_policy.py"
+  - "src/dpone/manifest/dbt_publish_profiles.py"
+  - "src/dpone/services/dbt_publish_compiler.py"
+  - "src/dpone/services/dbt_publish_compiler_support.py"
+  - "src/dpone/services/dbt_publish_model_compiler.py"
+  - "src/dpone/services/dbt_publish_artifact_writer.py"
+  - "src/dpone/readiness/dbt_airflow_artifact_projection.py"
+  - "src/dpone/readiness/dbt_airflow_execution_pack.py"
+  - "src/dpone/readiness/dbt_semantic_refresh_airflow_pack.py"
+  - "src/dpone/app/dbt_publish_composition.py"
+  - "src/dpone/commands/dbt_publish_cmd.py"
+  - "src/dpone/commands/dbt_publish_cli_support.py"
+  - "packages/dbt-dpone/**"
+  - "docs/schemas/dbt/dpone.dbt-publish-policy.v2.schema.json"
+  - "docs/schemas/dbt/dpone.dbt-publish-explain.v2.schema.json"
+  - "docs/schemas/dbt/dpone.dbt-publish-policy.v1.schema.json"
+  - "docs/schemas/dbt/dpone.dbt-publish-explain.v1.schema.json"
+  - "tests/test_dbt_publish_cli.py"
+  - "tests/test_dbt_publish_schema_contracts.py"
+  - "tests/test_dbt_semantic_refresh_preview.py"
+  - "tests/test_dbt_self_service_docs_contracts.py"
+  - "tests/test_dbt_semantic_refresh_*.py"
+  - "tests/fixtures/semantic-refresh-v2/dbt/**"
+read_only_paths:
+  - "src/dpone/adapters/dbt_workflow_selection.py"
+  - "src/dpone/contracts/dbt_sqlserver_graph_policy.py"
+  - "src/dpone/contracts/dbt_sqlserver_graph_policy_contract.py"
+  - "src/dpone/contracts/dbt_sqlserver_macro_authority.py"
+  - "src/dpone/runtime/dbt_preflight.py"
+  - "docs/feature-design-semantic-refresh-runtime-v2.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/adapters/dbt_workflow_selection.py"
+  - "src/dpone/contracts/dbt_sqlserver_graph_policy.py"
+  - "src/dpone/runtime/dbt_preflight.py"
+
+shared_file_owner: "root"
+dependencies: ["SEMREF-V2-CONTRACTS"]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_semantic_refresh_selection.py tests/test_dbt_semantic_refresh_proof.py tests/test_dbt_semantic_refresh_lifecycle.py -q"
+  broad:
+    - "uv run ruff check ."
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "V1 selection or graph policy would need semantic widening."
+  - "A dependency proof cannot fail closed with available metadata."

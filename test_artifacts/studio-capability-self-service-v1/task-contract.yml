@@ -1,0 +1,93 @@
+schema_version: 1
+task_id: "DPONE-STUDIO-SELF-SERVICE-V1"
+title: "Delegated writer contract: self-service capability discovery and Studio API v1"
+goal: >-
+  Govern delegated writers implementing the approved capability authority,
+  correctness fixes, route-first beginner CLI, parse-safe local Studio API,
+  schemas, compatibility aliases, security boundaries, documentation, and
+  validation evidence. Shared semantic files remain owned by the integrator.
+specification: "docs/feature-design-studio-capability-self-service-v1.md"
+base_commit: "77f2b530"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Unsupported, stale, skipped, mocked, or non-executed capability evidence never reports success."
+  - "CLI, Studio API, and generated documentation project one capability snapshot."
+  - "The local Studio adapter is loopback-first, bounded, parse-safe, and schema-described."
+  - "Legacy Studio endpoints remain deprecated compatibility views for the documented window."
+  - "All required repository quality, documentation, packaging, and non-live gates pass."
+  - "Live and human usability evidence are reported as SKIP or UNVERIFIED unless actually executed."
+
+public_contract_impact:
+  level: deprecation
+  surfaces:
+    - CLI
+    - Studio HTTP API
+    - OpenAPI
+    - JSON Schema
+    - capability discovery
+    - connector certification
+    - quality outcome
+    - documentation
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/**"
+  - "tests/**"
+  - "docs/**"
+  - "tools/generate_studio_openapi.py"
+  - "test_artifacts/studio-capability-self-service-v1/**"
+  - "test_artifacts/studio-usability/**"
+read_only_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+
+shared_file_owner: "Codex integrator (outside this delegated writer contract)"
+
+dependencies:
+  - "PR #437 merged at base commit 77f2b530"
+required_checks:
+  focused:
+    - "Studio capability, API, HTTP security, quality, certification, and Airflow explain tests"
+  broad:
+    - "change-aware selector"
+    - "ruff check and format"
+    - "mypy"
+    - "architecture, import, layer, and module budgets"
+    - "non-live pytest"
+    - "documentation and generated-reference gates"
+    - "strict MkDocs build"
+    - "affected package builds"
+  live:
+    - "No live environment approved; report SKIP/UNVERIFIED"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+  - validation_evidence
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

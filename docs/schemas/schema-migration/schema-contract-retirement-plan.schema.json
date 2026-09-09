@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-retirement-plan.schema.json",
+  "title": "Schema Contract Retirement Plan",
+  "type": "object",
+  "required": ["schema_version", "status", "views", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_retirement_plan.v1"},
+    "retirement_plan_id": {"type": "string", "pattern": "^sha256:"},
+    "status": {"enum": ["ready", "warning", "blocked"]},
+    "contract_id": {"type": ["string", "null"]},
+    "retirement_gate_id": {"type": ["string", "null"]},
+    "compatibility_view_plan_id": {"type": ["string", "null"]},
+    "views": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

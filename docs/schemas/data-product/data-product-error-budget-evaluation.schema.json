@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-error-budget-evaluation.schema.json",
+  "title": "dpone data product error budget evaluation",
+  "type": "object",
+  "required": ["schema_version", "status", "error_budget_evaluation_id", "windows", "blockers", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_error_budget_evaluation.v1"},
+    "status": {"enum": ["disabled", "passed", "warning", "blocked"]},
+    "error_budget_evaluation_id": {"type": "string", "pattern": "^sha256:"},
+    "product_id": {"type": ["string", "null"]},
+    "windows": {"type": "array"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  }
+}

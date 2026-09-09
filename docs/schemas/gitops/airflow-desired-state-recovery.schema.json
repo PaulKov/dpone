@@ -1,0 +1,206 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-desired-state-recovery.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "desired_state": {
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "not": {
+            "enum": [
+              "current",
+              "latest"
+            ]
+          },
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$",
+          "type": "string"
+        },
+        "previous": {
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "properties": {
+                "deployment_id": {
+                  "type": "null"
+                },
+                "revision": {
+                  "type": "null"
+                }
+              }
+            },
+            {
+              "properties": {
+                "deployment_id": {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "revision": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
+            }
+          ],
+          "properties": {
+            "deployment_id": {
+              "anyOf": [
+                {
+                  "pattern": "^sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "revision",
+            "deployment_id"
+          ],
+          "type": "object"
+        },
+        "promoted_at": {
+          "format": "date-time",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?Z$",
+          "type": "string"
+        },
+        "promotion": {
+          "additionalProperties": false,
+          "properties": {
+            "airflow_index_sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "deployment_id": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "expected_dag_ids": {
+              "items": {
+                "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,248}[A-Za-z0-9])?$",
+                "type": "string"
+              },
+              "maxItems": 5000,
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "publication_evidence_sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "registry_scope_id": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "release_id": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "runtime_image_dbt_digest": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "runtime_image_digest": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "registry_scope_id",
+            "release_id",
+            "deployment_id",
+            "airflow_index_sha256",
+            "runtime_image_digest",
+            "expected_dag_ids",
+            "publication_evidence_sha256"
+          ],
+          "type": "object"
+        },
+        "schema": {
+          "const": "dpone.airflow-desired-deployment.v1"
+        },
+        "source": {
+          "additionalProperties": false,
+          "properties": {
+            "git_sha": {
+              "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+              "type": "string"
+            },
+            "job_id": {
+              "pattern": "^[0-9]{1,32}$",
+              "type": "string"
+            },
+            "occurrence_id": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "pipeline_id": {
+              "pattern": "^[0-9]{1,32}$",
+              "type": "string"
+            },
+            "project": {
+              "maxLength": 512,
+              "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?(?:/[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?)+$",
+              "type": "string"
+            },
+            "ref": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "project",
+            "ref",
+            "pipeline_id",
+            "job_id",
+            "occurrence_id",
+            "git_sha"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "schema",
+        "environment",
+        "source",
+        "promotion",
+        "previous",
+        "promoted_at"
+      ],
+      "type": "object"
+    },
+    "observed_revision": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.airflow-desired-state-recovery.v1"
+    }
+  },
+  "required": [
+    "schema",
+    "observed_revision",
+    "desired_state"
+  ],
+  "title": "dpone GitOps local Airflow desired-state pre-activation recovery record",
+  "type": "object"
+}

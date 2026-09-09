@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/deployment-cache-activation-history-v2.schema.json",
+  "title": "dpone GitOps verified Airflow cache activation history",
+  "type": "object",
+  "required": [
+    "schema",
+    "revision",
+    "entries",
+    "legacy_v1_diagnostics"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.deployment-cache-activation-history.v2"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "entries": {
+      "type": "object",
+      "maxProperties": 10000,
+      "propertyNames": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "activation_id",
+          "release_id",
+          "deployment_id",
+          "airflow_index_sha256",
+          "loaded_dag_ids",
+          "verified_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "activation_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "release_id": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "deployment_id": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "airflow_index_sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "loaded_dag_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5000,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 250
+            }
+          },
+          "verified_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "legacy_v1_diagnostics": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "required": [
+          "entry_sha256"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "entry_sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

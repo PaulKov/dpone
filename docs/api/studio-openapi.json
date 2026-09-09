@@ -1,0 +1,6417 @@
+{
+  "components": {
+    "schemas": {
+      "ArtifactState": {
+        "additionalProperties": false,
+        "properties": {
+          "airflow_pack": {
+            "enum": [
+              "planned",
+              "materialized",
+              "stale",
+              "unavailable"
+            ]
+          },
+          "dag_spec": {
+            "enum": [
+              "planned",
+              "materialized",
+              "stale",
+              "unavailable"
+            ]
+          },
+          "manifest": {
+            "enum": [
+              "source",
+              "invalid",
+              "missing"
+            ]
+          },
+          "published_deployment_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "published_generation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "manifest",
+          "dag_spec",
+          "airflow_pack",
+          "published_deployment_id",
+          "published_generation"
+        ],
+        "type": "object"
+      },
+      "CapabilityDiscoveryResponse": {
+        "$defs": {
+          "beginner": {
+            "additionalProperties": false,
+            "properties": {
+              "default_recipe_ref": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/nullableString"
+              },
+              "recipe_available": {
+                "type": "boolean"
+              },
+              "recipe_refs": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/stringArray"
+              }
+            },
+            "required": [
+              "recipe_available",
+              "recipe_refs",
+              "default_recipe_ref"
+            ],
+            "type": "object"
+          },
+          "certificationLevel": {
+            "enum": [
+              "experimental",
+              "route-certified",
+              "production-certified",
+              "enterprise-certified"
+            ]
+          },
+          "certificationVariant": {
+            "additionalProperties": false,
+            "properties": {
+              "airflow_runtime_mode": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "evidence_refs": {
+                "items": {
+                  "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/digest"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "evidence_status": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/evidenceStatus"
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "level": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/certificationLevel"
+              },
+              "reason_codes": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/stringArray"
+              },
+              "route_id": {
+                "minLength": 5,
+                "type": "string"
+              },
+              "schema_evolution": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "transport": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "route_id",
+              "transport",
+              "schema_evolution",
+              "airflow_runtime_mode",
+              "level",
+              "evidence_status",
+              "evidence_refs",
+              "reason_codes"
+            ],
+            "type": "object"
+          },
+          "connector": {
+            "additionalProperties": false,
+            "properties": {
+              "capability_ids": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/stringArray"
+              },
+              "docs_link": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "endpoint_types": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/stringArray"
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "install_extras": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/stringArray"
+              },
+              "maturity": {
+                "enum": [
+                  "certified",
+                  "experimental",
+                  "community"
+                ]
+              },
+              "release_phase": {
+                "enum": [
+                  "stable",
+                  "beta",
+                  "alpha"
+                ]
+              },
+              "roles": {
+                "items": {
+                  "enum": [
+                    "source",
+                    "sink",
+                    "state"
+                  ]
+                },
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "id",
+              "endpoint_types",
+              "roles",
+              "install_extras",
+              "capability_ids",
+              "maturity",
+              "release_phase",
+              "docs_link"
+            ],
+            "type": "object"
+          },
+          "digest": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "evidenceStatus": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "SKIP",
+              "UNVERIFIED"
+            ]
+          },
+          "issue": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "pattern": "^DPONE_[A-Z0-9_]+$",
+                "type": "string"
+              },
+              "entity_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "entity_kind": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "message": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "entity_kind",
+              "entity_id",
+              "message"
+            ],
+            "type": "object"
+          },
+          "nullableString": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recipe": {
+            "additionalProperties": false,
+            "properties": {
+              "certification_level": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/certificationLevel"
+              },
+              "evidence_status": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/evidenceStatus"
+              },
+              "install_extras": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/stringArray"
+              },
+              "limitations": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/stringArray"
+              },
+              "origin": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "reason_codes": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/stringArray"
+              },
+              "ref": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "route_id": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/nullableString"
+              },
+              "scaffold_argv": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "scaffoldable": {
+                "type": "boolean"
+              },
+              "sink": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/nullableString"
+              },
+              "source": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/nullableString"
+              },
+              "status": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "strategy": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/nullableString"
+              },
+              "support_status": {
+                "enum": [
+                  "supported",
+                  "conditional",
+                  "not_supported",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "ref",
+              "origin",
+              "status",
+              "source",
+              "sink",
+              "strategy",
+              "route_id",
+              "support_status",
+              "certification_level",
+              "evidence_status",
+              "install_extras",
+              "limitations",
+              "scaffoldable",
+              "reason_codes",
+              "scaffold_argv"
+            ],
+            "type": "object"
+          },
+          "route": {
+            "additionalProperties": false,
+            "properties": {
+              "beginner": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/beginner"
+              },
+              "certification": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/routeCertification"
+              },
+              "id": {
+                "minLength": 5,
+                "type": "string"
+              },
+              "sink": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "source": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "strategy": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "support": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/routeSupport"
+              }
+            },
+            "required": [
+              "id",
+              "source",
+              "sink",
+              "strategy",
+              "support",
+              "certification",
+              "beginner"
+            ],
+            "type": "object"
+          },
+          "routeCertification": {
+            "additionalProperties": false,
+            "properties": {
+              "evidence_status": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/evidenceStatus"
+              },
+              "level": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/certificationLevel"
+              },
+              "reason_codes": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/stringArray"
+              },
+              "variants": {
+                "items": {
+                  "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/certificationVariant"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "level",
+              "evidence_status",
+              "reason_codes",
+              "variants"
+            ],
+            "type": "object"
+          },
+          "routeSupport": {
+            "additionalProperties": false,
+            "properties": {
+              "docs_link": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "install_extras": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/stringArray"
+              },
+              "limitations": {
+                "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/stringArray"
+              },
+              "status": {
+                "enum": [
+                  "supported",
+                  "conditional",
+                  "not_supported"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "limitations",
+              "docs_link",
+              "install_extras"
+            ],
+            "type": "object"
+          },
+          "stringArray": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "connectors": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/connector"
+            },
+            "type": "array"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/issue"
+            },
+            "type": "array"
+          },
+          "recipes": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/recipe"
+            },
+            "type": "array"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/route"
+            },
+            "type": "array"
+          },
+          "schema": {
+            "const": "dpone.capability-discovery.v1"
+          },
+          "snapshot_id": {
+            "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/digest"
+          }
+        },
+        "required": [
+          "schema",
+          "snapshot_id",
+          "connectors",
+          "routes",
+          "recipes",
+          "issues"
+        ],
+        "title": "dpone capability discovery v1",
+        "type": "object"
+      },
+      "Change": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "diff": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "path",
+          "message",
+          "diff"
+        ],
+        "type": "object"
+      },
+      "DiagnosticAction": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "safety": {
+            "const": "manual"
+          }
+        },
+        "required": [
+          "code",
+          "action",
+          "safety"
+        ],
+        "type": "object"
+      },
+      "DiagnosticCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "warning",
+              "failed"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "status",
+          "message"
+        ],
+        "type": "object"
+      },
+      "DiagnosticSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "failed": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "passed": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "warning": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "passed",
+          "warning",
+          "failed"
+        ],
+        "type": "object"
+      },
+      "DponeError": {
+        "additionalProperties": true,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "docs_url": {
+            "type": "string"
+          },
+          "fixes": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorFix"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          },
+          "schema": {
+            "const": "dpone.error.v1"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "error",
+              "critical"
+            ]
+          },
+          "stage": {
+            "type": "string"
+          },
+          "trace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema",
+          "code",
+          "stage",
+          "severity",
+          "message",
+          "fixes"
+        ],
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/DponeError"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "passed": {
+            "const": false
+          }
+        },
+        "required": [
+          "passed",
+          "errors"
+        ],
+        "type": "object"
+      },
+      "ErrorFix": {
+        "additionalProperties": false,
+        "properties": {
+          "argv": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "safety": {
+            "enum": [
+              "safe",
+              "manual",
+              "destructive"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "safety"
+        ],
+        "type": "object"
+      },
+      "GitOpsPrepareRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "branch": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "manifest_path": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "service": {
+            "const": "dpone-studio-api"
+          },
+          "status": {
+            "const": "ok"
+          },
+          "version": {
+            "const": "v1"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "version"
+        ],
+        "type": "object"
+      },
+      "ManifestDraftRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "manifest_path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "quality_checks": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "sink_connection": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sink_type": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_connection": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_table": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_type": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "strategy": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "target_schema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "target_table": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "unique_key": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_type",
+          "sink_type",
+          "strategy"
+        ],
+        "type": "object"
+      },
+      "ManifestDraftResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/StructuredCommand"
+            },
+            "type": "array"
+          },
+          "manifest_path": {
+            "type": "string"
+          },
+          "manifest_yaml": {
+            "type": "string"
+          },
+          "quality_checks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "quality_gates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "schema": {
+            "const": "dpone.manifest-draft.v1"
+          },
+          "status": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema",
+          "valid",
+          "status",
+          "manifest_path",
+          "manifest_yaml",
+          "quality_checks",
+          "quality_gates",
+          "commands",
+          "warnings"
+        ],
+        "type": "object"
+      },
+      "NextAction": {
+        "additionalProperties": false,
+        "properties": {
+          "argv": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "label": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "argv"
+        ],
+        "type": "object"
+      },
+      "ObjectResponse": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "OpenApiDocument": {
+        "properties": {
+          "components": {
+            "type": "object"
+          },
+          "info": {
+            "type": "object"
+          },
+          "openapi": {
+            "const": "3.1.0"
+          },
+          "paths": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "openapi",
+          "info",
+          "paths",
+          "components"
+        ],
+        "type": "object"
+      },
+      "OperatorDiagnostics": {
+        "additionalProperties": false,
+        "properties": {
+          "airflow_bundle": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ]
+          },
+          "airflow_bundle_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "binding_set_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticCheck"
+            },
+            "type": "array"
+          },
+          "connection_registry_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "credential_runtime_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deployment_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "index_path": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "dpone.airflow-operator-diagnostics.v1"
+          },
+          "next_actions": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticAction"
+            },
+            "type": "array"
+          },
+          "operator_pinning": {
+            "enum": [
+              "planned",
+              "incomplete",
+              "pinned",
+              "not_applicable"
+            ]
+          },
+          "parse_side_effects": {
+            "$ref": "#/components/schemas/ParseSideEffects"
+          },
+          "release_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "runtime_artifact_delivery": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "runtime_image_digest": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "invalid",
+              "materialized",
+              "operator_issues",
+              "operator_warnings",
+              "not_applicable"
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/DiagnosticSummary"
+          },
+          "workload_operators": {
+            "items": {
+              "$ref": "#/components/schemas/WorkloadOperatorSummary"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "status",
+          "operator_pinning",
+          "parse_side_effects",
+          "checks",
+          "summary",
+          "next_actions"
+        ],
+        "type": "object"
+      },
+      "ParseSideEffects": {
+        "additionalProperties": false,
+        "properties": {
+          "airflow_connections": {
+            "type": "boolean"
+          },
+          "airflow_variables": {
+            "type": "boolean"
+          },
+          "cache_refresh": {
+            "type": "boolean"
+          },
+          "kubernetes": {
+            "type": "boolean"
+          },
+          "metadata_db": {
+            "type": "boolean"
+          },
+          "network": {
+            "type": "boolean"
+          },
+          "vault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "network",
+          "metadata_db",
+          "airflow_variables",
+          "airflow_connections",
+          "vault",
+          "kubernetes",
+          "cache_refresh"
+        ],
+        "type": "object"
+      },
+      "PipelineExplainResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_state": {
+            "$ref": "#/components/schemas/ArtifactState"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            },
+            "type": "array"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/DponeError"
+            },
+            "type": "array"
+          },
+          "exit_code": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "hint": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "dpone.airflow-explain.v1"
+          },
+          "next_actions": {
+            "items": {
+              "$ref": "#/components/schemas/NextAction"
+            },
+            "type": "array"
+          },
+          "operator_diagnostics": {
+            "$ref": "#/components/schemas/OperatorDiagnostics"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "pipeline_ref": {
+            "type": "string"
+          },
+          "source_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "pipeline_ref",
+          "passed",
+          "changes",
+          "errors",
+          "source_path",
+          "artifact_state",
+          "operator_diagnostics",
+          "hint",
+          "next_actions"
+        ],
+        "type": "object"
+      },
+      "PipelineSummary": {
+        "$defs": {
+          "artifactState": {
+            "additionalProperties": false,
+            "properties": {
+              "airflow_pack": {
+                "enum": [
+                  "planned",
+                  "materialized",
+                  "stale",
+                  "unavailable"
+                ]
+              },
+              "dag_spec": {
+                "enum": [
+                  "planned",
+                  "materialized",
+                  "stale",
+                  "unavailable"
+                ]
+              },
+              "manifest": {
+                "enum": [
+                  "source",
+                  "invalid",
+                  "missing"
+                ]
+              },
+              "published_deployment_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "published_generation": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "manifest",
+              "dag_spec",
+              "airflow_pack",
+              "published_deployment_id",
+              "published_generation"
+            ],
+            "type": "object"
+          },
+          "certificationVariant": {
+            "additionalProperties": false,
+            "properties": {
+              "airflow_runtime_mode": {
+                "type": "string"
+              },
+              "evidence_refs": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "evidence_status": {
+                "enum": [
+                  "PASS",
+                  "FAIL",
+                  "SKIP",
+                  "UNVERIFIED"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "level": {
+                "enum": [
+                  "experimental",
+                  "route-certified",
+                  "production-certified",
+                  "enterprise-certified"
+                ]
+              },
+              "reason_codes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "route_id": {
+                "type": "string"
+              },
+              "schema_evolution": {
+                "type": "string"
+              },
+              "transport": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "route_id",
+              "transport",
+              "schema_evolution",
+              "airflow_runtime_mode",
+              "level",
+              "evidence_status",
+              "evidence_refs",
+              "reason_codes"
+            ],
+            "type": "object"
+          },
+          "dponeError": {
+            "additionalProperties": true,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "fixes": {
+                "items": {
+                  "$ref": "#/components/schemas/PipelineSummary/$defs/errorFix"
+                },
+                "type": "array"
+              },
+              "message": {
+                "type": "string"
+              },
+              "schema": {
+                "const": "dpone.error.v1"
+              },
+              "severity": {
+                "enum": [
+                  "info",
+                  "warning",
+                  "error",
+                  "critical"
+                ]
+              },
+              "stage": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schema",
+              "code",
+              "stage",
+              "severity",
+              "message",
+              "fixes"
+            ],
+            "type": "object"
+          },
+          "errorFix": {
+            "additionalProperties": false,
+            "properties": {
+              "argv": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              },
+              "safety": {
+                "enum": [
+                  "safe",
+                  "manual",
+                  "destructive"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "safety"
+            ],
+            "type": "object"
+          },
+          "qualityGate": {
+            "additionalProperties": true,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "severity": {
+                "enum": [
+                  "info",
+                  "warning",
+                  "error",
+                  "critical"
+                ]
+              },
+              "type": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "type"
+            ],
+            "type": "object"
+          },
+          "routeCertification": {
+            "additionalProperties": false,
+            "properties": {
+              "evidence_status": {
+                "enum": [
+                  "PASS",
+                  "FAIL",
+                  "SKIP",
+                  "UNVERIFIED"
+                ]
+              },
+              "level": {
+                "enum": [
+                  "experimental",
+                  "route-certified",
+                  "production-certified",
+                  "enterprise-certified"
+                ]
+              },
+              "reason_codes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "variants": {
+                "items": {
+                  "$ref": "#/components/schemas/PipelineSummary/$defs/certificationVariant"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "level",
+              "evidence_status",
+              "reason_codes",
+              "variants"
+            ],
+            "type": "object"
+          },
+          "routeSupport": {
+            "additionalProperties": false,
+            "properties": {
+              "docs_link": {
+                "type": "string"
+              },
+              "install_extras": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "limitations": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "status": {
+                "enum": [
+                  "supported",
+                  "conditional",
+                  "not_supported"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "limitations",
+              "docs_link",
+              "install_extras"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "artifact_state": {
+            "$ref": "#/components/schemas/PipelineSummary/$defs/artifactState"
+          },
+          "authoring_mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "certification": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PipelineSummary/$defs/routeCertification"
+              }
+            ]
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineSummary/$defs/dponeError"
+            },
+            "type": "array"
+          },
+          "id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "next_actions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "argv": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "label": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "argv"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "operational_status": {
+            "enum": [
+              "ready",
+              "blocked",
+              "not_applicable"
+            ]
+          },
+          "processes": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "sink": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "strategy": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "source",
+                "sink",
+                "strategy"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "quality_gates": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineSummary/$defs/qualityGate"
+            },
+            "type": "array"
+          },
+          "recipe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schedule": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schema": {
+            "const": "dpone.pipeline-summary.v1"
+          },
+          "source_path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "support": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PipelineSummary/$defs/routeSupport"
+              }
+            ]
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schema",
+          "id",
+          "source_path",
+          "valid",
+          "operational_status",
+          "authoring_mode",
+          "recipe",
+          "processes",
+          "quality_gates",
+          "schedule",
+          "artifact_state",
+          "support",
+          "certification",
+          "next_actions",
+          "errors"
+        ],
+        "title": "dpone pipeline summary v1",
+        "type": "object"
+      },
+      "PipelineSummaryListResponse": {
+        "properties": {
+          "count": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineSummary"
+            },
+            "type": "array"
+          },
+          "schema": {
+            "const": "dpone.pipeline-summary-list.v1"
+          },
+          "total": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema",
+          "items",
+          "count",
+          "total"
+        ],
+        "type": "object"
+      },
+      "PlanEndpoint": {
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "connection_id": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "connection_id",
+          "table"
+        ],
+        "type": "object"
+      },
+      "PlanIssue": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "error",
+              "critical"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "message",
+          "action"
+        ],
+        "type": "object"
+      },
+      "PlanRequest": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "manifest_path": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "selector": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "manifest_path"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "manifest_yaml": {
+                "maxLength": 1048576,
+                "minLength": 1,
+                "type": "string"
+              },
+              "selector": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "manifest_yaml"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "PlanResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "bulk_path": {
+            "type": "string"
+          },
+          "columnar_fast_path": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "dry_run": {
+            "const": true
+          },
+          "estimated_rows": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "native_transfer_bulk_wire": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "native_transfer_execution": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "native_transfer_route_decision": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "native_transfer_snapshot_optimization": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "native_transfer_transport": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "partitioning": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "physical_design": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "postgres_mssql_wire": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "process": {
+            "type": "string"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "reconciliation": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "runtime_storage": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "schema_evolution": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "selector": {
+            "type": "string"
+          },
+          "sink": {
+            "$ref": "#/components/schemas/PlanEndpoint"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PlanEndpoint"
+          },
+          "source_impact": {
+            "items": {
+              "$ref": "#/components/schemas/PlanIssue"
+            },
+            "type": "array"
+          },
+          "staging": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "state": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/PlanStrategy"
+          },
+          "strategy_intelligence": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "type_fidelity": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "type_inference": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "type_matrix": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "dry_run",
+          "process",
+          "selector",
+          "source",
+          "sink",
+          "strategy",
+          "quality",
+          "warnings"
+        ],
+        "type": "object"
+      },
+      "PlanSection": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "PlanStrategy": {
+        "additionalProperties": false,
+        "properties": {
+          "merge_policy": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "mssql_contract": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
+          "unique_key": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          }
+        },
+        "required": [
+          "mode",
+          "unique_key",
+          "merge_policy"
+        ],
+        "type": "object"
+      },
+      "QualityCheckRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "checks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "checks"
+        ],
+        "type": "object"
+      },
+      "RecipeListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/issue"
+            },
+            "type": "array"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "recipes": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityDiscoveryResponse/$defs/recipe"
+            },
+            "type": "array"
+          },
+          "schema": {
+            "const": "dpone.recipe-discovery-list.v1"
+          },
+          "snapshot_id": {
+            "pattern": "^sha256:",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema",
+          "passed",
+          "snapshot_id",
+          "recipes",
+          "issues"
+        ],
+        "type": "object"
+      },
+      "ReconciliationPreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "apply_deletes": {
+            "type": "boolean"
+          },
+          "sink_type": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "unique_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_type",
+          "sink_type"
+        ],
+        "type": "object"
+      },
+      "SourceFile": {
+        "additionalProperties": false,
+        "properties": {
+          "fingerprint": {
+            "pattern": "^sha256:",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "fingerprint"
+        ],
+        "type": "object"
+      },
+      "StaticCheckRequest": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "pipeline_ref": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "pipeline_ref"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "manifest_yaml": {
+                "maxLength": 1048576,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "manifest_yaml"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "StaticCheckResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "airflow_authoring_migration_plan": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "authoring_mode": {
+            "type": "string"
+          },
+          "canonical_kind": {
+            "type": "string"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            },
+            "type": "array"
+          },
+          "deprecated_aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/DponeError"
+            },
+            "type": "array"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "network": {
+            "type": "boolean"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "recipe_resolution": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "secrets": {
+            "type": "boolean"
+          },
+          "semantic_fingerprint": {
+            "pattern": "^sha256:",
+            "type": "string"
+          },
+          "source_files": {
+            "items": {
+              "$ref": "#/components/schemas/SourceFile"
+            },
+            "type": "array"
+          },
+          "source_fingerprint": {
+            "pattern": "^sha256:",
+            "type": "string"
+          },
+          "source_kind": {
+            "type": "string"
+          },
+          "source_queries": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "passed",
+          "changes",
+          "errors",
+          "network",
+          "secrets",
+          "source_queries"
+        ],
+        "type": "object"
+      },
+      "StructuredCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "argv": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "stdout_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "argv"
+        ],
+        "type": "object"
+      },
+      "StudioMetaResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "const": "local_development_adapter"
+          },
+          "read_only": {
+            "const": true
+          },
+          "release_reason_code": {
+            "const": "studio_usability_evidence_missing"
+          },
+          "release_verdict": {
+            "const": "NO-GO"
+          },
+          "schema": {
+            "const": "dpone.studio-meta.v1"
+          },
+          "service": {
+            "const": "dpone-studio-api"
+          },
+          "snapshot_id": {
+            "pattern": "^sha256:",
+            "type": "string"
+          },
+          "ui_reason_code": {
+            "type": "string"
+          },
+          "ui_status": {
+            "enum": [
+              "installed",
+              "not_installed",
+              "incompatible"
+            ]
+          },
+          "ui_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "usability_status": {
+            "const": "UNVERIFIED"
+          },
+          "version": {
+            "const": "v1"
+          }
+        },
+        "required": [
+          "schema",
+          "service",
+          "version",
+          "mode",
+          "read_only",
+          "ui_status",
+          "ui_version",
+          "ui_reason_code",
+          "usability_status",
+          "release_verdict",
+          "release_reason_code",
+          "snapshot_id"
+        ],
+        "type": "object"
+      },
+      "WorkloadOperatorSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "airflow_connection_bridge": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "operator": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workload_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "workload_id",
+          "task_id",
+          "operator"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Local development adapter. Loopback requests may use the local-operator identity; non-loopback mode requires bearer authentication. Remote production deployment is not supported.",
+    "title": "dpone Studio API",
+    "version": "v1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/audit/events": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "audit_events_legacy_api_audit_events",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/certification/matrix": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "legacy_certification_matrix_legacy_api_certification_matrix",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/connections/capabilities": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "legacy_connection_capabilities_legacy_api_connections_capabilities",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/connectors": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "legacy_studio_legacy_api_connectors",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/deploy/guide": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "deployment_guide_legacy_api_deploy_guide",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/doctor": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "doctor_legacy_api_doctor",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/gitops/prepare": {
+      "post": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "gitops_prepare_legacy_api_gitops_prepare",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitOpsPrepareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/manifests/draft": {
+      "post": {
+        "deprecated": true,
+        "description": "Build and canonically validate an in-memory manifest draft.",
+        "operationId": "draft_manifest_legacy_api_manifests_draft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "sink_type": "clickhouse",
+                "source_table": "orders",
+                "source_type": "mssql",
+                "strategy": "incremental_merge",
+                "unique_key": "id"
+              },
+              "schema": {
+                "$ref": "#/components/schemas/ManifestDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManifestDraftResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Validate a manifest draft"
+      }
+    },
+    "/api/observability/slo": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "observability_slo_legacy_api_observability_slo",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/perf": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "performance_legacy_api_perf",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/plan": {
+      "post": {
+        "deprecated": true,
+        "description": "Calculate a credential-free dry-run execution plan.",
+        "operationId": "plan_legacy_api_plan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "manifest_path": "manifests/orders.batch.yaml",
+                "selector": "dbo.orders"
+              },
+              "schema": {
+                "$ref": "#/components/schemas/PlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Plan a manifest"
+      }
+    },
+    "/api/quality/check": {
+      "post": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "quality_check_legacy_api_quality_check",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QualityCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/reconciliation/preview": {
+      "post": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "reconciliation_preview_legacy_api_reconciliation_preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconciliationPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/runs": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "runs_legacy_api_runs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/schema/explorer": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "schema_explorer_legacy_api_schema_explorer",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sink",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/security/policy": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "security_policy_legacy_api_security_policy",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/state/inspect": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "state_inspect_legacy_api_state_inspect",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "backend",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state_type",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "identity",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/studio": {
+      "get": {
+        "deprecated": true,
+        "description": "Compatibility-only endpoint; do not add new clients.",
+        "operationId": "legacy_studio_legacy_api_studio",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectResponse"
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "Deprecation": {
+                "description": "Signals that this compatibility endpoint is deprecated.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              },
+              "Link": {
+                "description": "Points to the canonical Studio API contract.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Sunset": {
+                "description": "Last supported date for the compatibility endpoint.",
+                "schema": {
+                  "const": "Fri, 23 Jul 2027 00:00:00 GMT",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Deprecated compatibility operation"
+      }
+    },
+    "/api/v1/capabilities": {
+      "get": {
+        "deprecated": false,
+        "description": "List connector, route, recipe, support, certification, and evidence axes.",
+        "operationId": "capabilities",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityDiscoveryResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Discover capabilities"
+      }
+    },
+    "/api/v1/checks/static": {
+      "post": {
+        "deprecated": false,
+        "description": "Validate one pipeline or in-memory manifest without live I/O.",
+        "operationId": "static_check",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "pipeline_ref": "orders_daily"
+              },
+              "schema": {
+                "$ref": "#/components/schemas/StaticCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaticCheckResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Check authoring statically"
+      }
+    },
+    "/api/v1/manifests/draft": {
+      "post": {
+        "deprecated": false,
+        "description": "Build and canonically validate an in-memory manifest draft.",
+        "operationId": "draft_manifest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "sink_type": "clickhouse",
+                "source_table": "orders",
+                "source_type": "mssql",
+                "strategy": "incremental_merge",
+                "unique_key": "id"
+              },
+              "schema": {
+                "$ref": "#/components/schemas/ManifestDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManifestDraftResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Validate a manifest draft"
+      }
+    },
+    "/api/v1/meta": {
+      "get": {
+        "deprecated": false,
+        "description": "Return API mode, UI availability, and capability snapshot identity.",
+        "operationId": "meta",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioMetaResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Read Studio metadata"
+      }
+    },
+    "/api/v1/pipelines": {
+      "get": {
+        "deprecated": false,
+        "description": "Return bounded summaries for direct project pipeline sources.",
+        "operationId": "pipelines",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineSummaryListResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "List pipelines"
+      }
+    },
+    "/api/v1/pipelines/{id}/explain": {
+      "get": {
+        "deprecated": false,
+        "description": "Return target-scoped Airflow and artifact diagnostics.",
+        "operationId": "pipeline_explain",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_.-]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineExplainResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Explain one pipeline"
+      }
+    },
+    "/api/v1/plans": {
+      "post": {
+        "deprecated": false,
+        "description": "Calculate a credential-free dry-run execution plan.",
+        "operationId": "plan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "manifest_path": "manifests/orders.batch.yaml",
+                "selector": "dbo.orders"
+              },
+              "schema": {
+                "$ref": "#/components/schemas/PlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Plan a manifest"
+      }
+    },
+    "/api/v1/recipes": {
+      "get": {
+        "deprecated": false,
+        "description": "List recipe metadata already projected by dpone policy.",
+        "operationId": "recipes",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeListResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Discover recipes"
+      }
+    },
+    "/healthz": {
+      "get": {
+        "deprecated": false,
+        "description": "Return a dependency-free process health response.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Check Studio API health"
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "deprecated": false,
+        "description": "Return the contract for this server authentication profile.",
+        "operationId": "openapi",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenApiDocument"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Structured dpone error"
+          }
+        },
+        "security": [],
+        "summary": "Read the Studio OpenAPI contract"
+      }
+    }
+  },
+  "security": [],
+  "x-dpone-auth-policy": {
+    "loopback": "local_operator",
+    "non_loopback": "bearer_required"
+  }
+}

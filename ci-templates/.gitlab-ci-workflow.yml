@@ -1,0 +1,42 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      variables:
+        UV_IMAGE: "$CI_REGISTRY_IMAGE/uv-dpone:latest"
+      when: always
+
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop"'
+      variables:
+        UV_IMAGE: "$CI_REGISTRY_IMAGE/uv-dpone:latest"
+      when: always
+
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      variables:
+        UV_IMAGE: "$CI_REGISTRY_IMAGE/uv-dpone:latest"
+      when: always
+
+    - when: never
+
+default:
+  tags: [example-werf-runner]
+  before_script:
+    - set -x
+
+stages:
+  - docker-build
+  - debug
+  - pre-test
+  - integration-test
+  - pre-build
+  - build
+  - publish
+  - smoke-test
+  - promote
+  - cleanup
+
+variables:
+  WERF_NAMESPACE: infra-${CI_ENVIRONMENT_SLUG}
+  WERF_SET_BACKUP: "werf.backup=false"
+  LIB_NAME: "dpone"
+  PACK_REGISTRY: "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.example.com/api/v4/projects/${CI_PROJECT_ID}/packages/pypi/simple"
+  PUBLIC_PYPI_SIMPLE: "https://pypi.org/simple"

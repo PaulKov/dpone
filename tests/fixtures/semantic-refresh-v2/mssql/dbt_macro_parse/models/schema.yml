@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: events
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: event_id
+        data_type: bigint
+        constraints:
+          - type: not_null
+      - name: occurred_at
+        data_type: datetime2(6)
+        constraints:
+          - type: not_null
+      - name: payload
+        data_type: varchar(32)
+        constraints:
+          - type: not_null

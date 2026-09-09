@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+defaults:
+  name: orders_xmin_initial
+  source:
+    type: postgres
+    connection_id: postgres_oltp
+    options:
+      incremental_strategy: xmin
+      xmin_execution: {mode: initial, handoff_id: orders_v1}
+      batch_size: 100000
+      export_format: csv
+      compress_export: false
+  sink:
+    type: mssql
+    connection_id: mssql_dwh
+    table: {schema: landing, name: orders}
+    staging: {database: DWH_Stage, schema: staging}
+    strategy:
+      mode: backfill
+      unique_key: [id]
+      backfill:
+        inner_mode: incremental_merge
+        parallel_workers: 4
+        retry_policy: non_committed
+        lease_ttl_minutes: 60
+        state: {backend: audit_schema, schema: governance, require_distributed_lock: true}
+        chunk: {column: id, from: 1, to: 50000000, step: 250000, kind: integer}
+    options: {bulk: {mode: bcp}}
+  state:
+    type: mssql
+    connection_id: mssql_dwh
+    atomicity: target_atomic
+    provisioning: external
+    table: {name: dpone_source_state}
+    run_table: {name: dpone_run_state}
+    receipt_table: {name: dpone_commit_receipt}
+    repair_authority_table: {name: dpone_repair_authority}
+    repair_consumption_table: {name: dpone_repair_authority_consumption}
+    audit_table: {name: dpone_load_audit}
+
+schemas:
+  public:
+    tables: [orders]

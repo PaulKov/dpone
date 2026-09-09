@@ -1,0 +1,315 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-runtime-pod-retention-event.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "operation_started"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "error_code": {
+            "type": "null"
+          },
+          "outcome": {
+            "const": "started"
+          },
+          "pod_name": {
+            "type": "null"
+          },
+          "pod_ref": {
+            "type": "null"
+          },
+          "precondition_ref": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "delete_intent"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "error_code": {
+            "type": "null"
+          },
+          "outcome": {
+            "const": "intent_recorded"
+          },
+          "pod_name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "pod_ref": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "precondition_ref": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "delete_outcome"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "delete_accepted",
+              "already_absent",
+              "changed_since_plan",
+              "delete_failed",
+              "interrupted"
+            ]
+          },
+          "pod_name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "pod_ref": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "precondition_ref": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "operation_completed"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "properties": {
+          "error_code": {
+            "type": "null"
+          },
+          "outcome": {
+            "enum": [
+              "ok",
+              "partial",
+              "failed"
+            ]
+          },
+          "pod_name": {
+            "type": "null"
+          },
+          "pod_ref": {
+            "type": "null"
+          },
+          "precondition_ref": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "delete_outcome"
+          },
+          "outcome": {
+            "enum": [
+              "delete_failed",
+              "interrupted"
+            ]
+          }
+        },
+        "required": [
+          "event",
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "error_code": {
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "delete_outcome"
+          },
+          "outcome": {
+            "enum": [
+              "delete_accepted",
+              "already_absent",
+              "changed_since_plan"
+            ]
+          }
+        },
+        "required": [
+          "event",
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "error_code": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "actor": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "credential_mode": {
+      "enum": [
+        "in-cluster",
+        "kubeconfig"
+      ]
+    },
+    "error_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "event": {
+      "enum": [
+        "operation_started",
+        "delete_intent",
+        "delete_outcome",
+        "operation_completed"
+      ]
+    },
+    "namespace": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "operation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "started",
+        "intent_recorded",
+        "delete_accepted",
+        "already_absent",
+        "changed_since_plan",
+        "delete_failed",
+        "interrupted",
+        "ok",
+        "partial",
+        "failed"
+      ]
+    },
+    "pod_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pod_ref": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "precondition_ref": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schema": {
+      "const": "dpone.airflow-runtime-pod-retention-event.v1"
+    },
+    "selected_count": {
+      "maximum": 1000,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "sequence": {
+      "maximum": 10000,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema",
+    "operation_id",
+    "sequence",
+    "event",
+    "namespace",
+    "observed_at",
+    "actor",
+    "credential_mode",
+    "selected_count",
+    "pod_ref",
+    "precondition_ref",
+    "pod_name",
+    "outcome",
+    "error_code"
+  ],
+  "title": "dpone GitOps Airflow runtime Pod retention mutation event",
+  "type": "object"
+}

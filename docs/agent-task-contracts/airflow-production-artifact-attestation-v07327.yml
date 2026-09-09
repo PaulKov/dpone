@@ -1,0 +1,196 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-PRODUCTION-ARTIFACT-ATTESTATION-07327"
+title: "Production Airflow artifact attestation"
+goal: "Verify one immutable signed deployment before Airflow cache activation or KPO runtime extraction."
+specification: "docs/feature-design-airflow-production-artifact-attestation-v07327.md"
+base_commit: "bf809640"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Protected CI can prepare, externally sign, verify, and immutably publish one deployment attestation package."
+  - "Stock cache materialization verifies the exact package before local installation."
+  - "Stock runtime init-fetch verifies the same package before executable extraction."
+  - "Tamper, replay, wrong key, revocation, partial publication, and unavailable verifier fail closed."
+  - "Non-production unsigned behavior remains backward-compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone airflow artifact-attestation CLI"
+    - "Airflow artifact attestation and trust policy schemas"
+    - "Airflow cache materialization evidence"
+    - "runtime-fetch-ready attestation evidence"
+  migration_required: false
+  migration_notes: "Production exact deployments add a signed overlay; existing unsigned deployments remain usable only in non-production."
+
+owned_paths:
+  - "README.md"
+  - "docker/runtime/Dockerfile"
+  - "docs/README.md"
+  - "docs/adr-index.md"
+  - "docs/adr/0026-digest-first-runtime-image-promotion.md"
+  - "docs/airflow-self-service-evidence.md"
+  - "docs/cli-reference.md"
+  - "docs/errors/DPONE_ARTIFACT_ATTESTATION_REQUIRED.md"
+  - "docs/getting-started/first-airflow-dag.md"
+  - "docs/index.md"
+  - "docs/quality-metrics.md"
+  - "docs/runtime-image.md"
+  - "packages/apache-airflow-providers-dpone/README.md"
+  - "packages/apache-airflow-providers-dpone/pyproject.toml"
+  - "packages/dpone-airflow-pack/pyproject.toml"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/init_fetch_delivery.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/init_fetch_pod.py"
+  - "packages/dpone-native-accel/pyproject.toml"
+  - "src/dpone/adapters/cosign_blob_signature.py"
+  - "src/dpone/contracts/airflow_artifact_attestation.py"
+  - "src/dpone/contracts/airflow_artifact_attestation_errors.py"
+  - "src/dpone/contracts/airflow_deployment_trust_policy.py"
+  - "src/dpone/ports/airflow_deployment_attestation.py"
+  - "src/dpone/services/airflow_artifact_attestation.py"
+  - "src/dpone/adapters/cosign_public_key_signature.py"
+  - "src/dpone/adapters/airflow_artifact_attestation.py"
+  - "src/dpone/readiness/airflow_artifact_attestation.py"
+  - "src/dpone/readiness/airflow_deployment_attestation.py"
+  - "src/dpone/readiness/airflow_deployment_attestation_verifier.py"
+  - "src/dpone/readiness/airflow_attestation_files.py"
+  - "src/dpone/readiness/airflow_deployment_trust_policy.py"
+  - "src/dpone/runtime/airflow_artifact_materialization.py"
+  - "src/dpone/runtime/airflow_artifact_materialization_attestation.py"
+  - "src/dpone/runtime/airflow_artifact_attestation_inventory.py"
+  - "src/dpone/runtime/airflow_artifact_publication.py"
+  - "src/dpone/runtime/airflow_deployment_attestation_subject.py"
+  - "src/dpone/runtime/runtime_init_fetch_artifacts.py"
+  - "src/dpone/runtime/runtime_init_fetch_attestation_verification.py"
+  - "src/dpone/runtime/runtime_init_fetch_service.py"
+  - "src/dpone/runtime/runtime_init_fetch_attestation_decision.py"
+  - "src/dpone/runtime/runtime_init_fetch_ready.py"
+  - "src/dpone/runtime/runtime_init_fetch_ready_builder.py"
+  - "src/dpone/runtime/runtime_init_fetch_ready_models.py"
+  - "src/dpone/runtime/verified_pack_launcher.py"
+  - "src/dpone/readiness/airflow_artifact_delivery.py"
+  - "src/dpone/readiness/airflow_runtime_init_fetch.py"
+  - "src/dpone/readiness/airflow_runtime_init_fetch_config.py"
+  - "src/dpone/readiness/airflow_artifact_trust_material.py"
+  - "src/dpone/readiness/airflow_desired_state_materializer.py"
+  - "src/dpone/readiness/airflow_desired_state_reconcile.py"
+  - "src/dpone/services/airflow_artifact_attestation_consumer.py"
+  - "src/dpone/services/airflow_artifact_attestation_registry.py"
+  - "src/dpone/gitops/schema_airflow_contracts.py"
+  - "src/dpone/gitops/schema_airflow_deployment_attestation_contracts.py"
+  - "src/dpone/gitops/schema_airflow_runtime_ready_v2_contract.py"
+  - "src/dpone/gitops/schema_validation.py"
+  - "src/dpone/commands/airflow_artifact_delivery_cmd.py"
+  - "src/dpone/commands/airflow_artifact_attestation_cmd.py"
+  - "src/dpone/commands/airflow_deployment_attestation_cmd.py"
+  - "src/dpone/commands/airflow_deployment_attestation_rendering.py"
+  - "src/dpone/commands/airflow_self_service_output.py"
+  - "src/dpone/commands/airflow_self_service_cmd.py"
+  - "src/dpone/commands/airflow_cmd.py"
+  - "tests/test_airflow_artifact_attestation.py"
+  - "tests/test_airflow_artifact_attestation_adapters.py"
+  - "tests/test_airflow_artifact_attestation_docs.py"
+  - "tests/test_airflow_artifact_attestation_schema_parity.py"
+  - "tests/test_airflow_remote_artifact_delivery.py"
+  - "tests/test_airflow_runtime_init_fetch_cli.py"
+  - "tests/test_airflow_runtime_init_fetch_schema_contracts.py"
+  - "tests/test_airflow_provider_init_fetch_execution.py"
+  - "tests/test_runtime_github_artifact_attestation.py"
+  - "tests/test_native_acceleration_contracts.py"
+  - "tests/test_oss_release_readiness.py"
+  - "tests/test_release_smoke_contracts.py"
+  - "tests/test_snapshot_version.py"
+  - "tests/test_gitops_schema_contracts.py"
+  - "tests/test_airflow_artifact_attestation_cli.py"
+  - "tests/test_airflow_deployment_attestation_rendering.py"
+  - "tests/test_airflow_deployment_trust_policy_cli.py"
+  - "tests/agent_policy/_runtime_image_certification_helpers.py"
+  - "tests/agent_policy/test_runtime_image_certification.py"
+  - "tests/agent_policy/test_runtime_image_certification_io.py"
+  - "tests/agent_policy/_runtime_image_promotion_helpers.py"
+  - "tests/agent_policy/test_runtime_image_cosign_certification.py"
+  - "tests/agent_policy/test_runtime_image_promotion_contracts.py"
+  - "tests/agent_policy/test_runtime_image_promotion_retry.py"
+  - "tests/agent_policy/test_runtime_image_registry_cli.py"
+  - "docs/schemas/gitops/airflow-artifact-attestation*.schema.json"
+  - "docs/schemas/gitops/runtime-fetch-ready-v2.schema.json"
+  - "docs/schemas/gitops/airflow-deployment-trust-policy.schema.json"
+  - "docs/schemas/gitops/airflow-deployment-trust-policy-render.schema.json"
+  - "docs/schemas/gitops/runtime-artifact-trust-policy-v2.schema.json"
+  - "docs/schemas/release/runtime-image-certification-v2.schema.json"
+  - "docs/feature-design-airflow-production-artifact-attestation-v07327.md"
+  - "docs/adr/0035-airflow-production-artifact-attestation.md"
+  - "docs/adr/0036-runtime-image-certification-v2.md"
+  - "docs/airflow-pack-provider.md"
+  - "docs/airflow-cache-sync.md"
+  - "docs/airflow-artifact-trust.md"
+  - "docs/airflow-artifact-attestation-operations.md"
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/architecture.md"
+  - "docs/compatibility.md"
+  - "tools/agent_policy/runtime_image_certification.py"
+  - "tools/agent_policy/runtime_image_certification_models.py"
+  - "tools/agent_policy/runtime_image_promotion.py"
+  - "tools/agent_policy/runtime_image_promotion_models.py"
+  - "tools/agent_policy/runtime_image_registry.py"
+  - "docs/reference/gitops-schema-catalog.md"
+  - "docs/agent-task-contracts/airflow-production-artifact-attestation-v07327.yml"
+  - "test_artifacts/agent-policy/agent_governance_gate.json"
+  - "test_artifacts/release/v0.73.28/**"
+
+read_only_paths:
+  - "src/dpone/contracts/airflow_deployment.py"
+  - "src/dpone/contracts/airflow_desired_state.py"
+  - "src/dpone/services/airflow_desired_state.py"
+  - "docs/adr/0009-artifact-delivery-and-cache-materializer.md"
+  - "docs/adr/0024-airflow-executable-init-fetch-wire-boundary.md"
+  - "docs/adr/0033-airflow-s3-desired-state-pull.md"
+
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - ".cursor"
+  - "outputs"
+  - "test_artifacts/release/v0.73.21"
+  - "test_artifacts/release/v0.73.23"
+
+shared_file_owner: "Codex"
+
+dependencies:
+  - "airflow-platform-ci signing job"
+  - "Environment-specific public-key/trust-policy configuration and pinned Cosign"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_artifact_attestation.py tests/test_airflow_remote_artifact_delivery.py tests/test_airflow_runtime_init_fetch_cli.py -q"
+  broad:
+    - "change-aware validation plan and repository quality gates"
+  live:
+    - "signed exact dev materialization, restart recovery, and runtime smoke"
+    - "staged production materialization and smoke"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "A private key would enter dpone artifacts, logs, or runtime."
+  - "Production verification would downgrade to checksum-only behavior."

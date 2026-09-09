@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+convention: landing_raw_v1
+
+vars:
+  src_system: cbr
+  src_database: api
+  host: cbr_ru
+  owner_team: finance-analytics
+  owner_contact: finance-analytics@example.com
+  sla: daily
+
+defaults:
+  source:
+    type: api
+    api_type: cbr
+    options:
+      resource: "{{ src_table }}"
+      unique_key:
+        - as_of_date
+        - valute_id
+      lookback_days: 3
+      full_refresh_days: 30
+
+  sink:
+    type: bigquery
+    connection_type: vault
+    connection_id: bigquery-demo
+    vault_path: gcp/demo-project-{{ env_code }}/bq/example-etl-service
+    staging:
+      schema: stg
+    strategy:
+      mode: incremental_merge
+    options:
+      log_sample_rows: 5
+
+  bigquery_proxy:
+    proxy_enable: true
+
+schemas:
+  app:
+    tables:
+      - xml_daily_asp

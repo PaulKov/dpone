@@ -1,0 +1,94 @@
+schema_version: 1
+task_id: "DPONE-V07328-NESTED-CORRECTNESS"
+title: "Fail closed on nested normalization loss, collisions and child-quality violations"
+goal: "Preserve empty-container meaning and reject corrupt nested packages before target or state mutation."
+specification: "docs/feature-design-release-blocker-remediation-v07328.md"
+base_commit: "8f32637714f6c7c9c57372c72b5ce087aff8d861"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Empty list and mapping values survive normalize plus reverse rebuild without fake child rows."
+  - "Existing ASCII physical table names stay stable; non-ASCII names and distinct paths with the same lowercase collision key fail before staging."
+  - "Runtime fail policies reject duplicate configured child keys and orphan hierarchy rows before snapshot or target mutation."
+  - "Warn and skip policies are explicit and never reported as an executed pass."
+  - "Certification uses observed behavior and complete representative reverse equality rather than hard-coded pass values."
+  - "Semantic spill replay preserves explicit scalar types, including date, datetime and bytes."
+  - "Failed quality or load attempts remove only their attempt-local generation."
+  - "Uncertified sink-native writer/loader pairs use typed streaming instead of a file artifact."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "nested normalization output and errors"
+    - "child_quality manifest policy"
+    - "nested certification evidence"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/runtime/normalization"
+  - "src/dpone/runtime/lineage/identity.py"
+  - "src/dpone/runtime/etl/nested_load.py"
+  - "src/dpone/runtime/etl/nested_load_config.py"
+  - "src/dpone/runtime/etl/nested_spill_load.py"
+  - "src/dpone/runtime/etl/nested_spill_rows.py"
+  - "src/dpone/readiness/nested_certification.py"
+  - "src/dpone/readiness/nested_certification_checks.py"
+  - "docs/nested-normalization.md"
+  - "docs/adr/0038-nested-normalization-lossless-identity.md"
+  - "docs/feature-design-release-blocker-remediation-v07328.md"
+  - "examples/nested/rest_api_to_clickhouse.yml"
+  - "examples/nested/rest_api_to_mssql.yml"
+  - "examples/nested/kafka_to_clickhouse.yml"
+  - "CHANGELOG.md"
+  - "tests/test_nested_normalization_contracts.py"
+  - "tests/test_nested_normalization_industrial_layer.py"
+  - "tests/test_nested_normalization_industrial.py"
+  - "tests/test_nested_normalization_runtime_hardening.py"
+  - "tests/test_nested_runtime_hardening.py"
+  - "tests/test_nested_spill_retry_schema_identity.py"
+  - "tests/test_nested_spill_release_blockers.py"
+  - "tests/test_lineage_foundation_contracts.py"
+  - "tests/test_release_docs_cjm_regressions.py"
+read_only_paths:
+  - "src/dpone/runtime/etl/processor.py"
+  - "src/dpone/runtime/sinks"
+  - "tests/nested_package_test_support.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/schema"
+
+shared_file_owner: "Codex"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_nested_normalization_contracts.py tests/test_nested_normalization_industrial_layer.py tests/test_nested_normalization_runtime_hardening.py tests/test_nested_runtime_hardening.py tests/test_nested_spill_retry_schema_identity.py -q"
+  broad:
+    - "uv run ruff check owned paths"
+    - "uv run mypy --config-file mypy.ini"
+  live:
+    - "new exact-commit real_local nested and route certification after integration"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,78 @@
+schema_version: 1
+task_id: "SS-44-49-50"
+title: "Harden internal dependency pins and candidate artifact inventory"
+goal: >-
+  Close the reviewed release-integrity gaps by rejecting conditional or otherwise
+  non-mandatory internal dependency pins and by evaluating the candidate
+  distribution directory through bounded, no-follow, replacement-aware file
+  descriptors.
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-report.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent-agent"
+
+acceptance_criteria:
+  - "Internal release dependencies reject markers, extras, direct URLs, duplicate entries, non-exact specifiers, and versions different from the release version."
+  - "The candidate inventory rejects a symlinked distribution root and non-regular entries."
+  - "Candidate archive hashing uses no-follow file descriptors and fails closed if identity or metadata changes while reading."
+  - "Candidate inventory enforces explicit entry-count, per-file-byte, and aggregate-byte budgets before publish or network access."
+  - "Legacy discovery delegates to the same strict inventory authority or fails closed; it cannot silently ignore stray entries."
+  - "Focused tests cover the reported bypasses and deterministic bounded failure evidence."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "release preflight"
+    - "PyPI candidate inventory"
+  migration_required: false
+
+owned_paths:
+  - "tools/agent_policy/release_identity_gate.py"
+  - "tests/agent_policy/test_release_identity_gate.py"
+  - "tools/pypi_release_smoke_dist.py"
+  - "tests/test_pypi_release_smoke_dist.py"
+read_only_paths:
+  - "test_artifacts/airflow-self-service-global-review-v0731/review-report.md"
+  - ".github/workflows/release.yml"
+  - "tools/pypi_release_smoke.py"
+  - "docs/release.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "parent-agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/agent_policy/test_release_identity_gate.py tests/test_pypi_release_smoke_dist.py -q"
+    - "uv run ruff check tools/agent_policy/release_identity_gate.py tools/pypi_release_smoke_dist.py tests/agent_policy/test_release_identity_gate.py tests/test_pypi_release_smoke_dist.py"
+    - "uv run ruff format --check tools/agent_policy/release_identity_gate.py tools/pypi_release_smoke_dist.py tests/agent_policy/test_release_identity_gate.py tests/test_pypi_release_smoke_dist.py"
+    - "uv run mypy --config-file mypy.ini tools/agent_policy/release_identity_gate.py tools/pypi_release_smoke_dist.py"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "A dependency change is required."
+  - "Another writer owns the same semantic contract."

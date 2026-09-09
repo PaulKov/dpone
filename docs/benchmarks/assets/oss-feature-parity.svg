@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="502" viewBox="0 0 920 502" role="img">
+<rect width="920" height="502" fill="#ffffff"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Feature parity coverage</text>
+<text x="32" y="66" font-size="13" fill="#475569">Qualitative capability score from public product documentation and local dpone evidence.</text>
+<text x="32" y="113" font-size="13" font-weight="700" fill="#111827">dpone</text>
+<rect x="210" y="98" width="560" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="98" width="526" height="20" rx="4" fill="#0f766e"/>
+<text x="790" y="113" font-size="12" fill="#334155">94 / code</text>
+<text x="32" y="161" font-size="13" font-weight="700" fill="#111827">Airbyte</text>
+<rect x="210" y="146" width="560" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="146" width="414" height="20" rx="4" fill="#2563eb"/>
+<text x="790" y="161" font-size="12" fill="#334155">74 / code</text>
+<text x="32" y="209" font-size="13" font-weight="700" fill="#111827">dlt</text>
+<rect x="210" y="194" width="560" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="194" width="240" height="20" rx="4" fill="#dc2626"/>
+<text x="790" y="209" font-size="12" fill="#334155">43 / code</text>
+<text x="32" y="257" font-size="13" font-weight="700" fill="#111827">Pentaho Kettle</text>
+<rect x="210" y="242" width="560" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="242" width="291" height="20" rx="4" fill="#f59e0b"/>
+<text x="790" y="257" font-size="12" fill="#334155">52 / code</text>
+<text x="32" y="305" font-size="13" font-weight="700" fill="#111827">Apache Hop</text>
+<rect x="210" y="290" width="560" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="290" width="302" height="20" rx="4" fill="#f59e0b"/>
+<text x="790" y="305" font-size="12" fill="#334155">54 / code</text>
+<text x="32" y="353" font-size="13" font-weight="700" fill="#111827">Sling</text>
+<rect x="210" y="338" width="560" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="338" width="235" height="20" rx="4" fill="#dc2626"/>
+<text x="790" y="353" font-size="12" fill="#334155">42 / code</text>
+<text x="32" y="401" font-size="13" font-weight="700" fill="#111827">Fivetran</text>
+<rect x="210" y="386" width="560" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="386" width="492" height="20" rx="4" fill="#0f766e"/>
+<text x="790" y="401" font-size="12" fill="#334155">88 / closed-core</text>
+<text x="32" y="449" font-size="13" font-weight="700" fill="#111827">Informatica</text>
+<rect x="210" y="434" width="560" height="20" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="434" width="520" height="20" rx="4" fill="#0f766e"/>
+<text x="790" y="449" font-size="12" fill="#334155">93 / closed-core</text>
+</svg>

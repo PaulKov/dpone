@@ -1,0 +1,82 @@
+schema_version: 1
+task_id: "SS-56"
+title: "Airflow parse benchmark fail-closed certification"
+goal: >
+  Prevent parse evidence from reporting PASS when process-cold import plus first
+  load exceeds the documented SLA, matrix identity is absent, or failure text
+  contains sensitive data.
+specification: >
+  Isolated release-blocking correction to the existing documented parse SLO and
+  evidence/redaction contracts. Impact and validation are captured here and in
+  the global review report; no new benchmark capability is introduced.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "Process-cold import-plus-first-load p95 is certifying and respects the 5-second boundary."
+  - "Any missing Airflow, Python, support-tier, or constraints identity is non-certifying and exits non-zero."
+  - "N/A and UNVERIFIED states never contribute passed=true to top-level PASS."
+  - "Worker and setup failures use the shared public redaction policy and bounded stable diagnostics."
+  - "URI userinfo, token/password assignments, absolute workstation paths, newlines, and traceback text cannot leak into evidence."
+  - "Existing valid matrix evidence remains compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - Airflow parse benchmark evidence
+    - parse certification exit status
+    - uploaded failure diagnostics
+  migration_required: false
+
+owned_paths:
+  - tools/airflow_provider_parse_benchmark.py
+  - tools/airflow_provider_parse_benchmark_evidence.py
+  - tests/test_airflow_provider_parse_benchmark.py
+read_only_paths:
+  - .github/workflows/airflow-pack-compat.yml
+  - src/dpone/security_redaction.py
+  - docs/airflow-self-service-architecture.md
+  - docs/benchmarks/quality_budgets.yml
+  - tests/test_output_text_redaction.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - src/dpone/security_redaction.py
+
+shared_file_owner: "parent Codex agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_provider_parse_benchmark.py -q"
+  broad:
+    - "uv run ruff check tools/airflow_provider_parse_benchmark.py tools/airflow_provider_parse_benchmark_evidence.py tests/test_airflow_provider_parse_benchmark.py"
+    - "uv run mypy --config-file mypy.ini tools/airflow_provider_parse_benchmark.py tools/airflow_provider_parse_benchmark_evidence.py"
+  live:
+    - "Installed Airflow 2/3 wheel matrix remains UNVERIFIED unless actually executed"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "The documented 5-second budget would need to be weakened."
+  - "A live matrix result would need to be manufactured."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/runtime-fetch-ready.schema.json",
+  "title": "dpone GitOps verified runtime fetch ready manifest",
+  "type": "object",
+  "required": [
+    "schema",
+    "plan_sha256",
+    "release_id",
+    "deployment_id",
+    "runtime_image_digest",
+    "trust_tier",
+    "artifact_registry_ref",
+    "registry_config_sha256",
+    "trust_policy_sha256",
+    "workload_id",
+    "pack_fingerprint",
+    "artifacts",
+    "verification"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.runtime-fetch-ready.v1"
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "release_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "deployment_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "runtime_image_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "trust_tier": {
+      "enum": [
+        "production",
+        "non_production"
+      ]
+    },
+    "artifact_registry_ref": {
+      "type": "string",
+      "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$"
+    },
+    "registry_config_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "trust_policy_sha256": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "workload_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+      "maxLength": 256
+    },
+    "pack_fingerprint": {
+      "$ref": "#/$defs/sha256"
+    },
+    "artifacts": {
+      "type": "object",
+      "required": [
+        "release",
+        "deployment",
+        "workload_pack"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "release": {
+          "$ref": "#/$defs/readyArtifact"
+        },
+        "deployment": {
+          "$ref": "#/$defs/readyArtifact"
+        },
+        "workload_pack": {
+          "$ref": "#/$defs/readyArtifact"
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "required": [
+        "checksums",
+        "effective_attestation_requirement",
+        "attestations",
+        "attestation_decision_sha256",
+        "runtime_payload_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "checksums": {
+          "const": "passed"
+        },
+        "effective_attestation_requirement": {
+          "enum": [
+            "optional",
+            "required"
+          ]
+        },
+        "attestations": {
+          "enum": [
+            "not_required",
+            "passed"
+          ]
+        },
+        "attestation_decision_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "runtime_payload_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "effective_attestation_requirement": {
+                "const": "required"
+              }
+            },
+            "required": [
+              "effective_attestation_requirement"
+            ]
+          },
+          "then": {
+            "properties": {
+              "attestations": {
+                "const": "passed"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "effective_attestation_requirement": {
+                "const": "optional"
+              }
+            },
+            "required": [
+              "effective_attestation_requirement"
+            ]
+          },
+          "then": {
+            "properties": {
+              "attestations": {
+                "const": "not_required"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "readyArtifact": {
+      "type": "object",
+      "required": [
+        "artifact_ref",
+        "locator",
+        "sha256",
+        "bytes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ref": {
+          "type": "string",
+          "pattern": "^cache://(?!(?:[^/\\\\\\s?#%]+/)*(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?!(?:[^/\\\\\\s?#%]+/)*(?:\\.|\\.\\.)(?:/|$))[^/\\\\\\s?#%]+(?:/[^/\\\\\\s?#%]+)*$"
+        },
+        "locator": {
+          "type": "string",
+          "pattern": "^payload/[^\\s\\\\]+$",
+          "not": {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "trust_tier": {
+            "const": "production"
+          }
+        },
+        "required": [
+          "trust_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "trust_policy_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "verification": {
+            "properties": {
+              "effective_attestation_requirement": {
+                "const": "required"
+              },
+              "attestations": {
+                "const": "passed"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

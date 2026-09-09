@@ -1,0 +1,379 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-pod-contract.schema.json",
+  "title": "dpone GitOps Airflow pod contract",
+  "type": "object",
+  "required": [
+    "kind",
+    "schema_version",
+    "producer",
+    "bundle_path",
+    "run_spec_path",
+    "runtime_profile_path",
+    "pod_spec_path",
+    "kpo_kwargs_path",
+    "image",
+    "namespace",
+    "service_account",
+    "xcom",
+    "pod_spec",
+    "kpo_kwargs"
+  ],
+  "properties": {
+    "kind": {
+      "const": "gitops.airflow_pod_contract"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "bundle_path": {
+      "type": "string"
+    },
+    "run_spec_path": {
+      "type": "string"
+    },
+    "runtime_profile_path": {
+      "type": "string"
+    },
+    "pod_spec_path": {
+      "type": "string"
+    },
+    "kpo_kwargs_path": {
+      "type": "string"
+    },
+    "image": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "service_account": {
+      "type": "string"
+    },
+    "xcom": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "enabled",
+        "return_path",
+        "summary_path",
+        "mode",
+        "outcome_mode"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "return_path": {
+          "type": "string"
+        },
+        "summary_path": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "outcome_mode": {
+          "type": "string"
+        }
+      }
+    },
+    "pod_spec": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "kpo_kwargs": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "git_sync": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "enabled",
+        "repo",
+        "ref",
+        "image",
+        "root",
+        "link",
+        "worktree_path",
+        "sparse_checkout_file",
+        "clone",
+        "auth",
+        "sparse_paths"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "link": {
+          "type": "string"
+        },
+        "worktree_path": {
+          "type": "string"
+        },
+        "sparse_checkout_file": {
+          "type": "string"
+        },
+        "clone": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "depth",
+            "filter"
+          ],
+          "properties": {
+            "depth": {
+              "type": "integer"
+            },
+            "filter": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "blob:none",
+                "tree:0",
+                null
+              ]
+            }
+          }
+        },
+        "auth": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string"
+            },
+            "ssh_secret": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "name",
+                "ssh_key",
+                "known_hosts_key"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "ssh_key": {
+                  "type": "string"
+                },
+                "known_hosts_key": {
+                  "type": "string"
+                }
+              }
+            },
+            "https_secret": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "name",
+                "username_key",
+                "password_key"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "username_key": {
+                  "type": "string"
+                },
+                "password_key": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "sparse_paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "path",
+              "kind",
+              "source",
+              "required",
+              "exists",
+              "is_dir",
+              "reason"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "exists": {
+                "type": "boolean"
+              },
+              "is_dir": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "connection_bridge": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "enabled",
+        "mode",
+        "runtime_mode",
+        "required_connection_ids",
+        "env"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "runtime_mode": {
+          "type": "string"
+        },
+        "secret_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "required_connection_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          }
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "connection_id",
+              "env_name"
+            ],
+            "properties": {
+              "connection_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.-]+$"
+              },
+              "env_name": {
+                "type": "string",
+                "pattern": "^AIRFLOW_CONN_[A-Z0-9_]+$"
+              },
+              "secret_ref": {
+                "type": "object",
+                "additionalProperties": true,
+                "required": [
+                  "name",
+                  "key"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                    "maxLength": 63
+                  },
+                  "key": {
+                    "type": "string",
+                    "pattern": "^AIRFLOW_CONN_[A-Z0-9_]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "code",
+        "message",
+        "path",
+        "source"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

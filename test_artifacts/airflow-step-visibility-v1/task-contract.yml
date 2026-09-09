@@ -1,0 +1,127 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-VISIBILITY-V1"
+title: "Selector-safe Airflow step visibility"
+goal: "Implement inline, task, and group materialization without duplicate process execution or false success."
+specification: "docs/feature-design-airflow-step-visibility-v1.md"
+base_commit: "649b2c36"
+integrator: "current Codex task"
+
+acceptance_criteria:
+  - "Every newly built DAG-spec process node carries a validated selector and explicit visibility."
+  - "Every selected node resolves one immutable selector-indexed process plan; provider code never rewrites shell commands."
+  - "A multi-process workload executes exactly the selected process once per node."
+  - "inline creates one fail-closed task; task creates flat internal tasks; group contains the same tasks in TaskGroup."
+  - "Visible task warning and hard budgets are deterministic and enforced before publication."
+  - "Old selected packs fail closed; legacy unselected packs retain compatibility."
+  - "Airflow parse performs zero network, database, secret, Variable, Connection, or cache-refresh calls."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - manifest_schema
+    - dag_spec
+    - airflow_pack
+    - airflow_provider
+    - preview_explain
+    - documentation
+  migration_required: true
+
+owned_paths:
+  - src/dpone/gitops/airflow_step_visibility.py
+  - src/dpone/gitops/airflow_dag_spec.py
+  - src/dpone/gitops/airflow_dag_spec_policy.py
+  - src/dpone/gitops/airflow_dag_spec_builder.py
+  - src/dpone/gitops/airflow_dag_spec_builder_support.py
+  - src/dpone/gitops/airflow_compact_pack.py
+  - src/dpone/gitops/airflow_compact_process_plans.py
+  - src/dpone/gitops/airflow_compact_runtime.py
+  - src/dpone/gitops/airflow_compact_steps.py
+  - src/dpone/gitops/schema_airflow_pack_contracts.py
+  - src/dpone/readiness/airflow_preview_dag_spec.py
+  - src/dpone/readiness/airflow_self_service_templates.py
+  - src/dpone/readiness/airflow_self_service.py
+  - src/dpone/readiness/airflow_local_safe_sample_deployment.py
+  - src/dpone/readiness/project_selection_preview.py
+  - src/dpone/commands/airflow_self_service_rendering.py
+  - src/dpone/commands/airflow_preview_rendering.py
+  - src/dpone/readiness/project_selection_dag_projection.py
+  - src/dpone/schema/etl-flow-manifest.schema.json
+  - src/dpone/schema/etl-flow-fragment-manifest.schema.json
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/
+  - tests/test_airflow_step_visibility.py
+  - tests/test_airflow_dag_spec_builder.py
+  - tests/test_airflow_dag_loader_contract.py
+  - tests/test_airflow_runtime_adapter.py
+  - tests/test_gitops_schema_contracts.py
+  - tests/test_airflow_dag_spec_contract.py
+  - tests/test_airflow_self_service_preview_provider.py
+  - tests/test_airflow_self_service_cli.py
+  - tests/test_cli_gitops_workload_catalog.py
+  - tools/airflow_step_visibility_benchmark.py
+  - docs/schemas/gitops/airflow-dag-spec.schema.json
+  - docs/schemas/gitops/airflow-pack.schema.json
+  - docs/feature-design-airflow-step-visibility-v1.md
+  - docs/airflow-self-service-backlog.md
+  - docs/airflow-self-service.md
+  - docs/compatibility.md
+  - CHANGELOG.md
+  - test_artifacts/airflow-step-visibility-v1/
+read_only_paths:
+  - docs/architecture.md
+  - docs/engineering-standards.md
+  - docs/airflow-industrial-self-service-specification.md
+  - docs/adr/
+  - src/dpone/manifest/
+  - src/dpone/runtime/
+forbidden_paths:
+  - .cursor/
+  - pyproject.toml
+  - uv.lock
+  - mkdocs.yml
+  - .github/workflows/
+
+shared_file_owner: "current Codex task"
+
+dependencies:
+  - "Airflow Authoring v1"
+  - "formal Airflow provider facade"
+  - "immutable release/deployment index"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_step_visibility.py tests/test_airflow_dag_spec_builder.py tests/test_airflow_dag_loader_contract.py tests/test_airflow_runtime_adapter.py tests/test_gitops_schema_contracts.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "Approved Airflow/Kubernetes MSSQL to ClickHouse route only; otherwise UNVERIFIED"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - validation_report
+  - benchmark
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

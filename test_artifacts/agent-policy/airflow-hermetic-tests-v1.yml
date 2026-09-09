@@ -1,0 +1,123 @@
+schema_version: 1
+task_id: "AIRFLOW-HERMETIC-TESTS-V1"
+title: "Hermetic dpone.test.v1 execution"
+goal: >-
+  Make every scaffolded self-service pipeline immediately testable with bounded
+  fixtures, deterministic connector-neutral load semantics, safe CI reports,
+  and no network, credentials, connector runtime, or route-certification claim.
+specification: "docs/feature-design-airflow-hermetic-tests-v1.md"
+base_commit: "c3feaa4e"
+integrator: "codex-integrator"
+
+acceptance_criteria:
+  - "Classic, flow, folder, and recipe pipelines use the canonical authoring compiler."
+  - "Scaffolded tests and fixtures pass with one credential-free dpone test command."
+  - "Full refresh, append, and merge final-state semantics are deterministic and fail closed outside v1 coverage."
+  - "All inputs are project-confined and bounded; reports never expose row, credential, or secret-topology values."
+  - "Report output cannot overwrite authoring inputs, fixtures, symlinks, or unrelated existing files."
+  - "The dpone test CLI path constructs no environment-backed application context."
+  - "Same logical inputs produce the same test_id across independent runs."
+  - "Reports explicitly distinguish hermetic contract coverage from route certification."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone test"
+    - "dpone.test.v1"
+    - "dpone.test-report.v1"
+    - "dpone.test-suite-report.v1"
+    - "HermeticTestService"
+    - "Airflow pipeline scaffold test/fixture bundle"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/contracts/hermetic_test*.py"
+  - "src/dpone/ports/hermetic_test*.py"
+  - "src/dpone/adapters/hermetic_test*.py"
+  - "src/dpone/manifest/hermetic_test*.py"
+  - "src/dpone/manifest/confined_files.py"
+  - "src/dpone/manifest/confined_files_windows.py"
+  - "src/dpone/manifest/authoring_folder.py"
+  - "src/dpone/manifest/recipe_catalog.py"
+  - "src/dpone/services/hermetic_test*.py"
+  - "src/dpone/commands/test_cmd.py"
+  - "src/dpone/commands/base.py"
+  - "src/dpone/commands/func_command.py"
+  - "src/dpone/cli/main.py"
+  - "src/dpone/schema/test-manifest.schema.json"
+  - "src/dpone/readiness/airflow_pipeline_scaffold.py"
+  - "src/dpone/readiness/airflow_recipe_errors.py"
+  - "src/dpone/readiness/airflow_self_service_templates.py"
+  - "src/dpone/gitops/schema_hermetic_test_contracts.py"
+  - "docs/schemas/gitops/test-*.schema.json"
+  - "tests/test_airflow_hermetic_tests_v1.py"
+  - "tests/test_airflow_folder_authoring_v1.py"
+  - "tests/test_airflow_recipe_catalog_v1.py"
+  - "tests/test_airflow_self_service_cli.py"
+  - "tools/airflow_hermetic_tests_benchmark.py"
+  - "docs/feature-design-airflow-hermetic-tests-v1.md"
+  - "docs/adr/0018-hermetic-tests-outside-runtime.md"
+  - "docs/adr-index.md"
+  - "docs/airflow-self-service*.md"
+  - "docs/getting-started/first-airflow-dag.md"
+  - "docs/testing/**"
+  - "docs/cli-reference.md"
+  - "docs/reference/configuration.md"
+  - "docs/compatibility.md"
+  - "docs/errors/DPONE_TEST*.md"
+  - "docs/errors/DPONE_RECIPE_HERMETIC_TEST_UNSUPPORTED.md"
+  - "test_artifacts/airflow-hermetic-tests-v1/**"
+read_only_paths:
+  - "src/dpone/runtime/**"
+  - "packages/dpone-airflow-pack/**"
+  - "src/dpone/manifest/bounded_yaml.py"
+forbidden_paths:
+  - "uv.lock"
+  - ".github/workflows/**"
+  - ".cursor/**"
+
+shared_file_owner: "codex-integrator"
+integrator_owned_shared_paths:
+  - "src/dpone/commands/registry_top.py"
+  - "src/dpone/gitops/schema_contracts.py"
+  - "tests/test_gitops_schema_contracts.py"
+  - "CHANGELOG.md"
+  - "docs/reference/gitops-schema-catalog.md"
+  - "mkdocs.yml"
+
+dependencies:
+  - "docs/feature-design-airflow-hermetic-tests-v1.md"
+  - "docs/adr/0018-hermetic-tests-outside-runtime.md"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_hermetic_tests_v1.py tests/test_airflow_self_service_cli.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - validation_report
+  - benchmark
+
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

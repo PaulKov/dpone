@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-cost-plan.schema.json",
+  "title": "dpone data product cost plan",
+  "type": "object",
+  "required": ["schema_version", "status", "cost_plan_id"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_cost_plan.v1"},
+    "status": {"type": "string"},
+    "cost_plan_id": {"type": "string"},
+    "product": {"type": "object"},
+    "planned_capacity": {"type": "object"},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,85 @@
+name: Nested live readiness (not certification)
+
+on:
+  workflow_dispatch:
+    inputs:
+      row_count:
+        description: Root rows for deterministic nested readiness checks
+        default: "10000"
+        required: false
+      include_kafka:
+        description: Run Kafka/Redpanda checks when available
+        default: "true"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  nested-live-readiness:
+    name: integration_nested_live readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: dpone
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dpone"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8
+        ports:
+          - 8123:8123
+          - 9000:9000
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: "Dpone_Strong_Passw0rd!"
+        ports:
+          - 1433:1433
+      kafka:
+        image: redpandadata/redpanda:v24.2.8
+        ports:
+          - 9092:9092
+        options: >-
+          --health-cmd "rpk cluster health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Run nested contract gate
+        run: uv run pytest tests/test_nested_normalization_industrial_layer.py tests/test_nested_normalization_runtime_hardening.py -q
+      - name: Run connectivity-only live readiness marker
+        env:
+          DPONE_POSTGRES_DSN: postgresql://postgres:postgres@localhost:5432/dpone
+          DPONE_MSSQL_DSN: "Driver={ODBC Driver 18 for SQL Server};Server=localhost,1433;Database=master;UID=sa;PWD=Dpone_Strong_Passw0rd!;Encrypt=yes;TrustServerCertificate=yes"
+          DPONE_CLICKHOUSE_HOST: localhost
+          DPONE_KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+          DPONE_ENABLE_NESTED_LIVE: "1"
+        run: uv run pytest -m "integration_nested_live" tests/integration tests -q
+      - name: Write deterministic nested readiness evidence
+        if: always()
+        run: |
+          uv run dpone normalize certify --row-count "${{ inputs.row_count }}" --output-dir test_artifacts/nested/github-readiness/contracts --format text
+          uv run dpone normalize benchmark --row-count "${{ inputs.row_count }}" --output-dir test_artifacts/nested/github-readiness/benchmark --format text
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: nested-live-readiness-evidence
+          path: test_artifacts/nested/github-readiness

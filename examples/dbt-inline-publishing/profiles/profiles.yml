@@ -1,0 +1,16 @@
+dpone_dbt_demo:
+  target: parse
+  outputs:
+    parse:
+      type: sqlserver
+      driver: ODBC Driver 18 for SQL Server
+      server: localhost
+      port: 1433
+      database: DWH_Stage
+      schema: pricing
+      authentication: sql
+      user: "{{ env_var('DPONE_DBT_DEMO_SQLSERVER_USER') }}"
+      password: "{{ env_var('DPONE_DBT_DEMO_SQLSERVER_PASSWORD') }}"
+      encrypt: true
+      trust_cert: true
+      threads: 1

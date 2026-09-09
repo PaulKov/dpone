@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/standardization/airflow-public-contract-report.v1.schema.json",
+  "title": "dpone Airflow public contract report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "baseline",
+    "target_release",
+    "status",
+    "passed",
+    "fingerprint",
+    "checks",
+    "compatibility",
+    "issues"
+  ],
+  "properties": {
+    "schema": {"const": "dpone.airflow-public-contract-report.v1"},
+    "baseline": {"const": "dpone.airflow-self-service-public-contracts.v1"},
+    "target_release": {"type": "string", "minLength": 1, "maxLength": 64},
+    "status": {"enum": ["passed", "failed"]},
+    "passed": {"type": "boolean"},
+    "fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "checks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["required", "compatible"],
+        "properties": {
+          "required": {"type": "integer", "minimum": 0},
+          "compatible": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "compatibility": {"type": "object"},
+    "issues": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "subject", "message"],
+        "properties": {
+          "code": {"type": "string", "pattern": "^DPONE_[A-Z0-9_]+$"},
+          "subject": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "message": {"type": "string", "minLength": 1, "maxLength": 2048}
+        }
+      }
+    }
+  }
+}

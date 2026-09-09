@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "row_count": 10000,
+  "normalized_rows": 53334,
+  "elapsed_seconds": 3.64783804200124,
+  "rows_per_second": 2741.349776185212,
+  "normalized_rows_per_second": 14620.714896306208,
+  "row_counts": {
+    "orders": 10000,
+    "orders__customer": 10000,
+    "orders__items": 20000,
+    "orders__tags": 13334
+  },
+  "spill_formats": {
+    "orders": "jsonl",
+    "orders__customer": "jsonl",
+    "orders__items": "jsonl",
+    "orders__tags": "jsonl"
+  }
+}

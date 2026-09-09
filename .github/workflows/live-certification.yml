@@ -1,0 +1,1211 @@
+name: Live certification
+
+on:
+  workflow_call:
+    inputs:
+      profile:
+        description: Certification profile to run.
+        required: false
+        default: local_live
+        type: string
+      row_count:
+        description: Matrix/stress row count. Keep <=100000 for CI cost control.
+        required: false
+        default: "25000"
+        type: string
+      run_native_benchmark_suite:
+        description: Run long Postgres->MSSQL/MSSQL->ClickHouse native benchmark suite.
+        required: false
+        default: false
+        type: boolean
+      native_benchmark_rows:
+        description: Comma-separated rows for native benchmark suite.
+        required: false
+        default: "10000,1000000,10000000"
+        type: string
+      native_benchmark_partitions:
+        description: >-
+          Partition counts for native benchmark suite. Keep 1 until shared
+          PostgreSQL MVCC snapshots are supported.
+        required: false
+        default: "1"
+        type: string
+      run_vendor_live:
+        description: Run vendor_live tests that require configured secrets.
+        required: false
+        default: false
+        type: boolean
+      vendor_backfill_source_filter:
+        description: Vendor-live backfill source filter.
+        required: false
+        default: "*"
+        type: string
+      vendor_backfill_sink_filter:
+        description: Vendor-live backfill sink filter.
+        required: false
+        default: "*"
+        type: string
+      vendor_backfill_case_id_filter:
+        description: Optional exact vendor-live backfill case_id filter.
+        required: false
+        default: "*"
+        type: string
+      execute_route_rc_commands:
+        description: Execute route release-candidate commands against live services.
+        required: false
+        default: false
+        type: boolean
+      expected_commit_sha:
+        description: Optional exact commit assertion for a reusable release-candidate call.
+        required: false
+        default: ""
+        type: string
+      local_artifact_name:
+        description: Artifact name used to retain raw local-live evidence.
+        required: false
+        default: live-certification-local
+        type: string
+    secrets:
+      APPSFLYER_API_TOKEN:
+        required: false
+      GOOGLE_ADS_DEVELOPER_TOKEN:
+        required: false
+      GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON:
+        required: false
+      MINDBOX_SECRET_KEY:
+        required: false
+      SIMILARWEB_API_KEY:
+        required: false
+      YANDEX_WEBMASTER_OAUTH_TOKEN:
+        required: false
+      OPENEXCHANGERATES_APP_ID:
+        required: false
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Certification profile to run.
+        required: false
+        default: local_live
+        type: choice
+        options:
+          - local_live
+          - real_local
+          - type_matrix_certification
+          - native_transfer
+          - vendor_live
+      row_count:
+        description: Matrix/stress row count. Keep <=100000 for CI cost control.
+        required: false
+        default: "25000"
+        type: string
+      run_native_benchmark_suite:
+        description: Run long Postgres->MSSQL/MSSQL->ClickHouse native benchmark suite.
+        required: false
+        default: false
+        type: boolean
+      native_benchmark_rows:
+        description: Comma-separated rows for native benchmark suite. Use 10000,1000000,10000000 for release evidence.
+        required: false
+        default: "10000,1000000,10000000"
+        type: string
+      native_benchmark_partitions:
+        description: >-
+          Partition counts for native benchmark suite. Keep 1 until shared
+          PostgreSQL MVCC snapshots are supported.
+        required: false
+        default: "1"
+        type: string
+      run_vendor_live:
+        description: Run vendor_live tests that require configured secrets.
+        required: false
+        default: false
+        type: boolean
+      vendor_backfill_source_filter:
+        description: Vendor-live backfill source filter. Use * for all configured managed sources.
+        required: false
+        default: "*"
+        type: string
+      vendor_backfill_sink_filter:
+        description: Vendor-live backfill sink filter. Use * for all configured managed sinks.
+        required: false
+        default: "*"
+        type: string
+      vendor_backfill_case_id_filter:
+        description: Optional exact vendor-live backfill case_id filter.
+        required: false
+        default: "*"
+        type: string
+      execute_route_rc_commands:
+        description: Execute route_rc_orchestration command trains against the live services instead of dry-run only.
+        required: false
+        default: false
+        type: boolean
+      expected_commit_sha:
+        description: Optional exact commit assertion for release-candidate evidence.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  local-live-certification:
+    name: Local live certification gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    if: ${{ inputs.profile == 'local_live' || inputs.profile == 'real_local' || inputs.profile == 'type_matrix_certification' || inputs.profile == 'native_transfer' }}
+    env:
+      CERT_ROOT: test_artifacts/live_certification
+      CERT_EXECUTE_ROUTE_RC_COMMANDS: ${{ inputs.execute_route_rc_commands }}
+      CERT_NATIVE_BENCHMARK_PARTITIONS: ${{ inputs.native_benchmark_partitions }}
+      CERT_NATIVE_BENCHMARK_ROWS: ${{ inputs.native_benchmark_rows }}
+      CERT_PROFILE: ${{ inputs.profile }}
+      CERT_ROW_COUNT: ${{ inputs.row_count }}
+      DPONE_RUN_INTEGRATION: "1"
+      DPONE_RUN_INTEGRATION_MATRIX: "1"
+      DPONE_MATRIX_ROW_COUNT: ${{ inputs.row_count }}
+      DPONE_MATRIX_ARTIFACT_DIR: test_artifacts/live_certification/matrix
+      DPONE_IT_MYSQL_HOST: 127.0.0.1
+      DPONE_IT_MYSQL_PORT_FORWARD: "53306"
+      DPONE_IT_MYSQL_DATABASE: dpone_it
+      DPONE_IT_MYSQL_USER: dpone
+      DPONE_IT_MYSQL_PASSWORD: dpone
+      DPONE_IT_POSTGRES_HOST: 127.0.0.1
+      DPONE_IT_POSTGRES_PORT: "55432"
+      DPONE_IT_POSTGRES_DATABASE: dpone_it
+      DPONE_IT_POSTGRES_USER: dpone
+      DPONE_IT_POSTGRES_PASSWORD: dpone
+      DPONE_IT_MSSQL_HOST: 127.0.0.1
+      DPONE_IT_MSSQL_PORT: "51433"
+      DPONE_IT_MSSQL_DATABASE: dpone
+      DPONE_IT_MSSQL_USER: sa
+      DPONE_IT_MSSQL_PASSWORD: Dp0ne.Strong.Pw.2026!
+      DPONE_IT_MSSQL_TRUST_SERVER_CERTIFICATE: "yes"
+      DPONE_IT_MSSQL_BCP_PATH: bcp
+      DPONE_IT_CH_HOST: 127.0.0.1
+      DPONE_IT_CH_PORT: "59000"
+      DPONE_IT_CH_HTTP_PORT: "58123"
+      DPONE_IT_CH_DATABASE: dpone_it
+      DPONE_IT_CH_USER: default
+      DPONE_IT_CH_PASSWORD: dpone
+      DPONE_KAFKA_BOOTSTRAP_SERVERS: 127.0.0.1:59092
+      DPONE_SCHEMA_REGISTRY_URL: http://127.0.0.1:58081
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify optional exact commit binding
+        env:
+          EXPECTED_COMMIT_SHA: ${{ inputs.expected_commit_sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${EXPECTED_COMMIT_SHA}" ]; then
+            exit 0
+          fi
+          if ! printf '%s\n' "${EXPECTED_COMMIT_SHA}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::expected_commit_sha must be one full lowercase SHA."
+            exit 1
+          fi
+          actual_commit="$(git rev-parse HEAD)"
+          master_commit="$(git rev-parse refs/remotes/origin/master)"
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ] || [ "${GITHUB_REF}" != "refs/heads/master" ] || [ "${GITHUB_REF_TYPE}" != "branch" ]; then
+            echo "::error::Release-candidate certification must be dispatched from master."
+            exit 1
+          fi
+          if [ "${EXPECTED_COMMIT_SHA}" != "${GITHUB_SHA}" ] || [ "${EXPECTED_COMMIT_SHA}" != "${actual_commit}" ] || [ "${EXPECTED_COMMIT_SHA}" != "${master_commit}" ]; then
+            echo "::error::Live certification is not bound to the requested exact commit."
+            exit 1
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Build live certification plan
+        run: |
+          mkdir -p "$CERT_ROOT"
+          uv run dpone ops live-certification-plan \
+            --output-dir "$CERT_ROOT/plan" \
+            --profile "${CERT_PROFILE}" \
+            --row-count "${CERT_ROW_COUNT}" \
+            --format json
+
+      - name: Use complete contract matrix mode
+        run: |
+          # The generic matrix is a credential-free contract simulation. The
+          # service-backed route fixtures below own local-live evidence.
+          echo "DPONE_MATRIX_RUN_MODE=mock_contract" >> "$GITHUB_ENV"
+
+      - name: Install native database tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg unixodbc-dev
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+            | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+          . /etc/os-release
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/${VERSION_ID}/prod ${VERSION_CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 mssql-tools18
+          echo "/opt/mssql-tools18/bin" >> "$GITHUB_PATH"
+
+      - name: Start disposable local services
+        run: docker compose -f docker/docker-compose.integration.yml up -d postgres mysql mssql clickhouse kafka schema-registry minio
+
+      - name: Prepare local MSSQL benchmark database
+        env:
+          DPONE_IT_MSSQL_HOST: 127.0.0.1
+          DPONE_IT_MSSQL_PORT: "51433"
+          DPONE_IT_MSSQL_DATABASE: dpone
+          DPONE_IT_MSSQL_USER: sa
+          DPONE_IT_MSSQL_PASSWORD: Dp0ne.Strong.Pw.2026!
+        run: |
+          set -euo pipefail
+          for attempt in {1..60}; do
+            if /opt/mssql-tools18/bin/sqlcmd \
+              -S "${DPONE_IT_MSSQL_HOST},${DPONE_IT_MSSQL_PORT}" \
+              -U "$DPONE_IT_MSSQL_USER" \
+              -P "$DPONE_IT_MSSQL_PASSWORD" \
+              -C \
+              -Q "SELECT 1" >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "MSSQL did not become ready for local live certification."
+              exit 1
+            fi
+            sleep 2
+          done
+          cat > /tmp/dpone_prepare_live_mssql.sql <<'SQL'
+          IF DB_ID(N'$(db)') IS NULL
+          BEGIN
+              DECLARE @sql nvarchar(max) = N'CREATE DATABASE ' + QUOTENAME(N'$(db)');
+              EXEC(@sql);
+          END
+          SQL
+          /opt/mssql-tools18/bin/sqlcmd \
+            -S "${DPONE_IT_MSSQL_HOST},${DPONE_IT_MSSQL_PORT}" \
+            -U "$DPONE_IT_MSSQL_USER" \
+            -P "$DPONE_IT_MSSQL_PASSWORD" \
+            -C \
+            -v db="$DPONE_IT_MSSQL_DATABASE" \
+            -i /tmp/dpone_prepare_live_mssql.sql
+
+      - name: Run local service markers
+        run: |
+          set -euo pipefail
+          uv run pytest \
+            tests/integration/mysql/test_mysql_source_integration.py \
+            tests/integration/postgres/test_postgres_connector_integration.py \
+            tests/integration/mssql/test_mssql_optional_integration.py \
+            tests/integration/kafka/test_kafka_optional_integration.py \
+            -q -rs \
+            --junitxml="$CERT_ROOT/local_service_markers_junit.xml"
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$CERT_ROOT/local_service_markers_junit.xml" \
+            --min-passed 8 \
+            --max-skipped 0 \
+            --evidence-json "$CERT_ROOT/service_markers.json" \
+            --profile "${CERT_PROFILE}" \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+
+      - name: Run MySQL local route cells
+        if: ${{ inputs.profile == 'local_live' || inputs.profile == 'real_local' || inputs.profile == 'native_transfer' }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$CERT_ROOT/mysql"
+          # MySQL -> MSSQL target-MAX incrementals are fail-closed, and the
+          # legacy direct-sink tests do not provision governed MSSQL state.
+          uv run pytest \
+            tests/integration/mysql/test_mysql_to_postgres_native_transfer_integration.py::test_mysql_to_postgres_full_refresh_csv_copy \
+            tests/integration/mysql/test_mysql_to_postgres_native_transfer_integration.py::test_mysql_to_postgres_incremental_merge_watermark \
+            tests/integration/mysql/test_mysql_to_clickhouse_native_transfer_integration.py::test_mysql_to_clickhouse_full_refresh_tsv \
+            tests/integration/mysql/test_mysql_to_clickhouse_native_transfer_integration.py::test_mysql_to_clickhouse_incremental_merge_watermark \
+            tests/integration/mysql/test_mysql_to_kafka_native_transfer_integration.py::test_mysql_to_kafka_full_refresh_csv_produce \
+            -q -rs \
+            --junitxml="$CERT_ROOT/mysql/mysql_local_route_cells_junit.xml"
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$CERT_ROOT/mysql/mysql_local_route_cells_junit.xml" \
+            --min-passed 5 \
+            --max-skipped 0 \
+            --evidence-json "$CERT_ROOT/mysql/mysql_local_route_cells.json" \
+            --profile "${CERT_PROFILE}" \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+
+      - name: Run type matrix certification profile
+        if: ${{ inputs.profile == 'type_matrix_certification' }}
+        env:
+          DPONE_IT_MSSQL_HOST: 127.0.0.1
+          DPONE_IT_MSSQL_PORT: "51433"
+          DPONE_IT_MSSQL_PORT_FORWARD: "51433"
+          DPONE_IT_MSSQL_DATABASE: master
+          DPONE_IT_MSSQL_USER: sa
+          DPONE_IT_MSSQL_PASSWORD: Dp0ne.Strong.Pw.2026!
+          DPONE_IT_MSSQL_TRUST_SERVER_CERTIFICATE: "yes"
+          DPONE_IT_MSSQL_BCP_PATH: /opt/mssql-tools18/bin/bcp
+          DPONE_IT_POSTGRES_HOST: 127.0.0.1
+          DPONE_IT_POSTGRES_PORT: "55432"
+          DPONE_IT_POSTGRES_DATABASE: dpone_it
+          DPONE_IT_POSTGRES_USER: dpone
+          DPONE_IT_POSTGRES_PASSWORD: dpone
+          DPONE_IT_PG_HOST: 127.0.0.1
+          DPONE_IT_PG_PORT: "55432"
+          DPONE_IT_CH_HOST: 127.0.0.1
+          DPONE_IT_CH_PORT: "59000"
+          DPONE_IT_CH_HTTP_PORT: "58123"
+          DPONE_IT_CH_DATABASE: dpone_it
+          DPONE_IT_CH_USER: default
+          DPONE_IT_CH_PASSWORD: dpone
+        run: |
+          mkdir -p "$CERT_ROOT/type_matrix"
+          uv run pytest \
+            -m "type_matrix_certification" \
+            tests/test_type_matrix_certification.py \
+            -q \
+            --junitxml="$CERT_ROOT/type_matrix/type_matrix_contracts_junit.xml"
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$CERT_ROOT/type_matrix/type_matrix_contracts_junit.xml" \
+            --min-passed 1 \
+            --max-skipped 0 \
+            --evidence-json "$CERT_ROOT/type_matrix/type_matrix_contracts.json" \
+            --profile "${CERT_PROFILE}" \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+          uv run pytest \
+            tests/integration/mssql/test_mssql_to_clickhouse_native_transfer_integration.py \
+            tests/integration/mssql/test_postgres_to_mssql_native_transfer_integration.py \
+            -q \
+            --junitxml="$CERT_ROOT/type_matrix/live_fixture_junit.xml"
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$CERT_ROOT/type_matrix/live_fixture_junit.xml" \
+            --min-passed 1 \
+            --max-skipped 0 \
+            --evidence-json "$CERT_ROOT/type_matrix/live_fixture.json" \
+            --profile "${CERT_PROFILE}" \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+          uv run python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from dpone.readiness.physical_design import PhysicalDesignOptions, PhysicalDesignPlanner
+          from dpone.readiness.schema_evolution import ColumnDef, SchemaEvolutionPolicy
+          from dpone.services.schema_evolution_explain import SchemaEvolutionExplainService
+          from dpone.services.schema_type_matrix import PairTypeMatrixService
+
+          out = Path("test_artifacts/live_certification/type_matrix")
+          out.mkdir(parents=True, exist_ok=True)
+          matrix = PairTypeMatrixService()
+          decisions = {
+              "mssql_to_clickhouse": matrix.build(source="mssql", sink="clickhouse"),
+              "postgres_to_mssql": matrix.build(source="postgres", sink="mssql"),
+          }
+          (out / "type_matrix_decisions.json").write_text(json.dumps(decisions, indent=2), encoding="utf-8")
+
+          planner = PhysicalDesignPlanner()
+          clickhouse_plan = planner.plan(
+              sink_type="clickhouse",
+              table="landing.certified_orders",
+              source_schema=[("id", "int"), ("status", "nvarchar(50)"), ("created_at", "datetime")],
+              options=PhysicalDesignOptions.from_config(
+                  {"storage": {"clickhouse": {"engine": "MergeTree", "order_by": ["id"], "low_cardinality": {"mode": "explicit", "columns": ["status"]}}}}
+              ),
+          )
+          mssql_plan = planner.plan(
+              sink_type="mssql",
+              table="landing.certified_orders",
+              source_schema=[("id", "integer"), ("payload", "jsonb"), ("created_at", "timestamp with time zone")],
+              options=PhysicalDesignOptions.from_config({"indexes": {"primary_key": ["id"]}}),
+          )
+          (out / "physical_ddl_plan.sql").write_text(
+              "\n\n".join(["-- MSSQL -> ClickHouse"] + list(clickhouse_plan.ddl) + ["-- Postgres -> MSSQL"] + list(mssql_plan.ddl)),
+              encoding="utf-8",
+          )
+
+          explain = SchemaEvolutionExplainService()
+          rerun = explain.explain(
+              source_system="mssql",
+              sink_system="clickhouse",
+              source=[ColumnDef("id", "int", nullable=True), ColumnDef("status", "nvarchar(50)", nullable=True)],
+              target=[ColumnDef("id", "Nullable(Int32)", nullable=True), ColumnDef("status", "Nullable(String)", nullable=True)],
+              policy=SchemaEvolutionPolicy(),
+          )
+          (out / "schema_evolution_rerun.json").write_text(json.dumps(rerun, indent=2), encoding="utf-8")
+          PY
+          cat > "$CERT_ROOT/type_matrix/live_fixture_summary.md" <<MD
+          # Type matrix certification
+
+          - profile: \`${CERT_PROFILE}\`
+          - routes: \`MSSQL -> ClickHouse\`, \`Postgres -> MSSQL\`
+          - contract junit: \`$CERT_ROOT/type_matrix/type_matrix_contracts_junit.xml\`
+          - live fixture junit: \`$CERT_ROOT/type_matrix/live_fixture_junit.xml\`
+          - observed evidence: \`type_matrix_contracts.json\`, \`live_fixture.json\`
+          - planning artifacts: \`type_matrix_decisions.json\`, \`physical_ddl_plan.sql\`, \`schema_evolution_rerun.json\`
+          - release-only performance/state/reconciliation checks: \`UNVERIFIED\`
+          MD
+
+      - name: Run native transfer live fixtures
+        if: ${{ inputs.profile == 'native_transfer' }}
+        run: |
+          set -euo pipefail
+          # Governed PostgreSQL -> MSSQL evidence is collected by the
+          # release-authoritative route-live-wide workflow, not these legacy
+          # direct-sink fixtures.
+          uv run pytest \
+            tests/integration/mssql/test_mssql_to_clickhouse_native_transfer_integration.py \
+            -q -rs \
+            --junitxml="$CERT_ROOT/native_transfer_live_junit.xml"
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$CERT_ROOT/native_transfer_live_junit.xml" \
+            --min-passed 3 \
+            --max-skipped 0 \
+            --evidence-json "$CERT_ROOT/native_transfer_live_fixtures.json" \
+            --profile native_transfer \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+
+      - name: Run native transfer CDC state and reconciliation fixtures
+        if: ${{ inputs.profile == 'native_transfer' }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$CERT_ROOT/cdc-state"
+          uv run pytest \
+            tests/integration/mssql/test_mssql_clickhouse_live_cdc_runtime_integration.py::test_mssql_change_tracking_runtime_applies_to_clickhouse_and_commits_offsets \
+            tests/integration/mssql/test_mssql_clickhouse_live_cdc_runtime_integration.py::test_mssql_change_tracking_runtime_materializes_clickhouse_current_state \
+            tests/integration/mssql/test_mssql_clickhouse_live_cdc_runtime_integration.py::test_mssql_change_tracking_retention_gap_resyncs_clickhouse_without_committing_offsets \
+            -q -rs \
+            --junitxml="$CERT_ROOT/cdc-state/junit.xml"
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$CERT_ROOT/cdc-state/junit.xml" \
+            --min-passed 3 \
+            --max-skipped 0 \
+            --evidence-json "$CERT_ROOT/cdc-state/junit_evidence.json" \
+            --profile native_transfer \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+
+      - name: Run source/sink matrix
+        if: ${{ inputs.profile != 'type_matrix_certification' }}
+        run: |
+          mkdir -p "$DPONE_MATRIX_ARTIFACT_DIR"
+          uv run pytest -m integration_matrix tests/integration/matrix -q \
+            --junitxml="$DPONE_MATRIX_ARTIFACT_DIR/junit.xml"
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$DPONE_MATRIX_ARTIFACT_DIR/junit.xml" \
+            --min-passed 1 \
+            --max-skipped 0 \
+            --evidence-json "$CERT_ROOT/matrix_execution.json" \
+            --profile "${CERT_PROFILE}" \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+
+      - name: Run Postgres to MSSQL native fast-path smoke
+        if: ${{ inputs.profile != 'type_matrix_certification' }}
+        run: |
+          mkdir -p "$CERT_ROOT/benchmarks"
+          uv run python tools/mssql_stress.py \
+            --rows "${CERT_ROW_COUNT}" \
+            --batch-size 50000 \
+            --bcp-path /opt/mssql-tools18/bin/bcp \
+            --clickhouse-bulk-mode http \
+            --clickhouse-http-host 127.0.0.1 \
+            --clickhouse-http-port 58123 \
+            --slo-pg-mssql-rps 500 \
+            --slo-mssql-clickhouse-rps 500 \
+            --json-output "$CERT_ROOT/benchmarks/postgres_mssql_native_fast_path.json"
+
+      - name: Run route-refresh-execute MSSQL ClickHouse live certification
+        if: ${{ inputs.profile != 'type_matrix_certification' }}
+        env:
+          DPONE_RUN_REFRESH_EXECUTOR_LIVE: "1"
+          DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR: test_artifacts/live_certification/refresh-executor/mssql-clickhouse
+          DPONE_IT_MSSQL_HOST: 127.0.0.1
+          DPONE_IT_MSSQL_PORT: "51433"
+          DPONE_IT_MSSQL_DATABASE: master
+          DPONE_IT_MSSQL_USER: sa
+          DPONE_IT_MSSQL_PASSWORD: Dp0ne.Strong.Pw.2026!
+          DPONE_IT_MSSQL_TRUST_SERVER_CERTIFICATE: "yes"
+          DPONE_IT_MSSQL_BCP_PATH: /opt/mssql-tools18/bin/bcp
+          DPONE_IT_CH_HOST: 127.0.0.1
+          DPONE_IT_CH_PORT: "59000"
+          DPONE_IT_CH_DATABASE: dpone_it
+          DPONE_IT_CH_USER: default
+          DPONE_IT_CH_PASSWORD: dpone
+          DPONE_IT_CH_CLIENT_COMMAND: docker exec -i dpone-it-clickhouse clickhouse-client
+          DPONE_IT_CH_CLIENT_HOST: 127.0.0.1
+          DPONE_IT_CH_CLIENT_PORT: "9000"
+        run: |
+          mkdir -p "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR"
+          uv run pytest \
+            tests/integration/mssql/test_mssql_clickhouse_refresh_executor_live_integration.py \
+            -q \
+            --junitxml="$CERT_ROOT/refresh_executor_live_junit.xml"
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$CERT_ROOT/refresh_executor_live_junit.xml" \
+            --min-passed 1 \
+            --max-skipped 0 \
+            --evidence-json "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/junit_evidence.json" \
+            --profile "${CERT_PROFILE}" \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+          test -f "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/execute-replay/route_refresh_execution.json"
+          cp "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/execute-replay/route_refresh_execution.json" \
+            "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/route_refresh_execution.json"
+          test -f "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/verify/route_refresh_verification.json"
+          cp "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/verify/route_refresh_verification.json" \
+            "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/route_refresh_verification.json"
+          test -f "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/route_refresh_snapshot_capture.json"
+          cp "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/route_refresh_snapshot_capture.json" \
+            "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/route_refresh_snapshot_capture.json"
+          test -f "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/source_route_refresh_snapshot.json"
+          cp "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/source_route_refresh_snapshot.json" \
+            "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/source_route_refresh_snapshot.json"
+          test -f "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/sink_route_refresh_snapshot.json"
+          cp "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/sink_route_refresh_snapshot.json" \
+            "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/sink_route_refresh_snapshot.json"
+
+      - name: Run route-refresh-execute Postgres MSSQL live certification
+        if: ${{ inputs.profile != 'type_matrix_certification' }}
+        env:
+          DPONE_RUN_REFRESH_EXECUTOR_LIVE: "1"
+          DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR: test_artifacts/live_certification/refresh-executor/postgres-mssql
+          DPONE_IT_PG_HOST: 127.0.0.1
+          DPONE_IT_PG_PORT: "55432"
+          DPONE_IT_PG_DATABASE: dpone_it
+          DPONE_IT_PG_USER: dpone
+          DPONE_IT_PG_PASSWORD: dpone
+          DPONE_IT_POSTGRES_HOST: 127.0.0.1
+          DPONE_IT_POSTGRES_PORT: "55432"
+          DPONE_IT_POSTGRES_DATABASE: dpone_it
+          DPONE_IT_POSTGRES_USER: dpone
+          DPONE_IT_POSTGRES_PASSWORD: dpone
+          DPONE_IT_MSSQL_HOST: 127.0.0.1
+          DPONE_IT_MSSQL_PORT: "51433"
+          DPONE_IT_MSSQL_DATABASE: master
+          DPONE_IT_MSSQL_USER: sa
+          DPONE_IT_MSSQL_PASSWORD: Dp0ne.Strong.Pw.2026!
+          DPONE_IT_MSSQL_TRUST_SERVER_CERTIFICATE: "yes"
+          DPONE_IT_MSSQL_BCP_PATH: /opt/mssql-tools18/bin/bcp
+        run: |
+          mkdir -p "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR"
+          uv run pytest \
+            tests/integration/mssql/test_postgres_mssql_refresh_executor_live_integration.py \
+            -q \
+            --junitxml="$CERT_ROOT/postgres_mssql_refresh_executor_live_junit.xml"
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$CERT_ROOT/postgres_mssql_refresh_executor_live_junit.xml" \
+            --min-passed 1 \
+            --max-skipped 0 \
+            --evidence-json "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/junit_evidence.json" \
+            --profile "${CERT_PROFILE}" \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+          test -f "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/execute-replay/route_refresh_execution.json"
+          cp "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/execute-replay/route_refresh_execution.json" \
+            "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/route_refresh_execution.json"
+          test -f "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/verify/route_refresh_verification.json"
+          cp "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/verify/route_refresh_verification.json" \
+            "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/route_refresh_verification.json"
+          test -f "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/route_refresh_snapshot_capture.json"
+          cp "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/route_refresh_snapshot_capture.json" \
+            "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/route_refresh_snapshot_capture.json"
+          test -f "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/source_route_refresh_snapshot.json"
+          cp "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/source_route_refresh_snapshot.json" \
+            "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/source_route_refresh_snapshot.json"
+          test -f "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/sink_route_refresh_snapshot.json"
+          cp "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/capture/sink_route_refresh_snapshot.json" \
+            "$DPONE_REFRESH_EXECUTOR_LIVE_ARTIFACT_DIR/sink_route_refresh_snapshot.json"
+
+      - name: Run Postgres to MSSQL native benchmark suite
+        if: ${{ inputs.run_native_benchmark_suite == true }}
+        run: |
+          mkdir -p "$CERT_ROOT/benchmarks/native_benchmark_suite"
+          PYTHONUNBUFFERED=1 uv run python tools/mssql_benchmark_suite.py \
+            --rows "${CERT_NATIVE_BENCHMARK_ROWS}" \
+            --partitions "${CERT_NATIVE_BENCHMARK_PARTITIONS}" \
+            --export-workers 1 \
+            --load-workers 1 \
+            --batch-size 100000 \
+            --bcp-path /opt/mssql-tools18/bin/bcp \
+            --optimizer-profile high_throughput_safe \
+            --slo-pg-mssql-rps 500 \
+            --slo-mssql-clickhouse-rps 500 \
+            --clickhouse-bulk-mode http \
+            --clickhouse-http-host 127.0.0.1 \
+            --clickhouse-http-port 58123 \
+            --output-dir "$CERT_ROOT/benchmarks/native_benchmark_suite" \
+            --markdown-output "$CERT_ROOT/benchmarks/postgres_mssql_native_benchmark_summary.md"
+
+      - name: Build matrix certification report
+        if: ${{ always() && inputs.profile != 'type_matrix_certification' }}
+        run: |
+          uv run dpone ops integration-matrix-report \
+            --artifact-dir "$DPONE_MATRIX_ARTIFACT_DIR" \
+            --output-dir "$DPONE_MATRIX_ARTIFACT_DIR" \
+            --format json
+
+      # Release-only assemblers stay disabled until every required input is
+      # produced by an executed check. Raw JUnit and route artifacts above are
+      # uploaded as observed evidence; absence remains UNVERIFIED.
+      - name: "Disabled (UNVERIFIED): native transfer evidence and strategy bundle"
+        if: ${{ false }}
+        run: |
+          mkdir -p "$CERT_ROOT/native-transfer/postgres-mssql/payloads" "$CERT_ROOT/native-transfer/mssql-clickhouse/payloads"
+          cat > "$CERT_ROOT/native-transfer/postgres-mssql/plan.json" <<JSON
+          {
+            "native_transfer_plan": {
+              "evidence_contract": {
+                "route": "postgres_to_mssql",
+                "strategy": "cdc_apply",
+                "state_commit_gate": "after_target_finalize_and_quality",
+                "required_artifacts": [
+                  "native_transfer_plan.json",
+                  "transfer_diagnostics.json",
+                  "cdc_replay_plan.json",
+                  "partition_checkpoints.json",
+                  "partition_retry_plan.json",
+                  "typed_reconciliation.json",
+                  "quality_results.json",
+                  "state_transition.json"
+                ],
+                "required_checks": [
+                  "partition_checkpoint_consistency",
+                  "typed_reconciliation",
+                  "quality_gate",
+                  "state_transition_after_commit"
+                ],
+                "partition_retry": {"enabled": true},
+                "typed_reconciliation": {"required": true, "scope": "source_target_type_aware"}
+              }
+            }
+          }
+          JSON
+          for artifact in native_transfer_plan.json transfer_diagnostics.json cdc_replay_plan.json partition_checkpoints.json partition_retry_plan.json typed_reconciliation.json quality_results.json state_transition.json; do
+            cat > "$CERT_ROOT/native-transfer/postgres-mssql/payloads/$artifact" <<JSON
+          {
+            "status": "UNVERIFIED",
+            "artifact": "$artifact",
+            "profile": "${CERT_PROFILE}",
+            "route": "postgres_to_mssql"
+          }
+          JSON
+          done
+          uv run dpone strategy native-transfer-evidence \
+            --run-id "live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-postgres-mssql" \
+            --plan-json "$CERT_ROOT/native-transfer/postgres-mssql/plan.json" \
+            --payload native_transfer_plan.json="$CERT_ROOT/native-transfer/postgres-mssql/payloads/native_transfer_plan.json" \
+            --payload transfer_diagnostics.json="$CERT_ROOT/native-transfer/postgres-mssql/payloads/transfer_diagnostics.json" \
+            --payload cdc_replay_plan.json="$CERT_ROOT/native-transfer/postgres-mssql/payloads/cdc_replay_plan.json" \
+            --payload partition_checkpoints.json="$CERT_ROOT/native-transfer/postgres-mssql/payloads/partition_checkpoints.json" \
+            --payload partition_retry_plan.json="$CERT_ROOT/native-transfer/postgres-mssql/payloads/partition_retry_plan.json" \
+            --payload typed_reconciliation.json="$CERT_ROOT/native-transfer/postgres-mssql/payloads/typed_reconciliation.json" \
+            --payload quality_results.json="$CERT_ROOT/native-transfer/postgres-mssql/payloads/quality_results.json" \
+            --payload state_transition.json="$CERT_ROOT/native-transfer/postgres-mssql/payloads/state_transition.json" \
+            --output-dir "$CERT_ROOT/native-transfer/postgres-mssql/evidence" \
+            --format json
+          cat > "$CERT_ROOT/native-transfer/mssql-clickhouse/plan.json" <<JSON
+          {
+            "native_transfer_plan": {
+              "evidence_contract": {
+                "route": "mssql_to_clickhouse",
+                "strategy": "incremental_merge",
+                "state_commit_gate": "after_target_finalize_and_quality",
+                "required_artifacts": [
+                  "native_transfer_plan.json",
+                  "transfer_diagnostics.json",
+                  "partition_checkpoints.json",
+                  "partition_retry_plan.json",
+                  "typed_reconciliation.json",
+                  "quality_results.json",
+                  "state_transition.json"
+                ],
+                "required_checks": [
+                  "partition_checkpoint_consistency",
+                  "typed_reconciliation",
+                  "quality_gate",
+                  "state_transition_after_commit"
+                ],
+                "partition_retry": {"enabled": true},
+                "typed_reconciliation": {"required": true, "scope": "source_target_type_aware"}
+              }
+            }
+          }
+          JSON
+          for artifact in native_transfer_plan.json transfer_diagnostics.json partition_checkpoints.json partition_retry_plan.json typed_reconciliation.json quality_results.json state_transition.json; do
+            cat > "$CERT_ROOT/native-transfer/mssql-clickhouse/payloads/$artifact" <<JSON
+          {
+            "status": "UNVERIFIED",
+            "artifact": "$artifact",
+            "profile": "${CERT_PROFILE}",
+            "route": "mssql_to_clickhouse"
+          }
+          JSON
+          done
+          uv run dpone strategy native-transfer-evidence \
+            --run-id "live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-mssql-clickhouse" \
+            --plan-json "$CERT_ROOT/native-transfer/mssql-clickhouse/plan.json" \
+            --payload native_transfer_plan.json="$CERT_ROOT/native-transfer/mssql-clickhouse/payloads/native_transfer_plan.json" \
+            --payload transfer_diagnostics.json="$CERT_ROOT/native-transfer/mssql-clickhouse/payloads/transfer_diagnostics.json" \
+            --payload partition_checkpoints.json="$CERT_ROOT/native-transfer/mssql-clickhouse/payloads/partition_checkpoints.json" \
+            --payload partition_retry_plan.json="$CERT_ROOT/native-transfer/mssql-clickhouse/payloads/partition_retry_plan.json" \
+            --payload typed_reconciliation.json="$CERT_ROOT/native-transfer/mssql-clickhouse/payloads/typed_reconciliation.json" \
+            --payload quality_results.json="$CERT_ROOT/native-transfer/mssql-clickhouse/payloads/quality_results.json" \
+            --payload state_transition.json="$CERT_ROOT/native-transfer/mssql-clickhouse/payloads/state_transition.json" \
+            --output-dir "$CERT_ROOT/native-transfer/mssql-clickhouse/evidence" \
+            --format json
+          uv run dpone strategy certification-bundle \
+            --bundle-id "native-transfer-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --native-transfer-evidence "$CERT_ROOT/native-transfer/postgres-mssql/evidence/live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-postgres-mssql/evidence_index.json" \
+            --native-transfer-evidence "$CERT_ROOT/native-transfer/mssql-clickhouse/evidence/live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-mssql-clickhouse/evidence_index.json" \
+            --matrix-artifact "$DPONE_MATRIX_ARTIFACT_DIR/certification_report.json" \
+            --docs-link docs/source-sink/postgres-to-mssql.md \
+            --docs-link docs/source-sink/mssql-to-clickhouse.md \
+            --output-dir "$CERT_ROOT/strategy-certification" \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): observability metrics"
+        if: ${{ false }}
+        run: |
+          cat > "$CERT_ROOT/run_report.json" <<JSON
+          {
+            "manifest": "live-certification.yml",
+            "process": "local_live_certification",
+            "selector": "local_live",
+            "run_id": "live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}",
+            "passed": false,
+            "attempts": 1,
+            "max_attempts": 1,
+            "result": {
+              "status": "unverified",
+              "extracted_rows": ${CERT_ROW_COUNT},
+              "inserted_rows": ${CERT_ROW_COUNT},
+              "updated_rows": 0,
+              "final_rows": ${CERT_ROW_COUNT},
+              "duration_seconds": 60,
+              "throughput_rows_per_second": 1000,
+              "errors": []
+            }
+          }
+          JSON
+          uv run dpone observability metrics-export \
+            --run-report "$CERT_ROOT/run_report.json" \
+            --output-dir "$CERT_ROOT/observability" \
+            --label env=ci \
+            --label gate=live_certification \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): benchmark and SLO gate"
+        if: ${{ false }}
+        run: |
+          uv run dpone ops benchmark-slo-gate \
+            --output-dir "$CERT_ROOT/benchmark-slo" \
+            --metrics-json '{"throughput_rows_per_second":1000,"duration_seconds":60,"freshness_lag_seconds":120,"failure_rate":0}' \
+            --baseline-json '{"throughput_rows_per_second":{"value":900,"direction":"higher"},"duration_seconds":{"value":90,"direction":"lower"}}' \
+            --objectives-json '{"throughput_rows_per_second":{"min":500},"freshness_lag_seconds":{"max":300},"failure_rate":{"max":0}}' \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): performance certification"
+        if: ${{ false }}
+        run: |
+          uv run dpone ops performance-certification \
+            --output-dir "$CERT_ROOT/performance-certification" \
+            --profile "${CERT_PROFILE}" \
+            --row-count "${CERT_ROW_COUNT}" \
+            --metrics-json '{"throughput_rows_per_second":1000,"duration_seconds":60,"memory_peak_mb":1024,"failure_rate":0}' \
+            --minimum-json '{"throughput_rows_per_second":500,"failure_rate":0}' \
+            --maximum-json '{"duration_seconds":120,"memory_peak_mb":2048}' \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): live state and reconciliation evidence"
+        if: ${{ false }}
+        run: |
+          cat > "$CERT_ROOT/state_evidence.json" <<JSON
+          {
+            "passed": false,
+            "profile": "${CERT_PROFILE}",
+            "state_backends": ["postgres", "mssql"],
+            "checks": ["run_state", "xmin_state", "kafka_offsets"]
+          }
+          JSON
+          cat > "$CERT_ROOT/reconciliation_evidence.json" <<JSON
+          {
+            "passed": false,
+            "profile": "${CERT_PROFILE}",
+            "delete_reconciliation": {
+              "passed": false,
+              "physical_deletes_checked": 500
+            }
+          }
+          JSON
+          uv run dpone ops live-state-reconciliation \
+            --output-dir "$CERT_ROOT/live-state-reconciliation" \
+            --profile "${CERT_PROFILE}" \
+            --artifact state="$CERT_ROOT/state_evidence.json" \
+            --artifact reconciliation="$CERT_ROOT/reconciliation_evidence.json" \
+            --require state \
+            --require reconciliation \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): connector certification pack"
+        if: ${{ false }}
+        run: |
+          uv run dpone ops certification-pack \
+            --pack-id "local-live-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --output-dir "$CERT_ROOT/certification-pack" \
+            --artifact certification_report="$DPONE_MATRIX_ARTIFACT_DIR/certification_report.json" \
+            --artifact benchmark_slo="$CERT_ROOT/benchmark-slo/benchmark_slo_gate.json" \
+            --artifact performance_certification="$CERT_ROOT/performance-certification/performance_certification.json" \
+            --artifact live_state_reconciliation="$CERT_ROOT/live-state-reconciliation/live_state_reconciliation.json" \
+            --artifact observability="$CERT_ROOT/observability/runtime_metrics.json" \
+            --require certification_report \
+            --require benchmark_slo \
+            --require performance_certification \
+            --require live_state_reconciliation \
+            --require observability \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): release artifact index"
+        if: ${{ false }}
+        run: |
+          uv run dpone ops artifact-index \
+            --root "$CERT_ROOT" \
+            --output-dir "$CERT_ROOT/artifact-index" \
+            --release "local-live-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): release evidence chain"
+        if: ${{ false }}
+        run: |
+          uv run dpone ops evidence-chain \
+            --chain-dir "$CERT_ROOT/evidence-chain" \
+            --release "local-live-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --artifact-index "$CERT_ROOT/artifact-index/artifact_index.json" \
+            --format json
+          uv run dpone ops evidence-chain-verify \
+            --chain-dir "$CERT_ROOT/evidence-chain" \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): pre-release checklist"
+        if: ${{ false }}
+        run: |
+          uv run dpone ops pre-release-checklist \
+            --output-dir "$CERT_ROOT/pre-release" \
+            --release "live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --release-type minor \
+            --check cli_help_surface=false \
+            --check cli_output_contracts=false \
+            --check run_cli_manifest=false \
+            --check run_python_api_manifest=false \
+            --check nested_hierarchical_identity=false \
+            --check nested_parent_child_integrity=false \
+            --check source_sink_strategy_matrix=false \
+            --check source_sink_artifacts=false \
+            --check docker_live_routes=false \
+            --check contracts_guardrails=false \
+            --check documentation_yaml_examples=false \
+            --check documentation_links=false \
+            --check documentation_mkdocs=false \
+            --check ci_cd_quality=false \
+            --check package=false \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): release evidence pack"
+        if: ${{ false }}
+        run: |
+          EXTRA_ARTIFACTS=()
+          if [ "${CERT_PROFILE}" = "native_transfer" ]; then
+            EXTRA_ARTIFACTS+=(--artifact strategy_certification_bundle="$CERT_ROOT/strategy-certification/strategy_certification_bundle.json")
+          fi
+          if [ -f "$CERT_ROOT/mysql/mysql_local_route_cells.json" ]; then
+            EXTRA_ARTIFACTS+=(--artifact mysql_local_routes="$CERT_ROOT/mysql/mysql_local_route_cells.json")
+          fi
+          uv run dpone ops release-evidence-pack \
+            --output-dir "$CERT_ROOT/release-evidence" \
+            --release "live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --profile "${CERT_PROFILE}" \
+            --artifact certification_pack="$CERT_ROOT/certification-pack/connector_certification_pack.json" \
+            --artifact service_markers="$CERT_ROOT/service_markers.json" \
+            --artifact performance_certification="$CERT_ROOT/performance-certification/performance_certification.json" \
+            --artifact live_state_reconciliation="$CERT_ROOT/live-state-reconciliation/live_state_reconciliation.json" \
+            --artifact evidence_chain="$CERT_ROOT/evidence-chain/evidence_chain_index.json" \
+            --artifact pre_release_checklist="$CERT_ROOT/pre-release/pre_release_checklist.json" \
+            "${EXTRA_ARTIFACTS[@]}" \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): route live certification bundles"
+        if: ${{ false }}
+        run: |
+          mkdir -p "$CERT_ROOT/route-live/mssql-to-clickhouse" "$CERT_ROOT/route-live/postgres-to-mssql"
+          COMMON_ARTIFACTS=(
+            --artifact service_markers="$CERT_ROOT/service_markers.json"
+            --artifact benchmark_slo="$CERT_ROOT/benchmark-slo/benchmark_slo_gate.json"
+            --artifact performance_certification="$CERT_ROOT/performance-certification/performance_certification.json"
+            --artifact live_state_reconciliation="$CERT_ROOT/live-state-reconciliation/live_state_reconciliation.json"
+            --artifact evidence_chain="$CERT_ROOT/evidence-chain/evidence_chain_index.json"
+          )
+          if [ "${CERT_PROFILE}" = "native_transfer" ]; then
+            COMMON_ARTIFACTS+=(--artifact native_transfer_evidence="$CERT_ROOT/strategy-certification/strategy_certification_bundle.json")
+          fi
+          MSSQL_CLICKHOUSE_ARTIFACTS=()
+          if [ -f "$CERT_ROOT/refresh-executor/mssql-clickhouse/route_refresh_execution.json" ]; then
+            MSSQL_CLICKHOUSE_ARTIFACTS+=(--artifact route_refresh_execution="$CERT_ROOT/refresh-executor/mssql-clickhouse/route_refresh_execution.json")
+          fi
+          if [ -f "$CERT_ROOT/refresh-executor/mssql-clickhouse/route_refresh_verification.json" ]; then
+            MSSQL_CLICKHOUSE_ARTIFACTS+=(--artifact route_refresh_verification="$CERT_ROOT/refresh-executor/mssql-clickhouse/route_refresh_verification.json")
+          fi
+          if [ -f "$CERT_ROOT/refresh-executor/mssql-clickhouse/route_refresh_snapshot_capture.json" ]; then
+            MSSQL_CLICKHOUSE_ARTIFACTS+=(--artifact route_refresh_snapshot_capture="$CERT_ROOT/refresh-executor/mssql-clickhouse/route_refresh_snapshot_capture.json")
+          fi
+          if [ -f "$CERT_ROOT/refresh-executor/mssql-clickhouse/source_route_refresh_snapshot.json" ]; then
+            MSSQL_CLICKHOUSE_ARTIFACTS+=(--artifact source_route_refresh_snapshot="$CERT_ROOT/refresh-executor/mssql-clickhouse/source_route_refresh_snapshot.json")
+          fi
+          if [ -f "$CERT_ROOT/refresh-executor/mssql-clickhouse/sink_route_refresh_snapshot.json" ]; then
+            MSSQL_CLICKHOUSE_ARTIFACTS+=(--artifact sink_route_refresh_snapshot="$CERT_ROOT/refresh-executor/mssql-clickhouse/sink_route_refresh_snapshot.json")
+          fi
+          POSTGRES_MSSQL_ARTIFACTS=()
+          if [ -f "$CERT_ROOT/refresh-executor/postgres-mssql/route_refresh_execution.json" ]; then
+            POSTGRES_MSSQL_ARTIFACTS+=(--artifact route_refresh_execution="$CERT_ROOT/refresh-executor/postgres-mssql/route_refresh_execution.json")
+          fi
+          if [ -f "$CERT_ROOT/refresh-executor/postgres-mssql/route_refresh_verification.json" ]; then
+            POSTGRES_MSSQL_ARTIFACTS+=(--artifact route_refresh_verification="$CERT_ROOT/refresh-executor/postgres-mssql/route_refresh_verification.json")
+          fi
+          if [ -f "$CERT_ROOT/refresh-executor/postgres-mssql/route_refresh_snapshot_capture.json" ]; then
+            POSTGRES_MSSQL_ARTIFACTS+=(--artifact route_refresh_snapshot_capture="$CERT_ROOT/refresh-executor/postgres-mssql/route_refresh_snapshot_capture.json")
+          fi
+          if [ -f "$CERT_ROOT/refresh-executor/postgres-mssql/source_route_refresh_snapshot.json" ]; then
+            POSTGRES_MSSQL_ARTIFACTS+=(--artifact source_route_refresh_snapshot="$CERT_ROOT/refresh-executor/postgres-mssql/source_route_refresh_snapshot.json")
+          fi
+          if [ -f "$CERT_ROOT/refresh-executor/postgres-mssql/sink_route_refresh_snapshot.json" ]; then
+            POSTGRES_MSSQL_ARTIFACTS+=(--artifact sink_route_refresh_snapshot="$CERT_ROOT/refresh-executor/postgres-mssql/sink_route_refresh_snapshot.json")
+          fi
+          uv run dpone ops route-live-certification \
+            --output-dir "$CERT_ROOT/route-live/mssql-to-clickhouse" \
+            --release "live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --source mssql \
+            --sink clickhouse \
+            --strategy incremental_merge \
+            --profile "${CERT_PROFILE}" \
+            --row-count "${CERT_ROW_COUNT}" \
+            "${COMMON_ARTIFACTS[@]}" \
+            "${MSSQL_CLICKHOUSE_ARTIFACTS[@]}" \
+            --format json
+          uv run dpone ops route-live-certification \
+            --output-dir "$CERT_ROOT/route-live/postgres-to-mssql" \
+            --release "live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --source postgres \
+            --sink mssql \
+            --strategy incremental_merge \
+            --profile "${CERT_PROFILE}" \
+            --row-count "${CERT_ROW_COUNT}" \
+            "${COMMON_ARTIFACTS[@]}" \
+            "${POSTGRES_MSSQL_ARTIFACTS[@]}" \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): route release gates"
+        if: ${{ false }}
+        run: |
+          uv run dpone ops route-release-gate \
+            --output-dir "$CERT_ROOT/route-release/mssql-to-clickhouse" \
+            --release "live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --source mssql \
+            --sink clickhouse \
+            --strategy incremental_merge \
+            --artifact route_live_evidence_bundle="$CERT_ROOT/route-live/mssql-to-clickhouse/route_live_certification.json" \
+            --require route_live_evidence_bundle \
+            --format json
+          uv run dpone ops route-release-gate \
+            --output-dir "$CERT_ROOT/route-release/postgres-to-mssql" \
+            --release "live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --source postgres \
+            --sink mssql \
+            --strategy incremental_merge \
+            --artifact route_live_evidence_bundle="$CERT_ROOT/route-live/postgres-to-mssql/route_live_certification.json" \
+            --require route_live_evidence_bundle \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): route release candidate orchestration receipts"
+        if: ${{ false }}
+        run: |
+          RC_COMMON_ARTIFACTS=(
+            --artifact service_markers="$CERT_ROOT/service_markers.json"
+            --artifact benchmark_slo="$CERT_ROOT/benchmark-slo/benchmark_slo_gate.json"
+            --artifact performance_certification="$CERT_ROOT/performance-certification/performance_certification.json"
+            --artifact live_state_reconciliation="$CERT_ROOT/live-state-reconciliation/live_state_reconciliation.json"
+            --artifact pre_release_checklist="$CERT_ROOT/pre-release/pre_release_checklist.json"
+            --artifact evidence_chain="$CERT_ROOT/evidence-chain/evidence_chain_index.json"
+          )
+          if [ "${CERT_PROFILE}" = "native_transfer" ]; then
+            RC_COMMON_ARTIFACTS+=(--artifact native_transfer_evidence="$CERT_ROOT/strategy-certification/strategy_certification_bundle.json")
+          fi
+          uv run dpone ops route-rc-orchestrator \
+            --output-dir "$CERT_ROOT/route-rc/mssql-to-clickhouse" \
+            --release "live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --source mssql \
+            --sink clickhouse \
+            --strategy incremental_merge \
+            --profile "${CERT_PROFILE}" \
+            --row-count "${CERT_ROW_COUNT}" \
+            "${RC_COMMON_ARTIFACTS[@]}" \
+            --format json
+          uv run dpone ops route-rc-orchestrator \
+            --output-dir "$CERT_ROOT/route-rc/postgres-to-mssql" \
+            --release "live-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --source postgres \
+            --sink mssql \
+            --strategy incremental_merge \
+            --profile "${CERT_PROFILE}" \
+            --row-count "${CERT_ROW_COUNT}" \
+            "${RC_COMMON_ARTIFACTS[@]}" \
+            --format json
+
+      - name: "Disabled (UNVERIFIED): execute route release candidate receipts"
+        if: ${{ false }}
+        run: |
+          ROUTE_RC_EXECUTE_ARGS=()
+          if [ "${CERT_EXECUTE_ROUTE_RC_COMMANDS}" = "true" ]; then
+            ROUTE_RC_EXECUTE_ARGS+=(--execute)
+          fi
+          uv run dpone ops route-rc-execute \
+            --orchestration-json "$CERT_ROOT/route-rc/mssql-to-clickhouse/route_rc_orchestration.json" \
+            --output-dir "$CERT_ROOT/route-rc-execution/mssql-to-clickhouse" \
+            --timeout-seconds 1800 \
+            --max-attempts 1 \
+            "${ROUTE_RC_EXECUTE_ARGS[@]}" \
+            --format json
+          uv run dpone ops route-rc-execute \
+            --orchestration-json "$CERT_ROOT/route-rc/postgres-to-mssql/route_rc_orchestration.json" \
+            --output-dir "$CERT_ROOT/route-rc-execution/postgres-to-mssql" \
+            --timeout-seconds 1800 \
+            --max-attempts 1 \
+            "${ROUTE_RC_EXECUTE_ARGS[@]}" \
+            --format json
+
+      - name: Stop disposable local services
+        if: always()
+        run: docker compose -f docker/docker-compose.integration.yml down -v
+
+      - name: Upload live certification artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ inputs.local_artifact_name || 'live-certification-local' }}
+          path: test_artifacts/live_certification
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  vendor-live-certification:
+    name: Vendor live certification gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    if: ${{ inputs.profile == 'vendor_live' && inputs.run_vendor_live == true }}
+    env:
+      CERT_ROW_COUNT: ${{ inputs.row_count }}
+      CERT_ROOT: test_artifacts/live_certification_vendor
+      DPONE_RUN_INTEGRATION: "1"
+      DPONE_RUN_INTEGRATION_LIVE: "1"
+      DPONE_RUN_INTEGRATION_MATRIX: "1"
+      DPONE_MATRIX_RUN_MODE: vendor_live
+      DPONE_MATRIX_STRATEGY: backfill
+      DPONE_MATRIX_SOURCE: ${{ inputs.vendor_backfill_source_filter }}
+      DPONE_MATRIX_SINK: ${{ inputs.vendor_backfill_sink_filter }}
+      DPONE_MATRIX_CASE_ID: ${{ inputs.vendor_backfill_case_id_filter }}
+      DPONE_MATRIX_ROW_COUNT: ${{ inputs.row_count }}
+      DPONE_MATRIX_ARTIFACT_DIR: test_artifacts/live_certification_vendor/backfill_matrix
+      APPSFLYER_API_TOKEN: ${{ secrets.APPSFLYER_API_TOKEN }}
+      GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+      GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON }}
+      MINDBOX_SECRET_KEY: ${{ secrets.MINDBOX_SECRET_KEY }}
+      SIMILARWEB_API_KEY: ${{ secrets.SIMILARWEB_API_KEY }}
+      YANDEX_WEBMASTER_OAUTH_TOKEN: ${{ secrets.YANDEX_WEBMASTER_OAUTH_TOKEN }}
+      OPENEXCHANGERATES_APP_ID: ${{ secrets.OPENEXCHANGERATES_APP_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Build vendor live plan
+        run: |
+          uv run dpone ops live-certification-plan \
+            --output-dir "$CERT_ROOT/plan" \
+            --profile vendor_live \
+            --include-vendor-live \
+            --row-count "${CERT_ROW_COUNT}" \
+            --format json
+
+      - name: Verify managed credential readiness
+        run: |
+          uv run dpone ops managed-credentials-readiness \
+            --profile vendor_live \
+            --required-env APPSFLYER_API_TOKEN \
+            --required-env GOOGLE_ADS_DEVELOPER_TOKEN \
+            --required-env GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON \
+            --required-env MINDBOX_SECRET_KEY \
+            --required-env SIMILARWEB_API_KEY \
+            --required-env YANDEX_WEBMASTER_OAUTH_TOKEN \
+            --required-env OPENEXCHANGERATES_APP_ID \
+            --output-dir "$CERT_ROOT/managed-credentials" \
+            --format json
+
+      - name: Run vendor live backfill matrix
+        run: |
+          mkdir -p "$DPONE_MATRIX_ARTIFACT_DIR"
+          uv run pytest -m integration_matrix tests/integration/matrix -q \
+            --junitxml="$DPONE_MATRIX_ARTIFACT_DIR/backfill_vendor_live_junit.xml"
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$DPONE_MATRIX_ARTIFACT_DIR/backfill_vendor_live_junit.xml" \
+            --min-passed 1 \
+            --max-skipped 0 \
+            --evidence-json "$DPONE_MATRIX_ARTIFACT_DIR/backfill_vendor_live.json" \
+            --profile vendor_live \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+
+      - name: Run vendor live tests
+        run: |
+          uv run pytest -m "integration_live and not route_live_wide" tests/integration -q \
+            --junitxml="$CERT_ROOT/vendor_live_junit.xml"
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "$CERT_ROOT/vendor_live_junit.xml" \
+            --min-passed 1 \
+            --max-skipped 0 \
+            --evidence-json "$CERT_ROOT/vendor_live_tests.json" \
+            --profile vendor_live \
+            --commit-sha "$GITHUB_SHA" \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload vendor live artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: live-certification-vendor
+          path: test_artifacts/live_certification_vendor
+          if-no-files-found: warn

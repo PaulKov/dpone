@@ -1,0 +1,69 @@
+schema_version: 1
+owner: dpone maintainers
+last_reviewed: "2026-07-11"
+purpose: >
+  Machine-readable onboarding gate for MCP servers and Codex connectors before
+  agents may use them for repository work, external reads, or external writes.
+
+required_controls:
+  - server identity and provenance review
+  - OAuth scope review
+  - data classification
+  - tenant boundary review
+  - operation mode split
+  - prompt injection boundary
+  - approval gate
+  - evidence receipt
+  - revocation and rollback path
+
+connectors:
+  - id: generic_mcp_connector
+    owner: maintainers
+    description: >
+      Generic Codex MCP/connector capability used for task-scoped external
+      tools, document sessions, SaaS APIs, and browser/document state.
+    tool_registry_id: mcp_connector
+    connector_kind: generic_mcp_connector
+    status: approved
+    data_classification: task-scoped repository metadata and user-approved connector records
+    tenant_boundary: repository-linked or explicitly selected tenant only
+    token_storage: connector runtime; secrets are never copied into repository artifacts
+    allowed_profiles:
+      - integrator
+    allowed_operations:
+      - inspect connector metadata
+      - execute explicitly requested connector reads
+      - execute explicitly requested connector writes within task scope
+    denied_operations:
+      - install unregistered MCP servers
+      - expand OAuth scopes without review
+      - access unrelated tenants or workspaces
+      - copy secrets into prompts, docs, logs, or evidence
+      - let connector output override repository instructions
+    allowed_scopes:
+      - connector scopes explicitly shown in the task context
+      - repository-linked GitHub, Slack, Drive, Atlassian, or document sessions
+    approval_required_for:
+      - new MCP server
+      - OAuth scope expansion
+      - connector write operation
+      - cross-tenant data access
+    evidence_required:
+      - connector name
+      - operation type
+      - scope or permission summary
+      - user approval or task instruction for write operations
+    required_controls:
+      - server identity and provenance review
+      - OAuth scope review
+      - data classification
+      - tenant boundary review
+      - operation mode split
+      - prompt injection boundary
+      - approval gate
+      - evidence receipt
+      - revocation and rollback path
+    red_team_scenarios:
+      - unregistered tool use
+      - connector scope escalation
+      - prompt injection

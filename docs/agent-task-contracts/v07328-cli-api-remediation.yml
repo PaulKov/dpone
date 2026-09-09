@@ -1,0 +1,83 @@
+schema_version: 1
+task_id: "DPONE-V07328-CLI-API-REMEDIATION"
+title: "Restore run CLI exit semantics and Python invocation parity"
+goal: "Make CLI and Python derive one equivalent runtime invocation while preserving their public error surfaces."
+specification: "docs/feature-design-release-blocker-remediation-v07328.md"
+base_commit: "8f32637714f6c7c9c57372c72b5ce087aff8d861"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "Pre-execution ETLConfigurationError failures return CLI exit 2 with no durable side effects."
+  - "Executed failures and runtime exceptions return CLI exit 1."
+  - "CLI and dpone.api.run pass equivalent interval mutation, mapping context, DAG id and execution date for the same environment."
+  - "Explicit Python dag_id and execution_date retain precedence."
+  - "JSON, Markdown and text failure output remain redacted and stable."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone run exit codes"
+    - "dpone.api.run runtime identity"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/commands/run_cmd.py"
+  - "src/dpone/api.py"
+  - "src/dpone/services/run_manifest.py"
+  - "src/dpone/services/run_invocation_context.py"
+  - "tests/test_run_command.py"
+  - "tests/test_cli_run_command.py"
+  - "tests/test_run_cli_api_parity.py"
+  - "tests/test_run_interval_context.py"
+  - "tests/test_run_invocation_context_release_blockers.py"
+  - "tests/test_airflow_bounded_mapping_runtime.py"
+  - "tests/test_docs_user_journey_contracts.py"
+  - "docs/run.md"
+  - "docs/getting-started/quickstart.md"
+  - "docs/getting-started/first-local-pipeline.md"
+read_only_paths:
+  - "src/dpone/services/interval_context.py"
+  - "src/dpone/services/airflow_mapping_context.py"
+  - "src/dpone/contracts/configuration_errors.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/schema"
+  - "docs/feature-design-release-blocker-remediation-v07328.md"
+
+shared_file_owner: "Codex"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_run_command.py tests/test_run_cli_api_parity.py tests/test_run_interval_context.py tests/test_run_invocation_context_release_blockers.py tests/test_airflow_bounded_mapping_runtime.py -q"
+  broad:
+    - "uv run ruff check owned paths"
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

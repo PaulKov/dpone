@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/restore-plan.schema.json",
+  "title": "dpone schema migration restore plan",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "restore_plan_id",
+    "pack_id",
+    "backup_run_id",
+    "environment",
+    "target",
+    "restore_table",
+    "operations",
+    "preconditions",
+    "blockers",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_restore_plan.v1"},
+    "status": {"enum": ["planned", "blocked"]},
+    "restore_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "backup_run_id": {"type": ["string", "null"]},
+    "environment": {"type": "string"},
+    "target": {"type": "object", "required": ["sink_type", "table"], "additionalProperties": true},
+    "backup_destination": {"type": ["string", "null"]},
+    "restore_table": {"type": "string"},
+    "operations": {"type": "array", "items": {"type": "object"}},
+    "preconditions": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

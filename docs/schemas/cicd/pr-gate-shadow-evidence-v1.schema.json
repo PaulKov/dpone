@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/cicd/pr-gate-shadow-evidence-v1.schema.json",
+  "title": "dpone.pr-gate-shadow-evidence.v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "repository_id", "pr_number", "base_sha", "head_sha", "merge_sha", "plan_digest", "implementation_bundle_digest", "jobs", "status"],
+  "properties": {"schema_version": {"const": "dpone.pr-gate-shadow-evidence.v1"}, "repository_id":{"type":"integer","minimum":1}, "pr_number":{"type":"integer","minimum":1}, "base_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"}, "head_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"}, "merge_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"}, "plan_digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}, "implementation_bundle_digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}, "status": {"enum":["PASS","FAIL","UNVERIFIED"]}, "jobs": {"type":"object", "additionalProperties": false, "required":["static","contracts","docs","python-3.11","python-3.12","packaging","postgresql","airflow","runtime-wheel-smoke"], "patternProperties":{"^(static|contracts|docs|python-3\\.11|python-3\\.12|packaging|postgresql|airflow|runtime-wheel-smoke)$":{"type":"object","additionalProperties":false,"required":["selection","outcome"],"properties":{"selection":{"enum":["RUN","N/A"]},"outcome":{"enum":["PASS","FAIL","N/A","UNVERIFIED"]}}}}}}
+}

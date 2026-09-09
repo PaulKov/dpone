@@ -1,0 +1,242 @@
+[build-system]
+requires = ["uv_build>=0.9.18,<0.12.0"]
+build-backend = "uv_build"
+
+[project]
+name = "dpone"
+version = "0.74.33"
+description = "Declarative ETL framework for YAML-driven data pipelines"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = "Apache-2.0"
+authors = [{ name = "PaulKov" }]
+maintainers = [{ name = "PaulKov" }]
+keywords = [
+  "etl",
+  "data-platform",
+  "data-engineering",
+  "yaml",
+  "dag",
+  "bigquery",
+  "postgres",
+  "mssql",
+  "sql-server",
+  "clickhouse",
+  "kafka",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Database",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: System :: Distributed Computing",
+  "Typing :: Typed",
+]
+dependencies = [
+  "pyyaml>=6.0.1",
+  "jinja2>=3.1.0",
+  "sqlglot==30.12.0",
+  "pendulum==3.2.0",
+  "prettytable==3.18.0",
+  "pytz>=2023.3",
+  "idna>=3.15",
+  "requests>=2.33.0",
+  "urllib3>=2.7.0",
+  "ijson>=3.3.0",
+  "jsonschema>=4.23,<5",
+  "dpone-airflow-pack==0.74.33",
+]
+
+[project.scripts]
+dpone = "dpone.cli.main:main"
+dpone-runtime-install = "dpone.runtime.dev_install:main_install"
+dpone-runtime-exec = "dpone.runtime.dev_install:main_exec"
+
+[project.urls]
+Homepage = "https://github.com/PaulKov/dpone"
+Repository = "https://github.com/PaulKov/dpone"
+Issues = "https://github.com/PaulKov/dpone/issues"
+Documentation = "https://paulkov.github.io/dpone/"
+Changelog = "https://github.com/PaulKov/dpone/blob/master/CHANGELOG.md"
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]==3.3.4"]
+clickhouse = ["clickhouse-connect==0.6.22", "clickhouse-driver==0.2.10", "clickhouse-cityhash==1.0.2.5"]
+mssql = ["pyodbc>=5.2,<6"]
+mysql = ["PyMySQL>=1.1,<2"]
+gcp = ["google-cloud-bigquery==3.42.2", "google-cloud-storage==3.12.1", "protobuf>=6.33.5", "pyasn1>=0.6.4"]
+s3 = ["boto3>=1.34,<2"]
+azure = ["azure-identity>=1.13,<2", "azure-storage-blob>=12.19,<13"]
+object_storage = [
+  "boto3>=1.34,<2",
+  "azure-identity>=1.13,<2",
+  "azure-storage-blob>=12.19,<13",
+  "google-cloud-storage==3.12.1",
+]
+accel = ["dpone-native-accel==0.74.33"]
+columnar = ["pyarrow>=23.0.1,<26"]
+pandas = ["pandas==2.1.4", "numpy==1.26.4"]
+vault = ["vault-kv-client>=0.1.0,<0.2.0"]
+semantic-refresh-airflow = [
+  "pyodbc>=5.2,<6",
+  "boto3>=1.34,<2",
+  "pyarrow>=23.0.1,<26",
+  "vault-kv-client>=0.1.0,<0.2.0",
+  "dbt-core==1.12.3",
+  "dbt-sqlserver==1.11.1",
+]
+dbt = ["dbt-core>=1.8,<2"]
+dbt-mssql = [
+  "dbt-core==1.12.3",
+  "dbt-sqlserver==1.11.1",
+]
+kubernetes = ["kubernetes>=32.0.1,!=36.0.0,<37"]
+google_ads = ["google-ads>=28.0.0,<29.0.0", "protobuf>=6.33.5", "pyasn1>=0.6.4"]
+kafka = ["confluent-kafka>=2.14,<3", "fastavro>=1.11,<2", "protobuf>=6.33.5", "googleapis-common-protos>=1.70,<2", "httpx>=0.28,<1", "authlib>=1.3,<2", "cachetools>=5,<8", "orjson>=3.10,<4"]
+full = [
+  "psycopg[binary]==3.3.4",
+  "clickhouse-connect==0.6.22",
+  "clickhouse-driver==0.2.10",
+  "clickhouse-cityhash==1.0.2.5",
+  "pyodbc>=5.2,<6",
+  "PyMySQL>=1.1,<2",
+  "google-cloud-bigquery==3.42.2",
+  "google-cloud-storage==3.12.1",
+  "boto3>=1.34,<2",
+  "azure-identity>=1.13,<2",
+  "azure-storage-blob>=12.19,<13",
+  "pyarrow>=23.0.1,<26",
+  "protobuf>=6.33.5",
+  "pyasn1>=0.6.4",
+  "pandas==2.1.4",
+  "numpy==1.26.4",
+  "vault-kv-client>=0.1.0,<0.2.0",
+  "kubernetes>=32.0.1,!=36.0.0,<37",
+  "google-ads>=28.0.0,<29.0.0",
+  "confluent-kafka>=2.14,<3",
+  "fastavro>=1.11,<2",
+  "httpx>=0.28,<1",
+  "authlib>=1.3,<2",
+  "cachetools>=5,<8",
+  "orjson>=3.10,<4",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.3",
+  "pytest-cov>=5.0.0",
+  "Pygments>=2.20.0",
+  "ruff>=0.6.9",
+  "mypy>=1.11.2",
+  "pre-commit>=3.8.0",
+  "types-PyYAML>=6.0.12.20240917",
+  "types-requests>=2.32.0.20240914",
+  "minio>=7.2.9",
+  "mkdocs>=1.6,<2",
+  "mkdocs-material>=9.7,<10",
+  "pymdown-extensions>=11.0.1,<12",
+  "twine>=6,<7",
+  "lizard>=1.23,<2",
+  "radon>=6.0,<7",
+  "pytest-xdist>=3.8.0",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.uv.sources]
+dpone-native-accel = { workspace = true }
+dpone-airflow-pack = { workspace = true }
+
+[tool.uv.build-backend]
+source-exclude = [
+  "src/dpone/.env.example",
+  "src/dpone/.gitignore",
+  "src/dpone/AGENTS.md",
+]
+
+[tool.uv.workspace]
+members = ["packages/dpone-native-accel", "packages/dpone-airflow-pack"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+  "integration: tests that require external services (PostgreSQL/ClickHouse)",
+  "integration_extended: extended/nightly integration tests (MinIO/GCS-export and installed-package scenarios)",
+  "integration_live: manual/nightly live integration tests against real vendor APIs",
+  "route_live_wide: disposable multi-service route certification owned by the route-live-wide workflow",
+  "integration_postgres: optional integration tests requiring Docker PostgreSQL",
+  "integration_mssql: optional integration tests requiring Docker SQL Server and bcp tools",
+  "integration_mysql: optional integration tests requiring Docker MySQL",
+  "integration_clickhouse: optional integration tests requiring Docker ClickHouse",
+  "integration_postgres_cdc: optional integration tests requiring PostgreSQL wal_level=logical",
+  "integration_postgres_xmin: optional integration tests requiring PostgreSQL for XMin strategy selection",
+  "integration_kafka: optional integration tests requiring Kafka and Schema Registry",
+  "integration_nested_live: manual nested normalization live certification tests against local DB/Kafka services",
+  "integration_replay: optional tests for replay execution adapters against local or injected live backends",
+  "integration_replay_services: optional replay CLI tests against local Postgres/Kafka/DB services",
+  "integration_matrix: manual source->sink x load strategy certification matrix tests",
+  "integration_matrix_mock: manual mock/local source->sink matrix tests without external vendor credentials",
+  "integration_backfill: end-to-end chunked backfill matrix tests against local Docker services",
+  "type_matrix_certification: source->sink type matrix, physical DDL and temporal fidelity certification tests",
+  "nightly: tests intended for scheduled or manual nightly-like pipelines",
+  "packaging: tests that validate installed package artifacts",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["src", "tests", "tools"]
+extend-exclude = [".cache"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.coverage.run]
+source = ["src/dpone"]
+omit = [
+  # Legacy compatibility import shims are covered through their canonical runtime modules.
+  "src/dpone/credentials/*",
+  "src/dpone/etl/*",
+  "src/dpone/etl_logging/*",
+  "src/dpone/reconciliation/**",
+  "src/dpone/sink/**",
+  "src/dpone/source/**",
+  "src/dpone/sql_helpers/**",
+  "src/dpone/state/**",
+  "src/dpone/xmin/**",
+  "src/dpone/yaml_config_handler/**",
+
+  # Live adapters require external services or vendor credentials and are
+  # exercised by explicit integration profiles, not by the public OSS CI gate.
+  "src/dpone/runtime/connectors/api/*",
+  "src/dpone/runtime/connectors/bigquery.py",
+  "src/dpone/runtime/connectors/postgres.py",
+  "src/dpone/runtime/connectors/clickhouse*.py",
+  "src/dpone/runtime/sources/strategies/api/**",
+  "src/dpone/runtime/sources/strategies/clickhouse/**",
+  "src/dpone/runtime/sources/strategies/postgres/**",
+  "src/dpone/runtime/sinks/bigquery*.py",
+  "src/dpone/runtime/sinks/postgres*.py",
+  "src/dpone/runtime/sinks/strategies/**",
+]
+
+[tool.coverage.report]
+# Ratchet policy: raise fail_under toward the measured baseline (85%+ as of
+# 2026-07) whenever a release lands above it; never lower it back.
+fail_under = 80
+show_missing = true
+skip_covered = true

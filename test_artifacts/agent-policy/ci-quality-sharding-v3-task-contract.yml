@@ -1,0 +1,87 @@
+schema_version: 1
+task_id: "618-v3"
+title: "CI quality sharding and exact-head performance evidence"
+goal: "Reach required quality critical-path p95 below 720 seconds without weakening evidence."
+specification: "docs/feature-design-ci-quality-sharding-v3.md"
+base_commit: "756a03a88907ad447ea740a7ee73025c81b257c1"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "V1 and V2 policy/schema/fixtures stay byte-exact."
+  - "Both existing Quality checks contexts remain required aggregate gates."
+  - "Every non-live test has deterministic, exact-head required execution and Python 3.12 combined coverage retains the ratchet."
+  - "Missing, duplicate, cancelled, stale or mismatched evidence fails closed."
+  - "Three unchanged-SHA GitHub-hosted attempts prove p95 below 720 seconds with zero unclassified flakes."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["GitHub Actions quality workflow", "agent security policy", "CI evidence artifacts", "operator runbook"]
+  migration_required: false
+
+owned_paths:
+  - tools/ci_quality_
+  - tests/test_ci_quality_
+  - docs/feature-design-ci-quality-sharding-v3.md
+  - docs/cicd/ci-performance-evidence.md
+  - test_artifacts/ci-quality/
+integrator_owned_paths:
+  - .github/workflows/ci.yml
+  - .agents/policy/workflow-security-privileged-v3.yml
+  - evals/agent/workflow-security-privileged-policy-v3.schema.json
+  - tools/agent_policy/workflow_privilege_
+  - tests/agent_policy/
+  - tests/fixtures/ci-shadow-pr3b/
+  - docs/cicd/runbooks.md
+  - docs/cicd/workflows.md
+  - docs/ci-cd.md
+  - docs/quality-metrics.md
+  - test_artifacts/agent-policy/
+read_only_paths:
+  - .agents/policy/workflow-security-privileged.yml
+  - .agents/policy/workflow-security-privileged-v2.yml
+  - evals/agent/workflow-security-privileged-policy.schema.json
+  - evals/agent/workflow-security-privileged-policy-v2.schema.json
+  - docs/feature-design-ci-governance-profile-v2-amendment.md
+forbidden_paths:
+  - .github/workflows
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .agents/policy/workflow-security-privileged.yml
+  - .agents/policy/workflow-security-privileged-v2.yml
+  - evals/agent/workflow-security-privileged-policy.schema.json
+  - evals/agent/workflow-security-privileged-policy-v2.schema.json
+  - .agents/policy/workflow-security-privileged-v3.yml
+  - evals/agent/workflow-security-privileged-policy-v3.schema.json
+  - tools/agent_policy/workflow_privilege_
+  - tests/agent_policy
+  - tests/fixtures/ci-shadow-pr3b
+  - docs/cicd/runbooks.md
+  - docs/cicd/workflows.md
+  - docs/ci-cd.md
+  - docs/quality-metrics.md
+  - test_artifacts/agent-policy
+shared_file_owner: "Codex"
+
+dependencies: ["#607 V2 activation merged", "APPROVED V3 specification"]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_ci_quality_*.py tests/agent_policy/test_workflow_privilege_profiles.py -q"
+    - "uv run python tools/agent_policy/workflow_security.py ."
+  broad:
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+  live: ["Three unchanged-SHA hosted PR runs; p95 below 720 seconds"]
+
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

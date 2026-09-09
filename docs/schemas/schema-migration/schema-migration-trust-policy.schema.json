@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-migration-trust-policy.schema.json",
+  "title": "dpone schema migration trust policy",
+  "type": "object",
+  "required": ["schema_version", "profile"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_trust_policy.v1"
+    },
+    "profile": {"type": "string", "minLength": 1},
+    "require_signed_provenance": {"type": "boolean"},
+    "allowed_producers": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "allowed_repositories": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "allowed_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "require_protected_ref": {"type": "boolean"},
+    "require_commit_sha": {"type": "boolean"},
+    "require_ci_run": {"type": "boolean"},
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed_algorithms": {"type": "array", "items": {"enum": ["HMAC-SHA256"]}},
+        "allowed_key_ids": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "external_attestations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": {"type": "boolean"},
+        "allowed_kinds": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-flow-manifest.schema.json
+kind: dpone.flow.v1
+authoring:
+  mode: flow
+  source: examples/nested/rest_api_to_clickhouse.yml
+metadata:
+  id: nested_orders_api_to_clickhouse
+  domain: examples
+
+processes:
+  - name: nested_orders_api_to_clickhouse
+    source:
+      type: api
+      api_type: rest
+      connection_ref: orders_api
+      table: {schema: api, name: orders}
+      endpoint: /orders
+      options:
+        records_path: $.orders[*]
+    sink:
+      type: clickhouse
+      connection_ref: clickhouse_dwh
+      table: {schema: landing, name: orders}
+      strategy: {mode: incremental_merge, unique_key: [order_id], merge_policy: delete_insert}
+      options:
+        sink_type: clickhouse
+        nested_fast_path:
+          enabled: true
+        lineage:
+          enabled: true
+          preset: hierarchical
+        normalization:
+          nested:
+            enabled: true
+            materialization: spill_to_disk
+            spill_output_format: json_each_row
+            child_snapshot_store:
+              enabled: true
+              backend: json
+              path: .dpone/state/clickhouse_nested_child_snapshots.json
+            atomicity:
+              mode: staging_commit
+              on_failure: rollback_staged
+            child_quality:
+              duplicate_child_key: fail
+              orphan_child_rows: fail
+            nested_level: 4
+            split_paths:
+              - path: $.items[*]
+                table: order_lines
+                unique_key: [order_id, sku]
+                delete_policy: replace_parent_children
+            guardrails:
+              max_child_tables: 16
+              max_rows_per_root: 10000
+              max_array_length: 1000
+            raw_landing: true

@@ -1,0 +1,88 @@
+schema_version: 1
+task_id: "DPONE-512-PR4B"
+title: "CI shadow trusted exact-SHA auditor"
+goal: "Implement the approved default-branch, data-only PR Gate shadow auditor without changing legacy merge authority."
+specification: "docs/feature-design-ci-pr-gate-exact-sha-evidence.md"
+base_commit: "176735df2fd0e0e233b962b5143bebb64ffec8d1"
+integrator: "dpone-integrator"
+
+acceptance_criteria:
+  - "Specification status is APPROVED before production-code writes."
+  - "The auditor accepts only a stable current merge tuple (B,H,M), with complete open-PR pagination, two equal observations, and final revalidation before receipt persistence."
+  - "Incoming action_required workflow_run events are receipt-free telemetry and never establish later-run identity."
+  - "Auditor code is default-branch data-only: it does not check out, import, cache, evaluate, source, or execute pull-request content."
+  - "Audit and implementation-bundle schemas are closed; malformed, forged, foreign, missing, or ambiguous inputs produce an attempt-bound UNVERIFIED receipt."
+  - "Audit receipts are create-only, attempt-specific, retained for 90 days, and legacy nineteen-check merge authority remains unchanged."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["diagnostic audit workflow", "audit receipt schema", "audit CLI", "trusted implementation bundle manifest"]
+  migration_required: false
+
+owned_paths:
+  - "test_artifacts/agent-policy/ci-shadow-pr4b-task-contract.yml"
+integrator_owned_paths:
+  - ".github/workflows/pr-gate-shadow-audit.yml"
+  - ".agents/policy/ci-shadow-bundle-v1.yml"
+  - "docs/schemas/cicd"
+  - "docs/cicd"
+  - "mkdocs.yml"
+  - "src/dpone/contracts"
+  - "src/dpone/services/ci"
+  - "src/dpone/ports"
+  - "src/dpone/adapters"
+  - "tools/ci"
+  - "tests"
+read_only_paths:
+  - "docs/feature-design-ci-pr-gate-exact-sha-evidence.md"
+  - "docs/adr/0046-component-aware-pr-gate-authority.md"
+  - "docs/adr/0048-exact-sha-readiness-evidence.md"
+  - ".github/workflows/pr-gate-shadow.yml"
+  - ".github/workflows/ci.yml"
+  - ".agents/policy/github-branch-protection.yml"
+forbidden_paths:
+  - ".github/workflows"
+  - ".agents/policy"
+  - "docs/schemas/cicd"
+  - "docs/cicd"
+  - "src/dpone/contracts"
+  - "src/dpone/services/ci"
+  - "src/dpone/ports"
+  - "src/dpone/adapters"
+  - "tools/ci"
+  - "tests"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/ci.yml"
+  - ".agents/policy/github-branch-protection.yml"
+
+shared_file_owner: "dpone-integrator"
+dependencies:
+  - "Merged PR4A exact-head producer and claims evidence"
+  - "Specification status APPROVED"
+  - "Fresh base_commit at implementation handoff"
+  - "Authorized public-fork lifecycle canary before PR4C implementation"
+required_checks:
+  focused:
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/ci-shadow-pr4b-task-contract.yml"
+    - "uv run pytest tests/test_ci_shadow_pr4b_audit.py tests/test_ci_shadow_pr4b_cli.py tests/test_ci_shadow_pr4b_workflow_contract.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+  live:
+    - "Hosted default-branch audit evidence; UNVERIFIED without authorized exact-head evidence"
+required_outputs: ["implementation", "tests", "documentation_impact", "completion_report"]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Specification is not APPROVED."
+  - "Base commit is stale at implementation handoff."
+  - "Change alters legacy authority, secrets, write/OIDC scope, or branch protection."
+  - "Required shared path lacks integrator ownership."
+  - "Any implementation path executes or imports pull-request-controlled bytes."

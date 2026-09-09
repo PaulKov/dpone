@@ -1,0 +1,140 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-RUN-IDENTITY-RERUN-V1"
+title: "Correlate Airflow run identity and plan reproducible reruns"
+goal: "Carry one verified release/deployment/DAG/pack/bundle identity through a workload attempt and independently plan bundle/artifact reruns."
+specification: "docs/feature-design-airflow-run-identity-rerun-v1.md"
+base_commit: "7d058420"
+integrator: "current Codex task"
+
+acceptance_criteria:
+  - "Index-backed provider tasks carry one bounded non-secret dpone.airflow-run-identity.v1."
+  - "XCom and evidence bundle preserve and validate the exact runtime-observed identity."
+  - "Rerun planning selects original/latest Airflow bundle independently from original/latest dpone artifacts."
+  - "Critical original reruns block non-versioned bundles and unavailable releases/deployments."
+  - "No planner network call, Airflow metadata access, secret lookup, cache refresh, or remote mutation occurs."
+  - "Airflow parse remains within existing side-effect and performance budgets."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone.airflow-run-identity.v1"
+    - "gitops.airflow_xcom_summary optional run_identity"
+    - "gitops.airflow_evidence_bundle optional run_identity"
+    - "dpone.airflow-rerun-plan.v1"
+    - "dpone airflow rerun-plan"
+  migration_required: false
+
+owned_paths:
+  - "docs/feature-design-airflow-run-identity-rerun-v1.md"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/run_identity.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_loader.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_materializer.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_tasks.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_wiring.py"
+  - "src/dpone/contracts/airflow_run_identity.py"
+  - "src/dpone/readiness/airflow_rerun_plan.py"
+  - "src/dpone/ports/airflow_rerun.py"
+  - "src/dpone/adapters/airflow_rerun_files.py"
+  - "src/dpone/adapters/deployment_cache_files.py"
+  - "src/dpone/runtime/deployment_cache_common.py"
+  - "src/dpone/services/airflow_rerun_plan_service.py"
+  - "src/dpone/commands/airflow_rerun_plan_cmd.py"
+  - "src/dpone/commands/airflow_rerun_plan_rendering.py"
+  - "src/dpone/commands/airflow_self_service_cmd.py"
+  - "src/dpone/gitops/airflow_runtime_models.py"
+  - "src/dpone/gitops/airflow_xcom_outcome.py"
+  - "src/dpone/commands/gitops/airflow_xcom_cmd.py"
+  - "src/dpone/commands/gitops/airflow_cmd.py"
+  - "src/dpone/gitops/airflow_evidence_bundle.py"
+  - "src/dpone/gitops/airflow_evidence_bundle_models.py"
+  - "src/dpone/gitops/airflow_runtime_profile_models.py"
+  - "src/dpone/services/gitops/airflow_runtime_exec_service.py"
+  - "src/dpone/gitops/schema_airflow_runtime_contracts.py"
+  - "src/dpone/gitops/schema_airflow_evidence_bundle_contracts.py"
+  - "src/dpone/gitops/schema_airflow_contracts.py"
+  - "src/dpone/gitops/schema_airflow_run_identity_contracts.py"
+  - "docs/schemas/gitops/airflow-run-identity.schema.json"
+  - "docs/schemas/gitops/airflow-rerun-plan.schema.json"
+  - "docs/schemas/gitops/airflow-xcom-summary.schema.json"
+  - "docs/schemas/gitops/airflow-evidence-bundle.schema.json"
+  - "tests/test_airflow_run_identity.py"
+  - "tests/test_airflow_rerun_plan.py"
+  - "tests/test_airflow_deployment_index_provider.py"
+  - "tests/test_airflow_dag_loader_contract.py"
+  - "tests/test_gitops_airflow_evidence_bundle.py"
+  - "tests/test_cli_gitops_airflow_commands.py"
+  - "tests/test_gitops_airflow_runtime_evidence_output.py"
+  - "tests/test_gitops_airflow_xcom_inline_evidence.py"
+  - "tests/test_gitops_schema_contracts.py"
+  - "tests/test_gitops_airflow_runtime.py"
+  - "docs/airflow-self-service.md"
+  - "docs/airflow-pack-provider.md"
+  - "docs/compatibility.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "docs/cli-reference.md"
+  - "docs/gitops-control-plane.md"
+  - "docs/quality-metrics.md"
+  - "docs/reference/gitops-schema-catalog.md"
+  - "test_artifacts/agent-policy/airflow-run-identity-rerun-v1.yml"
+  - "test_artifacts/airflow-run-identity-rerun-v1/**"
+read_only_paths:
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/adr/0013-reproducible-rerun-and-retention.md"
+  - "src/dpone/readiness/airflow_bundle_identity.py"
+  - "src/dpone/runtime/deployment_cache_retention.py"
+forbidden_paths:
+  - ".cursor/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+
+shared_file_owner: "current Codex task"
+
+dependencies: []
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_run_identity.py tests/test_airflow_rerun_plan.py tests/test_airflow_deployment_index_provider.py tests/test_gitops_airflow_evidence_bundle.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv build packages/dpone-airflow-pack --out-dir dist"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "UNVERIFIED until an approved Airflow GitDagBundle environment reruns a critical attempt with the original retained deployment"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Implementation maps a dpone release or pack one-to-one to an Airflow DAG Bundle."
+  - "Runtime resolves current instead of using the parsed release/deployment pins."
+  - "Provider parse reads network, metadata DB, Variable, Connection, Vault, Kubernetes, or refreshes cache."
+  - "Identity contains secret values, Vault paths, signed URLs, or registry bodies."
+  - "A required edit touches user-owned .cursor files."

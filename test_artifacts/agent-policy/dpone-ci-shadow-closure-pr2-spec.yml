@@ -1,0 +1,145 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-CLOSURE-PR2"
+title: "Record the CI shadow closure specification and authority ADRs"
+goal: >-
+  Replace the frozen PR #511 proposal with an auditable repository specification
+  that keeps the nineteen legacy checks authoritative, reserves PR Gate for a
+  future non-Actions App, and defines data-only exact-SHA shadow evidence.
+specification: >-
+  Approved DPONE-CI-SHADOW-CLOSURE plan tracked by
+  https://github.com/PaulKov/dpone/issues/512. Repository approval requires the
+  exact-head owner attestation, Agent PR receipt, legacy checks, and recorded
+  merge commit described by the specification and ADR 0037.
+base_commit: "66e6b651e93b96a1e8b9b649095d9f2b53e8aa53"
+integrator: "/root"
+
+acceptance_criteria:
+  - "The feature design is APPROVED, implementation remains PLANNED, and approval evidence is external and exact-head bound."
+  - "ADR 0046 assigns Actions only PR Gate shadow and reserves PR Gate for a positive future App ID different from 15368."
+  - "ADR 0048 defines direct data-only evidence, API-bound attempts, trusted default-branch audit, stateless full-window reconciliation, two-phase compatibility, and default-deny readiness."
+  - "REST run identity remains H and mutable PR association fields are diagnostic only; the read-only auditor uniquely resolves the still-current GitHub-owned refs/pull/<N>/merge to claimed M, immutable M parents bind B/H, the workflow blob is identical in B/H/M, and product/control work checks out exact H without any PR-head write, OIDC, secret, or attestation capability."
+  - "The checkout-free approved claims collector binds direct GitHub event repository IDs, PR/base/head refs and B/H/M; the auditor requires one stable fully enumerated open-PR tuple, bounded exact-PR mergeability polling, and a second identical observation at the final receipt linearization point."
+  - "Moved merge identity requires a fresh PR event/run, closed or merged identity is terminal UNVERIFIED, and final identity failure is persisted as a typed receipt rather than escaping."
+  - "Every evidence matrix disables fail-fast, required product commands fail natively, and UNVERIFIED uncertainty dominates authenticated terminal FAIL and PASS."
+  - "Fork approval is fail-closed telemetry until a live public-fork canary establishes observable platform behavior; no same run ID or run attempt continuity is assumed, and only an independently authenticated post-start completed attempt enters audit."
+  - "The machine-readable reconciliation MVP design fixture and closed schema freeze the approved values but are not runtime inputs; PR 4C must create an exact child-owned dpone.contracts runtime contract before implementation, and the CLI has no external --policy argument."
+  - "PR 4C performs a complete stateless closed-UTC-second 14-day provider-observable exact-interval scan on every invocation with a 30-minute grace; adjacent seconds split into singleton children, wider inclusive seams overlap one second, and two consecutive complete whole-window observations independently acquire matching run/attempt records, exact-attempt Jobs pages, artifact inventories, bounded artifact bytes, and digests before the evidence_observed_through boundary, after which evaluation performs no provider read."
+  - "Every auditor record is resolved to its exact producer root during both observations and classified only by provider-authenticated producer workflow_run.created_at: before scan_from is diagnostic OUT_OF_SCOPE_OLD_PRODUCER_RERUN, exact interval bounds evaluate normally, the grace interval defers, and future/query-omitted/missing/foreign producer identity is UNVERIFIED with a closed stable code and recovery command ID."
+  - "PR 4C has no cursor, predecessor state, unresolved ledger, DAG, ACI lattice, tombstones, external sort, genesis, checkpoint promotion, or manifest/state/finalization transaction."
+  - "PR 4C emits one immutable bounded direct-JSON report; the highest observed auditor attempt must be terminal, any higher nonterminal attempt is UNVERIFIED, and independent auditor runs or conflicting decisions are UNVERIFIED."
+  - "All required evidence uploads bind trusted workflow retention-days 90 through source-specific authority: producer workflow bytes are identical in B/H/M, while auditor and reconciler bind allowlisted default-branch workflow ID/path/revision/ref/event/run/attempt; PR 4C authenticates per-object created_at/expires_at/expired metadata and bytes but treats expires_at only as an availability deadline, while repository retention settings are optional PR 7 telemetry and never authority."
+  - "PR 4C stops at exact API/request/raw-record/byte/wall-time limits and emits a compact incomplete UNVERIFIED lower-bound summary without a full-set digest or self-referential payload hash."
+  - "Every outbound HTTP dispatch, redirect, poll, Git/PR read, artifact request, and retry is counted before send; closed request classes sum to total_http_requests with retry_requests as an intersecting subset, while pre-decompression API plus artifact body bytes equal the total. Parent hard maxima remain 800 requests, 128 MiB, and 900 seconds."
+  - "A separately approved source-free PR 4C calibration-probe child emits only closed exact-source-bound UNVERIFIED capacity evidence under parent maxima and binds a domain-separated shared acquisition-bundle digest that excludes independently authenticated calibration/reconciliation workflow and CLI roots. Before reconciler-child approval, an unexpired complete 14-day double observation from byte-identical shared acquisition code and an identical controllable runner-label/architecture/Python configuration must use at most 400 requests, 64 MiB, and 450 monotonic seconds, while hosted image version remains diagnostic under the two-times margin/runtime caps and any expansion requires an approved parent amendment."
+  - "The capacity artifact is capped at 8 MiB and carries the sorted unique repo-relative shared-acquisition manifest with paths capped at 1,024 UTF-8 bytes; length-framed path/mode/blob-SHA entries and the domain-separated SHA-256 formula are exact, symlink/dynamic/unresolved inputs fail closed, and the approval consumer selects exact source run/attempt and external artifact ID/name, rejects oversized metadata before a max+1 read, verifies provider digest and size against the same raw bytes, then duplicate-free/non-finite strict-parses a depth-32/50,000-node tree before checking policy, bundle, interval arithmetic, 900-second observation freshness, strict pre-expiry approval, and trusted current time."
+  - "Below hard limits capacity counters are exact; retry_requests cannot exceed total_http_requests, crossed request, byte, or wall budgets serialize in canonical order at their hard maxima as fail-closed saturating lower bounds, byte overflow uses bounded remaining+1 detection, and every dispatch timeout is capped by remaining monotonic wall budget."
+  - "Acceptance canaries are never extra out-of-window daily-root PASS prerequisites, but every in-window canary attempt folds normally; only the public-fork lifecycle canary precedes PR 4C, while route/failure/cancellation/burst/distinct-SHA campaigns run after PR 4C and before goal acceptance."
+  - "Each reconciliation report is authoritative only for its immutable exact interval; a fresh attempt cannot repair an overlapping interval with lost evidence, deterministic resource limits wait for a clean window or approved amendment, and a later clean-window PASS never relabels an older FAIL/UNVERIFIED report."
+  - "Before workflow integration the PR 4C calibration-probe child introduces the exact dpone.ports.evidence.CreateOnlyEvidenceWriterV1 port and dpone.adapters.filesystem_evidence.DescriptorPinnedCreateOnlyEvidenceWriter adapter for later reconciler reuse; the current route-attestation helper is not direct authority, any shared extraction preserves its compatibility tests, and an identical target is idempotent only after current root/parent/leaf/inode/bytes revalidation plus successful current file and parent fsync."
+  - "PR 4C receives contents:read, actions:read, and pull-requests:read only; Administration:read and all write/OIDC/check publication capabilities are forbidden."
+  - "Readiness pair recovery retains authenticated prior bytes until durable commit cleanup; digests alone never stand in for restorable content."
+  - "CI policy lives in canonical contracts/services/ports/adapters behind thin workflow/tool composition roots."
+  - "PR 6A may develop dormant internal default-deny and pair-transaction groundwork after PR 2, but PR 6B public adapters, migration, merge, and activation require PR 5B authenticated verifier evidence."
+  - "The canonical active v1 policy is the sole source for the exact nineteen context names; App ID 15368 remains a separate time-bound live observation owned by optional dormant PR 7."
+  - "PR 3B admits only closed CodeQL, the exact no-drift ADR 0037 legacy governance-source exception, and ADR 0037 merged closure; changing or retiring that exception requires a prior ADR 0037 amendment."
+  - "The current nineteen legacy checks remain the only merge authority; no workflow, protection, release, tag, variable, or production-source mutation is introduced by PR 2."
+  - "The PR2 task contract, machine-readable reconciliation policy, focused contracts, ADR index, control-surface link, and documentation navigation validate."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "repository CI architecture specification"
+    - "ADR 0046 shadow versus future App authority"
+    - "ADR 0048 exact-SHA evidence, stateless reconciliation, and readiness design"
+    - "GitHub branch-protection maintainer documentation"
+    - "machine-readable reconciliation MVP"
+  migration_required: false
+
+owned_paths:
+  - docs/feature-design-ci-pr-gate-exact-sha-evidence.md
+  - docs/quality-metrics.md
+  - docs/adr/0046-component-aware-pr-gate-authority.md
+  - docs/adr/0048-exact-sha-readiness-evidence.md
+  - docs/adr-index.md
+  - docs/github-branch-protection.md
+  - tests/test_ci_shadow_spec_contracts.py
+  - tests/test_ci_shadow_reconciliation_contracts.py
+  - tests/test_ci_shadow_capacity_contracts.py
+  - tests/test_ci_shadow_capacity_validation_contracts.py
+  - test_artifacts/agent-policy/dpone-ci-shadow-closure-pr2-spec.yml
+  - test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-mvp.yml
+  - test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-mvp.schema.json
+  - test_artifacts/agent-policy/dpone-ci-shadow-reconciliation-capacity.schema.json
+
+read_only_paths:
+  - .agents/policy/github-branch-protection.yml
+  - docs/feature-design-standard.md
+  - docs/adr/0028-frozen-release-policy-and-publication-boundary.md
+  - docs/adr/0037-immutable-agent-pr-merge-closure.md
+  - docs/adr/0047-module-size-debt-ratchet.md
+  - docs/benchmarks/quality_budgets.yml
+  - tools/agent_policy/control_surface.py
+  - tools/agent_policy/task_contract.py
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - .agents/policy
+  - evals/agent
+  - src
+  - tools/ci
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "Phase 0 frozen ledger in issue #512"
+  - "PR 1 exact merge commit 0fa1b35bfd20c35fa0cb2a8c3dfa966d7afc11d4 is contained in PR 2 base 66e6b651e93b96a1e8b9b649095d9f2b53e8aa53 and satisfies the baseline prerequisite"
+  - >-
+    Integrator-only delta: /root owns and applies mkdocs.yml navigation after
+    writer handoff; it is outside this path-scoped writer's owned_paths and
+    remains forbidden to the writer. The writer reports the requested link in
+    documentation_impact for integrator reconciliation.
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_ci_shadow_spec_contracts.py tests/test_ci_shadow_reconciliation_contracts.py tests/test_ci_shadow_capacity_contracts.py tests/test_ci_shadow_capacity_validation_contracts.py tests/agent_policy/test_task_contract.py tests/test_docs_language_contracts.py -q"
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/dpone-ci-shadow-closure-pr2-spec.yml"
+  broad:
+    - "uv run dpone docs check-docs"
+    - "uv run dpone docs check-generated-references"
+    - "uv run mkdocs build --strict"
+    - "uv run python tools/agent_policy/select_checks.py --base-ref 66e6b651e93b96a1e8b9b649095d9f2b53e8aa53"
+    - "Execute and record every command selected by select_checks.py; selection alone is not validation."
+    - "uv run ruff check . && uv run ruff format --check . && uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules && uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json --base-ref 66e6b651e93b96a1e8b9b649095d9f2b53e8aa53 --head-ref $(git rev-parse HEAD)"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+  live:
+    - "All nineteen unchanged legacy required checks on the exact PR head without bypass"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "The exact PR 2 base does not contain PR 1 merge commit 0fa1b35bfd20c35fa0cb2a8c3dfa966d7afc11d4."
+  - "The exact PR 2 head lacks repository owner attestation."
+  - "Any workflow, protection policy, release surface, tag, variable, or production source changes."

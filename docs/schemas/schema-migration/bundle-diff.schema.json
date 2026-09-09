@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/bundle-diff.schema.json",
+  "title": "dpone schema migration bundle diff",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "diff_id",
+    "status",
+    "base_bundle_id",
+    "head_bundle_id",
+    "base_pack_id",
+    "head_pack_id",
+    "target",
+    "summary",
+    "changes",
+    "blockers",
+    "warnings",
+    "recommendations"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_bundle_diff.v1"
+    },
+    "diff_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["same", "changed", "breaking", "blocked"]},
+    "base_bundle_id": {"type": ["string", "null"]},
+    "head_bundle_id": {"type": ["string", "null"]},
+    "base_pack_id": {"type": ["string", "null"]},
+    "head_pack_id": {"type": ["string", "null"]},
+    "target": {"type": "object"},
+    "summary": {
+      "type": "object",
+      "required": [
+        "changes_count",
+        "breaking_count",
+        "approval_delta_count",
+        "impact_delta_count",
+        "gate_delta_count"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "changes_count": {"type": "integer", "minimum": 0},
+        "breaking_count": {"type": "integer", "minimum": 0},
+        "approval_delta_count": {"type": "integer", "minimum": 0},
+        "impact_delta_count": {"type": "integer", "minimum": 0},
+        "gate_delta_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "path",
+          "classification",
+          "severity",
+          "risk_tags",
+          "base",
+          "head",
+          "reviewer_action"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "kind": {
+            "enum": [
+              "migration_pack",
+              "impact_plan",
+              "approval",
+              "environment_contract",
+              "certification",
+              "promotion",
+              "gate",
+              "bundle_metadata"
+            ]
+          },
+          "path": {"type": "string"},
+          "classification": {
+            "enum": ["metadata", "evidence", "schema", "physical", "impact", "approval", "promotion", "policy"]
+          },
+          "severity": {"enum": ["info", "low", "medium", "high", "critical"]},
+          "risk_tags": {"type": "array", "items": {"type": "string"}},
+          "reviewer_action": {"type": "string"}
+        }
+      }
+    },
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  }
+}

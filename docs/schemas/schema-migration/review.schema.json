@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/review.schema.json",
+  "title": "dpone schema migration review",
+  "type": "object",
+  "required": ["schema_version", "status", "bundle_id", "pack_id", "target", "summary", "markdown"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_review.v1"
+    },
+    "status": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "target": {"type": "object"},
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "markdown": {"type": "string"}
+  }
+}

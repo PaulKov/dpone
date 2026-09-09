@@ -1,0 +1,116 @@
+"""CDC control-plane evidence services."""
+
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
+
+__all__ = [
+    "CdcApplyCertificationReport",
+    "CdcApplyCertificationService",
+    "CdcApplyEvent",
+    "CdcApplyFixture",
+    "CdcApplyResult",
+    "CdcApplyStrategy",
+    "CdcEvidenceReader",
+    "CdcHandoffCatalog",
+    "CdcHandoffDecision",
+    "CdcHandoffPolicy",
+    "CdcHandoffProfile",
+    "CdcHandoffReport",
+    "CdcMaterializationService",
+    "CdcTypedMaterializationService",
+    "CdcObservabilityDecision",
+    "CdcObservabilityEvidenceItem",
+    "CdcObservabilityEvidenceService",
+    "CdcObservabilityReport",
+    "CdcFailureScenario",
+    "CdcPromotionDecision",
+    "CdcPromotionEvidenceItem",
+    "CdcPromotionGateService",
+    "CdcPromotionReport",
+    "CdcRecoveryDecision",
+    "CdcRecoveryEvidenceItem",
+    "CdcRecoveryEvidenceService",
+    "CdcRecoveryPolicy",
+    "CdcRecoveryReport",
+    "CdcRuntimeRunService",
+    "CdcRouteMetadata",
+    "CdcSchemaChangeEvent",
+    "CdcSchemaApplyPlan",
+    "CdcSchemaApplyPolicy",
+    "CdcSchemaApplyReport",
+    "CdcSchemaApplyResult",
+    "CdcSchemaEvolutionApplyService",
+    "CdcSchemaEvolutionDecision",
+    "CdcSchemaEvolutionEvidenceItem",
+    "CdcSchemaEvolutionEvidenceService",
+    "CdcSchemaEvolutionPlan",
+    "CdcSchemaEvolutionPolicy",
+    "CdcSchemaEvolutionReport",
+    "CdcSloProfile",
+    "CdcStreamKey",
+    "CdcTelemetrySnapshot",
+    "InMemoryCdcApplyStrategy",
+    "SnapshotCdcHandoffService",
+]
+
+_EXPORTS: dict[str, str] = {
+    "CdcApplyCertificationReport": "dpone.ops.cdc.apply_models:CdcApplyCertificationReport",
+    "CdcApplyCertificationService": "dpone.ops.cdc.apply:CdcApplyCertificationService",
+    "CdcApplyEvent": "dpone.ops.cdc.apply_models:CdcApplyEvent",
+    "CdcApplyFixture": "dpone.ops.cdc.apply_models:CdcApplyFixture",
+    "CdcApplyResult": "dpone.ops.cdc.apply_models:CdcApplyResult",
+    "CdcApplyStrategy": "dpone.ops.cdc.apply:CdcApplyStrategy",
+    "CdcEvidenceReader": "dpone.ops.cdc.evidence:CdcEvidenceReader",
+    "CdcHandoffCatalog": "dpone.ops.cdc.catalog:CdcHandoffCatalog",
+    "CdcRouteMetadata": "dpone.ops.cdc.catalog:CdcRouteMetadata",
+    "CdcHandoffPolicy": "dpone.ops.cdc.policy:CdcHandoffPolicy",
+    "CdcHandoffDecision": "dpone.ops.cdc.models:CdcHandoffDecision",
+    "CdcHandoffProfile": "dpone.ops.cdc.models:CdcHandoffProfile",
+    "CdcHandoffReport": "dpone.ops.cdc.models:CdcHandoffReport",
+    "CdcMaterializationService": "dpone.ops.cdc.materialization:CdcMaterializationService",
+    "CdcTypedMaterializationService": "dpone.ops.cdc.typed_materialization:CdcTypedMaterializationService",
+    "CdcObservabilityDecision": "dpone.ops.cdc.observability_models:CdcObservabilityDecision",
+    "CdcObservabilityEvidenceItem": "dpone.ops.cdc.observability_models:CdcObservabilityEvidenceItem",
+    "CdcObservabilityEvidenceService": "dpone.ops.cdc.observability:CdcObservabilityEvidenceService",
+    "CdcObservabilityReport": "dpone.ops.cdc.observability_models:CdcObservabilityReport",
+    "CdcFailureScenario": "dpone.ops.cdc.recovery_models:CdcFailureScenario",
+    "CdcPromotionDecision": "dpone.ops.cdc.promotion_models:CdcPromotionDecision",
+    "CdcPromotionEvidenceItem": "dpone.ops.cdc.promotion_models:CdcPromotionEvidenceItem",
+    "CdcPromotionGateService": "dpone.ops.cdc.promotion:CdcPromotionGateService",
+    "CdcPromotionReport": "dpone.ops.cdc.promotion_models:CdcPromotionReport",
+    "CdcRecoveryDecision": "dpone.ops.cdc.recovery_models:CdcRecoveryDecision",
+    "CdcRecoveryEvidenceItem": "dpone.ops.cdc.recovery_models:CdcRecoveryEvidenceItem",
+    "CdcRecoveryEvidenceService": "dpone.ops.cdc.recovery:CdcRecoveryEvidenceService",
+    "CdcRecoveryPolicy": "dpone.ops.cdc.recovery_models:CdcRecoveryPolicy",
+    "CdcRecoveryReport": "dpone.ops.cdc.recovery_models:CdcRecoveryReport",
+    "CdcRuntimeRunService": "dpone.ops.cdc.runtime_run:CdcRuntimeRunService",
+    "CdcSchemaChangeEvent": "dpone.ops.cdc.schema_evolution_models:CdcSchemaChangeEvent",
+    "CdcSchemaApplyPlan": "dpone.ops.cdc.schema_apply_models:CdcSchemaApplyPlan",
+    "CdcSchemaApplyPolicy": "dpone.ops.cdc.schema_apply_models:CdcSchemaApplyPolicy",
+    "CdcSchemaApplyReport": "dpone.ops.cdc.schema_apply_models:CdcSchemaApplyReport",
+    "CdcSchemaApplyResult": "dpone.ops.cdc.schema_apply_models:CdcSchemaApplyResult",
+    "CdcSchemaEvolutionApplyService": "dpone.ops.cdc.schema_apply:CdcSchemaEvolutionApplyService",
+    "CdcSchemaEvolutionDecision": "dpone.ops.cdc.schema_evolution_models:CdcSchemaEvolutionDecision",
+    "CdcSchemaEvolutionEvidenceItem": "dpone.ops.cdc.schema_evolution_models:CdcSchemaEvolutionEvidenceItem",
+    "CdcSchemaEvolutionEvidenceService": "dpone.ops.cdc.schema_evolution:CdcSchemaEvolutionEvidenceService",
+    "CdcSchemaEvolutionPlan": "dpone.ops.cdc.schema_evolution_models:CdcSchemaEvolutionPlan",
+    "CdcSchemaEvolutionPolicy": "dpone.ops.cdc.schema_evolution_models:CdcSchemaEvolutionPolicy",
+    "CdcSchemaEvolutionReport": "dpone.ops.cdc.schema_evolution_models:CdcSchemaEvolutionReport",
+    "CdcSloProfile": "dpone.ops.cdc.observability_models:CdcSloProfile",
+    "CdcStreamKey": "dpone.ops.cdc.models:CdcStreamKey",
+    "CdcTelemetrySnapshot": "dpone.ops.cdc.observability_models:CdcTelemetrySnapshot",
+    "InMemoryCdcApplyStrategy": "dpone.ops.cdc.apply:InMemoryCdcApplyStrategy",
+    "SnapshotCdcHandoffService": "dpone.ops.cdc.handoff:SnapshotCdcHandoffService",
+}
+
+
+def __getattr__(name: str) -> Any:
+    target = _EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attr = target.split(":")
+    value = getattr(import_module(module_name), attr)
+    globals()[name] = value
+    return value

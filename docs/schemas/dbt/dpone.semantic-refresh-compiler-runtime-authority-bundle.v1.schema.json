@@ -1,0 +1,158 @@
+{
+  "$comment": "This authority ends at execution binding. Attempts, orchestration facts, receipts and outcomes are forbidden.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-compiler-runtime-authority-bundle.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "not": {
+        "required": [
+          "workflow_replacement_plan_sha256"
+        ]
+      },
+      "properties": {
+        "workflow_mode": {
+          "enum": [
+            "normal",
+            "complete_scope_replay"
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "workflow_mode": {
+          "const": "failed_precommit_replacement"
+        }
+      },
+      "required": [
+        "workflow_replacement_plan_sha256"
+      ]
+    }
+  ],
+  "properties": {
+    "authority_bundle_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "compiler_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "environment": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "models": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_adoption_receipt_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "model_definition_proof_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "model_unique_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "mutation_closure_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "operation_id": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "operation_plan_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "read_dependency_proof_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "sqlserver_lifecycle_policy_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "baseline_adoption_receipt_sha256",
+          "model_definition_proof_sha256",
+          "model_unique_id",
+          "mutation_closure_sha256",
+          "operation_id",
+          "operation_plan_sha256",
+          "read_dependency_proof_sha256",
+          "sqlserver_lifecycle_policy_sha256"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "route_certification_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "runtime_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-compiler-runtime-authority-bundle.v1"
+    },
+    "workflow_execution_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_execution_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "workflow_mode": {
+      "enum": [
+        "normal",
+        "failed_precommit_replacement",
+        "complete_scope_replay"
+      ],
+      "type": "string"
+    },
+    "workflow_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_replacement_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "authority_bundle_sha256",
+    "compiler_policy_sha256",
+    "deployment_id",
+    "environment",
+    "models",
+    "release_id",
+    "route_certification_receipt_sha256",
+    "runtime_policy_sha256",
+    "schema",
+    "workflow_execution_binding_sha256",
+    "workflow_execution_id",
+    "workflow_mode",
+    "workflow_plan_sha256"
+  ],
+  "type": "object"
+}

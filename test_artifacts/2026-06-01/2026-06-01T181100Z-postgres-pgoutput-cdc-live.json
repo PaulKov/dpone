@@ -1,0 +1,20 @@
+{
+  "artifact_schema": "dpone.test-artifact.v1",
+  "artifact_type": "integration.postgres_pgoutput_cdc",
+  "artifact_label": "2026-06-01T181100Z-postgres-pgoutput-cdc-live",
+  "created_by": "Codex GPT-5",
+  "executed_by_os_user": "macbook",
+  "executed_at": "2026-06-01T18:11:00Z",
+  "command": "DPONE_IT_PG_CDC_HOST=127.0.0.1 DPONE_IT_PG_CDC_PORT=15435 DPONE_IT_PG_CDC_DATABASE=dpone DPONE_IT_PG_CDC_USER=dpone DPONE_IT_PG_CDC_PASSWORD=*** uv run pytest tests/integration/postgres/test_postgres_cdc_integration.py -q",
+  "environment": {
+    "postgres_container": "dpone-it-postgres-cdc",
+    "postgres_port": 15435,
+    "wal_level": "logical",
+    "cdc_plugin": "pgoutput"
+  },
+  "result": "passed",
+  "summary": {
+    "tests": "1 passed",
+    "coverage": "live insert/update/delete logical decoding with pgoutput plus Postgres CDC offset storage roundtrip"
+  }
+}

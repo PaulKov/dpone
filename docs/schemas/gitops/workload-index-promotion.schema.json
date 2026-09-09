@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/workload-index-promotion.schema.json",
+  "title": "dpone GitOps approval-bound workload-index promotion receipt",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "mode",
+    "baseline_path",
+    "baseline_before_sha256",
+    "baseline_before_fingerprint",
+    "promoted_sha256",
+    "promoted_fingerprint"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.workload-index-promotion.v1"
+    },
+    "status": {
+      "const": "promoted"
+    },
+    "mode": {
+      "enum": [
+        "bootstrap",
+        "change"
+      ]
+    },
+    "baseline_path": {
+      "type": "string",
+      "minLength": 1,
+      "allOf": [
+        {
+          "not": {
+            "pattern": "(^/|\\\\|\\x00|(^|/)\\.{1,2}(/|$))"
+          }
+        },
+        {
+          "not": {
+            "pattern": "//|/$"
+          }
+        }
+      ]
+    },
+    "baseline_before_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "baseline_before_fingerprint": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "promoted_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "promoted_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/release/release-evidence-v2.schema.json",
+  "title": "dpone release evidence v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "schema_version", "status", "decision", "state",
+    "release_identity_id", "release_authority_id", "candidate_id", "attempt_id",
+    "authorization", "governance_snapshots"
+  ],
+  "properties": {
+    "schema": { "const": "dpone.release-evidence.v2" },
+    "schema_version": { "const": 2 },
+    "status": { "const": "PASS" },
+    "decision": { "const": "GO" },
+    "state": { "const": "CLOSED" },
+    "release_identity_id": { "$ref": "#/$defs/sha256Id" },
+    "release_authority_id": { "$ref": "#/$defs/sha256Id" },
+    "candidate_id": { "$ref": "#/$defs/sha256Id" },
+    "attempt_id": { "$ref": "#/$defs/sha256Id" },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorization_id", "authorization_state", "lease_id", "fencing_token"],
+      "properties": {
+        "authorization_id": { "$ref": "#/$defs/sha256Id" },
+        "authorization_state": { "const": "AUTHORIZED" },
+        "lease_id": { "$ref": "#/$defs/sha256Id" },
+        "fencing_token": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "governance_snapshots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["A", "B", "C"],
+      "properties": {
+        "A": { "$ref": "#/$defs/snapshot" },
+        "B": { "$ref": "#/$defs/snapshot" },
+        "C": { "$ref": "#/$defs/snapshot" }
+      }
+    }
+  },
+  "$defs": {
+    "sha256Id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read_count", "snapshot_sha256", "protected_base_sha"],
+      "properties": {
+        "read_count": { "const": 2 },
+        "snapshot_sha256": { "$ref": "#/$defs/sha256Id" },
+        "protected_base_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    }
+  }
+}

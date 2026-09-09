@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/test-report.schema.json",
+  "title": "dpone GitOps hermetic test report",
+  "type": "object",
+  "required": [
+    "schema",
+    "test_id",
+    "name",
+    "status",
+    "execution_status",
+    "data_outcome",
+    "coverage",
+    "pipeline",
+    "process",
+    "fixtures",
+    "temporary_target",
+    "expectations",
+    "errors",
+    "duration_ms"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.test-report.v1"
+    },
+    "test_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "blocked"
+      ]
+    },
+    "execution_status": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "skipped"
+      ]
+    },
+    "data_outcome": {
+      "enum": [
+        "passed",
+        "failed_quality_gate",
+        "unknown"
+      ]
+    },
+    "coverage": {
+      "$ref": "#/$defs/coverage"
+    },
+    "pipeline": {
+      "$ref": "#/$defs/pipeline"
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "fixtures": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/fixture"
+      },
+      "maxProperties": 3
+    },
+    "temporary_target": {
+      "$ref": "#/$defs/temporary_target"
+    },
+    "expectations": {
+      "type": "array",
+      "maxItems": 1003,
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "$ref": "#/$defs/error"
+      }
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "$defs": {
+    "coverage": {
+      "type": "object",
+      "required": [
+        "level",
+        "includes",
+        "excludes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "const": "hermetic_contract"
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      }
+    },
+    "pipeline": {
+      "type": "object",
+      "required": [
+        "path",
+        "semantic_fingerprint"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "semantic_fingerprint": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "rows"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "not": {
+            "pattern": "^(?:/|[A-Za-z]:|.*\\\\)"
+          }
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "temporary_target": {
+      "type": "object",
+      "required": [
+        "uri",
+        "rows",
+        "rejected_rows",
+        "schema"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "uri": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^tmp://dpone-tests/sha256-[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rejected_rows": {
+          "const": 0
+        },
+        "schema": {
+          "type": "object",
+          "additionalProperties": {
+            "enum": [
+              "null",
+              "bool",
+              "int64",
+              "float64",
+              "string",
+              "array",
+              "object",
+              "mixed"
+            ]
+          }
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "required": [
+        "code",
+        "path",
+        "message"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": [
+        "schema",
+        "code",
+        "stage",
+        "severity",
+        "message",
+        "fixes",
+        "docs_url"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "const": "dpone.error.v1"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "stage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "severity": {
+          "const": "error"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "fixes": {
+          "type": "array"
+        },
+        "docs_url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      }
+    }
+  }
+}

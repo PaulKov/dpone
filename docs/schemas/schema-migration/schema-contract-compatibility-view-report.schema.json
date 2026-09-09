@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-compatibility-view-report.schema.json",
+  "title": "dpone schema contract compatibility view report",
+  "type": "object",
+  "required": ["schema_version", "status", "markdown", "blockers", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_compatibility_view_report.v1"},
+    "status": {"type": ["string", "null"]},
+    "contract_id": {"type": ["string", "null"]},
+    "compatibility_view_plan_id": {"type": ["string", "null"]},
+    "markdown": {"type": "string"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

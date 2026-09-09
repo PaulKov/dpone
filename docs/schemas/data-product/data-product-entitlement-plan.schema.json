@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-entitlement-plan.schema.json",
+  "title": "Data Product Entitlement Plan",
+  "type": "object",
+  "required": ["schema_version", "status", "entitlement_plan_id", "decisions", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_entitlement_plan.v1"},
+    "status": {"enum": ["ready", "warning", "blocked", "disabled"]},
+    "entitlement_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "access_classification_id": {"type": ["string", "null"]},
+    "consumer_matrix_id": {"type": ["string", "null"]},
+    "product": {"type": "object"},
+    "product_id": {"type": ["string", "null"]},
+    "decisions": {"type": "array", "items": {"type": "object"}},
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

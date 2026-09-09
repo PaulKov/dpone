@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/error.schema.json",
+  "title": "dpone GitOps structured error",
+  "type": "object",
+  "required": [
+    "schema",
+    "code",
+    "stage",
+    "severity",
+    "message"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "dpone.error.v1"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^DPONE_[A-Z0-9_]+$"
+    },
+    "stage": {
+      "type": "string",
+      "minLength": 1
+    },
+    "severity": {
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    "path": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "safety"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "safety": {
+            "enum": [
+              "safe",
+              "manual",
+              "destructive"
+            ]
+          },
+          "command": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "docs_url": {
+      "type": "string"
+    },
+    "trace_id": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,80 @@
+schema_version: 1
+task_id: "SS-REVIEW-KPO-INIT-FETCH-RUNTIME"
+title: "Implement runtime init-fetch and verified-pack launchers"
+goal: "Fetch pinned artifacts through a reader port, publish a ready manifest, and execute only the fetched pack command."
+specification: "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "ArtifactRegistryReader and Writer follow interface segregation while preserving ArtifactRegistry compatibility."
+  - "Runtime plan decode/hash/size/secret validation happens before registry or destination I/O."
+  - "Init verifies deployment, release, inventory, pack size/checksum/fingerprint and attestation policy."
+  - "Ready manifest is written last and atomically with no physical URI, secret or absolute path."
+  - "Verified-pack launcher revalidates ready/plan/pack and executes argv without shell=True."
+  - "required_for_prod fails closed when no concrete verifier is configured."
+  - "Missing/tampered ready state cannot execute data code or advance checkpoint/state."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["ArtifactRegistry port", "runtime init-fetch plan/result", "runtime image CLI contract"]
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/ports/artifact_registry.py"
+  - "src/dpone/runtime/artifact_delivery.py"
+  - "src/dpone/runtime/init_fetch_contract.py"
+  - "src/dpone/runtime/init_fetch_execution.py"
+  - "src/dpone/runtime/runtime_init_fetch_plan.py"
+  - "src/dpone/runtime/runtime_init_fetch_plan_codec.py"
+  - "src/dpone/runtime/runtime_init_fetch_receipts.py"
+  - "src/dpone/runtime/runtime_init_fetch_ready.py"
+  - "src/dpone/runtime/runtime_init_fetch_service.py"
+  - "src/dpone/runtime/runtime_init_fetch_storage.py"
+  - "src/dpone/runtime/runtime_payload_archive.py"
+  - "src/dpone/runtime/safe_sample_init_fetch.py"
+  - "src/dpone/runtime/verified_pack_launcher.py"
+  - "src/dpone/readiness/airflow_runtime_init_fetch.py"
+  - "src/dpone/commands/airflow_deployment_build_cmd.py"
+  - "src/dpone/commands/airflow_runtime_delivery_cmd.py"
+  - "src/dpone/commands/airflow_self_service_cmd.py"
+  - "tests/test_init_fetch_trust_boundary.py"
+  - "tests/test_airflow_runtime_phase1b_contracts.py"
+  - "tests/test_airflow_runtime_init_fetch_cli.py"
+  - "tests/test_runtime_init_fetch_security.py"
+read_only_paths:
+  - "docs/feature-design-airflow-kpo-init-fetch-execution-v0731.md"
+  - "src/dpone/readiness/airflow_artifact_delivery.py"
+  - "packages/dpone-airflow-pack"
+forbidden_paths:
+  - "packages"
+  - "docs"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+shared_file_owner: "integrator"
+dependencies:
+  - "SS-REVIEW-KPO-INIT-FETCH-CONTRACT"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_init_fetch_trust_boundary.py tests/test_airflow_runtime_phase1b_contracts.py tests/test_airflow_runtime_init_fetch_cli.py -q"
+    - "uv run ruff check src/dpone/ports/artifact_registry.py src/dpone/runtime/artifact_delivery.py src/dpone/runtime/init_fetch_contract.py src/dpone/runtime/init_fetch_execution.py src/dpone/runtime/verified_pack_launcher.py src/dpone/readiness/airflow_runtime_init_fetch.py src/dpone/commands/airflow_runtime_delivery_cmd.py"
+    - "uv run mypy --config-file mypy.ini src/dpone/runtime/init_fetch_contract.py src/dpone/runtime/init_fetch_execution.py src/dpone/runtime/verified_pack_launcher.py"
+  broad:
+    - "uv run pytest -k 'init_fetch or runtime_pack_exec' -q"
+    - "uv run dpone docs check-import-rules"
+  live: []
+required_outputs:
+  [implementation, tests, security_impact, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Required edit falls outside owned_paths."
+  - "Runtime needs a physical registry secret in the plan or command line."
+  - "The launcher would need shell=True or scheduler-copied runtime_command."

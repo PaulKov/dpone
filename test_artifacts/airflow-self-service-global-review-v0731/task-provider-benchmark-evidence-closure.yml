@@ -1,0 +1,65 @@
+schema_version: 1
+task_id: "SS-REVIEW-PROVIDER-BENCHMARK-EVIDENCE-CLOSURE"
+title: "Make strict-v2 provider benchmark evidence fail closed"
+goal: "Prevent false benchmark PASS for non-v2 fixtures, bind run identity to verified descriptors, strengthen SLO topology assertions, and split new benchmark modules below quality budgets."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Benchmark fixture metadata is derived from the written index and records schema, index digest, delivery mode, and trust tier."
+  - "Evidence FAILS for v1, local_preview, malformed strict-v2, or an index digest mismatch."
+  - "Fixture integrity participates in the top-level PASS decision."
+  - "Cold loader timing is named accurately and a separate import-plus-first-load observation is recorded."
+  - "Run-identity tests use the exact verified DAG descriptor digest."
+  - "The mocked 100 DAG / 500 workload SLO asserts exact DAG/task topology, fatal/errors/skips, and replay behavior."
+  - "Every new or changed benchmark production module stays below 350 SLOC where practical and below the 400 SLOC hard limit."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["Airflow provider benchmark evidence", "strict-v2 parse SLO evidence"]
+  migration_required: false
+
+owned_paths:
+  - "tools/airflow_provider_parse_benchmark.py"
+  - "tools/airflow_provider_parse_benchmark_support.py"
+  - "tools/airflow_provider_parse_benchmark_evidence.py"
+  - "tools/airflow_provider_parse_benchmark_fixture.py"
+  - "tools/airflow_provider_parse_benchmark_tripwire.py"
+  - "tests/test_airflow_provider_parse_benchmark.py"
+  - "tests/test_airflow_provider_parse_slo.py"
+  - "tests/test_airflow_run_identity.py"
+read_only_paths:
+  - "docs/schemas/gitops/airflow-deployment-index-v2.schema.json"
+  - "src/dpone/readiness/airflow_deployment_projection.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/run_identity.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone"
+  - "packages"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_provider_parse_slo.py tests/test_airflow_provider_parse_benchmark.py tests/test_airflow_run_identity.py -q"
+    - "uv run ruff check tools/airflow_provider_parse_benchmark*.py tests/test_airflow_provider_parse_slo.py tests/test_airflow_provider_parse_benchmark.py tests/test_airflow_run_identity.py"
+    - "uv run ruff format --check tools/airflow_provider_parse_benchmark*.py tests/test_airflow_provider_parse_slo.py tests/test_airflow_provider_parse_benchmark.py tests/test_airflow_run_identity.py"
+  broad:
+    - "uv run pytest -k airflow -q"
+    - "uv run dpone docs check-module-size --package tools --no-baseline --warn-lines 450 --max-lines 600 --warn-sloc 350 --max-sloc 400"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

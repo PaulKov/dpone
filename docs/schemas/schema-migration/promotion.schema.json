@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/promotion.schema.json",
+  "title": "dpone schema migration promotion receipt",
+  "type": "object",
+  "required": ["schema_version", "status", "pack_id", "from_environment", "to_environment"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_promotion.v1"
+    },
+    "command": {"const": "promote"},
+    "status": {"enum": ["promoted", "blocked"]},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "promotion_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "from_environment": {"type": "string"},
+    "to_environment": {"type": "string"},
+    "certification_id": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

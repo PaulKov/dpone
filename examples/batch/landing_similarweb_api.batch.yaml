@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+convention: landing_raw_v1
+
+vars:
+  src_system: similarweb
+  src_database: api
+  host: api_similarweb_com
+  owner_team: marketing-analytics
+  owner_contact: marketing-analytics@example.com
+  sla: monthly
+
+defaults:
+  source:
+    type: api
+    api_type: similarweb
+    connection_type: vault
+    connection_id: api__similarweb
+    vault_path: api/similarweb
+    options:
+      resource: "{{ src_table }}"
+      domains:
+        - example.com
+        - docs.example.com
+      limit: 2000
+      page_size: 2000
+      min_keywords_count: 1000
+      traffic_source: Organic
+      web_source: Total
+      branded_type: All
+      country: world
+      timeout: 60
+      max_retries: 3
+      rate_limit_delay: 1.0
+
+  sink:
+    type: bigquery
+    connection_type: vault
+    connection_id: bigquery-demo
+    vault_path: gcp/demo-project-{{ env_code }}/bq/example-etl-service
+    staging:
+      schema: stg
+    strategy:
+      mode: incremental_append
+    options:
+      log_sample_rows: 5
+
+  bigquery_proxy:
+    proxy_enable: true
+
+schemas:
+  default:
+    tables:
+      - keywords

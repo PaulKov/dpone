@@ -1,0 +1,22 @@
+---
+description: Batch ETL / route certification requires wide typed fixtures and all supported load strategies.
+alwaysApply: true
+---
+
+# Route live wide certification
+
+Do not claim Batch ETL (or stronger) for a source→sink route from a narrow smoke
+table or from only `full_refresh` + `incremental_merge`.
+
+For every integration certification:
+
+1. Wide fixture covering the pair type profile (round-tripable types).
+2. Live coverage of every sink-supported load strategy (or explicit N/A).
+3. Semantic + typed assertions beyond row counts.
+4. SKIP/UNVERIFIED when env/credentials/billing missing — never PASS.
+
+Reference implementation and standard:
+
+- `docs/testing/route-live-wide-certification.md`
+- `docs/feature-design-route-live-wide-certification-v1.md`
+- `tests/integration/mysql/test_mysql_to_bigquery_vendor_live_integration.py`

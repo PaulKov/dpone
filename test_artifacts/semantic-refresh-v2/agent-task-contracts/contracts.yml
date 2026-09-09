@@ -1,0 +1,51 @@
+schema_version: 1
+task_id: "SEMREF-V2-CONTRACTS"
+title: "Semantic refresh canonical contracts and schemas"
+goal: "Implement pure versioned identity, workflow-mode, proof, outcome, and policy contracts with canonical digests and golden tests."
+specification: "docs/feature-design-semantic-refresh-runtime-v2.md"
+base_commit: "02fce840351a29475163ce69b0949e344d67154b"
+integrator: "root"
+
+acceptance_criteria:
+  - "All nine v1 semantic-refresh documents reject unknown fields and recompute their canonical SHA-256 digests."
+  - "Identity dependency direction is acyclic and attempt/runtime fields cannot enter semantic operation identity."
+  - "Workflow-mode invariants enforce normal/replay versus failed-precommit replacement branches."
+  - "Effective-key datetime/date/decimal domains and MSSQL outcome vocabulary are closed."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["Python contracts", "JSON schemas", "artifact identities"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/contracts/semantic_refresh_*.py"
+  - "docs/schemas/dbt/dpone.semantic-refresh-*.schema.json"
+  - "tests/test_semantic_refresh_contracts*.py"
+  - "tests/fixtures/semantic-refresh-v2/contracts/**"
+read_only_paths:
+  - "src/dpone/contracts/dbt_contract_validation.py"
+  - "src/dpone/contracts/dbt_runtime.py"
+  - "docs/adr/0011-canonical-fingerprints.md"
+  - "docs/feature-design-semantic-refresh-runtime-v2.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/contracts/dbt_*.py"
+
+shared_file_owner: "root"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_semantic_refresh_contracts.py -q"
+  broad: []
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "A shared existing contract must change before additive contracts can work."

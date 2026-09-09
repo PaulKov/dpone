@@ -1,0 +1,70 @@
+schema_version: 1
+task_id: "SEMREF-V2-PUBLICATION"
+title: "Sealed artifact, ClickHouse prepared publication, and Airflow projection"
+goal: "Implement additive transport, ClickHouse PREPARE/COMMIT, workflow reduction, and Airflow projection contracts."
+specification: "docs/feature-design-semantic-refresh-runtime-v2.md"
+base_commit: "76ec08dfac57e80fccb63487cf4bc63d6e5172cc"
+integrator: "root"
+
+acceptance_criteria:
+  - "Create-only version-pinned chunks and manifest-last sealing are deterministic and conflict-safe."
+  - "ClickHouse shadow equation and exact grouped-multiset conformance are represented as closed plans/receipts."
+  - "UUID exchange reconciliation and atomic multi-head publication never report false success."
+  - "Airflow emits success Assets only after the fully complete durable workflow summary."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["artifact manifests", "ClickHouse receipts", "Airflow task projection", "evidence"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/ports/semantic_refresh_artifact_*.py"
+  - "src/dpone/ports/semantic_refresh_clickhouse_*.py"
+  - "src/dpone/services/semantic_refresh_artifact*.py"
+  - "src/dpone/runtime/semantic_refresh_artifact_*.py"
+  - "src/dpone/runtime/semantic_refresh_clickhouse_*.py"
+  - "src/dpone/adapters/semantic_refresh_artifact_*.py"
+  - "src/dpone/adapters/semantic_refresh_clickhouse_*.py"
+  - "src/dpone/adapters/semantic_refresh_mssql_publication*.py"
+  - "src/dpone/adapters/semantic_refresh_mssql_workflow_summary.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/semantic_refresh_*.py"
+  - "tests/test_semantic_refresh_artifact_*.py"
+  - "tests/test_semantic_refresh_clickhouse_*.py"
+  - "tests/test_semantic_refresh_airflow_*.py"
+  - "tests/test_semantic_refresh_workflow_summary.py"
+  - "tests/fixtures/semantic-refresh-v2/publication/**"
+read_only_paths:
+  - "src/dpone/runtime/sinks/clickhouse_staged_load.py"
+  - "src/dpone/runtime/sinks/clickhouse_operation_tables.py"
+  - "src/dpone/runtime/governance/finalization.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/workflow_outcome.py"
+  - "docs/feature-design-semantic-refresh-runtime-v2.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/runtime/sinks/clickhouse_staged_load.py"
+  - "src/dpone/runtime/governance/finalization.py"
+
+shared_file_owner: "root"
+dependencies: ["SEMREF-V2-CONTRACTS", "SEMREF-V2-MSSQL"]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_semantic_refresh_artifact_contracts.py tests/test_semantic_refresh_clickhouse_contracts.py tests/test_semantic_refresh_airflow_projection.py -q"
+  broad:
+    - "uv run ruff check ."
+  live:
+    - "UNVERIFIED until approved ClickHouse/Airflow/Kubernetes environments exist"
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "A new shared schema or registry is needed without integrator ownership."
+  - "Live credentials or destructive publication would be required."

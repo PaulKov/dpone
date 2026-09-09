@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/workload-index.schema.json",
+  "title": "dpone GitOps ephemeral workload index",
+  "type": "object",
+  "required": [
+    "schema",
+    "project_fingerprint",
+    "layout_mode",
+    "layout_root",
+    "pipeline_id_scope",
+    "workloads"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.workload-index.v1"
+    },
+    "project_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "layout_mode": {
+      "const": "domain_first"
+    },
+    "layout_root": {
+      "type": "string",
+      "minLength": 1,
+      "allOf": [
+        {
+          "pattern": "^\\S(?:.*\\S)?$"
+        },
+        {
+          "not": {
+            "pattern": "(^/|\\\\|\\x00|(^|/)\\.{1,2}(/|$))"
+          }
+        },
+        {
+          "not": {
+            "pattern": "//|/$"
+          }
+        }
+      ]
+    },
+    "pipeline_id_scope": {
+      "const": "project"
+    },
+    "workloads": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pipeline_id",
+          "domain",
+          "owner",
+          "ownership_fingerprint",
+          "authoring_source",
+          "source_sha256",
+          "semantic_fingerprint",
+          "workload_fingerprint",
+          "connection_refs",
+          "dependencies",
+          "airflow"
+        ],
+        "properties": {
+          "pipeline_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{1,127}$"
+          },
+          "domain": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{1,127}$"
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "ownership_fingerprint": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "authoring_source": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "not": {
+                  "pattern": "(^/|\\\\|\\x00|(^|/)\\.{1,2}(/|$))"
+                }
+              },
+              {
+                "not": {
+                  "pattern": "//|/$"
+                }
+              }
+            ]
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "semantic_fingerprint": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "workload_fingerprint": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "connection_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "path",
+                "sha256"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "allOf": [
+                    {
+                      "not": {
+                        "pattern": "(^/|\\\\|\\x00|(^|/)\\.{1,2}(/|$))"
+                      }
+                    },
+                    {
+                      "not": {
+                        "pattern": "//|/$"
+                      }
+                    }
+                  ]
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            }
+          },
+          "airflow": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "enabled",
+              "dag_id",
+              "schedule"
+            ],
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "dag_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "schedule": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "uniqueItems": true,
+      "maxItems": 5000
+    }
+  }
+}

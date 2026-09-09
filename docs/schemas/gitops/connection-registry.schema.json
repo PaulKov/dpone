@@ -1,0 +1,1042 @@
+{
+  "$defs": {
+    "airflowConnection": {
+      "additionalProperties": true,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "access_key"
+            ]
+          },
+          {
+            "required": [
+              "access_key_id"
+            ]
+          },
+          {
+            "required": [
+              "client_secret"
+            ]
+          },
+          {
+            "required": [
+              "jwt"
+            ]
+          },
+          {
+            "required": [
+              "password"
+            ]
+          },
+          {
+            "required": [
+              "private_key"
+            ]
+          },
+          {
+            "required": [
+              "secret"
+            ]
+          },
+          {
+            "required": [
+              "secret_id"
+            ]
+          },
+          {
+            "required": [
+              "secret_key"
+            ]
+          },
+          {
+            "required": [
+              "session_token"
+            ]
+          },
+          {
+            "required": [
+              "token"
+            ]
+          },
+          {
+            "required": [
+              "vault_path"
+            ]
+          },
+          {
+            "required": [
+              "vault_token"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "connection_id": {
+          "$ref": "#/$defs/airflowConnectionId"
+        },
+        "execution_mode": {
+          "const": "operator_bridge"
+        },
+        "resolver": {
+          "const": "airflow_connection"
+        }
+      },
+      "required": [
+        "resolver",
+        "connection_id",
+        "execution_mode"
+      ],
+      "type": "object"
+    },
+    "airflowConnectionId": {
+      "pattern": "^[A-Za-z0-9_.-]+$",
+      "type": "string"
+    },
+    "connectionRef": {
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+      "type": "string"
+    },
+    "envVar": {
+      "additionalProperties": true,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "access_key"
+            ]
+          },
+          {
+            "required": [
+              "access_key_id"
+            ]
+          },
+          {
+            "required": [
+              "client_secret"
+            ]
+          },
+          {
+            "required": [
+              "jwt"
+            ]
+          },
+          {
+            "required": [
+              "password"
+            ]
+          },
+          {
+            "required": [
+              "private_key"
+            ]
+          },
+          {
+            "required": [
+              "secret"
+            ]
+          },
+          {
+            "required": [
+              "secret_id"
+            ]
+          },
+          {
+            "required": [
+              "secret_key"
+            ]
+          },
+          {
+            "required": [
+              "session_token"
+            ]
+          },
+          {
+            "required": [
+              "token"
+            ]
+          },
+          {
+            "required": [
+              "vault_path"
+            ]
+          },
+          {
+            "required": [
+              "vault_token"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/envVarFields"
+        },
+        "resolver": {
+          "const": "env_var"
+        },
+        "support": {
+          "const": "development_only"
+        }
+      },
+      "required": [
+        "resolver",
+        "support",
+        "fields"
+      ],
+      "type": "object"
+    },
+    "envVarFields": {
+      "additionalProperties": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+        "type": "string"
+      },
+      "minProperties": 1,
+      "propertyNames": {
+        "minLength": 1,
+        "pattern": "\\S",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "fields": {
+      "additionalProperties": {
+        "minLength": 1,
+        "pattern": "\\S",
+        "type": "string"
+      },
+      "minProperties": 1,
+      "propertyNames": {
+        "minLength": 1,
+        "pattern": "\\S",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "kubernetesSecretApi": {
+      "additionalProperties": true,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "access_key"
+            ]
+          },
+          {
+            "required": [
+              "access_key_id"
+            ]
+          },
+          {
+            "required": [
+              "client_secret"
+            ]
+          },
+          {
+            "required": [
+              "jwt"
+            ]
+          },
+          {
+            "required": [
+              "password"
+            ]
+          },
+          {
+            "required": [
+              "private_key"
+            ]
+          },
+          {
+            "required": [
+              "secret"
+            ]
+          },
+          {
+            "required": [
+              "secret_id"
+            ]
+          },
+          {
+            "required": [
+              "secret_key"
+            ]
+          },
+          {
+            "required": [
+              "session_token"
+            ]
+          },
+          {
+            "required": [
+              "token"
+            ]
+          },
+          {
+            "required": [
+              "vault_path"
+            ]
+          },
+          {
+            "required": [
+              "vault_token"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/fields"
+        },
+        "name": {
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "type": "string"
+        },
+        "namespace": {
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "type": "string"
+        },
+        "resolver": {
+          "const": "kubernetes_secret_api"
+        }
+      },
+      "required": [
+        "resolver",
+        "namespace",
+        "name",
+        "fields"
+      ],
+      "type": "object"
+    },
+    "kubernetesSecretVolume": {
+      "additionalProperties": true,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "access_key"
+            ]
+          },
+          {
+            "required": [
+              "access_key_id"
+            ]
+          },
+          {
+            "required": [
+              "client_secret"
+            ]
+          },
+          {
+            "required": [
+              "jwt"
+            ]
+          },
+          {
+            "required": [
+              "password"
+            ]
+          },
+          {
+            "required": [
+              "private_key"
+            ]
+          },
+          {
+            "required": [
+              "secret"
+            ]
+          },
+          {
+            "required": [
+              "secret_id"
+            ]
+          },
+          {
+            "required": [
+              "secret_key"
+            ]
+          },
+          {
+            "required": [
+              "session_token"
+            ]
+          },
+          {
+            "required": [
+              "token"
+            ]
+          },
+          {
+            "required": [
+              "vault_path"
+            ]
+          },
+          {
+            "required": [
+              "vault_token"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/safeVolumeFields"
+        },
+        "mount_path": {
+          "$ref": "#/$defs/safeVolumeMountPath"
+        },
+        "payload_format": {
+          "enum": [
+            "field_mapping",
+            "airflow_connection_uri"
+          ]
+        },
+        "resolver": {
+          "const": "kubernetes_secret_volume"
+        },
+        "secret_name": {
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resolver",
+        "secret_name",
+        "mount_path",
+        "fields"
+      ],
+      "type": "object"
+    },
+    "safeVolumeFields": {
+      "additionalProperties": {
+        "minLength": 1,
+        "not": {
+          "anyOf": [
+            {
+              "pattern": "^/"
+            },
+            {
+              "pattern": "(^|/)\\.\\.(/|$)"
+            }
+          ]
+        },
+        "pattern": "\\S",
+        "type": "string"
+      },
+      "minProperties": 1,
+      "propertyNames": {
+        "minLength": 1,
+        "pattern": "\\S",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "safeVolumeMountPath": {
+      "not": {
+        "pattern": "(^|/)\\.\\.(/|$)"
+      },
+      "pattern": "^/run/secrets/dpone/\\S+$",
+      "type": "string"
+    },
+    "sha256": {
+      "pattern": "^sha256:[A-Fa-f0-9]{64}$",
+      "type": "string"
+    },
+    "vaultKv": {
+      "additionalProperties": true,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "access_key"
+            ]
+          },
+          {
+            "required": [
+              "access_key_id"
+            ]
+          },
+          {
+            "required": [
+              "client_secret"
+            ]
+          },
+          {
+            "required": [
+              "jwt"
+            ]
+          },
+          {
+            "required": [
+              "password"
+            ]
+          },
+          {
+            "required": [
+              "private_key"
+            ]
+          },
+          {
+            "required": [
+              "secret"
+            ]
+          },
+          {
+            "required": [
+              "secret_id"
+            ]
+          },
+          {
+            "required": [
+              "secret_key"
+            ]
+          },
+          {
+            "required": [
+              "session_token"
+            ]
+          },
+          {
+            "required": [
+              "token"
+            ]
+          },
+          {
+            "required": [
+              "vault_path"
+            ]
+          },
+          {
+            "required": [
+              "vault_token"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/fields"
+        },
+        "kv_version": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "mount": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 512,
+          "not": {
+            "pattern": "(^|/)(v1|data)(/|$)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(/[A-Za-z0-9][A-Za-z0-9_.-]*)*$",
+          "type": "string"
+        },
+        "resolution_scope": {
+          "enum": [
+            "workload_start",
+            "dag_run_start"
+          ]
+        },
+        "resolver": {
+          "const": "vault_kv"
+        },
+        "version_policy": {
+          "enum": [
+            "latest",
+            "pinned"
+          ]
+        }
+      },
+      "required": [
+        "resolver",
+        "mount",
+        "path",
+        "fields",
+        "version_policy",
+        "resolution_scope"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/connection-registry.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "connections": {
+      "additionalProperties": {
+        "additionalProperties": true,
+        "properties": {
+          "connection": {
+            "additionalProperties": true,
+            "properties": {
+              "asset_authority": {
+                "additionalProperties": false,
+                "properties": {
+                  "host": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "instance": {
+                    "minLength": 1,
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "port": {
+                    "maximum": 65535,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "host"
+                ],
+                "type": "object"
+              },
+              "database": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "database_authorities": {
+                "additionalProperties": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "create_token": {
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,7})?$",
+                      "type": "string"
+                    },
+                    "database_guid": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "database_id": {
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "database_id",
+                    "create_token",
+                    "database_guid"
+                  ],
+                  "type": "object"
+                },
+                "minProperties": 1,
+                "propertyNames": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "host": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "instance": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "parameters": {
+                "additionalProperties": true,
+                "propertyNames": {
+                  "not": {
+                    "enum": [
+                      "access_key",
+                      "access_key_id",
+                      "client_secret",
+                      "jwt",
+                      "password",
+                      "private_key",
+                      "secret",
+                      "secret_id",
+                      "secret_key",
+                      "session_token",
+                      "token",
+                      "vault_path",
+                      "vault_token"
+                    ]
+                  }
+                },
+                "type": "object"
+              },
+              "port": {
+                "maximum": 65535,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "postgres_source_authority": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "database": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "canonical_name": {
+                            "maxLength": 63,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "oid": {
+                            "maximum": 4294967295,
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "canonical_name",
+                          "oid"
+                        ],
+                        "type": "object"
+                      },
+                      "principals": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "effective": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "canonical_name": {
+                                "maxLength": 63,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "oid": {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "canonical_name",
+                              "oid"
+                            ],
+                            "type": "object"
+                          },
+                          "session": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "canonical_name": {
+                                "maxLength": 63,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "oid": {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "canonical_name",
+                              "oid"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "effective",
+                          "session"
+                        ],
+                        "type": "object"
+                      },
+                      "relations": {
+                        "additionalProperties": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "namespace_oid": {
+                              "maximum": 4294967295,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "relation": {
+                              "maxLength": 63,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "relation_oid": {
+                              "maximum": 4294967295,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "schema": {
+                              "maxLength": 63,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "schema",
+                            "relation",
+                            "namespace_oid",
+                            "relation_oid"
+                          ],
+                          "type": "object"
+                        },
+                        "minProperties": 1,
+                        "propertyNames": {
+                          "minLength": 3,
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "system_identifier": {
+                        "pattern": "^[1-9][0-9]{0,19}$",
+                        "type": "string"
+                      },
+                      "timeline_id": {
+                        "maximum": 4294967295,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "topology_role": {
+                        "enum": [
+                          "primary",
+                          "standby"
+                        ]
+                      },
+                      "version": {
+                        "const": 1
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "system_identifier",
+                      "timeline_id",
+                      "topology_role",
+                      "database",
+                      "principals",
+                      "relations"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "database": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "canonical_name": {
+                            "maxLength": 63,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "oid": {
+                            "maximum": 4294967295,
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "canonical_name",
+                          "oid"
+                        ],
+                        "type": "object"
+                      },
+                      "principals": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "effective": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "canonical_name": {
+                                "maxLength": 63,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "oid": {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "canonical_name",
+                              "oid"
+                            ],
+                            "type": "object"
+                          },
+                          "session": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "canonical_name": {
+                                "maxLength": 63,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "oid": {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "canonical_name",
+                              "oid"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "effective",
+                          "session"
+                        ],
+                        "type": "object"
+                      },
+                      "relations": {
+                        "additionalProperties": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "namespace_oid": {
+                              "maximum": 4294967295,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "relation": {
+                              "maxLength": 63,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "relation_oid": {
+                              "maximum": 4294967295,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "schema": {
+                              "maxLength": 63,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "schema",
+                            "relation",
+                            "namespace_oid",
+                            "relation_oid"
+                          ],
+                          "type": "object"
+                        },
+                        "minProperties": 1,
+                        "propertyNames": {
+                          "minLength": 3,
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "topology_role": {
+                        "enum": [
+                          "primary",
+                          "standby"
+                        ]
+                      },
+                      "verification_profile": {
+                        "const": "catalog_identity"
+                      },
+                      "version": {
+                        "const": 2
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "verification_profile",
+                      "topology_role",
+                      "database",
+                      "principals",
+                      "relations"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "schema": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "secure": {
+                "type": "boolean"
+              }
+            },
+            "propertyNames": {
+              "not": {
+                "enum": [
+                  "access_key",
+                  "access_key_id",
+                  "client_secret",
+                  "jwt",
+                  "password",
+                  "private_key",
+                  "secret",
+                  "secret_id",
+                  "secret_key",
+                  "session_token",
+                  "token",
+                  "vault_path",
+                  "vault_token"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "credentials": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/vaultKv"
+              },
+              {
+                "$ref": "#/$defs/kubernetesSecretVolume"
+              },
+              {
+                "$ref": "#/$defs/kubernetesSecretApi"
+              },
+              {
+                "$ref": "#/$defs/airflowConnection"
+              },
+              {
+                "$ref": "#/$defs/envVar"
+              }
+            ]
+          },
+          "type": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "credentials"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/connectionRef"
+      },
+      "type": "object"
+    },
+    "environment": {
+      "type": "string"
+    },
+    "fingerprint": {
+      "$ref": "#/$defs/sha256"
+    },
+    "schema": {
+      "const": "dpone.connection-registry.v1"
+    }
+  },
+  "required": [
+    "schema",
+    "connections"
+  ],
+  "title": "dpone GitOps connection registry",
+  "type": "object"
+}

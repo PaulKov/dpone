@@ -1,0 +1,77 @@
+name: Feature design
+description: Propose a production-grade dpone feature or material public-contract change
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form before implementation for public features, connector/strategy capabilities, state/evidence changes, and Airflow/dbt integrations. Do not include secrets or live credentials.
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem and outcome
+      description: Who has the problem, what fails today, and what measurable outcome is required?
+    validations:
+      required: true
+  - type: textarea
+    id: journey
+    attributes:
+      label: Persona and customer journey
+      description: Cover discovery, prerequisites, configuration, execution, observation, diagnosis, recovery, production operation, and upgrade.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Proposed public contract
+      description: CLI, Python API, manifest/schema, artifacts, defaults, errors, and compatibility.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: algorithm
+    attributes:
+      label: Algorithm and failure semantics
+      description: Explain data flow, identity, state/evidence ordering, retries, replay, transactions, concurrency, rollback, and edge cases.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: architecture
+    attributes:
+      label: Architecture and alternatives
+      description: Components, ports/adapters, dependency direction, alternatives, migration, and ADR need.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: comparison
+    attributes:
+      label: Relevant market comparison
+      description: Compare the capability with relevant current official documentation for dlt, Informatica, Airbyte, Fivetran, Pentaho, SSIS, gusty, Astronomer Cosmos, or Apache Beam. Mark irrelevant systems N/A.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: proof
+    attributes:
+      label: Measurable differentiation
+      description: Define scenario, baseline, metric, target, reproducible procedure, evidence artifact, and limitations.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Tests, certification, documentation, rollout, and rollback
+      render: markdown
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgement
+    attributes:
+      label: Design acknowledgement
+      options:
+        - label: I understand implementation starts only after the specification is marked APPROVED.
+          required: true

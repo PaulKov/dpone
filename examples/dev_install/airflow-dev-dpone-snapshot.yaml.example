@@ -1,0 +1,5 @@
+airflowDevDponeSnapshot:
+  enabled: true
+  installMode: snapshot
+  packageSpec: dpone==0.0.0.dev1234
+  targetDir: /opt/airflow/.dpone-pkgs

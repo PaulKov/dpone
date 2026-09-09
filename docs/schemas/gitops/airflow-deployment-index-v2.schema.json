@@ -1,0 +1,797 @@
+{
+  "$defs": {
+    "artifact": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ref": {
+          "pattern": "^cache://(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?![^\\s]*/(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))[^\\s]+$",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "id",
+        "artifact_ref",
+        "sha256",
+        "bytes"
+      ],
+      "type": "object"
+    },
+    "artifacts": {
+      "items": {
+        "$ref": "#/$defs/artifact"
+      },
+      "type": "array"
+    },
+    "exactArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ref": {
+          "pattern": "^cache://(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?![^\\s]*/(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))[^\\s]+$",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "artifact_ref",
+        "sha256",
+        "bytes"
+      ],
+      "type": "object"
+    },
+    "identity": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "mssqlAssetOutletProjection": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_set_ref": {
+          "$ref": "#/$defs/identity"
+        },
+        "connection_registry_ref": {
+          "$ref": "#/$defs/identity"
+        },
+        "entries": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "asset_ref": {
+                "additionalProperties": false,
+                "properties": {
+                  "connection_ref": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "database": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "engine": {
+                    "const": "mssql"
+                  },
+                  "schema": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "table": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "engine",
+                  "connection_ref",
+                  "database",
+                  "schema",
+                  "table"
+                ],
+                "type": "object"
+              },
+              "asset_ref_sha256": {
+                "$ref": "#/$defs/identity"
+              },
+              "registry_connection_ref": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "resolved_binding": {
+                "additionalProperties": false,
+                "properties": {
+                  "registry_connection_ref": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "registry_connection_ref"
+                ],
+                "type": "object"
+              },
+              "uri": {
+                "maxLength": 2048,
+                "minLength": 1,
+                "pattern": "^mssql://[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?:[1-9][0-9]{0,4}/(?:[A-Za-z0-9._~%-]+/){2,3}[A-Za-z0-9._~%-]+$",
+                "type": "string"
+              },
+              "workload_ids": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 1024,
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "asset_ref",
+              "asset_ref_sha256",
+              "registry_connection_ref",
+              "resolved_binding",
+              "workload_ids",
+              "uri"
+            ],
+            "type": "object"
+          },
+          "maxItems": 4096,
+          "minItems": 1,
+          "type": "array"
+        },
+        "environment": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "projection_sha256": {
+          "$ref": "#/$defs/identity"
+        },
+        "schema": {
+          "const": "dpone.mssql-asset-outlet-projection.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "environment",
+        "binding_set_ref",
+        "connection_registry_ref",
+        "entries",
+        "projection_sha256"
+      ],
+      "type": "object"
+    },
+    "runtimePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ref": {
+          "pattern": "^cache://(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?![^\\s]*/(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))[^\\s]+$",
+          "type": "string"
+        },
+        "bytes": {
+          "maximum": 268435456,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "dbt_project_bundle",
+            "dbt_manifest",
+            "dbt_selection_lock"
+          ]
+        },
+        "media_type": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "artifact_ref",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "type": "object"
+    },
+    "runtimePayloads": {
+      "items": {
+        "$ref": "#/$defs/runtimePayload"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "semanticRefreshDagProjection": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_bytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "artifact_ref": {
+          "pattern": "^cache://(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?![^\\s]*/(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))[^\\s]+$",
+          "type": "string"
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/identity"
+        },
+        "authority": {
+          "$ref": "#/$defs/semanticRefreshDagProjectionAuthority"
+        },
+        "dag_id": {
+          "pattern": "^[A-Za-z0-9_.-]{1,250}$",
+          "type": "string"
+        },
+        "dag_projection_sha256": {
+          "$ref": "#/$defs/identity"
+        },
+        "projection_id": {
+          "pattern": "^semantic_refresh_v2::[A-Za-z0-9_.-]{1,250}$",
+          "type": "string"
+        },
+        "workflow_name": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "projection_id",
+        "workflow_name",
+        "dag_id",
+        "dag_projection_sha256",
+        "artifact_ref",
+        "artifact_sha256",
+        "artifact_bytes",
+        "authority"
+      ],
+      "type": "object"
+    },
+    "semanticRefreshDagProjectionAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "authority_record_sha256": {
+          "$ref": "#/$defs/identity"
+        },
+        "dag_projection_sha256": {
+          "$ref": "#/$defs/identity"
+        },
+        "deployment_id": {
+          "$ref": "#/$defs/identity"
+        },
+        "package_artifacts_sha256": {
+          "$ref": "#/$defs/identity"
+        },
+        "plan_bundle_sha256": {
+          "$ref": "#/$defs/identity"
+        },
+        "pre_release_bundle_sha256": {
+          "$ref": "#/$defs/identity"
+        },
+        "release_id": {
+          "$ref": "#/$defs/identity"
+        },
+        "schema": {
+          "const": "dpone.semantic-refresh-v2-dag-projection-authority.v1"
+        },
+        "template_pack_fingerprint": {
+          "$ref": "#/$defs/identity"
+        },
+        "topology_sha256": {
+          "$ref": "#/$defs/identity"
+        },
+        "workflow_plan_sha256": {
+          "$ref": "#/$defs/identity"
+        }
+      },
+      "required": [
+        "schema",
+        "authority_record_sha256",
+        "dag_projection_sha256",
+        "deployment_id",
+        "package_artifacts_sha256",
+        "plan_bundle_sha256",
+        "pre_release_bundle_sha256",
+        "release_id",
+        "template_pack_fingerprint",
+        "topology_sha256",
+        "workflow_plan_sha256"
+      ],
+      "type": "object"
+    },
+    "semanticRefreshDagProjections": {
+      "items": {
+        "$ref": "#/$defs/semanticRefreshDagProjection"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workloadArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ref": {
+          "pattern": "^cache://(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?![^\\s]*/(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))[^\\s]+$",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "pack_fingerprint": {
+          "$ref": "#/$defs/sha256"
+        },
+        "runtime_payload_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "id",
+        "artifact_ref",
+        "sha256",
+        "bytes",
+        "pack_fingerprint"
+      ],
+      "type": "object"
+    },
+    "workloadArtifacts": {
+      "items": {
+        "$ref": "#/$defs/workloadArtifact"
+      },
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-deployment-index-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "trust_tier": {
+            "const": "production"
+          }
+        },
+        "required": [
+          "trust_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "runtime_artifact_delivery": {
+            "properties": {
+              "trust_tier": {
+                "const": "production"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "trust_tier": {
+            "const": "non_production"
+          }
+        },
+        "required": [
+          "trust_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "runtime_artifact_delivery": {
+            "properties": {
+              "trust_tier": {
+                "const": "non_production"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "dev_evidence_delivery"
+        ]
+      },
+      "then": {
+        "properties": {
+          "trust_tier": {
+            "const": "non_production"
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "airflow_bundle_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "binding_set": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/exactArtifact"
+        },
+        {
+          "properties": {
+            "artifact_ref": {
+              "pattern": "^cache://runtime-connection-contexts/sha256-[0-9a-f]{64}/binding-set[.]json$"
+            }
+          }
+        }
+      ]
+    },
+    "binding_set_ref": {
+      "$ref": "#/$defs/identity"
+    },
+    "connection_registry": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/exactArtifact"
+        },
+        {
+          "properties": {
+            "artifact_ref": {
+              "pattern": "^cache://runtime-connection-contexts/sha256-[0-9a-f]{64}/connection-registry[.]json$"
+            }
+          }
+        }
+      ]
+    },
+    "connection_registry_ref": {
+      "$ref": "#/$defs/identity"
+    },
+    "credential_runtime": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/exactArtifact"
+        },
+        {
+          "properties": {
+            "artifact_ref": {
+              "pattern": "^cache://runtime-connection-contexts/sha256-[0-9a-f]{64}/credential-runtime[.]json$"
+            }
+          }
+        }
+      ]
+    },
+    "credential_runtime_ref": {
+      "$ref": "#/$defs/identity"
+    },
+    "dag_specs": {
+      "$ref": "#/$defs/artifacts"
+    },
+    "deployment": {
+      "$ref": "#/$defs/exactArtifact"
+    },
+    "deployment_id": {
+      "$ref": "#/$defs/identity"
+    },
+    "dev_evidence_delivery": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_name": {
+          "maxLength": 63,
+          "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$",
+          "type": "string"
+        },
+        "mode": {
+          "const": "shared_pvc"
+        },
+        "mount_path": {
+          "const": "/var/lib/dpone/dev-evidence"
+        },
+        "worker_queue": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "claim_name",
+        "mount_path",
+        "worker_queue"
+      ],
+      "type": "object"
+    },
+    "release": {
+      "$ref": "#/$defs/exactArtifact"
+    },
+    "release_id": {
+      "$ref": "#/$defs/identity"
+    },
+    "runtime_artifact_delivery": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "trust_tier": {
+                "const": "production"
+              }
+            },
+            "required": [
+              "trust_tier"
+            ]
+          },
+          "then": {
+            "properties": {
+              "verify": {
+                "properties": {
+                  "attestations": {
+                    "const": "required_for_prod"
+                  }
+                }
+              }
+            },
+            "required": [
+              "trust_policy_ref"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trust_tier": {
+                "const": "non_production"
+              }
+            },
+            "required": [
+              "trust_tier"
+            ]
+          },
+          "then": {
+            "properties": {
+              "verify": {
+                "properties": {
+                  "attestations": {
+                    "const": "optional"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "artifact_registry_ref": {
+          "maxLength": 128,
+          "pattern": "^(?=.{1,128}$)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])$)(?!(?:sk_(?:live|test|prod)_[A-Za-z0-9_-]{8,}|sk-(?:proj|svcacct)-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{16,})$)[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "type": "string"
+        },
+        "identity": {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "enum": [
+                "kubernetes_workload_identity"
+              ]
+            },
+            "namespace": {
+              "maxLength": 63,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+              "type": "string"
+            },
+            "service_account": {
+              "maxLength": 63,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "method",
+            "service_account",
+            "namespace"
+          ],
+          "type": "object"
+        },
+        "mode": {
+          "const": "init_fetch"
+        },
+        "registry_config_ref": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "maxLength": 253,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+              "type": "string"
+            },
+            "kind": {
+              "const": "kubernetes_config_map"
+            },
+            "name": {
+              "maxLength": 63,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+              "type": "string"
+            },
+            "sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "key",
+            "sha256"
+          ],
+          "type": "object"
+        },
+        "source": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_registry_ref": {
+              "maxLength": 128,
+              "pattern": "^(?=.{1,128}$)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])$)(?!(?:sk_(?:live|test|prod)_[A-Za-z0-9_-]{8,}|sk-(?:proj|svcacct)-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{16,})$)[A-Za-z0-9][A-Za-z0-9_.-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "artifact_registry_ref"
+          ],
+          "type": "object"
+        },
+        "trust_policy_ref": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "maxLength": 253,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+              "type": "string"
+            },
+            "kind": {
+              "const": "kubernetes_config_map"
+            },
+            "name": {
+              "maxLength": 63,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+              "type": "string"
+            },
+            "sha256": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "key",
+            "sha256"
+          ],
+          "type": "object"
+        },
+        "trust_tier": {
+          "enum": [
+            "production",
+            "non_production"
+          ]
+        },
+        "verify": {
+          "additionalProperties": false,
+          "properties": {
+            "attestations": {
+              "enum": [
+                "optional",
+                "required_for_prod"
+              ]
+            },
+            "checksums": {
+              "enum": [
+                "required"
+              ]
+            }
+          },
+          "required": [
+            "checksums",
+            "attestations"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "mode",
+        "trust_tier",
+        "artifact_registry_ref",
+        "identity",
+        "registry_config_ref",
+        "source",
+        "verify"
+      ],
+      "type": "object"
+    },
+    "runtime_image_digest": {
+      "$ref": "#/$defs/identity"
+    },
+    "runtime_image_ref": {
+      "pattern": "^(?!.*(?:\\s|://|\\?|#|=))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::(?!0+/)(?:[0-9]{1,4}|[0-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?/[a-z0-9]+(?:[._/-][a-z0-9]+)*@sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "runtime_payloads": {
+      "$ref": "#/$defs/runtimePayloads"
+    },
+    "schema": {
+      "const": "dpone.airflow-deployment-index.v2"
+    },
+    "semantic_refresh_dag_projections": {
+      "$ref": "#/$defs/semanticRefreshDagProjections"
+    },
+    "trust_tier": {
+      "enum": [
+        "production",
+        "non_production"
+      ]
+    },
+    "workload_packs": {
+      "$ref": "#/$defs/workloadArtifacts"
+    }
+  },
+  "required": [
+    "schema",
+    "release_id",
+    "deployment_id",
+    "trust_tier",
+    "dag_specs",
+    "workload_packs",
+    "binding_set_ref",
+    "connection_registry_ref",
+    "credential_runtime_ref",
+    "binding_set",
+    "connection_registry",
+    "credential_runtime",
+    "runtime_image_ref",
+    "runtime_image_digest",
+    "airflow_bundle_ref",
+    "runtime_artifact_delivery",
+    "release",
+    "deployment"
+  ],
+  "title": "dpone GitOps executable Airflow deployment index v2",
+  "type": "object"
+}

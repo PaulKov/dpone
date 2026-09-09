@@ -1,0 +1,1244 @@
+name: Runtime image
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/runtime-image.yml"
+      - "docker/runtime/**"
+      - "docs/runtime-image.md"
+      - "docs/cicd/release-and-pages.md"
+      - "docs/release.md"
+      - "docs/schemas/release/runtime-image-*.schema.json"
+      - "tests/agent_policy/test_runtime_image_*.py"
+      - "tests/test_release_smoke_contracts.py"
+      - "tools/agent_policy/release_identity_gate.py"
+      - "tools/agent_policy/release_commit_gate.py"
+      - "tools/agent_policy/release_candidate_evidence_*.py"
+      - "tools/agent_policy/runtime_image_certification.py"
+      - "tools/agent_policy/runtime_image_promotion.py"
+      - "tools/agent_policy/runtime_image_registry.py"
+      - "tools/pypi_candidate_inventory.py"
+      - "tools/pypi_release_smoke.py"
+      - "tools/pypi_release_smoke_dist.py"
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Local smoke image label or public dpone version. Manual runs never publish."
+        required: false
+        default: ""
+        type: string
+      package_spec:
+        description: "Optional pip package spec for a non-publishing manual smoke build."
+        required: false
+        default: ""
+        type: string
+      push_image:
+        description: "Deprecated safety tripwire. Production pushes occur only for tag push events."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/paulkov/dpone-runtime
+
+jobs:
+  development-build:
+    name: Build and smoke non-publishing runtime image
+    if: ${{ github.event_name != 'push' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Resolve safe non-publishing inputs
+        id: image
+        shell: bash
+        env:
+          INPUT_PACKAGE_SPEC: ${{ inputs.package_spec }}
+          INPUT_PUSH_IMAGE: ${{ inputs.push_image }}
+          INPUT_VERSION: ${{ inputs.version }}
+          RUNTIME_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [[ "${INPUT_PUSH_IMAGE}" == "true" ]]; then
+            echo "::error::Manual runtime-image publication is forbidden; push an approved annotated release tag."
+            exit 1
+          fi
+          if [[ "${INPUT_PACKAGE_SPEC}" == *$'\n'* || "${INPUT_PACKAGE_SPEC}" == *$'\r'* || "${#INPUT_PACKAGE_SPEC}" -gt 1024 ]]; then
+            echo "::error::package_spec must be a bounded single-line pip requirement."
+            exit 1
+          fi
+          if [[ "${RUNTIME_EVENT_NAME}" == "pull_request" ]]; then
+            version="pr-${GITHUB_SHA::12}"
+            package_spec="/opt/dpone-src[full]"
+            accel_package_spec="/opt/dpone-src/packages/dpone-native-accel"
+            verify_pypi="false"
+          else
+            version="${INPUT_VERSION:-manual-${GITHUB_SHA::12}}"
+            if [[ ! "${version}" =~ ^[0-9A-Za-z][0-9A-Za-z._-]{0,127}$ ]]; then
+              echo "::error::version must be a safe OCI tag component."
+              exit 1
+            fi
+            if [[ -n "${INPUT_PACKAGE_SPEC}" ]]; then
+              package_spec="${INPUT_PACKAGE_SPEC}"
+              accel_package_spec=""
+              verify_pypi="false"
+            elif [[ -n "${INPUT_VERSION}" ]]; then
+              package_spec="dpone[full,accel]==${version}"
+              accel_package_spec=""
+              verify_pypi="true"
+            else
+              package_spec="/opt/dpone-src[full]"
+              accel_package_spec="/opt/dpone-src/packages/dpone-native-accel"
+              verify_pypi="false"
+            fi
+          fi
+          {
+            echo "version=${version}"
+            echo "package_spec=${package_spec}"
+            echo "accel_package_spec=${accel_package_spec}"
+            echo "verify_pypi=${verify_pypi}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Wait for selected public package version
+        if: ${{ steps.image.outputs.verify_pypi == 'true' }}
+        env:
+          RUNTIME_VERSION: ${{ steps.image.outputs.version }}
+        run: |
+          uv run python tools/pypi_release_smoke.py \
+            --package dpone \
+            --version "${RUNTIME_VERSION}" \
+            --timeout-seconds 1800 \
+            --poll-interval-seconds 30 \
+            --install-smoke \
+            --install-extra full,accel \
+            --format md
+
+      - name: Create runtime evidence directory
+        run: mkdir -p test_artifacts/runtime-image
+
+      - name: Build runtime image
+        env:
+          ACCEL_PACKAGE_SPEC: ${{ steps.image.outputs.accel_package_spec }}
+          PACKAGE_SPEC: ${{ steps.image.outputs.package_spec }}
+          RUNTIME_VERSION: ${{ steps.image.outputs.version }}
+        run: |
+          docker build \
+            -f docker/runtime/Dockerfile \
+            --build-arg DPONE_PACKAGE_SPEC="${PACKAGE_SPEC}" \
+            --build-arg DPONE_ACCEL_PACKAGE_SPEC="${ACCEL_PACKAGE_SPEC}" \
+            --build-arg DPONE_IMAGE_VERSION="${RUNTIME_VERSION}" \
+            --build-arg DPONE_IMAGE_REVISION="${GITHUB_SHA}" \
+            --build-arg DPONE_IMAGE_CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t "${IMAGE_NAME}:${RUNTIME_VERSION}" \
+            .
+
+      - name: Smoke runtime image
+        env:
+          RUNTIME_VERSION: ${{ steps.image.outputs.version }}
+        run: |
+          image="${IMAGE_NAME}:${RUNTIME_VERSION}"
+          docker run --rm "${image}" --version
+          docker run --rm --entrypoint python "${image}" -m pip check
+          docker run --rm --entrypoint bcp "${image}" -v
+          docker run --rm --entrypoint sqlcmd "${image}" '-?'
+          docker run --rm --entrypoint clickhouse-client "${image}" --version
+          docker run --rm --entrypoint cosign "${image}" version --json
+          docker run --rm "${image}" runtime native-accel doctor --format json
+          docker run --rm "${image}" airflow runtime-init-fetch --help
+          docker run --rm "${image}" airflow runtime-pack-exec --help
+
+      - name: Record local runtime image evidence
+        if: always()
+        env:
+          RUNTIME_VERSION: ${{ steps.image.outputs.version }}
+        run: |
+          image="${IMAGE_NAME}:${RUNTIME_VERSION}"
+          if docker image inspect "${image}" >/dev/null 2>&1; then
+            docker image inspect "${image}" > test_artifacts/runtime-image/image-inspect.json
+            docker run --rm --entrypoint python "${image}" -m pip list --format=json \
+              > test_artifacts/runtime-image/python-packages.json
+            docker run --rm --entrypoint dpkg-query "${image}" -W \
+              '-f=${binary:Package}\t${Version}\n' \
+              > test_artifacts/runtime-image/os-packages.tsv
+          fi
+
+      - name: Generate local runtime image SBOM
+        if: ${{ success() }}
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: ${{ env.IMAGE_NAME }}:${{ steps.image.outputs.version }}
+          format: spdx-json
+          output-file: test_artifacts/runtime-image/runtime-image.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Upload runtime image evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: runtime-image-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/runtime-image/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  release-preflight:
+    name: Validate release identity for runtime image
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      statuses: read
+    outputs:
+      created: ${{ steps.release.outputs.created }}
+      version: ${{ steps.release.outputs.version }}
+      evidence_artifact_id: ${{ steps.preflight-upload.outputs.artifact-id }}
+      evidence_artifact_digest: ${{ steps.preflight-upload.outputs.artifact-digest }}
+    steps:
+      - name: Checkout complete release history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Install release verification dependencies
+        run: uv sync --all-extras
+
+      - name: Create runtime evidence directory
+        run: mkdir -p test_artifacts/runtime-image
+
+      - name: Resolve immutable runtime release inputs
+        id: release
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          created="$(git show -s --format=%cI "${RELEASE_COMMIT}")"
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Runtime release tag does not contain a supported version."
+            exit 1
+          fi
+          {
+            echo "version=${version}"
+            echo "created=${created}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Validate runtime release identity
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          # Use the uv-managed environment from `uv sync` above. Bare `python`
+          # points at the Actions system interpreter and fails closed without PyYAML.
+          uv run python tools/agent_policy/release_identity_gate.py \
+            --root . \
+            --tag "${RELEASE_TAG}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --remote-ref origin/master \
+            --output test_artifacts/runtime-image/release-identity.json
+          uv run python tools/agent_policy/release_commit_gate.py \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --policy .agents/policy/github-branch-protection.yml \
+            --timeout-seconds 300 \
+            --poll-interval-seconds 15 \
+            > test_artifacts/runtime-image/exact-commit-checks.json
+          uv run python tools/agent_policy/release_merge_receipt_gate.py \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --required-check-report test_artifacts/runtime-image/exact-commit-checks.json \
+            --output test_artifacts/runtime-image/exact-commit-merge-receipt.json
+          uv run python tools/agent_policy/release_candidate_evidence_gate.py \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --release "${RELEASE_TAG}" \
+            --publication-workflow-path ".github/workflows/runtime-image.yml" \
+            --publication-run-id "${GITHUB_RUN_ID}" \
+            --publication-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output test_artifacts/runtime-image/release_candidate_evidence_verification.json
+
+      - name: Stage closed release-candidate verifier bundle
+        run: |
+          set -euo pipefail
+          verifier_dir="test_artifacts/runtime-image/release-candidate-verifier"
+          mkdir -p "${verifier_dir}"
+          cp \
+            tools/agent_policy/artifact_resource_limits.py \
+            tools/agent_policy/pr_receipt_github_api.py \
+            tools/agent_policy/release_candidate_evidence_archive.py \
+            tools/agent_policy/release_candidate_evidence_builder.py \
+            tools/agent_policy/release_candidate_evidence_codec.py \
+            tools/agent_policy/release_candidate_evidence_contract.py \
+            tools/agent_policy/release_candidate_evidence_gate.py \
+            tools/agent_policy/release_candidate_evidence_github.py \
+            tools/agent_policy/release_candidate_evidence_policy.py \
+            tools/agent_policy/release_candidate_evidence_route_chunks.py \
+            tools/agent_policy/release_candidate_evidence_route_validation.py \
+            tools/agent_policy/release_candidate_evidence_source.py \
+            tools/agent_policy/release_candidate_evidence_stress_validation.py \
+            tools/agent_policy/release_candidate_evidence_validation.py \
+            "${verifier_dir}/"
+
+      - name: Upload runtime image preflight evidence
+        id: preflight-upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: runtime-image-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/runtime-image/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  build-runtime-candidate:
+    name: Build digest-only runtime image candidate
+    needs: release-preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      oci_artifact_id: ${{ steps.oci-upload.outputs.artifact-id }}
+      oci_artifact_digest: ${{ steps.oci-upload.outputs.artifact-digest }}
+      build_artifact_id: ${{ steps.build-upload.outputs.artifact-id }}
+      build_artifact_digest: ${{ steps.build-upload.outputs.artifact-digest }}
+      tools_artifact_id: ${{ steps.tools-upload.outputs.artifact-id }}
+      tools_artifact_digest: ${{ steps.tools-upload.outputs.artifact-digest }}
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Install release verification dependencies
+        run: uv sync --all-extras
+
+      - name: Create runtime evidence directory
+        env:
+          RUNTIME_EVIDENCE_DIR: ${{ runner.temp }}/dpone-runtime-image
+        run: |
+          set -euo pipefail
+          test ! -e "${RUNTIME_EVIDENCE_DIR}"
+          # Do not pre-create oci-layout: buildx type=oci defaults to tar=true and
+          # fails with "destination file ... is a directory" if the dest exists.
+          mkdir -p "${RUNTIME_EVIDENCE_DIR}/checks"
+
+      - name: Build exact runtime candidate distributions
+        env:
+          RUNTIME_EVIDENCE_DIR: ${{ runner.temp }}/dpone-runtime-image
+        run: |
+          uv build
+          uv build packages/dpone-native-accel --out-dir dist
+          uv build packages/dpone-airflow-pack --out-dir dist
+          uv build packages/apache-airflow-providers-dpone --out-dir dist
+          rm -f dist/.gitignore
+          version="${GITHUB_REF_NAME#v}"
+          uv run python tools/pypi_release_smoke_dist.py \
+            --dist-dir dist \
+            --expected-version "${version}" \
+            --inventory-only \
+            --format json \
+            > "${RUNTIME_EVIDENCE_DIR}/candidate-inventory.json"
+          uv run python tools/agent_policy/package_archive_gate.py \
+            dist/*.whl dist/*.tar.gz \
+            > "${RUNTIME_EVIDENCE_DIR}/package-archive-gate.json"
+          uv run twine check dist/*
+          sha256sum dist/* | LC_ALL=C sort -k2 > "${RUNTIME_EVIDENCE_DIR}/candidate-sha256sums.txt"
+
+      - name: Verify exact public wheel and sdist identities
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+          RUNTIME_EVIDENCE_DIR: ${{ runner.temp }}/dpone-runtime-image
+        run: |
+          version="${RELEASE_VERSION#v}"
+          uv run python tools/pypi_release_smoke_dist.py \
+            --dist-dir dist \
+            --expected-version "${version}" \
+            --timeout-seconds 1800 \
+            --poll-interval-seconds 30 \
+            --install-smoke \
+            --dpone-install-extra full,accel \
+            --format md \
+            | tee "${RUNTIME_EVIDENCE_DIR}/pypi-candidate-identity.md"
+
+      - name: Build local runtime candidate image and OCI layout
+        env:
+          RUNTIME_CREATED: ${{ needs.release-preflight.outputs.created }}
+          RUNTIME_EVIDENCE_DIR: ${{ runner.temp }}/dpone-runtime-image
+          RUNTIME_VERSION: ${{ needs.release-preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            -f docker/runtime/Dockerfile \
+            --platform linux/amd64 \
+            --build-arg DPONE_PACKAGE_SPEC="dpone[full,accel]==${RUNTIME_VERSION}" \
+            --build-arg DPONE_ACCEL_PACKAGE_SPEC="" \
+            --build-arg DPONE_IMAGE_VERSION="${RUNTIME_VERSION}" \
+            --build-arg DPONE_IMAGE_REVISION="${GITHUB_SHA}" \
+            --build-arg DPONE_IMAGE_CREATED="${RUNTIME_CREATED}" \
+            --output "type=docker,name=${IMAGE_NAME}:${RUNTIME_VERSION}" \
+            --output "type=oci,dest=${RUNTIME_EVIDENCE_DIR}/oci-layout,name=${IMAGE_NAME},tar=false" \
+            .
+          # buildx tar=false historically may omit the OCI layout marker file.
+          if [[ ! -f "${RUNTIME_EVIDENCE_DIR}/oci-layout/oci-layout" ]]; then
+            printf '%s\n' '{"imageLayoutVersion":"1.0.0"}' \
+              > "${RUNTIME_EVIDENCE_DIR}/oci-layout/oci-layout"
+          fi
+          test -f "${RUNTIME_EVIDENCE_DIR}/oci-layout/index.json"
+
+      - name: Smoke runtime image before privileged push
+        env:
+          RUNTIME_EVIDENCE_DIR: ${{ runner.temp }}/dpone-runtime-image
+          RUNTIME_VERSION: ${{ needs.release-preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          image="${IMAGE_NAME}:${RUNTIME_VERSION}"
+          checks_root="${RUNTIME_EVIDENCE_DIR}/checks"
+          record_pass() {
+            local check_id="$1"
+            local temporary
+            temporary="$(mktemp "${checks_root}/.${check_id}.XXXXXX")"
+            jq -n \
+              --arg id "${check_id}" \
+              --arg subject_name "${IMAGE_NAME}" \
+              --arg source_commit_sha "${GITHUB_SHA}" \
+              '{
+                schema: "dpone.runtime-image-check.v1",
+                id: $id,
+                status: "PASS",
+                subject_name: $subject_name,
+                subject_digest: "sha256:pending",
+                source_commit_sha: $source_commit_sha
+              }' > "${temporary}"
+            chmod 0444 "${temporary}"
+            mv -T "${temporary}" "${checks_root}/${check_id}.json"
+          }
+          observed_version="$(docker run --rm --entrypoint python "${image}" -c \
+            "from importlib.metadata import version; print(version('dpone'))")"
+          test "${observed_version}" = "${RUNTIME_VERSION}"
+          record_pass installed-dpone-version
+          docker run --rm "${image}" --version
+          record_pass dpone-version
+          docker run --rm --entrypoint python "${image}" -m pip check
+          record_pass pip-check
+          docker run --rm --entrypoint bcp "${image}" -v
+          record_pass bcp
+          docker run --rm --entrypoint sqlcmd "${image}" '-?'
+          record_pass sqlcmd
+          docker run --rm --entrypoint clickhouse-client "${image}" --version
+          record_pass clickhouse-client
+          docker run --rm --entrypoint cosign "${image}" version --json
+          record_pass cosign
+          docker run --rm "${image}" runtime native-accel doctor --format json
+          record_pass native-accel-doctor
+          docker run --rm "${image}" airflow runtime-init-fetch --help
+          record_pass airflow-runtime-init-fetch-help
+          docker run --rm "${image}" airflow runtime-pack-exec --help
+          record_pass airflow-runtime-pack-exec-help
+          docker image inspect "${image}" > "${RUNTIME_EVIDENCE_DIR}/image-inspect.json"
+          docker run --rm --entrypoint python "${image}" -m pip list --format=json \
+            > "${RUNTIME_EVIDENCE_DIR}/python-packages.json"
+          docker run --rm --entrypoint dpkg-query "${image}" -W \
+            '-f=${binary:Package}\t${Version}\n' \
+            > "${RUNTIME_EVIDENCE_DIR}/os-packages.tsv"
+
+      - name: Generate runtime image SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: ${{ env.IMAGE_NAME }}:${{ needs.release-preflight.outputs.version }}
+          format: spdx-json
+          output-file: ${{ runner.temp }}/dpone-runtime-image/runtime-image.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Stage privileged-job tool bundle
+        env:
+          RUNTIME_EVIDENCE_DIR: ${{ runner.temp }}/dpone-runtime-image
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNTIME_EVIDENCE_DIR}/tools-bundle"
+          cp tools/agent_policy/runtime_image_promotion.py \
+            tools/agent_policy/runtime_image_promotion_models.py \
+            tools/agent_policy/runtime_image_registry.py \
+            tools/agent_policy/runtime_image_registry_transport.py \
+            tools/agent_policy/runtime_image_publication_journal.py \
+            tools/agent_policy/runtime_image_certification.py \
+            tools/agent_policy/runtime_image_certification_models.py \
+            "${RUNTIME_EVIDENCE_DIR}/tools-bundle/"
+
+      - name: Upload OCI layout candidate
+        id: oci-upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: runtime-image-oci-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/dpone-runtime-image/oci-layout/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+      - name: Upload runtime image build evidence
+        id: build-upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: runtime-image-build-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/dpone-runtime-image/checks/
+            ${{ runner.temp }}/dpone-runtime-image/*.json
+            ${{ runner.temp }}/dpone-runtime-image/*.md
+            ${{ runner.temp }}/dpone-runtime-image/*.txt
+            ${{ runner.temp }}/dpone-runtime-image/*.tsv
+            ${{ runner.temp }}/dpone-runtime-image/runtime-image.spdx.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+      - name: Upload runtime image tool bundle
+        id: tools-upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: runtime-image-tools-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/dpone-runtime-image/tools-bundle/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  push-attest-runtime-candidate:
+    name: Push and attest digest-only runtime image
+    needs:
+      - release-preflight
+      - build-runtime-candidate
+    runs-on: ubuntu-latest
+    environment: ghcr
+    permissions:
+      actions: read
+      attestations: write
+      checks: read
+      contents: read
+      id-token: write
+      packages: write
+    outputs:
+      digest: ${{ steps.candidate.outputs.digest }}
+      evidence_artifact_id: ${{ steps.push-upload.outputs.artifact-id }}
+      evidence_artifact_digest: ${{ steps.push-upload.outputs.artifact-digest }}
+    steps:
+      - name: Download OCI layout candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.build-runtime-candidate.outputs.oci_artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/dpone-runtime-image/oci-layout
+
+      - name: Download runtime image build evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.build-runtime-candidate.outputs.build_artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/dpone-runtime-image
+
+      - name: Download closed release-candidate verifier bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.release-preflight.outputs.evidence_artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/runtime-image-preflight
+
+      - name: Set up verifier Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Install crane
+        env:
+          CRANE_VERSION: "0.20.3"
+          CRANE_SHA256: "36c67a932f489b3f2724b64af90b599a8ef2aa7b004872597373c0ad694dc059"
+        run: |
+          set -euo pipefail
+          archive="${RUNNER_TEMP}/go-containerregistry_Linux_x86_64.tar.gz"
+          curl --fail --show-error --silent --location \
+            "https://github.com/google/go-containerregistry/releases/download/v${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" \
+            --output "${archive}"
+          printf '%s  %s\n' "${CRANE_SHA256}" "${archive}" | sha256sum --check -
+          tar -xzf "${archive}" -C /usr/local/bin crane
+          crane version
+
+      - name: Login to GHCR for digest-only candidate
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "${GHCR_TOKEN}" \
+            | crane auth login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+
+      - name: Recheck annotated tag identity before GHCR publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          gates_dir="${RUNNER_TEMP}/dpone-runtime-image/runtime-publication-gates"
+          mkdir -p "${gates_dir}"
+          ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
+          object_type="$(printf '%s' "${ref_json}" | python -c 'import json,sys; print(json.load(sys.stdin)["object"]["type"])')"
+          object_sha="$(printf '%s' "${ref_json}" | python -c 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])')"
+          if [[ "${object_type}" != "tag" ]]; then
+            echo "::error::Runtime release tag must remain an annotated tag object before GHCR publication."
+            exit 1
+          fi
+          tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${object_sha}")"
+          peeled="$(printf '%s' "${tag_json}" | python -c 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])')"
+          tag_object_type="$(printf '%s' "${tag_json}" | python -c 'import json,sys; print(json.load(sys.stdin)["object"]["type"])')"
+          if [[ "${tag_object_type}" != "commit" || "${peeled}" != "${RELEASE_COMMIT}" ]]; then
+            echo "::error::Annotated tag no longer peels to runtime release commit ${RELEASE_COMMIT}."
+            exit 1
+          fi
+          TAG_OBJECT_SHA="${object_sha}" PEELLED_COMMIT="${peeled}" python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "commit_sha": os.environ["RELEASE_COMMIT"],
+              "peeled_commit_sha": os.environ["PEELLED_COMMIT"],
+              "schema_version": 1,
+              "status": "PASS",
+              "tag": os.environ["RELEASE_TAG"],
+              "tag_object_sha": os.environ["TAG_OBJECT_SHA"],
+          }
+          Path(os.environ["RUNNER_TEMP"], "dpone-runtime-image", "runtime-publication-gates", "tag_recheck_ghcr_push.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Reverify release candidate immediately before GHCR publication
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VERIFIER_DIR: ${{ runner.temp }}/runtime-image-preflight/release-candidate-verifier
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/dpone-runtime-image/runtime-publication-gates"
+          python "${VERIFIER_DIR}/release_candidate_evidence_gate.py" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --release "${RELEASE_TAG}" \
+            --publication-workflow-path ".github/workflows/runtime-image.yml" \
+            --publication-run-id "${GITHUB_RUN_ID}" \
+            --publication-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output "${RUNNER_TEMP}/dpone-runtime-image/runtime-publication-gates/before_ghcr_push.json"
+
+      - name: Push digest-only runtime candidate
+        id: candidate
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          RUNTIME_EVIDENCE_DIR: ${{ runner.temp }}/dpone-runtime-image
+        run: |
+          set -euo pipefail
+          # The pinned crane defaults a repository-only destination to :latest.
+          # Resolve the single OCI descriptor before any registry mutation and
+          # publish only through its digest-qualified reference.
+          index_json="${RUNTIME_EVIDENCE_DIR}/oci-layout/index.json"
+          candidate_digest="$(
+            jq -er '
+              if .schemaVersion == 2
+                 and ((.manifests | type) == "array")
+                 and (.manifests | length) == 1
+              then .manifests[0].digest
+              else error("OCI layout must contain exactly one image descriptor")
+              end
+            ' "${index_json}"
+          )"
+          if [[ ! "${candidate_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::OCI layout descriptor digest is not canonical."
+            exit 1
+          fi
+          destination="${IMAGE_NAME}@${candidate_digest}"
+          refs_file="${RUNTIME_EVIDENCE_DIR}/image-refs.txt"
+          crane push \
+            "${RUNTIME_EVIDENCE_DIR}/oci-layout" \
+            "${destination}" \
+            --image-refs "${refs_file}"
+          digest="$(
+            sed -nE 's/.*@(sha256:[0-9a-f]{64})$/\1/p' "${refs_file}" \
+              | tail -n1
+          )"
+          if [[ -z "${digest}" ]]; then
+            digest="$(
+              sed -nE 's/^(sha256:[0-9a-f]{64})$/\1/p' "${refs_file}" \
+                | tail -n1
+            )"
+          fi
+          if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::crane push did not return a canonical image digest."
+            echo "::error::image-refs contents:"
+            cat "${refs_file}" >&2 || true
+            exit 1
+          fi
+          if [[ "${digest}" != "${candidate_digest}" || "$(cat "${refs_file}")" != "${destination}" ]]; then
+            echo "::error::Digest-only GHCR publication does not match the immutable OCI descriptor."
+            exit 1
+          fi
+          printf '%s\n' "${candidate_digest}" > "${RUNTIME_EVIDENCE_DIR}/candidate-layout-digest.txt"
+          printf '%s\n' "${digest}" > "${RUNTIME_EVIDENCE_DIR}/image-digest.txt"
+          for check in "${RUNTIME_EVIDENCE_DIR}"/checks/*.json; do
+            jq --arg digest "${digest}" '.subject_digest = $digest' "${check}" > "${check}.tmp"
+            mv -T "${check}.tmp" "${check}"
+          done
+          printf '%s' "${GHCR_TOKEN}" \
+            | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+          subject="${IMAGE_NAME}@${digest}"
+          docker pull "${subject}"
+          docker run --rm --entrypoint cosign "${subject}" version --json
+          temporary="$(mktemp "${RUNTIME_EVIDENCE_DIR}/checks/.cosign.XXXXXX")"
+          jq -n \
+            --arg subject_name "${IMAGE_NAME}" \
+            --arg subject_digest "${digest}" \
+            --arg source_commit_sha "${GITHUB_SHA}" \
+            '{
+              schema: "dpone.runtime-image-check.v1",
+              id: "cosign",
+              status: "PASS",
+              subject_name: $subject_name,
+              subject_digest: $subject_digest,
+              source_commit_sha: $source_commit_sha
+            }' > "${temporary}"
+          chmod 0444 "${temporary}"
+          mv -T "${temporary}" "${RUNTIME_EVIDENCE_DIR}/checks/cosign.json"
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+
+      - name: Attest runtime image provenance
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.candidate.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest runtime image SBOM
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.candidate.outputs.digest }}
+          sbom-path: ${{ runner.temp }}/dpone-runtime-image/runtime-image.spdx.json
+          push-to-registry: true
+
+      - name: Verify runtime image attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_DIGEST: ${{ steps.candidate.outputs.digest }}
+          RUNTIME_EVIDENCE_DIR: ${{ runner.temp }}/dpone-runtime-image
+        run: |
+          set -euo pipefail
+          subject="oci://${IMAGE_NAME}@${IMAGE_DIGEST}"
+          gh attestation verify "${subject}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/runtime-image.yml" \
+            --source-ref "${GITHUB_REF}" \
+            --source-digest "${GITHUB_SHA}" \
+            --predicate-type "https://slsa.dev/provenance/v1" \
+            --format json \
+            > "${RUNTIME_EVIDENCE_DIR}/provenance-verification.json"
+          gh attestation verify "${subject}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/runtime-image.yml" \
+            --source-ref "${GITHUB_REF}" \
+            --source-digest "${GITHUB_SHA}" \
+            --predicate-type "https://spdx.dev/Document/v2.3" \
+            --format json \
+            > "${RUNTIME_EVIDENCE_DIR}/sbom-verification.json"
+
+      - name: Upload runtime image push and attestation evidence
+        id: push-upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: runtime-image-push-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/dpone-runtime-image/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  certify-runtime-candidate:
+    name: Certify pushed runtime image from verified receipts
+    needs:
+      - release-preflight
+      - push-attest-runtime-candidate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      certification_artifact_digest: ${{ steps.certification-upload.outputs.artifact-digest }}
+      certification_artifact_id: ${{ steps.certification-upload.outputs.artifact-id }}
+      certification_artifact_name: ${{ steps.certification.outputs.artifact_name }}
+      certification_run_attempt: ${{ steps.certification.outputs.run_attempt }}
+      digest: ${{ needs.push-attest-runtime-candidate.outputs.digest }}
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Download runtime image push and attestation evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.push-attest-runtime-candidate.outputs.evidence_artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/dpone-runtime-image
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Install release verification dependencies
+        run: uv sync --all-extras
+
+      - name: Derive PASS runtime image certification from verified receipts
+        id: certification
+        env:
+          IMAGE_DIGEST: ${{ needs.push-attest-runtime-candidate.outputs.digest }}
+          RUNTIME_EVIDENCE_DIR: ${{ runner.temp }}/dpone-runtime-image
+          RUNTIME_VERSION: ${{ needs.release-preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          uv run python tools/agent_policy/runtime_image_promotion.py certify \
+            --image "${IMAGE_NAME}" \
+            --version "${RUNTIME_VERSION}" \
+            --release-tag "${GITHUB_REF_NAME}" \
+            --source-commit "${GITHUB_SHA}" \
+            --source-ref "${GITHUB_REF}" \
+            --source-repository "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/runtime-image.yml" \
+            --digest "${IMAGE_DIGEST}" \
+            --platform linux/amd64 \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --dockerfile docker/runtime/Dockerfile \
+            --dockerignore docker/runtime/Dockerfile.dockerignore \
+            --context-root . \
+            --context-manifest-output "${RUNTIME_EVIDENCE_DIR}/runtime-image-context-manifest.json" \
+            --sbom "${RUNTIME_EVIDENCE_DIR}/runtime-image.spdx.json" \
+            --provenance-verification "${RUNTIME_EVIDENCE_DIR}/provenance-verification.json" \
+            --sbom-verification "${RUNTIME_EVIDENCE_DIR}/sbom-verification.json" \
+            --checks-root "${RUNTIME_EVIDENCE_DIR}/checks" \
+            --output "${RUNTIME_EVIDENCE_DIR}/runtime-image-certification.json"
+          echo "artifact_name=runtime-image-certification-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            >> "${GITHUB_OUTPUT}"
+          echo "run_attempt=${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload immutable runtime image certification
+        id: certification-upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.certification.outputs.artifact_name }}
+          path: ${{ runner.temp }}/dpone-runtime-image/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  promote-certified-image:
+    name: Promote certified runtime image aliases
+    needs:
+      - release-preflight
+      - certify-runtime-candidate
+      - build-runtime-candidate
+    runs-on: ubuntu-latest
+    environment: ghcr
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      packages: write
+    concurrency:
+      group: runtime-image-ghcr-promotion
+      cancel-in-progress: false
+    outputs:
+      evidence_artifact_id: ${{ steps.publication-upload.outputs.artifact-id }}
+      evidence_artifact_digest: ${{ steps.publication-upload.outputs.artifact-digest }}
+    steps:
+      - name: Verify immutable runtime image certification artifact identity
+        env:
+          CERTIFICATION_ARTIFACT_DIGEST: ${{ needs.certify-runtime-candidate.outputs.certification_artifact_digest }}
+          CERTIFICATION_ARTIFACT_ID: ${{ needs.certify-runtime-candidate.outputs.certification_artifact_id }}
+          CERTIFICATION_ARTIFACT_NAME: ${{ needs.certify-runtime-candidate.outputs.certification_artifact_name }}
+          CERTIFICATION_RUN_ATTEMPT: ${{ needs.certify-runtime-candidate.outputs.certification_run_attempt }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          case "${CERTIFICATION_ARTIFACT_ID}" in
+            ""|*[!0-9]*) echo "::error::Certification artifact ID is invalid."; exit 1 ;;
+          esac
+          if [[ ! "${CERTIFICATION_ARTIFACT_DIGEST}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::Certification artifact digest is invalid."
+            exit 1
+          fi
+          expected_name="runtime-image-certification-${GITHUB_RUN_ID}-${CERTIFICATION_RUN_ATTEMPT}"
+          test "${CERTIFICATION_ARTIFACT_NAME}" = "${expected_name}"
+          mkdir -p test_artifacts/runtime-image
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${CERTIFICATION_ARTIFACT_ID}" \
+            > test_artifacts/runtime-image/certification-artifact-metadata.raw.json
+          jq -e \
+            --arg artifact_id "${CERTIFICATION_ARTIFACT_ID}" \
+            --arg digest "sha256:${CERTIFICATION_ARTIFACT_DIGEST}" \
+            --arg head_sha "${GITHUB_SHA}" \
+            --arg name "${CERTIFICATION_ARTIFACT_NAME}" \
+            --argjson run_id "${GITHUB_RUN_ID}" \
+            '
+              .id == ($artifact_id | tonumber)
+              and .name == $name
+              and .digest == $digest
+              and .expired == false
+              and .workflow_run.id == $run_id
+              and .workflow_run.head_sha == $head_sha
+            ' test_artifacts/runtime-image/certification-artifact-metadata.raw.json
+          jq \
+            '{
+              schema: "dpone.runtime-image-certification-artifact.v1",
+              artifact_id: .id,
+              name,
+              digest,
+              size_in_bytes,
+              created_at,
+              expires_at,
+              workflow_run: {
+                id: .workflow_run.id,
+                head_sha: .workflow_run.head_sha
+              }
+            }' \
+            test_artifacts/runtime-image/certification-artifact-metadata.raw.json \
+            > test_artifacts/runtime-image/certification-artifact-identity.json
+          rm -f test_artifacts/runtime-image/certification-artifact-metadata.raw.json
+
+      - name: Download immutable runtime image certification
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.certify-runtime-candidate.outputs.certification_artifact_id }}
+          digest-mismatch: error
+          path: test_artifacts/runtime-image
+
+      - name: Download runtime image tool bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.build-runtime-candidate.outputs.tools_artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/dpone-runtime-image-tools
+
+      - name: Download closed release-candidate verifier bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.release-preflight.outputs.evidence_artifact_id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/runtime-image-preflight
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Validate runtime image certification
+        env:
+          IMAGE_DIGEST: ${{ needs.certify-runtime-candidate.outputs.digest }}
+          RUNTIME_VERSION: ${{ needs.release-preflight.outputs.version }}
+          TOOLS_DIR: ${{ runner.temp }}/dpone-runtime-image-tools
+        run: |
+          PYTHONPATH="${TOOLS_DIR}" python "${TOOLS_DIR}/runtime_image_promotion.py" validate-certification \
+            --certification test_artifacts/runtime-image/runtime-image-certification.json \
+            --image "${IMAGE_NAME}" \
+            --version "${RUNTIME_VERSION}" \
+            --digest "${IMAGE_DIGEST}" \
+            --source-commit "${GITHUB_SHA}" \
+            --source-ref "${GITHUB_REF}"
+
+      - name: Login to GHCR for certified promotion
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "${GHCR_TOKEN}" \
+            | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+
+      - name: Recheck annotated tag identity before GHCR alias promotion
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p test_artifacts/runtime-image
+          ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
+          object_type="$(printf '%s' "${ref_json}" | python -c 'import json,sys; print(json.load(sys.stdin)["object"]["type"])')"
+          object_sha="$(printf '%s' "${ref_json}" | python -c 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])')"
+          if [[ "${object_type}" != "tag" ]]; then
+            echo "::error::Runtime release tag must remain an annotated tag object before GHCR alias promotion."
+            exit 1
+          fi
+          tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${object_sha}")"
+          peeled="$(printf '%s' "${tag_json}" | python -c 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])')"
+          tag_object_type="$(printf '%s' "${tag_json}" | python -c 'import json,sys; print(json.load(sys.stdin)["object"]["type"])')"
+          if [[ "${tag_object_type}" != "commit" || "${peeled}" != "${RELEASE_COMMIT}" ]]; then
+            echo "::error::Annotated tag no longer peels to runtime release commit ${RELEASE_COMMIT}."
+            exit 1
+          fi
+          TAG_OBJECT_SHA="${object_sha}" PEELLED_COMMIT="${peeled}" python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "commit_sha": os.environ["RELEASE_COMMIT"],
+              "peeled_commit_sha": os.environ["PEELLED_COMMIT"],
+              "schema_version": 1,
+              "status": "PASS",
+              "tag": os.environ["RELEASE_TAG"],
+              "tag_object_sha": os.environ["TAG_OBJECT_SHA"],
+          }
+          Path("test_artifacts/runtime-image/tag_recheck_alias_promotion.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Reverify release candidate immediately before GHCR alias promotion
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VERIFIER_DIR: ${{ runner.temp }}/runtime-image-preflight/release-candidate-verifier
+        run: |
+          set -euo pipefail
+          python "${VERIFIER_DIR}/release_candidate_evidence_gate.py" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --commit-sha "${RELEASE_COMMIT}" \
+            --release "${RELEASE_TAG}" \
+            --publication-workflow-path ".github/workflows/runtime-image.yml" \
+            --publication-run-id "${GITHUB_RUN_ID}" \
+            --publication-run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --output test_artifacts/runtime-image/release_candidate_evidence_before_alias_promotion.json
+
+      - name: Reconcile certified runtime image aliases
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          IMAGE_DIGEST: ${{ needs.certify-runtime-candidate.outputs.digest }}
+          RUNTIME_VERSION: ${{ needs.release-preflight.outputs.version }}
+          TOOLS_DIR: ${{ runner.temp }}/dpone-runtime-image-tools
+        run: |
+          PYTHONPATH="${TOOLS_DIR}" python "${TOOLS_DIR}/runtime_image_promotion.py" promote \
+            --certification test_artifacts/runtime-image/runtime-image-certification.json \
+            --image "${IMAGE_NAME}" \
+            --version "${RUNTIME_VERSION}" \
+            --digest "${IMAGE_DIGEST}" \
+            --source-commit "${GITHUB_SHA}" \
+            --source-ref "${GITHUB_REF}" \
+            --actor "${GITHUB_ACTOR}" \
+            --token-env GHCR_TOKEN \
+            --output test_artifacts/runtime-image/runtime-image-publication.json
+
+      - name: Upload runtime image publication evidence
+        id: publication-upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: runtime-image-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/runtime-image/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+      - name: Write runtime image summary
+        env:
+          IMAGE_DIGEST: ${{ needs.certify-runtime-candidate.outputs.digest }}
+          RUNTIME_VERSION: ${{ needs.release-preflight.outputs.version }}
+        run: |
+          {
+            echo "## Runtime image"
+            echo ""
+            echo "- Image: \`${IMAGE_NAME}:${RUNTIME_VERSION}\`"
+            echo "- Digest: \`${IMAGE_DIGEST}\`"
+            echo "- Source commit: \`${GITHUB_SHA}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  collect-runtime-image-evidence:
+    name: Collect runtime image attempt evidence
+    if: ${{ always() && github.event_name == 'push' && github.ref_type == 'tag' }}
+    needs:
+      - release-preflight
+      - build-runtime-candidate
+      - push-attest-runtime-candidate
+      - certify-runtime-candidate
+      - promote-certified-image
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Download runtime image preflight evidence
+        id: download-preflight
+        if: ${{ always() && needs.release-preflight.outputs.evidence_artifact_id != '' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.release-preflight.outputs.evidence_artifact_id }}
+          digest-mismatch: error
+          path: test_artifacts/runtime-image-phases/preflight
+
+      - name: Download runtime image build evidence
+        id: download-build
+        if: ${{ always() && needs.build-runtime-candidate.outputs.build_artifact_id != '' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.build-runtime-candidate.outputs.build_artifact_id }}
+          digest-mismatch: error
+          path: test_artifacts/runtime-image-phases/build
+
+      - name: Download runtime image push evidence
+        id: download-push
+        if: ${{ always() && needs.push-attest-runtime-candidate.outputs.evidence_artifact_id != '' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.push-attest-runtime-candidate.outputs.evidence_artifact_id }}
+          digest-mismatch: error
+          path: test_artifacts/runtime-image-phases/push
+
+      - name: Download runtime image certification evidence
+        id: download-certification
+        if: ${{ always() && needs.certify-runtime-candidate.outputs.certification_artifact_id != '' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.certify-runtime-candidate.outputs.certification_artifact_id }}
+          digest-mismatch: error
+          path: test_artifacts/runtime-image-phases/certification
+
+      - name: Download runtime image publication evidence
+        id: download-publication
+        if: ${{ always() && needs.promote-certified-image.outputs.evidence_artifact_id != '' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.promote-certified-image.outputs.evidence_artifact_id }}
+          digest-mismatch: error
+          path: test_artifacts/runtime-image-phases/publication
+
+      - name: Record truthful runtime image attempt outcome
+        if: always()
+        env:
+          BUILD_RESULT: ${{ needs.build-runtime-candidate.result }}
+          PUSH_RESULT: ${{ needs.push-attest-runtime-candidate.result }}
+          CERTIFICATION_RESULT: ${{ needs.certify-runtime-candidate.result }}
+          PREFLIGHT_RESULT: ${{ needs.release-preflight.result }}
+          PROMOTION_RESULT: ${{ needs.promote-certified-image.result }}
+          PREFLIGHT_DOWNLOAD: ${{ steps.download-preflight.outcome }}
+          BUILD_DOWNLOAD: ${{ steps.download-build.outcome }}
+          PUSH_DOWNLOAD: ${{ steps.download-push.outcome }}
+          CERTIFICATION_DOWNLOAD: ${{ steps.download-certification.outcome }}
+          PROMOTION_DOWNLOAD: ${{ steps.download-publication.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p test_artifacts/runtime-image-final
+          jq -n \
+            --arg preflight "${PREFLIGHT_RESULT}" \
+            --arg build "${BUILD_RESULT}" \
+            --arg push "${PUSH_RESULT}" \
+            --arg certification "${CERTIFICATION_RESULT}" \
+            --arg promotion "${PROMOTION_RESULT}" \
+            --arg preflight_download "${PREFLIGHT_DOWNLOAD}" \
+            --arg build_download "${BUILD_DOWNLOAD}" \
+            --arg push_download "${PUSH_DOWNLOAD}" \
+            --arg certification_download "${CERTIFICATION_DOWNLOAD}" \
+            --arg promotion_download "${PROMOTION_DOWNLOAD}" \
+            --arg run_id "${GITHUB_RUN_ID}" \
+            --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
+            '{
+              schema: "dpone.runtime-image-attempt.v1",
+              status: (
+                if $preflight == "success"
+                  and $build == "success"
+                  and $push == "success"
+                  and $certification == "success"
+                  and $promotion == "success"
+                  and $preflight_download == "success"
+                  and $build_download == "success"
+                  and $push_download == "success"
+                  and $certification_download == "success"
+                  and $promotion_download == "success"
+                then "PASS"
+                else "FAIL"
+                end
+              ),
+              run_id: $run_id,
+              run_attempt: $run_attempt,
+              phases: {
+                preflight: $preflight,
+                build: $build,
+                push_attest: $push,
+                certification: $certification,
+                promotion: $promotion
+              },
+              artifact_downloads: {
+                preflight: $preflight_download,
+                build: $build_download,
+                push_attest: $push_download,
+                certification: $certification_download,
+                promotion: $promotion_download
+              }
+            }' > test_artifacts/runtime-image-final/attempt.json
+
+      - name: Upload attempt-scoped runtime image evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: runtime-image-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test_artifacts/runtime-image-phases/
+            test_artifacts/runtime-image-final/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+      - name: Fail incomplete runtime image attempt
+        if: always()
+        run: jq -e '.status == "PASS"' test_artifacts/runtime-image-final/attempt.json

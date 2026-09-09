@@ -1,0 +1,15 @@
+schema_version,generated_at,release_version,release_tag,release_sha,project_id,metric,value,status,scope
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dpone,max_sloc,397,warning,release
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,airbyte,max_sloc,28633,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,airbyte,max_loc,41035,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dlt,max_sloc,1631,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dlt,max_loc,2013,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,dlt,avg_clustering,0.22571859625560353,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,pentaho-kettle,max_sloc,7948,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,pentaho-kettle,max_loc,10532,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,pentaho-kettle,avg_clustering,0.27551212349141463,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,apache-hop,max_sloc,4584,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,apache-hop,max_loc,5998,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,apache-hop,avg_clustering,0.23501898463425958,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,sling,max_sloc,3379,warning,comparator
+2,2026-06-30T15:36:13+00:00,0.62.1,v0.62.1,3f562b42ebc8db96a14361ce93353486faa23af4,sling,max_loc,4198,warning,comparator

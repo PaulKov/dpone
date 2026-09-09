@@ -1,0 +1,50 @@
+schema_version: 1
+task_id: "DPONE-V07332-WITHDRAWAL"
+title: "Harden runtime Pod retention withdrawal evidence and races"
+goal: "Make withdrawal two-phase, externally acknowledged, classified, and race-closed before success."
+specification: "docs/feature-design-airflow-runtime-pod-retention-control-v0732.md"
+base_commit: "5a48134b29961d7299dbbb50e09e88da2880971d"
+integrator: "primary Codex agent"
+
+acceptance_criteria:
+  - "No mutation occurs without a validated external durable acknowledgement bound to sealed pre-evidence."
+  - "Second Job snapshot is revalidated terminal/inactive and final Job/Pod recapture precedes success."
+  - "Monitoring is retained until late work is excluded; evidence handling requires restricted encrypted storage."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["runtime Pod retention withdrawal runbook"]
+  migration_required: false
+
+owned_paths:
+  - docs/airflow-runtime-pod-retention-withdrawal.md
+  - tests/test_airflow_runtime_pod_retention_withdrawal_adversarial.py
+read_only_paths:
+  - docs/adr/0042-airflow-runtime-pod-retention-evidence.md
+  - tests/test_airflow_runtime_pod_retention_docs_contract.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "primary Codex agent"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_runtime_pod_retention_withdrawal_adversarial.py -q"
+  broad:
+    - "uv run ruff check owned paths"
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-docs"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

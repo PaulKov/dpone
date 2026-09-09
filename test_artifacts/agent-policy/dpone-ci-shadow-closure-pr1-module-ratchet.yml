@@ -1,0 +1,104 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-CLOSURE-PR1-RATCHET"
+title: "Implement module-size debt ratchet v2"
+goal: >-
+  Replace the unsafe v1 allowlist with a closed exact-cap v2 policy that keeps
+  global hard limits absolute, detects debt growth against exact Git identities,
+  and supports only the audited e1d93822 bootstrap migration, including a
+  descendant-base carry when the exact base retains the legacy ledger and no
+  cap exceeds either the audited source or the exact descendant-base source.
+specification: >-
+  Approved DPONE-CI-SHADOW-CLOSURE plan in GitHub issue #512 plus the
+  DPONE-CI-SHADOW-CLOSURE-PR1-RATCHET architecture review supplied by the
+  integrator.
+base_commit: "e1d93822b47234e940829319cac0dc9678f6906c"
+integrator: "/root"
+
+acceptance_criteria:
+  - "Hard max LOC/SLOC from quality_budgets.yml can never be waived by baseline entries."
+  - "V2 parsing is closed, duplicate-free, path-confined and rejects malformed types, dates, SHAs, duplicate paths and unknown fields."
+  - "Exact-cap growth fails; shrink requires a deterministic persisted ratchet update; stale and missing entries fail."
+  - "Grandfathered accepted_adr:null is allowed only through the e1d93822-audited legacy bootstrap, a descendant base retaining that ledger, or verified v2 continuity; migration caps never exceed either audited or exact descendant-base source bytes."
+  - "Exact base/head comparison fails closed for missing history and enforces rename-only and split semantics."
+  - "Exact-byte CAS authoring and final canonical verification never create missing parent directories; missing, replaced, or symlinked parents fail without certifying the candidate or overwriting concurrent bytes."
+
+public_contract_impact:
+  level: breaking
+  surfaces:
+    - "dpone docs check-module-size arguments, exit behavior and JSON diagnostics"
+    - "docs/module_size_baseline.json schema version 2"
+  migration_required: true
+
+owned_paths:
+  - src/dpone/metrics/module_size.py
+  - src/dpone/metrics/module_size_baseline.py
+  - src/dpone/metrics/module_size_continuity.py
+  - src/dpone/metrics/module_size_legacy.py
+  - src/dpone/metrics/module_size_policy.py
+  - src/dpone/metrics/module_size_snapshot.py
+  - src/dpone/metrics/module_size_confined_write.py
+  - src/dpone/metrics/module_size_thresholds.py
+  - src/dpone/metrics/module_size_write.py
+  - src/dpone/services/docs/check_module_size_service.py
+  - src/dpone/commands/docs/check_module_size_cmd.py
+  - tests/test_module_size_gate.py
+  - tests/test_module_size_confined_write_revalidation.py
+  - tests/test_module_size_policy.py
+  - tests/*module_size_snapshot_contract.py
+  - tests/test_module_size_transaction.py
+  - test_artifacts/agent-policy/dpone-ci-shadow-closure-pr1-module-ratchet.yml
+read_only_paths:
+  - docs/benchmarks/quality_budgets.yml
+  - docs/module_size_baseline.json
+  - docs/engineering-standards.md
+  - docs/adr
+  - .github/workflows/ci.yml
+  - docs/cli-reference.md
+  - docs/quality-metrics.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/module_size_baseline.json
+  - docs/benchmarks/quality_budgets.yml
+  - docs/adr
+  - docs/adr-index.md
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "Accepted ratchet ADR and shared baseline migration are integrator-owned before merge."
+  - "Integrator-owned grandfathered debt burn-down is tracked in GitHub issue #520."
+required_checks:
+  focused:
+    - "uv run pytest tests/test_module_size_confined_write_revalidation.py -q"
+    - "uv run pytest tests/test_module_size_gate.py tests/test_module_size_policy.py tests/test_module_size_schema_contract.py tests/test_module_size_snapshot_contract.py tests/test_module_size_transaction.py -q"
+    - "uv run ruff check src/dpone/metrics/module_size.py src/dpone/metrics/module_size_baseline.py src/dpone/metrics/module_size_confined_write.py src/dpone/metrics/module_size_continuity.py src/dpone/metrics/module_size_legacy.py src/dpone/metrics/module_size_policy.py src/dpone/metrics/module_size_snapshot.py src/dpone/metrics/module_size_thresholds.py src/dpone/metrics/module_size_write.py src/dpone/services/docs/check_module_size_service.py src/dpone/commands/docs/check_module_size_cmd.py tests/test_module_size_confined_write_revalidation.py tests/test_module_size_gate.py tests/test_module_size_policy.py tests/test_module_size_schema_contract.py tests/test_module_size_snapshot_contract.py tests/test_module_size_transaction.py"
+  broad:
+    - "uv run mypy --config-file mypy.ini"
+    - "HEAD_SHA=$(git rev-parse HEAD); BASE_SHA=$(git merge-base $HEAD_SHA origin/master); test $BASE_SHA != $HEAD_SHA; uv run dpone docs check-module-size --baseline docs/module_size_baseline.json --base-ref $BASE_SHA --head-ref $HEAD_SHA"
+  live:
+    - "N/A: writer must not run live GitHub checks"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

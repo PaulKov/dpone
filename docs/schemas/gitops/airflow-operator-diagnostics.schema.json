@@ -1,0 +1,353 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-operator-diagnostics.schema.json",
+  "title": "dpone GitOps Airflow operator diagnostics",
+  "type": "object",
+  "required": [
+    "kind",
+    "status",
+    "index_path",
+    "parse_side_effects",
+    "operator_pinning",
+    "checks",
+    "summary",
+    "next_actions"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "kind": {
+      "const": "dpone.airflow-operator-diagnostics.v1"
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "invalid",
+        "materialized",
+        "operator_issues",
+        "operator_warnings"
+      ]
+    },
+    "index_path": {
+      "type": "string"
+    },
+    "release_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "deployment_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "runtime_image_digest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "binding_set_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "connection_registry_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "credential_runtime_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "airflow_bundle_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "airflow_bundle": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "versioned": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "runtime_artifact_delivery": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "mode": {
+          "enum": [
+            "local_preview",
+            "init_fetch",
+            "shared_pvc",
+            "embedded_bundle",
+            "csi_volume",
+            "inline"
+          ]
+        },
+        "artifact_registry_ref": {
+          "type": "string",
+          "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$"
+        },
+        "identity": {
+          "type": "object",
+          "required": [
+            "method",
+            "service_account"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "method": {
+              "enum": [
+                "kubernetes_workload_identity"
+              ]
+            },
+            "service_account": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "source": {
+          "type": "object",
+          "required": [
+            "artifact_registry_ref"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "artifact_registry_ref": {
+              "type": "string",
+              "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$"
+            }
+          }
+        },
+        "verify": {
+          "type": "object",
+          "required": [
+            "checksums",
+            "attestations"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "checksums": {
+              "enum": [
+                "required"
+              ]
+            },
+            "attestations": {
+              "enum": [
+                "optional",
+                "required_for_prod"
+              ]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "init_fetch"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "required": [
+              "artifact_registry_ref",
+              "identity",
+              "source",
+              "verify"
+            ]
+          }
+        }
+      ]
+    },
+    "parse_side_effects": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "network",
+        "metadata_db",
+        "airflow_variables",
+        "airflow_connections",
+        "vault",
+        "kubernetes",
+        "cache_refresh"
+      ],
+      "properties": {
+        "network": {
+          "const": false
+        },
+        "metadata_db": {
+          "const": false
+        },
+        "airflow_variables": {
+          "const": false
+        },
+        "airflow_connections": {
+          "const": false
+        },
+        "vault": {
+          "const": false
+        },
+        "kubernetes": {
+          "const": false
+        },
+        "cache_refresh": {
+          "const": false
+        }
+      }
+    },
+    "operator_pinning": {
+      "enum": [
+        "planned",
+        "pinned",
+        "incomplete"
+      ]
+    },
+    "workload_operators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "status",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^DPONE_[A-Z0-9_]+$"
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "warning",
+              "failed"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "passed",
+        "warning",
+        "failed"
+      ],
+      "properties": {
+        "passed": {
+          "type": "integer"
+        },
+        "warning": {
+          "type": "integer"
+        },
+        "failed": {
+          "type": "integer"
+        }
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "action",
+          "safety"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^DPONE_[A-Z0-9_]+$"
+          },
+          "action": {
+            "type": "string"
+          },
+          "safety": {
+            "enum": [
+              "safe",
+              "manual",
+              "destructive"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "identity": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

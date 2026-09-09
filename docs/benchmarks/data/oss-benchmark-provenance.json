@@ -1,0 +1,691 @@
+{
+  "confidence": {
+    "cross_check": {
+      "benchmark_sloc": 295514,
+      "delta": 99776,
+      "external_sloc": 395290,
+      "project": "dpone",
+      "status": "fresh",
+      "tool": "tokei"
+    },
+    "metric_provenance": [
+      {
+        "collector": "collect_project_metrics",
+        "formula_version": "loc-sloc-v1",
+        "metric_group": "loc_sloc",
+        "mode": "measured",
+        "source": "pinned source tree"
+      },
+      {
+        "collector": "top_files",
+        "formula_version": "top-modules-v1",
+        "metric_group": "top_modules",
+        "mode": "measured",
+        "source": "pinned source tree"
+      },
+      {
+        "collector": "compute_coupling_metrics",
+        "formula_version": "dependency-proxy-v1",
+        "metric_group": "coupling_cohesion",
+        "mode": "measured",
+        "source": "static import graph"
+      },
+      {
+        "collector": "score_quality",
+        "formula_version": "solid-clean-oop-rubric-v1",
+        "metric_group": "solid_clean_oop",
+        "mode": "derived",
+        "source": "measured module size and dependency proxies"
+      },
+      {
+        "collector": "compute_industrial_maintainability_index",
+        "formula_version": "industrial-maintainability-v1",
+        "metric_group": "industrial_maintainability",
+        "mode": "derived",
+        "source": "quality, size, coupling, cohesion, coverage and freshness"
+      },
+      {
+        "collector": "evaluate_quality_gates",
+        "formula_version": "quality-gates-v1",
+        "metric_group": "quality_gates",
+        "mode": "derived",
+        "source": "merged benchmark payload"
+      },
+      {
+        "collector": "build_feature_parity_matrix",
+        "formula_version": "feature-parity-v1",
+        "metric_group": "feature_parity",
+        "mode": "inferred",
+        "source": "public product documentation and local dpone docs"
+      },
+      {
+        "collector": "build_governance_compliance_matrix",
+        "formula_version": "governance-compliance-v1",
+        "metric_group": "governance_compliance",
+        "mode": "inferred",
+        "source": "public docs and local evidence signals"
+      },
+      {
+        "collector": "build_security_supply_chain_matrix",
+        "formula_version": "security-supply-chain-v1",
+        "metric_group": "security_supply_chain",
+        "mode": "inferred",
+        "source": "repository files and public platform signals"
+      },
+      {
+        "collector": "build_refactor_roi_roadmap",
+        "formula_version": "refactor-roi-v1",
+        "metric_group": "refactor_roi",
+        "mode": "derived",
+        "source": "quality gate, complexity and architecture-risk evidence"
+      },
+      {
+        "collector": "analyze_semantic_maintainability",
+        "formula_version": "semantic-maintainability-v1",
+        "metric_group": "semantic_maintainability",
+        "mode": "derived",
+        "source": "static source-shape scan, project payloads and dependency proxies"
+      },
+      {
+        "collector": "build_scoring_calibration",
+        "formula_version": "scoring-calibration-v1",
+        "metric_group": "scoring_calibration",
+        "mode": "derived",
+        "source": "industrial, semantic, coverage and repository-profile evidence"
+      },
+      {
+        "collector": "build_scale_readiness",
+        "formula_version": "scale-readiness-v1",
+        "metric_group": "scale_readiness",
+        "mode": "derived",
+        "source": "current dpone metrics, comparator repository scale and calibrated quality budgets"
+      },
+      {
+        "collector": "build_independent_validation",
+        "formula_version": "independent-validation-v1",
+        "metric_group": "independent_validation",
+        "mode": "derived",
+        "source": "external analyzer command metadata and injected analyzer evidence"
+      },
+      {
+        "collector": "build_public_evidence_integrity",
+        "formula_version": "public-evidence-integrity-v1",
+        "metric_group": "public_evidence_integrity",
+        "mode": "derived",
+        "source": "public artifact redaction and claim evidence ledger"
+      },
+      {
+        "collector": "build_source_verification",
+        "formula_version": "source-verification-v1",
+        "metric_group": "source_verification",
+        "mode": "derived",
+        "source": "public source registry, URL/local source checks and claim-to-source matrix"
+      },
+      {
+        "collector": "build_benchmark_release_readiness",
+        "formula_version": "benchmark-release-readiness-v1",
+        "metric_group": "benchmark_release_readiness",
+        "mode": "derived",
+        "source": "quality gates, evidence integrity, source verification, evidence trust and trust center status"
+      },
+      {
+        "collector": "build_runtime_certification",
+        "formula_version": "runtime-certification-v1",
+        "metric_group": "runtime_certification",
+        "mode": "derived",
+        "source": "release context, quality gates, local docs and contract test artifacts"
+      },
+      {
+        "collector": "build_claims_ledger",
+        "formula_version": "claims-ledger-v1",
+        "metric_group": "claims_ledger",
+        "mode": "derived",
+        "source": "JSON evidence refs, generated artifacts and public source references"
+      },
+      {
+        "collector": "evaluate_quality_budgets",
+        "formula_version": "quality-budgets-v1",
+        "metric_group": "quality_budgets",
+        "mode": "derived",
+        "source": "docs/benchmarks/quality_budgets.yml and merged benchmark payload"
+      },
+      {
+        "collector": "write_evidence_exports",
+        "formula_version": "evidence-warehouse-export-v1",
+        "metric_group": "evidence_exports",
+        "mode": "derived",
+        "source": "final merged benchmark payload"
+      },
+      {
+        "affected_tools": 2,
+        "collector": "build_benchmark_payload",
+        "formula_version": "closed-core-note-v1",
+        "metric_group": "closed_core_notes",
+        "mode": "closed-core note",
+        "source": "public closed-core comparator positioning"
+      }
+    ],
+    "mode_counts": [
+      {
+        "count": 3,
+        "mode": "measured"
+      },
+      {
+        "count": 15,
+        "mode": "derived"
+      },
+      {
+        "count": 3,
+        "mode": "inferred"
+      },
+      {
+        "count": 1,
+        "mode": "closed-core note"
+      }
+    ],
+    "overall_band": "audit-ready",
+    "overall_confidence_score": 92,
+    "projects": {
+      "airbyte": {
+        "band": "audit-ready",
+        "confidence_score": 95,
+        "fresh_groups": 5,
+        "freshness": "fresh",
+        "name": "Airbyte",
+        "stale_groups": 0,
+        "unavailable_groups": 0
+      },
+      "apache-hop": {
+        "band": "audit-ready",
+        "confidence_score": 95,
+        "fresh_groups": 5,
+        "freshness": "fresh",
+        "name": "Apache Hop",
+        "stale_groups": 0,
+        "unavailable_groups": 0
+      },
+      "dlt": {
+        "band": "audit-ready",
+        "confidence_score": 95,
+        "fresh_groups": 5,
+        "freshness": "fresh",
+        "name": "dlt",
+        "stale_groups": 0,
+        "unavailable_groups": 0
+      },
+      "dpone": {
+        "band": "audit-ready",
+        "confidence_score": 100,
+        "fresh_groups": 5,
+        "freshness": "fresh",
+        "name": "dpone",
+        "stale_groups": 0,
+        "unavailable_groups": 0
+      },
+      "pentaho-kettle": {
+        "band": "audit-ready",
+        "confidence_score": 95,
+        "fresh_groups": 5,
+        "freshness": "fresh",
+        "name": "Pentaho Kettle",
+        "stale_groups": 0,
+        "unavailable_groups": 0
+      },
+      "sling": {
+        "band": "audit-ready",
+        "confidence_score": 95,
+        "fresh_groups": 5,
+        "freshness": "fresh",
+        "name": "Sling",
+        "stale_groups": 0,
+        "unavailable_groups": 0
+      }
+    },
+    "provenance_path": "docs/benchmarks/data/oss-benchmark-provenance.json",
+    "schema_version": 1
+  },
+  "generated_at": "2026-06-30T15:36:13+00:00",
+  "metric_provenance": [
+    {
+      "collector": "collect_project_metrics",
+      "formula_version": "loc-sloc-v1",
+      "metric_group": "loc_sloc",
+      "mode": "measured",
+      "source": "pinned source tree"
+    },
+    {
+      "collector": "top_files",
+      "formula_version": "top-modules-v1",
+      "metric_group": "top_modules",
+      "mode": "measured",
+      "source": "pinned source tree"
+    },
+    {
+      "collector": "compute_coupling_metrics",
+      "formula_version": "dependency-proxy-v1",
+      "metric_group": "coupling_cohesion",
+      "mode": "measured",
+      "source": "static import graph"
+    },
+    {
+      "collector": "score_quality",
+      "formula_version": "solid-clean-oop-rubric-v1",
+      "metric_group": "solid_clean_oop",
+      "mode": "derived",
+      "source": "measured module size and dependency proxies"
+    },
+    {
+      "collector": "compute_industrial_maintainability_index",
+      "formula_version": "industrial-maintainability-v1",
+      "metric_group": "industrial_maintainability",
+      "mode": "derived",
+      "source": "quality, size, coupling, cohesion, coverage and freshness"
+    },
+    {
+      "collector": "evaluate_quality_gates",
+      "formula_version": "quality-gates-v1",
+      "metric_group": "quality_gates",
+      "mode": "derived",
+      "source": "merged benchmark payload"
+    },
+    {
+      "collector": "build_feature_parity_matrix",
+      "formula_version": "feature-parity-v1",
+      "metric_group": "feature_parity",
+      "mode": "inferred",
+      "source": "public product documentation and local dpone docs"
+    },
+    {
+      "collector": "build_governance_compliance_matrix",
+      "formula_version": "governance-compliance-v1",
+      "metric_group": "governance_compliance",
+      "mode": "inferred",
+      "source": "public docs and local evidence signals"
+    },
+    {
+      "collector": "build_security_supply_chain_matrix",
+      "formula_version": "security-supply-chain-v1",
+      "metric_group": "security_supply_chain",
+      "mode": "inferred",
+      "source": "repository files and public platform signals"
+    },
+    {
+      "collector": "build_refactor_roi_roadmap",
+      "formula_version": "refactor-roi-v1",
+      "metric_group": "refactor_roi",
+      "mode": "derived",
+      "source": "quality gate, complexity and architecture-risk evidence"
+    },
+    {
+      "collector": "analyze_semantic_maintainability",
+      "formula_version": "semantic-maintainability-v1",
+      "metric_group": "semantic_maintainability",
+      "mode": "derived",
+      "source": "static source-shape scan, project payloads and dependency proxies"
+    },
+    {
+      "collector": "build_scoring_calibration",
+      "formula_version": "scoring-calibration-v1",
+      "metric_group": "scoring_calibration",
+      "mode": "derived",
+      "source": "industrial, semantic, coverage and repository-profile evidence"
+    },
+    {
+      "collector": "build_scale_readiness",
+      "formula_version": "scale-readiness-v1",
+      "metric_group": "scale_readiness",
+      "mode": "derived",
+      "source": "current dpone metrics, comparator repository scale and calibrated quality budgets"
+    },
+    {
+      "collector": "build_independent_validation",
+      "formula_version": "independent-validation-v1",
+      "metric_group": "independent_validation",
+      "mode": "derived",
+      "source": "external analyzer command metadata and injected analyzer evidence"
+    },
+    {
+      "collector": "build_public_evidence_integrity",
+      "formula_version": "public-evidence-integrity-v1",
+      "metric_group": "public_evidence_integrity",
+      "mode": "derived",
+      "source": "public artifact redaction and claim evidence ledger"
+    },
+    {
+      "collector": "build_source_verification",
+      "formula_version": "source-verification-v1",
+      "metric_group": "source_verification",
+      "mode": "derived",
+      "source": "public source registry, URL/local source checks and claim-to-source matrix"
+    },
+    {
+      "collector": "build_benchmark_release_readiness",
+      "formula_version": "benchmark-release-readiness-v1",
+      "metric_group": "benchmark_release_readiness",
+      "mode": "derived",
+      "source": "quality gates, evidence integrity, source verification, evidence trust and trust center status"
+    },
+    {
+      "collector": "build_runtime_certification",
+      "formula_version": "runtime-certification-v1",
+      "metric_group": "runtime_certification",
+      "mode": "derived",
+      "source": "release context, quality gates, local docs and contract test artifacts"
+    },
+    {
+      "collector": "build_claims_ledger",
+      "formula_version": "claims-ledger-v1",
+      "metric_group": "claims_ledger",
+      "mode": "derived",
+      "source": "JSON evidence refs, generated artifacts and public source references"
+    },
+    {
+      "collector": "evaluate_quality_budgets",
+      "formula_version": "quality-budgets-v1",
+      "metric_group": "quality_budgets",
+      "mode": "derived",
+      "source": "docs/benchmarks/quality_budgets.yml and merged benchmark payload"
+    },
+    {
+      "collector": "write_evidence_exports",
+      "formula_version": "evidence-warehouse-export-v1",
+      "metric_group": "evidence_exports",
+      "mode": "derived",
+      "source": "final merged benchmark payload"
+    },
+    {
+      "affected_tools": 2,
+      "collector": "build_benchmark_payload",
+      "formula_version": "closed-core-note-v1",
+      "metric_group": "closed_core_notes",
+      "mode": "closed-core note",
+      "source": "public closed-core comparator positioning"
+    }
+  ],
+  "reproducibility": {
+    "analyzer_schema_versions": {
+      "artifact_checksums": "sha256-v1",
+      "benchmark_payload": 1,
+      "benchmark_release_readiness": 1,
+      "evidence_trust": 1,
+      "independent_validation": 1,
+      "metric_provenance": "v1",
+      "public_evidence_integrity": 1,
+      "source_verification": 1
+    },
+    "artifact_checksums": [
+      {
+        "bytes": 422,
+        "path": "docs/benchmarks/assets/dpone-trust-center-badge.svg",
+        "sha256": "351a58c1c6451a61f39fd2099f8cb45438a8dd17fd1b4eb321ee0a7bf877fa62"
+      },
+      {
+        "bytes": 2340,
+        "path": "docs/benchmarks/assets/oss-analyzer-confidence.svg",
+        "sha256": "e7aae065282eee5b6585ec19ca5a799e75a919ce12787cd00aff7d9de5a418f3"
+      },
+      {
+        "bytes": 2427,
+        "path": "docs/benchmarks/assets/oss-architecture-delta.svg",
+        "sha256": "1531226d08ed7c4e5145ad6086b6dcdb2496bfbc0f1960ca4a5b256545c14ce0"
+      },
+      {
+        "bytes": 2161,
+        "path": "docs/benchmarks/assets/oss-architecture-risk-heatmap.svg",
+        "sha256": "f293d00ec66452efca70c5ad7d3c965a2a23a6477624a1117b5fcfad27c36442"
+      },
+      {
+        "bytes": 747,
+        "path": "docs/benchmarks/assets/oss-architecture-runway.svg",
+        "sha256": "46f10f6ec276f8284c11d41bfd3c4f4307bd0323b3ff2adec63bbe32809b8e7b"
+      },
+      {
+        "bytes": 2268,
+        "path": "docs/benchmarks/assets/oss-architecture-taxonomy.svg",
+        "sha256": "02ec5cbf6bd49cdff3cd93990f503c4a26e426cdadcbc2b0c233a2b7db4e4ed1"
+      },
+      {
+        "bytes": 2813,
+        "path": "docs/benchmarks/assets/oss-complexity-boundary.svg",
+        "sha256": "5f1a2d32f10d58ab1b0e1bac6d147c2decdf02d62e6bba0f35287bd08cb64012"
+      },
+      {
+        "bytes": 1469,
+        "path": "docs/benchmarks/assets/oss-coupling-cohesion-quadrant.svg",
+        "sha256": "43e154da9cc12c285fb2b25bd8a63c671185739bb8de49b4eb0ad088760d2d05"
+      },
+      {
+        "bytes": 2705,
+        "path": "docs/benchmarks/assets/oss-evidence-confidence.svg",
+        "sha256": "b7ccf9321a5ac48812e4ae95bbec6d20fee9e29d822b7fd2453038072fd5b91b"
+      },
+      {
+        "bytes": 2762,
+        "path": "docs/benchmarks/assets/oss-feature-parity.svg",
+        "sha256": "4070b614bd95cde843145920e30a3118552c8ae2b3e03f2f8ed4a085fac0e57f"
+      },
+      {
+        "bytes": 2194,
+        "path": "docs/benchmarks/assets/oss-god-object-radar.svg",
+        "sha256": "e8df8e792451de31a126e12f4e0f8be8abd13fef0027a09a1911f6257451a089"
+      },
+      {
+        "bytes": 2792,
+        "path": "docs/benchmarks/assets/oss-governance-compliance.svg",
+        "sha256": "177164710f1fd6bcbd075cfd005240ee4a141b768de4d5e4b37c5f93d8cad0b8"
+      },
+      {
+        "bytes": 4251,
+        "path": "docs/benchmarks/assets/oss-independent-validation.svg",
+        "sha256": "df139e8b46c88b878925aadc5b6e5e3219ba4fb5d1797d76da68ba6c0761921d"
+      },
+      {
+        "bytes": 1996,
+        "path": "docs/benchmarks/assets/oss-loc-sloc.svg",
+        "sha256": "b81fe07884a6c3a681048f0865b4c13dec20da26d3acef949a723bb60caaf79b"
+      },
+      {
+        "bytes": 1903,
+        "path": "docs/benchmarks/assets/oss-module-hotspots.svg",
+        "sha256": "46e1cb24005588c35fd2d3e8bd1582952b2732ae16feefbddab6586826e1ea5f"
+      },
+      {
+        "bytes": 3055,
+        "path": "docs/benchmarks/assets/oss-normalized-vs-raw.svg",
+        "sha256": "ea04576c1183409c320c80d157ea4b44c0edcf806a1eadd3901c707f20a40cd4"
+      },
+      {
+        "bytes": 2769,
+        "path": "docs/benchmarks/assets/oss-operability-tco.svg",
+        "sha256": "de1456e462045cae294176bb01c5c10fcd1eb8c0f147b76364246cab8522354b"
+      },
+      {
+        "bytes": 2781,
+        "path": "docs/benchmarks/assets/oss-operational-reliability.svg",
+        "sha256": "5d25bc56dffa5dbd2110b0d40f5a3127ee9cff404580781233dca84037d293c5"
+      },
+      {
+        "bytes": 1267,
+        "path": "docs/benchmarks/assets/oss-public-evidence-integrity.svg",
+        "sha256": "fe8094d4f441768ca8e3f4b32dba389e6ab22ce9e76885d76ecb125fbcb60030"
+      },
+      {
+        "bytes": 739,
+        "path": "docs/benchmarks/assets/oss-quality-headroom.svg",
+        "sha256": "0af4404f2d9a493e7582e4ebb24fb4cf357376cb642673e1657c4fd5eb991e8f"
+      },
+      {
+        "bytes": 3966,
+        "path": "docs/benchmarks/assets/oss-quality-scorecard.svg",
+        "sha256": "029cdda1fbddf2483f517a420a6acbf5ba8f0926b67201913a4d4ad3b89243fc"
+      },
+      {
+        "bytes": 4566,
+        "path": "docs/benchmarks/assets/oss-quality-trend.svg",
+        "sha256": "899e6ce74c8c20d40e47822217d845d0df2d269e87dd44d2027020856b595122"
+      },
+      {
+        "bytes": 5405,
+        "path": "docs/benchmarks/assets/oss-refactor-roi-roadmap.svg",
+        "sha256": "4510ca08484fc13469b99271f26fe1560fa7c2913101d1d4b299294b4b64cf76"
+      },
+      {
+        "bytes": 1040,
+        "path": "docs/benchmarks/assets/oss-release-readiness-seal.svg",
+        "sha256": "5c25163d3d185c13f5a4ce249ae243f577ce3c6dd3bb456ceac2dc6a03eac58c"
+      },
+      {
+        "bytes": 738,
+        "path": "docs/benchmarks/assets/oss-scale-readiness.svg",
+        "sha256": "f83ce9f3b561c01f72d4dfecffff63bed057f2f096412cfb43cb54582ad54c01"
+      },
+      {
+        "bytes": 2329,
+        "path": "docs/benchmarks/assets/oss-score-calibration.svg",
+        "sha256": "caccf8987bc6ea94c952789285c01a57ea47e5863a676ba1ea80bcb8d1501e25"
+      },
+      {
+        "bytes": 2307,
+        "path": "docs/benchmarks/assets/oss-score-sensitivity.svg",
+        "sha256": "df09da99c958689ef340f906b854afaf5ccd5f97b9b1371442b3f10c374cfb7b"
+      },
+      {
+        "bytes": 2642,
+        "path": "docs/benchmarks/assets/oss-security-supply-chain.svg",
+        "sha256": "11ad7a9e25aad7fece445c12f020ec45ef0c3a200366a7b23fd064ebbd7fa33a"
+      },
+      {
+        "bytes": 2207,
+        "path": "docs/benchmarks/assets/oss-semantic-maintainability.svg",
+        "sha256": "4c533c109ca4891a4f9a18ea58710228e6dcd2e1f3d619f183da9a32986194e6"
+      },
+      {
+        "bytes": 1444,
+        "path": "docs/benchmarks/assets/oss-source-verification.svg",
+        "sha256": "726ad48e3855cb6f8d2e646db45e1dbb167f416bfbab691af11803ab62a8037c"
+      },
+      {
+        "bytes": 6039,
+        "path": "docs/benchmarks/data/dpone-trust-center-snapshot-2026-06-12.json",
+        "sha256": "ceb5641d0351af39d734b90005a4616b731646a58abbef7633b701cefa4e4d9f"
+      },
+      {
+        "bytes": 3142,
+        "path": "docs/benchmarks/data/oss-benchmark-release-readiness-2026-06-12.json",
+        "sha256": "bf082333e0eb017c1a88934949b2270ad098353c2d7092681fac3fa78790159b"
+      },
+      {
+        "bytes": 696918,
+        "path": "docs/benchmarks/data/oss-code-quality-benchmark-2026-06-12.json",
+        "sha256": "c2a583c90c515415ca1621b77b5c5a67f9a8f4dd130db24a6584508d4ff5ec76"
+      },
+      {
+        "bytes": 75466,
+        "path": "docs/benchmarks/data/oss-code-quality-benchmark-history.json",
+        "sha256": "f60e6490abe25eb9739619a7e1803630140e8357cf3850e666225580dc5d3dc0"
+      },
+      {
+        "bytes": 6272,
+        "path": "docs/benchmarks/data/runtime-certification/latest/contract-checks.json",
+        "sha256": "44c0707b40ab04202b9cbaaf6a7fd1387640bcb3399ae377554c1be00ce89bab"
+      },
+      {
+        "bytes": 2882,
+        "path": "docs/benchmarks/data/runtime-certification/latest/run-ledger.json",
+        "sha256": "33929121a30dcf154b11bf4f490ce891216a2089bac30c2662cfcea132b91f3c"
+      },
+      {
+        "bytes": 1728,
+        "path": "docs/benchmarks/data/warehouse/certification_scenarios.csv",
+        "sha256": "ae5f4d3be4e90365fa74a7908769a56dd9a8a15a1445d0aecb3481783c8bf31a"
+      },
+      {
+        "bytes": 774,
+        "path": "docs/benchmarks/data/warehouse/claims.csv",
+        "sha256": "e3678d5240b842c939732ae738f3460d5df80f248cfa99093ccaf54aea184c76"
+      },
+      {
+        "bytes": 5380,
+        "path": "docs/benchmarks/data/warehouse/contract_checks.csv",
+        "sha256": "593e38631b9a50e1505bfccda8a7e4e5d385e8d93c2497909ad60383e5a2487d"
+      },
+      {
+        "bytes": 1939,
+        "path": "docs/benchmarks/data/warehouse/debt_ledger.csv",
+        "sha256": "1ff7dff082cb5e07ed8770c1ed74015d9f0693d492cae789c19221d0d13868fe"
+      },
+      {
+        "bytes": 4370,
+        "path": "docs/benchmarks/data/warehouse/metric_groups.csv",
+        "sha256": "9d77cae5aa01f615d47f1e96314daa3f0882b46a8baaf81b702d17b683a8ed3e"
+      },
+      {
+        "bytes": 1281,
+        "path": "docs/benchmarks/data/warehouse/projects.csv",
+        "sha256": "ee73381c9725176b5132205669c0b0b9b765120f5f8b6a0f9fff8768d1f8d37c"
+      },
+      {
+        "bytes": 2149,
+        "path": "docs/benchmarks/data/warehouse/quality_gates.csv",
+        "sha256": "bb00b31b02f4bbfd38434a31fd2e22847294f9107d395f88e73b53f2611c2ab9"
+      },
+      {
+        "bytes": 7967,
+        "path": "docs/benchmarks/data/warehouse/release_deltas.csv",
+        "sha256": "d70dbc5cf97a9e32eeefb20c5fdae749e9b5ca846df314847930b820f3221ab0"
+      },
+      {
+        "bytes": 1558,
+        "path": "docs/benchmarks/data/warehouse/run_ledger.csv",
+        "sha256": "7989286732bac53ad953657e0886b2ac371cfe75866604581bcf97bd16325056"
+      },
+      {
+        "bytes": 804,
+        "path": "docs/benchmarks/data/warehouse/runtime_certification.csv",
+        "sha256": "4348a6e802ca7e779e1dd95546d1f73560711898f681cc4501d89ef70ca7b2f8"
+      },
+      {
+        "bytes": 1932,
+        "path": "docs/benchmarks/dpone-trust-center-snapshot-2026-06-12.md",
+        "sha256": "79f9a4e5673b50275f61f035e9de01e799585d0a68210df8b31225fd09285a23"
+      },
+      {
+        "bytes": 2194,
+        "path": "docs/benchmarks/oss-benchmark-release-readiness-2026-06-12.md",
+        "sha256": "0bcf25ba88e0648082dfaaf57f964cba73ab72db8cd88ca0dd818af61a3e0f00"
+      },
+      {
+        "bytes": 156496,
+        "path": "docs/benchmarks/oss-code-quality-benchmark-2026-06-12.md",
+        "sha256": "9ddde8bf9ab73465439a635978f28a685252361dac63d5429d3880ecfff106b8"
+      },
+      {
+        "bytes": 6835,
+        "path": "test_artifacts/oss-code-quality-benchmark/pr-comment.md",
+        "sha256": "6da891d5cb5acc7be109eaa809fe781c0bafd40847eb2942b780ea0506fa84f9"
+      }
+    ],
+    "branch": "codex/release-v0.62.1",
+    "git_sha": "3f562b42ebc8db96a14361ce93353486faa23af4",
+    "platform": "macOS-15.3-arm64-arm-64bit",
+    "python_version": "3.11.14",
+    "third_party_cross_check": {
+      "benchmark_sloc": 295514,
+      "delta": 99776,
+      "external_sloc": 395290,
+      "project": "dpone",
+      "status": "fresh",
+      "tool": "tokei"
+    }
+  },
+  "run_context": {
+    "branch": "codex/release-v0.62.1",
+    "generated_at": "2026-06-30T15:36:13+00:00",
+    "git_sha": "3f562b42ebc8db96a14361ce93353486faa23af4",
+    "run_id": "local",
+    "run_url": "",
+    "updated_by": "codex-local",
+    "workflow_name": "local"
+  },
+  "schema_version": 1
+}

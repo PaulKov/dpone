@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/safe-sample-runtime-handoff.schema.json",
+  "title": "dpone GitOps safe sample runtime handoff",
+  "type": "object",
+  "required": [
+    "schema",
+    "plan_path",
+    "plan_sha256",
+    "plan_bytes",
+    "command",
+    "live_copy_command",
+    "live_copy_requires"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.safe-sample-runtime-handoff.v1"
+    },
+    "plan_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plan_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "plan_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "live_copy_command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "live_copy_requires": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

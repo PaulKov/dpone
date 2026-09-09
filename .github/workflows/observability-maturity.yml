@@ -1,0 +1,94 @@
+name: Observability maturity
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  observability:
+    name: Observability maturity gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+          enable-cache: true
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run observability tests
+        run: uv run pytest tests/test_observability.py -q
+
+      - name: Build synthetic run report
+        run: |
+          mkdir -p test_artifacts/observability/maturity
+          cat > test_artifacts/observability/maturity/run_report.json <<'JSON'
+          {
+            "manifest": "examples/postgres_to_mssql.yaml",
+            "process": "observability_maturity",
+            "selector": "weekly",
+            "run_id": "OBSERVABILITY-MATURITY",
+            "passed": true,
+            "attempts": 1,
+            "max_attempts": 3,
+            "retry_backoff_seconds": 0,
+            "result": {
+              "status": "success",
+              "extracted_rows": 10000,
+              "inserted_rows": 10000,
+              "updated_rows": 0,
+              "final_rows": 10000,
+              "duration_seconds": 10,
+              "throughput_rows_per_second": 1000
+            }
+          }
+          JSON
+
+      - name: Export Prometheus and OpenTelemetry metrics
+        run: |
+          uv run dpone observability metrics-export \
+            --run-report test_artifacts/observability/maturity/run_report.json \
+            --output-dir test_artifacts/observability/maturity/export \
+            --label env=ci \
+            --label gate=observability_maturity \
+            --label ci_run_id="${GITHUB_RUN_ID}" \
+            --resource-attr deployment.environment=ci \
+            --resource-attr service.version="${GITHUB_SHA}" \
+            --service-name dpone \
+            --namespace dpone.ci \
+            --format json | tee test_artifacts/observability/maturity/metrics_export_stdout.json
+
+      - name: Evaluate observability SLO smoke
+        run: |
+          uv run dpone ops slo-evaluate \
+            --metrics-json '{"throughput_rows_per_second":1000,"freshness_lag_seconds":120,"retry_backoff_seconds":0}' \
+            --objectives-json '{"throughput_rows_per_second":{"min":100},"freshness_lag_seconds":{"max":300},"retry_backoff_seconds":{"max":60}}' \
+            --format json | tee test_artifacts/observability/maturity/slo_report.json
+
+      - name: Build observability artifact index
+        if: always()
+        run: |
+          uv run dpone ops artifact-index \
+            --root test_artifacts/observability/maturity \
+            --output-dir test_artifacts/observability/maturity/index \
+            --release "observability-maturity-${GITHUB_RUN_ID}" \
+            --format json | tee test_artifacts/observability/maturity/artifact_index_stdout.json
+
+      - name: Upload observability evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: observability-maturity-report
+          path: test_artifacts/observability/maturity
+          if-no-files-found: error

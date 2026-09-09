@@ -1,0 +1,39 @@
+# Default ownership
+* @PaulKov
+
+# Agent control plane and engineering policy
+/AGENTS.md @PaulKov
+/.codex/ @PaulKov
+/.agents/ @PaulKov
+/docs/engineering-standards.md @PaulKov
+/docs/feature-design-standard.md @PaulKov
+/docs/documentation-standard.md @PaulKov
+/docs/agent-development.md @PaulKov
+/docs/agent-governance.md @PaulKov
+/docs/agent-mcp-connectors.md @PaulKov
+/docs/agent-permissions.md @PaulKov
+/docs/agent-release-protocol.md @PaulKov
+/docs/agent-risk-register.md @PaulKov
+/docs/agent-security-mapping.md @PaulKov
+/docs/feature-design-agent-permission-tool-registry.md @PaulKov
+/docs/feature-design-mcp-connector-onboarding-gate.md @PaulKov
+/docs/agent-templates/ @PaulKov
+/docs/github-branch-protection.md @PaulKov
+/tools/agent_policy/ @PaulKov
+/evals/agent/ @PaulKov
+
+# Public contracts and architecture
+/src/dpone/contracts/ @PaulKov
+/src/dpone/ports/ @PaulKov
+/src/dpone/schema/ @PaulKov
+/docs/adr/ @PaulKov
+/docs/architecture.md @PaulKov
+/docs/compatibility.md @PaulKov
+
+# Build, dependency, release, and automation surfaces
+/pyproject.toml @PaulKov
+/uv.lock @PaulKov
+/.github/workflows/ @PaulKov
+/.github/ISSUE_TEMPLATE/ @PaulKov
+/.github/CODEOWNERS @PaulKov
+/CHANGELOG.md @PaulKov

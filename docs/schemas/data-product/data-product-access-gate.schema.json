@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-access-gate.schema.json",
+  "title": "Data Product Access Gate",
+  "type": "object",
+  "required": ["schema_version", "status", "access_gate_id", "entitlement_plan_id", "privacy_impact_id", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_access_gate.v1"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "access_gate_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "profile": {"type": "string"},
+    "product": {"type": "object"},
+    "product_id": {"type": ["string", "null"]},
+    "entitlement_plan_id": {"type": ["string", "null"]},
+    "privacy_impact_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "summary": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

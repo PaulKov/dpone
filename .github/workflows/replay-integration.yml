@@ -1,0 +1,157 @@
+name: Replay integration gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_replay_gate:
+        description: "Run the replay execution integration gate"
+        required: true
+        default: true
+        type: boolean
+      run_service_backed_gate:
+        description: "Run replay CLI against local docker-compose services"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  replay-integration:
+    name: Replay integration
+    if: ${{ inputs.run_replay_gate }}
+    runs-on: ubuntu-latest
+    env:
+      DPONE_RUN_INTEGRATION_REPLAY: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Prepare artifacts directory
+        run: mkdir -p test_artifacts/replay_integration
+
+      - name: Run replay integration gate
+        run: >
+          uv run pytest -m integration_replay tests/integration/replay -q
+          --junitxml=test_artifacts/replay_integration/junit.xml
+
+      - name: Install SQL Server ODBC tools
+        if: ${{ inputs.run_service_backed_gate }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg unixodbc-dev
+          source /etc/os-release
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+          curl -fsSL "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/prod.list" \
+            | sed 's#deb #deb [signed-by=/usr/share/keyrings/microsoft-prod.gpg] #' \
+            | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 mssql-tools18
+
+      - name: Start local replay services
+        if: ${{ inputs.run_service_backed_gate }}
+        run: docker compose -f docker/docker-compose.integration.yml up -d postgres kafka schema-registry clickhouse mssql
+
+      - name: Wait for local replay services
+        if: ${{ inputs.run_service_backed_gate }}
+        run: |
+          docker compose -f docker/docker-compose.integration.yml ps
+          sleep 20
+
+      - name: Run service-backed replay integration gate
+        if: ${{ inputs.run_service_backed_gate }}
+        env:
+          DPONE_RUN_INTEGRATION_REPLAY_SERVICES: "1"
+        run: >
+          uv run pytest -m integration_replay_services tests/integration/replay -q
+          --junitxml=test_artifacts/replay_integration/service_junit.xml
+
+      - name: Stop local replay services
+        if: always() && inputs.run_service_backed_gate
+        run: docker compose -f docker/docker-compose.integration.yml down -v
+
+      - name: Build replay strategy certification bundle
+        if: always()
+        run: |
+          mkdir -p test_artifacts/strategy_certification/replay
+          cat > test_artifacts/strategy_certification/replay/workflow_summary.json <<EOF
+          {
+            "passed": ${{ job.status == 'success' }},
+            "workflow": "replay-integration.yml",
+            "run_id": "${{ github.run_id }}",
+            "run_attempt": "${{ github.run_attempt }}",
+            "service_backed_gate": "${{ inputs.run_service_backed_gate }}"
+          }
+          EOF
+          uv run dpone strategy certification-bundle \
+            --bundle-id "replay-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --output-dir test_artifacts/strategy_certification/replay \
+            --replay-evidence test_artifacts/strategy_certification/replay/workflow_summary.json \
+            --docs-link docs/testing/replay-integration.md \
+            --format json || true
+
+      - name: Build replay artifact index
+        if: always()
+        run: |
+          uv run dpone ops artifact-index \
+            --output-dir test_artifacts/certification/evidence-index/replay \
+            --root test_artifacts/replay_integration \
+            --root test_artifacts/strategy_certification/replay \
+            --release "replay-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --format json || true
+
+      - name: Build replay evidence chain
+        if: always()
+        run: |
+          uv run dpone ops evidence-chain \
+            --chain-dir test_artifacts/certification/evidence-chain/replay \
+            --release "replay-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --artifact-index test_artifacts/certification/evidence-index/replay/artifact_index.json \
+            --format json || true
+
+      - name: Verify replay evidence chain
+        if: always()
+        run: |
+          uv run dpone ops evidence-chain-verify \
+            --chain-dir test_artifacts/certification/evidence-chain/replay \
+            --format json
+
+      - name: Upload replay integration artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: replay-integration-artifacts
+          path: test_artifacts/replay_integration
+          if-no-files-found: warn
+
+      - name: Upload replay strategy certification bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: strategy-certification-replay
+          path: test_artifacts/strategy_certification/replay
+          if-no-files-found: warn
+
+      - name: Upload replay evidence chain
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: replay-evidence-chain
+          path: |
+            test_artifacts/certification/evidence-index/replay
+            test_artifacts/certification/evidence-chain/replay
+          if-no-files-found: warn

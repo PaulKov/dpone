@@ -1,0 +1,112 @@
+{
+  "evidence_seal": {
+    "generated_at": "2026-06-30T15:36:13+00:00",
+    "label": "Benchmark v3 verified",
+    "score": 100,
+    "source_revision": "codex/release-v0.62.1@3f562b42ebc8db96a14361ce93353486faa23af4",
+    "updated_by": "codex-local"
+  },
+  "freeze_policy": {
+    "experimental_metric_groups": [
+      "feature_parity",
+      "governance_compliance",
+      "security_supply_chain",
+      "operational_reliability",
+      "operability_tco",
+      "architecture_taxonomy",
+      "complexity_boundary",
+      "semantic_maintainability",
+      "scoring_calibration",
+      "scale_readiness",
+      "refactor_roi",
+      "independent_validation",
+      "external_analyzer_results",
+      "candidate_quality_delta",
+      "trend_summary"
+    ],
+    "policy": "Benchmark v3 keeps stable code-quality, release-certification and evidence-integrity metrics contract-compatible. Experimental posture, projection and roadmap metrics can evolve with explicit version notes.",
+    "stable_metric_groups": [
+      "loc_sloc",
+      "top_modules",
+      "coupling_cohesion",
+      "solid_clean_oop",
+      "coverage_confidence",
+      "industrial_maintainability",
+      "quality_gates",
+      "evidence_trust",
+      "public_evidence_integrity",
+      "source_verification",
+      "trust_center",
+      "runtime_certification",
+      "claims_ledger",
+      "quality_budgets",
+      "evidence_exports"
+    ]
+  },
+  "recommended_action": "Release the benchmark as v3 and use this evidence pack as the PR/release review summary.",
+  "release_checks": [
+    {
+      "evidence": "passed",
+      "id": "quality_gates",
+      "label": "Quality gates",
+      "status": "passed"
+    },
+    {
+      "evidence": "verified, redactions 0",
+      "id": "public_evidence_integrity",
+      "label": "Public evidence integrity",
+      "status": "passed"
+    },
+    {
+      "evidence": "verified, source health 100/100",
+      "id": "source_verification",
+      "label": "Source citation verification",
+      "status": "passed"
+    },
+    {
+      "evidence": "92/100 audit-ready",
+      "id": "evidence_trust",
+      "label": "Evidence trust",
+      "status": "passed"
+    },
+    {
+      "evidence": "verified",
+      "id": "trust_center",
+      "label": "Customer trust center",
+      "status": "passed"
+    },
+    {
+      "evidence": "projects and run context present",
+      "id": "generated_artifacts",
+      "label": "Generated artifact manifest",
+      "status": "passed"
+    },
+    {
+      "evidence": "verified 4, unverified 0",
+      "id": "claims_ledger",
+      "label": "Claims ledger",
+      "status": "passed"
+    },
+    {
+      "evidence": "passed 4, failed 0",
+      "id": "runtime_certification",
+      "label": "Runtime certification",
+      "status": "passed"
+    },
+    {
+      "evidence": "warning",
+      "id": "quality_budgets",
+      "label": "Quality budgets",
+      "status": "passed"
+    },
+    {
+      "evidence": "10 CSV exports",
+      "id": "evidence_exports",
+      "label": "Evidence warehouse exports",
+      "status": "passed"
+    }
+  ],
+  "release_stage": "benchmark-v3",
+  "schema_version": 1,
+  "status": "release-ready"
+}

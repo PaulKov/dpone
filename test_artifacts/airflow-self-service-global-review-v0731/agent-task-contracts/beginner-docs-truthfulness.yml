@@ -1,0 +1,86 @@
+schema_version: 1
+task_id: "AIRFLOW-SS-UX-TRUTHFULNESS"
+title: "Keep the first Airflow DAG journey truthful and progressively disclosed"
+goal: >
+  Correct the reviewed beginner documentation so the four-command offline
+  preview is a successful golden path, the fifth command is an optional
+  platform-gated sample handoff, and preview v1 is never presented as the
+  executable production v2 contract.
+specification: "docs/airflow-self-service-architecture.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "The first four commands are the successful offline First DAG path."
+  - "The sample command is labeled optional and returns exit 3 without data I/O until a platform executor is configured."
+  - "No text redefines an expected blocker as a successful sample execution."
+  - "Preview v1 shares the loader entry point, current-pointer convention, and cache layout, not the executable production schema contract."
+  - "The docs state that platform build regenerates immutable v2 artifacts; users never edit or promote preview v1 in place."
+  - "A compact Mermaid lane diagram shows preview v1 branching to platform-generated executable v2."
+  - "The beginner page labels shortened JSON as abridged and links to the generated schema/reference."
+  - "Focused language tests protect the corrected claims."
+
+public_contract_impact:
+  level: none
+  surfaces:
+    - documentation
+  migration_required: false
+
+owned_paths:
+  - "docs/getting-started/first-airflow-dag.md"
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/errors/DPONE_SAFE_SAMPLE_CERTIFIED_COPY_EXECUTOR_NOT_CONFIGURED.md"
+  - "tests/test_docs_language_contracts.py"
+
+read_only_paths:
+  - "docs/airflow-pack-provider.md"
+  - "docs/compatibility.md"
+  - "docs/reference/airflow-public-contracts.md"
+  - "tests/test_airflow_self_service_cli.py"
+  - "tests/test_release_smoke_contracts.py"
+
+forbidden_paths:
+  - "src"
+  - "packages"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - ".codex/config.toml"
+  - "docs/feature-design-airflow-pipeline-first-ux-p2.md"
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "Preserve all concurrent v0.73.1/v0.73.2 documentation changes already present."
+  - "Do not change installation pins; candidate publication is handled by the release train."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+  broad:
+    - "Integrator runs docs, links, and strict MkDocs gates."
+  live: []
+
+required_outputs:
+  - "implementation"
+  - "tests"
+  - "documentation_impact"
+  - "completion_report"
+
+completion_statuses:
+  allowed:
+    - "PASS"
+    - "FAIL"
+    - "SKIP"
+    - "N/A"
+    - "UNVERIFIED"
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "A documentation correction would require changing runtime behavior."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

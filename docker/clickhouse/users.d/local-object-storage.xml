@@ -1,0 +1,11 @@
+<clickhouse>
+  <!-- Local-integration only: the default test user may read the fixed collection. -->
+  <users>
+    <default>
+      <grants>
+        <query>GRANT ALL ON *.*</query>
+        <query>GRANT NAMED COLLECTION ON dpone_stage</query>
+      </grants>
+    </default>
+  </users>
+</clickhouse>

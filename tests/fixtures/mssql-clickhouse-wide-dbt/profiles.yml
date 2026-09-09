@@ -1,0 +1,16 @@
+dpone_mssql_clickhouse_wide:
+  target: live
+  outputs:
+    live:
+      type: sqlserver
+      driver: "{{ env_var('DPONE_IT_MSSQL_DRIVER', 'ODBC Driver 18 for SQL Server') }}"
+      server: "{{ env_var('DPONE_IT_MSSQL_HOST', '127.0.0.1') }}"
+      port: "{{ env_var('DPONE_IT_MSSQL_PORT_FORWARD', '51433') | int }}"
+      database: "{{ env_var('DPONE_IT_MSSQL_DATABASE', 'dpone_it') }}"
+      schema: "{{ env_var('DPONE_DBT_WIDE_SCHEMA', 'dpone_dbt_wide') }}"
+      authentication: sql
+      user: "{{ env_var('DPONE_IT_MSSQL_USER', 'sa') }}"
+      password: "{{ env_var('DPONE_IT_MSSQL_PASSWORD', 'Dp0ne.Strong.Pw.2026!') }}"
+      encrypt: true
+      trust_cert: true
+      threads: 1

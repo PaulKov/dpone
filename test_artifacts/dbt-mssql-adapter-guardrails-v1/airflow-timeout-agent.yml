@@ -1,0 +1,61 @@
+schema_version: 1
+task_id: "DPONE-DBT-AIRFLOW-EXECUTION-TIMEOUT"
+title: "Strict provider execution timeout projection"
+goal: "Add a bounded seconds wire field and construct Airflow timedelta only at the provider boundary."
+specification: "docs/feature-design-dbt-mssql-adapter-guardrails-v1.md"
+base_commit: "5b515cf7"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Provider execution schema/runtime accept only a positive bounded integer timeout."
+  - "Strict runtime converts seconds to datetime.timedelta before KPO construction."
+  - "Provider execution fingerprint remains bound to the wire field."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "optional provider_execution.kpo_kwargs.execution_timeout_seconds"
+  migration_required: false
+
+owned_paths:
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/provider_execution_contract.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/provider_execution.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_task_runtime.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/init_fetch_pod.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/init_fetch_pod_guard.py"
+  - "src/dpone/gitops/airflow_compact_runtime.py"
+  - "tests/test_airflow_provider_execution_authority.py"
+read_only_paths:
+  - "src/dpone/readiness/dbt_airflow_execution_pack.py"
+  - "tests/test_dbt_airflow_release_e2e.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/readiness/dbt_airflow_execution_pack.py"
+
+shared_file_owner: "Codex parent agent"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_provider_execution_authority.py -q"
+  broad:
+    - "uv run ruff check packages/dpone-airflow-pack/src/dpone_airflow_pack src/dpone/gitops/airflow_compact_runtime.py tests/test_airflow_provider_execution_authority.py"
+    - "uv run mypy --config-file mypy.ini packages/dpone-airflow-pack/src/dpone_airflow_pack src/dpone/gitops/airflow_compact_runtime.py"
+  live:
+    - "UNVERIFIED for real Airflow/Kubernetes"
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

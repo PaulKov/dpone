@@ -1,0 +1,55 @@
+schema_version: 1
+task_id: "SS-REVIEW-WORKLOAD-INIT-UNIT-OF-WORK"
+title: "Complete workload-init atomic rollback"
+goal: "Ensure workload init failure cannot leave successful-looking partial scaffold or catalog writes."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "Generated manifest is validated before repository mutation."
+  - "Scaffold and catalog receipts form one minimal unit of work."
+  - "Any catalog, validation, or apply failure rolls back owned writes in reverse order."
+  - "Concurrent winners are preserved and recovery artifacts are reported."
+  - "A repeated apply after failure is deterministic."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["dpone workload init --apply", "workload scaffold receipt"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/readiness/workload_init_service.py"
+  - "src/dpone/readiness/workload_init_catalog_merge.py"
+  - "src/dpone/readiness/workload_init_unit_of_work.py"
+  - "src/dpone/readiness/workload_init_catalog_storage.py"
+  - "tests/test_workload_init_cli.py"
+read_only_paths:
+  - "src/dpone/readiness/airflow_scaffold_apply.py"
+  - "src/dpone/manifest/confined_mutations.py"
+  - "src/dpone/manifest/batch_compiler_impl.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies: ["SS-REVIEW-WORKLOAD-INIT-TRANSACTION"]
+required_checks:
+  focused:
+    - "uv run pytest tests/test_workload_init_cli.py -q"
+  broad:
+    - "uv run pytest tests/test_workload_init_cli.py tests/test_airflow_self_service_security.py -q"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "A generic transaction framework would be required."
+  - "Another writer owns the same semantic contract."

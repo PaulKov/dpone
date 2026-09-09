@@ -1,0 +1,58 @@
+schema_version: 1
+task_id: "DPONE-000"
+title: ""
+goal: ""
+specification: ""
+base_commit: ""
+integrator: ""
+
+acceptance_criteria:
+  - ""
+
+public_contract_impact:
+  level: none  # none | compatible | deprecation | breaking
+  surfaces: []
+  migration_required: false
+
+owned_paths:
+  - ""
+# Optional. Keep shared semantic paths forbidden to delegated writers and list
+# them here only when integrator == shared_file_owner will reconcile them.
+integrator_owned_paths: []
+read_only_paths:
+  - ""
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "integrator"
+
+dependencies: []
+required_checks:
+  focused: []
+  broad: []
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

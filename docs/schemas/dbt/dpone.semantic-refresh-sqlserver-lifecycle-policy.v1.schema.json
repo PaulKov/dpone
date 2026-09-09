@@ -1,0 +1,134 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-sqlserver-lifecycle-policy.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adapter_policy_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "compatibility_level": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "contract_enforced": {
+      "const": true
+    },
+    "dbt_core_version": {
+      "const": "1.12.3"
+    },
+    "dbt_sqlserver_version": {
+      "const": "1.11.1"
+    },
+    "dispatch_closure_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "driver_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "existing_table_required": {
+      "const": true
+    },
+    "full_refresh_allowed": {
+      "const": false
+    },
+    "hooks_allowed": {
+      "const": false
+    },
+    "incremental_strategy": {
+      "const": "dpone_scope_merge"
+    },
+    "invocation_policy_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "macro_closure_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "materialization": {
+      "const": "incremental"
+    },
+    "materialization_closure_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "odbc_driver": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "on_schema_change": {
+      "const": "fail"
+    },
+    "package_artifacts_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "profile_policy_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "project_policy_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "pyodbc_version": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "python_version": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "runtime_image_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-sqlserver-lifecycle-policy.v1"
+    },
+    "schema_mutation_allowed": {
+      "const": false
+    },
+    "sqlserver_lifecycle_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "sqlserver_version": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "adapter_policy_digest",
+    "compatibility_level",
+    "contract_enforced",
+    "dbt_core_version",
+    "dbt_sqlserver_version",
+    "dispatch_closure_digest",
+    "driver_digest",
+    "existing_table_required",
+    "full_refresh_allowed",
+    "hooks_allowed",
+    "incremental_strategy",
+    "invocation_policy_digest",
+    "macro_closure_sha256",
+    "materialization",
+    "materialization_closure_digest",
+    "odbc_driver",
+    "on_schema_change",
+    "package_artifacts_digest",
+    "profile_policy_digest",
+    "project_policy_digest",
+    "pyodbc_version",
+    "python_version",
+    "runtime_image_digest",
+    "schema",
+    "schema_mutation_allowed",
+    "sqlserver_lifecycle_policy_sha256",
+    "sqlserver_version"
+  ],
+  "type": "object"
+}

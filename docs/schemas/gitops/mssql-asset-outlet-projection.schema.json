@@ -1,0 +1,126 @@
+{
+  "$defs": {
+    "identity": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/mssql-asset-outlet-projection.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "binding_set_ref": {
+      "$ref": "#/$defs/identity"
+    },
+    "connection_registry_ref": {
+      "$ref": "#/$defs/identity"
+    },
+    "entries": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_ref": {
+            "additionalProperties": false,
+            "properties": {
+              "connection_ref": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "database": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "engine": {
+                "const": "mssql"
+              },
+              "schema": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "table": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "engine",
+              "connection_ref",
+              "database",
+              "schema",
+              "table"
+            ],
+            "type": "object"
+          },
+          "asset_ref_sha256": {
+            "$ref": "#/$defs/identity"
+          },
+          "registry_connection_ref": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "resolved_binding": {
+            "additionalProperties": false,
+            "properties": {
+              "registry_connection_ref": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "registry_connection_ref"
+            ],
+            "type": "object"
+          },
+          "uri": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "^mssql://[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?:[1-9][0-9]{0,4}/(?:[A-Za-z0-9._~%-]+/){2,3}[A-Za-z0-9._~%-]+$",
+            "type": "string"
+          },
+          "workload_ids": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 1024,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "asset_ref",
+          "asset_ref_sha256",
+          "registry_connection_ref",
+          "resolved_binding",
+          "workload_ids",
+          "uri"
+        ],
+        "type": "object"
+      },
+      "maxItems": 4096,
+      "minItems": 1,
+      "type": "array"
+    },
+    "environment": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "projection_sha256": {
+      "$ref": "#/$defs/identity"
+    },
+    "schema": {
+      "const": "dpone.mssql-asset-outlet-projection.v1"
+    }
+  },
+  "required": [
+    "schema",
+    "environment",
+    "binding_set_ref",
+    "connection_registry_ref",
+    "entries",
+    "projection_sha256"
+  ],
+  "title": "dpone GitOps MSSQL asset outlet projection",
+  "type": "object"
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/recovery-restore-plan.schema.json",
+  "title": "dpone schema migration recovery restore plan",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "restore_plan_id",
+    "status",
+    "restore_point_id",
+    "pack_id",
+    "environment",
+    "target",
+    "operations",
+    "blockers",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_recovery_restore_plan.v1"},
+    "restore_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["planned", "blocked"]},
+    "restore_point_id": {"type": "string"},
+    "chain_verification_id": {"type": ["string", "null"]},
+    "pack_id": {"type": "string"},
+    "environment": {"type": "string"},
+    "target": {"type": "object"},
+    "operations": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,97 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-ASSET-PARTITIONS-V1"
+title: "Propagate one temporal asset partition into Airflow 3.2+"
+goal: "Make one declarative dpone asset partition native on Airflow 3.2+ and explicitly degraded on earlier supported versions."
+specification: "docs/feature-design-airflow-asset-partitions-v1.md"
+base_commit: "2f8d2529"
+integrator: "current Codex task"
+
+acceptance_criteria:
+  - "A user declares one temporal dimension once in an asset inlet/outlet mapping."
+  - "Build inference preserves partition identity and blocks mismatches or mixed producer contracts."
+  - "Airflow 3.2+ uses CronPartitionTimetable and PartitionedAssetTimetable with identity mapping."
+  - "Airflow 3.0/3.1 and 2.x preserve existing schedules and report degraded_unpartitioned."
+  - "Runtime evidence records the actual optional partition key without inferring it from logical_date."
+  - "Airflow parse performs no network, metadata DB, Variable, Connection, Vault, Kubernetes, or cache-refresh calls."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "airflow.execution.inlets/outlets partition metadata"
+    - "gitops.airflow_dag_spec partition_plan"
+    - "RunInterval and Airflow runtime evidence"
+    - "dpone-airflow-pack timetable materialization"
+  migration_required: false
+
+owned_paths:
+  - "docs/feature-design-airflow-asset-partitions-v1.md"
+  - "src/dpone/gitops/airflow_asset_partition.py"
+  - "src/dpone/gitops/airflow_asset_partition_plan.py"
+  - "src/dpone/gitops/airflow_asset_graph.py"
+  - "src/dpone/gitops/airflow_asset_cross_dag.py"
+  - "src/dpone/gitops/airflow_dag_spec.py"
+  - "src/dpone/gitops/airflow_dag_spec_builder.py"
+  - "src/dpone/gitops/airflow_compact_pack.py"
+  - "src/dpone/contracts/run_interval.py"
+  - "src/dpone/services/interval_context.py"
+  - "src/dpone/gitops/airflow_interval_env.py"
+  - "src/dpone/gitops/schema_airflow_runtime_contracts.py"
+  - "docs/schemas/gitops/airflow-dag-spec.schema.json"
+  - "docs/schemas/gitops/airflow-xcom-summary.schema.json"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/asset_partitions.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/asset_outlets.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_schedule.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_materializer.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/pack_tasks.py"
+  - "tests/test_airflow_asset_partitions.py"
+  - "tests/test_airflow_pack_asset_partitions_compat.py"
+  - "tests/test_airflow_asset_graph.py"
+  - "tests/test_airflow_asset_cross_dag.py"
+  - "tests/test_airflow_asset_outlets.py"
+  - "tests/test_airflow_interval_contract.py"
+  - "tests/test_airflow_interval_env_rendering.py"
+  - "tests/test_run_interval_context.py"
+  - "tests/test_gitops_airflow_runner_pack.py"
+  - "tests/airflow_dag_spec_repo.py"
+  - "docs/airflow-self-service.md"
+  - "docs/airflow-pack-provider.md"
+  - "docs/compatibility.md"
+  - "docs/quality-metrics.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "CHANGELOG.md"
+  - ".github/workflows/airflow-pack-compat.yml"
+  - "test_artifacts/airflow-asset-partitions-v1/**"
+read_only_paths:
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/adr/0003-airflow-parse-safe-provider.md"
+  - "docs/adr/0013-reproducible-rerun-and-retention.md"
+forbidden_paths:
+  - ".cursor/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - ".github/workflows/**"
+
+shared_file_owner: "current Codex task"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_asset_partitions.py tests/test_airflow_asset_graph.py tests/test_airflow_asset_cross_dag.py tests/test_airflow_asset_outlets.py tests/test_airflow_interval_contract.py tests/test_run_interval_context.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv build packages/dpone-airflow-pack --out-dir dist"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "UNVERIFIED until an approved Airflow 3.2+ environment emits and consumes a real partition event"
+
+stop_conditions:
+  - "Implementation requires Airflow imports in the build plane."
+  - "A provider fallback silently claims native partition behavior."
+  - "A required edit touches user-owned .cursor files."

@@ -1,0 +1,48 @@
+schema_version: 1
+task_id: "SS-REVIEW-CERTIFICATION"
+title: "Fail usability certification when a session has blockers"
+goal: "Preserve blocker_codes in the session model and prevent false PASS evidence."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "A passed session with any blocker code is not a complete success."
+  - "Five otherwise successful blocked sessions cannot produce PASS."
+  - "Existing evidence identity, privacy, and thresholds remain compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["self-service certification evidence"]
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/ops/self_service_certification_usability.py"
+  - "tests/test_self_service_certification.py"
+read_only_paths:
+  - "docs/schemas/gitops/self-service-usability-study.schema.json"
+  - "docs/airflow-self-service-evidence.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_self_service_certification.py -q"
+  broad:
+    - "uv run pytest tests/test_airflow_self_service_cli.py tests/test_self_service_certification.py -q"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

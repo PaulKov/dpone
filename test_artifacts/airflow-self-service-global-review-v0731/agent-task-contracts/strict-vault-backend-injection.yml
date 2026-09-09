@@ -1,0 +1,62 @@
+schema_version: 1
+task_id: "SS-70"
+title: "Strict Vault backend injection and ambient-reader removal"
+goal: >
+  Ensure strict runtime and safe-sample credential resolution never falls back
+  to an ambient/default Vault manager when the pinned credential-runtime does
+  not provide an explicit Vault Kubernetes-auth client.
+specification: >
+  Release-blocking correctness and secret-authority bug under accepted ADR
+  0027. Canonical BindingCredentialResolver requires explicit backend
+  injection; runtime composition roots derive that backend from the exact
+  credential-runtime snapshot and fail with bounded structured errors.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "vault_kv resolution with no injected Vault client fails closed."
+  - "Runtime context detects a registry requiring vault_kv when credential-runtime has no usable Vault backend."
+  - "Safe-sample live runtime builds its Vault reader from the pinned credential-runtime snapshot."
+  - "No default Vault manager, Vault path, token or raw backend error is reachable from strict execution."
+  - "Non-Vault resolvers remain compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - strict runtime credential resolution
+    - safe-sample live credential resolution
+  migration_required: false
+
+owned_paths:
+  - src/dpone/runtime/credentials/binding_resolver.py
+  - src/dpone/runtime/credentials/runtime_context.py
+  - src/dpone/readiness/safe_sample_live_runtime.py
+  - tests/test_runtime_connection_context_loader.py
+  - tests/test_runtime_connection_authority.py
+  - tests/test_safe_sample_live_runtime_assembly.py
+read_only_paths:
+  - docs/adr/0027-single-runtime-connection-authority.md
+  - docs/feature-design-runtime-connection-authority-and-hygiene-v0732.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "parent Codex agent"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_runtime_connection_context_loader.py tests/test_runtime_connection_authority.py tests/test_safe_sample_live_runtime_assembly.py -q"
+  broad:
+    - "uv run ruff check <owned Python paths>"
+    - "uv run ruff format --check <owned Python paths>"
+    - "uv run mypy --config-file mypy.ini <owned source paths>"
+  live:
+    - "Vault Kubernetes Auth remains UNVERIFIED without an approved live environment"
+
+stop_conditions:
+  - "A fix requires secret values outside runtime memory."
+  - "A fix weakens pinned runtime context verification."
+  - "Another writer owns the same path."

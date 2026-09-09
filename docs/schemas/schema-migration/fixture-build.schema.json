@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/fixture-build.schema.json",
+  "title": "dpone schema migration fixture build",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "fixture_build_id",
+    "pack_id",
+    "fixture_plan_id",
+    "target",
+    "status",
+    "mode",
+    "columns",
+    "metrics",
+    "blockers",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_fixture_build.v1"},
+    "fixture_build_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "fixture_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "target": {
+      "type": "object",
+      "required": ["sink_type", "table"],
+      "additionalProperties": true,
+      "properties": {
+        "sink_type": {"type": "string"},
+        "table": {"type": "string"}
+      }
+    },
+    "status": {"enum": ["dry_run", "built", "blocked"]},
+    "mode": {"enum": ["none", "synthetic", "artifact_sample", "masked_sample"]},
+    "columns": {"type": "array", "items": {"type": "string"}},
+    "key_columns": {"type": "array", "items": {"type": "string"}},
+    "hierarchy": {"type": "object"},
+    "checks": {"type": "object"},
+    "metrics": {"type": "object"},
+    "rows": {"type": "array", "items": {"type": "object"}},
+    "rows_artifact": {"type": "string"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-compliance-control-evaluation.schema.json",
+  "title": "Data Product Compliance Control Evaluation",
+  "type": "object",
+  "required": ["schema_version", "status", "compliance_evaluation_id", "compliance_plan_id", "controls", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_compliance_control_evaluation.v1"},
+    "status": {"enum": ["disabled", "passed", "warning", "blocked"]},
+    "compliance_evaluation_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "compliance_plan_id": {"type": ["string", "null"]},
+    "mode": {"type": ["string", "null"]},
+    "profile": {"type": ["string", "null"]},
+    "product": {"type": "object"},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "controls": {"type": "array", "items": {"type": "object"}},
+    "evidence_refs": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

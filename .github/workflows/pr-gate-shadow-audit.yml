@@ -1,0 +1,99 @@
+name: PR Gate shadow audit
+
+on:
+  workflow_run:
+    workflows: ["PR Gate shadow"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  audit:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion != 'action_required'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out trusted default-branch auditor revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.sha }}
+
+      - name: Set up locked auditor runtime
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Select one exact producer claims artifact
+        id: artifact
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          PRODUCER_RUN_ID: ${{ github.event.workflow_run.id }}
+          PRODUCER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        with:
+          script: |
+            const expected = `pr-gate-shadow-evidence-${process.env.PRODUCER_RUN_ID}-${process.env.PRODUCER_RUN_ATTEMPT}`;
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number(process.env.PRODUCER_RUN_ID),
+              per_page: 100,
+            });
+            const matches = artifacts.filter((artifact) => artifact.name === expected && !artifact.expired);
+            if (matches.length === 1) {
+              core.setOutput("id", String(matches[0].id));
+            }
+
+      - name: Download exact producer claims without executing them
+        if: steps.artifact.outputs.id != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ steps.artifact.outputs.id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          digest-mismatch: error
+          path: ${{ runner.temp }}/pr-gate-shadow-claims
+
+      - name: Write audit receipt from bounded data only
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PRODUCER_RUN_ID: ${{ github.event.workflow_run.id }}
+          PRODUCER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+          claims="${RUNNER_TEMP}/pr-gate-shadow-claims/pr-gate-shadow-evidence.json"
+          if [ ! -f "${claims}" ]; then
+            claims="${RUNNER_TEMP}/pr-gate-shadow-claims-missing.json"
+            printf '%s\n' '{}' > "${claims}"
+          fi
+          output="${RUNNER_TEMP}/pr-gate-shadow-audit-${PRODUCER_RUN_ID}-${PRODUCER_RUN_ATTEMPT}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json"
+          set +e
+          uv run --frozen python tools/ci/audit_pr_gate_shadow.py \
+            --github-event "${GITHUB_EVENT_PATH}" \
+            --claims "${claims}" \
+            --output "${output}"
+          audit_exit=$?
+          set -e
+          cp "${output}" "${GITHUB_WORKSPACE}/audit-receipt.json"
+          exit "${audit_exit}"
+
+      - name: Upload immutable audit receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: pr-gate-shadow-audit-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: audit-receipt.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90

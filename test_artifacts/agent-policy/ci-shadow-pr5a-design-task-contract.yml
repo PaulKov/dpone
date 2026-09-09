@@ -1,0 +1,61 @@
+schema_version: 1
+task_id: "DPONE-512-PR5A-DESIGN"
+title: "CI shadow PR5A immutable candidate manifest design"
+goal: "Freeze the public PR5A design before any candidate-manifest production code is written."
+specification: "docs/feature-design-ci-shadow-pr5a-candidate-manifest.md"
+base_commit: "0fd111aa6c7e2494f3bb3ffa7d6da2f31f923c17"
+integrator: "dpone-integrator"
+
+acceptance_criteria:
+  - "The specification is RESEARCHED and contains no production implementation."
+  - "Exactly three wheel identities, closed schema, create-new output and non-authority are explicit."
+  - "Implementation remains blocked until PR4A integration and status APPROVED."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["future CLI", "future candidate manifest schema", "future diagnostic artifact"]
+  migration_required: false
+
+owned_paths:
+  - "docs/feature-design-ci-shadow-pr5a-candidate-manifest.md"
+  - "test_artifacts/agent-policy/ci-shadow-pr5a-design-task-contract.yml"
+integrator_owned_paths: []
+read_only_paths:
+  - "docs/feature-design-ci-pr-gate-exact-sha-evidence.md"
+  - "docs/adr/0048-exact-sha-readiness-evidence.md"
+  - "src/dpone/manifest/confined_files.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "docs/schemas/cicd"
+  - "src/dpone"
+  - "tools/ci"
+  - "tests"
+
+shared_file_owner: "dpone-integrator"
+dependencies:
+  - "PR4A integration on master"
+  - "Maintainer approval of this specification"
+required_checks:
+  focused:
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/ci-shadow-pr5a-design-task-contract.yml"
+  broad:
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live:
+    - "N/A: design-only"
+required_outputs: ["implementation", "tests", "documentation_impact", "completion_report"]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "Production implementation begins before APPROVED status and a fresh implementation base."
+  - "The contract changes legacy authority, release behavior, branch protection, or credentials."

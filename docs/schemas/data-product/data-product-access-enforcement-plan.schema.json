@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-access-enforcement-plan.schema.json",
+  "title": "Data Product Access Enforcement Plan",
+  "type": "object",
+  "required": ["schema_version", "status", "access_enforcement_plan_id", "operations", "desired_state", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_access_enforcement_plan.v1"},
+    "status": {"enum": ["disabled", "ready", "warning", "blocked"]},
+    "access_enforcement_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "mode": {"type": "string"},
+    "profile": {"type": "string"},
+    "environment": {"type": "string"},
+    "product": {"type": "object"},
+    "product_id": {"type": ["string", "null"]},
+    "target": {"type": "object"},
+    "drift_policy": {"type": "string"},
+    "access_classification_id": {"type": ["string", "null"]},
+    "entitlement_plan_id": {"type": ["string", "null"]},
+    "privacy_impact_id": {"type": ["string", "null"]},
+    "access_gate_id": {"type": ["string", "null"]},
+    "authority_gate_id": {"type": ["string", "null"]},
+    "requirements": {"type": "array", "items": {"type": "object"}},
+    "desired_state": {"type": "object"},
+    "operations": {"type": "array", "items": {"type": "object"}},
+    "preconditions": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

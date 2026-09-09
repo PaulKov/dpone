@@ -1,0 +1,59 @@
+schema_version: 1
+task_id: "DPONE-DBT-MSSQL-PROJECT-POLICY"
+title: "Bounded SQL Server dbt project flag policy"
+goal: "Implement and unit-test exact literal project flag validation without wiring compiler/runtime shared files."
+specification: "docs/feature-design-dbt-mssql-adapter-guardrails-v1.md"
+base_commit: "5b515cf7"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "The four required literal boolean flags are accepted."
+  - "Missing, duplicate, templated, wrong-type and different values fail with stable actionable issues."
+  - "The reader is bounded and performs no import-time I/O."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "new SQL Server dbt project policy reader"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/adapters/dbt_sqlserver_project_policy.py"
+  - "tests/test_dbt_sqlserver_project_policy.py"
+read_only_paths:
+  - "src/dpone/manifest/bounded_yaml.py"
+  - "src/dpone/runtime/dbt_project_bundle_source.py"
+  - "src/dpone/commands/dbt_publish_cli_support.py"
+  - "tests/test_dbt_project_bundle.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "src/dpone/services/dbt_publish_compiler.py"
+  - "src/dpone/runtime/dbt_execution_service.py"
+
+shared_file_owner: "Codex parent agent"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_sqlserver_project_policy.py -q"
+  broad:
+    - "uv run ruff check src/dpone/adapters/dbt_sqlserver_project_policy.py tests/test_dbt_sqlserver_project_policy.py"
+    - "uv run mypy --config-file mypy.ini src/dpone/adapters/dbt_sqlserver_project_policy.py"
+  live:
+    - "N/A"
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

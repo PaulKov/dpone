@@ -1,0 +1,87 @@
+schema_version: 1
+task_id: "DPONE-DBT-PRE-MUTATION-IDENTITY"
+title: "Prove dbt invocation, selection and target identity before mutation"
+goal: "Close PR #454 pre-mutation correctness gaps without changing the frozen native dbt/Airflow architecture."
+specification: "docs/feature-design-dbt-pre-mutation-identity-remediation-v1.md"
+base_commit: "11264be81b1b5659989dd423db3d30ceb94090bc"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Compile selection, runtime preflight and runtime build share one canonical invocation contract."
+  - "Target and selection mismatches stop before dbt build."
+  - "Release identity remains environment-neutral and deployment identity retains endpoint authority."
+  - "Confirmed P1 contract, workflow and CI gaps are fail-closed."
+  - "Focused, broad, docs, package and PR technical gates pass."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "unreleased dpone.dbt-*.v1 schemas"
+    - "dbt execution pack and evidence"
+    - "dbt compile/check behavior"
+    - "activation workflows"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/contracts"
+  - "src/dpone/ports"
+  - "src/dpone/services"
+  - "src/dpone/runtime"
+  - "src/dpone/adapters"
+  - "src/dpone/type_system"
+  - "tests"
+  - "docs"
+  - "test_artifacts/dbt-pre-mutation-identity-remediation-v1"
+read_only_paths:
+  - "packages/dpone-airflow-pack"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "Codex parent agent"
+
+dependencies:
+  - "PR #454 head 11264be81b1b5659989dd423db3d30ceb94090bc"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_selection_resolution.py tests/test_dbt_runtime_execution.py tests/test_dbt_project_bundle.py tests/test_dbt_airflow_release_e2e.py tests/test_dbt_self_service_workflows.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+    - "uv build"
+  live:
+    - "UNVERIFIED unless an approved MSSQL/ClickHouse/Airflow/Kubernetes environment is available"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Another writer owns the same semantic contract."
+  - "Required edit contradicts the frozen native dbt/Airflow architecture."
+  - "A live check requires unapproved credentials or environment."
+  - "An unrelated user or parallel-branch change would be overwritten."

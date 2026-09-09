@@ -1,0 +1,64 @@
+schema_version: 1
+task_id: "SS-69"
+title: "Canonical connection identity fail-closed fast-path selection"
+goal: >
+  Prevent canonical-only source and sink endpoints from collapsing to equal
+  empty legacy IDs and selecting a same-database PostgreSQL fast path for
+  different logical connections.
+specification: >
+  Isolated release-blocking correctness bug under accepted ADR 0027. Preserve
+  legacy behavior while deriving non-secret endpoint identity from
+  connection_ref first and requiring two non-empty equal identities before
+  any same-connection optimization.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "LoadConfig uses connection_ref as endpoint identity when connection_id is absent."
+  - "Explicit legacy connection_id remains compatible."
+  - "Equal empty or missing identities never authorize InternalQueryArtifact."
+  - "Two different canonical connection_ref values select the exported cross-database path."
+  - "One identical canonical connection_ref can retain the certified same-connection fast path."
+  - "No registry body, endpoint, credential or secret enters LoadConfig or evidence."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - LoadConfig endpoint identity
+    - PostgreSQL full/xmin same-connection optimization
+  migration_required: false
+
+owned_paths:
+  - src/dpone/dag/load_config_builder.py
+  - src/dpone/runtime/sources/strategies/postgres/postgres_full_extract.py
+  - src/dpone/runtime/sources/strategies/postgres/postgres_xmin_extract.py
+  - tests/test_canonical_connection_identity.py
+read_only_paths:
+  - src/dpone/config/load_config.py
+  - docs/adr/0027-single-runtime-connection-authority.md
+  - docs/feature-design-runtime-connection-authority-and-hygiene-v0732.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs
+
+shared_file_owner: "parent Codex agent"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_canonical_connection_identity.py tests/test_postgres_xmin_strategy_selection.py tests/test_dag_config_split.py -q"
+  broad:
+    - "uv run ruff check <owned Python paths>"
+    - "uv run ruff format --check <owned Python paths>"
+    - "uv run mypy --config-file mypy.ini <owned source paths>"
+  live:
+    - "UNVERIFIED unless a PostgreSQL route is actually executed"
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "A safe fix requires physical registry topology in LoadConfig."
+  - "Public-contract impact is larger than a compatible correctness fix."
+  - "Another writer owns the same path."

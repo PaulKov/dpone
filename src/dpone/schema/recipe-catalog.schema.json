@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://paulkov.github.io/dpone/schemas/recipe-catalog.schema.json",
+  "title": "dpone declarative recipe catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "catalog_id", "artifacts"],
+  "properties": {
+    "schema": {"const": "dpone.recipe-catalog.v1"},
+    "catalog_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}$"},
+    "artifacts": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "ref", "artifact_ref", "sha256"],
+        "properties": {
+          "kind": {"enum": ["recipe", "profile", "component"]},
+          "ref": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}@[0-9]+\\.[0-9]+\\.[0-9]+$"},
+          "artifact_ref": {"type": "string", "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+\\.ya?ml$"},
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
+    }
+  }
+}

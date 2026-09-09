@@ -1,0 +1,49 @@
+{
+  "checks": [
+    {
+      "artifact_ref": "test_artifacts/signed-catalog-extension-conformance-v1/fixtures/public_contract.json",
+      "check": "public_contract",
+      "code": "DPONE_EXTENSION_CHECK_PASSED",
+      "sha256": "sha256:cce35048a57b1939529dc1087fb7fb28d350c2b88503bf08c6032f476cdc8f90",
+      "status": "PASS"
+    },
+    {
+      "artifact_ref": "test_artifacts/signed-catalog-extension-conformance-v1/fixtures/provider_discovery.json",
+      "check": "provider_discovery",
+      "code": "DPONE_EXTENSION_CHECK_PASSED",
+      "sha256": "sha256:63b9f99ae86a7abb9908d0b1333d62380b23159503a8b33edb89371553f96799",
+      "status": "PASS"
+    },
+    {
+      "artifact_ref": "test_artifacts/signed-catalog-extension-conformance-v1/fixtures/airflow_matrix.json",
+      "check": "airflow_matrix",
+      "code": "DPONE_EXTENSION_CHECK_PASSED",
+      "sha256": "sha256:e49b630c87b44dd750dc000f713bb6d5e3b0e059b024fb32f7fb852e78f63ab4",
+      "status": "PASS"
+    },
+    {
+      "artifact_ref": "test_artifacts/signed-catalog-extension-conformance-v1/fixtures/package_smoke.json",
+      "check": "package_smoke",
+      "code": "DPONE_EXTENSION_CHECK_PASSED",
+      "sha256": "sha256:15509da5b8580462c334f906def38e06e9dac744ac9bc61eaafac98dc0693a8e",
+      "status": "PASS"
+    },
+    {
+      "artifact_ref": "test_artifacts/signed-catalog-extension-conformance-v1/fixtures/parse_budget.json",
+      "check": "parse_budget",
+      "code": "DPONE_EXTENSION_CHECK_PASSED",
+      "sha256": "sha256:eafc6c80c1e35be2df73e8dd7e8e57875b152f89ecb014dbafee4888b12b06bd",
+      "status": "PASS"
+    }
+  ],
+  "conformance_id": "sha256:63c439ef40df0ee3553f3561e6bbeed3185e1ebfc2d33f07eac0094f34c1c15a",
+  "evaluated_at": "2026-07-17T10:35:52.880718Z",
+  "profile": "airflow_provider",
+  "schema": "dpone.extension-conformance.v1",
+  "status": "PASS",
+  "subject": {
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "apache-airflow-providers-dpone-fixture",
+    "version": "contract-fixture"
+  }
+}

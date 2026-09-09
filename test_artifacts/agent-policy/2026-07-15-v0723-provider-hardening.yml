@@ -1,0 +1,78 @@
+schema_version: 1
+task_id: "DPONE-V0723-PROVIDER"
+title: "Harden parse-safe provider index validation and module boundaries"
+goal: "Reject malformed deployment indexes without silent zero-DAG success and bring provider modules below the 400-SLOC hard budget."
+specification: "docs/feature-design-airflow-self-service-v0723-hardening.md"
+base_commit: "bfa778b566bdf29fbe31b2c7efc7a61d528ed1c9"
+integrator: "codex/v0.72.3-self-service-hardening"
+
+acceptance_criteria:
+  - "Missing or wrong-typed dag_specs, workload_packs, and runtime_artifact_delivery return a structured deployment-index error."
+  - "Valid indexes preserve existing LoadReport behavior and parse without network or Airflow metadata access."
+  - "Every module under packages/dpone-airflow-pack/src/dpone_airflow_pack is at or below the repository max_sloc budget."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "airflow provider LoadReport errors"
+    - "dpone.airflow-deployment-index.v1 validation"
+  migration_required: false
+
+owned_paths:
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_artifact_resolver.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_loader.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_materializer.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/operators.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/operator_runtime.py
+  - tests/test_airflow_deployment_index_provider.py
+  - tests/test_airflow_dag_loader.py
+  - tests/test_airflow_provider_module_size.py
+read_only_paths:
+  - docs/feature-design-airflow-self-service-v0723-hardening.md
+  - docs/benchmarks/quality_budgets.yml
+  - docs/schemas/gitops/airflow-deployment-index.schema.json
+  - src/dpone/readiness/airflow_self_service.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/asset_outlets.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/__init__.py
+  - packages/dpone-airflow-pack/src/airflow/providers/dpone/__init__.py
+
+shared_file_owner: "integrator"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_deployment_index_provider.py tests/test_airflow_dag_loader.py -q"
+    - "uv run dpone docs check-module-size --package packages/dpone-airflow-pack/src/dpone_airflow_pack --no-baseline"
+  broad:
+    - "uv run ruff check packages/dpone-airflow-pack/src tests/test_airflow_deployment_index_provider.py tests/test_airflow_dag_loader.py"
+    - "uv run mypy --config-file mypy.ini packages/dpone-airflow-pack/src"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

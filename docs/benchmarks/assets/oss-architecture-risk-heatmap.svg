@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="466" viewBox="0 0 920 466" role="img">
+<rect width="920" height="466" fill="#ffffff"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Architecture risk heatmap</text>
+<text x="32" y="66" font-size="13" fill="#475569">Risk score from module size, fan-out, fan-in, cohesion, and clustering hotspots.</text>
+<text x="32" y="114" font-size="13" font-weight="700" fill="#111827">dpone</text>
+<rect x="210" y="98" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="98" width="89" height="22" rx="4" fill="#0f766e"/>
+<text x="790" y="114" font-size="12" fill="#334155">low / 16</text>
+<text x="32" y="172" font-size="13" font-weight="700" fill="#111827">Airbyte</text>
+<rect x="210" y="156" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="156" width="268" height="22" rx="4" fill="#f59e0b"/>
+<text x="790" y="172" font-size="12" fill="#334155">medium / 48</text>
+<text x="32" y="230" font-size="13" font-weight="700" fill="#111827">dlt</text>
+<rect x="210" y="214" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="214" width="414" height="22" rx="4" fill="#dc2626"/>
+<text x="790" y="230" font-size="12" fill="#334155">high / 74</text>
+<text x="32" y="288" font-size="13" font-weight="700" fill="#111827">Pentaho Kettle</text>
+<rect x="210" y="272" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="272" width="560" height="22" rx="4" fill="#7f1d1d"/>
+<text x="790" y="288" font-size="12" fill="#334155">critical / 100</text>
+<text x="32" y="346" font-size="13" font-weight="700" fill="#111827">Apache Hop</text>
+<rect x="210" y="330" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="330" width="560" height="22" rx="4" fill="#7f1d1d"/>
+<text x="790" y="346" font-size="12" fill="#334155">critical / 100</text>
+<text x="32" y="404" font-size="13" font-weight="700" fill="#111827">Sling</text>
+<rect x="210" y="388" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="388" width="280" height="22" rx="4" fill="#dc2626"/>
+<text x="790" y="404" font-size="12" fill="#334155">high / 50</text>
+</svg>

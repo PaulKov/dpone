@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="516" viewBox="0 0 920 516" role="img" aria-label="Score calibration">
+<rect width="920" height="516" fill="#ffffff"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Score calibration</text>
+<text x="32" y="66" font-size="13" fill="#475569">Language/repo normalized maintainability scores with profile-aware thresholds.</text>
+<text x="32" y="118" font-size="13" font-weight="700" fill="#111827">dpone</text>
+<rect x="218" y="102" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="102" width="436" height="22" rx="4" fill="#2563eb"/>
+<text x="792" y="118" font-size="12" font-weight="400" fill="#334155">78 / python-framework</text>
+<text x="32" y="182" font-size="13" font-weight="700" fill="#111827">Airbyte</text>
+<rect x="218" y="166" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="166" width="212" height="22" rx="4" fill="#dc2626"/>
+<text x="792" y="182" font-size="12" font-weight="400" fill="#334155">38 / python-library</text>
+<text x="32" y="246" font-size="13" font-weight="700" fill="#111827">dlt</text>
+<rect x="218" y="230" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="230" width="2" height="22" rx="4" fill="#dc2626"/>
+<text x="792" y="246" font-size="12" font-weight="400" fill="#334155">0 / python-library</text>
+<text x="32" y="310" font-size="13" font-weight="700" fill="#111827">Pentaho Kettle</text>
+<rect x="218" y="294" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="294" width="2" height="22" rx="4" fill="#dc2626"/>
+<text x="792" y="310" font-size="12" font-weight="400" fill="#334155">0 / jvm-platform</text>
+<text x="32" y="374" font-size="13" font-weight="700" fill="#111827">Apache Hop</text>
+<rect x="218" y="358" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="358" width="50" height="22" rx="4" fill="#dc2626"/>
+<text x="792" y="374" font-size="12" font-weight="400" fill="#334155">9 / jvm-platform</text>
+<text x="32" y="438" font-size="13" font-weight="700" fill="#111827">Sling</text>
+<rect x="218" y="422" width="560" height="22" rx="4" fill="#e2e8f0"/>
+<rect x="218" y="422" width="2" height="22" rx="4" fill="#dc2626"/>
+<text x="792" y="438" font-size="12" font-weight="400" fill="#334155">0 / mixed-monorepo</text>
+</svg>

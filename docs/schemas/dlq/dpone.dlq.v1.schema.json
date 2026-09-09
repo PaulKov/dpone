@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PaulKov/dpone/docs/schemas/dlq/dpone.dlq.v1.schema.json",
+  "title": "dpone DLQ record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "record_id",
+    "run_id",
+    "load_id",
+    "record_ref",
+    "reason",
+    "diagnostics",
+    "payload",
+    "replay",
+    "created_at",
+    "expires_at",
+    "sha256"
+  ],
+  "properties": {
+    "schema": {"const": "dpone.dlq.v1"},
+    "record_id": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "load_id": {"type": "string", "minLength": 1},
+    "record_ref": {"type": "string", "pattern": "^dpone://"},
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "code", "stage", "message"],
+      "properties": {
+        "category": {
+          "enum": [
+            "schema_validation",
+            "source_decode",
+            "transform",
+            "quality",
+            "sink_rejection",
+            "cdc_poison",
+            "unknown"
+          ]
+        },
+        "code": {
+          "enum": [
+            "schema.required_null",
+            "schema.type_mismatch",
+            "source.decode_failed",
+            "transform.failed",
+            "quality.rule_failed",
+            "sink.row_rejected",
+            "cdc.poison",
+            "unknown.unclassified"
+          ]
+        },
+        "stage": {"type": "string", "minLength": 1},
+        "column": {"type": "string"},
+        "message": {"type": "string", "minLength": 1}
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actual_type": {"type": ["string", "null"]},
+        "column": {"type": ["string", "null"]},
+        "expected_type": {"type": ["string", "null"]},
+        "rule_id": {"type": ["string", "null"]},
+        "source_offset": {"type": ["string", "number", "null"]},
+        "source_partition": {"type": ["string", "number", "null"]}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "value"],
+      "properties": {
+        "policy": {"enum": ["reference_only", "masked", "preserve"]},
+        "value": {}
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "replayable"],
+      "properties": {
+        "status": {"enum": ["pending", "acknowledged"]},
+        "replayable": {"type": "boolean"}
+      }
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/dpone.mssql-clickhouse-wide-release-authority.v1.schema.json",
+  "title": "dpone local MSSQL to ClickHouse wide release authority v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "dpone.mssql-clickhouse-wide-release-authority.v1"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "release_id": {"type": "string", "minLength": 1},
+    "git_head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_snapshot_sha256": {"$ref": "#/$defs/digest"},
+    "worktree_dirty": {"const": false},
+    "environment_class": {"const": "LOCAL_DOCKER"},
+    "source_relation": {"type": "string", "minLength": 1},
+    "expected_rows": {"const": 10000},
+    "expected_source_columns": {"const": 201},
+    "expected_target_columns": {"const": 202},
+    "mssql_connection_sha256": {"$ref": "#/$defs/digest"},
+    "clickhouse_connection_sha256": {"$ref": "#/$defs/digest"},
+    "target_schema_sha256_by_slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bcp_native_required": {"$ref": "#/$defs/digest"},
+        "bcp_native_off": {"$ref": "#/$defs/digest"},
+        "parquet_s3_pull": {"$ref": "#/$defs/digest"}
+      },
+      "required": ["bcp_native_required", "bcp_native_off", "parquet_s3_pull"]
+    },
+    "s3_endpoint_sha256": {"$ref": "#/$defs/digest"},
+    "s3_bucket": {"type": "string", "minLength": 1},
+    "s3_named_collection": {"type": "string", "minLength": 1},
+    "production_certification": {"const": "UNVERIFIED"},
+    "authority_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "required": [
+    "schema_version", "created_at", "release_id", "git_head_sha", "source_snapshot_sha256",
+    "worktree_dirty", "environment_class", "source_relation", "expected_rows",
+    "expected_source_columns", "expected_target_columns", "mssql_connection_sha256",
+    "clickhouse_connection_sha256", "target_schema_sha256_by_slot", "s3_endpoint_sha256",
+    "s3_bucket", "s3_named_collection", "production_certification", "authority_sha256"
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

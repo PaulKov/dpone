@@ -1,0 +1,175 @@
+{
+  "$comment": "Airflow state alone is not evidence; the trusted observer, pod UID and full container closure are mandatory.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-trusted-attempt-termination-receipt.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempt_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "cluster_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "container_terminations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "container_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "finished_at": {
+            "format": "date-time",
+            "pattern": "Z$",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "container_id",
+          "finished_at",
+          "name",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "dag_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "map_index": {
+      "minimum": -1,
+      "type": "integer"
+    },
+    "namespace": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "observer_attestation_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "observer_authority": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "observer_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "observer_signature_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "operation_ids": {
+      "items": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "operation_set_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "pod_name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "pod_resource_version": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "pod_uid": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "run_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-trusted-attempt-termination-receipt.v1"
+    },
+    "task_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "terminal_phase": {
+      "enum": [
+        "Failed",
+        "Succeeded"
+      ],
+      "type": "string"
+    },
+    "termination_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "try_number": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "verification_status": {
+      "const": "VERIFIED"
+    },
+    "workflow_execution_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_execution_id": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "attempt_binding_sha256",
+    "cluster_id",
+    "container_terminations",
+    "dag_id",
+    "map_index",
+    "namespace",
+    "observed_at",
+    "observer_attestation_sha256",
+    "observer_authority",
+    "observer_policy_sha256",
+    "observer_signature_sha256",
+    "operation_ids",
+    "operation_set_sha256",
+    "pod_name",
+    "pod_resource_version",
+    "pod_uid",
+    "run_id",
+    "schema",
+    "task_id",
+    "terminal_phase",
+    "termination_receipt_sha256",
+    "try_number",
+    "verification_status",
+    "workflow_execution_binding_sha256",
+    "workflow_execution_id"
+  ],
+  "type": "object"
+}

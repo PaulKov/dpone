@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/connection-registry-migration-plan.schema.json",
+  "title": "dpone GitOps connection registry migration plan",
+  "type": "object",
+  "required": [
+    "kind",
+    "schema",
+    "mode",
+    "apply",
+    "environment",
+    "registry_path",
+    "summary",
+    "changes"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "kind": {
+      "const": "dpone.connection-registry-migration-plan.v1"
+    },
+    "schema": {
+      "const": "dpone.connection-registry-migration-plan.v1"
+    },
+    "mode": {
+      "const": "plan"
+    },
+    "apply": {
+      "const": false
+    },
+    "environment": {
+      "type": "string"
+    },
+    "registry_path": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "legacy_entries",
+        "manual_review_required",
+        "apply_supported"
+      ],
+      "properties": {
+        "legacy_entries": {
+          "type": "integer"
+        },
+        "manual_review_required": {
+          "type": "boolean"
+        },
+        "apply_supported": {
+          "type": "boolean"
+        }
+      }
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "action",
+          "connection_ref",
+          "path",
+          "detected",
+          "proposed_entry",
+          "manual_review_required",
+          "unified_diff"
+        ],
+        "properties": {
+          "action": {
+            "const": "replace_legacy_connection_entry"
+          },
+          "connection_ref": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "detected": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "proposed_entry": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "manual_review_required": {
+            "type": "boolean"
+          },
+          "unified_diff": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

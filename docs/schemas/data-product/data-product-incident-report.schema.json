@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/data-product/data-product-incident-report.schema.json",
+  "title": "dpone data product incident report",
+  "type": "object",
+  "required": ["schema_version", "incident_report_id", "status", "severity", "signals", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_incident_report.v1"},
+    "incident_report_id": {"type": "string"},
+    "status": {"enum": ["healthy", "open"]},
+    "severity": {"enum": ["none", "sev1", "sev2", "sev3"]},
+    "product_id": {"type": ["string", "null"]},
+    "slo_evaluation_id": {"type": ["string", "null"]},
+    "slo_gate_id": {"type": ["string", "null"]},
+    "signals": {"type": "array", "items": {"type": "string"}},
+    "failed_objectives": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}},
+    "markdown": {"type": "string"}
+  },
+  "additionalProperties": true
+}

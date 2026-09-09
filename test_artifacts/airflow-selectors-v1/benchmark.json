@@ -1,0 +1,36 @@
+{
+  "fixture": {
+    "edges": 1000,
+    "nodes": 500,
+    "repetitions": 100
+  },
+  "live_certification": "N/A: build-plane graph selection capability",
+  "passed": true,
+  "performance": {
+    "budget_p95_ms": 150.0,
+    "max_ms": 156.779,
+    "p50_ms": 119.927,
+    "p95_ms": 133.183,
+    "passed": true
+  },
+  "runner": {
+    "platform": "macOS-15.3-arm64-arm-64bit",
+    "processor": "arm64",
+    "python": "3.11.14"
+  },
+  "schema": "dpone.airflow-selectors-benchmark.v1",
+  "selection": {
+    "deterministic": true,
+    "exclude": "tag:deprecated",
+    "explained": 486,
+    "expression": "tag:finance+",
+    "fingerprint_count": 1,
+    "selected": 486
+  },
+  "side_effects": {
+    "network_calls": 0,
+    "passed": true,
+    "provider_contract_test": "tests/test_airflow_selectors_v1.py",
+    "provider_selector_parsing": 0
+  }
+}

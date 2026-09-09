@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/backup-plan.schema.json",
+  "title": "dpone schema migration backup plan",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "backup_plan_id",
+    "pack_id",
+    "environment",
+    "target",
+    "strategy",
+    "required",
+    "operations",
+    "preconditions",
+    "blockers",
+    "warnings"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_backup_plan.v1"},
+    "status": {"enum": ["planned", "blocked", "disabled"]},
+    "backup_plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "environment": {"type": "string"},
+    "target": {"type": "object", "required": ["sink_type", "table"], "additionalProperties": true},
+    "profile": {"enum": ["advisory", "stage", "prod_strict", "regulated"]},
+    "mode": {"enum": ["observe", "gate"]},
+    "strategy": {"enum": ["none", "target_native", "artifact_export", "manual"]},
+    "required": {"type": "boolean"},
+    "requirement_reasons": {"type": "array", "items": {"type": "string"}},
+    "backup_destination": {"type": ["string", "null"]},
+    "restore_table": {"type": ["string", "null"]},
+    "operations": {"type": "array", "items": {"type": "object"}},
+    "remediation_operations": {"type": "array", "items": {"type": "object"}},
+    "preconditions": {"type": "object"},
+    "retention": {"type": "object"},
+    "restore_rehearsal": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

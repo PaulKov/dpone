@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PaulKov/dpone/docs/schemas/dlq/dpone.dlq-replay-plan.v1.schema.json",
+  "title": "dpone DLQ replay plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "plan_id",
+    "run_id",
+    "resolver_identity",
+    "target_identity",
+    "policy",
+    "items",
+    "created_at"
+  ],
+  "properties": {
+    "schema": {"const": "dpone.dlq-replay-plan.v1"},
+    "plan_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "run_id": {"type": "string", "minLength": 1},
+    "resolver_identity": {"type": "string", "minLength": 1, "maxLength": 512},
+    "target_identity": {"type": "string", "minLength": 1, "maxLength": 512},
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_records", "max_bytes"],
+      "properties": {
+        "max_records": {"type": "integer", "minimum": 1, "maximum": 1000000},
+        "max_bytes": {"type": "integer", "minimum": 1048576, "maximum": 536870912}
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["record_id", "record_sha256", "record_ref", "idempotency_key"],
+        "properties": {
+          "record_id": {"type": "string"},
+          "record_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "record_ref": {"type": "string", "pattern": "^dpone://"},
+          "idempotency_key": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}

@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+convention: landing_raw_v1
+
+vars:
+  src_database: demo_source
+  src_system: demo_mssql
+  owner_team: data-platform-team
+  owner_contact: data-platform@example.com
+  sla: "daily"
+
+defaults:
+  source:
+    type: mssql
+    connection_type: vault
+    connection_id: mssql-demo
+    vault_path: mssql/demo-source
+    options:
+      batch_size: 100000
+      incremental_column: updated_at
+      export_format: csv
+      compress_export: false
+  sink:
+    type: bigquery
+    connection_type: vault
+    connection_id: bigquery-demo-dwh
+    vault_path: gcp/bigquery-demo-dwh
+    table: {schema: landing, name: orders}
+    strategy: {mode: incremental_merge, unique_key: id, merge_policy: delete_insert}
+
+schemas:
+  dbo:
+    tables:
+      - orders

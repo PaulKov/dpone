@@ -1,0 +1,47 @@
+{
+  "compile": {
+    "budget_p95_ms": 50.0,
+    "max_ms": 11.452,
+    "p50_ms": 10.058,
+    "p95_ms": 10.924,
+    "passed": true,
+    "total_ms": 2028.844
+  },
+  "determinism": {
+    "expected_distinct_count": 100,
+    "independent_builds_equal": true,
+    "release_fingerprint_count": 100,
+    "semantic_fingerprint_count": 100,
+    "source_fingerprint_count": 100
+  },
+  "fixture": {
+    "components_per_recipe": 3,
+    "processes_per_source": 3,
+    "sources": 100
+  },
+  "golden_path": {
+    "budget": 5,
+    "command_count": 5,
+    "passed": true
+  },
+  "live_certification": "N/A: declarative build-plane capability",
+  "mutation_detection": {
+    "affected_sources": 100,
+    "blocked_sources": 100,
+    "false_success_count": 0,
+    "passed": true
+  },
+  "passed": true,
+  "runner": {
+    "platform": "macOS-15.3-arm64-arm-64bit",
+    "processor": "arm64",
+    "python": "3.11.14"
+  },
+  "schema": "dpone.airflow-recipe-catalog-benchmark.v1",
+  "side_effects": {
+    "airflow_parse_contract_test": "tests/test_airflow_recipe_catalog_v1.py::test_recipe_static_paths_do_not_call_network_or_import_runtime_integrations",
+    "forbidden_runtime_imports": [],
+    "network_calls": 0,
+    "passed": true
+  }
+}

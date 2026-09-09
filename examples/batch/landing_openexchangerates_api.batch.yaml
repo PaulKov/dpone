@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+convention: landing_raw_v1
+
+vars:
+  src_system: openexchangerates
+  src_database: api
+  host: openexchangerates_org
+  owner_team: finance-analytics
+  owner_contact: finance-analytics@example.com
+  sla: daily
+
+defaults:
+  source:
+    type: api
+    api_type: openexchangerates
+    connection_type: vault
+    connection_id: api__openexchangerates
+    vault_path: api/openexchangerates
+    options:
+      resource: "{{ src_table }}"
+      symbols:
+        - ARS
+        - RUB
+        - EUR
+      lookback_days: 3
+      timeout: 60
+      max_retries: 3
+      retry_delay: 1.0
+      rate_limit_delay: 1.0
+
+  sink:
+    type: bigquery
+    connection_type: vault
+    connection_id: bigquery-demo
+    vault_path: gcp/demo-project-{{ env_code }}/bq/example-etl-service
+    staging:
+      schema: stg
+    strategy:
+      mode: incremental_merge
+    options:
+      log_sample_rows: 5
+
+  bigquery_proxy:
+    proxy_enable: true
+
+schemas:
+  default:
+    tables:
+      - table: historical_rates_daily
+        overrides:
+          source:
+            options:
+              unique_key:
+                - as_of_date
+                - symbol

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/environments.schema.json",
+  "title": "dpone schema migration environments",
+  "type": "object",
+  "required": ["schema_version", "chain", "environments"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_environments.v1"
+    },
+    "chain": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_.-]+$"
+      },
+      "uniqueItems": true
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_same_pack_id": {"type": "boolean"},
+        "require_previous_certification": {"type": "boolean"},
+        "require_impact_gate": {"type": "boolean"},
+        "prod_requires_approval": {"type": "boolean"}
+      }
+    },
+    "environments": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["ledger"],
+        "additionalProperties": false,
+        "properties": {
+          "ledger": {"type": "string", "minLength": 1},
+          "actual": {"type": "string", "minLength": 1},
+          "target_connection": {
+            "oneOf": [
+              {"type": "string", "minLength": 1},
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "path": {"type": "string", "minLength": 1},
+                  "ref": {"type": "string", "minLength": 1}
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

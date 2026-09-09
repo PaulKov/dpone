@@ -1,0 +1,105 @@
+schema_version: 1
+task_id: "AIRFLOW-SS-RUNTIME-IMAGE-PROMOTION"
+title: "Implement pure runtime-image promotion policy and evidence contracts"
+goal: >
+  Provide the fail-closed pure decisions, strict evidence validation, and
+  runtime-specific Docker context boundary needed by the integrator's
+  digest-first GHCR workflow.
+specification: "docs/feature-design-runtime-image-digest-first-promotion-v0732.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Only authenticated 404 means absent; all ambiguous registry outcomes fail closed."
+  - "Fixed aliases are same-digest idempotent and different-digest blocking."
+  - "Latest never regresses below a newer certified SemVer."
+  - "Certification/publication receipts reject missing, skipped, mismatched or partial PASS claims."
+  - "A separate workflow-ready certification producer validates all nine digest-bound check receipts, SPDX JSON, attestation verification receipts, and the exact Docker context before constructing PASS evidence."
+  - "Runtime Docker context is Dockerfile-specific, deny-by-default and exactly tested."
+  - "Policy output is deterministic, sanitized, and independent from network/Docker/GitHub globals."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "GHCR runtime image publication policy"
+    - "runtime image certification and publication evidence"
+    - "latest runtime image alias semantics"
+  migration_required: false
+
+owned_paths:
+  - "docker/runtime/Dockerfile.dockerignore"
+  - "tools/agent_policy/runtime_image_promotion.py"
+  - "tools/agent_policy/runtime_image_registry.py"
+  - "tools/agent_policy/runtime_image_certification.py"
+  - "tests/agent_policy/test_runtime_image_promotion.py"
+  - "tests/agent_policy/test_runtime_image_registry.py"
+  - "tests/agent_policy/test_runtime_image_certification.py"
+  - "docs/schemas/release/runtime-image-certification.schema.json"
+  - "docs/schemas/release/runtime-image-publication.schema.json"
+
+read_only_paths:
+  - "docs/feature-design-runtime-image-digest-first-promotion-v0732.md"
+  - "docs/adr/0026-digest-first-runtime-image-promotion.md"
+  - "docs/runtime-image.md"
+  - "docs/release.md"
+  - "tools/agent_policy/release_identity_gate.py"
+  - "tools/agent_policy/release_commit_gate.py"
+  - "tools/pypi_release_smoke_dist.py"
+  - ".github/workflows/release.yml"
+  - ".github/workflows/runtime-image.yml"
+  - "tests/test_release_smoke_contracts.py"
+  - ".dockerignore"
+
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - ".codex/config.toml"
+  - "docs/feature-design-airflow-pipeline-first-ux-p2.md"
+  - "src/dpone"
+  - "packages"
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "Work with existing concurrent edits; do not revert any unrelated release-smoke assertions."
+  - "Keep runtime release governance outside production dpone packages."
+  - "Do not claim GHCR tag immutability or multi-tag atomicity."
+  - "Live GHCR and Docker daemon checks remain UNVERIFIED without an approved environment."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/agent_policy/test_runtime_image_promotion.py -q"
+    - "uv run pytest tests/agent_policy/test_runtime_image_registry.py -q"
+    - "uv run pytest tests/agent_policy/test_runtime_image_certification.py -q"
+    - "uv run ruff check tools/agent_policy/runtime_image_promotion.py tools/agent_policy/runtime_image_registry.py tools/agent_policy/runtime_image_certification.py tests/agent_policy/test_runtime_image_promotion.py tests/agent_policy/test_runtime_image_registry.py tests/agent_policy/test_runtime_image_certification.py"
+    - "uv run ruff format --check tools/agent_policy/runtime_image_promotion.py tools/agent_policy/runtime_image_registry.py tools/agent_policy/runtime_image_certification.py tests/agent_policy/test_runtime_image_promotion.py tests/agent_policy/test_runtime_image_registry.py tests/agent_policy/test_runtime_image_certification.py"
+    - "uv run mypy --config-file mypy.ini tools/agent_policy/runtime_image_promotion.py tools/agent_policy/runtime_image_registry.py tools/agent_policy/runtime_image_certification.py"
+  broad:
+    - "Integrator runs complete workflow, docs, package, Airflow and non-live gates."
+  live:
+    - "UNVERIFIED unless an explicitly approved GHCR tag-push environment is available."
+
+required_outputs:
+  - "implementation"
+  - "tests"
+  - "documentation_impact"
+  - "completion_report"
+
+completion_statuses:
+  allowed:
+    - "PASS"
+    - "FAIL"
+    - "SKIP"
+    - "N/A"
+    - "UNVERIFIED"
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "The implementation would claim atomic GHCR tag promotion or permanent immutability."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

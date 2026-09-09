@@ -1,0 +1,63 @@
+schema_version: 1
+task_id: "DPONE-V074-INITIAL-RECEIPT-RECOVERY"
+title: "Recover committed initial-load receipts and stale campaign leases"
+goal: "Project target-committed chunk receipts into the campaign ledger without source or sink replay."
+specification: "docs/feature-design-resumable-shadow-initial-load.md"
+base_commit: "cbd88ad70aec2058fd1d24fc7c673f9e7dd339d8"
+integrator: "primary Codex agent"
+
+acceptance_criteria:
+  - "A target-committed generic receipt promotes the chunk ledger without source COPY or target INSERT."
+  - "A dead legacy session lock and a renewable campaign lease can be reclaimed without stealing a live owner."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["backfill receipt reconciliation", "MSSQL campaign lease recovery"]
+  migration_required: false
+
+owned_paths:
+  - src/dpone/backfill/campaign_lease.py
+  - src/dpone/backfill/mssql_receipt_recovery.py
+  - src/dpone/backfill/state.py
+  - src/dpone/backfill/file_state.py
+  - src/dpone/backfill/sql_state.py
+  - src/dpone/backfill/sql_state_base.py
+  - src/dpone/runtime/etl/backfill_orchestrator.py
+  - src/dpone/runtime/etl/mssql_transaction_admission.py
+  - tests/test_backfill_orchestrator.py
+  - tests/test_backfill_audit_schema_state.py
+  - tests/test_backfill_campaign_lease.py
+  - tests/test_backfill_mssql_receipt_recovery.py
+  - tests/test_mssql_generic_transaction_governance.py
+  - tests/integration/backfill/test_postgres_mssql_shadow_initial_integration.py
+  - docs/agent-task-contracts/v074-initial-process-lanes.yml
+read_only_paths:
+  - src/dpone/runtime/state/mssql_generic_transaction.py
+  - src/dpone/runtime/sinks/strategies/mssql/mssql_transaction_finalizer.py
+  - docs/feature-design-resumable-shadow-initial-load.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "primary Codex agent"
+dependencies: []
+required_checks:
+  focused:
+    - ".venv/bin/pytest -q tests/test_backfill_orchestrator.py tests/test_backfill_audit_schema_state.py"
+  broad:
+    - ".venv/bin/ruff check owned paths"
+    - ".venv/bin/mypy --config-file mypy.ini"
+  live:
+    - "Crash-after-commit retry proves source-free receipt projection on disposable MSSQL."
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

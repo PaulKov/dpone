@@ -1,0 +1,83 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-CLOSURE-PR1-OPTIONAL-IMPORTS"
+title: "Close minimal-environment optional dependency collection leaks"
+goal: >-
+  Make the base import and non-live collection paths independent of optional
+  native and Google SDK packages without weakening all-extras coverage.
+specification: >-
+  Approved DPONE-CI-SHADOW-CLOSURE plan tracked by
+  https://github.com/PaulKov/dpone/issues/512; PR1 explicitly repairs collection
+  errors before any CI architecture change.
+base_commit: "e1d93822b47234e940829319cac0dc9678f6906c"
+integrator: "/root"
+
+acceptance_criteria:
+  - "Runtime connector proxy imports without the gcp extra and injects/loads the authorized-session factory only at the capability boundary."
+  - "The direct native provider test skips only when the optional native distribution is unavailable; it still executes under all-extras."
+  - "State/reconciliation tests use a local compatible fake instead of importing Google SDK types."
+  - "Minimal locked-environment non-live collection passes without adding dependencies."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "base import safety for dpone.runtime.connectors.proxy"
+  migration_required: false
+
+owned_paths:
+  - src/dpone/runtime/connectors/proxy.py
+  - tests/test_runtime_optional_import_safety.py
+  - tests/test_runtime_proxy_and_soft_delete_contracts.py
+  - tests/test_runtime_state_and_reconciliation_contracts.py
+  - tests/test_direct_native_provider.py
+  - test_artifacts/agent-policy/dpone-ci-shadow-closure-pr1-optional-imports.yml
+read_only_paths:
+  - pyproject.toml
+  - uv.lock
+  - src/dpone/runtime/reconciliation/tech_tables.py
+  - docs/testing/overview.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/module_size_baseline.json
+  - docs/adr
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "Phase 0 freeze and audit ledger in GitHub issue #512"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_runtime_optional_import_safety.py tests/test_runtime_proxy_and_soft_delete_contracts.py tests/test_runtime_state_and_reconciliation_contracts.py tests/test_direct_native_provider.py -q"
+    - "minimal locked-environment pytest -m 'not integration_live' --collect-only -q"
+  broad:
+    - "uv run ruff check owned paths"
+    - "uv run ruff format --check owned paths"
+    - "uv run mypy --config-file mypy.ini"
+  live:
+    - "N/A"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "A dependency must be added to close the import leak."
+  - "Optional coverage would be silently skipped under all-extras."
+  - "Another writer owns the same semantic contract."

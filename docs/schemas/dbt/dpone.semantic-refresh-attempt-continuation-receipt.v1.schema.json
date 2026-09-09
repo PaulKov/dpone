@@ -1,0 +1,118 @@
+{
+  "$comment": "The receipt preserves the original attempt/fence and binds a later task try only after a trusted original-pod termination, an exclusive MSSQL guard with zero original-attempt sessions, zero matching ClickHouse query IDs, and exact current-target reconciliation.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-attempt-continuation-receipt.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "after_image_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "build_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "clickhouse_cluster_authority_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "clickhouse_query_id_prefix": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "clickhouse_quiescence_observation_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "continuation_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "engine_quiescence_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "fencing_epoch": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "guard_resource_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "mssql_active_session_count": {
+      "const": 0,
+      "type": "integer"
+    },
+    "mssql_guard_lock_status": {
+      "const": "EXCLUSIVE_ACQUIRED"
+    },
+    "operation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "operation_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "original_attempt_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "original_attempt_termination_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "pod_uid": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-attempt-continuation-receipt.v1"
+    },
+    "status": {
+      "const": "VERIFIED"
+    },
+    "task_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "try_number": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "verified_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "workflow_execution_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "after_image_sha256",
+    "build_receipt_sha256",
+    "clickhouse_cluster_authority_id",
+    "clickhouse_query_id_prefix",
+    "clickhouse_quiescence_observation_sha256",
+    "continuation_receipt_sha256",
+    "engine_quiescence_receipt_sha256",
+    "fencing_epoch",
+    "guard_resource_id",
+    "mssql_active_session_count",
+    "mssql_guard_lock_status",
+    "operation_id",
+    "operation_plan_sha256",
+    "original_attempt_binding_sha256",
+    "original_attempt_termination_receipt_sha256",
+    "pod_uid",
+    "schema",
+    "status",
+    "task_id",
+    "try_number",
+    "verified_at",
+    "workflow_execution_binding_sha256"
+  ],
+  "type": "object"
+}

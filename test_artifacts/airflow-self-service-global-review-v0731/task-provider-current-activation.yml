@@ -1,0 +1,76 @@
+schema_version: 1
+task_id: "DPONE-PROVIDER-CURRENT-ACTIVATION"
+title: "Require a canonical immutable activation behind the provider current pointer"
+goal: "Prevent Airflow parse from accepting a mutable directory or a non-canonical symlink as the deployment current pointer."
+specification: "docs/adr/0009-artifact-delivery-and-cache-materializer.md"
+base_commit: "ef88ae7f"
+integrator: "Codex main agent"
+
+acceptance_criteria:
+  - "A provider index path below current is accepted only when current is a relative symlink."
+  - "The symlink target has exactly activations/<environment>/<canonical deployment directory>."
+  - "The activation environment and deployment digest agree with the loaded deployment index."
+  - "A direct current directory, deployments target, absolute target, traversal, symlink escape, non-canonical deployment directory, or identity mismatch fails closed with a stable dpone error."
+  - "Pinned reads outside current remain backward compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "Airflow provider local cache current-pointer validation"
+  migration_required: true
+  migration:
+    - "Cache materializer must publish current as a relative symlink to activations/<environment>/sha256-<64 lowercase hex>."
+
+owned_paths:
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_artifact_contract.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py
+  - tests/test_airflow_deployment_index_provider.py
+read_only_paths:
+  - docs/adr/0009-artifact-delivery-and-cache-materializer.md
+  - src/dpone/runtime/deployment_cache_current_state.py
+  - src/dpone/runtime/deployment_cache_activation.py
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs
+  - src
+  - tests/conftest.py
+
+shared_file_owner: "Codex main agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_deployment_index_provider.py -q"
+    - "uv run ruff check packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_artifact_contract.py packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py tests/test_airflow_deployment_index_provider.py"
+  broad:
+    - "uv run pytest tests/test_airflow_dag_loader.py tests/test_airflow_dag_loader_contract.py tests/test_airflow_provider_parse_slo.py -q"
+  live:
+    - "N/A: local cache confinement contract"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - migration_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "The fix requires changing cache materializer production code."

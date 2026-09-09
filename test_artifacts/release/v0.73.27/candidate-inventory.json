@@ -1,0 +1,79 @@
+{
+  "artifacts": [
+    {
+      "artifact_type": "wheel",
+      "filename": "apache_airflow_providers_dpone-0.73.27-py3-none-any.whl",
+      "package": "apache-airflow-providers-dpone",
+      "sha256": "f82b8781c1d065a7962f4f42c9354b808c6603db17c1f5e7eea291c9cb1f0c1d",
+      "size_bytes": 5040,
+      "version": "0.73.27"
+    },
+    {
+      "artifact_type": "sdist",
+      "filename": "apache_airflow_providers_dpone-0.73.27.tar.gz",
+      "package": "apache-airflow-providers-dpone",
+      "sha256": "4ee029cf6bf83ec8b6eaadf0fedf767b41ede4442772ecac5edfdd6f55f8651e",
+      "size_bytes": 3281,
+      "version": "0.73.27"
+    },
+    {
+      "artifact_type": "wheel",
+      "filename": "dpone-0.73.27-py3-none-any.whl",
+      "package": "dpone",
+      "sha256": "dbcec8b7c0409b064bc2d4d018d6c717a4764ad175cf4d9c0d15e15c41a10060",
+      "size_bytes": 4474648,
+      "version": "0.73.27"
+    },
+    {
+      "artifact_type": "sdist",
+      "filename": "dpone-0.73.27.tar.gz",
+      "package": "dpone",
+      "sha256": "c14c7e457c377b666310f6e33c7b8ef4b40dfce96b857ce55dddf9c048fcfa31",
+      "size_bytes": 2925702,
+      "version": "0.73.27"
+    },
+    {
+      "artifact_type": "wheel",
+      "filename": "dpone_airflow_pack-0.73.27-py3-none-any.whl",
+      "package": "dpone-airflow-pack",
+      "sha256": "873f16cb46a4bb97c463790d748af413a219e1a4987beb82f099c095fe9238ee",
+      "size_bytes": 159910,
+      "version": "0.73.27"
+    },
+    {
+      "artifact_type": "sdist",
+      "filename": "dpone_airflow_pack-0.73.27.tar.gz",
+      "package": "dpone-airflow-pack",
+      "sha256": "f3718274ccf0d62b60c1e25fa1fc517c264916cdab7f669d71683141b3f9d2af",
+      "size_bytes": 114658,
+      "version": "0.73.27"
+    },
+    {
+      "artifact_type": "wheel",
+      "filename": "dpone_native_accel-0.73.27-py3-none-any.whl",
+      "package": "dpone-native-accel",
+      "sha256": "48a9346144f022ccb3e7616228569f10f0bb09565f00d025b94de6588e44b79b",
+      "size_bytes": 12198,
+      "version": "0.73.27"
+    },
+    {
+      "artifact_type": "sdist",
+      "filename": "dpone_native_accel-0.73.27.tar.gz",
+      "package": "dpone-native-accel",
+      "sha256": "97182453bed521b368791fea86b0e719b3f64b8f0a1d04a512685af19d663255",
+      "size_bytes": 9573,
+      "version": "0.73.27"
+    }
+  ],
+  "blockers": [],
+  "decision": "GO",
+  "expected_version": "0.73.27",
+  "schema_version": 1,
+  "status": "passed",
+  "summary": {
+    "artifact_count": 8,
+    "distribution_count": 4,
+    "expected_artifact_count": 8,
+    "expected_distribution_count": 4
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "artifact_schema": "dpone.test-artifact.v1",
+  "artifact_type": "quality.test_artifacts_validation_gate",
+  "artifact_label": "2026-06-01T183300Z-test-artifacts-validation-gate",
+  "created_by": "Codex GPT-5",
+  "executed_by_os_user": "macbook",
+  "executed_at": "2026-06-01T18:33:00Z",
+  "commands": [
+    "for f in test_artifacts/2026-06-01/*.json; do uv run python -m json.tool \"$f\" >/dev/null || exit 1; done",
+    "uv run ruff check .",
+    "uv run ruff format --check ."
+  ],
+  "result": "passed",
+  "summary": {
+    "json_artifacts": "all JSON artifacts parse successfully",
+    "ruff_check": "All checks passed",
+    "ruff_format": "698 files already formatted"
+  }
+}

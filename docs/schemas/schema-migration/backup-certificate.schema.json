@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/backup-certificate.schema.json",
+  "title": "dpone schema migration backup certificate",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "certificate_id",
+    "status",
+    "profile",
+    "pack_id",
+    "backup_run_id",
+    "environment",
+    "target",
+    "checks",
+    "blockers",
+    "warnings",
+    "metrics"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_migration_backup_certificate.v1"},
+    "certificate_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["certified", "warning", "blocked"]},
+    "profile": {"enum": ["advisory", "stage", "prod_strict", "regulated"]},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "backup_run_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "restore_run_id": {"type": ["string", "null"]},
+    "environment": {"type": "string"},
+    "target": {"type": "object", "required": ["sink_type", "table"], "additionalProperties": true},
+    "backup_destination": {"type": ["string", "null"]},
+    "restore_table": {"type": ["string", "null"]},
+    "remediation": {"type": "object"},
+    "checks": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "metrics": {"type": "object"}
+  }
+}

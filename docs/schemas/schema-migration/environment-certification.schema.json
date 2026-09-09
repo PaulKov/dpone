@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/environment-certification.schema.json",
+  "title": "dpone schema migration environment certification",
+  "type": "object",
+  "required": ["schema_version", "status", "environment", "pack_id"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "dpone.schema_migration_environment_certification.v1"
+    },
+    "command": {"const": "certify"},
+    "status": {"enum": ["certified", "blocked"]},
+    "environment": {"type": "string"},
+    "pack_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "certification_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "desired_fingerprint": {"type": "string"},
+    "actual_fingerprint": {"type": ["string", "null"]},
+    "ledger_digest": {"type": "string"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

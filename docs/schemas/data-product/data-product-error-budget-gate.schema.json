@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-error-budget-gate.schema.json",
+  "title": "dpone data product error budget gate",
+  "type": "object",
+  "required": ["schema_version", "status", "error_budget_gate_id", "profile", "blockers", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_error_budget_gate.v1"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "error_budget_gate_id": {"type": "string", "pattern": "^sha256:"},
+    "profile": {"enum": ["advisory", "stage", "prod_strict", "regulated"]},
+    "blockers": {"type": "array"},
+    "warnings": {"type": "array"}
+  }
+}

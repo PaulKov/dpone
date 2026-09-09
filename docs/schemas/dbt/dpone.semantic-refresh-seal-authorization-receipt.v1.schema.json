@@ -1,0 +1,235 @@
+{
+  "$comment": "Only a reconciled PREPARING journal with COMMITTED_WITH_IMAGES may authorize sealing.",
+  "$id": "https://dpone.dev/schemas/dpone.semantic-refresh-seal-authorization-receipt.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "not": {
+        "required": [
+          "utc_semantics_assurance_receipt_sha256"
+        ]
+      },
+      "properties": {
+        "event_time_source_type": {
+          "const": "date"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_time_source_type": {
+          "const": "datetime2(6)"
+        }
+      },
+      "required": [
+        "utc_semantics_assurance_receipt_sha256"
+      ]
+    }
+  ],
+  "properties": {
+    "after_image_relation_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "after_image_row_count": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "after_image_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "artifact_authority_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "attempt_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "baseline_adoption_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "before_image_relation_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "before_image_row_count": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "before_image_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "clickhouse_input_mapping_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "codec_mapping_certification_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "ddl_freeze_assurance_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "effective_key_mapping_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "effective_key_template_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "event_time_source_type": {
+      "enum": [
+        "date",
+        "datetime2(6)"
+      ],
+      "type": "string"
+    },
+    "fencing_epoch": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "issuer_attestation_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "issuer_authority": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "issuer_signature_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "journal_state": {
+      "const": "PREPARING"
+    },
+    "journal_version": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "model_build_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "model_unique_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "mssql_outcome": {
+      "const": "COMMITTED_WITH_IMAGES"
+    },
+    "operation_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "operation_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "ordered_writable_schema_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "parquet_schema_mapping_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "route_certification_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.semantic-refresh-seal-authorization-receipt.v1"
+    },
+    "seal_authorization_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "seal_policy_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "serializer_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "utc_semantics_assurance_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_execution_binding_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workflow_execution_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "workflow_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "workflow_plan_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "writer_exclusivity_assurance_receipt_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "after_image_relation_id",
+    "after_image_row_count",
+    "after_image_sha256",
+    "artifact_authority_sha256",
+    "attempt_binding_sha256",
+    "baseline_adoption_receipt_sha256",
+    "before_image_relation_id",
+    "before_image_row_count",
+    "before_image_sha256",
+    "clickhouse_input_mapping_sha256",
+    "codec_mapping_certification_sha256",
+    "created_at",
+    "ddl_freeze_assurance_receipt_sha256",
+    "effective_key_mapping_sha256",
+    "effective_key_template_sha256",
+    "event_time_source_type",
+    "fencing_epoch",
+    "issuer_attestation_sha256",
+    "issuer_authority",
+    "issuer_signature_sha256",
+    "journal_state",
+    "journal_version",
+    "model_build_receipt_sha256",
+    "model_unique_id",
+    "mssql_outcome",
+    "operation_id",
+    "operation_plan_sha256",
+    "ordered_writable_schema_sha256",
+    "parquet_schema_mapping_sha256",
+    "route_certification_receipt_sha256",
+    "schema",
+    "seal_authorization_receipt_sha256",
+    "seal_policy_sha256",
+    "serializer_sha256",
+    "workflow_execution_binding_sha256",
+    "workflow_execution_id",
+    "workflow_id",
+    "workflow_plan_sha256",
+    "writer_exclusivity_assurance_receipt_sha256"
+  ],
+  "type": "object"
+}

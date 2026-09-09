@@ -1,0 +1,259 @@
+stages:
+  - schema-review
+
+schema_migration_review:
+  stage: schema-review
+  image: ghcr.io/astral-sh/uv:python3.11-bookworm
+  variables:
+    DPONE_BUNDLE_SIGNING_KEY: local-dev-ci-key
+  script:
+    - uv run dpone schema migration plan --manifest manifests/orders.yaml --format json --output .dpone/schema-migration/orders.pack.json
+    - uv run dpone schema impact plan --pack .dpone/schema-migration/orders.pack.json --manifest manifests/orders.yaml --format json --output .dpone/schema-impact/orders.impact.json
+    - |
+      if [ -f .dpone/schema-contracts/orders.consumer-matrix.json ] \
+        && [ -f .dpone/schema-contracts/orders.compatibility-views.json ] \
+        && [ -f .dpone/schema-contracts/orders.consumer-certification.json ] \
+        && [ -f .dpone/schema-migration/registry/registry.json ]; then
+        uv run dpone schema contract adoption plan \
+          --manifest manifests/orders.yaml \
+          --consumer-matrix .dpone/schema-contracts/orders.consumer-matrix.json \
+          --compatibility-view-plan .dpone/schema-contracts/orders.compatibility-views.json \
+          --format json \
+          --output .dpone/schema-contracts/orders.adoption-plan.json
+        uv run dpone schema contract adoption status \
+          --plan .dpone/schema-contracts/orders.adoption-plan.json \
+          --registry .dpone/schema-migration/registry/registry.json \
+          --consumer-certification .dpone/schema-contracts/orders.consumer-certification.json \
+          --format json \
+          --output .dpone/schema-contracts/orders.adoption-status.json
+        uv run dpone schema contract adoption gate \
+          --status .dpone/schema-contracts/orders.adoption-status.json \
+          --profile prod_strict \
+          --format json \
+          --output .dpone/schema-contracts/orders.retirement-gate.json
+      fi
+    - |
+      if [ -f .dpone/connections/clickhouse-prod.json ] && [ -f approvals/orders-backup.yaml ]; then
+        uv run dpone schema migration backup plan \
+          --pack .dpone/schema-migration/orders.pack.json \
+          --manifest manifests/orders.yaml \
+          --target-connection .dpone/connections/clickhouse-prod.json \
+          --environment prod \
+          --format json \
+          --output .dpone/schema-migration/backup/orders/backup-plan.json
+        uv run dpone schema migration backup create \
+          --plan .dpone/schema-migration/backup/orders/backup-plan.json \
+          --approval approvals/orders-backup.yaml \
+          --format json \
+          --output .dpone/schema-migration/backup/orders/backup-run.json
+        uv run dpone schema migration backup certify \
+          --backup-run .dpone/schema-migration/backup/orders/backup-run.json \
+          --profile advisory \
+          --format json \
+          --output .dpone/schema-migration/backup/orders/backup-certificate.json
+        uv run dpone schema migration recovery point record \
+          --backup-certificate .dpone/schema-migration/backup/orders/backup-certificate.json \
+          --environment prod \
+          --store-uri .dpone/schema-migration/recovery/registry.json \
+          --format json \
+          --output .dpone/schema-migration/recovery/orders/recovery-point.json
+        RESTORE_POINT_ID=$(python -c "import json; print(json.load(open('.dpone/schema-migration/recovery/orders/recovery-point.json'))['restore_point_id'])")
+        uv run dpone schema migration recovery chain verify \
+          --restore-point-id "$RESTORE_POINT_ID" \
+          --require-restore-rehearsal \
+          --store-uri .dpone/schema-migration/recovery/registry.json \
+          --format json \
+          --output .dpone/schema-migration/recovery/orders/chain-verification.json
+      fi
+    - >
+      uv run dpone schema migration bundle build
+      --pack .dpone/schema-migration/orders.pack.json
+      --impact .dpone/schema-impact/orders.impact.json
+      --approval approvals/orders-impact.yaml
+      --attest
+      --output-dir .dpone/schema-migration/review/orders
+      --format json
+    - >
+      uv run dpone schema migration bundle verify
+      --bundle .dpone/schema-migration/review/orders/bundle.json
+      --require-attestation
+      --format json
+      --output .dpone/schema-migration/review/orders/verification.json
+    - >
+      uv run dpone schema migration bundle attest
+      --bundle .dpone/schema-migration/review/orders/bundle.json
+      --output .dpone/schema-migration/review/orders/provenance.json
+      --signing-key-env DPONE_BUNDLE_SIGNING_KEY
+      --signing-key-id ci-hmac
+      --provenance-source gitlab_ci
+      --repository "$CI_PROJECT_URL"
+      --commit-sha "$CI_COMMIT_SHA"
+      --ref "$CI_COMMIT_REF_NAME"
+      --run-id "$CI_PIPELINE_ID"
+      --workflow ".gitlab-ci.yml"
+      --protected-ref
+      --format json
+    - >
+      uv run dpone schema migration bundle trust verify
+      --bundle .dpone/schema-migration/review/orders/bundle.json
+      --provenance .dpone/schema-migration/review/orders/provenance.json
+      --signing-key-env DPONE_BUNDLE_SIGNING_KEY
+      --format json
+      --output .dpone/schema-migration/review/orders/trust-verification.json
+    - |
+      if [ -f .dpone/connections/clickhouse-stage.json ]; then
+        uv run dpone schema migration rehearse plan \
+          --pack .dpone/schema-migration/orders.pack.json \
+          --bundle .dpone/schema-migration/review/orders/bundle.json \
+          --environment stage \
+          --target-connection .dpone/connections/clickhouse-stage.json \
+          --output-dir .dpone/schema-migration/rehearsal/orders \
+          --format json
+        uv run dpone schema migration rehearse fixture plan \
+          --pack .dpone/schema-migration/orders.pack.json \
+          --manifest manifests/orders.yaml \
+          --format json \
+          --output .dpone/schema-migration/rehearsal/orders/fixture-plan.json
+        uv run dpone schema migration rehearse fixture build \
+          --plan .dpone/schema-migration/rehearsal/orders/fixture-plan.json \
+          --target-connection .dpone/connections/clickhouse-stage.json \
+          --execute \
+          --format json \
+          --output .dpone/schema-migration/rehearsal/orders/fixture-build.json
+        uv run dpone schema migration rehearse fixture profile \
+          --fixture-build .dpone/schema-migration/rehearsal/orders/fixture-build.json \
+          --target-connection .dpone/connections/clickhouse-stage.json \
+          --stage before \
+          --format json \
+          --output .dpone/schema-migration/rehearsal/orders/profile-before.json
+        uv run dpone schema migration rehearse run \
+          --plan .dpone/schema-migration/rehearsal/orders/rehearsal-plan.json \
+          --execute \
+          --format json \
+          --output .dpone/schema-migration/rehearsal/orders/rehearsal-run.json
+        uv run dpone schema migration rehearse fixture profile \
+          --fixture-build .dpone/schema-migration/rehearsal/orders/fixture-build.json \
+          --target-connection .dpone/connections/clickhouse-stage.json \
+          --stage after \
+          --format json \
+          --output .dpone/schema-migration/rehearsal/orders/profile-after.json
+        uv run dpone schema migration rehearse certify \
+          --run .dpone/schema-migration/rehearsal/orders/rehearsal-run.json \
+          --fixture-build .dpone/schema-migration/rehearsal/orders/fixture-build.json \
+          --before-profile .dpone/schema-migration/rehearsal/orders/profile-before.json \
+          --after-profile .dpone/schema-migration/rehearsal/orders/profile-after.json \
+          --profile prod_strict \
+          --format json \
+          --output .dpone/schema-migration/rehearsal/orders/rehearsal-certificate.json
+      fi
+    - >
+      uv run dpone schema migration bundle gate
+      --bundle .dpone/schema-migration/review/orders/bundle.json
+      --profile pr_review
+      --trust-verification .dpone/schema-migration/review/orders/trust-verification.json
+      --format json
+      --output .dpone/schema-migration/review/orders/bundle-gate.json
+    - >
+      uv run dpone schema migration registry record
+      --bundle .dpone/schema-migration/review/orders/bundle.json
+      --gate .dpone/schema-migration/review/orders/bundle-gate.json
+      --trust .dpone/schema-migration/review/orders/trust-verification.json
+      --environment pr
+      --stage reviewed
+      --format json
+      --output .dpone/schema-migration/review/orders/evidence-record.json
+    - |
+      if [ -f .dpone/schema-migration/ledger.json ] && [ -f .dpone/connections/clickhouse-prod.json ]; then
+        uv run dpone schema migration post-apply plan \
+          --pack .dpone/schema-migration/orders.pack.json \
+          --bundle .dpone/schema-migration/review/orders/bundle.json \
+          --ledger .dpone/schema-migration/ledger.json \
+          --manifest manifests/orders.yaml \
+          --target-connection .dpone/connections/clickhouse-prod.json \
+          --environment prod \
+          --format json \
+          --output .dpone/schema-migration/post-apply/orders/post-apply-plan.json
+        uv run dpone schema migration post-apply run \
+          --plan .dpone/schema-migration/post-apply/orders/post-apply-plan.json \
+          --execute \
+          --format json \
+          --output .dpone/schema-migration/post-apply/orders/post-apply-run.json
+        uv run dpone schema migration post-apply certify \
+          --run .dpone/schema-migration/post-apply/orders/post-apply-run.json \
+          --profile prod_strict \
+          --format json \
+          --output .dpone/schema-migration/post-apply/orders/post-apply-certificate.json
+        uv run dpone schema migration watch plan \
+          --pack .dpone/schema-migration/orders.pack.json \
+          --post-apply-certificate .dpone/schema-migration/post-apply/orders/post-apply-certificate.json \
+          --manifest manifests/orders.yaml \
+          --target-connection .dpone/connections/clickhouse-prod.json \
+          --environment prod \
+          --format json \
+          --output .dpone/schema-migration/watch/orders/watch-plan.json
+        uv run dpone schema migration watch run \
+          --plan .dpone/schema-migration/watch/orders/watch-plan.json \
+          --execute \
+          --format json \
+          --output .dpone/schema-migration/watch/orders/watch-run.json
+        uv run dpone schema migration watch certify \
+          --run .dpone/schema-migration/watch/orders/watch-run.json \
+          --profile prod_strict \
+          --format json \
+          --output .dpone/schema-migration/watch/orders/watch-certificate.json
+        uv run dpone schema migration remediation plan \
+          --pack .dpone/schema-migration/orders.pack.json \
+          --watch-certificate .dpone/schema-migration/watch/orders/watch-certificate.json \
+          --ledger .dpone/schema-migration/ledger.json \
+          --manifest manifests/orders.yaml \
+          --target-connection .dpone/connections/clickhouse-prod.json \
+          --environment prod \
+          --format json \
+          --output .dpone/schema-migration/remediation/orders/remediation-plan.json || true
+        if [ -f .dpone/schema-migration/remediation/orders/remediation-plan.json ] && [ -f approvals/orders-rollback.yaml ]; then
+          uv run dpone schema migration remediation apply \
+            --plan .dpone/schema-migration/remediation/orders/remediation-plan.json \
+            --approval approvals/orders-rollback.yaml \
+            --execute \
+            --format json \
+            --output .dpone/schema-migration/remediation/orders/remediation-run.json
+          uv run dpone schema migration remediation certify \
+            --run .dpone/schema-migration/remediation/orders/remediation-run.json \
+            --target-connection .dpone/connections/clickhouse-prod.json \
+            --profile prod_strict \
+            --format json \
+            --output .dpone/schema-migration/remediation/orders/remediation-certificate.json
+        fi
+      fi
+    - |
+      if [ -f .dpone/schema-migration/base/orders/bundle.json ]; then
+        uv run dpone schema migration bundle diff \
+          --base .dpone/schema-migration/base/orders/bundle.json \
+          --head .dpone/schema-migration/review/orders/bundle.json \
+          --head-gate .dpone/schema-migration/review/orders/bundle-gate.json \
+          --require-attestation \
+          --format md \
+          --output .dpone/schema-migration/review/orders/diff.md
+      else
+        printf '# Schema Migration Bundle Diff\n\n- base evidence not available in this PR job\n' > .dpone/schema-migration/review/orders/diff.md
+      fi
+    - >
+      uv run dpone schema migration review render
+      --bundle .dpone/schema-migration/review/orders/bundle.json
+      --format md
+      --output .dpone/schema-migration/review/orders/review.md
+  artifacts:
+    when: always
+    paths:
+      - .dpone/schema-migration/review/orders/bundle.json
+      - .dpone/schema-migration/review/orders/verification.json
+      - .dpone/schema-migration/review/orders/provenance.json
+      - .dpone/schema-migration/review/orders/trust-verification.json
+      - .dpone/schema-migration/review/orders/bundle-gate.json
+      - .dpone/schema-migration/review/orders/evidence-record.json
+      - .dpone/schema-migration/review/orders/diff.md
+      - .dpone/schema-migration/review/orders/review.md
+      - .dpone/schema-migration/post-apply/orders/*.json
+      - .dpone/schema-migration/watch/orders/*.json
+      - .dpone/schema-migration/remediation/orders/*.json
+      - .dpone/schema-migration/recovery/orders/*.json

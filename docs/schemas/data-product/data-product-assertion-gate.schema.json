@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/data-product/data-product-assertion-gate.schema.json",
+  "title": "dpone data product assertion gate",
+  "type": "object",
+  "required": ["schema_version", "assertion_gate_id", "status", "profile", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_assertion_gate.v1"},
+    "assertion_gate_id": {"type": "string"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "profile": {"type": "string"},
+    "product_id": {"type": ["string", "null"]},
+    "assertion_plan_id": {"type": ["string", "null"]},
+    "assertion_evaluation_id": {"type": ["string", "null"]},
+    "pack_id": {"type": ["string", "null"]},
+    "bundle_id": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "recommendations": {"type": "array", "items": {"type": "string"}}
+  }
+}

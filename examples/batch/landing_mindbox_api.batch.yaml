@@ -1,0 +1,91 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+convention: landing_raw_v1
+
+vars:
+  src_system: mindbox
+  src_database: api
+  host: api_mindbox_ru
+  owner_team: crm-analytics
+  owner_contact: crm-analytics@example.com
+  sla: daily
+
+defaults:
+  source:
+    type: api
+    api_type: mindbox
+    connection_type: vault
+    connection_id: api__mindbox
+    vault_path: api/mindbox
+    options:
+      resource: "{{ src_table }}"
+      batch_size: 10000
+      poll_interval: 30
+      export_timeout: 3600
+      utc_boundary_time: "21:00:00"
+
+  sink:
+    type: bigquery
+    connection_type: vault
+    connection_id: bigquery-demo
+    vault_path: gcp/demo-project-{{ env_code }}/bq/example-etl-service
+    staging:
+      schema: stg
+    strategy:
+      mode: incremental_merge
+    options:
+      log_sample_rows: 5
+
+  bigquery_proxy:
+    proxy_enable: true
+
+schemas:
+  app:
+    tables:
+      - table: getclients
+        overrides:
+          source:
+            options:
+              unique_key:
+                - ids_mindboxId
+              lookback_days: 2
+      - table: getorders
+        overrides:
+          source:
+            options:
+              unique_key:
+                - ids_mindboxId
+              lookback_days: 30
+      - table: getmailings
+        overrides:
+          source:
+            options:
+              unique_key:
+                - ids_id
+      - table: getmessagingreport
+        overrides:
+          sink:
+            strategy:
+              mode: full_refresh
+          source:
+            options:
+              full_refresh_days: 30
+      - table: getactions
+        overrides:
+          sink:
+            strategy:
+              mode: replace
+          source:
+            options:
+              lookback_days: 2
+              replace_column: creationDateTimeUtc
+      - table: operationslogs
+        overrides:
+          sink:
+            strategy:
+              mode: replace
+          source:
+            options:
+              lookback_days: 2
+              replace_column: OperationLogStartDateTimeUtc

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/agent-eval-result-v1.json",
+  "title": "dpone agent evaluation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "base_commit",
+    "status",
+    "changed_paths",
+    "checks",
+    "contract_impact",
+    "risks"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "base_commit": {"type": "string", "minLength": 7},
+    "status": {
+      "enum": ["PASS", "FAIL", "SKIP", "N/A", "UNVERIFIED"]
+    },
+    "changed_paths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status"],
+        "properties": {
+          "name": {"type": "string"},
+          "command": {"type": "string"},
+          "status": {"enum": ["PASS", "FAIL", "SKIP", "N/A", "UNVERIFIED"]},
+          "artifact": {"type": "string"},
+          "notes": {"type": "string"}
+        }
+      }
+    },
+    "contract_impact": {
+      "enum": ["none", "compatible", "deprecation", "breaking"]
+    },
+    "risks": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "first_pass_ci": {"type": "boolean"},
+        "accepted_without_rework": {"type": "boolean"},
+        "unrelated_changed_files": {"type": "integer", "minimum": 0},
+        "merge_conflicts": {"type": "integer", "minimum": 0},
+        "tokens": {"type": "integer", "minimum": 0},
+        "wall_time_seconds": {"type": "number", "minimum": 0}
+      }
+    }
+  }
+}

@@ -1,0 +1,60 @@
+schema_version: 1
+task_id: "SS-75"
+title: "Post-finalize quality receipt failure outcome"
+goal: >
+  Classify quality receipt drift after a successful staged target finalize as a
+  post-commit failure and attach the existing typed failure outcome.
+specification: >
+  Correctness finding under the approved fail-closed quality acceptance
+  contract. This change does not claim durable duplicate-write prevention; it
+  preserves the true process-local mutation boundary and counters for operator
+  handling.
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "parent Codex agent"
+
+acceptance_criteria:
+  - "Receipt drift before finalize remains pre_commit."
+  - "Receipt drift after finalize is recorded as post_commit."
+  - "Post-finalize QualityGateReceiptError carries QualityGateFailureOutcome from the actual load result."
+  - "The primary exception remains authoritative when evidence or cleanup also fails."
+  - "No retryable or durable-commit guarantee is added."
+
+public_contract_impact:
+  level: compatible_correctness_fix
+  surfaces:
+    - staged load failure evidence
+    - QualityGateReceiptError outcome
+  migration_required: false
+
+owned_paths:
+  - src/dpone/runtime/governance/finalization.py
+  - tests/test_quality_post_finalize_receipt_outcome.py
+read_only_paths:
+  - src/dpone/contracts/quality_failure.py
+  - tests/test_quality_gate_receipt_binding.py
+  - docs/feature-design-quality-acceptance-fail-closed-v0731.md
+forbidden_paths:
+  - docs/feature-design-target-commit-terminal-failures.md
+  - docs/adr/0022-target-commit-terminal-failures.md
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "parent Codex agent"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_quality_post_finalize_receipt_outcome.py tests/test_quality_gate_receipt_binding.py -q"
+  broad:
+    - "uv run ruff check <owned Python paths>"
+    - "uv run ruff format --check <owned Python paths>"
+    - "uv run mypy --config-file mypy.ini src/dpone/runtime/governance/finalization.py"
+  live:
+    - "N/A: deterministic staged-sink test doubles; live route remains UNVERIFIED."
+
+stop_conditions:
+  - "A fix claims durable target commit or duplicate-safe retry."
+  - "A fix masks the original receipt mismatch."
+  - "Another writer owns the same path."

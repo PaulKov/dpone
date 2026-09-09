@@ -1,0 +1,481 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-dag-spec.schema.json",
+  "title": "dpone GitOps Airflow dag-spec artifact",
+  "type": "object",
+  "required": [
+    "kind",
+    "schema_version",
+    "producer",
+    "dag_id",
+    "schedule",
+    "start_date",
+    "nodes",
+    "edges",
+    "topological_order",
+    "spec_fingerprint"
+  ],
+  "properties": {
+    "kind": {
+      "const": "gitops.airflow_dag_spec"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "dag_id": {
+      "type": "string"
+    },
+    "domain": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schedule": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "required": [
+            "assets"
+          ],
+          "properties": {
+            "assets": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "uri"
+                    ],
+                    "properties": {
+                      "uri": {
+                        "type": "string"
+                      },
+                      "external": {
+                        "type": "boolean"
+                      },
+                      "partition": {
+                        "type": "object",
+                        "required": [
+                          "dimensions"
+                        ],
+                        "properties": {
+                          "dimensions": {
+                            "type": "object",
+                            "minProperties": 1,
+                            "maxProperties": 1,
+                            "additionalProperties": {
+                              "type": "object",
+                              "required": [
+                                "type",
+                                "granularity",
+                                "timezone",
+                                "key_format",
+                                "source"
+                              ],
+                              "properties": {
+                                "type": {
+                                  "const": "temporal"
+                                },
+                                "granularity": {
+                                  "enum": [
+                                    "hour",
+                                    "day",
+                                    "month"
+                                  ]
+                                },
+                                "timezone": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "key_format": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "source": {
+                                  "const": "dag_schedule"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "start_date": {
+      "type": "string"
+    },
+    "timezone": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "catchup": {
+      "type": "boolean"
+    },
+    "max_active_runs": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "default_args": {
+      "type": "object"
+    },
+    "operator_overrides": {
+      "type": "object"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "type",
+        "path"
+      ],
+      "properties": {
+        "type": {
+          "const": "catalog"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "wiring": {
+      "type": "object",
+      "required": [
+        "mode",
+        "max_parallel_workloads",
+        "dependencies"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "waves",
+            "explicit",
+            "assets"
+          ]
+        },
+        "max_parallel_workloads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dependencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "visible_task_budget": {
+          "type": "object",
+          "required": [
+            "warn",
+            "max"
+          ],
+          "properties": {
+            "warn": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "visible_task_plan": {
+      "type": "object",
+      "required": [
+        "estimated_total",
+        "warn_threshold",
+        "max_tasks",
+        "status"
+      ],
+      "properties": {
+        "estimated_total": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "warn_threshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 250
+        },
+        "max_tasks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 250
+        },
+        "status": {
+          "enum": [
+            "within_budget",
+            "warning",
+            "blocked"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "workload_id",
+          "pack_ref",
+          "pack_path"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "workload_id": {
+            "type": "string"
+          },
+          "selector": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "task_group": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "visibility": {
+            "enum": [
+              "inline",
+              "task",
+              "group"
+            ]
+          },
+          "estimated_visible_tasks": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pack_ref": {
+            "type": "string"
+          },
+          "pack_path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "upstream",
+          "downstream",
+          "reason",
+          "origin"
+        ],
+        "properties": {
+          "upstream": {
+            "type": "string"
+          },
+          "downstream": {
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "declared",
+              "curated",
+              "inferred"
+            ]
+          },
+          "origin": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "topological_order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "workflow_outcome": {
+      "type": "object",
+      "required": [
+        "schema",
+        "task_id",
+        "workflow_id",
+        "expected_terminal_task_ids"
+      ],
+      "properties": {
+        "schema": {
+          "const": "dpone.dbt-workflow-outcome.v1"
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workflow_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_terminal_task_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "partition_plan": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "dimension",
+            "type",
+            "granularity",
+            "timezone",
+            "key_format",
+            "source",
+            "mapper",
+            "provenance",
+            "compatibility"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "cron_producer",
+                "asset_consumer"
+              ]
+            },
+            "dimension": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "type": {
+              "const": "temporal"
+            },
+            "granularity": {
+              "enum": [
+                "hour",
+                "day",
+                "month"
+              ]
+            },
+            "timezone": {
+              "type": "string"
+            },
+            "key_format": {
+              "type": "string"
+            },
+            "source": {
+              "const": "dag_schedule"
+            },
+            "mapper": {
+              "const": "identity"
+            },
+            "provenance": {
+              "type": "string"
+            },
+            "compatibility": {
+              "type": "object",
+              "required": [
+                "airflow_3_2_plus",
+                "airflow_3_0_3_1",
+                "airflow_2"
+              ],
+              "properties": {
+                "airflow_3_2_plus": {
+                  "const": "native"
+                },
+                "airflow_3_0_3_1": {
+                  "const": "degraded_unpartitioned"
+                },
+                "airflow_2": {
+                  "const": "degraded_unpartitioned"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "spec_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

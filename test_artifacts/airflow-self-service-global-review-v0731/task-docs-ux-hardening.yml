@@ -1,0 +1,86 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-SELF-SERVICE-DOCS-UX"
+title: "Align self-service documentation with the hardened provider and quality contracts"
+goal: "Remove reproducible First DAG, provider installation, quality migration, and recovery documentation blockers."
+specification: "test_artifacts/airflow-self-service-global-review-v0731/review-contract.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Authoring-only and Airflow scheduler-image prerequisites are explicit and executable."
+  - "Formal provider installation uses a supported Airflow/provider matrix cell and official constraints."
+  - "Provider API documents bounded index reads, isolated artifact verification, fatal index errors, and recovery."
+  - "First DAG output matches current preview/explain and safe-sample behavior."
+  - "Quality documentation distinguishes canonical gates from compatibility checks and contains no non-executable full example."
+  - "Safe-sample redaction policy covers mapping keys, URI userinfo, bearer tokens, evidence, and recovery."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "First DAG user journey"
+    - "Airflow provider installation and API reference"
+    - "quality.checks compatibility guidance"
+    - "safe-sample output and redaction guidance"
+  migration_required: true
+
+owned_paths:
+  - docs/getting-started/first-airflow-dag.md
+  - docs/airflow-pack-provider.md
+  - docs/airflow-provider-api.md
+  - docs/airflow-cache-sync.md
+  - docs/load-governance.md
+  - docs/postgres-xmin.md
+  - docs/runtime-image.md
+  - docs/airflow-self-service-architecture.md
+  - examples/airflow-self-service-pilot/RUNBOOK.ru.md
+  - packages/apache-airflow-providers-dpone/README.md
+read_only_paths:
+  - packages/dpone-airflow-pack/src/dpone_airflow_pack
+  - packages/apache-airflow-providers-dpone/pyproject.toml
+  - src/dpone
+  - tests
+  - docs/compatibility.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/cli-reference.md
+  - docs/documentation-standard.md
+  - docs/schemas
+  - .codex/config.toml
+  - docs/feature-design-airflow-pipeline-first-ux-p2.md
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "Current workspace provider/index/quality/redaction behavior."
+required_checks:
+  focused:
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run dpone docs check-docs"
+  broad:
+    - "uv run mkdocs build --strict"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

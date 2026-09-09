@@ -1,0 +1,105 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-AUTHORING-MIGRATION-V1"
+title: "Airflow authoring-mode migration v1"
+goal: "Implement plan-first, semantically equivalent classic/flow/folder source migration."
+specification: "docs/feature-design-airflow-authoring-mode-migration-v1.md"
+base_commit: "2a3d6d03819a24a7df42738454b18a13be11ad21"
+integrator: "Codex"
+
+acceptance_criteria:
+  - "All six directed classic/flow/folder migrations preserve the canonical semantic fingerprint."
+  - "Same-mode migration is a deterministic no-op."
+  - "Apply is path-confined, checksum guarded, atomic at the primary source and never deletes old fragments."
+  - "Recipe sources and conflicting fragments fail closed without writes."
+  - "CLI, JSON Schema, generated reference, docs and tests are synchronized."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "CLI: dpone migrate authoring"
+    - "Schema: dpone.authoring-migration.v1"
+    - "Structured authoring migration errors"
+  migration_required: false
+
+owned_paths:
+  - "docs/feature-design-airflow-authoring-mode-migration-v1.md"
+  - "docs/airflow-authoring-migration.md"
+  - "docs/airflow-authoring.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "docs/compatibility.md"
+  - "docs/cli-reference.md"
+  - "docs/reference/manifest-schemas.md"
+  - "docs/schemas/gitops/authoring-migration.schema.json"
+  - "docs/errors/DPONE_AUTHORING_MIGRATION_*.md"
+  - "src/dpone/commands/migrate_authoring_cmd.py"
+  - "src/dpone/commands/registry.py"
+  - "src/dpone/commands/registry_migrate.py"
+  - "src/dpone/manifest/authoring_migration_models.py"
+  - "src/dpone/manifest/authoring_migration_service.py"
+  - "src/dpone/manifest/authoring_migration_io.py"
+  - "src/dpone/manifest/authoring_migration_rendering.py"
+  - "src/dpone/manifest/authoring_migration_reporting.py"
+  - "src/dpone/readiness/authoring_migration_support.py"
+  - "src/dpone/gitops/schema_authoring_migration_contracts.py"
+  - "src/dpone/gitops/schema_contracts.py"
+  - "src/dpone/schema/authoring-migration.schema.json"
+  - "tests/test_airflow_authoring_mode_migration_v1.py"
+  - "tests/test_gitops_schema_contracts.py"
+  - "tests/test_manifest_schema_reference_docs.py"
+  - "test_artifacts/airflow-authoring-mode-migration-v1/**"
+  - "test_artifacts/agent-policy/airflow-authoring-mode-migration-v1.yml"
+read_only_paths:
+  - "src/dpone/manifest/authoring.py"
+  - "src/dpone/manifest/authoring_folder.py"
+  - "src/dpone/readiness/airflow_pipeline_source.py"
+  - "docs/adr/0006-authority-and-canonical-ir.md"
+  - "docs/adr/0015-single-authoring-compiler.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - ".cursor"
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "AuthoringCompiler and folder-loader protocol"
+  - "GitOps schema catalog"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_authoring_mode_migration_v1.py tests/test_gitops_schema_contracts.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

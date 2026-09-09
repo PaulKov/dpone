@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/project.schema.json",
+  "title": "dpone GitOps project authoring policy",
+  "type": "object",
+  "required": [
+    "schema"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "dpone.project.v1"
+    },
+    "authoring": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "primary_source_policy": {
+          "type": "string"
+        }
+      }
+    },
+    "airflow": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "index_path": {
+          "type": "string"
+        }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "flat",
+            "domain_first"
+          ]
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^\\S(?:.*\\S)?$"
+            },
+            {
+              "not": {
+                "pattern": "(^/|\\\\|\\x00|(^|/)\\.{1,2}(/|$))"
+              }
+            },
+            {
+              "not": {
+                "pattern": "//|/$"
+              }
+            }
+          ]
+        },
+        "pipeline_id_scope": {
+          "const": "project"
+        },
+        "system_root": {
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^\\S(?:.*\\S)?$"
+            },
+            {
+              "not": {
+                "pattern": "(^/|\\\\|\\x00|(^|/)\\.{1,2}(/|$))"
+              }
+            },
+            {
+              "not": {
+                "pattern": "//|/$"
+              }
+            }
+          ]
+        },
+        "dual_read_legacy_catalogs": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

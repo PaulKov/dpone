@@ -1,0 +1,242 @@
+name: Source release readiness
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: >-
+      github.repository == 'PaulKov/dpone' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/master' &&
+      github.ref_protected == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      artifact_id: ${{ steps.candidates.outputs.artifact-id }}
+      artifact_digest: ${{ steps.candidates.outputs.artifact-digest }}
+      producer_run_attempt: ${{ steps.context.outputs.run_attempt }}
+    steps:
+      - name: Checkout frozen protected source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Record frozen source and producer context
+        id: context
+        env:
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p test_artifacts/source-readiness-build
+          python -I -S - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          import tomllib
+          from pathlib import Path
+
+          commit = os.environ["GITHUB_SHA"]
+          actual = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          if actual != commit:
+              raise SystemExit("checkout does not match the frozen source commit")
+          project = subprocess.check_output(["git", "show", f"{commit}:pyproject.toml"], text=True)
+          version = tomllib.loads(project)["project"]["version"]
+          if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) is None:
+              raise SystemExit("source readiness requires a stable package version")
+          payload = {
+              "commit_sha": commit,
+              "tree_sha": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True).strip(),
+              "version": version,
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "workflow_sha": os.environ["WORKFLOW_SHA"],
+          }
+          Path("test_artifacts/source-readiness-build/context.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version}\nrun_attempt={payload['run_attempt']}\n")
+          PY
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Install locked validation dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Build and inspect all eight release archives
+        env:
+          RELEASE_VERSION: ${{ steps.context.outputs.version }}
+        run: |
+          set -euo pipefail
+          uv build --no-create-gitignore
+          uv build packages/dpone-native-accel --out-dir dist --no-create-gitignore
+          uv build packages/dpone-airflow-pack --out-dir dist --no-create-gitignore
+          uv build packages/apache-airflow-providers-dpone --out-dir dist --no-create-gitignore
+          uv run --frozen python tools/pypi_release_smoke_dist.py \
+            --dist-dir dist --expected-version "${RELEASE_VERSION}" --inventory-only --format json \
+            > test_artifacts/source-readiness-build/candidate-inventory.json
+          uv run --frozen python tools/agent_policy/package_archive_gate.py dist/*.whl dist/*.tar.gz \
+            > test_artifacts/source-readiness-build/package-archive-gate.json
+          uv run --frozen twine check dist/* \
+            | tee test_artifacts/source-readiness-build/twine-check.txt
+          sha256sum dist/* | LC_ALL=C sort -k2 \
+            > test_artifacts/source-readiness-build/archive-sha256sums.txt
+
+      - name: Smoke installed candidate wheels and full extras in a fresh environment
+        env:
+          RELEASE_VERSION: ${{ steps.context.outputs.version }}
+        run: |
+          set -euo pipefail
+          smoke_dir="${RUNNER_TEMP}/source-readiness-smoke"
+          python -m venv "${smoke_dir}"
+          "${smoke_dir}/bin/pip" install dist/*.whl
+          "${smoke_dir}/bin/pip" install --find-links dist "dpone[full,accel]==${RELEASE_VERSION}"
+          "${smoke_dir}/bin/pip" check | tee test_artifacts/source-readiness-build/pip-check.txt
+          "${smoke_dir}/bin/python" -I -c \
+            'import importlib.metadata as m, os; expected=os.environ["RELEASE_VERSION"]; names=("dpone","dpone-native-accel","dpone-airflow-pack","apache-airflow-providers-dpone"); actual={name:m.version(name) for name in names}; assert all(version == expected for version in actual.values()), actual; print(actual)' \
+            | tee test_artifacts/source-readiness-build/installed-versions.txt
+          "${smoke_dir}/bin/python" tools/package_smoke.py --project-root . --dpone-cmd "${smoke_dir}/bin/dpone" \
+            | tee test_artifacts/source-readiness-build/package-smoke.txt
+          sha256sum -c test_artifacts/source-readiness-build/archive-sha256sums.txt
+
+      - name: Revalidate closed inventory after package execution
+        env:
+          RELEASE_VERSION: ${{ steps.context.outputs.version }}
+        run: |
+          set -euo pipefail
+          uv run --frozen python tools/pypi_release_smoke_dist.py \
+            --dist-dir dist --expected-version "${RELEASE_VERSION}" --inventory-only --format json \
+            > test_artifacts/source-readiness-build/handoff-inventory.json
+          cmp test_artifacts/source-readiness-build/candidate-inventory.json \
+            test_artifacts/source-readiness-build/handoff-inventory.json
+
+      - name: Upload immutable candidate handoff
+        id: candidates
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: source-readiness-candidates-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/
+            test_artifacts/source-readiness-build/
+          if-no-files-found: error
+          retention-days: 90
+          archive: true
+          overwrite: false
+
+      - name: Retain build diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: source-readiness-build-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/source-readiness-build/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  hygiene:
+    needs: build
+    if: >-
+      github.repository == 'PaulKov/dpone' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/master' &&
+      github.ref_protected == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout frozen protected scanner
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download exact immutable candidate artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          digest-mismatch: error
+          path: candidate
+
+      - name: Record handoff identity and recheck archive bytes
+        env:
+          CANDIDATE_ARTIFACT_ID: ${{ needs.build.outputs.artifact_id }}
+          CANDIDATE_ARTIFACT_DIGEST: ${{ needs.build.outputs.artifact_digest }}
+          PRODUCER_RUN_ATTEMPT: ${{ needs.build.outputs.producer_run_attempt }}
+        run: |
+          set -euo pipefail
+          mkdir -p test_artifacts/source-readiness-hygiene
+          python -I -S - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          context = json.loads(Path("candidate/test_artifacts/source-readiness-build/context.json").read_text())
+          expected = (os.environ["GITHUB_SHA"], os.environ["GITHUB_REPOSITORY"],
+                      int(os.environ["GITHUB_RUN_ID"]), int(os.environ["PRODUCER_RUN_ATTEMPT"]))
+          actual = tuple(context[key] for key in ("commit_sha", "repository", "run_id", "run_attempt"))
+          if actual != expected:
+              raise SystemExit("candidate context does not match its frozen producer")
+          inventory = json.loads(Path("candidate/test_artifacts/source-readiness-build/handoff-inventory.json").read_text())
+          names = {item["filename"] for item in inventory["artifacts"]}
+          entries = list(Path("candidate/dist").iterdir())
+          if (len(inventory["artifacts"]) != 8 or len(names) != 8 or {path.name for path in entries} != names
+                  or any(path.is_symlink() or not path.is_file() for path in entries)):
+              raise SystemExit("candidate directory is no longer the closed eight-archive inventory")
+          context.update(
+              artifact_id=int(os.environ["CANDIDATE_ARTIFACT_ID"]),
+              artifact_digest=os.environ["CANDIDATE_ARTIFACT_DIGEST"],
+              hygiene_run_attempt=int(os.environ["GITHUB_RUN_ATTEMPT"]),
+          )
+          Path("test_artifacts/source-readiness-hygiene/handoff.json").write_text(
+              json.dumps(context, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          PY
+          cd candidate
+          sha256sum -c test_artifacts/source-readiness-build/archive-sha256sums.txt
+
+      - name: Certify frozen source and exact archives for tenant hygiene
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+          TENANT_HYGIENE_POLICY: ${{ secrets.TENANT_HYGIENE_POLICY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p test_artifacts/source-readiness-hygiene
+          if [[ -z "${TENANT_HYGIENE_POLICY}" ]]; then
+            echo "::error::TENANT_HYGIENE_POLICY is required; policy values remain CI-owned."
+            exit 1
+          fi
+          policy_path="$(mktemp "${RUNNER_TEMP}/tenant-hygiene.XXXXXXXX")"
+          trap 'rm -f -- "${policy_path}"' EXIT
+          printf '%s\n' "${TENANT_HYGIENE_POLICY}" > "${policy_path}"
+          unset TENANT_HYGIENE_POLICY
+          python -I -S tools/agent_policy/tenant_hygiene.py source \
+            --root . --commit-sha "${RELEASE_COMMIT}" --policy "${policy_path}" \
+            | tee test_artifacts/source-readiness-hygiene/tenant-hygiene-source.json
+          python -I -S tools/agent_policy/tenant_hygiene.py archive \
+            --policy "${policy_path}" candidate/dist/*.whl candidate/dist/*.tar.gz \
+            | tee test_artifacts/source-readiness-hygiene/tenant-hygiene-archives.json
+
+      - name: Retain hygiene reports and immutable handoff identity
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: source-readiness-hygiene-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/source-readiness-hygiene/
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false

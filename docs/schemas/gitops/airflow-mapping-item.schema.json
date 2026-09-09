@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-mapping-item.schema.json",
+  "title": "dpone GitOps bounded Airflow backfill mapping item",
+  "type": "object",
+  "required": [
+    "schema",
+    "mode",
+    "mapping_plan_fingerprint",
+    "backfill_plan_hash",
+    "item_index",
+    "first_chunk_index",
+    "last_chunk_index",
+    "chunks_count"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "dpone.airflow-mapping-item.v1"
+    },
+    "mode": {
+      "enum": [
+        "visible",
+        "summary"
+      ]
+    },
+    "mapping_plan_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "backfill_plan_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "item_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "first_chunk_index": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "last_chunk_index": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "chunks_count": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

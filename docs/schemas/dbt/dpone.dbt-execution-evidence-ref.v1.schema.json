@@ -1,0 +1,35 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-execution-evidence-ref.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bytes": {
+      "maximum": 16777216,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "schema": {
+      "const": "dpone.dbt-execution-evidence-ref.v1"
+    },
+    "sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "storage_scope": {
+      "const": "dbt_spool"
+    },
+    "workflow_id": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "workflow_id",
+    "sha256",
+    "bytes",
+    "storage_scope"
+  ],
+  "type": "object"
+}

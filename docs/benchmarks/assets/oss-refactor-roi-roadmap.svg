@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="618" viewBox="0 0 920 618" role="img">
+<rect width="920" height="618" fill="#f8fafc"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Refactor ROI roadmap</text>
+<text x="32" y="66" font-size="13" fill="#475569">Higher ROI means more quality debt reduction per unit of likely refactor effort.</text>
+<text x="210" y="102" font-size="11" fill="#64748b">ROI</text>
+<text x="500" y="102" font-size="11" fill="#64748b">Impact</text>
+<text x="650" y="102" font-size="11" fill="#64748b">Effort feasibility</text>
+<text x="32" y="140" font-size="12" font-weight="700" fill="#111827">subgraph_cmd.py</text>
+<text x="32" y="160" font-size="10" fill="#64748b">cmd_dag_subgraph complexity is 41.</text>
+<rect x="210" y="126" width="250" height="18" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="126" width="232" height="18" rx="4" fill="#0f766e"/>
+<text x="472" y="140" font-size="11" fill="#334155">93</text>
+<text x="500" y="140" font-size="11" fill="#334155">100</text>
+<text x="650" y="140" font-size="11" fill="#334155">74</text>
+<text x="760" y="140" font-size="10" fill="#475569">high-impact / low-effort</text>
+<text x="32" y="198" font-size="12" font-weight="700" fill="#111827">explain.py</text>
+<text x="32" y="218" font-size="10" fill="#64748b">render_manifest_explain_text complexity is</text>
+<rect x="210" y="184" width="250" height="18" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="184" width="227" height="18" rx="4" fill="#0f766e"/>
+<text x="472" y="198" font-size="11" fill="#334155">91</text>
+<text x="500" y="198" font-size="11" fill="#334155">100</text>
+<text x="650" y="198" font-size="11" fill="#334155">67</text>
+<text x="760" y="198" font-size="10" fill="#475569">high-impact / low-effort</text>
+<text x="32" y="256" font-size="12" font-weight="700" fill="#111827">list_edges_cmd.py</text>
+<text x="32" y="276" font-size="10" fill="#64748b">cmd_dag_list_edges complexity is 77.</text>
+<rect x="210" y="242" width="250" height="18" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="242" width="227" height="18" rx="4" fill="#0f766e"/>
+<text x="472" y="256" font-size="11" fill="#334155">91</text>
+<text x="500" y="256" font-size="11" fill="#334155">100</text>
+<text x="650" y="256" font-size="11" fill="#334155">67</text>
+<text x="760" y="256" font-size="10" fill="#475569">high-impact / low-effort</text>
+<text x="32" y="314" font-size="12" font-weight="700" fill="#111827">validation_profiles.py</text>
+<text x="32" y="334" font-size="10" fill="#64748b">_profile_from_manifest complexity is 43.</text>
+<rect x="210" y="300" width="250" height="18" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="300" width="220" height="18" rx="4" fill="#0f766e"/>
+<text x="472" y="314" font-size="11" fill="#334155">88</text>
+<text x="500" y="314" font-size="11" fill="#334155">100</text>
+<text x="650" y="314" font-size="11" fill="#334155">56</text>
+<text x="760" y="314" font-size="10" fill="#475569">high-impact / high-effort</text>
+<text x="32" y="372" font-size="12" font-weight="700" fill="#111827">load_config_builder.py</text>
+<text x="32" y="392" font-size="10" fill="#64748b">build complexity is 56.</text>
+<rect x="210" y="358" width="250" height="18" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="358" width="217" height="18" rx="4" fill="#0f766e"/>
+<text x="472" y="372" font-size="11" fill="#334155">87</text>
+<text x="500" y="372" font-size="11" fill="#334155">100</text>
+<text x="650" y="372" font-size="11" fill="#334155">53</text>
+<text x="760" y="372" font-size="10" fill="#475569">high-impact / high-effort</text>
+<text x="32" y="430" font-size="12" font-weight="700" fill="#111827">validation_rules.py</text>
+<text x="32" y="450" font-size="10" fill="#64748b">_validate_process complexity is 53.</text>
+<rect x="210" y="416" width="250" height="18" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="416" width="217" height="18" rx="4" fill="#0f766e"/>
+<text x="472" y="430" font-size="11" fill="#334155">87</text>
+<text x="500" y="430" font-size="11" fill="#334155">100</text>
+<text x="650" y="430" font-size="11" fill="#334155">54</text>
+<text x="760" y="430" font-size="10" fill="#475569">high-impact / high-effort</text>
+<text x="32" y="488" font-size="12" font-weight="700" fill="#111827">clickhouse_validation.py</text>
+<text x="32" y="508" font-size="10" fill="#64748b">validate_clickhouse_rows complexity is 46.</text>
+<rect x="210" y="474" width="250" height="18" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="474" width="215" height="18" rx="4" fill="#0f766e"/>
+<text x="472" y="488" font-size="11" fill="#334155">86</text>
+<text x="500" y="488" font-size="11" fill="#334155">100</text>
+<text x="650" y="488" font-size="11" fill="#334155">49</text>
+<text x="760" y="488" font-size="10" fill="#475569">high-impact / high-effort</text>
+<text x="32" y="546" font-size="12" font-weight="700" fill="#111827">pr_summary.py</text>
+<text x="32" y="566" font-size="10" fill="#64748b">render_pr_summary complexity is 45.</text>
+<rect x="210" y="532" width="250" height="18" rx="4" fill="#e2e8f0"/>
+<rect x="210" y="532" width="215" height="18" rx="4" fill="#0f766e"/>
+<text x="472" y="546" font-size="11" fill="#334155">86</text>
+<text x="500" y="546" font-size="11" fill="#334155">100</text>
+<text x="650" y="546" font-size="11" fill="#334155">49</text>
+<text x="760" y="546" font-size="10" fill="#475569">high-impact / high-effort</text>
+</svg>

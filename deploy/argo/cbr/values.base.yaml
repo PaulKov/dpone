@@ -1,0 +1,34 @@
+# Reference Airflow/Argo values for CBR rollout.
+# Adjust field names to your chart if it differs, but keep the env/command semantics.
+
+dpone:
+  manifestPath: /opt/airflow/dags/repo/examples/batch/landing_cbr_api.batch.yaml
+  packageTarget: /opt/airflow/.dpone-pkgs
+
+cbr:
+  manifestPath: /opt/airflow/dags/repo/examples/batch/landing_cbr_api.batch.yaml
+  schedule: "10 7 * * *"
+  selectors:
+    - app.xml_daily_asp
+  taskGroup: cbr__api
+
+airflow:
+  extraVolumes:
+    - name: dpone-runtime
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: dpone-runtime
+      mountPath: /opt/airflow/.dpone-pkgs
+  extraEnv:
+    - name: DPONE_PROJECT_DIR
+      value: /opt/airflow/dags/repo
+    - name: DPONE_PACKAGE_TARGET
+      value: /opt/airflow/.dpone-pkgs
+    - name: DPONE_LOG_LEVEL
+      value: INFO
+  scheduler:
+    command: ["dpone-runtime-exec", "airflow", "scheduler"]
+  worker:
+    command: ["dpone-runtime-exec", "airflow", "celery", "worker"]
+  triggerer:
+    command: ["dpone-runtime-exec", "airflow", "triggerer"]

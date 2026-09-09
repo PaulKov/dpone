@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/schema-migration/schema-contract-consumer-gate.schema.json",
+  "title": "dpone schema contract consumer gate",
+  "type": "object",
+  "required": ["schema_version", "status", "pack_id", "contract_id", "consumer_matrix_id", "blockers", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": "dpone.schema_contract_consumer_gate.v1"},
+    "consumer_gate_id": {"type": "string", "pattern": "^sha256:"},
+    "status": {"enum": ["allowed", "warning", "blocked"]},
+    "pack_id": {"type": ["string", "null"]},
+    "contract_id": {"type": ["string", "null"]},
+    "consumer_matrix_id": {"type": ["string", "null"]},
+    "head_contract_version_id": {"type": ["string", "null"]},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

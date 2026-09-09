@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-explain.schema.json",
+  "title": "dpone GitOps Airflow explain report",
+  "type": "object",
+  "required": [
+    "kind",
+    "passed",
+    "changes",
+    "errors",
+    "pipeline_ref",
+    "source_path",
+    "artifact_state",
+    "operator_diagnostics",
+    "hint"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "kind": {
+      "const": "dpone.airflow-explain.v1"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "pipeline_ref": {
+      "type": "string"
+    },
+    "source_path": {
+      "type": "string"
+    },
+    "artifact_state": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "manifest",
+        "dag_spec",
+        "airflow_pack",
+        "published_generation"
+      ],
+      "properties": {
+        "manifest": {
+          "enum": [
+            "source",
+            "missing",
+            "invalid"
+          ]
+        },
+        "dag_spec": {
+          "enum": [
+            "planned",
+            "materialized",
+            "stale"
+          ]
+        },
+        "airflow_pack": {
+          "enum": [
+            "planned",
+            "materialized",
+            "stale"
+          ]
+        },
+        "published_deployment_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "published_generation": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "deprecated": true,
+          "description": "Compatibility alias for published_deployment_id. Use published_deployment_id in new integrations."
+        }
+      }
+    },
+    "operator_diagnostics": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "hint": {
+      "type": "string"
+    }
+  }
+}

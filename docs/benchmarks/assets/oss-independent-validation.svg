@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="498" viewBox="0 0 920 498" role="img" aria-label="Independent analyzer validation">
+<rect width="920" height="498" fill="#ffffff"/>
+<text x="32" y="42" font-size="23" font-weight="700" fill="#111827">Independent analyzer validation</text>
+<text x="32" y="66" font-size="13" font-weight="400" fill="#475569">External analyzer cross-check status for LOC/SLOC and complexity evidence.</text>
+<text x="32" y="121" font-size="13" font-weight="700" fill="#111827">dpone</text>
+<rect x="220" y="104" width="144" height="24" rx="4" fill="#dc2626" opacity="0.14"/>
+<text x="230" y="120" font-size="12" font-weight="700" fill="#dc2626">LOC/SLOC: failed</text>
+<rect x="390" y="104" width="144" height="24" rx="4" fill="#dc2626" opacity="0.14"/>
+<text x="400" y="120" font-size="12" font-weight="700" fill="#dc2626">Complexity: failed</text>
+<text x="610" y="121" font-size="12" font-weight="400" fill="#334155">62/100 medium</text>
+<text x="790" y="121" font-size="12" font-weight="400" fill="#64748b">stale 0 / missing 0</text>
+<text x="32" y="181" font-size="13" font-weight="700" fill="#111827">Airbyte</text>
+<rect x="220" y="164" width="144" height="24" rx="4" fill="#dc2626" opacity="0.14"/>
+<text x="230" y="180" font-size="12" font-weight="700" fill="#dc2626">LOC/SLOC: failed</text>
+<rect x="390" y="164" width="144" height="24" rx="4" fill="#b45309" opacity="0.14"/>
+<text x="400" y="180" font-size="12" font-weight="700" fill="#b45309">Complexity: warning</text>
+<text x="610" y="181" font-size="12" font-weight="400" fill="#334155">70/100 medium</text>
+<text x="790" y="181" font-size="12" font-weight="400" fill="#64748b">stale 0 / missing 0</text>
+<text x="32" y="241" font-size="13" font-weight="700" fill="#111827">dlt</text>
+<rect x="220" y="224" width="144" height="24" rx="4" fill="#dc2626" opacity="0.14"/>
+<text x="230" y="240" font-size="12" font-weight="700" fill="#dc2626">LOC/SLOC: failed</text>
+<rect x="390" y="224" width="144" height="24" rx="4" fill="#dc2626" opacity="0.14"/>
+<text x="400" y="240" font-size="12" font-weight="700" fill="#dc2626">Complexity: failed</text>
+<text x="610" y="241" font-size="12" font-weight="400" fill="#334155">62/100 medium</text>
+<text x="790" y="241" font-size="12" font-weight="400" fill="#64748b">stale 0 / missing 0</text>
+<text x="32" y="301" font-size="13" font-weight="700" fill="#111827">Pentaho Kettle</text>
+<rect x="220" y="284" width="144" height="24" rx="4" fill="#dc2626" opacity="0.14"/>
+<text x="230" y="300" font-size="12" font-weight="700" fill="#dc2626">LOC/SLOC: failed</text>
+<rect x="390" y="284" width="144" height="24" rx="4" fill="#dc2626" opacity="0.14"/>
+<text x="400" y="300" font-size="12" font-weight="700" fill="#dc2626">Complexity: failed</text>
+<text x="610" y="301" font-size="12" font-weight="400" fill="#334155">62/100 medium</text>
+<text x="790" y="301" font-size="12" font-weight="400" fill="#64748b">stale 0 / missing 0</text>
+<text x="32" y="361" font-size="13" font-weight="700" fill="#111827">Apache Hop</text>
+<rect x="220" y="344" width="144" height="24" rx="4" fill="#dc2626" opacity="0.14"/>
+<text x="230" y="360" font-size="12" font-weight="700" fill="#dc2626">LOC/SLOC: failed</text>
+<rect x="390" y="344" width="144" height="24" rx="4" fill="#dc2626" opacity="0.14"/>
+<text x="400" y="360" font-size="12" font-weight="700" fill="#dc2626">Complexity: failed</text>
+<text x="610" y="361" font-size="12" font-weight="400" fill="#334155">62/100 medium</text>
+<text x="790" y="361" font-size="12" font-weight="400" fill="#64748b">stale 0 / missing 0</text>
+<text x="32" y="421" font-size="13" font-weight="700" fill="#111827">Sling</text>
+<rect x="220" y="404" width="144" height="24" rx="4" fill="#dc2626" opacity="0.14"/>
+<text x="230" y="420" font-size="12" font-weight="700" fill="#dc2626">LOC/SLOC: failed</text>
+<rect x="390" y="404" width="144" height="24" rx="4" fill="#dc2626" opacity="0.14"/>
+<text x="400" y="420" font-size="12" font-weight="700" fill="#dc2626">Complexity: failed</text>
+<text x="610" y="421" font-size="12" font-weight="400" fill="#334155">62/100 medium</text>
+<text x="790" y="421" font-size="12" font-weight="400" fill="#64748b">stale 0 / missing 0</text>
+</svg>

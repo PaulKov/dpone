@@ -1,0 +1,85 @@
+schema_version: 1
+task_id: "RELEASE-EXACT-COMMIT-PRODUCER-BINDING"
+title: "Bind exact-commit release checks to trusted producers and checked-in policy"
+goal: >
+  Prevent synthetic legacy statuses, foreign check runs, an unbound live
+  context, or a drifted reduced ruleset from satisfying the frozen release
+  commit gate.
+specification: "docs/agent-release-protocol.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "A required context without a positive live integration id is a terminal REQUIRED_CONTEXT_PRODUCER_UNBOUND blocker."
+  - "Legacy commit statuses remain diagnostic evidence and never satisfy a required release context."
+  - "A foreign check-run integration cannot satisfy the context."
+  - "A matching successful check run from the exact required integration still passes."
+  - "The live required-context name set exactly matches the checked-in policy set or returns RULESET_POLICY_DRIFT."
+  - "An explicit ruleset id cannot bypass the checked-in policy id."
+  - "All observations remain bound to the requested full commit SHA."
+  - "Reports and errors remain credential-free and deterministic."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "release exact-commit gate blocker vocabulary"
+    - "release preflight evidence"
+  migration_required: false
+
+owned_paths:
+  - "tools/agent_policy/release_commit_gate.py"
+  - "tests/agent_policy/test_release_commit_gate.py"
+
+read_only_paths:
+  - ".agents/policy/github-branch-protection.yml"
+  - "evals/agent/github-branch-protection.schema.json"
+  - "tools/agent_policy/pr_receipt_github.py"
+  - "tools/agent_policy/github_settings_drift.py"
+  - "docs/agent-release-protocol.md"
+
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - ".agents/policy/github-branch-protection.yml"
+  - ".codex/config.toml"
+  - "docs/feature-design-airflow-pipeline-first-ux-p2.md"
+
+shared_file_owner: "integrator"
+
+dependencies:
+  - "Preserve the current report schema and polling behavior."
+  - "Do not weaken live GitHub API error handling or expose token values."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/agent_policy/test_release_commit_gate.py -q"
+    - "uv run ruff check tools/agent_policy/release_commit_gate.py tests/agent_policy/test_release_commit_gate.py"
+    - "uv run mypy --config-file mypy.ini tools/agent_policy/release_commit_gate.py"
+  broad:
+    - "Integrator runs release/workflow/policy gates."
+  live:
+    - "UNVERIFIED unless an approved GitHub token and exact frozen commit are available."
+
+required_outputs:
+  - "implementation"
+  - "tests"
+  - "documentation_impact"
+  - "completion_report"
+
+completion_statuses:
+  allowed:
+    - "PASS"
+    - "FAIL"
+    - "SKIP"
+    - "N/A"
+    - "UNVERIFIED"
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

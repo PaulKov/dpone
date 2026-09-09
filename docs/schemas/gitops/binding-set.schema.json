@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/binding-set.schema.json",
+  "title": "dpone GitOps binding-set",
+  "type": "object",
+  "required": [
+    "schema",
+    "environment",
+    "bindings",
+    "runtime"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "dpone.binding-set.v1"
+    },
+    "environment": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bindings": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/connectionRef"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "connection_ref"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "connection_ref": {
+            "$ref": "#/$defs/connectionRef"
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "kubernetes_namespace": {
+          "type": "string"
+        },
+        "service_account": {
+          "type": "string"
+        },
+        "pool": {
+          "type": "string"
+        },
+        "resource_profile": {
+          "type": "string"
+        }
+      }
+    },
+    "connection_registry_ref": {
+      "type": "string"
+    },
+    "fingerprint": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "connectionRef": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+      "maxLength": 128
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[A-Fa-f0-9]{64}$"
+    }
+  }
+}

@@ -1,0 +1,80 @@
+schema: dpone.dbt-publish-policy.v3
+
+profiles:
+  mssql_to_clickhouse_mart:
+    source:
+      type: mssql
+      connection_ref: mssql_dwh_stage
+      options:
+        native_transfer:
+          mode: auto
+    sink:
+      type: clickhouse
+      connection_ref: clickhouse_dwh_dev
+      target_schema: DWH_Stage
+      staging_schema: DWH_Tech
+      options:
+        load_governance:
+          audit:
+            enabled: true
+            state_schema: DWH_Tech
+    certification:
+      transport: native_bcp_to_clickhouse
+      schema_evolution: widening
+      airflow_runtime_mode: kpo
+    state:
+      type: mssql
+      connection_ref: mssql_dwh_stage
+      table:
+        schema: dpone_state
+        name: dpone_xmin_state
+      partition_checkpoint_table:
+        schema: dpone_state
+        name: dpone_partition_checkpoints
+    strategy_policy:
+      allowed_strategies:
+        - incremental_merge
+        - partition_replace
+      partition_replace:
+        require_atomic_capability: true
+    runtime:
+      image: registry.example/data-platform/dbt-dpone@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      xcom_sidecar_image: registry.example/airflow/xcom@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      namespace: airflow
+      toolchain: dbt-sqlserver-1.11-core-1.12-certified
+      dbt_profile: dpone_runtime
+      dbt_target: runtime
+      dbt_threads: 4
+      dbt_timeout_seconds: 3600
+      airflow:
+        service_account_name: dpone-runtime
+    physical_design:
+      clickhouse:
+        profile: replicated_mart
+        replica_count: 3
+        cluster: dwh
+        partition_by: toYYYYMM(date_id)
+    execution:
+      profile: weak_worker
+      max_parallelism: 2
+      task_executor: KubernetesExecutor
+      deferrable: true
+      on_finish_action: delete_succeeded_pod
+      get_logs: true
+      logging_interval_seconds: 60
+    quality:
+      preset: strict
+      dbt_warning_policy: fail
+    lineage:
+      enabled: true
+      preset: standard
+
+workflows:
+  competitive_pricing:
+    schedule: "30 7 * * *"
+    start_date: "2026-01-01"
+    timezone: Europe/Moscow
+    owner: pricing-data
+    tags: [pricing, mart]
+    catchup: false
+    max_active_runs: 1

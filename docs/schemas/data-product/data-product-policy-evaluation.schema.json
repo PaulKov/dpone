@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/data-product/data-product-policy-evaluation.schema.json",
+  "title": "Data Product Policy Evaluation",
+  "type": "object",
+  "required": ["schema_version", "status", "policy_evaluation_id", "product", "rules", "blockers", "warnings"],
+  "properties": {
+    "schema_version": {"const": "dpone.data_product_policy_evaluation.v1"},
+    "status": {"enum": ["disabled", "passed", "warning", "blocked"]},
+    "policy_evaluation_id": {"type": "string"},
+    "policy_pack_id": {"type": "string"},
+    "product": {"type": "object"},
+    "rules": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

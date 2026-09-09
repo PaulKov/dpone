@@ -1,0 +1,65 @@
+schema_version: 1
+task_id: "DPONE-DBT-RUN-RESULTS-SCHEMA"
+title: "Validate dbt run-results v6 against the official schema"
+goal: "Vendor and load the official dbt run-results v6 schema offline behind a focused adapter."
+specification: "docs/feature-design-dbt-runtime-correctness-remediation-v1.md"
+base_commit: "c91387b70904fcfa55a66876d8e75409757961b9"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "The official v6 schema is packaged below src/dpone/schema/dbt."
+  - "The adapter validates offline and returns deterministic bounded violations."
+  - "Focused tests cover valid, invalid and unsupported schema versions."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dbt run-results validation"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/adapters/dbt_run_results_schema.py"
+  - "src/dpone/schema/dbt/run-results-v6.schema.json"
+  - "tests/test_dbt_run_results_schema_validation.py"
+read_only_paths:
+  - "src/dpone/adapters/dbt_manifest_schema.py"
+  - "src/dpone/runtime/dbt_run_results.py"
+  - "docs/feature-design-dbt-runtime-correctness-remediation-v1.md"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "docs/schemas"
+
+shared_file_owner: "Codex parent agent"
+
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_run_results_schema_validation.py -q"
+  broad:
+    - "uv run ruff check src/dpone/adapters/dbt_run_results_schema.py tests/test_dbt_run_results_schema_validation.py"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

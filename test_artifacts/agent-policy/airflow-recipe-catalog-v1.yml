@@ -1,0 +1,127 @@
+schema_version: 1
+task_id: "AIRFLOW-RECIPE-CATALOG-V1"
+title: "Content-pinned declarative recipe catalog v1"
+goal: >-
+  Implement external versioned declarative recipes, profiles, and reusable
+  components through the existing canonical authoring compiler without adding
+  scheduler-side execution or a second runtime engine.
+specification: "docs/feature-design-airflow-recipe-catalog-v1.md"
+base_commit: "054e100302be20fa7b6cc3ced4d68c6be5c3a03f"
+integrator: "codex-integrator"
+
+acceptance_criteria:
+  - "Recipe, profile, and component closure uses exact kind/path/digest pins."
+  - "One primary flow source compiles to the existing canonical manifest IR."
+  - "Recipes cannot execute Python, Jinja, shell, network, or secret lookups."
+  - "Answers are bounded, declared, allowlisted scalars without credentials."
+  - "Compile, pack, and safe-sample paths fail closed on dependency drift."
+  - "Existing built-in recipes and classic/flow/folder authoring stay compatible."
+  - "Architecture, documentation, packaging, and module budgets pass."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone.recipe-catalog.v1"
+    - "dpone.recipe.v1"
+    - "dpone.profile.v1"
+    - "dpone.component.v1"
+    - "dpone.flow.v1 recipe block"
+    - "dpone init pipeline --profile/--answers"
+    - "dpone recipe list/show/pin/validate"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/manifest/**"
+  - "src/dpone/readiness/airflow_recipe_*.py"
+  - "src/dpone/readiness/airflow_authoring_dependency_integrity.py"
+  - "src/dpone/readiness/airflow_authoring_validation.py"
+  - "src/dpone/readiness/airflow_local_workload_pack.py"
+  - "src/dpone/readiness/airflow_pipeline_scaffold.py"
+  - "src/dpone/readiness/airflow_self_service*.py"
+  - "src/dpone/gitops/workload_dependencies.py"
+  - "src/dpone/gitops/airflow_compact_pack.py"
+  - "src/dpone/gitops/airflow_compact_runtime.py"
+  - "src/dpone/gitops/airflow_compact_pack_bootstrap.py"
+  - "src/dpone/gitops/schema_airflow_pack_contracts.py"
+  - "src/dpone/schema/**"
+  - "src/dpone/commands/init_cmd.py"
+  - "src/dpone/commands/recipe_cmd.py"
+  - "src/dpone/commands/registry.py"
+  - "src/dpone/services/gitops/airflow_compact_pack_service.py"
+  - "tools/airflow_recipe_catalog_benchmark.py"
+  - "tests/test_airflow_recipe_catalog_v1.py"
+  - "tests/test_airflow_authoring_v1.py"
+  - "tests/test_safe_sample_pinned_source.py"
+  - "tests/test_airflow_compact_pack*.py"
+  - "docs/feature-design-airflow-recipe-catalog-v1.md"
+  - "docs/adr/0016-content-pinned-declarative-recipes.md"
+  - "docs/adr-index.md"
+  - "docs/airflow-recipes.md"
+  - "docs/airflow-self-service.md"
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/airflow-self-service-backlog.md"
+  - "docs/cli-reference.md"
+  - "docs/errors/DPONE_RECIPE*.md"
+  - "docs/getting-started/first-airflow-dag.md"
+  - "docs/reference/configuration.md"
+  - "docs/reference/manifest-schemas.md"
+  - "docs/schemas/gitops/airflow-pack.schema.json"
+  - "docs/compatibility.md"
+  - "test_artifacts/airflow-recipe-catalog-v1/**"
+read_only_paths:
+  - "packages/dpone-airflow-pack/**"
+  - "src/dpone/runtime/**"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+  - ".cursor/**"
+
+shared_file_owner: "codex-integrator"
+integrator_owned_shared_paths:
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+
+dependencies:
+  - "docs/adr/0016-content-pinned-declarative-recipes.md"
+  - "docs/feature-design-airflow-recipe-catalog-v1.md"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_recipe_catalog_v1.py -q"
+    - "uv run pytest tests/test_airflow_authoring_v1.py tests/test_safe_sample_pinned_source.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+  - validation_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

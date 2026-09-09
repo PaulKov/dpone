@@ -1,0 +1,159 @@
+name: Backfill integration matrix
+
+# End-to-end chunked backfill certification: real extraction, staging and
+# inner-strategy finalization for every locally supported source->target route
+# (postgres/mssql/clickhouse/kafka) plus operational scenarios (resume,
+# parallel workers, verification bridge, idempotent interval re-runs).
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "src/dpone/backfill/**"
+      - "src/dpone/runtime/etl/**"
+      - "src/dpone/runtime/sinks/**"
+      - "src/dpone/runtime/sources/**"
+      - "src/dpone/runtime/bootstrap_state.py"
+      - "src/dpone/services/backfill_service.py"
+      - "src/dpone/services/interval_context.py"
+      - "src/dpone/contracts/run_interval.py"
+      - "src/dpone/runtime/support/mssql_types.py"
+      - "src/dpone/type_system/source_sink/clickhouse_mssql.py"
+      - "src/dpone/readiness/schema_type_compatibility.py"
+      - "tests/integration/backfill/**"
+      - "tests/integration/airflow/**"
+      - "docker/docker-compose.integration.yml"
+      - ".github/workflows/backfill-integration.yml"
+  schedule:
+    # Nightly full run guards routes that PR path filters may not touch.
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Certification profile to run.
+        required: true
+        default: full_matrix
+        type: choice
+        options:
+          - full_matrix
+          - shadow_initial_smoke
+      expected_commit_sha:
+        description: Optional exact master commit binding for pre-release evidence.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  backfill-integration:
+    name: Backfill route x strategy matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CERT_PROFILE: ${{ github.event.inputs.profile || 'full_matrix' }}
+      CERT_ROOT: test_artifacts/backfill_integration
+      DPONE_RUN_INTEGRATION: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify optional exact commit binding
+        env:
+          EXPECTED_COMMIT_SHA: ${{ github.event.inputs.expected_commit_sha || '' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${EXPECTED_COMMIT_SHA}" ]; then
+            exit 0
+          fi
+          if ! printf '%s\n' "${EXPECTED_COMMIT_SHA}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::expected_commit_sha must be one full lowercase SHA."
+            exit 1
+          fi
+          actual_commit="$(git rev-parse HEAD)"
+          master_commit="$(git rev-parse refs/remotes/origin/master)"
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ] || [ "${GITHUB_REF}" != "refs/heads/master" ] || [ "${GITHUB_REF_TYPE}" != "branch" ]; then
+            echo "::error::Exact pre-release certification must be dispatched from master."
+            exit 1
+          fi
+          if [ "${EXPECTED_COMMIT_SHA}" != "${GITHUB_SHA}" ] || [ "${EXPECTED_COMMIT_SHA}" != "${actual_commit}" ] || [ "${EXPECTED_COMMIT_SHA}" != "${master_commit}" ]; then
+            echo "::error::Backfill certification is not bound to the requested exact commit."
+            exit 1
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Install SQL Server ODBC and bcp tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg unixodbc-dev
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+            | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+          . /etc/os-release
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/${VERSION_ID}/prod ${VERSION_CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 mssql-tools18
+          echo "/opt/mssql-tools18/bin" >> "$GITHUB_PATH"
+
+      - name: Start disposable local services
+        run: |
+          set -euo pipefail
+          if [ "${CERT_PROFILE}" = "shadow_initial_smoke" ]; then
+            docker compose -f docker/docker-compose.integration.yml up -d --wait postgres mssql
+          else
+            docker compose -f docker/docker-compose.integration.yml up -d --wait postgres clickhouse mssql kafka schema-registry
+          fi
+
+      - name: Run backfill integration matrix
+        run: |
+          set -euo pipefail
+          mkdir -p "${CERT_ROOT}"
+          if [ "${CERT_PROFILE}" = "shadow_initial_smoke" ]; then
+            uv run pytest \
+              tests/integration/backfill/test_postgres_mssql_shadow_initial_integration.py \
+              -q -rs \
+              --junitxml="${CERT_ROOT}/junit.xml"
+            uv run python tools/ci/assert_junit_executed.py \
+              --junit "${CERT_ROOT}/junit.xml" \
+              --min-passed 1 \
+              --max-skipped 0 \
+              --evidence-json "${CERT_ROOT}/execution.json" \
+              --profile "${CERT_PROFILE}" \
+              --commit-sha "${GITHUB_SHA}" \
+              --summary-md "${GITHUB_STEP_SUMMARY}"
+          else
+            uv run pytest -m integration_backfill tests/integration/backfill tests/integration/airflow -q \
+              -rs \
+              --junitxml="${CERT_ROOT}/junit.xml" \
+              --cov=src/dpone/backfill --cov=src/dpone/runtime/etl \
+              --cov-report=xml:"${CERT_ROOT}/coverage.xml" \
+              --cov-fail-under=0
+          fi
+
+      - name: Stop disposable local services
+        if: always()
+        run: docker compose -f docker/docker-compose.integration.yml down -v
+
+      - name: Upload junit and coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: backfill-integration-evidence
+          path: ${{ env.CERT_ROOT }}/
+          if-no-files-found: warn

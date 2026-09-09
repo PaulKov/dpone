@@ -1,0 +1,125 @@
+schema_version: 1
+task_id: "DPONE-AIRFLOW-V1-PUBLIC-CONTRACT-FREEZE"
+title: "Freeze the Airflow self-service v1 public contract"
+goal: "Make the promised Airflow self-service CLI, provider API, schema majors and support windows machine-checkable before v1.0."
+specification: "docs/feature-design-airflow-v1-public-contract-freeze.md"
+base_commit: "a5338706"
+integrator: "current Codex task"
+
+acceptance_criteria:
+  - "One reviewed baseline names the stable Airflow self-service CLI, provider API, schema majors and support windows."
+  - "The checker inspects the real parser, provider facade/stub, schema registry and package metadata without Airflow or runtime imports."
+  - "Additive optional surfaces remain compatible while seeded breaking mutations fail with stable issue codes."
+  - "The generated reference is derived from the baseline and cannot rewrite the baseline."
+  - "Provider legacy exports retain the declared two-minor and 365-day minimum window."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "dpone docs check-airflow-public-contracts"
+    - "dpone docs update-airflow-public-contract-reference"
+    - "dpone.airflow-public-contract-report.v1"
+    - "Airflow self-service v1 support policy"
+  migration_required: false
+
+owned_paths:
+  - "docs/feature-design-airflow-v1-public-contract-freeze.md"
+  - "docs/airflow-self-service-public-contracts-v1.yaml"
+  - "docs/reference/airflow-public-contracts.md"
+  - "docs/schemas/standardization/airflow-public-contract-report.schema.json"
+  - "packages/apache-airflow-providers-dpone/**"
+  - "packages/dpone-airflow-pack/pyproject.toml"
+  - "packages/dpone-airflow-pack/src/airflow/providers/dpone/**"
+  - "src/dpone/services/docs/airflow_public_contract_models.py"
+  - "src/dpone/services/docs/airflow_public_contract_loader.py"
+  - "src/dpone/services/docs/airflow_public_contract_evaluator.py"
+  - "src/dpone/services/docs/airflow_public_contract_reference.py"
+  - "src/dpone/services/docs/airflow_public_contract_provider.py"
+  - "src/dpone/services/docs/airflow_public_contracts.py"
+  - "src/dpone/security_redaction.py"
+  - "src/dpone/output_text.py"
+  - "src/dpone/ops/routes/rc_executor_redaction.py"
+  - "src/dpone/services/docs/airflow_public_contract_service.py"
+  - "src/dpone/commands/docs/airflow_public_contracts_cmd.py"
+  - "src/dpone/commands/docs/__init__.py"
+  - "src/dpone/commands/registry_docs_checks.py"
+  - "src/dpone/commands/registry_docs_updates.py"
+  - "tests/test_airflow_v1_public_contract_freeze.py"
+  - "tests/test_output_text_redaction.py"
+  - "tests/test_airflow_v1_public_contract_docs.py"
+  - "tests/test_airflow_formal_provider_distribution.py"
+  - "tests/test_airflow_pack_provider_package.py"
+  - "tests/test_airflow_provider_typing.py"
+  - "docs/airflow-self-service-backlog.md"
+  - "docs/compatibility.md"
+  - "docs/airflow-pack-provider.md"
+  - "docs/release.md"
+  - "docs/README.md"
+  - "test_artifacts/airflow-v1-public-contract-freeze/**"
+  - "test_artifacts/agent-policy/airflow-v1-public-contract-freeze.yml"
+
+read_only_paths:
+  - "src/dpone/cli/parser.py"
+  - "src/dpone/app/cli_reference_source.py"
+  - "src/dpone/services/docs/cli_reference.py"
+  - "src/dpone/gitops/schema_contracts.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/**"
+  - "pyproject.toml"
+  - "docs/compatibility_registry.yaml"
+
+forbidden_paths:
+  - ".cursor/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+
+shared_file_owner: "current Codex task"
+
+dependencies:
+  - "Frozen Industrial Self-Service Airflow architecture"
+  - "Canonical provider facade and PEP 561 stub"
+  - "GitOps schema catalog"
+  - "Compatibility registry and SemVer policy"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_v1_public_contract_freeze.py tests/test_airflow_v1_public_contract_docs.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "N/A: this slice is a static public-contract gate and makes no live production claim"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "The implementation imports Airflow, Vault, Kubernetes or runtime integrations on the docs-check path."
+  - "The checker can automatically rewrite its authoritative baseline."
+  - "A required edit touches user-owned .cursor files."

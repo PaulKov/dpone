@@ -1,0 +1,115 @@
+schema_version: 1
+task_id: "DPONE-CI-SHADOW-PR3A-SPEC"
+title: "Freeze the executable PR 3A CI-hygiene child contract"
+goal: >-
+  Convert the merged parent PR 3A architecture row into a researched,
+  reviewable, exact-path child specification without changing production
+  workflows, Dependabot, permissions, merge authority, or release behavior.
+specification: "docs/feature-design-ci-shadow-pr3a-ci-hygiene.md"
+base_commit: "6fdbcf90f38a88d5aa1793213160e0eb0fb6939d"
+integrator: "/root"
+
+acceptance_criteria:
+  - "Status is APPROVED because the maintainer authorized the exact reviewed head 67aa7ceca85f79ba95a01f7ddd9f8a54c2a861a3; merge still requires exact-head checks, owner attestation, and Agent PR receipt on the immutable APPROVED successor."
+  - "The child freezes exact Dependabot schedules, labels, limits, groups, and the missing-label implementation-task/start and implementation-merge stop without blocking specification approval."
+  - "The child freezes PR cancellation, a source-free queued nightly reusable-workflow caller, and exact matrix ceilings."
+  - "The child freezes stable whole-workflow Pages ordering, a read-only current-master guard, attempt-1-only non-PR upload/verification/deploy, new-current-master-run-only recovery, job-scoped deploy authority, and native read-only PR plus exact-master Dependency Review with no manual or synthetic backfill."
+  - "Executable tests validate exact label-probe argv/repository/query/host identity and current/stale/malformed/multiple/API-failed Pages guards, attempts 1/2 with prior/missing/current outputs, reversed completion, deploy/verify/full rerun prohibition, pre-dispatch positive-integer validation, explicit github.com label and Pages API host binding under a foreign GH_HOST, versioned dispatch response/new-run identity, provider-visible head_branch mapping, authenticated workflow source and exact action pin, provider-visible display-name/step correlation, zero/one/two exact-attempt deploy jobs, complete/incomplete Jobs pagination, skipped evidence, and removed/inverted-comparison mutations."
+  - "The future implementation governance test parses the actual .github/workflows/pages.yml and rejects any missing, prior-attempt, removed, or inverted SHA/run_attempt binding, non-PR build rerun, artifact overwrite, or skipped deployment false-PASS."
+  - "The child freezes a pinned, narrow, removable actionlint compatibility boundary for concurrency.queue."
+  - "The child names the exact implementation allowlist and the byte-identical release-sensitive denylist."
+  - "The child defines first-time Configure, Execute, Observe, Diagnose, Recover, Operate, rollback, and evidence journeys."
+  - "The documentation plan assigns pinned-actionlint install/streams/waiver recovery to the runbook, exact version/per-path/removal guidance to developer docs, and exit/stdout/stderr contracts to testing docs."
+  - "No production workflow, Dependabot file, workflow-security policy, source, package, protection, release, or live setting changes."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "repository CI child architecture contract"
+    - "PR 3A implementation and validation boundary"
+    - "contributor and operator documentation plan"
+  migration_required: false
+
+owned_paths:
+  - docs/feature-design-ci-shadow-pr3a-ci-hygiene.md
+  - docs/feature-design-ci-pr-gate-exact-sha-evidence.md
+  - docs/adr/0048-exact-sha-readiness-evidence.md
+  - docs/quality-metrics.md
+  - tests/test_ci_shadow_pr3a_contracts.py
+  - tests/test_ci_shadow_pr3a_label_probe.py
+  - tests/test_ci_shadow_pr3a_pages_guard.py
+  - tests/test_ci_shadow_pr3a_pages_recovery.py
+  - tests/test_ci_shadow_pr3a_pages_recovery_shell.py
+  - test_artifacts/agent-policy/dpone-ci-shadow-pr3a-spec.yml
+
+read_only_paths:
+  - .github/dependabot.yml
+  - .github/workflows/ci.yml
+  - .github/workflows/airflow-pack-compat.yml
+  - .github/workflows/pages.yml
+  - .github/workflows/dependency-review.yml
+  - .agents/policy/workflow-security.yml
+  - docs/adr/0046-component-aware-pr-gate-authority.md
+  - docs/feature-design-standard.md
+  - docs/documentation-standard.md
+  - docs/benchmarks/quality_budgets.yml
+  - tools/agent_policy/task_contract.py
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - .github/dependabot.yml
+  - .agents/policy
+  - evals/agent
+  - src
+  - tools/ci
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "Current master 6fdbcf90f38a88d5aa1793213160e0eb0fb6939d is the exact child-design base and contains PR 2 merge ec0323feba829d547e5f9c2d23acaac5b686f1a4."
+  - "The approved parent specification remains the architecture authority until this child is separately approved."
+  - "The missing live github-actions label blocks implementation-task start and implementation merge, not this design review or approval."
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_ci_shadow_pr3a_contracts.py tests/test_ci_shadow_pr3a_label_probe.py tests/test_ci_shadow_pr3a_pages_guard.py tests/test_ci_shadow_pr3a_pages_recovery.py tests/test_ci_shadow_pr3a_pages_recovery_shell.py tests/test_ci_shadow_spec_contracts.py tests/agent_policy/test_task_contract.py tests/test_docs_language_contracts.py -q"
+    - "uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/dpone-ci-shadow-pr3a-spec.yml"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref 6fdbcf90f38a88d5aa1793213160e0eb0fb6939d"
+    - "Execute every selected non-live check and report unavailable live evidence as UNVERIFIED."
+    - "uv run ruff check tests/test_ci_shadow_pr3a_contracts.py tests/test_ci_shadow_pr3a_label_probe.py tests/test_ci_shadow_pr3a_pages_guard.py tests/test_ci_shadow_pr3a_pages_recovery.py tests/test_ci_shadow_pr3a_pages_recovery_shell.py && uv run ruff format --check tests/test_ci_shadow_pr3a_contracts.py tests/test_ci_shadow_pr3a_label_probe.py tests/test_ci_shadow_pr3a_pages_guard.py tests/test_ci_shadow_pr3a_pages_recovery.py tests/test_ci_shadow_pr3a_pages_recovery_shell.py"
+    - "uv run dpone docs check-docs"
+    - "uv run dpone docs check-generated-references"
+    - "uv run dpone docs update-dev-metrics --check"
+    - "uv run mkdocs build --strict"
+    - "git diff --cached --check"
+  live:
+    - "Read-only exact label query; github-actions may remain UNVERIFIED for design review/approval but blocks implementation-task start and implementation merge."
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "The exact base is not 6fdbcf90f38a88d5aa1793213160e0eb0fb6939d."
+  - "Any production workflow, Dependabot, workflow-security policy, source, release, protection, or live GitHub setting changes."
+  - "The child status is changed to APPROVED without exact-head maintainer review evidence."

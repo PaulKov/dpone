@@ -1,0 +1,11 @@
+name: dpone_dbt_sqlserver_strategy_matrix
+version: 1.0.0
+config-version: 2
+profile: dpone_dbt_sqlserver_strategy_matrix
+model-paths: ["models"]
+
+flags:
+  dbt_sqlserver_enable_safe_type_expansion: false
+  dbt_sqlserver_use_native_string_types: true
+  dbt_sqlserver_use_dbt_transactions: true
+  dbt_sqlserver_use_default_schema_concat: true

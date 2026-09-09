@@ -1,0 +1,83 @@
+schema_version: 1
+task_id: "DPONE-DBT-MSSQL-MACRO-AUTHORITY-V1"
+title: "Generate and enforce the pinned SQL Server framework macro closure"
+goal: "Provide one pure, auditable macro-authority module and deterministic producer for integrator wiring."
+specification: "docs/feature-design-dbt-mssql-adapter-guardrails-v1.md"
+base_commit: "baf78f31"
+integrator: "Codex parent agent"
+
+acceptance_criteria:
+  - "Producer starts from the seven specification roots in the exact v12 SQL Server manifest."
+  - "Generated baseline freezes 131 dbt/dbt_sqlserver records with identity, macro_sql SHA-256 and sorted dependencies."
+  - "Generated invocation extension freezes the exact seven specified dbt records; its union with the framework closure is 138."
+  - "Pure evaluator detects root, body, dependency, package and selected-node macro drift."
+  - "Pure evaluator rejects project/package direct, default__ and sqlserver__ candidates derived from the trusted closure."
+  - "An unrelated unused custom macro remains admitted."
+  - "The exact dbt_dpone.dpone_publish helper may be admitted only by pinned identity/body and cannot add authority."
+  - "Producer --check and focused tests are deterministic and SDK-free."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "SQL Server selected-graph framework macro authority"
+    - "SQL Server graph-policy identity input"
+  migration_required: true
+  migration_notes: "Regenerate the manifest and all immutable dbt v1 outputs after the integrator wires the new policy."
+
+owned_paths:
+  - "src/dpone/contracts/dbt_sqlserver_macro_authority.py"
+  - "src/dpone/contracts/dbt_sqlserver_macro_authority_baseline.py"
+  - "tools/dbt_self_service/generate_sqlserver_macro_authority.py"
+  - "tests/test_dbt_sqlserver_macro_authority.py"
+read_only_paths:
+  - "examples/dbt-inline-publishing/fixtures/manifest.v12.json"
+  - "packages/dbt-dpone/macros/dpone_publish.sql"
+  - "src/dpone/contracts/dbt_sqlserver_graph_rules.py"
+  - "src/dpone/contracts/dbt_sqlserver_graph_policy.py"
+  - "src/dpone/contracts/dbt_graph_contract.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "Codex parent agent"
+
+dependencies:
+  - "Approved final boundary remediation at commit 0e6f7564"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_dbt_sqlserver_macro_authority.py -q"
+    - "uv run python tools/dbt_self_service/generate_sqlserver_macro_authority.py --check"
+    - "uv run ruff check src/dpone/contracts/dbt_sqlserver_macro_authority.py src/dpone/contracts/dbt_sqlserver_macro_authority_baseline.py tools/dbt_self_service/generate_sqlserver_macro_authority.py tests/test_dbt_sqlserver_macro_authority.py"
+    - "uv run mypy src/dpone/contracts/dbt_sqlserver_macro_authority.py tools/dbt_self_service/generate_sqlserver_macro_authority.py"
+  broad:
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+  live:
+    - "N/A: pure generated contract; exact dbt fixture is checked-in producer input"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Generated closure count differs from 131."
+  - "Generated invocation-extension count differs from 7 or its union with the framework closure differs from 138."
+  - "Producer requires runtime package introspection instead of the trusted manifest input."
+  - "Another writer owns the same semantic contract."

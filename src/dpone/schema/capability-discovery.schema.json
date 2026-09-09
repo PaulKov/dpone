@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/capability-discovery.schema.json",
+  "title": "dpone capability discovery v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "snapshot_id", "connectors", "routes", "recipes", "issues"],
+  "properties": {
+    "schema": {"const": "dpone.capability-discovery.v1"},
+    "snapshot_id": {"$ref": "#/$defs/digest"},
+    "connectors": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/connector"}
+    },
+    "routes": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/route"}
+    },
+    "recipes": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/recipe"}
+    },
+    "issues": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/issue"}
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "nullableString": {
+      "type": ["string", "null"]
+    },
+    "certificationLevel": {
+      "enum": [
+        "experimental",
+        "route-certified",
+        "production-certified",
+        "enterprise-certified"
+      ]
+    },
+    "evidenceStatus": {
+      "enum": ["PASS", "FAIL", "SKIP", "UNVERIFIED"]
+    },
+    "connector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "endpoint_types",
+        "roles",
+        "install_extras",
+        "capability_ids",
+        "maturity",
+        "release_phase",
+        "docs_link"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "endpoint_types": {"$ref": "#/$defs/stringArray"},
+        "roles": {
+          "type": "array",
+          "items": {"enum": ["source", "sink", "state"]},
+          "uniqueItems": true
+        },
+        "install_extras": {"$ref": "#/$defs/stringArray"},
+        "capability_ids": {"$ref": "#/$defs/stringArray"},
+        "maturity": {"enum": ["certified", "experimental", "community"]},
+        "release_phase": {"enum": ["stable", "beta", "alpha"]},
+        "docs_link": {"type": "string", "minLength": 1}
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "sink", "strategy", "support", "certification", "beginner"],
+      "properties": {
+        "id": {"type": "string", "minLength": 5},
+        "source": {"type": "string", "minLength": 1},
+        "sink": {"type": "string", "minLength": 1},
+        "strategy": {"type": "string", "minLength": 1},
+        "support": {"$ref": "#/$defs/routeSupport"},
+        "certification": {"$ref": "#/$defs/routeCertification"},
+        "beginner": {"$ref": "#/$defs/beginner"}
+      }
+    },
+    "routeSupport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "limitations", "docs_link", "install_extras"],
+      "properties": {
+        "status": {"enum": ["supported", "conditional", "not_supported"]},
+        "limitations": {"$ref": "#/$defs/stringArray"},
+        "docs_link": {"type": "string", "minLength": 1},
+        "install_extras": {"$ref": "#/$defs/stringArray"}
+      }
+    },
+    "routeCertification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "evidence_status", "reason_codes", "variants"],
+      "properties": {
+        "level": {"$ref": "#/$defs/certificationLevel"},
+        "evidence_status": {"$ref": "#/$defs/evidenceStatus"},
+        "reason_codes": {"$ref": "#/$defs/stringArray"},
+        "variants": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/certificationVariant"}
+        }
+      }
+    },
+    "certificationVariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "route_id",
+        "transport",
+        "schema_evolution",
+        "airflow_runtime_mode",
+        "level",
+        "evidence_status",
+        "evidence_refs",
+        "reason_codes"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "route_id": {"type": "string", "minLength": 5},
+        "transport": {"type": "string", "minLength": 1},
+        "schema_evolution": {"type": "string", "minLength": 1},
+        "airflow_runtime_mode": {"type": "string", "minLength": 1},
+        "level": {"$ref": "#/$defs/certificationLevel"},
+        "evidence_status": {"$ref": "#/$defs/evidenceStatus"},
+        "evidence_refs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/digest"},
+          "uniqueItems": true
+        },
+        "reason_codes": {"$ref": "#/$defs/stringArray"}
+      }
+    },
+    "beginner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recipe_available", "recipe_refs", "default_recipe_ref"],
+      "properties": {
+        "recipe_available": {"type": "boolean"},
+        "recipe_refs": {"$ref": "#/$defs/stringArray"},
+        "default_recipe_ref": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "origin",
+        "status",
+        "source",
+        "sink",
+        "strategy",
+        "route_id",
+        "support_status",
+        "certification_level",
+        "evidence_status",
+        "install_extras",
+        "limitations",
+        "scaffoldable",
+        "reason_codes",
+        "scaffold_argv"
+      ],
+      "properties": {
+        "ref": {"type": "string", "minLength": 1},
+        "origin": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "minLength": 1},
+        "source": {"$ref": "#/$defs/nullableString"},
+        "sink": {"$ref": "#/$defs/nullableString"},
+        "strategy": {"$ref": "#/$defs/nullableString"},
+        "route_id": {"$ref": "#/$defs/nullableString"},
+        "support_status": {"enum": ["supported", "conditional", "not_supported", "unknown"]},
+        "certification_level": {"$ref": "#/$defs/certificationLevel"},
+        "evidence_status": {"$ref": "#/$defs/evidenceStatus"},
+        "install_extras": {"$ref": "#/$defs/stringArray"},
+        "limitations": {"$ref": "#/$defs/stringArray"},
+        "scaffoldable": {"type": "boolean"},
+        "reason_codes": {"$ref": "#/$defs/stringArray"},
+        "scaffold_argv": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "entity_kind", "entity_id", "message"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^DPONE_[A-Z0-9_]+$"},
+        "entity_kind": {"type": "string", "minLength": 1},
+        "entity_id": {"type": "string", "minLength": 1},
+        "message": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

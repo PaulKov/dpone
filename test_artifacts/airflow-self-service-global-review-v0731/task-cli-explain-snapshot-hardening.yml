@@ -1,0 +1,67 @@
+schema_version: 1
+task_id: "SS-REVIEW-CLI-EXPLAIN-SNAPSHOT-HARDENING"
+title: "Make Airflow explain consume one active deployment snapshot"
+goal: "Prevent mixed-deployment diagnostics and make aggregate explain health agree with operator failures."
+specification: "docs/feature-design-self-service-cli-diagnostics-hardening-v0731.md"
+base_commit: "ef88ae7fbe678b748885eb52868604d5b653d02a"
+integrator: "primary Codex task"
+
+acceptance_criteria:
+  - "One explain invocation resolves and reads current/airflow-index.json exactly once."
+  - "Operator diagnostics and artifact state consume the same immutable confined bounded snapshot."
+  - "A pointer switch during explain cannot produce different deployment IDs in one response."
+  - "Invalid operator diagnostics produce passed=false, structured errors and exit code 1 when authoring itself passed."
+  - "Missing cache remains a successful planned state."
+  - "Explain performs zero network, metadata DB, Variable, Connection, Vault, Kubernetes or cache-refresh calls."
+  - "Public paths remain project-relative and redacted."
+
+public_contract_impact:
+  level: compatible
+  surfaces: ["dpone airflow explain", "dpone.airflow-explain.v1", "operator diagnostics"]
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/readiness/airflow_explain_service.py"
+  - "src/dpone/readiness/airflow_operator_diagnostics.py"
+  - "tests/test_airflow_explain_snapshot_consistency.py"
+read_only_paths:
+  - "docs/feature-design-self-service-cli-diagnostics-hardening-v0731.md"
+  - "docs/airflow-self-service-architecture.md"
+  - "docs/adr/0008-airflow-parse-safe-provider.md"
+  - "src/dpone/manifest/confined_files.py"
+  - "src/dpone/runtime/deployment_cache_common.py"
+  - "src/dpone/commands/airflow_self_service_cmd.py"
+  - "src/dpone/commands/airflow_self_service_rendering.py"
+  - "tests/test_airflow_operator_diagnostics.py"
+  - "tests/test_airflow_self_service_cli.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - ".github/workflows"
+  - "docs"
+  - "packages"
+
+shared_file_owner: "integrator"
+dependencies: []
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_explain_snapshot_consistency.py tests/test_airflow_operator_diagnostics.py -q"
+    - "uv run ruff check src/dpone/readiness/airflow_explain_service.py src/dpone/readiness/airflow_operator_diagnostics.py tests/test_airflow_explain_snapshot_consistency.py"
+    - "uv run mypy --config-file mypy.ini src/dpone/readiness/airflow_explain_service.py src/dpone/readiness/airflow_operator_diagnostics.py"
+  broad:
+    - "uv run pytest -k 'airflow and explain' -q"
+    - "uv run dpone docs check-airflow-public-contracts"
+    - "uv run dpone docs check-module-size --baseline docs/module_size_baseline.json"
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "The fix requires remote I/O or repository scanning during explain."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -1,0 +1,595 @@
+{
+  "artifact_schema": "dpone.test-artifact.v1",
+  "artifact_type": "stress.heavy_type_postgres_to_mssql",
+  "artifact_label": "2026-06-01T183200Z-heavy-type-stress-1000rows-smoke",
+  "created_by": "Codex GPT-5",
+  "executed_by_os_user": "macbook",
+  "started_at": "2026-06-01T18:31:31Z",
+  "requested_rows": 1000,
+  "requested_target_size_gib": 0.01,
+  "column_count": 100,
+  "source_system": "postgresql",
+  "target_system": "mssql",
+  "load_path": "PostgreSQL COPY TO STDOUT -> local bcp character file -> SQL Server bcp in",
+  "native_methods": [
+    "PostgreSQL COPY",
+    "Microsoft bcp"
+  ],
+  "type_matrix": [
+    {
+      "name": "id",
+      "postgres_type": "bigint",
+      "mssql_type": "bigint"
+    },
+    {
+      "name": "bool_01",
+      "postgres_type": "boolean",
+      "mssql_type": "bit"
+    },
+    {
+      "name": "bool_02",
+      "postgres_type": "boolean",
+      "mssql_type": "bit"
+    },
+    {
+      "name": "bool_03",
+      "postgres_type": "boolean",
+      "mssql_type": "bit"
+    },
+    {
+      "name": "bool_04",
+      "postgres_type": "boolean",
+      "mssql_type": "bit"
+    },
+    {
+      "name": "int_01",
+      "postgres_type": "integer",
+      "mssql_type": "int"
+    },
+    {
+      "name": "int_02",
+      "postgres_type": "integer",
+      "mssql_type": "int"
+    },
+    {
+      "name": "int_03",
+      "postgres_type": "integer",
+      "mssql_type": "int"
+    },
+    {
+      "name": "int_04",
+      "postgres_type": "integer",
+      "mssql_type": "int"
+    },
+    {
+      "name": "int_05",
+      "postgres_type": "integer",
+      "mssql_type": "int"
+    },
+    {
+      "name": "int_06",
+      "postgres_type": "integer",
+      "mssql_type": "int"
+    },
+    {
+      "name": "int_07",
+      "postgres_type": "integer",
+      "mssql_type": "int"
+    },
+    {
+      "name": "int_08",
+      "postgres_type": "integer",
+      "mssql_type": "int"
+    },
+    {
+      "name": "int_09",
+      "postgres_type": "integer",
+      "mssql_type": "int"
+    },
+    {
+      "name": "int_10",
+      "postgres_type": "integer",
+      "mssql_type": "int"
+    },
+    {
+      "name": "smallint_01",
+      "postgres_type": "smallint",
+      "mssql_type": "smallint"
+    },
+    {
+      "name": "smallint_02",
+      "postgres_type": "smallint",
+      "mssql_type": "smallint"
+    },
+    {
+      "name": "smallint_03",
+      "postgres_type": "smallint",
+      "mssql_type": "smallint"
+    },
+    {
+      "name": "smallint_04",
+      "postgres_type": "smallint",
+      "mssql_type": "smallint"
+    },
+    {
+      "name": "smallint_05",
+      "postgres_type": "smallint",
+      "mssql_type": "smallint"
+    },
+    {
+      "name": "tinyint_01",
+      "postgres_type": "smallint",
+      "mssql_type": "tinyint"
+    },
+    {
+      "name": "tinyint_02",
+      "postgres_type": "smallint",
+      "mssql_type": "tinyint"
+    },
+    {
+      "name": "tinyint_03",
+      "postgres_type": "smallint",
+      "mssql_type": "tinyint"
+    },
+    {
+      "name": "tinyint_04",
+      "postgres_type": "smallint",
+      "mssql_type": "tinyint"
+    },
+    {
+      "name": "tinyint_05",
+      "postgres_type": "smallint",
+      "mssql_type": "tinyint"
+    },
+    {
+      "name": "bigint_01",
+      "postgres_type": "bigint",
+      "mssql_type": "bigint"
+    },
+    {
+      "name": "bigint_02",
+      "postgres_type": "bigint",
+      "mssql_type": "bigint"
+    },
+    {
+      "name": "bigint_03",
+      "postgres_type": "bigint",
+      "mssql_type": "bigint"
+    },
+    {
+      "name": "bigint_04",
+      "postgres_type": "bigint",
+      "mssql_type": "bigint"
+    },
+    {
+      "name": "bigint_05",
+      "postgres_type": "bigint",
+      "mssql_type": "bigint"
+    },
+    {
+      "name": "decimal_01",
+      "postgres_type": "numeric(38,10)",
+      "mssql_type": "decimal(38,10)"
+    },
+    {
+      "name": "decimal_02",
+      "postgres_type": "numeric(38,10)",
+      "mssql_type": "decimal(38,10)"
+    },
+    {
+      "name": "decimal_03",
+      "postgres_type": "numeric(38,10)",
+      "mssql_type": "decimal(38,10)"
+    },
+    {
+      "name": "decimal_04",
+      "postgres_type": "numeric(38,10)",
+      "mssql_type": "decimal(38,10)"
+    },
+    {
+      "name": "decimal_05",
+      "postgres_type": "numeric(38,10)",
+      "mssql_type": "decimal(38,10)"
+    },
+    {
+      "name": "decimal_06",
+      "postgres_type": "numeric(38,10)",
+      "mssql_type": "decimal(38,10)"
+    },
+    {
+      "name": "decimal_07",
+      "postgres_type": "numeric(38,10)",
+      "mssql_type": "decimal(38,10)"
+    },
+    {
+      "name": "decimal_08",
+      "postgres_type": "numeric(38,10)",
+      "mssql_type": "decimal(38,10)"
+    },
+    {
+      "name": "decimal_09",
+      "postgres_type": "numeric(38,10)",
+      "mssql_type": "decimal(38,10)"
+    },
+    {
+      "name": "decimal_10",
+      "postgres_type": "numeric(38,10)",
+      "mssql_type": "decimal(38,10)"
+    },
+    {
+      "name": "float_01",
+      "postgres_type": "double precision",
+      "mssql_type": "float"
+    },
+    {
+      "name": "float_02",
+      "postgres_type": "double precision",
+      "mssql_type": "float"
+    },
+    {
+      "name": "float_03",
+      "postgres_type": "double precision",
+      "mssql_type": "float"
+    },
+    {
+      "name": "float_04",
+      "postgres_type": "double precision",
+      "mssql_type": "float"
+    },
+    {
+      "name": "float_05",
+      "postgres_type": "double precision",
+      "mssql_type": "float"
+    },
+    {
+      "name": "float_06",
+      "postgres_type": "double precision",
+      "mssql_type": "float"
+    },
+    {
+      "name": "real_01",
+      "postgres_type": "real",
+      "mssql_type": "real"
+    },
+    {
+      "name": "real_02",
+      "postgres_type": "real",
+      "mssql_type": "real"
+    },
+    {
+      "name": "real_03",
+      "postgres_type": "real",
+      "mssql_type": "real"
+    },
+    {
+      "name": "real_04",
+      "postgres_type": "real",
+      "mssql_type": "real"
+    },
+    {
+      "name": "money_01",
+      "postgres_type": "numeric(19,4)",
+      "mssql_type": "money"
+    },
+    {
+      "name": "money_02",
+      "postgres_type": "numeric(19,4)",
+      "mssql_type": "smallmoney"
+    },
+    {
+      "name": "money_03",
+      "postgres_type": "numeric(19,4)",
+      "mssql_type": "money"
+    },
+    {
+      "name": "money_04",
+      "postgres_type": "numeric(19,4)",
+      "mssql_type": "smallmoney"
+    },
+    {
+      "name": "date_01",
+      "postgres_type": "date",
+      "mssql_type": "date"
+    },
+    {
+      "name": "date_02",
+      "postgres_type": "date",
+      "mssql_type": "date"
+    },
+    {
+      "name": "date_03",
+      "postgres_type": "date",
+      "mssql_type": "date"
+    },
+    {
+      "name": "date_04",
+      "postgres_type": "date",
+      "mssql_type": "date"
+    },
+    {
+      "name": "date_05",
+      "postgres_type": "date",
+      "mssql_type": "date"
+    },
+    {
+      "name": "time_01",
+      "postgres_type": "time(6)",
+      "mssql_type": "time(6)"
+    },
+    {
+      "name": "time_02",
+      "postgres_type": "time(6)",
+      "mssql_type": "time(6)"
+    },
+    {
+      "name": "time_03",
+      "postgres_type": "time(6)",
+      "mssql_type": "time(6)"
+    },
+    {
+      "name": "time_04",
+      "postgres_type": "time(6)",
+      "mssql_type": "time(6)"
+    },
+    {
+      "name": "time_05",
+      "postgres_type": "time(6)",
+      "mssql_type": "time(6)"
+    },
+    {
+      "name": "datetime2_01",
+      "postgres_type": "timestamp(6)",
+      "mssql_type": "datetime2(6)"
+    },
+    {
+      "name": "datetime2_02",
+      "postgres_type": "timestamp(6)",
+      "mssql_type": "datetime2(6)"
+    },
+    {
+      "name": "datetime2_03",
+      "postgres_type": "timestamp(6)",
+      "mssql_type": "datetime2(6)"
+    },
+    {
+      "name": "datetime2_04",
+      "postgres_type": "timestamp(6)",
+      "mssql_type": "datetime2(6)"
+    },
+    {
+      "name": "datetimeoffset_01",
+      "postgres_type": "timestamptz",
+      "mssql_type": "datetimeoffset(6)"
+    },
+    {
+      "name": "datetimeoffset_02",
+      "postgres_type": "timestamptz",
+      "mssql_type": "datetimeoffset(6)"
+    },
+    {
+      "name": "datetimeoffset_03",
+      "postgres_type": "timestamptz",
+      "mssql_type": "datetimeoffset(6)"
+    },
+    {
+      "name": "datetimeoffset_04",
+      "postgres_type": "timestamptz",
+      "mssql_type": "datetimeoffset(6)"
+    },
+    {
+      "name": "uuid_01",
+      "postgres_type": "uuid",
+      "mssql_type": "uniqueidentifier"
+    },
+    {
+      "name": "uuid_02",
+      "postgres_type": "uuid",
+      "mssql_type": "uniqueidentifier"
+    },
+    {
+      "name": "uuid_03",
+      "postgres_type": "uuid",
+      "mssql_type": "uniqueidentifier"
+    },
+    {
+      "name": "uuid_04",
+      "postgres_type": "uuid",
+      "mssql_type": "uniqueidentifier"
+    },
+    {
+      "name": "json_01",
+      "postgres_type": "jsonb",
+      "mssql_type": "nvarchar(max)"
+    },
+    {
+      "name": "json_02",
+      "postgres_type": "json",
+      "mssql_type": "nvarchar(max)"
+    },
+    {
+      "name": "xml_01",
+      "postgres_type": "xml",
+      "mssql_type": "xml"
+    },
+    {
+      "name": "xml_02",
+      "postgres_type": "xml",
+      "mssql_type": "xml"
+    },
+    {
+      "name": "inet_01",
+      "postgres_type": "inet",
+      "mssql_type": "nvarchar(64)"
+    },
+    {
+      "name": "cidr_01",
+      "postgres_type": "cidr",
+      "mssql_type": "nvarchar(64)"
+    },
+    {
+      "name": "macaddr_01",
+      "postgres_type": "macaddr",
+      "mssql_type": "nvarchar(32)"
+    },
+    {
+      "name": "interval_01",
+      "postgres_type": "interval",
+      "mssql_type": "nvarchar(64)"
+    },
+    {
+      "name": "binary_01",
+      "postgres_type": "bytea",
+      "mssql_type": "varbinary(max)"
+    },
+    {
+      "name": "binary_02",
+      "postgres_type": "bytea",
+      "mssql_type": "varbinary(max)"
+    },
+    {
+      "name": "binary_03",
+      "postgres_type": "bytea",
+      "mssql_type": "varbinary(max)"
+    },
+    {
+      "name": "binary_04",
+      "postgres_type": "bytea",
+      "mssql_type": "varbinary(max)"
+    },
+    {
+      "name": "binary_05",
+      "postgres_type": "bytea",
+      "mssql_type": "varbinary(max)"
+    },
+    {
+      "name": "binary_06",
+      "postgres_type": "bytea",
+      "mssql_type": "varbinary(max)"
+    },
+    {
+      "name": "binary_07",
+      "postgres_type": "bytea",
+      "mssql_type": "varbinary(max)"
+    },
+    {
+      "name": "binary_08",
+      "postgres_type": "bytea",
+      "mssql_type": "varbinary(max)"
+    },
+    {
+      "name": "char_01",
+      "postgres_type": "char(32)",
+      "mssql_type": "char(32)"
+    },
+    {
+      "name": "char_02",
+      "postgres_type": "char(32)",
+      "mssql_type": "char(32)"
+    },
+    {
+      "name": "char_03",
+      "postgres_type": "char(32)",
+      "mssql_type": "char(32)"
+    },
+    {
+      "name": "char_04",
+      "postgres_type": "char(32)",
+      "mssql_type": "char(32)"
+    },
+    {
+      "name": "char_05",
+      "postgres_type": "char(32)",
+      "mssql_type": "char(32)"
+    },
+    {
+      "name": "char_06",
+      "postgres_type": "char(32)",
+      "mssql_type": "char(32)"
+    },
+    {
+      "name": "text_01",
+      "postgres_type": "text",
+      "mssql_type": "nvarchar(256)"
+    },
+    {
+      "name": "text_02",
+      "postgres_type": "text",
+      "mssql_type": "nvarchar(256)"
+    }
+  ],
+  "status": "passed",
+  "result": "passed",
+  "preflight": {
+    "available_free_gib": 23.031,
+    "required_free_gib": 0.035,
+    "required_free_multiplier": 3.5,
+    "sufficient_disk": true,
+    "column_count": 100,
+    "why_multiplier": "source table, export artifact, SQL Server data/log files, Docker overlay, and cleanup headroom coexist during stress"
+  },
+  "metrics": [
+    {
+      "name": "prepare_postgres_100_column_source",
+      "seconds": 0.197,
+      "rows": 1000,
+      "bytes_processed": null,
+      "rows_per_second": 5078.22,
+      "mib_per_second": null
+    },
+    {
+      "name": "prepare_mssql_100_column_target",
+      "seconds": 0.144,
+      "rows": null,
+      "bytes_processed": null,
+      "rows_per_second": null,
+      "mib_per_second": null
+    },
+    {
+      "name": "postgres_copy_to_bcp_file",
+      "seconds": 0.023,
+      "rows": 1000,
+      "bytes_processed": 1756054,
+      "rows_per_second": 42557.57,
+      "mib_per_second": 71.27
+    },
+    {
+      "name": "mssql_bcp_import",
+      "seconds": 0.189,
+      "rows": 1000,
+      "bytes_processed": null,
+      "rows_per_second": 5298.47,
+      "mib_per_second": null
+    }
+  ],
+  "export_result": {
+    "total_bytes": 1756054,
+    "chunk_count": 1000,
+    "elapsed": 0.02282094955444336,
+    "throughput": 73.38448358720407
+  },
+  "imported_rows": 1000,
+  "verification": {
+    "passed": true,
+    "postgres": {
+      "count_rows": "1000",
+      "sum_id": "500500",
+      "sum_int_01": "500500",
+      "sum_bool_01": "500",
+      "sum_text_01_len": "128000",
+      "min_uuid_01": "00000000-0000-0000-0000-000000000002",
+      "max_uuid_01": "00000000-0000-0000-0000-000000001001"
+    },
+    "mssql": {
+      "count_rows": "1000",
+      "sum_id": "500500",
+      "sum_int_01": "500500",
+      "sum_bool_01": "500",
+      "sum_text_01_len": "128000",
+      "min_uuid_01": "00000000-0000-0000-0000-000000000002",
+      "max_uuid_01": "00000000-0000-0000-0000-000000001001"
+    },
+    "source_column_count": 100,
+    "target_column_count": 100
+  },
+  "finished_at": "2026-06-01T18:31:31Z"
+}

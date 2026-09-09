@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-image-contract.schema.json",
+  "title": "dpone GitOps Airflow image contract report",
+  "type": "object",
+  "required": [
+    "kind",
+    "output_path",
+    "contract"
+  ],
+  "properties": {
+    "kind": {
+      "const": "gitops.airflow_image_contract"
+    },
+    "output_path": {
+      "type": "string"
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "kind",
+        "schema_version",
+        "producer",
+        "image",
+        "tools"
+      ],
+      "properties": {
+        "kind": {
+          "const": "gitops.airflow_image_contract.v1"
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "image_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dpone_version": {
+          "type": "string"
+        },
+        "python_version": {
+          "type": "string"
+        },
+        "airflow_provider_version": {
+          "type": "string"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "user": {
+          "type": "string"
+        },
+        "workdir": {
+          "type": "string"
+        },
+        "entrypoint": {
+          "type": "string"
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "code",
+        "message",
+        "path",
+        "source"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

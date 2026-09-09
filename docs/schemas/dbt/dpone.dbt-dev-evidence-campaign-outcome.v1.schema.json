@@ -1,0 +1,187 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.dbt-dev-evidence-campaign-outcome.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "code": {
+          "const": "DPONE_DBT_DEV_EVIDENCE_CAMPAIGN_PASSED"
+        },
+        "passed": {
+          "const": true
+        },
+        "status": {
+          "const": "passed"
+        },
+        "workflow_states": {
+          "items": {
+            "properties": {
+              "state": {
+                "const": "success"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          }
+        }
+      },
+      "required": [
+        "status",
+        "passed",
+        "code",
+        "workflow_states"
+      ]
+    },
+    {
+      "properties": {
+        "code": {
+          "const": "DPONE_DBT_DEV_EVIDENCE_CAMPAIGN_FAILED"
+        },
+        "passed": {
+          "const": false
+        },
+        "status": {
+          "const": "failed"
+        },
+        "workflow_states": {
+          "contains": {
+            "properties": {
+              "state": {
+                "const": "failed"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "minContains": 1
+        }
+      },
+      "required": [
+        "status",
+        "passed",
+        "code",
+        "workflow_states"
+      ]
+    },
+    {
+      "properties": {
+        "code": {
+          "const": "DPONE_DBT_DEV_EVIDENCE_CAMPAIGN_FAILED"
+        },
+        "passed": {
+          "const": false
+        },
+        "status": {
+          "const": "abandoned"
+        },
+        "workflow_states": {
+          "contains": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "queued",
+                  "running",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "minContains": 1
+        }
+      },
+      "required": [
+        "status",
+        "passed",
+        "code",
+        "workflow_states"
+      ]
+    }
+  ],
+  "properties": {
+    "campaign_request_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "closed": {
+      "const": true
+    },
+    "code": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "evidence_set_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "release_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "dpone.dbt-dev-evidence-campaign-outcome.v1"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "abandoned"
+      ]
+    },
+    "workflow_states": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "success",
+              "failed",
+              "unknown"
+            ]
+          },
+          "workflow_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow_id",
+          "state"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schema",
+    "status",
+    "passed",
+    "code",
+    "evidence_set_id",
+    "release_id",
+    "deployment_id",
+    "workflow_states",
+    "closed",
+    "campaign_request_sha256"
+  ],
+  "type": "object"
+}

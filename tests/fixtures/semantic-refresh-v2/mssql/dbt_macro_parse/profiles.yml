@@ -1,0 +1,17 @@
+semantic_refresh_macro_parse:
+  target: parse
+  outputs:
+    parse:
+      type: sqlserver
+      driver: ODBC Driver 18 for SQL Server
+      server: "{{ env_var('DPONE_IT_MSSQL_HOST', '127.0.0.1') }}"
+      port: "{{ env_var('DPONE_IT_MSSQL_PORT_FORWARD', '51433') | int }}"
+      database: "{{ env_var('DPONE_IT_MSSQL_DATABASE', 'dpone_it') }}"
+      schema: dpone_sr_macro
+      authentication: sql
+      user: "{{ env_var('DPONE_IT_MSSQL_USER', 'sa') }}"
+      password: "{{ env_var('DPONE_IT_MSSQL_PASSWORD', 'Dp0ne.Strong.Pw.2026!') }}"
+      encrypt: true
+      trust_cert: true
+      query_timeout: 600
+      threads: 1
