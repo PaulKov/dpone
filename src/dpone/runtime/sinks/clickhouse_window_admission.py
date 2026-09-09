@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 
 from dpone.contracts.bounded_window import WindowContractError
-from dpone.runtime.sinks.clickhouse_window_staging import WindowIO, literal
+from dpone.runtime.sinks.clickhouse_window_staging import WindowIO, identifier, literal
 
 
 def validate_target(io: WindowIO) -> None:
@@ -41,3 +42,26 @@ def validate_target(io: WindowIO) -> None:
         )
         if policies != [(0,)]:
             raise WindowContractError("Row policies may hide target data; window publication is unsupported")
+
+
+def validate_configuration(
+    schema: Sequence[tuple[str, str]],
+    *,
+    database: str,
+    table: str,
+    window_column: str,
+    target_id: str,
+    max_encoded_bytes: int,
+) -> None:
+    """Reject invalid target configuration before constructing any I/O resources."""
+    for name in (database, table, window_column, *(name for name, _ in schema)):
+        identifier(name)
+    if not schema or len({name for name, _ in schema}) != len(schema):
+        raise WindowContractError("Schema must contain unique columns")
+    window_type = dict(schema).get(window_column, "")
+    if not re.fullmatch(r"(?:Nullable\()?DateTime64\([0-6],\s*'UTC'\)\)?", window_type):
+        raise WindowContractError("Window column must be UTC DateTime64 with precision at most six")
+    if isinstance(max_encoded_bytes, bool) or not isinstance(max_encoded_bytes, int) or max_encoded_bytes <= 0:
+        raise WindowContractError("max_encoded_bytes must be a positive integer")
+    if not target_id:
+        raise WindowContractError("Physical target identity is required")

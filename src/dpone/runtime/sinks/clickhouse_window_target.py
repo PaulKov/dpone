@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from time import monotonic
@@ -27,7 +26,7 @@ from dpone.contracts.bounded_window import (
     WindowPlan,
 )
 from dpone.ports.bounded_window import ExclusiveWindowWriterGuard, WindowBinaryIngest, WindowMetadataStore
-from dpone.runtime.sinks.clickhouse_window_admission import validate_target
+from dpone.runtime.sinks.clickhouse_window_admission import validate_configuration, validate_target
 from dpone.runtime.sinks.clickhouse_window_staging import WindowConnector, WindowIO, WindowStaging, identifier
 
 
@@ -63,17 +62,14 @@ class ClickHouseWindowTarget:
         writer_guard: ExclusiveWindowWriterGuard | None,
         clock: Callable[[], float] = monotonic,
     ) -> None:
-        for name in (database, table, window_column, *(name for name, _ in schema)):
-            identifier(name)
-        if not schema or len({name for name, _ in schema}) != len(schema):
-            raise WindowContractError("Schema must contain unique columns")
-        window_type = dict(schema).get(window_column, "")
-        if not re.fullmatch(r"(?:Nullable\()?DateTime64\([0-6],\s*'UTC'\)\)?", window_type):
-            raise WindowContractError("Window column must be UTC DateTime64 with precision at most six")
-        if isinstance(max_encoded_bytes, bool) or not isinstance(max_encoded_bytes, int) or max_encoded_bytes <= 0:
-            raise WindowContractError("max_encoded_bytes must be a positive integer")
-        if not target_id:
-            raise WindowContractError("Physical target identity is required")
+        validate_configuration(
+            schema,
+            database=database,
+            table=table,
+            window_column=window_column,
+            target_id=target_id,
+            max_encoded_bytes=max_encoded_bytes,
+        )
         self.target_id = target_id
         self.io = WindowIO(
             tuple(schema),
