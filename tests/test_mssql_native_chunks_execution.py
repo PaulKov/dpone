@@ -125,6 +125,35 @@ def test_scheduler_reuses_frame_size_with_real_spawned_workers(tmp_path, monkeyp
     assert sum(map(len, target.files)) == sum(sizes)
 
 
+@pytest.mark.parametrize("mapping", [False, True])
+@pytest.mark.parametrize("view", [False, True])
+def test_spawned_workers_keep_values_from_reused_driver_buffers(tmp_path, mapping, view):
+    from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+
+    target = Target()
+    executor, plan, lease, _ = setup(tmp_path, target)
+    contract = build_mssql_bcp_native_contract(schema=[("value", "varbinary(8)")], query="SELECT synthetic")
+    plan = replace(plan, wire_fingerprint=contract.type_layout_hash)
+    executor.limits = replace(executor.limits, max_bytes=4096)
+    buffer = bytearray(b"a")
+    container = (
+        {"value": memoryview(buffer) if view else buffer} if mapping else [memoryview(buffer) if view else buffer]
+    )
+
+    def rows():
+        for content in (b"a", b"b", b"c"):
+            buffer[:] = content
+            yield container
+        buffer[:] = b"z"
+
+    result = executor.stage(plan, rows(), contract, lease)
+    encoder = MssqlNativeEncoder(contract, max_row_bytes=executor.limits.max_row_bytes)
+    expected = [encoder.encode_row((content,)) for content in (b"a", b"b", b"c")]
+    assert sorted(target.files) == sorted(expected)
+    assert result.rows == 3
+    assert sum(receipt.encoded_bytes for receipt in result.receipts) == sum(map(len, expected))
+
+
 def test_retry_exhaustion_requires_reextraction(tmp_path):
     target = Target(failures=3)
     executor, plan, lease, contract = setup(tmp_path, target)
