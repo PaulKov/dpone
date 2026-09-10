@@ -29,7 +29,7 @@ def _record_lock_snapshot(case, locker, locker_spid):
     """Observe only this fixture session's control-table locks before waiting.
 
     Catalog IDs and transaction state explain missing locks; they neither relax
-    the exact KEY/X assertion nor prove authentication rejection.
+    the exact key-lock assertion nor prove authentication rejection.
     """
     table = case.table("login_gates")
     context = execute(locker, "SELECT @@SPID,DB_ID(),@@TRANCOUNT,XACT_STATE();")
@@ -69,6 +69,24 @@ def _record_lock_snapshot(case, locker, locker_spid):
             "index_hobt_id_partition_type_unique_primary": indexes,
             "lock_type_mode_status_dbid_entity_index_owner_kind_owner_id_spid": locks,
         },
+    )
+
+
+def _exclusive_gate_key_lock(case, locker_spid):
+    """Require this session's granted exclusive key lock on the control table.
+
+    SQL Server RangeX-X holds both an exclusive range and exclusive resource;
+    it conflicts with the LOGON reader's shared and serializable shared locks.
+    """
+    return (
+        case.sql(
+            "SELECT COUNT(*) FROM sys.dm_tran_locks WHERE request_session_id=? AND resource_database_id=DB_ID() "
+            "AND resource_type='KEY' AND request_mode IN ('X','RangeX-X') AND request_status='GRANT' "
+            "AND resource_associated_entity_id IN (SELECT hobt_id FROM sys.partitions WHERE object_id=OBJECT_ID(?));",
+            locker_spid,
+            case.table("login_gates"),
+        )[0][0]
+        > 0
     )
 
 
@@ -144,18 +162,7 @@ def test_connection_attempts_racing_close_cannot_reconnect(gate_case):
         )
         try:
             _record_lock_snapshot(case, locker, locker_spid)
-            wait_until(
-                lambda: (
-                    case.sql(
-                        "SELECT COUNT(*) FROM sys.dm_tran_locks WHERE request_session_id=? AND resource_type='KEY' "
-                        "AND request_mode='X' AND request_status='GRANT' AND resource_associated_entity_id IN "
-                        "(SELECT hobt_id FROM sys.partitions WHERE object_id=OBJECT_ID(?));",
-                        locker_spid,
-                        case.table("login_gates"),
-                    )[0][0]
-                    > 0
-                )
-            )
+            wait_until(lambda: _exclusive_gate_key_lock(case, locker_spid))
             assert case.sql("SELECT is_disabled FROM sys.server_principals WHERE sid=?;", credentials.login_sid) == (
                 (False,),
             )

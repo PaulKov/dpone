@@ -237,11 +237,21 @@ def test_sql_failure_keeps_only_safe_code_not_driver_credentials():
     assert "private" not in str(caught.value)
 
 
-def test_syntax_failure_cannot_be_counted_as_permission_denial():
-    fault = SqlFailure(102, sqlstate="42000")
-    with pytest.raises(SqlFailure) as caught:
-        support.require_denied(lambda: (_ for _ in ()).throw(fault))
-    assert caught.value is fault
+@pytest.mark.parametrize(
+    "code,accepted", [(229, True), (17892, True), (18470, True), (102, False), (1222, False), (53, False)]
+)
+def test_permission_denial_codes_accept_only_documented_refusals(code, accepted):
+    fault = SqlFailure(code, sqlstate="42000")
+
+    def operation():
+        raise fault
+
+    if accepted:
+        assert support.require_denied(operation) == code
+    else:
+        with pytest.raises(SqlFailure) as caught:
+            support.require_denied(operation)
+        assert caught.value is fault
 
 
 @pytest.mark.parametrize("sqlstate,expected", [("42000", "42000"), ("PWD=never-print", None)])
@@ -323,6 +333,29 @@ def test_lock_snapshot_retains_exact_scope_and_observed_modes_without_certifying
     assert values == (51, table, table)
     assert "RangeX-X" in support.observation_document(observed)
     assert "PASS" not in support.observation_document(observed)
+
+
+@pytest.mark.parametrize("count,expected", [(0, False), (1, True)])
+def test_blocking_key_lock_query_requires_exact_resource_mode_session_database_and_table(count, expected):
+    from tests.integration.composition import test_composition_mssql_gate_recovery_live as recovery
+
+    queries = []
+
+    def query(statement, *values):
+        queries.append((statement, values))
+        return ((count,),)
+
+    table = "[gate_control].[composition_login_gates]"
+    case = SimpleNamespace(sql=query, table=lambda _: table)
+    assert recovery._exclusive_gate_key_lock(case, 58) is expected
+    statement, values = queries[0]
+    # This SQL predicate is the observation contract: PAGE/IX and foreign
+    # sessions/databases/table partitions must never satisfy it.
+    assert "resource_type='KEY'" in statement and "request_mode IN ('X','RangeX-X')" in statement
+    assert "request_status='GRANT'" in statement and "request_session_id=?" in statement
+    assert "resource_database_id=DB_ID()" in statement
+    assert "resource_associated_entity_id IN" in statement and "WHERE object_id=OBJECT_ID(?)" in statement
+    assert " OR " not in statement and values == (58, table)
 
 
 @pytest.mark.parametrize("expected,state", [(((1, "actual"),), "SUCCEEDED"), (((2, "invented"),), "FAILED")])

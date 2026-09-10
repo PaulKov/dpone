@@ -56,7 +56,8 @@ def require_denied(operation):
     """Require a permission/authentication refusal, never arbitrary SQL failure."""
     with pytest.raises(SqlFailure) as caught:
         operation()
-    if caught.value.code not in {229, 262, 297, 916, 2760, 15151, 15247, 15406, 18456, 17892}:
+    # Microsoft error 18470 is the independently observed disabled-account refusal.
+    if caught.value.code not in {229, 262, 297, 916, 2760, 15151, 15247, 15406, 18456, 18470, 17892}:
         raise caught.value  # Keep its safe SQLSTATE/code available to the report hook.
     return caught.value.code
 
