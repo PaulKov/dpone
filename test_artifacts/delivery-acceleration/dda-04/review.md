@@ -28,5 +28,22 @@ UNVERIFIED. The caller must freeze privileged database/server DDL-trigger change
 through transaction completion. DDA-06 owns the numbered ADR and activation work
 requires separate authorization.
 
-A second independent fresh-context test/certification review is running against
-the corrected candidate. Its conclusion will be recorded before final handoff.
+## Second fresh-context review
+
+Reviewer: `review_switch_v2` (dpone_test_certifier), 2026-09-10, reviewed exact
+implementation commit `9795f01cb9a7ad01f404ce69e1356fa2aa32a399`. Read-only; no live SQL.
+No additional component correctness blocker found. Reviewer confirmed 103
+focused tests and exact-candidate lint/type/module checks.
+
+P2 evidence finding: the original producer captured HEAD before a command and
+its diff afterward; a commit during execution could report inconsistent source
+identity. Corrected producer captures full source/producer identities both before
+and after, preserves both and returns UNVERIFIED if either changed. A four-case
+regression proves unchanged PASS/FAIL versus changed UNVERIFIED. The prior
+non-live suite was interrupted because its source identity was no longer frozen;
+required checks are rerun on the frozen producer revision.
+
+The reviewer correctly retains the layer gate failure as a merge blocker:
+runtime-to-contracts 217 exceeds 214. The DDA-04 constructors require those actual
+imports; DDA-06/root are coordinating an independently authorized dependency
+refactor. No baseline or budget changes were made here.
