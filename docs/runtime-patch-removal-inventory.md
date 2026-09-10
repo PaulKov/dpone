@@ -10,6 +10,11 @@ the [bounded MSSQL design](feature-design-clickhouse-mssql-bounded-native-v1.md)
 for the associated transport work. Production examples and evidence must remain
 synthetic and must not contain deployment-specific identifiers or credentials.
 
+The credential, logging and Airflow replacements are implemented for review in
+[PR #12](https://github.com/PaulKov/dpone/pull/12). This records proposed removal
+on that branch, not absence on released v0.74.36. The native transport remains a
+separate researched contract awaiting maintainer approval.
+
 ## Active inventory and removal order
 
 | Order | Patch and purpose | Explicit replacement | Migration and regression evidence |
