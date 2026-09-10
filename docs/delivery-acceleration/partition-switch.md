@@ -14,9 +14,14 @@ has no live correctness or performance certification yet.
 ## Supported catalog profile
 
 The v1 adapter accepts SQL Server **2022, major 16**, EngineEdition 2 or 3,
-with database-level `VIEW DEFINITION` and server `VIEW ANY DEFINITION`. Other editions/majors and hidden or
-incomplete metadata fail closed. This explicit implementation profile is narrower
-than the full set of SWITCH operations supported by SQL Server.
+with database-level `VIEW DEFINITION`, server `VIEW ANY DEFINITION`, and
+`SELECT ON OBJECT::sys.sql_expression_dependencies` in the target database.
+The catalog query needs this explicit SELECT permission to inspect dependencies;
+see [Microsoft's dependency-view permissions](https://learn.microsoft.com/en-us/sql/relational-databases/tables/view-the-dependencies-of-a-table?view=sql-server-ver17#permissions).
+The fixture owner provisions these permissions; the component does not grant them
+or require `db_owner` membership. Other editions/majors and hidden or incomplete
+metadata fail closed. This explicit implementation profile is narrower than the
+full set of SWITCH operations supported by SQL Server.
 
 All three existing tables must be in the same database and use the same partition
 function and scheme. The authored interval must equal two adjacent finite
