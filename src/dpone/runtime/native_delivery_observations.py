@@ -14,10 +14,12 @@ import time
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from dpone.contracts.native_delivery_observations import NativeDeliveryObservation, ObservationMetric, diagnostic_token
-from dpone.ports.native_delivery_observer import NativeDeliveryObserver
+
+if TYPE_CHECKING:
+    from dpone.ports.native_delivery_observer import NativeDeliveryObserver
 
 
 class _RecorderIdentity(TypedDict):
