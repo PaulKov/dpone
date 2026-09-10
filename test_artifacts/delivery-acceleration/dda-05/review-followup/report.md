@@ -1,5 +1,9 @@
 # DDA-05 independent review follow-up
 
+> This record accompanies corrective commit `b5ad9d2`. Its successor independent
+> review requested two further changes; [the final corrective record](final-review.md)
+> supersedes its pending-review state. Original logs are retained unchanged.
+
 The user requested a fresh independent subagent review and the same review after
 every further refinement. A fresh-context read-only architect reviewed
 `38f66039eb7424be077682763eb98fbaeaca08fa` against planning dependency
