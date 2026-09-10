@@ -172,6 +172,11 @@ class BulkWirePlanner:
             "binary" if route in {"typed_binary_row_stream", "typed_binary_bcp_native"} else policy.delimiter_profile,
             binary_format=policy.binary_format,
         )
+        if policy.binary_format == "mssql_native":
+            if (source_type.lower(), sink_type.lower(), policy.mode) != ("clickhouse", "mssql", "typed_binary"):
+                raise ValueError("mssql_native.route_unsupported")
+            route = "typed_binary_mssql_native"
+            profile = BulkWireDelimiterProfile("binary", "", "", "MSSQLNative")
         columns = tuple(_column(name, dtype) for name, dtype in schema)
         acceleration = NativeAccelerationRegistry().decide(
             policy=policy.acceleration,
@@ -180,6 +185,8 @@ class BulkWirePlanner:
             source_types=tuple(str(dtype) for _, dtype in schema),
         )
         warnings = _warnings(route, policy, profile)
+        if route == "typed_binary_mssql_native":
+            warnings += ("mssql_native_requires_composed_source_and_target_authority",)
         return BulkWireContract(
             schema_version=BULK_WIRE_SCHEMA_VERSION,
             selected_route=route,
@@ -313,6 +320,8 @@ def _normalize(value: str) -> str:
 
 
 def _binary_format(value: str) -> str:
+    if value == "mssql_native":
+        return value
     normalized = str(value or "rowbinary").strip().lower().replace("-", "")
     return "native" if normalized == "native" else "rowbinary"
 

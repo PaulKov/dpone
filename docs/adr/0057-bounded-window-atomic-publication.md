@@ -96,3 +96,14 @@ adds Decimal aliases and bounded fidelity checks without replacing those
 contracts. The public-snapshot governance implementation and debt ledger from
 master remain authoritative; the superseded branch migration is not retained.
 No hard limits, tolerance, exclusions or module-size debt caps are increased.
+
+
+## MSSQL native composition extension
+
+The approved [native transport specification](../feature-design-clickhouse-mssql-bounded-native-v1.md)
+adds one-query ClickHouse extraction and bounded native SQL Server staging.
+Completed contiguous staging is published through the existing MSSQL transaction
+finalizer with an authored half-open interval. Its target receipt is resolved
+before any source-free recovery can consider republishing. This does not extend
+the ClickHouse generation-exchange adapter or certify a live SQL Server route.
+See the [composition and recovery guide](../mssql-native-transport.md).

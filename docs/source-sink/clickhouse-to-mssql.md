@@ -19,6 +19,10 @@ doctor from the same standard environment used by the route runtime. Under an
 effective `-S`, irrelevant `.pth` files are not treated as executed startup
 state.
 
+For the opt-in bounded native Python composition API, see the
+[native transport guide](../mssql-native-transport.md). It requires explicit
+deployment authorities and has no live certification yet.
+
 ## When to use this path
 
 Use this path when ClickHouse is the system of record or ingestion boundary and

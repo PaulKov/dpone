@@ -2746,7 +2746,7 @@
                 }
               },
               "allOf": [
-                {"if": {"required": ["window"]}, "then": {"required": ["atomicity"], "properties": {"mode": {"const": "replace"}}}},
+                {"if": {"required": ["window"]}, "then": {"required": ["atomicity"], "properties": {"mode": {"enum": ["replace", "partition_replace"]}}}},
                 {"if": {"required": ["atomicity"]}, "then": {"required": ["window"]}},
                 {
                   "if": {
@@ -7244,7 +7244,8 @@
           "type": "string",
           "enum": [
             "rowbinary",
-            "native"
+            "native",
+            "mssql_native"
           ],
           "default": "rowbinary"
         },
@@ -7290,12 +7291,13 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "native_chunks": {"type": "object","additionalProperties": false,"required": ["max_total_encoded_bytes","stage_allocated_bytes_stop_threshold"],"properties": {"max_rows": {"type": "integer","minimum": 1,"maximum": 1000000,"default": 65536},"max_bytes": {"type": "integer","minimum": 1,"maximum": 1073741824,"default": 16777216},"max_row_bytes": {"type": "integer","minimum": 1,"default": 1048576},"max_pending": {"type": "integer","minimum": 1,"maximum": 64,"default": 2},"max_total_encoded_bytes": {"type": "integer","minimum": 1},"max_staging_tables": {"type": "integer","minimum": 1,"default": 1024},"stage_allocated_bytes_stop_threshold": {"type": "integer","minimum": 1}}},
         "chunking": {
           "type": "object",
           "additionalProperties": false,
           "description": "Opt-in atomic rolling-window execution; requires a composed snapshot source and all-writer target authority.",
           "properties": {
-            "mode": {"const": "bounded_window"},
+            "mode": {"enum": ["bounded_window", "bounded_stream"]},
             "parallelism": {"type": "integer", "minimum": 1, "maximum": 64},
             "checkpointing": {"const": "resumable"}
           }

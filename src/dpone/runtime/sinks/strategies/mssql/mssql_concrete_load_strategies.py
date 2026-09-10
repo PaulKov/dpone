@@ -155,6 +155,8 @@ class MSSQLPartitionReplaceStrategy(MSSQLPartitionSwitchMixin, MSSQLStrategyBase
         contract = normalize_mssql_load_strategy(load_config)
         partition = contract.partition_replace
         assert partition is not None
+        if not partition.values_from_staging:
+            raise ValueError("mssql_native.composed_staged_service_required")
 
         def handler(staging: StagingTableArtifact) -> LoadResult:
             target_exists = self._table_exists(load_config)

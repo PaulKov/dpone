@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from dpone.config.load_strategy import LoadStrategy
 from dpone.config.mssql_strategy_contract import normalize_mssql_load_strategy
 from dpone.contracts.mssql_type_contract import MssqlCatalogColumn
+from dpone.manifest.mssql_native_policy import native_requested, validate_native_config
 from dpone.readiness.physical_apply import DdlExecutionRequest
 from dpone.readiness.schema_evolution import SchemaPlan
 from dpone.runtime.mssql_spool_route import requires_mssql_character_spool_preflight
@@ -53,7 +54,12 @@ class MSSQLSink(AbstractSink):
         staging_consumer_factory: Any | None = None,
         runtime_storage_policy: RuntimeStoragePolicy | None = None,
         storage_preflight_service: StoragePreflightService | None = None,
+        native_staged_load_service: Any | None = None,
+        native_staged_load_service_factory: Any | None = None,
     ):
+        if native_staged_load_service is not None and native_staged_load_service_factory is not None:
+            raise ValueError("mssql_native.staging_composition_ambiguous")
+        self._native_staged_load = native_staged_load_service
         self.connector = connector
         self.state_storage = state_storage
         self.logger = logger or etl_logger
@@ -126,8 +132,12 @@ class MSSQLSink(AbstractSink):
             ),
         }
         self._strategy_map[LoadStrategy.BACKFILL] = BackfillStrategy(self._strategy_map)
+        if native_staged_load_service_factory is not None:
+            self._native_staged_load = native_staged_load_service_factory(self)
 
     def load(self, load_config: LoadConfig, payload: LoadPayload) -> LoadResult:
+        if native_requested(load_config):
+            return self._native_service(load_config).load(load_config, payload)
         normalize_mssql_load_strategy(load_config)
         require_generic_transaction_state(load_config, self.state_storage)
         strategy = self._strategy_map.get(load_config.load_strategy)
@@ -139,11 +149,44 @@ class MSSQLSink(AbstractSink):
         """Validate the strategy×physical contract before source row I/O."""
 
         del load_record
+        if native_requested(load_config):
+            self._native_service(load_config)
+            require_generic_transaction_state(load_config, self.state_storage)
+            return
         _require_target_acceptance_database(load_config)
         normalize_mssql_load_strategy(load_config)
         require_generic_transaction_state(load_config, self.state_storage)
         if requires_mssql_character_spool_preflight(load_config):
             self.staging_manager.preflight_storage()
+
+    def supports_staged_load_for(self, load_config: LoadConfig) -> bool:
+        """Admit only an explicitly configured and composed native lifecycle."""
+        if not native_requested(load_config):
+            return False
+        self._native_service(load_config)
+        return True
+
+    def _native_service(self, load_config: LoadConfig) -> Any:
+        validate_native_config(load_config)
+        if self._native_staged_load is None:
+            raise ValueError("mssql_native.staging_composition_required")
+        return self._native_staged_load
+
+    def stage_payload(self, load_config: LoadConfig, payload: LoadPayload) -> Any:
+        return self._native_service(load_config).stage(load_config, payload)
+
+    def finalize_staged_load(self, load_config: LoadConfig, handle: Any) -> LoadResult:
+        return self._native_service(load_config).finalize(load_config, handle)
+
+    def abort_staged_load(self, handle: Any) -> None:
+        if self._native_staged_load is None:
+            raise ValueError("mssql_native.staging_composition_required")
+        self._native_staged_load.abort(handle)
+
+    def cleanup_staged_load(self, handle: Any) -> None:
+        if self._native_staged_load is None:
+            raise ValueError("mssql_native.staging_composition_required")
+        self._native_staged_load.cleanup(handle)
 
     def mssql_transaction_governance_capability(self) -> str:
         """Declare mandatory receipt/fence governance to the ETL admission layer."""

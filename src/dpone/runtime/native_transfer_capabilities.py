@@ -28,6 +28,16 @@ class NativeTransferCapabilityPlanner:
         sink_options: Mapping[str, Any],
         transport: NativeTransferTransportPolicy,
     ) -> SliceTransportPlan:
+        wire = BulkWirePolicy.from_options(source_options)
+        if wire.binary_format == "mssql_native":
+            if (source_type.lower(), sink_type.lower(), wire.mode) != ("clickhouse", "mssql", "typed_binary"):
+                raise ValueError("mssql_native.route_unsupported")
+            return self._resolver.resolve(
+                transport,
+                source=StreamCapability.supported("clickhouse_single_query_snapshot"),
+                sink=StreamCapability.supported("mssql_bounded_native_staging"),
+                codec=StreamCapability.supported("mssql_native_binary_codec"),
+            )
         typed_row_stream = False
         if source_type.lower() == "mssql" and sink_type.lower() == "clickhouse":
             contract = BulkWirePlanner().plan(

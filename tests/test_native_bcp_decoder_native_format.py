@@ -55,7 +55,7 @@ def test_public_schemas_expose_clickhouse_native_binary_format() -> None:
         schema = json.loads((ROOT / relative).read_text())
         policy = schema["definitions"]["native_transfer_wire_policy"]["properties"]
 
-        assert policy["binary_format"]["enum"] == ["rowbinary", "native"]
+        assert policy["binary_format"]["enum"] == ["rowbinary", "native", "mssql_native"]
         assert "block_rows" in policy
         assert "block_bytes" in policy
 

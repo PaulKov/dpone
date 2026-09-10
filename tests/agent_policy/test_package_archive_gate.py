@@ -99,6 +99,14 @@ def _unexpected_payload_access(*_args: object, **_kwargs: object) -> None:
         ("example-1.0/.codex/config.toml", "INTERNAL_DIRECTORY"),
         ("example-1.0/.agents/policy.yml", "INTERNAL_DIRECTORY"),
         (r"example-1.0\.git\config", "INTERNAL_DIRECTORY"),
+        ("sitecustomize.py", "PYTHON_STARTUP_HOOK"),
+        ("example-1.0/usercustomize.py", "PYTHON_STARTUP_HOOK"),
+        ("example.data/purelib/bootstrap.pth", "PYTHON_STARTUP_HOOK"),
+        ("example.data/platlib/BOOTSTRAP.PTH", "PYTHON_STARTUP_HOOK"),
+        (r"example\sitecustomize\__init__.py", "PYTHON_STARTUP_HOOK"),
+        ("example/__pycache__/sitecustomize.cpython-312.pyc", "PYTHON_STARTUP_HOOK"),
+        ("example/sitecustomize.abi3.so", "PYTHON_STARTUP_HOOK"),
+        ("example/USERCUSTOMIZE.PYD", "PYTHON_STARTUP_HOOK"),
     ],
 )
 @pytest.mark.parametrize("kind", ["wheel", "sdist"])
@@ -119,6 +127,13 @@ def test_forbidden_members_fail_closed(
     assert report.decision == "NO-GO"
     assert report.archives[0].forbidden_members[0].reason == reason
     assert report.archives[0].forbidden_members[0].member == member.replace("\\", "/")
+
+
+@pytest.mark.parametrize("member", ["docs/sitecustomize_notes.md", "docs/sitecustomize.md", "package/path.py"])
+def test_startup_hook_documentation_is_not_executable(tmp_path: Path, member: str) -> None:
+    path = _wheel(tmp_path / "example.whl", {member: b"sitecustomize.py and bootstrap.pth"})
+
+    assert archive_gate.inspect_archives([path]).status == "PASS"
 
 
 @pytest.mark.parametrize(
