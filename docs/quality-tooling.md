@@ -22,6 +22,36 @@ Public MkDocs pages must be English-only and should use consistent link labels.
 
 ## Import checks
 
+Production modules must use ordinary definitions, explicit dependency injection
+and owned composition rather than replace another module's classes/functions.
+Run the finite source policy before integration:
+
+```bash
+uv run python tools/agent_policy/import_mutation_gate.py
+```
+
+The gate parses `src` and maintained `packages/*/src` without importing them.
+It checks import-executed attribute mutations, simple and tuple aliases, local
+initializer helpers and constructors, classmethod argument binding, eager
+annotations, registry overlays and recognized dynamic installation. Direct helper
+returns and global aliases retain provenance. Deferred annotations are not
+treated as executed code. Nonregular source files, including FIFOs, are rejected
+before reading. Output is bounded,
+deterministic JSON with `status`, `files_scanned`, `findings` and
+`omitted_findings`; findings contain relative path, line and stable code without
+source payloads. Findings, unreadable/malformed inputs and analysis limits fail
+with exit 1. CLI misuse returns exit 2. Instance data injection, subclass
+definitions and normal own-module exports remain valid.
+
+This is a syntactic gate, not a proof for arbitrary Python execution. Unknown
+calls, cross-file call graphs, reflection, metaclasses and descriptors require
+manual review. Complex indirect return values and argument unpacking are
+additional provenance limits. Do not add directory allowlists for mutation
+installers. Replace the mechanism with an owned adapter or an injected service and add a regression
+test before removal. Test-only hostile startup fixtures remain outside production
+inventory. Archive startup-hook hygiene is a separate metadata check; passing
+this source policy does not attest an installed environment.
+
 ```bash
 uv run python tools/check_import_rules.py
 uv run pytest tests/test_lazy_imports.py -q

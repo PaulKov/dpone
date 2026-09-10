@@ -5,16 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-_TRANSIENT_KUBERNETES_API_STATUSES = frozenset({429, 500, 502, 503, 504})
-
-
-class _RetryableLiveLogTransportError(RuntimeError):
-    """Private proof that a retryable error came from ``read_pod_logs``."""
-
-    def __init__(self, status: int, pod_manager: Any) -> None:
-        super().__init__("retryable Kubernetes live-log transport failure")
-        self.status = status
-        self.pod_manager = pod_manager
+from dpone_airflow_pack.log_transport_manager import RetryableLiveLogTransportError
 
 
 def ensure_live_base_container_logs(operator: Any) -> None:
@@ -66,39 +57,16 @@ def await_pod_completion_with_log_stream_fallback(
     if not api_exception_types or not bool(getattr(operator, "get_logs", False)):
         return await_with_live_logs()
 
-    restore_readers: list[Callable[[], None]] = []
-    patched_manager_ids: set[int] = set()
-
-    def patch_manager(pod_manager: Any) -> bool:
-        manager_id = id(pod_manager)
-        if manager_id in patched_manager_ids:
-            return True
-        restore = _install_live_log_transport_boundary(
-            pod_manager,
-            api_exception_types=api_exception_types,
-        )
-        if restore is None:
-            return False
-        patched_manager_ids.add(manager_id)
-        restore_readers.append(restore)
-        return True
-
-    if not patch_manager(operator.pod_manager):
+    boundary = getattr(operator, "_live_log_transport_boundary", None)
+    if boundary is None:
         return await_with_live_logs()
 
-    restore_refresh = _install_manager_refresh_boundary(operator, patch_manager=patch_manager)
-
     try:
-        try:
+        with boundary.classify(api_exception_types):
             return await_with_live_logs()
-        except _RetryableLiveLogTransportError as exc:
-            status = exc.status
-            fallback_manager = exc.pod_manager
-    finally:
-        if restore_refresh is not None:
-            restore_refresh()
-        for restore_reader in reversed(restore_readers):
-            restore_reader()
+    except RetryableLiveLogTransportError as exc:
+        status = exc.status
+        fallback_manager = exc.pod_manager
 
     operator.get_logs = False
     operator.log.warning(
@@ -114,93 +82,3 @@ def await_pod_completion_with_log_stream_fallback(
             1,
         ),
     )
-
-
-def _install_live_log_transport_boundary(
-    pod_manager: Any,
-    *,
-    api_exception_types: tuple[type[BaseException], ...],
-) -> Callable[[], None] | None:
-    """Mark only typed retryable failures raised by this manager's log reader."""
-
-    original_read_pod_logs = getattr(pod_manager, "read_pod_logs", None)
-    if not callable(original_read_pod_logs):
-        return None
-    try:
-        manager_vars = vars(pod_manager)
-    except TypeError:
-        return None
-    had_instance_override = "read_pod_logs" in manager_vars
-    original_instance_override = manager_vars.get("read_pod_logs")
-
-    def read_pod_logs_with_transport_boundary(*args: Any, **kwargs: Any) -> Any:
-        try:
-            return original_read_pod_logs(*args, **kwargs)
-        except Exception as exc:
-            status = _bounded_http_status(getattr(exc, "status", None))
-            if isinstance(exc, api_exception_types) and status in _TRANSIENT_KUBERNETES_API_STATUSES:
-                raise _RetryableLiveLogTransportError(status, pod_manager) from None
-            raise
-
-    try:
-        pod_manager.read_pod_logs = read_pod_logs_with_transport_boundary
-    except (AttributeError, TypeError):
-        return None
-
-    def restore() -> None:
-        if had_instance_override:
-            pod_manager.read_pod_logs = original_instance_override
-        else:
-            del pod_manager.read_pod_logs
-
-    return restore
-
-
-def _install_manager_refresh_boundary(
-    operator: Any,
-    *,
-    patch_manager: Callable[[Any], bool],
-) -> Callable[[], None] | None:
-    """Follow provider credential refreshes and bind each replacement manager."""
-
-    original_refresh = getattr(operator, "_refresh_cached_properties", None)
-    if not callable(original_refresh):
-        return None
-    try:
-        operator_vars = vars(operator)
-    except TypeError:
-        return None
-    had_instance_override = "_refresh_cached_properties" in operator_vars
-    original_instance_override = operator_vars.get("_refresh_cached_properties")
-
-    def refresh_with_log_boundary(*args: Any, **kwargs: Any) -> Any:
-        result = original_refresh(*args, **kwargs)
-        patch_manager(operator.pod_manager)
-        return result
-
-    try:
-        operator._refresh_cached_properties = refresh_with_log_boundary
-    except (AttributeError, TypeError):
-        return None
-
-    def restore() -> None:
-        if had_instance_override:
-            operator._refresh_cached_properties = original_instance_override
-        else:
-            del operator._refresh_cached_properties
-
-    return restore
-
-
-def _bounded_http_status(value: object) -> int | None:
-    """Return one bounded HTTP status without accepting booleans."""
-
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        status = value
-    elif isinstance(value, str) and len(value) == 3 and value.isascii() and value.isdigit():
-        status = int(value)
-    else:
-        return None
-    return status if 100 <= status <= 599 else None

@@ -11,6 +11,7 @@ from dpone_airflow_pack.live_base_logs import (
     await_pod_completion_with_log_stream_fallback,
     ensure_live_base_container_logs,
 )
+from dpone_airflow_pack.log_transport_manager import LiveLogTransportBoundary, LogTransportPodManagerMixin
 
 
 class _LogStreamError(RuntimeError):
@@ -31,7 +32,7 @@ class _RecordingLog:
         self.warnings.append(message % args)
 
 
-class _PodManager:
+class _RawPodManager:
     def __init__(
         self,
         *,
@@ -55,6 +56,11 @@ class _PodManager:
         if self.live_log_error is not None:
             raise self.live_log_error
         return self.live_log_result
+
+
+class _PodManager(LogTransportPodManagerMixin, _RawPodManager):
+    def __init__(self, *, boundary: LiveLogTransportBoundary | None = None, **kwargs: Any) -> None:
+        super().__init__(log_transport_boundary=boundary or LiveLogTransportBoundary(), **kwargs)
 
 
 class _ProviderPodManager(_PodManager):
@@ -81,11 +87,13 @@ class _ProviderPodManager(_PodManager):
 
 
 def _operator(*, get_logs: bool = True, manager: _PodManager | None = None) -> Any:
+    manager = manager or _PodManager()
     return SimpleNamespace(
+        _live_log_transport_boundary=manager.log_transport_boundary,
         get_logs=get_logs,
         base_container_name="base",
         base_container_status_polling_interval=2,
-        pod_manager=manager or _PodManager(),
+        pod_manager=manager,
         log=_RecordingLog(),
     )
 
@@ -127,6 +135,24 @@ def test_ensure_live_base_container_logs_rejects_follow_all_containers() -> None
 
     assert operator.get_logs is True
     assert operator.container_logs == "base"
+
+
+def test_live_log_execution_does_not_replace_methods() -> None:
+    manager = _PodManager()
+    operator = _operator(manager=manager)
+    original_reader = manager.read_pod_logs
+
+    def observe() -> None:
+        assert manager.read_pod_logs == original_reader
+        assert "read_pod_logs" not in vars(manager)
+        assert "_refresh_cached_properties" not in vars(operator)
+
+    await_pod_completion_with_log_stream_fallback(
+        operator,
+        pod=object(),
+        await_with_live_logs=observe,
+        api_exception_types=(_LogStreamError,),
+    )
 
 
 def test_log_stream_success_keeps_live_logs_and_skips_fallback() -> None:
@@ -295,6 +321,7 @@ def test_pinned_kpo_composes_fallback_with_installed_cncf_provider() -> None:
         do_xcom_push=False,
     )
     manager = _ProviderPodManager(live_log_error=ApiException(status=500))
+    manager.log_transport_boundary = operator._live_log_transport_boundary
     operator.__dict__["pod_manager"] = manager
     pod = object()
 
@@ -329,6 +356,7 @@ def test_pinned_kpo_keeps_non_log_api_failure_fail_closed() -> None:
         do_xcom_push=False,
     )
     manager = _ProviderPodManager(fetch_error=error)
+    manager.log_transport_boundary = operator._live_log_transport_boundary
     operator.__dict__["pod_manager"] = manager
 
     with pytest.raises(ApiException) as raised:
@@ -359,6 +387,8 @@ def test_provider_10_19_rebinds_log_boundary_after_credential_refresh() -> None:
     )
     first_manager = _ProviderPodManager(live_log_error=ApiException(status=401))
     replacement_manager = _ProviderPodManager(live_log_error=ApiException(status=500))
+    first_manager.log_transport_boundary = operator._live_log_transport_boundary
+    replacement_manager.log_transport_boundary = operator._live_log_transport_boundary
     operator.__dict__["pod_manager"] = first_manager
     pod = object()
     refresh_events: list[str] = []
@@ -429,6 +459,7 @@ def test_provider_10_19_fallback_preserves_xcom_final_wait_and_cleanup_sequence(
         do_xcom_push=True,
     )
     manager = LifecyclePodManager(live_log_error=ApiException(status=500))
+    manager.log_transport_boundary = operator._live_log_transport_boundary
     operator.__dict__["pod_manager"] = manager
     operator.pod_request_obj = pod
     operator.pod = pod

@@ -4,6 +4,20 @@ Status: implemented as a canonical `dpone` REST provider.
 
 The AppsFlyer integration extracts raw and aggregate reports from AppsFlyer APIs and loads them through the standard `dpone` source/sink runtime.
 
+## Credential composition
+
+Pass an explicit `vault_manager` to `AppsflyerCredentials.from_vault` or
+`AppsflyerConnector.from_vault` when the application owns secret access. For an
+already resolved secret, construct credentials and pass them to the connector.
+Public construction signatures and defaults are unchanged. The facade passes
+resolver dependencies to the canonical loader per call; it never temporarily
+replaces canonical module functions or credential classes. Nested and concurrent
+construction therefore cannot borrow another call's facade configuration.
+
+Connector maintainers should extend the owned credential-construction hook or
+pass dependencies through the existing loader, rather than replace globals.
+Keep secret values out of logs, receipts and manifests.
+
 ## Supported resources
 
 Common resources include:

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Add a bounded AST gate for import-time mutation patterns across production
+  package roots, with deterministic fail-closed findings and documented analysis
+  limits. Include it in Python validation selection.
+- Replace temporary Airflow pod-manager and credential-refresh method wrappers
+  with an owned manager subclass and injected log transport classifier. Preserve
+  transient log fallback and the provider completion/cleanup lifecycle.
+- Remove temporary credential module/class replacement from AppsFlyer construction;
+  nested and concurrent calls use explicit call-local dependencies.
+- Let the logging package own its exports directly, removing import-time writes
+  from logging implementation and port modules. Remove the exported
+  `sync_etl_logging_facade` patch helper without a deprecated shim; ordinary
+  logger imports retain identity. See the compatibility guide for migration.
+
 ## 0.74.36 - 2026-09-09
 
 - Add opt-in bounded atomic rolling-window Python composition with a PostgreSQL

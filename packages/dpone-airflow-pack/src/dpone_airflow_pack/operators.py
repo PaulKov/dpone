@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from functools import cached_property
 from importlib.util import find_spec
 from typing import Any
 
@@ -47,6 +48,7 @@ from dpone_airflow_pack.live_base_logs import (
     await_pod_completion_with_log_stream_fallback,
     ensure_live_base_container_logs,
 )
+from dpone_airflow_pack.log_transport_manager import LiveLogTransportBoundary, LogTransportPodManagerMixin
 from dpone_airflow_pack.operator_runtime import (
     UNSAFE_AIRFLOW_CONNECTION_ENV_ANNOTATION,
     UNSAFE_AIRFLOW_CONNECTION_ENV_VALUE,
@@ -89,6 +91,7 @@ def _airflow_core_available() -> bool:
 _KUBERNETES_API_EXCEPTION_TYPES: tuple[type[BaseException], ...] = ()
 try:
     from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+    from airflow.providers.cncf.kubernetes.utils.pod_manager import PodManager
     from kubernetes.client.exceptions import ApiException as _KubernetesApiException
 except Exception:  # pragma: no cover - local tests may not have Airflow installed.
     _AIRFLOW_CORE_AVAILABLE = _airflow_core_available()
@@ -135,6 +138,9 @@ except Exception:  # pragma: no cover - local tests may not have Airflow install
 else:
     _KUBERNETES_API_EXCEPTION_TYPES = (_KubernetesApiException,)
 
+    class _LogTransportPodManager(LogTransportPodManagerMixin, PodManager):
+        """Provider manager with an explicitly injected log transport boundary."""
+
 
 class PinnedXComSidecarKubernetesPodOperator(KubernetesPodOperator):
     def __init__(
@@ -174,6 +180,23 @@ class PinnedXComSidecarKubernetesPodOperator(KubernetesPodOperator):
         self.xcom_sidecar = xcom_sidecar
         self.inline_outcome_required_status = inline_outcome_required_status
         ensure_live_base_container_logs(self)
+
+    @cached_property
+    def _live_log_transport_boundary(self) -> LiveLogTransportBoundary:
+        return LiveLogTransportBoundary()
+
+    @cached_property
+    def pod_manager(self) -> Any:
+        """Recreate the owned manager when provider refresh invalidates its cache."""
+        if not _KUBERNETES_API_EXCEPTION_TYPES:
+            raise KubernetesPodOperatorDependencyError(
+                "DPONE_AIRFLOW_KUBERNETES_PROVIDER_UNAVAILABLE: log manager requires the Kubernetes provider"
+            )
+        return _LogTransportPodManager(
+            kube_client=self.client,
+            callbacks=self.callbacks,
+            log_transport_boundary=self._live_log_transport_boundary,
+        )
 
     def build_pod_request_obj(self, context: Any | None = None) -> Any:
         pod = super().build_pod_request_obj(context=context)
