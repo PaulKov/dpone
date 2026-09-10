@@ -50,3 +50,24 @@ scope. Live SQL/BCP is **SKIP** without an approved disposable environment;
 runtime scan reduction and performance remain **UNVERIFIED** pending DDA-06
 integration and DDA-05 measurement. Final command outcomes are recorded by the
 evidence producer in the group result files and completion report.
+
+## Integrated guide follow-up and final limitation
+
+DDA-06 subsequently supplied immutable checkpoint
+`49160c3982705b8576c50c0d06e740ae13991e08` with integrated coordinator tests and a
+57-case scoped PASS log. The owned guide was updated to describe those preliminary
+hermetic results, link the overview/test source/log and label the original
+integration recipe as historical. Final frozen integration gates and live
+performance remain separate. Agent `/root/docs_review` independently approved
+this revised guide and checked the completion report's truthful FAIL statuses.
+The docs/generated/language/strict-build gates passed again. The guide-only
+handoff is commit `ad9d96bce22a3514caaf70b0007251f1dc0c89f2`.
+
+The initial full non-live suite failed because of absent optional dependencies
+and two additional checks. After installing declared extras without changing
+the lockfile, its failed-set rerun passed 27 tests, skipped 25 and retained one
+doctor import timeout. The exact doctor case also failed in isolation. No
+unowned source or timeout was edited. Agent `/root/trace` separately confirmed
+that the catalog benchmark passes in isolation, has unchanged implementation
+and does not import DDA-02 helpers; its original aggregate failure's exact
+subgate remains unknown. See the completion report and preserved command logs.
