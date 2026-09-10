@@ -86,6 +86,32 @@ def test_fixed_observation_preserves_actual_counts_and_digest():
     assert json.loads(raw) == payload and len(raw) < 1024
 
 
+@pytest.mark.parametrize("state", [-1, 0, 1])
+def test_transaction_observations_preserve_signed_server_state(state):
+    payload = {"transaction_count": 1, "xact_state": state, "lock_mode": "Exclusive", "lock_result": -999}
+    assert json.loads(support.observation_document(payload)) == payload
+
+
+@pytest.mark.parametrize("payload", [{"xact_state": 2}, {"xact_state": True}, {"lock_mode": "PWD=secret"}])
+def test_transaction_observations_reject_unknown_states_or_raw_strings(payload):
+    with pytest.raises(ValueError):
+        support.observation_document(payload)
+
+
+def test_transaction_snapshot_records_actual_rows_before_assertions(monkeypatch):
+    properties = []
+    case = support.TrustCase(SimpleNamespace(), lambda name, value: properties.append((name, value)))
+    monkeypatch.setattr(support, "execute", lambda *args: ((1, -1, "Exclusive"),))
+    assert case.record_transaction("transaction_after_fault", object()) == ((1, -1, "Exclusive"),)
+    assert len(properties) == 1 and properties[0][0] == "dpone.trust.transaction_after_fault"
+    assert json.loads(properties[0][1]) == {
+        "result_rows": 1,
+        "lock_mode": "Exclusive",
+        "transaction_count": 1,
+        "xact_state": -1,
+    }
+
+
 def report():
     return SimpleNamespace(
         failed=True,
@@ -136,6 +162,70 @@ def test_unrelated_reports_are_not_sanitized_or_relabelled():
         SimpleNamespace(nodeid="tests/test_other.py::test_case"), SimpleNamespace(excinfo=None), value
     )
     assert repr(value) == before
+
+
+def test_failure_location_contains_only_owned_filename_and_line():
+    filename = str(Path(support.__file__).resolve())
+    try:
+        exec(compile("raise AssertionError('PWD=never-print')", filename, "exec"), {})
+    except AssertionError as error:
+        value = report()
+        support.sanitize_report(
+            SimpleNamespace(nodeid=support.LIVE_MODULE + "::test_case"),
+            SimpleNamespace(excinfo=SimpleNamespace(value=error)),
+            value,
+        )
+    assert ("dpone.trust.failure_location", "nonproduction_mssql_trust_live_support.py:1") in value.user_properties
+    assert "never-print" not in repr(value) and filename not in repr(value)
+
+
+def test_failure_diagnostics_survive_real_pytest_teardown_into_junit(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    junit = tmp_path / "failure.xml"
+    script = """
+import sys
+import pytest
+from tests.integration.composition import nonproduction_mssql_trust_live_support as support
+class Fault:
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_runtest_setup(self, item):
+        support.observation_document({'password': 'never-print'})
+raise SystemExit(pytest.main(sys.argv[1:], plugins=[Fault()]))
+"""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            script,
+            "-p",
+            "tests.integration.composition.nonproduction_mssql_trust_live_support",
+            support.LIVE_MODULE + "::test_insufficient_transaction_lock_never_returns_trust",
+            "-o",
+            "junit_family=xunit1",
+            "--junitxml",
+            str(junit),
+            "--tb=no",
+        ],
+        cwd=root,
+        env=os.environ
+        | {
+            "DPONE_RUN_COMPOSITION_MSSQL_TRUST_LIVE": "0",
+            "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+            "PYTHONPATH": os.pathsep.join((str(root / "src"), str(root))),
+            "PYTEST_ADDOPTS": "",
+            "PYTEST_PLUGINS": "",
+        },
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode == 1
+    case = ElementTree.parse(junit).getroot().find(".//testcase")
+    assert case is not None and case.find("error") is not None
+    properties = {item.attrib["name"]: item.attrib["value"] for item in case.findall("properties/property")}
+    assert properties["dpone.trust.failure"] == "assertion_or_fixture_failure"
+    assert properties["dpone.trust.failure_location"].startswith("nonproduction_mssql_trust_live_support.py:")
+    assert "never-print" not in junit.read_text()
 
 
 def test_fixed_report_inventory_cannot_grow_through_duplicate_properties():

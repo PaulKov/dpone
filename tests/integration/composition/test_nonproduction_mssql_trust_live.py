@@ -210,6 +210,7 @@ def test_insufficient_transaction_lock_never_returns_trust(trust_case):
     refusals = 0
     with closing(case.database.connect()) as connection, closing(connection.cursor()) as cursor:
         ledger = CompositionMssqlLedger(cursor, case.schema)
+        case.record_transaction("transaction_initial", connection)
         with pytest.raises(NonproductionAuthorityError, match="trust_ledger_lock"):
             case.provider().read_revision_in(ledger)
         refusals += 1
@@ -222,6 +223,11 @@ def test_insufficient_transaction_lock_never_returns_trust(trust_case):
                     COMPOSITION_MSSQL_LEDGER_LOCK,
                     mode,
                 )
+                acquisition = {"result_rows": len(locked)}
+                if len(locked) == 1 and len(locked[0]) == 1:
+                    acquisition["lock_result"] = locked[0][0]
+                case.record("transaction_" + mode.lower() + "_acquire", acquisition)
+                case.record_transaction("transaction_" + mode.lower(), connection)
                 assert len(locked) == 1 and locked[0][0] >= 0
                 if mode == "Exclusive":
                     # A real server constraint failure dooms this transaction.
@@ -231,12 +237,18 @@ def test_insufficient_transaction_lock_never_returns_trust(trust_case):
                         "INSERT INTO #trust_fault VALUES (1); BEGIN TRY INSERT INTO #trust_fault VALUES (1); "
                         "END TRY BEGIN CATCH SELECT XACT_STATE(); END CATCH;",
                     )
+                    fault = {"result_rows": len(state)}
+                    if len(state) == 1 and len(state[0]) == 1:
+                        fault["xact_state"] = state[0][0]
+                    case.record("transaction_fault", fault)
+                    case.record_transaction("transaction_after_fault", connection)
                     assert state == ((-1,),)
                 with pytest.raises(NonproductionAuthorityError, match="trust_ledger_lock"):
                     case.provider().read_revision_in(ledger)
                 refusals += 1
             finally:
                 execute(connection, "IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;")
+        case.record_transaction("transaction_final", connection)
         assert execute(connection, "SELECT @@TRANCOUNT,XACT_STATE();") == ((0, 0),)
     assert case.provider().read_revision().revision == 1
     case.record("transaction", {"rows": len(case.rows()), "denied": refusals})

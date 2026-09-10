@@ -14,6 +14,7 @@ import os
 import platform
 import re
 from contextlib import closing, contextmanager
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -21,7 +22,7 @@ from tests.integration.composition.mssql_gate_live_provisioning import SqlFailur
 from tests.integration.composition.mssql_store_live_support import OwnedDatabase
 from tests.nonproduction_signature_helpers import github_policy, trust
 
-from dpone.adapters.composition_mssql_schema import render_composition_mssql_schema
+from dpone.adapters.composition_mssql_schema import COMPOSITION_MSSQL_LEDGER_LOCK, render_composition_mssql_schema
 from dpone.adapters.nonproduction_mssql_schema import (
     render_nonproduction_mssql_schema,
     require_nonproduction_mssql_schema,
@@ -38,6 +39,14 @@ _OBSERVATIONS = {
     "invalid",
     "drift",
     "transaction",
+    "transaction_initial",
+    "transaction_shared_acquire",
+    "transaction_shared",
+    "transaction_exclusive_acquire",
+    "transaction_exclusive",
+    "transaction_fault",
+    "transaction_after_fault",
+    "transaction_final",
     "ack",
     "permissions",
 }
@@ -54,6 +63,8 @@ _COUNTS = {
     "winners",
     "restored",
     "allowed",
+    "result_rows",
+    "transaction_count",
 }
 _HASHES = {"policy_sha256", "verifier_policy_sha256", "trigger_sha256"}
 _REASONS = {
@@ -65,6 +76,7 @@ _REASONS = {
     "trust_control_authority",
     "trust_environment",
 }
+_FAILURE_DIAGNOSTICS = pytest.StashKey[list[tuple[str, str]]]()
 
 
 def require_owned_database(env, *, system, machine):
@@ -86,6 +98,12 @@ def observation_document(payload):
         if key in _HASHES and type(value) is str and re.fullmatch(r"sha256:[0-9a-f]{64}", value):
             continue
         if key == "sql_error" and type(value) is int and 1 <= value <= 999999:
+            continue
+        if key == "xact_state" and type(value) is int and value in {-1, 0, 1}:
+            continue
+        if key == "lock_result" and type(value) is int and value in {-999, -3, -2, -1, 0, 1}:
+            continue
+        if key == "lock_mode" and type(value) is str and value in {"NoLock", "Shared", "Exclusive", "Update"}:
             continue
         raise ValueError("unsafe_trust_observation")
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -231,6 +249,19 @@ class TrustCase:
             raise ValueError("unsafe_trust_observation_name")
         self.record_property("dpone.trust." + name, observation_document(payload))
 
+    def record_transaction(self, name, connection):
+        """Observe the real connection before a refusal; never infer batch state."""
+        rows = execute(
+            connection,
+            "SELECT @@TRANCOUNT,XACT_STATE(),APPLOCK_MODE(N'public', ?, N'Transaction');",
+            COMPOSITION_MSSQL_LEDGER_LOCK,
+        )
+        payload = {"result_rows": len(rows)}
+        if len(rows) == 1 and len(rows[0]) == 3:
+            payload.update(zip(("transaction_count", "xact_state", "lock_mode"), rows[0], strict=True))
+        self.record(name, payload)
+        return rows
+
     def cleanup(self):
         if self.admin is not None:
             try:
@@ -260,6 +291,8 @@ def sanitize_report(item, call, report):
     """Change only this module's diagnostics, preserving its actual result state."""
     if item.nodeid.split("::", 1)[0] != LIVE_MODULE:
         return
+    stash = getattr(item, "stash", None)
+    diagnostics = stash.get(_FAILURE_DIAGNOSTICS, []) if stash is not None else []
     safe = []
     seen = set()
     for name, value in report.user_properties:
@@ -279,11 +312,32 @@ def sanitize_report(item, call, report):
         elif isinstance(error, NonproductionAuthorityError) and type(error.reason) is str and error.reason in _REASONS:
             reason = error.reason
         report.longrepr = "SQL trust component failed: " + reason
-        safe.append(("dpone.trust.failure", reason))
+        diagnostics = [("dpone.trust.failure", reason)]
+        location = _failure_location(error)
+        if location is not None:
+            diagnostics.append(("dpone.trust.failure_location", location))
+        if stash is not None:
+            stash[_FAILURE_DIAGNOSTICS] = diagnostics
     elif report.skipped:
         report.longrepr = (LIVE_MODULE, 0, "requires explicit disposable Linux SQL trust runner")
-    report.user_properties = safe
+    # JUnit reads properties from teardown, after the failure report was emitted.
+    report.user_properties = safe + diagnostics
     report.sections = []
+
+
+def _failure_location(error):
+    """Expose only an owned basename and line, never source, locals or traceback."""
+    sources = {Path(__file__).resolve(), Path(__file__).with_name(Path(LIVE_MODULE).name).resolve()}
+    frame = error.__traceback__ if isinstance(error, BaseException) else None
+    location = None
+    for _ in range(64):
+        if frame is None:
+            break
+        source = Path(frame.tb_frame.f_code.co_filename).resolve()
+        if source in sources and 1 <= frame.tb_lineno <= 999999:
+            location = f"{source.name}:{frame.tb_lineno}"
+        frame = frame.tb_next
+    return location
 
 
 @pytest.hookimpl(hookwrapper=True)
