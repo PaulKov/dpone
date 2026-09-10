@@ -92,6 +92,35 @@ limits. Enforce them before reads and while streaming. Source bytes and actual
 HTTP payload bytes remain separate measurements. These are campaign limits,
 not performance certification.
 
+The initial protected counter implementation uses environment/campaign/phase
+pools for distinct workload membership and attempt counts. Qualification export
+rows and source bytes additionally select the exact six-dimensional route;
+execution export rows and source bytes share the whole execution campaign pool.
+Each workload also obeys its lower signed ceiling. Neither grant UUID, policy
+digest, deployment nor activation creates a fresh campaign pool. Replacement
+grants therefore cannot reset consumption. Reservations and measured usage are
+separate: unresolved reservations remain charged, with no automatic refund.
+
+For the initial two export cells, source bytes retain the existing producer
+meaning: complete BCP-native file bytes including field framing for MSSQL, and
+COPY payload bytes before optional gzip after the existing typed source
+projection for PostgreSQL. Actual ClickHouse body payload bytes are measured
+separately at the sender; failed sends retain an incomplete observation and their
+reservation. A complete finite, immutable source-export bound is reserved before
+starting BCP or COPY, covering driver/process read-ahead. Bounded fixture keys,
+types, schema/query pins and actual closed source writers establish that bound;
+expected row counts or statistics alone do not. Unbounded generated dbt outputs
+remain unsupported until their source bound is independently established. No
+TOP/LIMIT clipping or truncating cast may manufacture a complete snapshot.
+
+Protected admission authenticates outside the short global SQL transaction.
+It privately brackets verification with equal append-only trust revisions and
+original snapshots, then rechecks that revision, exact bytes, time and ownership
+inside the transaction that consumes the grant or reserves RUNNING and budgets.
+Authentication results supplied by a caller cannot replace those operations.
+The monotonic trust revision prevents an intervening policy change from being
+hidden by restoring old policy bytes.
+
 Only newly isolated, independently enrolled synthetic PostgreSQL, SQL Server
 and single-node ClickHouse participants qualify. No production reads, business
 fixtures, ambient legacy writers or arbitrary development data are authorized.

@@ -20,6 +20,9 @@
   Protected counters, physical enrollment and complete worker enforcement remain
   required before scoped execution. Existing production/native-v2 authority
   remains unchanged.
+  Add explicit grant-bound activation requests and a read-only SQL provider for
+  externally provisioned append-only trust revisions. Preserve old request
+  decoding and transaction behavior through shared structural/admission helpers.
 
 - Add concrete SQL Server persistence for complete composition occurrences and
   cross-connector guards, with independent commit readback and exact protected

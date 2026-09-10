@@ -26,6 +26,8 @@ authority and reject the new family.
 | `dpone.runtime.nonproduction_authentication.NonproductionGrantAuthenticator` | Authenticate original qualification/execution grants and refresh independent trust after verification |
 | `dpone.ports.nonproduction_authentication.NonproductionTrustProvider` | Supply an independently configured policy, verifier-policy pins and current revocation snapshot |
 | `dpone.adapters.nonproduction_github_signature.GitHubNonproductionGrantSignatureVerifier` | Bind external signer expectations and pass exact original bytes to the injected `GitHubArtifactAttestationVerifier` |
+| `dpone.contracts.nonproduction_activation.NonproductionCompositionActivationRequest` | Encode the distinct full activation request with its mandatory execution-grant digest |
+| `dpone.adapters.nonproduction_mssql_trust.MssqlNonproductionTrustProvider` | Reopen independently provisioned SQL trust revisions and compare them inside an existing admission transaction |
 
 Documents reject unknown and duplicate members, noncanonical JSON, non-finite
 numbers, ambiguous types and unsupported discriminators. New authority document
@@ -66,6 +68,75 @@ other claims cannot obtain a new replay key. Protected storage must bind that
 key to the exact original grant bytes and phase-specific subjects. A digest alone
 cannot establish that a qualification was consumed or an execution was admitted.
 Expiry or revocation never releases an unknown attempt's physical ownership.
+
+The approved implementation algorithm uses campaign/phase pools for workload
+and attempt counts, exact route pools for qualification export rows/bytes, and
+a campaign-wide execution export pool. Changed grants or activations cannot
+reset those pools. Reserve the verified finite immutable export bound before
+BCP/COPY starts; separately retain actual complete or incomplete measurements.
+This counter and source-seal enforcement is still pending, as described in the
+[specification](feature-specs/nonproduction-composition-authority.md).
+
+## Protected SQL trust revisions
+
+An independent platform administrator installs
+`render_nonproduction_mssql_schema(control_schema="dpone_control")` from
+`dpone.adapters.nonproduction_mssql_schema` into the existing control database.
+This one-time renderer creates `composition_nonproduction_trust` and its exact
+append trigger. Runtime never installs, repairs, updates or selects trust from a
+grant. Reapplying the initial renderer fails rather than adopting existing data.
+
+Provision the original policy/verifier bytes, independently selected digests,
+environment UUID, schema version, consecutive revision and revocation epoch.
+The trigger serializes one-row appends with the existing transaction-owned
+composition lock, rejects UPDATE/DELETE and requires the next revision and a
+nondecreasing epoch. Exact original bytes remain VARBINARY; installed SQL module
+identity instead uses the renderer's NVARCHAR/UTF-16 hash.
+
+Construct `MssqlNonproductionTrustProvider` with an independently protected
+connection factory, `expected_service_id`, `expected_environment_id` and optional
+control schema. `read()` preserves the existing authenticator snapshot API.
+`read_revision()` returns a documentary revision plus the full original snapshot
+from a fresh connection. Both verify pinned service/environment, schema, trigger,
+bounded bytes/hashes and policy/epoch consistency. Uncertain reads or commits
+return no trusted observation.
+
+`read_revision_in(ledger)` and `require_revision_in(ledger, expected)` inspect an
+existing committable transaction holding the exact Exclusive transaction-owned
+composition lock. They neither connect nor commit. Protected admission can
+privately bracket signature verification with equal revisions, then recheck the
+same revision/bytes and clock inside its atomic grant/budget/attempt transaction.
+The current component provides the read/compare capability; that complete
+consumption transaction remains pending.
+
+The platform must separately establish complete catalog visibility and prevent
+provisioners from altering/truncating tables, disabling triggers, impersonating
+privileged principals or otherwise bypassing append-only enforcement. Catalog
+hashes and RLS rejection detect drift; they do not prove effective permissions.
+Actual installation, concurrent appends and no-bypass permissions still require
+isolated SQL qualification. A constructed revision is never an executor permit.
+
+## Scoped activation request
+
+`NonproductionCompositionActivationRequest` carries the complete existing request
+fields plus mandatory `execution_grant_sha256` under
+`dpone.composition-activation-request.nonproduction.v1`. It requires all three
+initial execution cells, their native/standalone assignments, at most 64 workloads
+and the complete unique physical-write partition. The request digest covers the
+grant and exact canonical bytes; physical guards and `runtime_context_sha256`
+retain their previous meanings.
+
+Use `to_bytes()` and the explicit `from_bytes(raw)` reader for this family.
+Protected persistence must separately compare the independently expected request
+digest. The old v1 reader continues rejecting the new document. Existing attempt
+and receipt shapes can bind its new request digest without an optional scope
+field or legacy-family fallback.
+
+`require_execution_grant(grant)` compares the exact grant digest, parent release,
+deployment, activation and complete workload/constituent/pack membership. This
+is a pure comparison; it does not verify signatures, native ancestry, physical
+scope, time or consumption. Concrete scoped persistence and worker factories
+remain unavailable.
 
 ## Required runtime verification
 
