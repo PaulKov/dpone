@@ -19,6 +19,7 @@ OWNED_TESTS = [
     "tests/test_runtime_partition_replace_native_contracts.py",
 ]
 CHECKS = {
+    "producer": ["uv", "run", "pytest", "test_artifacts/delivery-acceleration/dda-04/test_check_evidence.py", "-q"],
     "focused": ["uv", "run", "pytest", *OWNED_TESTS, "-q", "--junitxml=" + str(OUTPUT / "focused-junit.xml")],
     "contract": [
         "uv",
@@ -58,8 +59,39 @@ def git(*args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=ROOT, text=True).strip()
 
 
+def source_identity() -> dict[str, str]:
+    paths = git(
+        "ls-files",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+        "--",
+        "src",
+        "tests",
+        "docs",
+        "tools",
+        "pyproject.toml",
+        "uv.lock",
+        "mypy.ini",
+        "mkdocs.yml",
+    )
+    content = hashlib.sha256()
+    for name in sorted(set(paths.splitlines())):
+        path = ROOT / name
+        content.update(name.encode() + b"\0")
+        content.update(path.read_bytes() if path.is_file() else b"MISSING")
+        content.update(b"\0")
+    return {
+        "head": git("rev-parse", "HEAD"),
+        "tree": git("rev-parse", "HEAD^{tree}"),
+        "source_sha256": content.hexdigest(),
+        "producer_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    }
+
+
 def run(name: str) -> None:
-    head = git("rev-parse", "HEAD")
+    before = source_identity()
+    head = before["head"]
     command = CHECKS.get(name)
     if name == "module-size":
         base = git("merge-base", head, "origin/master")
@@ -84,14 +116,19 @@ def run(name: str) -> None:
     env = dict(os.environ, PYTEST_XDIST_AUTO_NUM_WORKERS="2")
     with (OUTPUT / (name + ".log")).open("w") as output:
         process = subprocess.run(command, cwd=ROOT, env=env, stdout=output, stderr=subprocess.STDOUT, check=False)
+    after = source_identity()
+    unchanged = before == after
     record = {
         "name": name,
         "command": command,
         "head": head,
         "planning_dependency": "f3682940f8864563cde0e6b6ecee60f746b49020",
-        "diff_sha256": hashlib.sha256(git("diff", "HEAD", "--", "src", "tests", "docs").encode()).hexdigest(),
+        "source_before": before,
+        "source_after": after,
+        "source_unchanged": unchanged,
         "dirty": bool(git("status", "--porcelain")),
-        "status": "PASS" if process.returncode == 0 else "FAIL",
+        "status": ("PASS" if process.returncode == 0 else "FAIL") if unchanged else "UNVERIFIED",
+        "reason": None if unchanged else "Source or producer identity changed during the check",
         "exit_code": process.returncode,
         "duration_seconds": round(time.time() - started, 3),
         "log": name + ".log",
