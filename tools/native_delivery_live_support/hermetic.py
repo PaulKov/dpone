@@ -2,7 +2,10 @@
 
 from pathlib import Path
 
-from .execution import Snapshot
+from .artifacts import ArtifactStore
+from .execution import ExecutionAdapter, Snapshot
+from .profiles import Dataset
+from .runner import configuration, route_record, run_benchmark
 
 
 class HermeticRouteSession:
@@ -94,3 +97,25 @@ class HermeticRouteFactory:
         session = HermeticRouteSession(dataset, case, clock)
         self.sessions.append(session)
         return session
+
+
+LIMITS = {
+    "max_total_encoded_bytes": 104857600,
+    "stage_allocated_bytes_stop_threshold": 104857600,
+    "max_rows": 16,
+    "max_bytes": 1048576,
+    "max_row_bytes": 65536,
+    "max_pending": 2,
+    "max_staging_tables": 128,
+    "parallelism": 1,
+}
+
+
+def produce_fixture(tmp_path, factory=None):
+    return run_benchmark(
+        adapter=ExecutionAdapter(factory or HermeticRouteFactory(), "candidate"),
+        dataset=Dataset("unicode", 16),
+        config=configuration(LIMITS),
+        route=route_record("partition_replace", "bounded_native"),
+        store=ArtifactStore(tmp_path / "run.json"),
+    )

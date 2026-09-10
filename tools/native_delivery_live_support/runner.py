@@ -10,7 +10,7 @@ from .artifacts import ArtifactStore, digest
 from .correctness import RECOVERY_CHECKS, SAMPLE_CHECKS, aggregate, check, failure_recovery, receipt, snapshot_checks
 from .execution import DeliveryClock, ExecutionAdapter, environment_record, git_identity, measured, unavailable
 from .maintenance import record_owner
-from .profiles import Dataset
+from .profiles import Dataset, capture_rows
 from .resources import ProcessTreeRss
 
 
@@ -153,7 +153,7 @@ def _trial(
             raise ValueError("trial_identity_drift")
         session = adapter.factory.open(dataset, case=sample_id, clock=clock)
         record_owner(store, session, sample_id)
-        before_outside = tuple(session.snapshot().outside_rows)
+        before_outside = capture_rows(session.snapshot().outside_rows)
         with ProcessTreeRss() as rss:
             session.run()
             visibility, pipeline = clock.finish()

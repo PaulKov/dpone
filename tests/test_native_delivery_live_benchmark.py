@@ -16,22 +16,13 @@ from tools.native_delivery_live_support.execution import (
     measured,
     unavailable,
 )
+from tools.native_delivery_live_support.hermetic import LIMITS
 from tools.native_delivery_live_support.hermetic import HermeticRouteFactory as FakeFactory
 from tools.native_delivery_live_support.hermetic import HermeticRouteSession as FakeSession
+from tools.native_delivery_live_support.hermetic import produce_fixture as produce
 from tools.native_delivery_live_support.profiles import PROFILES, Dataset, exact_multiset
-from tools.native_delivery_live_support.runner import configuration, route_record, run_benchmark
+from tools.native_delivery_live_support.runner import configuration
 from tools.native_delivery_live_support.validation import require_comparable, validate_metric, validate_run
-
-LIMITS = {
-    "max_total_encoded_bytes": 104857600,
-    "stage_allocated_bytes_stop_threshold": 104857600,
-    "max_rows": 16,
-    "max_bytes": 1048576,
-    "max_row_bytes": 65536,
-    "max_pending": 2,
-    "max_staging_tables": 128,
-    "parallelism": 1,
-}
 
 
 @pytest.fixture
@@ -47,16 +38,6 @@ def fake_rss(monkeypatch):
             return unavailable("bytes", "hermetic_no_process_sampling")
 
     monkeypatch.setattr("tools.native_delivery_live_support.runner.ProcessTreeRss", NoProcessSampler)
-
-
-def produce(tmp_path, factory=None):
-    return run_benchmark(
-        adapter=ExecutionAdapter(factory or FakeFactory(), "candidate"),
-        dataset=Dataset("unicode", 16),
-        config=configuration(LIMITS),
-        route=route_record("partition_replace", "bounded_native"),
-        store=ArtifactStore(tmp_path / "run.json"),
-    )
 
 
 @pytest.mark.parametrize("profile", PROFILES)
@@ -485,3 +466,50 @@ def test_live_factory_setup_failure_has_no_driver_exception_chain(tmp_path, monk
     with pytest.raises(pytest.fail.Exception) as error:
         live_factory("full_refresh", "bounded_native")
     assert error.value.__context__ is None and "secret" not in str(error.value)
+
+
+def test_capture_freezes_reused_row_dictionaries():
+    from tools.native_delivery_live_support.profiles import capture_rows
+
+    row = {"value": 0}
+
+    def reused():
+        for value in range(3):
+            row["value"] = value
+            yield row
+
+    captured = capture_rows(reused())
+    row["value"] = 99
+    assert captured == ({"value": 0}, {"value": 1}, {"value": 2})
+
+
+@pytest.mark.parametrize("phase", ["publish", "unknown_recovery"])
+def test_outside_window_snapshots_cannot_be_rewritten_in_place(tmp_path, fake_rss, monkeypatch, phase):
+    original_publish, original_recover = FakeSession._publish, FakeSession.recover
+
+    def corrupt_publish(self):
+        original_publish(self)
+        if phase == "publish":
+            self.outside[0]["outside"] = "changed"
+
+    def corrupt_recovery(self, *, source_allowed):
+        if phase == "unknown_recovery" and not self.known:
+            self.outside[0]["outside"] = "changed"
+        original_recover(self, source_allowed=source_allowed)
+
+    monkeypatch.setattr(FakeSession, "_publish", corrupt_publish)
+    monkeypatch.setattr(FakeSession, "recover", corrupt_recovery)
+    report = produce(tmp_path)
+    assert report["status"] == "FAIL"
+    assert report["recovery_receipt"]["status"] == "FAIL"
+
+
+def test_full_refresh_unknown_commit_may_replace_all_old_rows(monkeypatch):
+    original = FakeSession._publish
+
+    def publish(self):
+        original(self)
+        self.outside.clear()
+
+    monkeypatch.setattr(FakeSession, "_publish", publish)
+    assert all(c["status"] == "PASS" for c in failure_recovery(FakeFactory(), Dataset("narrow", 16), "full_refresh"))

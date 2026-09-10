@@ -39,6 +39,20 @@ def exact_multiset(rows: Iterable[Mapping[str, object]]) -> Counter[bytes]:
     return Counter(canonical_json({k: typed_value(v) for k, v in row.items()}) for row in rows)
 
 
+def capture_rows(rows: Iterable[Mapping[str, object]]) -> tuple[dict[str, object], ...]:
+    """Freeze a snapshot before execution; driver iterators may reuse row mappings.
+
+    Accepted fixture values are immutable scalars. Reject mutable/unsupported
+    values here so later mutation cannot rewrite the before-image evidence.
+    """
+    captured = []
+    for row in rows:
+        for value in row.values():
+            typed_value(value)
+        captured.append(dict(row))
+    return tuple(captured)
+
+
 def multiset_summary(counts: Counter[bytes]) -> dict[str, object]:
     """Non-value diagnostic summary; equality is checked on the full counters."""
     import hashlib
