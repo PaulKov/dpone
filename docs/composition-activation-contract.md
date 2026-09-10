@@ -13,6 +13,11 @@ for artifact delivery, and [the approved specification](feature-specs/compositio
 for the full execution scope. A successful source read, plan, fake-adapter test,
 cache install or launcher prepare does not certify SQL execution.
 
+The separate [ClickHouse snapshot component](composition-clickhouse-snapshots.md)
+defines strict whole-snapshot intents and one-time EXCHANGE/recovery policy.
+Concrete ClickHouse gate, catalog, storage and worker qualification remain
+required before that component can participate in actual parent execution.
+
 ## Concrete SQL Server persistence
 
 `dpone.adapters.composition_mssql_store.MssqlCompositionActivationStore`
