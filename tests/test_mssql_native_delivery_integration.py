@@ -88,7 +88,7 @@ def delivery_fixture(tmp_path, rows, *, tamper=None):
         max_total_encoded_bytes=10000,
         stage_allocated_bytes_stop_threshold=10000,
         max_rows=2,
-        max_bytes=1024,
+        max_bytes=4096,
         max_row_bytes=4,
         parallelism=1,
     )
@@ -177,10 +177,21 @@ def test_integrated_fresh_delivery_keeps_four_raw_and_two_prepared_readbacks(tmp
     ],
 )
 def test_integrated_tamper_is_rejected_at_each_retained_boundary(tmp_path, tamper, code):
-    preparer, config, payload, _connector, context, closed = delivery_fixture(tmp_path, [(7,)], tamper=tamper)
-    with pytest.raises(ValueError, match=code):
+    prepublication = tamper[:2] in {("raw", 4), ("prepared", 2)}
+    preparer, config, payload, connector, context, closed = delivery_fixture(
+        tmp_path, [(7,)], tamper=None if prepublication else tamper
+    )
+    if prepublication:
+        # Establish the durable prepared boundary before enabling corruption;
+        # rejection during stage() cannot prove independent prepublication checks.
         prepared = preparer.stage(config, payload)
-        preparer.reverify(prepared)
+        assert context.journal_factory().publication.state()["phase"] == "prepared"
+        connector.tamper = tamper
+        with pytest.raises(ValueError, match=code):
+            preparer.reverify(prepared)
+    else:
+        with pytest.raises(ValueError, match=code):
+            preparer.stage(config, payload)
     state = context.journal_factory().publication.state()
     assert state is None or state["phase"] in {"preparing", "prepared"}
     assert closed == [True]

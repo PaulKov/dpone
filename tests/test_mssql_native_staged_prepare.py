@@ -60,8 +60,23 @@ class MemoryConnector:
             self.properties[self.qualified_name(params[1], params[2], database="db")] = params[0]
         elif sql.startswith("INSERT INTO "):
             target = sql.split("INSERT INTO ", 1)[1].split(" (", 1)[0]
-            for select in sql.split(") ", 1)[1].split(" UNION ALL "):
-                self.tables[target].extend(dict(row) for row in self.tables[select.split(" FROM ", 1)[1]])
+            # A deliberately finite SQL storage double: execute the explicit raw
+            # SELECT/UNION ALL source and validate the canonical metadata clauses.
+            # Full expression/type parity is covered by the helper and live tests.
+            sources = re.findall(r"FROM (\[[^]]+\]\.\[[^]]+\]\.\[[^]]+\])", sql)
+            for source in sources:
+                self.tables[target].extend(dict(row) for row in self.tables[source])
+            if "AS [__dpone__load_id]" in sql:
+                assert "N'load' AS [__dpone__load_id]" in sql
+                assert "HASHBYTES" in sql
+                assert "AS [__dpone__loaded_at]" in sql and "AS [__dpone__extracted_at]" in sql
+                for row in self.tables[target]:
+                    row.update(
+                        __dpone__load_id="load",
+                        __dpone__loaded_at=datetime(2026, 1, 1),
+                        __dpone__row_id="f" * 64,
+                        __dpone__extracted_at=datetime(2026, 1, 1),
+                    )
         elif sql.startswith("UPDATE n SET "):
             target = sql.rsplit(" FROM ", 1)[1].removesuffix(" AS n")
             assert "[__dpone__load_id] = N'load'" in sql

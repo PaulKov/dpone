@@ -216,6 +216,18 @@ class MssqlNativeStagingNormalizer:
     ) -> StagingTableArtifact:
         """Finalize a one-table business-prefix BCP materialization."""
 
+        self._validate_direct_native(load_config, native, schema, resolved)
+        self._project_authoritative_metadata(native, resolved, lineage)
+        return self._complete_direct_native(load_config, native, resolved, lineage)
+
+    def _validate_direct_native(
+        self,
+        load_config: Any,
+        native: StagingTableArtifact,
+        schema: Sequence[tuple[str, str]],
+        resolved: ResolvedMssqlNativeSchema,
+    ) -> None:
+        """Validate the typed stage and required keys before issuing evidence."""
         wire_names = tuple(str(name) for name, _dtype in schema)
         if (
             not native.typed_file_ingestion
@@ -227,10 +239,18 @@ class MssqlNativeStagingNormalizer:
             or native.bulk_text_codec is not None
         ):
             _raise("mssql_native_projection.direct_staging_contract_invalid")
+        self._validate_required_keys(native, mssql_unique_keys(load_config))
+
+    def _complete_direct_native(
+        self,
+        load_config: Any,
+        native: StagingTableArtifact,
+        resolved: ResolvedMssqlNativeSchema,
+        lineage: Any,
+    ) -> StagingTableArtifact:
+        """Check projected key/count semantics and finalize consumed evidence."""
         keys = mssql_unique_keys(load_config)
         equality_keys = mssql_equality_keys(load_config, keys)
-        self._validate_required_keys(native, keys)
-        self._project_authoritative_metadata(native, resolved, lineage)
         self._validate_key_sql_semantics(native, keys, equality_keys)
         actual_rows = self._count_rows(native)
         if actual_rows != native.row_count:
