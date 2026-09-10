@@ -7,8 +7,6 @@ from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
-from dpone.contracts.mssql_database_authority import MssqlDatabaseAuthorityPin
-from dpone.contracts.runtime_connection import ResolvedBindingConnection
 from dpone.runtime.credentials.resolved_connector_factory import ResolvedConnectorFactory
 from dpone.runtime.state.mssql_database_authority_errors import (
     MssqlDatabaseAuthorityVerificationError,
@@ -18,6 +16,8 @@ from dpone.runtime.state.mssql_database_authority_errors import (
 )
 
 if TYPE_CHECKING:
+    from dpone.contracts.mssql_database_authority import MssqlDatabaseAuthorityPin
+    from dpone.contracts.runtime_connection import ResolvedBindingConnection
     from dpone.runtime.state.mssql_database_authority import MssqlDatabaseAuthorityVerifier
 
 MSSQL_DATABASE_AUTHORITY_CONNECT_TIMEOUT_SECONDS = 10

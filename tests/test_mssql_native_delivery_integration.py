@@ -63,7 +63,7 @@ class DeliveryConnector(MemoryConnector):
         return super().get_records_iterator(sql)
 
 
-def delivery_fixture(tmp_path, rows, *, tamper=None):
+def delivery_fixture(tmp_path, rows, *, tamper=None, observer=None):
     connector = DeliveryConnector(tamper)
     manager = MSSQLStagingManager(connector)
     strategy = MSSQLFullRefreshStrategy(connector, SimpleNamespace(), manager)
@@ -104,10 +104,11 @@ def delivery_fixture(tmp_path, rows, *, tamper=None):
             assert_lease=store.assert_lease,
             mutation_scope=lambda *args: nullcontext(),
             options_factory=BcpOptions,
+            observer=observer,
         )
 
     executor = BoundedNativeChunks(
-        store=store, importer_factory=importer_factory, work_dir=tmp_path / "files", limits=limits
+        store=store, importer_factory=importer_factory, work_dir=tmp_path / "files", limits=limits, observer=observer
     )
 
     def verify(receipts):
@@ -135,6 +136,7 @@ def delivery_fixture(tmp_path, rows, *, tamper=None):
         lambda: NativeChunkJournal(store, lease, plan),
         nullcontext,
         max_row_bytes=4,
+        observer=observer,
     )
     base = prepared_fixture()
     payload = SimpleNamespace(
@@ -194,4 +196,34 @@ def test_integrated_tamper_is_rejected_at_each_retained_boundary(tmp_path, tampe
             preparer.stage(config, payload)
     state = context.journal_factory().publication.state()
     assert state is None or state["phase"] in {"preparing", "prepared"}
+    assert closed == [True]
+
+
+@pytest.mark.parametrize("rows", [[], [(7,), (7,), (7,)]])
+def test_observed_delivery_reports_actual_boundaries_and_preserves_journal(tmp_path, rows):
+    import os
+
+    from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
+
+    observer = BoundedNativeDeliveryObserver()
+    preparer, config, payload, connector, context, closed = delivery_fixture(tmp_path, rows, observer=observer)
+    prepared = preparer.stage(config, payload)
+    preparer.reverify(prepared)
+    report = observer.snapshot()
+    assert report["status"] == "PASS"
+    spans = report["observations"]
+    assert {item["reason"] for item in spans if item["phase"] == "raw_verify"} == {
+        "import",
+        "immediate_inspection",
+        "preparation",
+        "prepublication",
+    }
+    assert [item["reason"] for item in spans if item["phase"] == "prepared_verify"] == ["preparation", "prepublication"]
+    assert len([item for item in spans if item["phase"] == "bcp"]) == (2 if rows else 0)
+    encoded = [item for item in spans if item["phase"] == "encode"]
+    assert encoded and all(item["process_id"] != os.getpid() for item in encoded)
+    frames = [item for item in spans if item["phase"] == "frame_build"]
+    assert all(item["metrics"]["source_read_work_seconds"]["availability"] == "measured" for item in frames)
+    assert all(item["metrics"]["source_adapt_work_seconds"]["value"] is None for item in frames)
+    assert all("schema_version" not in item for item in context.journal_factory().completed().observations)
     assert closed == [True]

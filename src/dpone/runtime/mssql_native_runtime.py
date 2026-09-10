@@ -13,14 +13,18 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from threading import Event, Thread
 from time import monotonic
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.bounded_window import WindowContractError, WindowLease
 from dpone.contracts.process_types import ProcessResult
 from dpone.manifest.mssql_native_policy import validate_native_config
 from dpone.ports.bounded_window import WindowStore
 from dpone.runtime.governance.ports import StagedLoadHandle
+from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session
 from dpone.runtime.sinks.load_result import LoadResult
+
+if TYPE_CHECKING:
+    from dpone.ports.native_delivery_observer import NativeDeliveryObserver
 
 
 @dataclass(frozen=True)
@@ -47,6 +51,7 @@ class NativeMssqlRuntime:
         evidence: Callable[[Any, LoadResult, Any, WindowLease], None],
         advance_state: Callable[[Any, LoadResult, WindowLease], None],
         lease_ttl: float = 60.0,
+        observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
     ) -> None:
         if lease_ttl <= 0:
             raise ValueError("mssql_native.lease_ttl_invalid")
@@ -54,6 +59,8 @@ class NativeMssqlRuntime:
         self.bindings, self.source, self.preflight = bindings, source, preflight
         self.quality, self.evidence, self.advance_state = quality, evidence, advance_state
         self.lease_ttl = lease_ttl
+        self.observations = delivery_session(observer)
+        self._recorder = self.observations.recorder("runtime")
 
     def run(self, load_config: Any, *, owner: str) -> ProcessResult:
         """Resume target receipts before any source factory; never replay unknown commit."""
@@ -89,14 +96,16 @@ class NativeMssqlRuntime:
             if state is None:
                 raise WindowContractError("mssql_native.publication_receipt_missing")
             if state["phase"] == "published":
-                self.evidence(load_config, result, context, lease)
-                self._check(lease, lost)
-                journal.publication.evidence_complete()
+                with self._recorder.phase("evidence"):
+                    self.evidence(load_config, result, context, lease)
+                    self._check(lease, lost)
+                    journal.publication.evidence_complete()
                 state = journal.publication.state()
             if state["phase"] == "evidence-complete":
-                self.advance_state(load_config, result, lease)
-                self._check(lease, lost)
-                journal.publication.succeeded()
+                with self._recorder.phase("checkpoint"):
+                    self.advance_state(load_config, result, lease)
+                    self._check(lease, lost)
+                    journal.publication.succeeded()
             if journal.publication.state()["phase"] != "succeeded":
                 raise WindowContractError("mssql_native.incomplete_publication")
             if handle is not None:
@@ -135,7 +144,8 @@ class NativeMssqlRuntime:
     ) -> LoadResult:
         self._check(lease, lost)
         try:
-            self.quality(config, handle, lease)
+            with self._recorder.phase("quality"):
+                self.quality(config, handle, lease)
             self._check(lease, lost)
         except BaseException as error:
             try:
@@ -144,7 +154,8 @@ class NativeMssqlRuntime:
                 error.add_note(f"native prepublication cleanup failed: {type(cleanup).__name__}")
             raise
         # Finalizer owns unknown-outcome classification; never abort after intent.
-        return service.finalize(config, handle)
+        with self._recorder.phase("publish", reason="service_finalize"):
+            return service.finalize(config, handle)
 
     def _check(self, lease: WindowLease, lost: Event) -> None:
         if lost.is_set():
