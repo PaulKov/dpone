@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from dpone.manifest.airflow_resources import KubernetesResourceError, reject_resource_overrides
 from dpone.readiness.airflow_compact_pack_release_models import CompactPackReleaseError
 
 _AWS_ENV_TEMPLATES = {
@@ -114,10 +115,11 @@ def _certified_strict_dag_operator_overrides(value: object) -> dict[str, Any]:
     )
 
     raw = value if isinstance(value, Mapping) else {}
-    selected = {str(key): item for key, item in raw.items() if str(key) in STRICT_OPERATOR_OVERRIDE_FIELDS}
     try:
+        reject_resource_overrides(raw, field="operator_overrides")
+        selected = {str(key): item for key, item in raw.items() if str(key) in STRICT_OPERATOR_OVERRIDE_FIELDS}
         return validate_strict_operator_overrides(selected)
-    except InitFetchProviderError as exc:
+    except (InitFetchProviderError, KubernetesResourceError) as exc:
         raise CompactPackReleaseError(
             "DPONE_COMPACT_PACK_RELEASE_OPERATOR_OVERRIDES_INVALID",
             str(exc),

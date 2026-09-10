@@ -19,6 +19,10 @@ _MANIFEST_LIMITS = BoundedYamlLimits(max_bytes=8 * 1024 * 1024, max_tokens=100_0
 class RuntimeManifestMaterializationError(ValueError):
     """An editable manifest cannot be compiled into safe runtime input."""
 
+    def __init__(self, message: str, *, code: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+
 
 @dataclass(frozen=True, slots=True)
 class RuntimeManifestMaterialization:
@@ -64,6 +68,8 @@ def materialize_runtime_manifest(
             project_root=root,
         )
     except AuthoringCompilationError as exc:
+        if exc.code == "DPONE_AIRFLOW_RESOURCES_INVALID":
+            raise RuntimeManifestMaterializationError(str(exc), code=exc.code) from exc
         raise RuntimeManifestMaterializationError("runtime_manifest_compile_failed") from exc
     canonical_bytes = (
         json.dumps(compilation.canonical_manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n"

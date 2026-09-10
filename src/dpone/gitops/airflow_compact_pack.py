@@ -27,7 +27,6 @@ from dpone_airflow_pack.provider_execution_contract import (
     kubernetes_pod_name,
 )
 
-from dpone.gitops.airflow_asset_partition import normalize_asset_items
 from dpone.gitops.airflow_asset_uri import ResolvedMssqlAssetRegistry
 from dpone.gitops.airflow_compact_errors import AirflowCompactPackBuildError, project_compact_connections
 from dpone.gitops.airflow_compact_pack_bootstrap import (
@@ -39,6 +38,7 @@ from dpone.gitops.airflow_compact_pack_bootstrap import (
 )
 from dpone.gitops.airflow_compact_pack_helpers import (
     compact_pack_artifact_index,
+    compact_pack_execution_policy,
     compact_pack_image_pull_secrets,
     compact_pack_outcome_gate,
     compact_pack_pod_annotations,
@@ -57,6 +57,7 @@ from dpone.gitops.airflow_compact_runtime import compact_kpo_kwargs, compact_pro
 from dpone.gitops.airflow_runner_contract import resolve_airflow_runner_contract
 from dpone.gitops.workload_catalog_models import GitOpsWorkloadCatalogIssue
 from dpone.gitops.workload_dependencies import WorkloadDependencyError
+from dpone.manifest.airflow_resources import workload_airflow_resources
 from dpone.manifest.runtime_materialization import RuntimeManifestMaterializationError, materialize_runtime_manifest
 
 COMPACT_PACK_SOURCE = "dpone gitops airflow pack"
@@ -109,7 +110,7 @@ class GitOpsAirflowCompactPackReport:
             "pack_identity": {"schema": PACK_IDENTITY_SCHEMA},
             "producer": self.producer,
             "meta": {"kind": self.kind, "path": self.output_path},
-            "airflow": {"execution": self.airflow_execution or _execution_policy(effective_config)},
+            "airflow": {"execution": self.airflow_execution or compact_pack_execution_policy(effective_config)},
             "artifact_dir": self.artifact_dir,
             "output_path": self.output_path,
             "bundle_path": self.bundle_path,
@@ -183,7 +184,7 @@ class AirflowCompactPackBuilder:
                 repo_root=repo_path,
             )
         except (RuntimeManifestMaterializationError, WorkloadDependencyError) as exc:
-            raise AirflowCompactPackBuildError(str(exc)) from exc
+            raise AirflowCompactPackBuildError(str(exc), code=getattr(exc, "code", None)) from exc
         runner_contract = resolve_airflow_runner_contract(
             dict_mapping(effective.get("airflow")),
             repo_root=repo_path,
@@ -236,7 +237,7 @@ class AirflowCompactPackBuilder:
             )
         airflow_execution, outlet_warnings, outlet_blockers = execution_policy_with_inferred_outlets(
             workload=workload,
-            execution=_execution_policy(workload.effective_config),
+            execution=compact_pack_execution_policy(workload.effective_config),
             repo_root=repo_path,
             env=env,
             mssql_registry=mssql_registry,
@@ -279,16 +280,6 @@ class AirflowCompactPackBuilder:
         )
 
 
-def _execution_policy(effective_config: dict[str, Any]) -> dict[str, Any]:
-    airflow = dict_mapping(effective_config.get("airflow"))
-    execution = dict_mapping(airflow.get("execution"))
-    normalized = dict(execution)
-    for asset_field in ("inlets", "outlets"):
-        if asset_field in normalized:
-            normalized[asset_field] = normalize_asset_items(normalized[asset_field])
-    return normalized
-
-
 def _pod_spec(
     *,
     workload: GitOpsWorkloadDefinition,
@@ -300,6 +291,7 @@ def _pod_spec(
 ) -> tuple[dict[str, Any], RuntimeWorkloadPayload | None]:
     contract = runner_contract
     config = workload.effective_config
+    resources = workload_airflow_resources(config)
     airflow = dict_mapping(config.get("airflow"))
     image = str(config.get("image") or "<IMAGE>")
     namespace = str(config.get("namespace") or "default")
@@ -341,6 +333,8 @@ def _pod_spec(
             "volumes": [{"name": "dpone-worktree", "emptyDir": {}}],
         },
     }
+    if resources is not None:
+        pod["spec"]["containers"][0]["resources"] = resources
     pull_secrets = compact_pack_image_pull_secrets(airflow)
     if pull_secrets:
         pod["spec"]["imagePullSecrets"] = [{"name": secret} for secret in pull_secrets]

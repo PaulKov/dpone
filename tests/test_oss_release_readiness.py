@@ -20,7 +20,7 @@ def test_pyproject_declares_public_oss_metadata() -> None:
     project = _pyproject()["project"]
 
     assert project["name"] == "dpone"
-    assert project["version"] == "0.76.0"
+    assert project["version"] == "0.77.0"
     assert project["license"] == "Apache-2.0"
     assert project["authors"] == [{"name": "PaulKov"}]
     assert project["maintainers"] == [{"name": "PaulKov"}]
@@ -34,7 +34,7 @@ def test_pyproject_exposes_public_vault_and_full_extras() -> None:
     extras = _pyproject()["project"]["optional-dependencies"]
 
     assert extras["vault"] == ["vault-kv-client>=0.1.0,<0.2.0"]
-    assert extras["accel"] == ["dpone-native-accel==0.76.0"]
+    assert extras["accel"] == ["dpone-native-accel==0.77.0"]
     assert "vault-client" not in "\n".join(extras["vault"])
 
     full = set(extras["full"])

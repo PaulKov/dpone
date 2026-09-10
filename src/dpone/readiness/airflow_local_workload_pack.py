@@ -13,6 +13,7 @@ from typing import Any
 
 from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
 from dpone.gitops.workload_catalog_models import GitOpsConfigProvenance, GitOpsWorkloadDefinition
+from dpone.manifest.airflow_resources import manifest_airflow_resources
 from dpone.manifest.confined_files import project_relative_path, sha256_confined_file
 from dpone.readiness.airflow_authoring_dependency_integrity import (
     AuthoringDependencyIntegrityError,
@@ -43,6 +44,7 @@ def build_local_airflow_workload_pack(
 
     manifest_path = _repo_relative(root, source_path)
     domain = _domain(pipeline_payload)
+    resources = manifest_airflow_resources(pipeline_payload)
     workload = GitOpsWorkloadDefinition(
         workload_id=pipeline_id,
         manifest=manifest_path,
@@ -53,7 +55,10 @@ def build_local_airflow_workload_pack(
             "image_digest": runtime_image_digest,
             "namespace": "airflow-dev",
             "runner_policy": "advisory",
-            "airflow": {"service_account_name": "dpone-runtime"},
+            "airflow": {
+                "service_account_name": "dpone-runtime",
+                **({"resources": resources} if resources is not None else {}),
+            },
         },
         provenance={"manifest": GitOpsConfigProvenance("authoring", manifest_path, "pipeline")},
     )

@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from dpone.manifest.airflow_resources import KubernetesResourceError, manifest_airflow_resources
 from dpone.manifest.authoring import (
     AuthoringCompilation,
     AuthoringCompilationError,
@@ -63,7 +64,8 @@ def compile_pipeline_source(
         try:
             errors.extend(_universal_manifest_errors(compilation, path))
         except (ManifestConfigurationError, ValueError) as exc:
-            errors.append(_error("DPONE_AUTHORING_COMPILATION_FAILED", str(exc), path.as_posix()))
+            code = exc.code if isinstance(exc, KubernetesResourceError) else "DPONE_AUTHORING_COMPILATION_FAILED"
+            errors.append(_error(code, str(exc), path.as_posix()))
         return compilation, errors
     return None, errors
 
@@ -86,6 +88,9 @@ def authoring_check_view(
     }
     if compilation.recipe_provenance is not None:
         details["recipe_resolution"] = dict(compilation.recipe_provenance)
+    resources = manifest_airflow_resources(payload)
+    if resources is not None:
+        details["airflow_resources"] = resources
     process_view = {**payload, "processes": [dict(process) for process in compilation.processes]}
     return details, process_view
 

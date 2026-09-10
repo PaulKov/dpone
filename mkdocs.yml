@@ -128,6 +128,9 @@ nav:
       - Airflow runtime pod retention control design: feature-design-airflow-runtime-pod-retention-control-v0732.md
       - Airflow runtime activation evidence design: feature-design-airflow-runtime-activation-evidence-v0732.md
       - Airflow provider API: airflow-provider-api.md
+      - Airflow workload resources: airflow-workload-resources.md
+      - Runtime startup diagnostics: airflow-runtime-startup-diagnostics.md
+      - Hooks and resources design: feature-design-airflow-hooks-resources.md
       - Init-fetch pod retention design: feature-design-airflow-init-fetch-pod-retention-v0732.md
       - Init-fetch connection bridge design: feature-design-airflow-init-fetch-connection-bridge-v0732.md
       - Registry: registry.md

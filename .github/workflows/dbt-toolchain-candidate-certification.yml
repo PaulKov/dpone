@@ -157,14 +157,20 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           set -euo pipefail
-          PYTHONPATH="$PWD/src:$PWD" "$CERT_ROOT/venv/bin/python" -m pytest \
+          # The source checkout must include dpone's declared lightweight pack dependency.
+          export PYTHONPATH="$PWD/src:$PWD/packages/dpone-airflow-pack/src:$PWD"
+          "$CERT_ROOT/venv/bin/python" -m pytest \
             tests/test_dbt_workspace_mssql_observation_live.py -o addopts='' -q \
             --junitxml="$CERT_ROOT/workspace-observation.xml"
-          PYTHONPATH="$PWD/src" "$CERT_ROOT/venv/bin/python" - <<'PY'
+          "$CERT_ROOT/venv/bin/python" - <<'PY'
           from pathlib import Path
           import dpone.runtime.dbt_workspace_mssql_observer as observer
+          import dpone_airflow_pack.kubernetes_resources as resource_contract
           from xml.etree import ElementTree
           assert Path(observer.__file__).resolve().is_relative_to(Path.cwd() / "src")
+          assert Path(resource_contract.__file__).resolve().is_relative_to(
+              Path.cwd() / "packages/dpone-airflow-pack/src"
+          )
           root = ElementTree.parse("test_artifacts/dbt_sqlserver_candidate/workspace-observation.xml").getroot()
           suites = root.findall("testsuite") if root.tag == "testsuites" else [root]
           assert len(suites) == 1 and suites[0].tag == "testsuite"
