@@ -201,6 +201,7 @@ def test_integrated_tamper_is_rejected_at_each_retained_boundary(tmp_path, tampe
 
 @pytest.mark.parametrize("rows", [[], [(7,), (7,), (7,)]])
 def test_observed_delivery_reports_actual_boundaries_and_preserves_journal(tmp_path, rows):
+    import json
     import os
 
     from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
@@ -211,6 +212,8 @@ def test_observed_delivery_reports_actual_boundaries_and_preserves_journal(tmp_p
     preparer.reverify(prepared)
     report = observer.snapshot()
     assert report["status"] == "PASS"
+    serialized = json.loads(json.dumps(report))
+    assert BoundedNativeDeliveryObserver.from_snapshot(serialized).snapshot() == report
     spans = report["observations"]
     assert {item["reason"] for item in spans if item["phase"] == "raw_verify"} == {
         "import",

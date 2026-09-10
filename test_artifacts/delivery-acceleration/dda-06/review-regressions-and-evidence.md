@@ -44,3 +44,11 @@ Reviewer-executed results:
 
 The integrator retains independent raw RED/portable-export logs in this directory
 and will rerun the complete focused set after the reviewed DDA-05 fix lands.
+
+The follow-up review of a three-line JSON round-trip assertion over source
+`fe0de2fe8bd190fba97a5ae16b496ef5e9fc4eef` was independently approved with no
+findings. The reviewer reran both real-spawn observation cases: **2 PASS**,
+17 deselected in 1.39 seconds. The new DDA-01 reconstruction preserves the
+complete actual coordinator/worker report after JSON serialization for empty
+and populated workloads; existing journal and phase assertions remain intact.
+The integrator's separate two-case PASS log is `observed-sidecar-roundtrip.log`.
