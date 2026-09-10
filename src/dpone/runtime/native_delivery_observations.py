@@ -37,6 +37,9 @@ _DIAGNOSTICS = frozenset(
         "invalid_recorder_report",
     }
 )
+_SNAPSHOT_FIELDS = frozenset(
+    "schema_version kind status limitations recorders capacity observations aggregates".split()
+)
 
 
 def _identity_valid(identity: Mapping[str, Any]) -> bool:
@@ -127,17 +130,7 @@ class BoundedNativeDeliveryObserver:
         from serialized labels. Irrecoverable loss flags remain explicit.
         """
         if (
-            set(payload)
-            != {
-                "schema_version",
-                "kind",
-                "status",
-                "limitations",
-                "recorders",
-                "capacity",
-                "observations",
-                "aggregates",
-            }
+            set(payload) != _SNAPSHOT_FIELDS
             or type(payload["schema_version"]) is not int
             or payload["schema_version"] != 1
         ):
