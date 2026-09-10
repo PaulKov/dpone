@@ -142,8 +142,8 @@ Kubernetes capacity for the intended workload; see
 
 ## Upgrade and recover
 
-This capability is an Unreleased change integrated on `0.76.0`; that published
-version does not contain the fix. Use all three Python distributions (`dpone`,
+This capability is included in `0.77.0`; `0.76.0` does not contain the fix.
+Use all three Python distributions (`dpone`,
 `dpone-airflow-pack`, `apache-airflow-providers-dpone`) from the same release and
 pin the corresponding runtime image digest. The existing Airflow/Python support
 matrix remains in [compatibility](compatibility.md); no additional version pair

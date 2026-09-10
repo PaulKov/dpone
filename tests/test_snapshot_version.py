@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_read_project_version() -> None:
-    assert read_project_version(ROOT / "pyproject.toml") == "0.76.0"
+    assert read_project_version(ROOT / "pyproject.toml") == "0.77.0"
 
 
 def test_build_snapshot_version_from_release_base() -> None:
@@ -22,4 +22,4 @@ def test_build_snapshot_version_from_release_base() -> None:
 
 
 def test_build_snapshot_version_from_pyproject() -> None:
-    assert build_snapshot_version_from_pyproject(ROOT / "pyproject.toml", pipeline_iid=77) == "0.76.0.dev77"
+    assert build_snapshot_version_from_pyproject(ROOT / "pyproject.toml", pipeline_iid=77) == "0.77.0.dev77"

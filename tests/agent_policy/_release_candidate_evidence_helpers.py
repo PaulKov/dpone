@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY = "PaulKov/dpone"
 COMMIT_SHA = "a" * 40
 # Bundle tests validate ROOT package metadata, so this is the current candidate.
-RELEASE = "v0.76.0"
+RELEASE = "v0.77.0"
 RUN_ID = 101
 RUN_ATTEMPT = 2
 CHECK_RUN_ID = 201

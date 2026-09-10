@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.77.0 - 2026-09-10
+
 - Add validated workload `airflow.resources` for CPU, memory and ephemeral
   storage; preserve requests/limits through strict delivery and bind resource
   changes to authoring selection and artifact identity. Reject resource-capable
@@ -17,6 +19,13 @@
 - Pass the verified runtime connection context to separate Airflow hooks so
   canonical `connection_ref` SQL hooks can resolve their pinned credentials.
   Retain artifact verification and hook child-exit/XCom behavior.
+
+### Known limitation
+
+- The existing PostgreSQL same-database internal-query full-refresh path can
+  replace a pre-existing target and lose PK/NOT NULL constraints. This release
+  does not correct that load-strategy defect; it remains a separate tracked fix.
+  Hooks/resources live acceptance does not certify constraint preservation.
 
 ## 0.76.0 - 2026-09-10
 

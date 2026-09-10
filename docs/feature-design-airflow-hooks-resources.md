@@ -3,7 +3,7 @@
 - Status: IMPLEMENTED (acceptance is recorded for each assessed commit and image)
 - Owner: dpone maintainers; implementation integrator: Codex
 - Issue: maintainer supplied specification, “Reliable Airflow hooks and declarative Kubernetes resources”
-- Target release: next coordinated dpone / dpone-airflow-pack release
+- Target release: coordinated `0.77.0` release of all four dpone distributions
 - Approval: maintainer explicitly requested implementation of the supplied specification on 2026-09-10.
 - Base: `3977ca2d04ca5dbcf3338d7c31faff8a1199549e` (0.74.36)
 - Integration base: `d5ad9aa` (0.76.0); preserve the new release-composition boundary.
