@@ -58,6 +58,10 @@ def load_expected_dbt_release(
         read_confined_file(root, "release-set.json", max_bytes=_MAX_RELEASE_BYTES),
         "release-set",
     )
+    if release.get("schema") == "dpone.release-set.v3":
+        raise DbtDevEvidenceReleaseError(
+            "composition requires parent-bound evidence; native-only evidence cannot certify the composed release"
+        )
     producer = release.get("producer")
     if isinstance(producer, Mapping) and producer.get("wire_contract") == DBT_RUNTIME_WIRE_V2:
         if source_reader is None:

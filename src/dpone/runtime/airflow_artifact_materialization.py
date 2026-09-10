@@ -7,13 +7,11 @@ import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.airflow_deployment import release_id as compute_release_id
 from dpone.contracts.airflow_deployment_projection import deployment_projection_violation
-from dpone.ports.airflow_deployment_attestation import (
-    AirflowDeploymentAttestationVerifier,
-)
+from dpone.manifest.release_composition_files import composition_auxiliary_artifacts
 from dpone.runtime.airflow_artifact_delivery_models import (
     AirflowArtifactDeliveryError,
     MaterializeReport,
@@ -47,6 +45,11 @@ from dpone.runtime.deployment_cache_common import DeploymentCacheError
 from dpone.runtime.deployment_cache_models import ValidatedDeploymentProjection
 from dpone.runtime.deployment_cache_projection_validator import DeploymentCacheProjectionValidator
 from dpone.runtime.immutable_local_tree import ImmutableLocalTreeError, materialize_immutable_local_tree_at
+
+if TYPE_CHECKING:
+    from dpone.ports.airflow_deployment_attestation import (
+        AirflowDeploymentAttestationVerifier,
+    )
 
 
 class AirflowArtifactMaterializer:
@@ -179,7 +182,8 @@ class AirflowArtifactMaterializer:
         index: Mapping[str, Any],
     ) -> None:
         request = state.request
-        for relative, sha256 in declared_release_artifacts(release):
+        root = state.staging_root / "releases" / request.release_dir_name
+        for relative, sha256 in (*declared_release_artifacts(release), *composition_auxiliary_artifacts(root, release)):
             state.fetch(
                 PurePosixPath("releases", request.release_dir_name, relative.as_posix()),
                 expected_sha256=sha256,
@@ -290,6 +294,7 @@ def _validate_remote_headers(
         not in {
             "dpone.release-set.v1",
             "dpone.release-set.v2",
+            "dpone.release-set.v3",
         }
         or release.get("release_id") != request.release_id
     ):
@@ -331,6 +336,8 @@ def _install_staged_projection(
 ) -> tuple[str, str]:
     staged_release = staging / "releases" / request.release_dir_name
     release_names = ["release-set.json", *(relative.as_posix() for relative, _ in declared_release_artifacts(release))]
+    if release.get("schema") == "dpone.release-set.v3":
+        release_names.extend(path.as_posix() for path, _ in composition_auxiliary_artifacts(staged_release, release))
     staged_deployment = staging / "deployments" / request.environment / request.deployment_dir_name
     deployment_names = deployment_file_names(deployment, index)
     release_state = "not_installed"

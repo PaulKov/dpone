@@ -1211,3 +1211,13 @@ healed. Release v1 cannot declare dbt wire v2. Native singleton release roots ar
 not supported by this new compact mode; existing singleton delivery remains.
 See [compact workspace delivery](dbt-compact-delivery.md) for migration and
 troubleshooting. Production workspace activation remains separately gated.
+
+## Verified release composition
+
+Use [release composition](release-composition.md) to deliver one complete native
+workspace and independently authored ordinary transfer packs in an explicit
+`dpone.release-set.v3` parent. Native v2 authority and bytes remain intact. Upgrade
+all readers before using v3. Composition activation is unavailable until physical
+admission covers every constituent; see the
+[contracts](release-composition-reference.md) and
+[migration and recovery guide](release-composition-operations.md).

@@ -1,0 +1,73 @@
+{
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/release-composition.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "native_workspace": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_release_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "root": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "root",
+        "expected_release_id"
+      ],
+      "type": "object"
+    },
+    "schema": {
+      "const": "dpone.release-composition.v1"
+    },
+    "standalone": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_inventory_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "root": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "root",
+        "expected_inventory_sha256"
+      ],
+      "type": "object"
+    },
+    "transport": {
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "const": "compact_v2_runtime_connection_context"
+        },
+        "xcom_sidecar_image": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "xcom_sidecar_image"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema",
+    "native_workspace",
+    "standalone",
+    "transport"
+  ],
+  "title": "dpone GitOps release composition manifest",
+  "type": "object"
+}

@@ -7,7 +7,12 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.airflow_deployment import is_sha256_digest
-from dpone.contracts.airflow_release_artifacts import ReleaseArtifactLocatorError, release_artifact_path
+from dpone.contracts.release_artifact_metadata import (
+    ArtifactChecksumPolicy,
+    ReleaseArtifactMetadataError,
+    parse_release_artifact_pin,
+)
+from dpone.manifest.release_composition_files import composition_auxiliary_artifacts
 from dpone.runtime.airflow_artifact_attestation_inventory import attestation_publication_spec
 from dpone.runtime.airflow_artifact_delivery_models import (
     AirflowArtifactDeliveryError,
@@ -65,6 +70,8 @@ def release_artifact_sections(
     sections = list(_BASE_RELEASE_SECTIONS)
     if release_includes_runtime_payloads(release_schema, artifacts):
         sections.append("runtime_payloads")
+    if release_schema == "dpone.release-set.v3":
+        sections.append("composition_sources")
     return tuple(sections)
 
 
@@ -90,7 +97,10 @@ def build_publish_inventory(
         root=request.cache_root,
     )
     release_files = [release_set_file]
-    for relative, declared_sha in declared_release_artifacts(release):
+    for relative, declared_sha in (
+        *declared_release_artifacts(release),
+        *composition_auxiliary_artifacts(release_dir, release),
+    ):
         item = _local_artifact_file(
             key=PurePosixPath("releases", request.release_dir_name, relative.as_posix()),
             path=release_dir / relative.as_posix(),
@@ -210,6 +220,7 @@ def declared_release_artifacts(release: Mapping[str, Any]) -> tuple[tuple[PurePo
     if release_schema not in {
         "dpone.release-set.v1",
         "dpone.release-set.v2",
+        "dpone.release-set.v3",
     }:
         raise AirflowArtifactDeliveryError(
             "DPONE_RELEASE_SCHEMA_INVALID",
@@ -230,22 +241,16 @@ def declared_release_artifacts(release: Mapping[str, Any]) -> tuple[tuple[PurePo
                     f"release-set {section} entries must be objects",
                 )
             try:
-                relative = release_artifact_path(item)
-            except ReleaseArtifactLocatorError as exc:
+                pin = parse_release_artifact_pin(item, checksum_policy=ArtifactChecksumPolicy.LEGACY_VALUE)
+            except ReleaseArtifactMetadataError as exc:
                 raise AirflowArtifactDeliveryError("DPONE_RELEASE_ARTIFACTS_INVALID", str(exc)) from exc
-            sha256 = item.get("sha256")
-            if not is_sha256_digest(sha256):
-                raise AirflowArtifactDeliveryError(
-                    "DPONE_RELEASE_ARTIFACTS_INVALID",
-                    "release artifact sha256 is invalid",
-                )
-            key = relative.as_posix()
+            key = pin.path.as_posix()
             if key in declared:
                 raise AirflowArtifactDeliveryError(
                     "DPONE_RELEASE_ARTIFACTS_INVALID",
                     "release-set contains duplicate artifact paths",
                 )
-            declared[key] = str(sha256)
+            declared[key] = pin.sha256
             if section in {"dag_specs", "workload_packs"}:
                 executable_artifacts += 1
     if executable_artifacts == 0:

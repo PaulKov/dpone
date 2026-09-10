@@ -1,0 +1,57 @@
+schema_version: 1
+task_id: DPONE-COMPOSE-DOCS
+title: Composition user and developer documentation
+goal: Write self-service how-to reference and operations docs for approved composition
+specification: docs/feature-specs/verified-release-composition.md
+base_commit: 3977ca2d04ca5dbcf3338d7c31faff8a1199549e
+integrator: root
+acceptance_criteria:
+- Preserve existing v1/v2 contracts and fail closed for unsupported closure.
+- Use DI, real framework verifiers and red-first regression tests.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - Python API
+  - release composition
+  migration_required: true
+owned_paths:
+- docs/release-composition.md
+- docs/release-composition-reference.md
+- docs/release-composition-operations.md
+integrator_owned_paths: []
+read_only_paths:
+- docs/feature-specs/verified-release-composition.md
+- docs/adr/0058-verified-release-composition.md
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+shared_file_owner: root
+dependencies: []
+required_checks:
+  focused:
+  - uv run dpone docs check-docs
+  broad:
+  - uv run ruff check .
+  - uv run mypy --config-file mypy.ini
+  live: []
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.

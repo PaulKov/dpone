@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dpone.ports.deployment_cache_retention_receipts import DeploymentCacheRetentionReceiptStorePort
 from dpone.runtime.deployment_cache_common import DeploymentCacheError
 from dpone.runtime.deployment_cache_retention_contracts import (
     DeploymentCacheRetentionApplyError,
@@ -14,6 +13,9 @@ from dpone.runtime.deployment_cache_retention_contracts import (
     is_canonical_retention_digest,
 )
 from dpone.runtime.deployment_cache_retention_state_codec import retention_operation_id
+
+if TYPE_CHECKING:
+    from dpone.ports.deployment_cache_retention_receipts import DeploymentCacheRetentionReceiptStorePort
 
 
 class DeploymentCacheRetentionReceipts:

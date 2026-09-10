@@ -1,0 +1,782 @@
+{
+  "$defs": {
+    "artifact": {
+      "oneOf": [
+        {
+          "additionalProperties": true,
+          "properties": {
+            "artifact_ref": {
+              "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "path": {
+              "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+              "type": "string"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "required": [
+            "id",
+            "sha256",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "artifact_ref": {
+              "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "path": {
+              "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+              "type": "string"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "required": [
+            "id",
+            "sha256",
+            "artifact_ref"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "artifacts": {
+      "items": {
+        "$ref": "#/$defs/artifact"
+      },
+      "type": "array"
+    },
+    "identity": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "runtimePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "maximum": 268435456,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "dbt_project_bundle",
+            "dbt_manifest",
+            "dbt_selection_lock"
+          ]
+        },
+        "media_type": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "path": {
+          "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "type": "object"
+    },
+    "sha256": {
+      "pattern": "^sha256:[A-Fa-f0-9]{64}$",
+      "type": "string"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/release-set-v3.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "additionalProperties": false,
+      "properties": {
+        "canonical_schemas": {
+          "$ref": "#/$defs/artifacts"
+        },
+        "composition_sources": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "bytes": {
+                "maximum": 268435456,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "path": {
+                "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                "type": "string"
+              },
+              "sha256": {
+                "$ref": "#/$defs/identity"
+              }
+            },
+            "required": [
+              "id",
+              "path",
+              "sha256",
+              "bytes"
+            ],
+            "type": "object"
+          },
+          "maxItems": 50000,
+          "minItems": 1,
+          "type": "array"
+        },
+        "dag_specs": {
+          "$ref": "#/$defs/artifacts"
+        },
+        "runtime_payloads": {
+          "items": {
+            "$ref": "#/$defs/runtimePayload"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "workload_packs": {
+          "$ref": "#/$defs/artifacts"
+        }
+      },
+      "required": [
+        "dag_specs",
+        "workload_packs",
+        "canonical_schemas",
+        "runtime_payloads",
+        "composition_sources"
+      ],
+      "type": "object"
+    },
+    "constituents": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "const": "native"
+              },
+              "kind": {
+                "const": "dbt_workspace"
+              },
+              "release": {
+                "$id": "https://paulkov.github.io/dpone/schemas/gitops/release-set-v2.schema.json",
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "additionalProperties": false,
+                "properties": {
+                  "artifacts": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "canonical_schemas": {
+                        "items": {
+                          "oneOf": [
+                            {
+                              "additionalProperties": true,
+                              "properties": {
+                                "artifact_ref": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "path": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "sha256": {
+                                  "pattern": "^sha256:[A-Fa-f0-9]{64}$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "sha256",
+                                "path"
+                              ],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": true,
+                              "properties": {
+                                "artifact_ref": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "path": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "sha256": {
+                                  "pattern": "^sha256:[A-Fa-f0-9]{64}$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "sha256",
+                                "artifact_ref"
+                              ],
+                              "type": "object"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "dag_specs": {
+                        "items": {
+                          "oneOf": [
+                            {
+                              "additionalProperties": true,
+                              "properties": {
+                                "artifact_ref": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "path": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "sha256": {
+                                  "pattern": "^sha256:[A-Fa-f0-9]{64}$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "sha256",
+                                "path"
+                              ],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": true,
+                              "properties": {
+                                "artifact_ref": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "path": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "sha256": {
+                                  "pattern": "^sha256:[A-Fa-f0-9]{64}$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "sha256",
+                                "artifact_ref"
+                              ],
+                              "type": "object"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      },
+                      "runtime_payloads": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "bytes": {
+                              "maximum": 268435456,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "id": {
+                              "pattern": "^[A-Za-z0-9_.:-]{1,256}$",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "enum": [
+                                "dbt_project_bundle",
+                                "dbt_manifest",
+                                "dbt_selection_lock"
+                              ]
+                            },
+                            "media_type": {
+                              "maxLength": 200,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "path": {
+                              "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                              "type": "string"
+                            },
+                            "sha256": {
+                              "pattern": "^sha256:[A-Fa-f0-9]{64}$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind",
+                            "path",
+                            "sha256",
+                            "bytes",
+                            "media_type"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 64,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "workload_packs": {
+                        "items": {
+                          "oneOf": [
+                            {
+                              "additionalProperties": true,
+                              "properties": {
+                                "artifact_ref": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "path": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "sha256": {
+                                  "pattern": "^sha256:[A-Fa-f0-9]{64}$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "sha256",
+                                "path"
+                              ],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": true,
+                              "properties": {
+                                "artifact_ref": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "path": {
+                                  "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                                  "type": "string"
+                                },
+                                "sha256": {
+                                  "pattern": "^sha256:[A-Fa-f0-9]{64}$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "sha256",
+                                "artifact_ref"
+                              ],
+                              "type": "object"
+                            }
+                          ]
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "dag_specs",
+                      "workload_packs",
+                      "canonical_schemas",
+                      "runtime_payloads"
+                    ],
+                    "type": "object"
+                  },
+                  "producer": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "dpone_version": {
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9.!+_-]{0,63}$",
+                        "type": "string"
+                      },
+                      "wire_contract": {
+                        "enum": [
+                          "dpone.dbt-airflow-self-service.v1",
+                          "dpone.dbt-airflow-self-service.v2"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "dpone_version",
+                      "wire_contract"
+                    ],
+                    "type": "object"
+                  },
+                  "promotion": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "profile": {
+                        "const": "compact_v2_runtime_connection_context"
+                      },
+                      "schema": {
+                        "const": "dpone.compact-pack-release-promotion.v1"
+                      }
+                    },
+                    "required": [
+                      "schema",
+                      "profile"
+                    ],
+                    "type": "object"
+                  },
+                  "provenance": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "route_certifications": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "airflow_runtime_mode": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "certification_level": {
+                              "enum": [
+                                "production-certified",
+                                "enterprise-certified"
+                              ]
+                            },
+                            "evidence_reason_codes": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "evidence_refs": {
+                              "items": {
+                                "pattern": "^sha256:[0-9a-f]{64}$",
+                                "type": "string"
+                              },
+                              "minItems": 1,
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "evidence_status": {
+                              "const": "PASS"
+                            },
+                            "route_id": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "schema_evolution": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "snapshot_id": {
+                              "pattern": "^sha256:[0-9a-f]{64}$",
+                              "type": "string"
+                            },
+                            "support": {
+                              "enum": [
+                                "supported",
+                                "conditional"
+                              ]
+                            },
+                            "transport": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "variant_id": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "variant_id",
+                            "route_id",
+                            "transport",
+                            "schema_evolution",
+                            "airflow_runtime_mode",
+                            "snapshot_id",
+                            "support",
+                            "certification_level",
+                            "evidence_status",
+                            "evidence_refs",
+                            "evidence_reason_codes"
+                          ],
+                          "type": "object"
+                        },
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "selection_fingerprints": {
+                        "items": {
+                          "pattern": "^sha256:[0-9a-f]{64}$",
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "source": {
+                        "const": "dpone dbt compile"
+                      },
+                      "source_snapshot_sha256": {
+                        "pattern": "^sha256:[0-9a-f]{64}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "source_snapshot_sha256",
+                      "selection_fingerprints",
+                      "route_certifications"
+                    ],
+                    "type": "object"
+                  },
+                  "release_id": {
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "schema": {
+                    "const": "dpone.release-set.v2"
+                  },
+                  "selection_authority": {
+                    "const": "dbt_cli"
+                  },
+                  "selection_fingerprint": {
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "schema",
+                  "release_id",
+                  "producer",
+                  "selection_authority",
+                  "selection_fingerprint",
+                  "artifacts",
+                  "provenance"
+                ],
+                "title": "dpone GitOps release-set v2",
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "release"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "const": "standalone"
+              },
+              "inventory": {
+                "additionalProperties": false,
+                "properties": {
+                  "dag_specs": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "bytes": {
+                          "maximum": 268435456,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "id": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "path": {
+                          "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                          "type": "string"
+                        },
+                        "sha256": {
+                          "$ref": "#/$defs/identity"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "path",
+                        "sha256",
+                        "bytes"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 50000,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "schema": {
+                    "const": "dpone.workload-inventory.v1"
+                  },
+                  "workload_packs": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "bytes": {
+                          "maximum": 268435456,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "id": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "pack_fingerprint": {
+                          "$ref": "#/$defs/identity"
+                        },
+                        "path": {
+                          "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\u0000-\\u0020\\u007f\\\\:])[^\\s\\\\:]+$",
+                          "type": "string"
+                        },
+                        "sha256": {
+                          "$ref": "#/$defs/identity"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "path",
+                        "sha256",
+                        "bytes",
+                        "pack_fingerprint"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 50000,
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "schema",
+                  "dag_specs",
+                  "workload_packs"
+                ],
+                "type": "object"
+              },
+              "inventory_sha256": {
+                "$ref": "#/$defs/identity"
+              },
+              "kind": {
+                "const": "workload_inventory"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "inventory",
+              "inventory_sha256"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "producer": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "const": "dpone.release-composition.v1"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "type": "object"
+    },
+    "promotion": {
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "const": "compact_v2_runtime_connection_context"
+        },
+        "schema": {
+          "const": "dpone.compact-pack-release-promotion.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "profile"
+      ],
+      "type": "object"
+    },
+    "release_id": {
+      "$ref": "#/$defs/identity"
+    },
+    "schema": {
+      "const": "dpone.release-set.v3"
+    }
+  },
+  "required": [
+    "schema",
+    "release_id",
+    "producer",
+    "promotion",
+    "artifacts",
+    "constituents"
+  ],
+  "title": "dpone GitOps verified release composition",
+  "type": "object"
+}

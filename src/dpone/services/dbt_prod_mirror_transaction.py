@@ -6,9 +6,9 @@ import os
 import stat
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
 
 from dpone.contracts.dbt_workspace_promotion import validate_workspace_mirror_paths
-from dpone.ports.dbt_prod_mirror import DbtProdMirrorContent, DbtProdMirrorOwnership
 from dpone.ports.dbt_project_bundle import DbtProjectBundleOperations
 from dpone.services.dbt_prod_mirror_content import DbtSingletonMirrorContent
 from dpone.services.dbt_prod_mirror_journal import (
@@ -19,6 +19,9 @@ from dpone.services.dbt_prod_mirror_journal import (
 )
 from dpone.services.dbt_prod_mirror_paths import confined_mirror_destination
 from dpone.services.dbt_prod_promotion_contract import DbtProdMirrorError
+
+if TYPE_CHECKING:
+    from dpone.ports.dbt_prod_mirror import DbtProdMirrorContent, DbtProdMirrorOwnership
 
 
 @dataclass(frozen=True, slots=True)

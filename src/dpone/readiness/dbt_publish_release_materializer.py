@@ -7,14 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from dpone.contracts.airflow_deployment import release_id as compute_release_id
-from dpone.contracts.dbt_release import (
-    dbt_release_authority_violation,
-    dbt_release_producer_violation,
-    dbt_release_runtime_wire_contract,
-    is_workspace_dbt_wire,
+from dpone.contracts.dbt_release_admission import (
+    NativeReleaseAdmissionError,
+    parse_native_release_admission,
 )
-from dpone.contracts.strict_json import StrictJsonError, strict_json_object
 from dpone.gitops.schema_validation import GitOpsSchemaValidator
 from dpone.manifest.confined_files import read_confined_file
 from dpone.runtime.deployment_cache_common import DeploymentCacheError, promotion_lock
@@ -65,38 +61,23 @@ class DbtReleaseMaterializer:
             "release-set.json",
             max_bytes=MAX_DBT_RELEASE_SET_BYTES,
         )
-        release = _json_object(release_bytes)
-        if release.get("schema") != "dpone.release-set.v2":
-            raise DbtReleaseMaterializationError("compiled dbt release must use dpone.release-set.v2")
         try:
-            wire_contract = dbt_release_runtime_wire_contract(release)
-        except ValueError as exc:
-            raise DbtReleaseMaterializationError("compiled dbt release producer identity is invalid") from exc
-        authority_violation = dbt_release_authority_violation(release, expected_wire_contract=wire_contract)
-        if authority_violation is not None:
-            raise DbtReleaseMaterializationError(authority_violation)
+            admission = parse_native_release_admission(release_bytes)
+        except NativeReleaseAdmissionError as exc:
+            raise DbtReleaseMaterializationError(str(exc)) from exc
+        release = admission.release
         issues = GitOpsSchemaValidator().validate(
             release,
             expected_kind="dpone.release-set.v2",
         )
         if issues:
             raise DbtReleaseMaterializationError("compiled dbt release violates dpone.release-set.v2")
-        claimed_value = release.get("release_id")
-        if not isinstance(claimed_value, str):
-            raise DbtReleaseMaterializationError("compiled dbt release id is invalid")
-        claimed = claimed_value
-        if claimed != compute_release_id(release):
-            raise DbtReleaseMaterializationError("compiled dbt release identity does not match its content")
-        if expected_release_id is not None and claimed != expected_release_id:
-            raise DbtReleaseMaterializationError("compiled dbt release differs from the expected release")
-        producer_violation = dbt_release_producer_violation(
-            release,
-            expected_dpone_version=installed_version(),
-            expected_wire_contract=wire_contract,
-        )
-        if producer_violation is not None:
-            raise DbtReleaseMaterializationError(producer_violation)
-        if is_workspace_dbt_wire(wire_contract):
+        try:
+            claimed = admission.require_identity(expected_release_id)
+            admission.require_producer(installed_version())
+        except NativeReleaseAdmissionError as exc:
+            raise DbtReleaseMaterializationError(str(exc)) from exc
+        if admission.is_workspace:
             if self._workspace_sources is None:
                 raise DbtReleaseMaterializationError("workspace installation requires a complete-source verifier")
             try:
@@ -159,14 +140,6 @@ def _legacy_files(compiled: Path, release: Mapping[str, Any], release_bytes: byt
                 raise DbtReleaseMaterializationError("compiled dbt release contains duplicate artifact paths")
             files[relative] = data
     return files
-
-
-def _json_object(payload: bytes) -> dict[str, Any]:
-    try:
-        value = strict_json_object(payload)
-    except StrictJsonError as exc:
-        raise DbtReleaseMaterializationError("compiled dbt release-set is invalid JSON") from exc
-    return value
 
 
 def _sha256(payload: bytes) -> str:

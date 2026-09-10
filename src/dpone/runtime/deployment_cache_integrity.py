@@ -116,6 +116,7 @@ class DeploymentCacheIntegrityVerifier:
         if release_schema not in {
             "dpone.release-set.v1",
             "dpone.release-set.v2",
+            "dpone.release-set.v3",
         }:
             raise DeploymentCacheError(
                 "DPONE_RELEASE_SCHEMA_INVALID",
@@ -176,6 +177,15 @@ class DeploymentCacheIntegrityVerifier:
                 release_id=release_id,
                 index_path=index_path,
             )
+        if release_schema == "dpone.release-set.v3":
+            from dpone.manifest.release_composition_files import verify_composition_transport_files
+
+            try:
+                verify_composition_transport_files(release_dir, release)
+            except (ValueError, OSError) as exc:
+                raise DeploymentCacheError(
+                    "DPONE_COMPOSITION_INVALID", "composition transport inventory is incomplete or corrupt"
+                ) from exc
         self._verify_semantic_refresh_sidecars(index=index, index_path=index_path)
         return validation.dbt_runtime_wire_contract
 

@@ -1,11 +1,10 @@
 # Workspace source verification
 
-This page describes **unreleased reader support**, not an available end-to-end
-workspace publishing feature. The single-project compiler still emits dbt wire
-v1. Workspace discovery and aggregate compilation are implemented locally;
-release publication, production integration, consumer rollout and live
-certification remain pending under the
-[approved multi-project design](feature-design-dbt-multi-project-release.md).
+This page describes complete workspace source verification. Workspace discovery,
+aggregate compilation and [compact delivery](dbt-compact-delivery.md) provide the
+local producer and consumer path. The single-project compiler retains dbt wire
+v1. Live certification and production activation require separate environment
+admission under the [multi-project design](feature-design-dbt-multi-project-release.md).
 Do not hand-edit a compiled singleton release to enable workspace delivery.
 
 ## Purpose and boundaries
@@ -134,7 +133,7 @@ selection JSON retains the narrower 1 MiB evidence-reader
 bound. Source inventory is at most 1 MiB. Archive expansion and confinement use
 the existing bundle policy.
 
-## Aggregate producer boundary (unreleased)
+## Aggregate producer boundary
 
 The reusable project projector captures a bundle and resolves each workflow once,
 then constructs its packs using the final versioned payload IDs. The workspace
@@ -174,9 +173,9 @@ idempotent retry; different existing output is a conflict, not an overwrite.
 The subject is allowed as a fixed transport artifact, never as authority to add
 other files. This is not a database transaction, signature or live certification.
 
-The workspace CLI compile command is implemented locally but unreleased;
-environment-bound physical target preflight and consumer activation remain
-pending. Non-executable semantic-refresh templates
+The workspace CLI compile command supports immutable local publication.
+Environment-bound physical target preflight and consumer activation require
+separate admission. Non-executable semantic-refresh templates
 remain on their existing singleton path; workspace projection rejects them before
 capturing source rather than silently dropping their missing DAGs.
 

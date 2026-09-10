@@ -25,6 +25,7 @@ from dpone.gitops.schema_release_set_promotion import (
 )
 from dpone.readiness.airflow_compact_pack_release_helpers import (
     closed_connection_projection,
+    require_legacy_pack_authority,
     rewrite_strict_init_fetch_dag_spec,
     rewrite_strict_init_fetch_pack,
 )
@@ -166,8 +167,10 @@ def _materialize(
                     "DPONE_COMPACT_PACK_RELEASE_PACK_MISSING",
                     f"missing compact pack for workload {workload_id!r}",
                 )
+            original_pack = _load_json_object(pack_path)
+            require_legacy_pack_authority(original_pack)
             pack = rewrite_strict_init_fetch_pack(
-                _load_json_object(pack_path),
+                original_pack,
                 xcom_sidecar_image=xcom_sidecar_image,
             )
             pack_bytes = _json_bytes(pack)
@@ -281,7 +284,14 @@ def _materialize_workspace(
     root: Path, cache: Path, *, xcom_sidecar_image: str, dag_ids: Sequence[str] | None
 ) -> CompactPackReleaseReport:
     from dpone.app.dbt_promotion_composition import build_dbt_compact_workspace_release_builder
+    from dpone.readiness.airflow_composed_release_materializer import (
+        materialize_composed_release,
+        read_workspace_release_descriptor,
+    )
     from dpone.readiness.airflow_release_schema_validation import validate_release_set_schema
+
+    if read_workspace_release_descriptor(root).get("schema") == "dpone.release-set.v3":
+        return materialize_composed_release(root, cache, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
 
     if cache.is_relative_to(root.resolve()):
         raise CompactPackReleaseError(

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.75.0 - 2026-09-10
+
+- Add verified release composition for a complete native dbt workspace and
+  independent ordinary SQL transfer packs. Public inventory/compose commands bind
+  source identities, reconstruct executable closure, preserve native v2 bytes,
+  and deliver an explicit v3 parent through registry, cache and provider readers.
+  Activation fails closed until every constituent has physical admission.
+- Reject descriptor-less legacy materialization of workspace wire-v2 payloads;
+  regenerate through the complete workspace producer and compact materializer.
+- Validate inventory sidecar images with the same OCI contract used by the
+  Airflow provider; malformed repository names and invalid registry ports return
+  a structured rejection instead of a successful inventory report.
+
 ## 0.74.36 - 2026-09-09
 
 - Add opt-in bounded atomic rolling-window Python composition with a PostgreSQL
