@@ -90,6 +90,10 @@ Move it to root `gitops.airflow.resources`, then rerun check and preview.
 Folder and recipe diagnostics use the expanded process index. Catalog
 `reconcile` preserves this field-path diagnostic and writes no pack or DAG
 artifacts when validation fails. Per-process resource overrides are unsupported.
+The same rule applies when a batch Jinja expression produces a resource mapping:
+validation runs after rendering as well. Its diagnostic uses
+`compiled_processes[0].gitops.airflow.resources` for the first resolved process.
+Ordinary typed templates and connector options remain supported.
 
 Move `pod_template_dict`, `pod_template_file`, `full_pod_spec`,
 `container_resources` or direct `resources` from `operator_overrides` into the

@@ -75,8 +75,10 @@ defaults/schema/table scopes, fail with `DPONE_AIRFLOW_RESOURCES_INVALID` and a
 path plus recovery guidance. This applies even if root resources also exist.
 Canonical manifest policy validates placement after authoring expansion and
 before batch compilation, which also protects direct classic loader callers.
-Traversal follows authoring containers and leaves connector/application data
-alone. Reconcile preserves the safe diagnostic before writing artifacts.
+The final rendered process is checked too, because typed Jinja expressions can
+produce mappings absent from the raw source. Traversal follows authoring
+containers and leaves connector/application data alone. Reconcile preserves
+the safe diagnostic before writing artifacts.
 
 The ordinary release-composition verifier added in 0.75.0 admits this validated
 resource-only manifest metadata during source reconstruction. Other `gitops`
@@ -211,7 +213,9 @@ manifest/runtime policy ownership and the readiness compatibility facade.
 The initial integration review found no remaining actionable issues. A later
 independent review exposed ignored process-scoped resource declarations; the
 placement guard and regression matrix address that finding, with another fresh
-review required for the correction. Focused runtime/resource/composition coverage passed 231 tests;
+review required for the correction. That review additionally reproduced a
+typed-template bypass, addressed by validating the final rendered process.
+Focused runtime/resource/composition coverage passed 231 tests;
 the composition, schema and identity integration group passed 163 tests.
 
 Ruff, formatting, mypy, import rules, layer/module budgets, generated references,

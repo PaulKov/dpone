@@ -33,8 +33,8 @@ def reject_process_airflow_resources(payload: Mapping[str, Any]) -> None:
     processes = payload.get("processes")
     if isinstance(processes, list | tuple):
         for index, process in enumerate(processes):
-            _reject_process_resources(process, field=f"processes[{index}]")
-    _reject_process_resources(payload.get("defaults"), field="defaults")
+            reject_process_resource_declaration(process, field=f"processes[{index}]")
+    reject_process_resource_declaration(payload.get("defaults"), field="defaults")
     schemas = payload.get("schemas")
     if not isinstance(schemas, Mapping):
         return
@@ -42,19 +42,21 @@ def reject_process_airflow_resources(payload: Mapping[str, Any]) -> None:
         if not isinstance(schema, Mapping):
             continue
         field = f"schemas.{name}"
-        _reject_process_resources(schema, field=field)
-        _reject_process_resources(schema.get("defaults"), field=f"{field}.defaults")
+        reject_process_resource_declaration(schema, field=field)
+        reject_process_resource_declaration(schema.get("defaults"), field=f"{field}.defaults")
         tables = schema.get("tables")
         if not isinstance(tables, list | tuple):
             continue
         for index, table in enumerate(tables):
             if isinstance(table, Mapping):
                 table_field = f"{field}.tables[{index}]"
-                _reject_process_resources(table, field=table_field)
-                _reject_process_resources(table.get("overrides"), field=f"{table_field}.overrides")
+                reject_process_resource_declaration(table, field=table_field)
+                reject_process_resource_declaration(table.get("overrides"), field=f"{table_field}.overrides")
 
 
-def _reject_process_resources(value: object, *, field: str) -> None:
+def reject_process_resource_declaration(value: object, *, field: str) -> None:
+    """Validate one raw or rendered process; templates may produce typed maps."""
+
     if not isinstance(value, Mapping):
         return
     gitops = value.get("gitops")

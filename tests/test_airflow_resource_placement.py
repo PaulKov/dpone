@@ -181,3 +181,54 @@ def test_recipe_expansion_cannot_hide_process_resources(tmp_path: Path) -> None:
     assert len(errors) == 1
     assert errors[0]["code"] == _RESOURCE_CODE
     assert "processes[0].gitops.airflow.resources" in errors[0]["message"]
+
+
+@pytest.mark.parametrize("scope", ["defaults", "schemas.src.defaults", "schemas.src.tables[0].overrides"])
+@pytest.mark.parametrize("template_field", ["gitops", "airflow"])
+@pytest.mark.parametrize("route", ["authoring", "loader", "reconcile"])
+def test_rendered_resources_cannot_bypass_placement_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    scope: str,
+    template_field: str,
+    route: str,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    source, _ = _source(tmp_path, scope)
+    schema = source["schemas"]["src"]
+    target = {
+        "defaults": source["defaults"],
+        "schemas.src.defaults": schema["defaults"],
+        "schemas.src.tables[0].overrides": schema["tables"][0]["overrides"],
+    }[scope]
+    owner = target if template_field == "gitops" else target["gitops"]
+    source["vars"] = {"airflow_options": owner[template_field]}
+    owner[template_field] = "{{ airflow_options }}"
+    path = tmp_path / "pipeline.yaml"
+    path.write_text(yaml.safe_dump(source, sort_keys=False), encoding="utf-8")
+
+    if route == "authoring":
+        compilation, errors = compile_pipeline_source(
+            source, path, root=tmp_path, compiler=default_authoring_compiler()
+        )
+        assert compilation is None
+        assert len(errors) == 1
+        code, message = errors[0]["code"], errors[0]["message"]
+    elif route == "loader":
+        with pytest.raises(ManifestConfigurationError) as caught:
+            ManifestLoaderRouter().load(path, metadata_only=True)
+        code, message = getattr(caught.value, "code", None), str(caught.value)
+    else:
+        exit_code, payload, _stderr = _reconcile(capsys)
+        assert exit_code == 2
+        assert payload["packs"] == []
+        assert payload["dag_specs"] == []
+        matching = [blocker for blocker in payload["blockers"] if blocker["code"] == _RESOURCE_CODE]
+        assert len(matching) == 1
+        code, message = matching[0]["code"], matching[0]["message"]
+        assert not (tmp_path / PACK_ROOT).exists()
+        assert not (tmp_path / ".dpone-cache").exists()
+    assert code == _RESOURCE_CODE
+    assert "compiled_processes[0].gitops.airflow.resources" in message
+    assert "manifest root" in message

@@ -7,7 +7,7 @@ from typing import Any
 
 from dpone.config import ENV_CODE
 from dpone.governance.quality import QualityGatePolicy
-from dpone.manifest.airflow_resources import reject_process_airflow_resources
+from dpone.manifest.airflow_resources import reject_process_airflow_resources, reject_process_resource_declaration
 from dpone.manifest.batch_dependencies import _normalize_depends_on, _validate_unique_names
 from dpone.manifest.batch_merge import deep_merge
 from dpone.manifest.batch_models import _RESERVED_VARS, CompiledProcess
@@ -129,6 +129,7 @@ class BatchManifestCompiler:
                         render_ctx[k] = v
                 cfg = self._renderer.render(cfg, render_ctx)
                 cfg = self._ensure_dict(cfg, "process_rendered", manifest_path)
+                reject_process_resource_declaration(cfg, field=f"compiled_processes[{len(compiled)}]")
                 if "quality" in cfg:
                     cfg["quality"] = self._validated_quality(
                         cfg["quality"],

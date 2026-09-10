@@ -164,10 +164,6 @@ class AuthoringCompiler:
             }
             source["processes"] = [copy.deepcopy(dict(process)) for process in folder.processes]
             source.pop("fragments", None)
-        try:
-            resources = manifest_airflow_resources(source)
-        except KubernetesResourceError as exc:
-            raise AuthoringCompilationError(exc.code, str(exc)) from exc
         canonical, aliases = self._normalize(source, source_kind=source_kind, mode=mode)
         if project_root is not None and include_content_dependencies:
             try:
@@ -194,7 +190,10 @@ class AuthoringCompiler:
                 "content_dependencies": [item.to_jsonable() for item in source_content_dependencies],
             }
         try:
+            resources = manifest_airflow_resources(source)
             compiled = self._batch_compiler.compile(canonical, manifest_path=source_path)
+        except KubernetesResourceError as exc:
+            raise AuthoringCompilationError(exc.code, str(exc)) from exc
         except ManifestConfigurationError:
             raise
         except Exception as exc:  # noqa: BLE001 - normalize all compiler failures at the public boundary.
