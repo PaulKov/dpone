@@ -238,8 +238,29 @@ def test_sql_failure_keeps_only_safe_code_not_driver_credentials():
 
 
 def test_syntax_failure_cannot_be_counted_as_permission_denial():
-    with pytest.raises(AssertionError):
-        support.require_denied(lambda: (_ for _ in ()).throw(SqlFailure(102)))
+    fault = SqlFailure(102, sqlstate="42000")
+    with pytest.raises(SqlFailure) as caught:
+        support.require_denied(lambda: (_ for _ in ()).throw(fault))
+    assert caught.value is fault
+
+
+@pytest.mark.parametrize("sqlstate,expected", [("42000", "42000"), ("PWD=never-print", None)])
+def test_unclassified_denial_keeps_only_safe_sql_codes_in_junit(sqlstate, expected):
+    fault = SqlFailure(54321, sqlstate=sqlstate)
+    with pytest.raises(SqlFailure) as caught:
+        support.require_denied(lambda: (_ for _ in ()).throw(fault))
+    item = SimpleNamespace(
+        nodeid="tests/integration/composition/test_composition_mssql_gate_live.py::test_case", user_properties=[]
+    )
+    report = SimpleNamespace(failed=True, longrepr="private", user_properties=[], sections=["private"])
+    hook = support.pytest_runtest_makereport(item, SimpleNamespace(excinfo=SimpleNamespace(value=caught.value)))
+    next(hook)
+    with pytest.raises(StopIteration):
+        hook.send(SimpleNamespace(get_result=lambda: report))
+    assert caught.value is fault and report.failed
+    observed = json.loads(dict(item.user_properties)["dpone.gate.failure_sql"])
+    assert observed == {"sqlstate": expected, "native_codes": [54321]}
+    assert "never-print" not in json.dumps(item.user_properties) and report.sections == []
 
 
 @pytest.mark.parametrize("payload", [{"password": "secret"}, {"evidence": {"dsn": "secret"}}, {"rows": "x" * 65537}])
@@ -275,6 +296,35 @@ def test_bounded_wait_cannot_turn_missing_observation_into_pass():
         support.wait_until(lambda: False, timeout=0.01)
 
 
+def test_lock_snapshot_retains_exact_scope_and_observed_modes_without_certifying(monkeypatch):
+    from tests.integration.composition import test_composition_mssql_gate_recovery_live as recovery
+
+    queries, recorded = [], []
+    table = "[gate_control].[composition_login_gates]"
+    locks = (("KEY", "RangeX-X", "GRANT", 5, 1234, 1, "TRANSACTION", 88, 51),)
+    responses = iter((((88, 1, 2, True),), ((5, 91),), ((1234, 1, 1, 1, True, True),), locks))
+
+    def query(statement, *values):
+        queries.append((statement, values))
+        return next(responses)
+
+    monkeypatch.setattr(recovery, "execute", lambda *_: ((51, 5, 1, 1),))
+    case = SimpleNamespace(
+        table=lambda _: table, sql=query, record=lambda name, payload: recorded.append((name, payload))
+    )
+    assert recovery._record_lock_snapshot(case, SimpleNamespace(autocommit=False), 51) is None
+    assert len(recorded) == 1 and recorded[0][0] == "row_lock_snapshot"
+    observed = recorded[0][1]
+    assert observed["lock_type_mode_status_dbid_entity_index_owner_kind_owner_id_spid"] == locks
+    assert observed["control_database_and_table_ids"] == ((5, 91),)
+    lock_sql, values = queries[-1]
+    assert "TOP (65)" in lock_sql and "l.request_session_id=? AND l.resource_database_id=DB_ID()" in lock_sql
+    assert "p.object_id=OBJECT_ID(?)" in lock_sql and "l.resource_associated_entity_id=OBJECT_ID(?)" in lock_sql
+    assert values == (51, table, table)
+    assert "RangeX-X" in support.observation_document(observed)
+    assert "PASS" not in support.observation_document(observed)
+
+
 @pytest.mark.parametrize("expected,state", [(((1, "actual"),), "SUCCEEDED"), (((2, "invented"),), "FAILED")])
 def test_reconciliation_derives_status_and_digest_from_reopened_rows(monkeypatch, expected, state):
     from dpone.contracts.airflow_deployment import canonical_fingerprint
@@ -304,7 +354,10 @@ def test_failure_report_retains_only_numeric_code_and_discards_capture():
     with pytest.raises(StopIteration):
         hook.send(SimpleNamespace(get_result=lambda: report))
     assert report.longrepr == "SQL gate component failed: sql_error_229"
-    assert report.user_properties == [("dpone.gate.failure", "sql_error_229")]
+    assert dict(report.user_properties) == {
+        "dpone.gate.failure": "sql_error_229",
+        "dpone.gate.failure_sql": '{"native_codes":[229],"sqlstate":null}',
+    }
     assert item.user_properties == report.user_properties
     assert report.sections == []
 
