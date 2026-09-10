@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+defaults:
+  name: synthetic_native_events
+  source:
+    type: clickhouse
+    connection_id: clickhouse_source
+    options:
+      native_transfer:
+        wire:
+          mode: typed_binary
+          binary_format: mssql_native
+        execution:
+          chunking:
+            mode: bounded_stream
+            parallelism: 2
+            checkpointing: resumable
+          native_chunks:
+            max_rows: 65536
+            max_bytes: 16777216
+            max_row_bytes: 1048576
+            max_pending: 2
+            max_total_encoded_bytes: 1073741824
+            max_staging_tables: 1024
+            stage_allocated_bytes_stop_threshold: 10737418240
+  sink:
+    type: mssql
+    connection_id: mssql_target
+    table:
+      schema: dbo
+      name: synthetic_events
+    strategy:
+      mode: partition_replace
+      atomicity: target_atomic
+      window:
+        column: observed_at
+        anchor: data_interval_end
+        lookback: P1D
+        chunk_interval: P1D
+        timezone: UTC
+schemas:
+  synthetic:
+    tables:
+      - events

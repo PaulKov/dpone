@@ -29,7 +29,7 @@ def test_public_schemas_expose_typed_binary_native_wire_policy() -> None:
 
         assert "typed_binary" in policy["mode"]["enum"]
         assert policy["source_native_format"]["enum"] == ["auto", "odbc_row_stream", "bcp_native"]
-        assert policy["binary_format"]["enum"] == ["rowbinary", "native"]
+        assert policy["binary_format"]["enum"] == ["rowbinary", "native", "mssql_native"]
         assert "block_rows" in policy
         assert "block_bytes" in policy
         clickhouse_bulk = _clickhouse_bulk_schema(schema, relative)

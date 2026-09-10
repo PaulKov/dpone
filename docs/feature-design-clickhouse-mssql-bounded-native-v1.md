@@ -8,7 +8,9 @@
 
 This specification is for framework maintainers and connector authors. It proposes
 an opt-in replacement for the complete character spool on bounded ClickHouse to
-MSSQL loads. It is not an implemented capability or a production migration guide.
+MSSQL loads. Implementation and deployment prerequisites are tracked in the
+[native transport guide](mssql-native-transport.md); live certification remains
+unverified.
 See the [current route guide](source-sink/clickhouse-to-mssql.md) for usable behavior
 and the [feature design standard](feature-design-standard.md) for approval.
 
@@ -386,3 +388,26 @@ the final implementation before integration. No merge or release is authorized.
 - [x] Primary-source alternatives and reproducible validation plan recorded.
 - [x] Single integrator and independent read-only reviews assigned.
 - [x] Maintainer marks this concrete extension APPROVED before production edits.
+
+
+## Implementation refinements
+
+Source admission requires an injected exclusion authority covering relation and
+policy DDL from catalog inspection through source cleanup. The nonzero Atomic
+relation UUID is persisted with completed payload metadata. DateTime values use
+integer microsecond SQL projections and exact UTC window strings, avoiding native
+driver float decoding and parameter truncation. Overflow modes throw and query
+cache reuse is disabled.
+
+The durable journal stores chunk states and a nested publication state. Top-level
+`stage_complete` binds contiguous chunk receipts and completed source metadata in
+one CAS. The nested preparation/publication states distinguish source-free rebuild,
+unknown commit, evidence completion and source-state completion. Source progress
+never advances on an individual chunk receipt.
+
+Native wire limits apply to business bytes. Verification of generated lineage
+uses a separately derived finite schema bound and preserves physical nullability.
+The observed SQL allocation stop threshold counts reserved pages of native staging
+tables; volume and transaction-log headroom are separate admission observations.
+Mandatory deployment callbacks must use real fencing, capacity and persistence
+services. Synthetic no-op authorities are not a deployment configuration.

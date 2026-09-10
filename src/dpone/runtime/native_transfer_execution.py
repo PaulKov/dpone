@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from dpone.contracts.mssql_native_chunks import NativeChunkLimits
 from dpone.runtime.native_transfer_route_models import RouteCertificationPolicy
 from dpone.runtime.native_transfer_transport import NativeTransferTransportPolicy
 from dpone.runtime.storage_policy import parse_byte_size
@@ -50,12 +51,24 @@ class NativeTransferExecutionPolicy:
     certification: RouteCertificationPolicy = field(default_factory=RouteCertificationPolicy)
     resource: NativeTransferResourcePolicy = field(default_factory=NativeTransferResourcePolicy)
     warnings: tuple[str, ...] = ()
+    chunking: dict[str, Any] | None = None
+    native_chunks: NativeChunkLimits | None = None
 
     @classmethod
     def from_mapping(cls, value: dict[str, Any] | None = None) -> NativeTransferExecutionPolicy:
         raw = dict(value or {})
         profile = str(raw.get("profile") or "balanced")
+        chunking = raw.get("chunking")
+        native_chunks = None
+        if "native_chunks" in raw:
+            from types import SimpleNamespace
+
+            from dpone.manifest.mssql_native_policy import native_limits
+
+            native_chunks = native_limits(SimpleNamespace(options={"native_transfer": {"execution": raw}}))
         return cls(
+            chunking=dict(chunking) if isinstance(chunking, dict) else None,
+            native_chunks=native_chunks,
             mode=str(raw.get("mode") or "auto"),
             profile=profile,
             cleanup_policy=str(raw.get("cleanup_policy") or "eager"),
@@ -74,6 +87,16 @@ class NativeTransferExecutionPolicy:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            **({"chunking": dict(self.chunking)} if self.chunking is not None else {}),
+            **(
+                {
+                    "native_chunks": {
+                        key: value for key, value in asdict(self.native_chunks).items() if key != "parallelism"
+                    }
+                }
+                if self.native_chunks is not None
+                else {}
+            ),
             "mode": self.mode,
             "profile": self.profile,
             "cleanup_policy": self.cleanup_policy,

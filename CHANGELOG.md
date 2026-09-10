@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add opt-in Python composition for bounded native ClickHouse to MSSQL transport,
+  independent verified staging, exact authored interval publication and fenced
+  source-free recovery. Live interoperability/performance remain unverified;
+  see the native transport guide for required deployment authorities.
+
 - Reject Python startup-hook members in wheel/sdist inspection, including `.pth`
   files and source, compiled, or package forms of `sitecustomize`/`usercustomize`.
   Archive inspection remains metadata-only.

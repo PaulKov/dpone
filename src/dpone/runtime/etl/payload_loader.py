@@ -165,7 +165,7 @@ class PayloadLoadService(PayloadLoadTerminalMixin):
         try:
             if quality_execution is not None:
                 quality_execution.select_boundary(
-                    "pre_commit" if supports_staged_load(self.sink) else "post_commit",
+                    "pre_commit" if supports_staged_load(self.sink, load_config) else "post_commit",
                     load_config=load_config,
                 )
             lifecycle_context = self.payload_lifecycle_preparer.prepare(
@@ -291,7 +291,7 @@ class PayloadLoadService(PayloadLoadTerminalMixin):
         quality_scope: Any | None = None,
         quality_execution: QualityGateExecution | None = None,
     ) -> Any:
-        if supports_staged_load(self.sink):
+        if supports_staged_load(self.sink, load_config):
             return invoke_with_target_guard(
                 self.finalization_coordinator.load,
                 before_target_mutation=before_target_mutation,

@@ -33,6 +33,7 @@ from dpone.readiness.managed_utils import (
     _source_columns,
     _table,
 )
+from dpone.readiness.mssql_native_planning import project_mssql_native
 from dpone.readiness.physical_design import PhysicalDesignOptions, PhysicalDesignPlanner
 from dpone.readiness.resolved_process_route import resolve_process_route
 from dpone.readiness.schema_contracts import SchemaContract
@@ -161,6 +162,7 @@ class ExecutionPlanService:
         plan["warnings"] = plan_warnings(plan)
         if explain_strategy:
             plan["strategy_intelligence"] = lc.options.get("strategy_intelligence", {})
+        project_mssql_native(plan, lc)
         return _redact(plan)
 
     def _bulk_path(self, raw: Mapping[str, Any], source: str, sink: str, export_format: str) -> str:

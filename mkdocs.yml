@@ -165,6 +165,7 @@ nav:
       - Data Product Remediation Runbooks: data-product-remediation.md
       - Adaptive native transfer: native-transfer-industrial-runtime.md
       - Atomic rolling windows: rolling-window.md
+      - MSSQL native transport: mssql-native-transport.md
       - Object storage staging: object-storage-staging.md
       - Supply-chain evidence: supply-chain.md
       - SLSA release self-assessment: supply-chain-slsa.md
