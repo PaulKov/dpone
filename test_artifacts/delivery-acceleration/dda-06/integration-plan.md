@@ -6,11 +6,20 @@ Status: preparation in progress; no implementation or performance PASS implied.
 
 - Audited production baseline: `d5ad9aaecc900c24df421b160ed36b4cfc726e45`.
 - Immutable approved planning dependency: `f3682940f8864563cde0e6b6ecee60f746b49020`.
-- Integration branch: `codex/dda-06-integration`.
+- PR branch: `codex/dda-06-integration`; current local working branch:
+  `codex/dda-06-linear-integration`.
 - Contract: `../agent-task-contracts/dda-06-integration.yml`.
 - `origin/master` was fetched before branch preparation and contained the baseline.
 - The clean detached worktree was placed on the integration branch and imported
   the planning dependency with ordinary `git merge --no-edit` (fast-forward).
+- GitHub subsequently rejected the non-fast-forward planning-registry merge
+  `c4a015b` because its branch rule forbids merge commits. That local history is
+  retained in `codex/dda-06-integration`. A new local branch from the published
+  `ed00a5f` applied registry `85e598c` and own test commit `e7879db` with
+  `cherry-pick -x`. Its tree was verified identical to `e7879db`, then pushed as
+  a normal fast-forward update to the same PR branch. No reset, rebase, force push
+  or repository-rule change was used. Further reviewed dependencies use
+  provenance-preserving cherry-picks when a merge would violate this rule.
 - DDA-01 through DDA-05 changes require reviewed handoffs and recorded commits.
   Audit imported dependency paths separately from DDA-06's own diff.
 - Planning specification and task-plan documents remain immutable. Record current
