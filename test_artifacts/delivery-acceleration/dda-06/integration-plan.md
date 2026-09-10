@@ -1,6 +1,6 @@
 # DDA-06 integration and validation plan
 
-Status: preparation in progress; no implementation or performance PASS implied.
+Status: implementation integrated and independently reviewed; final integrated gates in progress. Architecture HOLD and live performance UNVERIFIED remain explicit.
 
 ## Identity and ownership
 

@@ -54,3 +54,21 @@ The native encoder opt-in selects a separate worker entrypoint with the original
 argument tuple. The default submitted-task serialization and admission boundary
 are preserved; no diagnostic flag enlarges that tuple. Legacy journal records
 remain unchanged. The new sidecar is bounded separately.
+
+Reviewed owner follow-ups received after the implementation handoff:
+
+- DDA-01 documentation `3e57875` imported as `a4db8b2`: integrated observation
+  composition, explicitly missing independent visibility authority, and preserved
+  native cancellation exception classification.
+- DDA-02 documentation `ad9d96b`: reviewer-approved current structural behavior,
+  historical component recipe and immutable integration test/evidence links.
+- DDA-04 evidence-only `039fe201c9c24c9f95f1b2af55794c384b2299c5`: final report,
+  immutable gate receipts and scoped ownership audit. Source/docs/tests remain
+  identical to the already imported reviewed component checkpoint.
+
+DDA-01 replay after locked all-extras installation resolved dependency/collection
+failures: 685 PASS / 1 FAIL across the failed-file set; the remaining architecture
+cross-layer-ratio failure remains documented. DDA-02's replay retained one
+pre-existing doctor PYTHONTRACEMALLOC subprocess timeout, including an isolated
+reproduction; its owned helper tests remain PASS. No unowned timeout or baseline
+was modified by DDA-06.
