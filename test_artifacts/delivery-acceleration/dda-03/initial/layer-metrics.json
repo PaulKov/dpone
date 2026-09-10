@@ -1,0 +1,15 @@
+{
+  "command": "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json",
+  "status": "FAIL",
+  "exit_code": 2,
+  "elapsed_seconds": 19.24,
+  "log": "layer-metrics.log",
+  "head": "f3682940f8864563cde0e6b6ecee60f746b49020",
+  "implementation_sha256": {
+    "src/dpone/runtime/mssql_native_sized_frames.py": "81ff303fbe5f6e9052d77d678c03752a8fb91aa5c45886963536a0238f380622",
+    "src/dpone/runtime/mssql_native_chunks_files.py": "466e8286ab7e3fcb716075a7d5a45b479f1c6dc52877ce141192fc4cd6ca47b5",
+    "tests/test_mssql_native_sized_frames.py": "086ee9c984b65912501ba5fdf2c4761c0b521a09d2f4ac84f4ad186c083dd85f",
+    "tests/test_mssql_native_chunks_files.py": "589ba061e7a37b3b0cb0d16844952fa8f38379c104ccbceb2955f989c938e035",
+    "docs/delivery-acceleration/frames.md": "9f40aa9aa9c93960d0c284a9059ba9479b7bb03fec94ef5a5366631104419fe8"
+  }
+}

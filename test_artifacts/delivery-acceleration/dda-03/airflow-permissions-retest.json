@@ -1,0 +1,35 @@
+{
+  "status": "PASS",
+  "command": [
+    "uv",
+    "run",
+    "pytest",
+    "tests/test_airflow_cache_shared_directory_mode.py",
+    "-q"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.71,
+  "baseline": "d5ad9aaecc900c24df421b160ed36b4cfc726e45",
+  "files": {
+    "tests/test_airflow_cache_shared_directory_mode.py": {
+      "sha256": "7117c9a833ada55047f311f582641ab73aad5680ee0e7af61181e822054cd816",
+      "identical_to_base": true
+    },
+    "packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_permissions.py": {
+      "sha256": "b600fe13fc17200e30c29e60dc8899ff9873f5451982a100d4d5f7522afb48c4",
+      "identical_to_base": true
+    },
+    "packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_layout.py": {
+      "sha256": "ba5700e2ad8e748f569574e72d32a6ec344a439b3a669340c62ae2306e5fc8ae",
+      "identical_to_base": true
+    },
+    "tests/conftest.py": {
+      "sha256": "69c0d461e335047070a1214df8e5c0c7185a230036a6611a645d1d10a5328d89",
+      "identical_to_base": true
+    }
+  },
+  "temporary_root": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dpone-dda03-airflow-permissions",
+  "directory_gid": 20,
+  "effective_gid": 20,
+  "note": "Retest only; the full-suite failure remains recorded without promotion to PASS."
+}

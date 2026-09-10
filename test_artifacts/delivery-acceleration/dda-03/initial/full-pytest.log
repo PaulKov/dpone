@@ -1,0 +1,678 @@
+bringing up nodes...
+bringing up nodes...
+
+.........................s.s..s..s.s.s.s.s..s.s..s.s..s.s..s.s..s.s..s.s [  0%]
+.s.s..s....s.s...s..s.s..s.s.s.s..s.s..s.s.s.s.s..s.s.s.s.s.s.s..s.s.s.s [  0%]
+.s..ss..s.s.s..s.s..s..ss.s..s..s.s..s.s.s...s..s..s..s.s..s.s.s..s.s..s [  1%]
+.s..s.s..s.s..s.s.s.ss..s.s.s..s.s..s.......sssss........sss.s..s.ssss.. [  1%]
+....s.s..ss...s..s..s.s..s.s.s..s..s..s.s..s.s..s.s.....s..s..s.s..s.s.. [  1%]
+s.s.ss..s..s.s..s.s..s.s.s..s.s..s..s.s..s..s..s..s.s..s..s.s..s..s..s.. [  2%]
+s..s..s...s..s.s..s..s..s.s..s.s..s..s..s.s..s..s.s..s.s..s..s..s..s.s.. [  2%]
+s.s..s.s..s.s..s.s..s..s.s.s..s.s.s..s.s..s...s..s..s..s.s.s.s..s.s.s..s [  2%]
+..s.s..s.s..s.s..s.s..s.s..s...s.s..s..s.s..s.s..s..ss.ss.ss.ss.ss.s.s.s [  3%]
+.s.s.ss.s.s.s.s.ss..s.ss.s.s.s.s.s..s.s.s.s.s.s.s.s..s.ss.s.s.ss.s.s..ss [  3%]
+.s.s.sss.ss.ss.ss.ss.s.s.sss.s.ss.s.s.s.s.s.ss.s.s.s.s.s.s.s.s.s.s.ss.s. [  3%]
+s.s.s.s.s..s.ss.s.s.s..s.s.s.ss.s.s.s.s.ss.s.s.s.s.ss.s.s.s.ss.s.s.ss.s. [  4%]
+s.s.s.s..s.s.s..s.s.s.s.s.s.ss.s.s.s.s.s..s.ss.s.s.s.s.s.s.ss.s.s.s.s.s. [  4%]
+s.ss.s.s.s.ss.s..ss.s.s.s.s.ss.ss.s.s.ss.ss.ss.sss.s.s.s.s.s.s.s.s.s..ss [  4%]
+..s.s.s.s.s.s.ss.s.ss.s.ss.s.ss.s.s.s.s.s.s..s.s.s.ss.s.ss.............. [  5%]
+..........................................................s............. [  5%]
+........................................................................ [  5%]
+........................................................................ [  6%]
+........................................................................ [  6%]
+........................................................................ [  6%]
+........................................................................ [  7%]
+........................................................................ [  7%]
+........................................................................ [  7%]
+........................................................................ [  8%]
+........................................................................ [  8%]
+........................................................................ [  8%]
+........................................................................ [  9%]
+........................................................................ [  9%]
+...............................s....s.....s.....s.......s...s...s...s... [  9%]
+s....s....s.....s..s..s......s...s....s...s..s....s...s....s...s....s... [ 10%]
+s....s.....s...s..s...s...s...s...s.....s...s....s...s....s....s...s.... [ 10%]
+s...s....s....s...s....s.....s......s.....s....s......s....s...s...s...s [ 10%]
+....s......s.....s.....s..s...s...s...s......s....s...s....s.s....s..s.. [ 11%]
+s...s...s...s....s...s...s....s..s...s...s..s.....s.....s....s...s..s... [ 11%]
+s...s..s..s..s...s...s..s...s.....s...s...s.....s....s..s...s....s...s.. [ 11%]
+.s...s.................................................................. [ 12%]
+...F.............F..................F...................F............... [ 12%]
+.....................................s..s.s...............s............. [ 12%]
+......................s................................................. [ 13%]
+........................................................................ [ 13%]
+........................................................................ [ 13%]
+........................................................................ [ 14%]
+........................................................................ [ 14%]
+........................................................................ [ 14%]
+........................................................................ [ 15%]
+........................................................................ [ 15%]
+........................................................................ [ 15%]
+........................................................................ [ 16%]
+........................................................................ [ 16%]
+........................................................................ [ 16%]
+........................................................................ [ 17%]
+........................................................................ [ 17%]
+........................................................................ [ 17%]
+........................................................................ [ 18%]
+............................................................s.s.s.s.s.s. [ 18%]
+s.s.s.s.s.s.s.s.s.s.s.s.s.....ssssssssssssssssssssssss.sssssssssssssssss [ 18%]
+ssssssssssssssssssssssss.s.s.s.s.s.s.s.s.s.s.s.s........................ [ 19%]
+........................................................................ [ 19%]
+........................................................................ [ 19%]
+........................................................................ [ 20%]
+........................................................................ [ 20%]
+........................................................................ [ 20%]
+........................................................................ [ 21%]
+........................................................................ [ 21%]
+........................................................................ [ 21%]
+........................................................................ [ 22%]
+........................................................................ [ 22%]
+........................................................................ [ 22%]
+........................................................................ [ 23%]
+........................................................................ [ 23%]
+........................................................................ [ 23%]
+........................................................................ [ 24%]
+........................................................................ [ 24%]
+........................................................................ [ 24%]
+........................................................................ [ 25%]
+........................................................................ [ 25%]
+.............................F.......................................... [ 25%]
+........................................................................ [ 26%]
+.........sss....................................ss..s..s..s.....s..s..s. [ 26%]
+.s...................................................................... [ 26%]
+........................................................................ [ 27%]
+.........s.............................................................. [ 27%]
+........................................................................ [ 28%]
+........................................................................ [ 28%]
+........................................................................ [ 28%]
+........................................................................ [ 29%]
+........................................................................ [ 29%]
+...........F...F...F...F................................................ [ 29%]
+........................................................................ [ 30%]
+........................................................................ [ 30%]
+........................................................................ [ 30%]
+........................................................................ [ 31%]
+........................................................................ [ 31%]
+........................................................................ [ 31%]
+........................................................................ [ 32%]
+........................................................................ [ 32%]
+........................................................................ [ 32%]
+........................................................................ [ 33%]
+........................................................................ [ 33%]
+........................................................................ [ 33%]
+........................................................................ [ 34%]
+........................................................................ [ 34%]
+........................................................................ [ 34%]
+........................................................................ [ 35%]
+........................................................................ [ 35%]
+........................................................................ [ 35%]
+........................................................................ [ 36%]
+........................................................................ [ 36%]
+........................................................................ [ 36%]
+........................................................................ [ 37%]
+........................................................................ [ 37%]
+........................................................................ [ 37%]
+........................................................................ [ 38%]
+......................s................................................. [ 38%]
+........................................................................ [ 38%]
+...................................................s.................... [ 39%]
+........................................................................ [ 39%]
+........................................................................ [ 39%]
+........................................................................ [ 40%]
+........................................................................ [ 40%]
+........................................................................ [ 40%]
+..........................................................s............. [ 41%]
+........................................................................ [ 41%]
+........................................................................ [ 41%]
+........................................................................ [ 42%]
+........................................................................ [ 42%]
+........................................................................ [ 42%]
+........................................................................ [ 43%]
+........................................................................ [ 43%]
+........................................................................ [ 43%]
+........................................................................ [ 44%]
+........................................................................ [ 44%]
+........................................................................ [ 44%]
+........................................................................ [ 45%]
+........................................................................ [ 45%]
+........................................................................ [ 45%]
+........................................................................ [ 46%]
+........................................................................ [ 46%]
+........................................................................ [ 46%]
+........................................................................ [ 47%]
+........................................................................ [ 47%]
+........................................................................ [ 47%]
+........................................................................ [ 48%]
+........................................................................ [ 48%]
+........................................................................ [ 48%]
+..................s..................................................... [ 49%]
+........................................................................ [ 49%]
+........................................................................ [ 49%]
+........................................................................ [ 50%]
+........................................................................ [ 50%]
+................................
+==================================== ERRORS ====================================
+_ ERROR collecting tests/integration/postgres/test_postgres_snapshot_retry_live.py _
+ImportError while importing test module '/Users/paulkov007/.codex/worktrees/0ce4/dpone-public/tests/integration/postgres/test_postgres_snapshot_retry_live.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/integration/postgres/test_postgres_snapshot_retry_live.py:6: in <module>
+    from psycopg import errors
+E   ImportError: cannot import name 'errors' from 'psycopg' (unknown location)
+____________ ERROR collecting tests/test_postgres_snapshot_retry.py ____________
+ImportError while importing test module '/Users/paulkov007/.codex/worktrees/0ce4/dpone-public/tests/test_postgres_snapshot_retry.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_postgres_snapshot_retry.py:10: in <module>
+    from psycopg import errors
+E   ImportError: cannot import name 'errors' from 'psycopg' (unknown location)
+=================================== FAILURES ===================================
+_________ test_fixed_binary_policy[False-False-hex-00ff41-accelerated] _________
+[gw1] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/0ce4/dpone-public/.venv/bin/python
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3579/popen-gw1/test_fixed_binary_policy_False2')
+backend = 'accelerated', policy = 'hex', expected = b'00ff41', nullable = False
+overflow = False
+
+    @pytest.mark.parametrize("backend", ["rowbinary", "python_native", "accelerated"])
+    @pytest.mark.parametrize("policy,expected", [("hex", b"00ff41"), ("base64", b"AP9B")])
+    @pytest.mark.parametrize("nullable", [False, True])
+    @pytest.mark.parametrize("overflow", [False, True])
+    def test_fixed_binary_policy(tmp_path, backend, policy, expected, nullable, overflow):
+        from dpone.runtime.support.type_mapping.mssql_clickhouse import MssqlClickHouseTypePolicy
+    
+        fmt = "RowBinary" if backend == "rowbinary" else "Native"
+        schema = [("value", "varbinary(3)" + (" nullable" if nullable else ""))]
+        contract = build_mssql_bcp_native_contract(schema=schema, query="SELECT synthetic", target_format=fmt)
+        path = tmp_path / "binary.bcp"
+        path.write_bytes(bytes.fromhex("030000ff41") + (b"\xff\xff" if nullable else b""))
+        artifact = SourceNativeArtifact(path, columns=["value"], native_wire_contract=contract)
+        registry = None if backend == "accelerated" else NativeAccelerationRegistry(module_loader=lambda: None)
+        width = len(expected) - int(overflow)
+        target = f"FixedString({width})"
+        target = f"Nullable({target})" if nullable else target
+        stream = NativeWireTranscoder(registry=registry).to_clickhouse_binary(
+            artifact,
+            schema,
+            clickhouse_schema=[("value", target)],
+            type_policy=MssqlClickHouseTypePolicy(binary_encoding=policy),
+        )
+        if overflow:
+            with pytest.raises(ValueError):
+                b"".join(stream.iter_bytes())
+            return
+        if fmt == "RowBinary":
+            golden = b"\x00" + expected + b"\x01" if nullable else expected
+        else:
+            golden = bytes([1, 2 if nullable else 1]) + _ch_string("value") + _ch_string(target)
+            golden += b"\x00\x01" + expected + bytes(width) if nullable else expected
+        assert b"".join(stream.iter_bytes()) == golden
+        if backend == "accelerated":
+>           assert stream.native_acceleration_evidence.selected_backend == "native_accelerated"
+E           AssertionError: assert 'python_reference' == 'native_accelerated'
+E             
+E             - native_accelerated
+E             + python_reference
+
+tests/test_native_bcp_type_matrix.py:221: AssertionError
+________ test_fixed_binary_policy[False-False-base64-AP9B-accelerated] _________
+[gw1] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/0ce4/dpone-public/.venv/bin/python
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3579/popen-gw1/test_fixed_binary_policy_False5')
+backend = 'accelerated', policy = 'base64', expected = b'AP9B', nullable = False
+overflow = False
+
+    @pytest.mark.parametrize("backend", ["rowbinary", "python_native", "accelerated"])
+    @pytest.mark.parametrize("policy,expected", [("hex", b"00ff41"), ("base64", b"AP9B")])
+    @pytest.mark.parametrize("nullable", [False, True])
+    @pytest.mark.parametrize("overflow", [False, True])
+    def test_fixed_binary_policy(tmp_path, backend, policy, expected, nullable, overflow):
+        from dpone.runtime.support.type_mapping.mssql_clickhouse import MssqlClickHouseTypePolicy
+    
+        fmt = "RowBinary" if backend == "rowbinary" else "Native"
+        schema = [("value", "varbinary(3)" + (" nullable" if nullable else ""))]
+        contract = build_mssql_bcp_native_contract(schema=schema, query="SELECT synthetic", target_format=fmt)
+        path = tmp_path / "binary.bcp"
+        path.write_bytes(bytes.fromhex("030000ff41") + (b"\xff\xff" if nullable else b""))
+        artifact = SourceNativeArtifact(path, columns=["value"], native_wire_contract=contract)
+        registry = None if backend == "accelerated" else NativeAccelerationRegistry(module_loader=lambda: None)
+        width = len(expected) - int(overflow)
+        target = f"FixedString({width})"
+        target = f"Nullable({target})" if nullable else target
+        stream = NativeWireTranscoder(registry=registry).to_clickhouse_binary(
+            artifact,
+            schema,
+            clickhouse_schema=[("value", target)],
+            type_policy=MssqlClickHouseTypePolicy(binary_encoding=policy),
+        )
+        if overflow:
+            with pytest.raises(ValueError):
+                b"".join(stream.iter_bytes())
+            return
+        if fmt == "RowBinary":
+            golden = b"\x00" + expected + b"\x01" if nullable else expected
+        else:
+            golden = bytes([1, 2 if nullable else 1]) + _ch_string("value") + _ch_string(target)
+            golden += b"\x00\x01" + expected + bytes(width) if nullable else expected
+        assert b"".join(stream.iter_bytes()) == golden
+        if backend == "accelerated":
+>           assert stream.native_acceleration_evidence.selected_backend == "native_accelerated"
+E           AssertionError: assert 'python_reference' == 'native_accelerated'
+E             
+E             - native_accelerated
+E             + python_reference
+
+tests/test_native_bcp_type_matrix.py:221: AssertionError
+_________ test_fixed_binary_policy[False-True-hex-00ff41-accelerated] __________
+[gw1] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/0ce4/dpone-public/.venv/bin/python
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3579/popen-gw1/test_fixed_binary_policy_False8')
+backend = 'accelerated', policy = 'hex', expected = b'00ff41', nullable = True
+overflow = False
+
+    @pytest.mark.parametrize("backend", ["rowbinary", "python_native", "accelerated"])
+    @pytest.mark.parametrize("policy,expected", [("hex", b"00ff41"), ("base64", b"AP9B")])
+    @pytest.mark.parametrize("nullable", [False, True])
+    @pytest.mark.parametrize("overflow", [False, True])
+    def test_fixed_binary_policy(tmp_path, backend, policy, expected, nullable, overflow):
+        from dpone.runtime.support.type_mapping.mssql_clickhouse import MssqlClickHouseTypePolicy
+    
+        fmt = "RowBinary" if backend == "rowbinary" else "Native"
+        schema = [("value", "varbinary(3)" + (" nullable" if nullable else ""))]
+        contract = build_mssql_bcp_native_contract(schema=schema, query="SELECT synthetic", target_format=fmt)
+        path = tmp_path / "binary.bcp"
+        path.write_bytes(bytes.fromhex("030000ff41") + (b"\xff\xff" if nullable else b""))
+        artifact = SourceNativeArtifact(path, columns=["value"], native_wire_contract=contract)
+        registry = None if backend == "accelerated" else NativeAccelerationRegistry(module_loader=lambda: None)
+        width = len(expected) - int(overflow)
+        target = f"FixedString({width})"
+        target = f"Nullable({target})" if nullable else target
+        stream = NativeWireTranscoder(registry=registry).to_clickhouse_binary(
+            artifact,
+            schema,
+            clickhouse_schema=[("value", target)],
+            type_policy=MssqlClickHouseTypePolicy(binary_encoding=policy),
+        )
+        if overflow:
+            with pytest.raises(ValueError):
+                b"".join(stream.iter_bytes())
+            return
+        if fmt == "RowBinary":
+            golden = b"\x00" + expected + b"\x01" if nullable else expected
+        else:
+            golden = bytes([1, 2 if nullable else 1]) + _ch_string("value") + _ch_string(target)
+            golden += b"\x00\x01" + expected + bytes(width) if nullable else expected
+        assert b"".join(stream.iter_bytes()) == golden
+        if backend == "accelerated":
+>           assert stream.native_acceleration_evidence.selected_backend == "native_accelerated"
+E           AssertionError: assert 'python_reference' == 'native_accelerated'
+E             
+E             - native_accelerated
+E             + python_reference
+
+tests/test_native_bcp_type_matrix.py:221: AssertionError
+_________ test_fixed_binary_policy[False-True-base64-AP9B-accelerated] _________
+[gw1] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/0ce4/dpone-public/.venv/bin/python
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3579/popen-gw1/test_fixed_binary_policy_False11')
+backend = 'accelerated', policy = 'base64', expected = b'AP9B', nullable = True
+overflow = False
+
+    @pytest.mark.parametrize("backend", ["rowbinary", "python_native", "accelerated"])
+    @pytest.mark.parametrize("policy,expected", [("hex", b"00ff41"), ("base64", b"AP9B")])
+    @pytest.mark.parametrize("nullable", [False, True])
+    @pytest.mark.parametrize("overflow", [False, True])
+    def test_fixed_binary_policy(tmp_path, backend, policy, expected, nullable, overflow):
+        from dpone.runtime.support.type_mapping.mssql_clickhouse import MssqlClickHouseTypePolicy
+    
+        fmt = "RowBinary" if backend == "rowbinary" else "Native"
+        schema = [("value", "varbinary(3)" + (" nullable" if nullable else ""))]
+        contract = build_mssql_bcp_native_contract(schema=schema, query="SELECT synthetic", target_format=fmt)
+        path = tmp_path / "binary.bcp"
+        path.write_bytes(bytes.fromhex("030000ff41") + (b"\xff\xff" if nullable else b""))
+        artifact = SourceNativeArtifact(path, columns=["value"], native_wire_contract=contract)
+        registry = None if backend == "accelerated" else NativeAccelerationRegistry(module_loader=lambda: None)
+        width = len(expected) - int(overflow)
+        target = f"FixedString({width})"
+        target = f"Nullable({target})" if nullable else target
+        stream = NativeWireTranscoder(registry=registry).to_clickhouse_binary(
+            artifact,
+            schema,
+            clickhouse_schema=[("value", target)],
+            type_policy=MssqlClickHouseTypePolicy(binary_encoding=policy),
+        )
+        if overflow:
+            with pytest.raises(ValueError):
+                b"".join(stream.iter_bytes())
+            return
+        if fmt == "RowBinary":
+            golden = b"\x00" + expected + b"\x01" if nullable else expected
+        else:
+            golden = bytes([1, 2 if nullable else 1]) + _ch_string("value") + _ch_string(target)
+            golden += b"\x00\x01" + expected + bytes(width) if nullable else expected
+        assert b"".join(stream.iter_bytes()) == golden
+        if backend == "accelerated":
+>           assert stream.native_acceleration_evidence.selected_backend == "native_accelerated"
+E           AssertionError: assert 'python_reference' == 'native_accelerated'
+E             
+E             - native_accelerated
+E             + python_reference
+
+tests/test_native_bcp_type_matrix.py:221: AssertionError
+____ test_demo_real_parse_validates_and_can_publish_the_generated_manifest _____
+[gw0] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/0ce4/dpone-public/.venv/bin/python
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3579/popen-gw0/test_demo_real_parse_validates0')
+
+    def test_demo_real_parse_validates_and_can_publish_the_generated_manifest(
+        tmp_path: Path,
+    ) -> None:
+        generated_manifest = tmp_path / "manifest.json"
+        completed = subprocess.run(
+            ("bash", "examples/dbt-inline-publishing/run_demo.sh"),
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env={
+                **os.environ,
+                "DPONE_DBT_DEMO_MODE": "parse",
+                "DPONE_DBT_DEMO_MANIFEST_OUTPUT": str(generated_manifest),
+            },
+        )
+    
+>       assert completed.returncode == 0, completed.stderr
+E       AssertionError: Real parse mode requires dbt Core and the dbt-sqlserver adapter.
+E         
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=('bash', 'examples/dbt-inline-publishing/run_demo.sh'), returncode=2, stdout='', stderr='Real parse mode requires dbt Core and the dbt-sqlserver adapter.\n').returncode
+
+tests/test_dbt_inline_publishing.py:146: AssertionError
+____ test_concrete_after_image_publisher_seals_only_verified_protected_rows ____
+[gw1] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/0ce4/dpone-public/.venv/bin/python
+
+name = 'pyarrow'
+
+    def _module(name: str) -> Any:
+        try:
+>           return importlib.import_module(name)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+src/dpone/runtime/semantic_refresh_parquet_codec.py:203: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'pyarrow', package = None
+
+    def import_module(name, package=None):
+        """Import a module.
+    
+        The 'package' argument is required when performing a relative import. It
+        specifies the package to use as the anchor point from which to resolve the
+        relative import to an absolute import.
+    
+        """
+        level = 0
+        if name.startswith('.'):
+            if not package:
+                raise TypeError("the 'package' argument is required to perform a "
+                                f"relative import for {name!r}")
+            for character in name:
+                if character != '.':
+                    break
+                level += 1
+>       return _bootstrap._gcd_import(name[level:], package, level)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       ModuleNotFoundError: No module named 'pyarrow'
+
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/importlib/__init__.py:90: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+    def test_concrete_after_image_publisher_seals_only_verified_protected_rows() -> None:
+>       operation, seal, snapshot, codec = _publisher_authorities()
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_semantic_refresh_clickhouse_http.py:1562: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_semantic_refresh_clickhouse_http.py:1529: in _publisher_authorities
+    parquet_schema_mapping_sha256=codec.schema_mapping_sha256(fields),
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/dpone/runtime/semantic_refresh_parquet_codec.py:60: in schema_mapping_sha256
+    _validate_fields(fields)
+src/dpone/runtime/semantic_refresh_parquet_codec.py:198: in _validate_fields
+    _arrow_type(_module("pyarrow"), field.mssql_type)
+                ^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'pyarrow'
+
+    def _module(name: str) -> Any:
+        try:
+            return importlib.import_module(name)
+        except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency guard
+>           raise ModuleNotFoundError("dpone_parquet_v1 requires the 'dpone[columnar]' extra") from exc
+E           ModuleNotFoundError: dpone_parquet_v1 requires the 'dpone[columnar]' extra
+
+src/dpone/runtime/semantic_refresh_parquet_codec.py:205: ModuleNotFoundError
+_ test_concrete_after_image_publisher_rejects_snapshot_swap_before_store_write _
+[gw1] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/0ce4/dpone-public/.venv/bin/python
+
+name = 'pyarrow'
+
+    def _module(name: str) -> Any:
+        try:
+>           return importlib.import_module(name)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+src/dpone/runtime/semantic_refresh_parquet_codec.py:203: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'pyarrow', package = None
+
+    def import_module(name, package=None):
+        """Import a module.
+    
+        The 'package' argument is required when performing a relative import. It
+        specifies the package to use as the anchor point from which to resolve the
+        relative import to an absolute import.
+    
+        """
+        level = 0
+        if name.startswith('.'):
+            if not package:
+                raise TypeError("the 'package' argument is required to perform a "
+                                f"relative import for {name!r}")
+            for character in name:
+                if character != '.':
+                    break
+                level += 1
+>       return _bootstrap._gcd_import(name[level:], package, level)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       ModuleNotFoundError: No module named 'pyarrow'
+
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/importlib/__init__.py:90: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+    def test_concrete_after_image_publisher_rejects_snapshot_swap_before_store_write() -> None:
+>       operation, seal, snapshot, codec = _publisher_authorities()
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_semantic_refresh_clickhouse_http.py:1612: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_semantic_refresh_clickhouse_http.py:1529: in _publisher_authorities
+    parquet_schema_mapping_sha256=codec.schema_mapping_sha256(fields),
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/dpone/runtime/semantic_refresh_parquet_codec.py:60: in schema_mapping_sha256
+    _validate_fields(fields)
+src/dpone/runtime/semantic_refresh_parquet_codec.py:198: in _validate_fields
+    _arrow_type(_module("pyarrow"), field.mssql_type)
+                ^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'pyarrow'
+
+    def _module(name: str) -> Any:
+        try:
+            return importlib.import_module(name)
+        except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency guard
+>           raise ModuleNotFoundError("dpone_parquet_v1 requires the 'dpone[columnar]' extra") from exc
+E           ModuleNotFoundError: dpone_parquet_v1 requires the 'dpone[columnar]' extra
+
+src/dpone/runtime/semantic_refresh_parquet_codec.py:205: ModuleNotFoundError
+_____ test_authority_bound_reader_uses_same_exact_operation_store_binding ______
+[gw1] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/0ce4/dpone-public/.venv/bin/python
+
+name = 'pyarrow'
+
+    def _module(name: str) -> Any:
+        try:
+>           return importlib.import_module(name)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+src/dpone/runtime/semantic_refresh_parquet_codec.py:203: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'pyarrow', package = None
+
+    def import_module(name, package=None):
+        """Import a module.
+    
+        The 'package' argument is required when performing a relative import. It
+        specifies the package to use as the anchor point from which to resolve the
+        relative import to an absolute import.
+    
+        """
+        level = 0
+        if name.startswith('.'):
+            if not package:
+                raise TypeError("the 'package' argument is required to perform a "
+                                f"relative import for {name!r}")
+            for character in name:
+                if character != '.':
+                    break
+                level += 1
+>       return _bootstrap._gcd_import(name[level:], package, level)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       ModuleNotFoundError: No module named 'pyarrow'
+
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/importlib/__init__.py:90: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+    def test_authority_bound_reader_uses_same_exact_operation_store_binding() -> None:
+>       operation, seal, snapshot, codec = _publisher_authorities()
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_semantic_refresh_clickhouse_http.py:1657: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_semantic_refresh_clickhouse_http.py:1529: in _publisher_authorities
+    parquet_schema_mapping_sha256=codec.schema_mapping_sha256(fields),
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/dpone/runtime/semantic_refresh_parquet_codec.py:60: in schema_mapping_sha256
+    _validate_fields(fields)
+src/dpone/runtime/semantic_refresh_parquet_codec.py:198: in _validate_fields
+    _arrow_type(_module("pyarrow"), field.mssql_type)
+                ^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'pyarrow'
+
+    def _module(name: str) -> Any:
+        try:
+            return importlib.import_module(name)
+        except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency guard
+>           raise ModuleNotFoundError("dpone_parquet_v1 requires the 'dpone[columnar]' extra") from exc
+E           ModuleNotFoundError: dpone_parquet_v1 requires the 'dpone[columnar]' extra
+
+src/dpone/runtime/semantic_refresh_parquet_codec.py:205: ModuleNotFoundError
+___ test_authority_bound_reader_rejects_kms_authority_swap_before_object_io ____
+[gw1] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/0ce4/dpone-public/.venv/bin/python
+
+name = 'pyarrow'
+
+    def _module(name: str) -> Any:
+        try:
+>           return importlib.import_module(name)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+src/dpone/runtime/semantic_refresh_parquet_codec.py:203: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'pyarrow', package = None
+
+    def import_module(name, package=None):
+        """Import a module.
+    
+        The 'package' argument is required when performing a relative import. It
+        specifies the package to use as the anchor point from which to resolve the
+        relative import to an absolute import.
+    
+        """
+        level = 0
+        if name.startswith('.'):
+            if not package:
+                raise TypeError("the 'package' argument is required to perform a "
+                                f"relative import for {name!r}")
+            for character in name:
+                if character != '.':
+                    break
+                level += 1
+>       return _bootstrap._gcd_import(name[level:], package, level)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       ModuleNotFoundError: No module named 'pyarrow'
+
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/importlib/__init__.py:90: ModuleNotFoundError
+
+The above exception was the direct cause of the following exception:
+
+    def test_authority_bound_reader_rejects_kms_authority_swap_before_object_io() -> None:
+>       operation, seal, _snapshot, _codec = _publisher_authorities()
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_semantic_refresh_clickhouse_http.py:1702: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_semantic_refresh_clickhouse_http.py:1529: in _publisher_authorities
+    parquet_schema_mapping_sha256=codec.schema_mapping_sha256(fields),
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/dpone/runtime/semantic_refresh_parquet_codec.py:60: in schema_mapping_sha256
+    _validate_fields(fields)
+src/dpone/runtime/semantic_refresh_parquet_codec.py:198: in _validate_fields
+    _arrow_type(_module("pyarrow"), field.mssql_type)
+                ^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'pyarrow'
+
+    def _module(name: str) -> Any:
+        try:
+            return importlib.import_module(name)
+        except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency guard
+>           raise ModuleNotFoundError("dpone_parquet_v1 requires the 'dpone[columnar]' extra") from exc
+E           ModuleNotFoundError: dpone_parquet_v1 requires the 'dpone[columnar]' extra
+
+src/dpone/runtime/semantic_refresh_parquet_codec.py:205: ModuleNotFoundError
+=========================== short test summary info ============================
+FAILED tests/test_native_bcp_type_matrix.py::test_fixed_binary_policy[False-False-hex-00ff41-accelerated]
+FAILED tests/test_native_bcp_type_matrix.py::test_fixed_binary_policy[False-False-base64-AP9B-accelerated]
+FAILED tests/test_native_bcp_type_matrix.py::test_fixed_binary_policy[False-True-hex-00ff41-accelerated]
+FAILED tests/test_native_bcp_type_matrix.py::test_fixed_binary_policy[False-True-base64-AP9B-accelerated]
+FAILED tests/test_dbt_inline_publishing.py::test_demo_real_parse_validates_and_can_publish_the_generated_manifest
+FAILED tests/test_semantic_refresh_clickhouse_http.py::test_concrete_after_image_publisher_seals_only_verified_protected_rows
+FAILED tests/test_semantic_refresh_clickhouse_http.py::test_concrete_after_image_publisher_rejects_snapshot_swap_before_store_write
+FAILED tests/test_semantic_refresh_clickhouse_http.py::test_authority_bound_reader_uses_same_exact_operation_store_binding
+FAILED tests/test_semantic_refresh_clickhouse_http.py::test_authority_bound_reader_rejects_kms_authority_swap_before_object_io
+ERROR tests/integration/postgres/test_postgres_snapshot_retry_live.py - Impor...
+ERROR tests/test_postgres_snapshot_retry.py - ImportError while importing tes...
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/Users/paulkov007/.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/threading.py:359: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+9 failed, 10124 passed, 737 skipped, 2 errors in 582.03s (0:09:42)
