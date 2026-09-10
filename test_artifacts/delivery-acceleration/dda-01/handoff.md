@@ -1,15 +1,15 @@
 # DDA-01 integration handoff
 
-Code commit: `7fcdabd43ed8656f1de52415fa66d8b7db6befd4`.
-Reviewed documentation commit: `3e57875` (same production code).
+Code commit: `9b69be0c16e69e7b34352e0f1148d10c48e525f7`.
+Reviewed documentation commit: `9aa2a0e`. Latest independent review: [review-v2.md](review-v2.md).
 PR: https://github.com/PaulKov/dpone/pull/28.
 Baseline: `d5ad9aaecc900c24df421b160ed36b4cfc726e45`.
 Immutable planning dependency: `f3682940f8864563cde0e6b6ecee60f746b49020`.
 
 Use the final PR branch tip to include subsequent evidence-only commits. If the
 integrator already has the planning dependency, cherry-pick the implementation
-commits with `-x` in order: `b8ae950`, `94bbd3c`, `7912df9`, `957c239`, `7fcdabd`, `3e57875`, then the
-evidence commit. Preserve later master changes and do not force-push.
+commits with `-x` in order: `b8ae950`, `94bbd3c`, `7912df9`, `957c239`, `7fcdabd`, `3e57875`, `006e0a1`,
+`9aa2a0e`, `9b69be0`, then the final evidence commit. Preserve later master changes and do not force-push.
 
 ## Component and authority
 
@@ -74,9 +74,10 @@ normalization, schemas, factories, registry, changelog or navigation edits occur
 
 ## Validation boundary
 
-Focused suite: 70 PASS (27 observation and 43 benchmark cases). Targeted mypy (six new files), repository mypy, ruff,
-formatting, import rules, module-size, docs/generated reference/language checks
-and strict MkDocs have passed. Exact command evidence is retained in this folder.
+Focused suite: 91 PASS (27 observation and 64 benchmark cases). Targeted mypy (six new files), repository mypy, ruff,
+formatting, import rules, module-size, generated-reference/language checks
+and strict MkDocs have passed. The standalone documentation link check is FAIL
+because the agreed DDA-06-owned index.md is absent here; validate it in integration. Exact command evidence is retained in this folder.
 Full regression and optional-dependency replay results are recorded in
 `completion.md`; the original full-suite FAIL is retained without relabeling.
 
@@ -85,11 +86,13 @@ The isolated layer-metrics gate reports runtime-to-contracts flow 216, above its
 and root were informed; only an approved genuine annotation-only dependency
 cleanup in shared code can resolve it. No baseline, budget, facade or dependency
 hiding was introduced here. Architecture fitness also reports average clustering
-0.18170059431282887 against target 0.180 (planning source: 0.1813233335910147).
+0.18174658401113647 against target 0.180 (planning source: 0.1813233335910147).
 The architecture pytest gate also fails on cross-layer ratio
-0.30024001745581497 > 0.300; all three results require integration resolution.
+0.30020726519035673 > 0.300; all three results require integration resolution.
 After installing locked optional dependencies, the replay of all 13 failed/error
-files produced 685 PASS and this one architecture FAIL in 137.19 seconds.
+files produced 685 PASS and one architecture FAIL in 137.19 seconds on the
+historical source. The final-source architecture test still fails; the combined
+full regression remains DDA-06 work. See review-v2.md for current evidence.
 
 Live SQL, containers and performance profiles were not run: SKIP, no approved
 disposable environment. Benchmark acceptance targets are not measured results.

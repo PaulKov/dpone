@@ -85,3 +85,11 @@ the exact 83 changed paths against the ownership audit, and unchanged src/tools
 since 7fcdabd. No misleading result or identity claims were found. The requested
 exact focused/replay command invocations were added to completion.md. Captured
 raw logs retain their original whitespace; the source/docs whitespace check passes.
+
+## Subsequent fresh-context review requested by the user
+
+The previous approvals were superseded by two P2 findings at 006e0a1 from
+`/root/independent_review_v2`. Both were fixed and independently re-reviewed;
+a later behavior-neutral field-set extraction was also independently re-reviewed.
+See [review-v2.md](review-v2.md) for exact diff hashes, commits, tests and the
+correction of the earlier documentation-check PASS label.

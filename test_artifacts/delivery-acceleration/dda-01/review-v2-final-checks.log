@@ -1,0 +1,42 @@
+Subject: 9b69be0c16e69e7b34352e0f1148d10c48e525f7
+Command: ['uv', 'run', '--locked', '--no-sync', 'ruff', 'check', '.']
+All checks passed!
+Exit: 0
+Command: ['uv', 'run', '--locked', '--no-sync', 'ruff', 'format', '--check', '.']
+5811 files already formatted
+Exit: 0
+Command: ['uv', 'run', '--locked', '--no-sync', 'mypy', '--config-file', 'mypy.ini']
+Success: no issues found in 1164 source files
+Exit: 0
+Command: ['uv', 'run', '--locked', '--no-sync', 'mypy', '--follow-imports=silent', 'src/dpone/contracts/native_delivery_observations.py', 'src/dpone/ports/native_delivery_observer.py', 'src/dpone/runtime/native_delivery_observations.py', 'src/dpone/runtime/native_delivery_benchmark.py', 'src/dpone/runtime/native_delivery_benchmark_artifacts.py', 'tools/native_delivery_benchmark.py']
+Success: no issues found in 6 source files
+Exit: 0
+Command: ['uv', 'run', '--locked', '--no-sync', 'python', 'tools/agent_policy/select_checks.py', '--base-ref', 'origin/master']
+# Change-aware validation plan
+
+Categories: cli, docs, python, runtime_state
+
+## Commands
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+- `uv run mypy --config-file mypy.ini`
+- `uv run dpone docs check-import-rules`
+- `uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json`
+- `HEAD_SHA="$(git rev-parse HEAD)"; BASE_SHA="$(git merge-base "$HEAD_SHA" origin/master)"; if [ "$BASE_SHA" = "$HEAD_SHA" ]; then BASE_SHA="$(git rev-parse "${HEAD_SHA}^")"; fi; uv run dpone docs check-module-size --baseline docs/module_size_baseline.json --base-ref "$BASE_SHA" --head-ref "$HEAD_SHA"`
+- `uv run pytest -k "cli or command" -q`
+- `uv run dpone docs check-docs`
+- `uv run dpone docs check-generated-references`
+- `uv run pytest tests/test_docs_language_contracts.py -q`
+- `uv run mkdocs build --strict`
+- `uv run pytest -m "not integration_live" -n auto --dist loadfile`
+- `uv run pytest -k "runtime or state or checkpoint or replay" -q`
+
+## Potential release gates
+- R1 CLI correctness and UX
+- R2 run CLI/Python parity
+- R6 documentation and CJM
+- R5 contracts and guardrails
+- R9 recovery/observability/performance
+
+Live checks require an approved environment; SKIP/UNVERIFIED is not PASS.
+Exit: 0
