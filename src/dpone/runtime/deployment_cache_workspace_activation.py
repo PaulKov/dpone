@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from dpone.contracts.release_composition import COMPOSITION_ADMISSION
 from dpone.gitops.release_set_validation import release_activation_failure
 from dpone.runtime.deployment_cache_common import DeploymentCacheError
 
@@ -30,6 +31,8 @@ class DeploymentCacheWorkspaceActivation:
         previous_deployment_id: str | None,
     ) -> Any | None:
         failure = release_activation_failure(dbt_wire)
+        if dbt_wire == COMPOSITION_ADMISSION and failure is not None:
+            raise DeploymentCacheError(failure.code, failure.message)
         if failure is None:
             return None
         coordinator = self._coordinator
@@ -95,6 +98,8 @@ class DeploymentCacheWorkspaceActivation:
         previous_deployment_id: str | None,
     ) -> None:
         failure = release_activation_failure(dbt_wire)
+        if dbt_wire == COMPOSITION_ADMISSION and failure is not None:
+            raise DeploymentCacheError(failure.code, failure.message)
         if failure is None:
             return
         coordinator = self._coordinator

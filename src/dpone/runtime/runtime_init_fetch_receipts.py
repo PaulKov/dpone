@@ -65,10 +65,18 @@ def validate_runtime_receipts(
         not in {
             "dpone.release-set.v1",
             "dpone.release-set.v2",
+            "dpone.release-set.v3",
         }
         or release_id(release) != plan.release_id
     ):
         raise _integrity_error("release-set identity does not match the pinned plan")
+    if release.get("schema") == "dpone.release-set.v3":
+        from dpone.contracts.release_composition_policy import validate_composition_metadata
+
+        try:
+            validate_composition_metadata(release)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise _integrity_error("composition ownership or authority is invalid") from exc
     if release.get("release_id") != plan.release_id:
         raise _integrity_error("release-set declared identity does not match the pinned plan")
     if requires_release_set_v2_for_runtime_payloads(

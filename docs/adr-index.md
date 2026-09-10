@@ -62,3 +62,5 @@ Architecture Decision Records document important design choices and their conseq
 New ADRs should include status, context, decision, consequences, and links to related implementation or documentation.
 
 - [ADR 0057: Bounded-window publication and recovery authority (Accepted)](adr/0057-bounded-window-atomic-publication.md)
+
+- [ADR 0058: Verified release composition preserves constituent authority (Accepted)](adr/0058-verified-release-composition.md)

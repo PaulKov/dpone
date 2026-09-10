@@ -19,6 +19,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from dpone.contracts.legacy_release_dbt_authority import require_legacy_dbt_authority
 from dpone.gitops.schema_release_set_promotion import (
     COMPACT_PROMOTION_PROFILE,
     COMPACT_PROMOTION_SCHEMA,
@@ -166,8 +167,16 @@ def _materialize(
                     "DPONE_COMPACT_PACK_RELEASE_PACK_MISSING",
                     f"missing compact pack for workload {workload_id!r}",
                 )
+            original_pack = _load_json_object(pack_path)
+            try:
+                require_legacy_dbt_authority(original_pack)
+            except ValueError as exc:
+                raise CompactPackReleaseError(
+                    "DPONE_COMPACT_PACK_RELEASE_NATIVE_AUTHORITY_REQUIRED",
+                    "native dbt inputs require a complete workspace descriptor; rebuild with workspace compile",
+                ) from exc
             pack = rewrite_strict_init_fetch_pack(
-                _load_json_object(pack_path),
+                original_pack,
                 xcom_sidecar_image=xcom_sidecar_image,
             )
             pack_bytes = _json_bytes(pack)
@@ -282,6 +291,11 @@ def _materialize_workspace(
 ) -> CompactPackReleaseReport:
     from dpone.app.dbt_promotion_composition import build_dbt_compact_workspace_release_builder
     from dpone.readiness.airflow_release_schema_validation import validate_release_set_schema
+
+    if _load_json_object(root / "release-set.json").get("schema") == "dpone.release-set.v3":
+        from dpone.readiness.airflow_composed_release_materializer import materialize_composed_release
+
+        return materialize_composed_release(root, cache, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
 
     if cache.is_relative_to(root.resolve()):
         raise CompactPackReleaseError(

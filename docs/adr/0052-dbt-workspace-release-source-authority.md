@@ -243,3 +243,6 @@ native DAG selection and foreign workloads outside source closure. Verify the
 full private output before immutable publication. This amendment grants no new
 physical-target activation or certification authority. See the
 [compact delivery specification](../feature-design-dbt-compact-wire-v2.md).
+
+Independent ordinary workloads use the outer envelope in
+[ADR 0058](0058-verified-release-composition.md); they do not extend native workspace membership.

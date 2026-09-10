@@ -68,6 +68,10 @@ class DbtReleaseSourceReader:
 
     def _read(self, root: Path, expected_release_id: str) -> DbtReleaseSources:
         release = release_object(self._read_file(root, "release-set.json", max_bytes=_MAX_RELEASE_BYTES), "release-set")
+        if release.get("schema") == "dpone.release-set.v3":
+            raise DbtDevEvidenceReleaseError(
+                "composition requires its complete constituent verifier; native-only source operations are unsupported"
+            )
         inventory = DbtSourceInventory.from_payload(
             self._read_file(root, "_dbt/dbt-source-snapshot.json", max_bytes=MAX_DBT_SOURCE_INVENTORY_BYTES)
         )

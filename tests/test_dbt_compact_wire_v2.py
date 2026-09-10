@@ -42,7 +42,12 @@ def verify_delivery(tmp_path, compiled):
     materialized = materialize_compact_pack_release(pack_root=compiled, cache_root=cache, xcom_sidecar_image=SIDECAR)
     assert materialized.passed, materialized.blockers
     release = json.loads((Path(materialized.release_dir) / "release-set.json").read_bytes())
-    for key in ("producer", "selection_authority", "selection_fingerprint", "provenance"):
+    preserved = (
+        ("producer", "constituents", "promotion")
+        if original.get("schema") == "dpone.release-set.v3"
+        else ("producer", "selection_authority", "selection_fingerprint", "provenance")
+    )
+    for key in preserved:
         assert release[key] == original[key]
     assert release["artifacts"]["runtime_payloads"] == original["artifacts"]["runtime_payloads"]
     _write_environment(tmp_path)

@@ -139,6 +139,15 @@ def _load_projection_inputs(
     )
     validate_release_set_schema(release, path=release_path)
     require_release_identity(release, requested_release_id=release_id, path=release_path)
+    if release.get("schema") == "dpone.release-set.v3":
+        from dpone.manifest.release_composition_files import verify_composition_transport_files
+
+        try:
+            verify_composition_transport_files(release_path.parent, release)
+        except (ValueError, OSError) as exc:
+            raise AirflowDeploymentProjectionError(
+                "DPONE_COMPOSITION_INVALID", "composition transport inventory is incomplete or corrupt"
+            ) from exc
 
     binding_relative = f"environments/{environment}/binding-set.yaml"
     registry_relative = f"platform/connection-registries/{environment}.yaml"

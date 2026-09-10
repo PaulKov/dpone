@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.airflow_deployment import is_sha256_digest
 from dpone.contracts.airflow_release_artifacts import ReleaseArtifactLocatorError, release_artifact_path
+from dpone.contracts.release_composition_subject import COMPOSITION_SUBJECT, composition_subject_sha256
 from dpone.runtime.airflow_artifact_attestation_inventory import attestation_publication_spec
 from dpone.runtime.airflow_artifact_delivery_models import (
     AirflowArtifactDeliveryError,
@@ -65,6 +66,8 @@ def release_artifact_sections(
     sections = list(_BASE_RELEASE_SECTIONS)
     if release_includes_runtime_payloads(release_schema, artifacts):
         sections.append("runtime_payloads")
+    if release_schema == "dpone.release-set.v3":
+        sections.append("composition_sources")
     return tuple(sections)
 
 
@@ -103,6 +106,21 @@ def build_publish_inventory(
                 details={"logical_path": relative.as_posix()},
             )
         release_files.append(item)
+
+    if release.get("schema") == "dpone.release-set.v3":
+        subject = _local_artifact_file(
+            key=PurePosixPath("releases", request.release_dir_name, COMPOSITION_SUBJECT),
+            path=release_dir / COMPOSITION_SUBJECT,
+            root=request.cache_root,
+        )
+        from dpone.manifest.confined_files import read_confined_file
+
+        descriptor_payload = read_confined_file(release_dir, "release-set.json", max_bytes=8 * 1024 * 1024)
+        if subject.sha256 != composition_subject_sha256(release, descriptor_payload):
+            raise AirflowArtifactDeliveryError(
+                "DPONE_COMPOSITION_INVALID", "composition subject differs from bound release bytes"
+            )
+        release_files.append(subject)
 
     deployment_names = deployment_file_names(
         projection.deployment,
@@ -210,6 +228,7 @@ def declared_release_artifacts(release: Mapping[str, Any]) -> tuple[tuple[PurePo
     if release_schema not in {
         "dpone.release-set.v1",
         "dpone.release-set.v2",
+        "dpone.release-set.v3",
     }:
         raise AirflowArtifactDeliveryError(
             "DPONE_RELEASE_SCHEMA_INVALID",

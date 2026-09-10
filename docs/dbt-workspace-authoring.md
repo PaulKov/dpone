@@ -1,9 +1,10 @@
 # Discover, check and compile a dbt workspace
 
 For analysts and data engineers adding dbt projects to an existing repository.
-These commands are **unreleased**. They implement discovery, offline checks and
-one immutable multi-project release; physical-target certification, consumer
-integration and live rollout remain pending.
+These commands provide discovery, offline checks and one immutable multi-project
+release. Use [compact workspace delivery](dbt-compact-delivery.md) for supported
+consumer delivery. Physical-target certification and live rollout require
+separate environment evidence.
 Start at the [dbt integration hub](dbt.md).
 
 ## No central domain registration
@@ -118,8 +119,7 @@ mixed v1/v2 pack fails closed. Profile errors are redacted; check the selected
 profile/output locally using non-secret parse credentials. The v1 singleton
 format and default command behavior remain unchanged.
 
-This is unreleased reader/producer support, not permission to activate v2 on an
-older runtime. Deploy matching readers first; exact runtime/provider checks,
+Reader/producer support does not authorize activation on an older runtime. Deploy matching readers first; exact runtime/provider checks,
 physical-target validation and environment acceptance remain required.
 
 Canonical manifest preparation must use the same logical target, certified

@@ -159,7 +159,7 @@ dpone gitops airflow release-materialize \
 The materializer verifies that every DAG-spec workload reference has a compact
 pack, rewrites the strict runtime contract, and produces an immutable
 `release_id`. A compact `release-set.v1` without dbt runtime payloads remains a
-legacy-compatible release. A v1 release carrying optional dbt payload inventory
+legacy-compatible release. A v1 release carrying legacy wire-v1 dbt payload inventory
 is eligible only for verified non-production transport; strict production
 projection rejects it because v1 does not bind dbt selection/provenance
 authority. Build the production v2 release instead:
@@ -174,6 +174,12 @@ First run `dbt parse --project-dir path/to/dbt-project`, then follow the
 [dbt compile reference](dbt-self-service-reference.md#command-contract)
 for profiles, cache publication, and recovery. Never hand-edit the compact v1
 descriptor to bypass this boundary.
+
+Workspace wire-v2 payloads require the complete native descriptor and source
+snapshot. Descriptor-less legacy layout cannot authorize them. Use
+[workspace authoring](dbt-workspace-authoring.md) and
+[compact workspace delivery](dbt-compact-delivery.md), then
+[composition](release-composition.md) for independent ordinary workloads.
 
 The production build returns typed blocker
 `DPONE_DBT_PRODUCTION_RELEASE_SCHEMA_REQUIRED` when a v1 release contains dbt
@@ -237,3 +243,13 @@ deployment caches follow their own retention policies; disposable reconcile
 roots may be removed after their release evidence is retained.
 
 Next: [publish and activate remote packs](airflow-pack-provider.md).
+
+## Verified release composition
+
+Use [release composition](release-composition.md) to deliver one complete native
+workspace and independently authored ordinary transfer packs in an explicit
+`dpone.release-set.v3` parent. Native v2 authority and bytes remain intact. Upgrade
+all readers before using v3. Composition activation is unavailable until physical
+admission covers every constituent; see the
+[contracts](release-composition-reference.md) and
+[migration and recovery guide](release-composition-operations.md).

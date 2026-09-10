@@ -176,6 +176,10 @@ def validate_dbt_runtime_source_projection(
     """
 
     release = strict_json_object(release_payload)
+    if release.get("schema") == "dpone.release-set.v3":
+        from dpone.contracts.release_composition_policy import composition_native_release
+
+        release = composition_native_release(release, workload_id=workload_id)
     wire = dbt_release_runtime_wire_contract(release)
     if wire == DBT_RUNTIME_WIRE_V2:
         descriptors = bind_dbt_runtime_workload(

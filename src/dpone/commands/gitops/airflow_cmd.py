@@ -8,6 +8,12 @@ from importlib import import_module
 from typing import Any
 
 from dpone.commands.func_command import CommandGroup, FuncCommand
+from dpone.commands.gitops.release_composition_cmd import (
+    cmd_release_compose,
+    cmd_release_inventory,
+    register_release_compose_parser,
+    register_release_inventory_parser,
+)
 
 
 def _load(module_name: str) -> Any:
@@ -37,6 +43,8 @@ def airflow_group() -> CommandGroup:
             register_release_materialize_parser,
             cmd_gitops_airflow_release_materialize,
         ),
+        FuncCommand("release-compose", register_release_compose_parser, cmd_release_compose),
+        FuncCommand("release-inventory", register_release_inventory_parser, cmd_release_inventory),
         FuncCommand("publish", register_publish_parser, cmd_gitops_airflow_publish),
         FuncCommand("artifact-index", register_artifact_index_parser, cmd_gitops_airflow_artifact_index),
         FuncCommand("preflight", register_preflight_parser, cmd_gitops_airflow_preflight),

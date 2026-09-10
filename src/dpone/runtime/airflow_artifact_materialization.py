@@ -11,6 +11,8 @@ from typing import Any
 
 from dpone.contracts.airflow_deployment import release_id as compute_release_id
 from dpone.contracts.airflow_deployment_projection import deployment_projection_violation
+from dpone.contracts.release_composition_subject import COMPOSITION_SUBJECT, composition_subject_sha256
+from dpone.manifest.confined_files import read_confined_file
 from dpone.ports.airflow_deployment_attestation import (
     AirflowDeploymentAttestationVerifier,
 )
@@ -184,6 +186,13 @@ class AirflowArtifactMaterializer:
                 PurePosixPath("releases", request.release_dir_name, relative.as_posix()),
                 expected_sha256=sha256,
             )
+        if release.get("schema") == "dpone.release-set.v3":
+            root = state.staging_root / "releases" / request.release_dir_name
+            descriptor_payload = read_confined_file(root, "release-set.json", max_bytes=8 * 1024 * 1024)
+            state.fetch(
+                PurePosixPath("releases", request.release_dir_name, COMPOSITION_SUBJECT),
+                expected_sha256=composition_subject_sha256(release, descriptor_payload),
+            )
         semantic_files = dict(semantic_refresh_deployment_files(deployment, index))
         for name in deployment_file_names(deployment, index):
             state.fetch(
@@ -290,6 +299,7 @@ def _validate_remote_headers(
         not in {
             "dpone.release-set.v1",
             "dpone.release-set.v2",
+            "dpone.release-set.v3",
         }
         or release.get("release_id") != request.release_id
     ):
@@ -331,6 +341,8 @@ def _install_staged_projection(
 ) -> tuple[str, str]:
     staged_release = staging / "releases" / request.release_dir_name
     release_names = ["release-set.json", *(relative.as_posix() for relative, _ in declared_release_artifacts(release))]
+    if release.get("schema") == "dpone.release-set.v3":
+        release_names.append(COMPOSITION_SUBJECT)
     staged_deployment = staging / "deployments" / request.environment / request.deployment_dir_name
     deployment_names = deployment_file_names(deployment, index)
     release_state = "not_installed"

@@ -156,6 +156,9 @@ nav:
           - Workspace source verification: dbt-workspace-source-verification.md
           - Workspace authoring: dbt-workspace-authoring.md
           - Compact workspace delivery: dbt-compact-delivery.md
+          - Compose independent releases: release-composition.md
+          - Composition contracts: release-composition-reference.md
+          - Composition operations: release-composition-operations.md
           - Workspace promotion: dbt-workspace-promotion.md
       - Runtime observability: observability.md
       - Data Product SLO and incidents: data-product-slo.md
@@ -606,6 +609,7 @@ nav:
       - ADR 0055 (Proposed): adr/0055-rest-operation-profile-authority.md
       - ADR 0056: adr/0056-public-snapshot-governance-recovery.md
       - ADR 0057: adr/0057-bounded-window-atomic-publication.md
+      - ADR 0058: adr/0058-verified-release-composition.md
 
 extra:
   generator: false

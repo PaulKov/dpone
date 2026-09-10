@@ -9,6 +9,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+from dpone.contracts.tree_integrity_subject import encode_tree_integrity_subject
 from dpone.manifest.confined_files import (
     ConfinedFileError,
     read_confined_file,
@@ -144,9 +145,9 @@ class BoundedTreeIntegrityService:
         return tuple(files)
 
     def _encode(self, files: tuple[_TreeFile, ...]) -> bytes:
-        lines = [self._policy.schema_header]
-        lines.extend(f"{item.sha256}  {item.path}" for item in files)
-        encoded = ("\n".join(lines) + "\n").encode("utf-8")
+        encoded = encode_tree_integrity_subject(
+            self._policy.schema_header, ((item.path, item.sha256) for item in files)
+        )
         if len(encoded) > self._policy.max_inventory_bytes:
             raise BoundedTreeIntegrityError("checksum subject exceeds its byte limit")
         return encoded

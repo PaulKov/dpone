@@ -1047,3 +1047,13 @@ For complete multi-project dbt compile trees, follow
 provider parsing preserve each workload's ordered source trio. Inventory sorting
 does not repair malformed v2 references. Launcher preflight remains separate from
 SQL execution and workspace activation authority.
+
+## Verified release composition
+
+Use [release composition](release-composition.md) to deliver one complete native
+workspace and independently authored ordinary transfer packs in an explicit
+`dpone.release-set.v3` parent. Native v2 authority and bytes remain intact. Upgrade
+all readers before using v3. Composition activation is unavailable until physical
+admission covers every constituent; see the
+[contracts](release-composition-reference.md) and
+[migration and recovery guide](release-composition-operations.md).

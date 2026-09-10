@@ -13,6 +13,8 @@ from dpone.contracts.dbt_release import (
     dbt_release_runtime_wire_contract,
     is_workspace_dbt_wire,
 )
+from dpone.contracts.release_composition import COMPOSITION_ADMISSION, COMPOSITION_SCHEMA
+from dpone.contracts.release_composition_policy import validate_composition_metadata
 from dpone.gitops.schema_validation import GitOpsSchemaValidator
 
 
@@ -42,7 +44,7 @@ def validate_release_set(release: Mapping[str, Any]) -> ReleaseSetValidation:
     """Preserve verified producer identity with the schema/authority decision."""
 
     kind = release.get("schema")
-    if kind not in {"dpone.release-set.v1", "dpone.release-set.v2"}:
+    if kind not in {"dpone.release-set.v1", "dpone.release-set.v2", COMPOSITION_SCHEMA}:
         return ReleaseSetValidation(
             ReleaseSetValidationFailure("DPONE_RELEASE_SCHEMA_INVALID", "release-set schema is invalid")
         )
@@ -54,6 +56,16 @@ def validate_release_set(release: Mapping[str, Any]) -> ReleaseSetValidation:
         return ReleaseSetValidation(
             ReleaseSetValidationFailure("DPONE_RELEASE_SET_INVALID", "release-set violates its public schema")
         )
+    if kind == COMPOSITION_SCHEMA:
+        try:
+            validate_composition_metadata(release)
+        except (ValueError, TypeError, KeyError):
+            return ReleaseSetValidation(
+                ReleaseSetValidationFailure(
+                    "DPONE_COMPOSITION_INVALID", "composition ownership or constituent authority is invalid"
+                )
+            )
+        return ReleaseSetValidation(dbt_runtime_wire_contract=COMPOSITION_ADMISSION)
     if kind == "dpone.release-set.v1" and "producer" not in release:
         return ReleaseSetValidation()
     try:
@@ -75,6 +87,11 @@ def validate_release_set(release: Mapping[str, Any]) -> ReleaseSetValidation:
 def release_activation_failure(dbt_wire: str | None) -> ReleaseSetValidationFailure | None:
     """Keep workspace reader support separate from physical activation authority."""
 
+    if dbt_wire == COMPOSITION_ADMISSION:
+        return ReleaseSetValidationFailure(
+            "DPONE_COMPOSITION_ADMISSION_UNAVAILABLE",
+            "composition activation requires physical-target admission for all constituents; current is unchanged",
+        )
     if is_workspace_dbt_wire(dbt_wire):
         return ReleaseSetValidationFailure(
             "DPONE_DBT_WORKSPACE_ADMISSION_UNAVAILABLE",

@@ -85,6 +85,7 @@ def require_release_identity(
     if release.get("schema") not in {
         "dpone.release-set.v1",
         "dpone.release-set.v2",
+        "dpone.release-set.v3",
     }:
         raise AirflowDeploymentProjectionError(
             "DPONE_RELEASE_SCHEMA_INVALID",

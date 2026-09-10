@@ -1,0 +1,84 @@
+"""Executable public CLI/API parity and invalid-input side-effect boundaries."""
+
+import json
+import subprocess
+import sys
+from dataclasses import replace
+
+import pytest
+import yaml
+
+from dpone.app.release_composition import build_release_composition_service
+from tests.test_release_composition_delivery import composition_request as composition_request
+
+
+def invoke(*args):
+    return subprocess.run(
+        [sys.executable, "-c", "from dpone.cli.main import main; main()", "gitops", "airflow", *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_cli_inventory_and_compose_match_public_api(composition_request):
+    request = composition_request
+    inventory = invoke(
+        "release-inventory",
+        "--pack-root",
+        str(request.standalone_root),
+        "--xcom-sidecar-image",
+        request.xcom_sidecar_image,
+    )
+    assert inventory.returncode == 0, inventory.stderr + inventory.stdout
+    assert inventory.stderr == ""
+    assert json.loads(inventory.stdout)["inventory_sha256"] == request.expected_inventory_sha256
+    manifest = request.output_dir.parent / "composition.yaml"
+    manifest.write_text(
+        yaml.safe_dump(
+            {
+                "schema": "dpone.release-composition.v1",
+                "native_workspace": {
+                    "root": str(request.native_root),
+                    "expected_release_id": request.expected_release_id,
+                },
+                "standalone": {
+                    "root": str(request.standalone_root),
+                    "expected_inventory_sha256": request.expected_inventory_sha256,
+                },
+                "transport": {"profile": request.profile, "xcom_sidecar_image": request.xcom_sidecar_image},
+            }
+        )
+    )
+    result = invoke("release-compose", "--manifest", str(manifest), "--output-dir", str(request.output_dir))
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert result.stderr == ""
+    assert json.loads(result.stdout) == build_release_composition_service().compose(request).to_dict()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"schema": "dpone.release-composition.v9"},
+        {"schema": "dpone.release-composition.v1", "native_workspace": None},
+    ],
+)
+def test_invalid_manifest_is_single_json_failure_without_publication(tmp_path, payload):
+    source = tmp_path / "composition.yaml"
+    source.write_text(yaml.safe_dump(payload))
+    output = tmp_path / "composed"
+    result = invoke("release-compose", "--manifest", str(source), "--output-dir", str(output))
+    assert result.returncode == 2
+    assert not json.loads(result.stdout)["passed"]
+    assert result.stderr == "" and not output.exists()
+
+
+@pytest.mark.parametrize("source", ["native_root", "standalone_root"])
+def test_api_rejects_output_source_alias(composition_request, source):
+    request = composition_request
+    root = getattr(request, source)
+    before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    report = build_release_composition_service().compose(replace(request, output_dir=root / "derived"))
+    assert not report.passed
+    assert {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
