@@ -1,0 +1,76 @@
+schema_version: 1
+task_id: DPONE-PG-LIVE-TESTS
+title: PostgreSQL strategy live regression tests
+goal: Restore selected strategy and transactional full refresh for internal queries
+specification: test_artifacts/postgres-strategy-preservation/design.md
+base_commit: d5ad9aaecc900c24df421b160ed36b4cfc726e45
+integrator: root
+acceptance_criteria:
+- Preserve existing target identity and constraints in default refresh
+- Preserve scoped strategy semantics and every LoadResult field
+- One full-refresh transaction owner; primary failure survives cleanup and rollback
+- Exact-source real PostgreSQL evidence and independent review
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - PostgreSQL sink strategies
+  - LoadResult
+  - documentation
+  migration_required: false
+owned_paths:
+- tests/integration/postgres/test_postgres_strategy_preservation_live.py
+- tests/integration/postgres/strategy_preservation_support.py
+integrator_owned_paths: []
+read_only_paths:
+- src
+- docs
+- test_artifacts/postgres-strategy-preservation
+forbidden_paths:
+- CHANGELOG.md
+- src/dpone/config/load_config.py
+- src/dpone/schema
+- pyproject.toml
+- uv.lock
+- mkdocs.yml
+- .github/workflows
+- src
+- docs
+- test_artifacts
+- tests/conftest.py
+- tests/integration/conftest.py
+shared_file_owner: root
+dependencies: []
+required_checks:
+  focused:
+  - PostgreSQL strategy and lifecycle regressions
+  broad:
+  - ruff
+  - format
+  - mypy
+  - imports
+  - layers
+  - module-size
+  - non-live pytest
+  - docs
+  - mkdocs
+  live:
+  - isolated local PostgreSQL
+  - isolated Kubernetes strict proof
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.

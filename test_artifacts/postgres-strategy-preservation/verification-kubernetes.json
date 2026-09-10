@@ -1,0 +1,134 @@
+{
+  "status": "PASS",
+  "source_commit": "1ff83879fc7640d358cad15402672eafddcabf41",
+  "controller_uid": "1826409a-ecdc-488c-9f58-6e1c38542224",
+  "namespace": "dpone-pg-preserve-ec30",
+  "scope": "Five actual strict Airflow DAG runs with default PostgreSQL full_refresh; synthetic tables only",
+  "runtime_image": {
+    "node_ref": "dpone-airflow-registry:5000/postgres-strategy-runtime@sha256:a15298761cd85fa8dee100d705af6f2a35179b2622e8abba6c715993495c892e",
+    "source_commit": "1ff83879fc7640d358cad15402672eafddcabf41",
+    "allowed_image_digests": [
+      "sha256:a15298761cd85fa8dee100d705af6f2a35179b2622e8abba6c715993495c892e",
+      "sha256:21dda2c5a3af225dcf5774f8138a68c90989978b4f3abab9437d3bde16c880ca"
+    ]
+  },
+  "cases": [
+    {
+      "case": "refresh-first",
+      "status": "PASS",
+      "pod_uid": "bd8d03ad-8b9c-4e0d-8846-07a5783f172d",
+      "run_id": "manual__2026-09-10T19:51:44.451474+00:00",
+      "release_id": "sha256:cfb654eb1db9f687e07e18debe38bcbb17b13ff84950bee4ae5ca7c56c081a99",
+      "deployment_id": "sha256:6db6837852bbbe1c7a8d21b8d1aaaba3cfd66e92c7905a4df2987cc1ab345107",
+      "runtime_evidence_sha256": "sha256:2e0dbd2c00e02fb735fa6ed119ffcfecd13672490a30496125b557968a2135c8",
+      "runtime_xcom_sha256": "sha256:4a539eb2fe59b33b9976817e5887e15ad021dbc8f71c866ce2c1b25bdf5bf9d9",
+      "target_oid": [
+        [
+          16420
+        ]
+      ],
+      "rows": [
+        [
+          1,
+          "alpha"
+        ],
+        [
+          2,
+          "beta"
+        ]
+      ]
+    },
+    {
+      "case": "refresh-changed",
+      "status": "PASS",
+      "pod_uid": "7c32fd00-c23d-44b5-97bf-71b61079675d",
+      "run_id": "manual__2026-09-10T19:52:29.899911+00:00",
+      "release_id": "sha256:cfb654eb1db9f687e07e18debe38bcbb17b13ff84950bee4ae5ca7c56c081a99",
+      "deployment_id": "sha256:6db6837852bbbe1c7a8d21b8d1aaaba3cfd66e92c7905a4df2987cc1ab345107",
+      "runtime_evidence_sha256": "sha256:821d35a09e614f73a7c3ec76590d90c8a18a36ee170dd0cddab6b465f15f8fa3",
+      "runtime_xcom_sha256": "sha256:60aecc4ac1ab1bf805d35a0e5ee5c129a6a7a74afa46b3d6f2a723ef3c4d5b5b",
+      "target_oid": [
+        [
+          16420
+        ]
+      ],
+      "rows": [
+        [
+          3,
+          "changed"
+        ]
+      ]
+    },
+    {
+      "case": "refresh-replay",
+      "status": "PASS",
+      "pod_uid": "431ec418-d5ce-4f10-b4ba-f2d1b712284b",
+      "run_id": "manual__2026-09-10T19:53:18.683344+00:00",
+      "release_id": "sha256:cfb654eb1db9f687e07e18debe38bcbb17b13ff84950bee4ae5ca7c56c081a99",
+      "deployment_id": "sha256:6db6837852bbbe1c7a8d21b8d1aaaba3cfd66e92c7905a4df2987cc1ab345107",
+      "runtime_evidence_sha256": "sha256:f6b8bc77b25cc71ce641f2cc188a5da8e9b693e3724105a9c96e0ec5937e6cee",
+      "runtime_xcom_sha256": "sha256:8908ac06f83f0a7496862471f2ff57ccbd5f2f521abf148f38cbaf4ddfcb9388",
+      "target_oid": [
+        [
+          16420
+        ]
+      ],
+      "rows": [
+        [
+          3,
+          "changed"
+        ]
+      ]
+    },
+    {
+      "case": "refresh-rejected",
+      "status": "PASS",
+      "pod_uid": "516680ca-2e1b-481f-8ed3-9a70c33dfb11",
+      "run_id": "manual__2026-09-10T19:53:39.017990+00:00",
+      "release_id": "sha256:cfb654eb1db9f687e07e18debe38bcbb17b13ff84950bee4ae5ca7c56c081a99",
+      "deployment_id": "sha256:6db6837852bbbe1c7a8d21b8d1aaaba3cfd66e92c7905a4df2987cc1ab345107",
+      "runtime_evidence_sha256": "sha256:5b24676e48901acd1ae69ac2d82d88fda98b577329762de20d3cd8864fe22dc4",
+      "runtime_xcom_sha256": "sha256:893fa1da9ec5efc72849abab1676692407b028ad3c396d5fa5bb76e56bc7eb0f",
+      "target_oid": [
+        [
+          16420
+        ]
+      ],
+      "rows": [
+        [
+          3,
+          "changed"
+        ]
+      ]
+    },
+    {
+      "case": "refresh-retry",
+      "status": "PASS",
+      "pod_uid": "5d7049ea-54b7-4321-99ac-9c406795ea52",
+      "run_id": "manual__2026-09-10T19:54:05.880708+00:00",
+      "release_id": "sha256:cfb654eb1db9f687e07e18debe38bcbb17b13ff84950bee4ae5ca7c56c081a99",
+      "deployment_id": "sha256:6db6837852bbbe1c7a8d21b8d1aaaba3cfd66e92c7905a4df2987cc1ab345107",
+      "runtime_evidence_sha256": "sha256:ccf26659efd5f708ba5b5b671245a6f5bec992af787e3831f30e20b99b9f21e7",
+      "runtime_xcom_sha256": "sha256:3672750c5e9fcbe29970a3141073afa9f7252362d019e3b050e7fac601cb9300",
+      "target_oid": [
+        [
+          16420
+        ]
+      ],
+      "rows": [
+        [
+          5,
+          "retry"
+        ]
+      ]
+    }
+  ],
+  "outside_scope": [
+    "hooks",
+    "manifest resources",
+    "other routes",
+    "package publication"
+  ],
+  "raw_evidence_manifest": "kubernetes/verification.json",
+  "raw_evidence_manifest_sha256": "sha256:377940b78f836cb61e1fde97d32b61fbbc603fc6241aa24eccc37b348b97ec0b"
+}

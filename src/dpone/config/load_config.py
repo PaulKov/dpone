@@ -98,7 +98,7 @@ class LoadConfig:
 
     Возможные значения:
     - None или 'truncate_insert': TRUNCATE + INSERT (по умолчанию, быстрый режим)
-    - 'exchange': Exchange Pattern (атомарная замена через RENAME, zero downtime)
+    - 'exchange': explicit object replacement; PostgreSQL may block or reject dependencies
 
     Exchange Pattern:
     - Создается временная таблица {table}__tmp

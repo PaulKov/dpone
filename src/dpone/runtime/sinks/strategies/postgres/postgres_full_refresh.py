@@ -104,174 +104,126 @@ class PostgresFullRefreshStrategy(PostgresStrategyBase):
             staging_table = staging.table
             backup_table = ExchangeQueries.get_backup_table_name(target_table)
 
-            self.connector.begin()
-            try:
-                # Шаг 1: Проверяем существование target таблицы
-                check_sql = sql.SQL(ExchangeQueries.pg_check_table_exists())
-                exists = self.connector.get_records(check_sql, (target_schema, target_table))
-                table_existed = exists and exists[0][0]
+            # Шаг 1: Проверяем существование target таблицы
+            check_sql = sql.SQL(ExchangeQueries.pg_check_table_exists())
+            exists = self.connector.get_records(check_sql, (target_schema, target_table))
+            table_existed = exists and exists[0][0]
 
-                if table_existed:
-                    # ПУТЬ 1: Target существует → Exchange Pattern
-                    self.logger.log_etl_progress(
-                        "PG_EXCHANGE_START",
-                        {
-                            "Target": f"{target_schema}.{target_table}",
-                            "Staging": f"{staging_schema}.{staging_table}",
-                            "Mode": "Exchange Pattern (атомарная замена)",
-                        },
-                    )
-
-                    # Переименовываем target → backup
-                    rename_to_backup_sql = sql.SQL("ALTER TABLE {}.{} RENAME TO {}").format(
-                        sql.Identifier(target_schema),
-                        sql.Identifier(target_table),
-                        sql.Identifier(backup_table),
-                    )
-                    self.connector.execute_query(rename_to_backup_sql)
-
-                    self.logger.log_etl_progress(
-                        "PG_EXCHANGE_BACKUP",
-                        {
-                            "Original": f"{target_schema}.{target_table}",
-                            "Backup": f"{target_schema}.{backup_table}",
-                        },
-                    )
-                else:
-                    # ПУТЬ 2: Target не существует → первая загрузка
-                    self.logger.log_etl_progress(
-                        "PG_EXCHANGE_FIRST_LOAD",
-                        {
-                            "Target": f"{target_schema}.{target_table}",
-                            "Staging": f"{staging_schema}.{staging_table}",
-                            "Mode": "First load (no backup needed)",
-                        },
-                    )
-
-                # Шаг 2: Переименовываем staging → target (атомарный swap)
-                if staging_schema != target_schema:
-                    set_schema_sql = sql.SQL("ALTER TABLE {}.{} SET SCHEMA {}").format(
-                        sql.Identifier(staging_schema),
-                        sql.Identifier(staging_table),
-                        sql.Identifier(target_schema),
-                    )
-                    self.connector.execute_query(set_schema_sql)
-
-                    # Затем переименовываем (теперь staging в target_schema)
-                    rename_staging_sql = sql.SQL("ALTER TABLE {}.{} RENAME TO {}").format(
-                        sql.Identifier(target_schema),
-                        sql.Identifier(staging_table),
-                        sql.Identifier(target_table),
-                    )
-                    self.connector.execute_query(rename_staging_sql)
-                else:
-                    # Staging уже в нужной схеме, просто переименовываем
-                    rename_staging_sql = sql.SQL("ALTER TABLE {}.{} RENAME TO {}").format(
-                        sql.Identifier(staging_schema),
-                        sql.Identifier(staging_table),
-                        sql.Identifier(target_table),
-                    )
-                    self.connector.execute_query(rename_staging_sql)
-
+            if table_existed:
+                # ПУТЬ 1: Target существует → Exchange Pattern
                 self.logger.log_etl_progress(
-                    "PG_EXCHANGE_SWAP",
+                    "PG_EXCHANGE_START",
                     {
-                        "Staging": f"{staging_schema}.{staging_table}",
                         "Target": f"{target_schema}.{target_table}",
-                        "Status": "Swapped (atomic)",
+                        "Staging": f"{staging_schema}.{staging_table}",
+                        "Mode": "Exchange Pattern (атомарная замена)",
                     },
                 )
 
-                # Шаг 3: Удаляем backup таблицу (если была)
-                if table_existed:
-                    drop_backup_sql = sql.SQL("DROP TABLE IF EXISTS {}.{}").format(
-                        sql.Identifier(target_schema),
-                        sql.Identifier(backup_table),
-                    )
-                    self.connector.execute_query(drop_backup_sql)
-
-                    self.logger.log_etl_progress(
-                        "PG_EXCHANGE_CLEANUP",
-                        {
-                            "Backup": f"{target_schema}.{backup_table}",
-                            "Status": "Dropped",
-                        },
-                    )
-
-                # Получаем количество строк в новой target таблице
-                count_sql = sql.SQL("SELECT COUNT(*) FROM {}.{}").format(
+                # Переименовываем target → backup
+                rename_to_backup_sql = sql.SQL("ALTER TABLE {}.{} RENAME TO {}").format(
                     sql.Identifier(target_schema),
                     sql.Identifier(target_table),
+                    sql.Identifier(backup_table),
                 )
-                result = self.connector.get_records(count_sql)
-                inserted = result[0][0] if result else 0
+                self.connector.execute_query(rename_to_backup_sql)
 
                 self.logger.log_etl_progress(
-                    "PG_EXCHANGE_COMPLETE",
+                    "PG_EXCHANGE_BACKUP",
+                    {
+                        "Original": f"{target_schema}.{target_table}",
+                        "Backup": f"{target_schema}.{backup_table}",
+                    },
+                )
+            else:
+                # ПУТЬ 2: Target не существует → первая загрузка
+                self.logger.log_etl_progress(
+                    "PG_EXCHANGE_FIRST_LOAD",
                     {
                         "Target": f"{target_schema}.{target_table}",
-                        "Rows": inserted,
-                        "Mode": "Exchange Pattern",
+                        "Staging": f"{staging_schema}.{staging_table}",
+                        "Mode": "First load (no backup needed)",
                     },
                 )
 
-                self.connector.commit_transaction()
+            # Шаг 2: Переименовываем staging → target (атомарный swap)
+            if staging_schema != target_schema:
+                set_schema_sql = sql.SQL("ALTER TABLE {}.{} SET SCHEMA {}").format(
+                    sql.Identifier(staging_schema),
+                    sql.Identifier(staging_table),
+                    sql.Identifier(target_schema),
+                )
+                self.connector.execute_query(set_schema_sql)
 
-                # Логируем sample если нужно
-                if inserted > 0 and hasattr(load_config, "log_sample_rows") and load_config.log_sample_rows > 0:
-                    self._log_target_sample(load_config, load_config.log_sample_rows)
+                # Затем переименовываем (теперь staging в target_schema)
+                rename_staging_sql = sql.SQL("ALTER TABLE {}.{} RENAME TO {}").format(
+                    sql.Identifier(target_schema),
+                    sql.Identifier(staging_table),
+                    sql.Identifier(target_table),
+                )
+                self.connector.execute_query(rename_staging_sql)
+            else:
+                # Staging уже в нужной схеме, просто переименовываем
+                rename_staging_sql = sql.SQL("ALTER TABLE {}.{} RENAME TO {}").format(
+                    sql.Identifier(staging_schema),
+                    sql.Identifier(staging_table),
+                    sql.Identifier(target_table),
+                )
+                self.connector.execute_query(rename_staging_sql)
 
-                return LoadResult(
-                    inserted_rows=inserted,
-                    updated_rows=0,
-                    total_rows=inserted,
-                    staging_rows=inserted,
+            self.logger.log_etl_progress(
+                "PG_EXCHANGE_SWAP",
+                {
+                    "Staging": f"{staging_schema}.{staging_table}",
+                    "Target": f"{target_schema}.{target_table}",
+                    "Status": "Swapped (atomic)",
+                },
+            )
+
+            # Шаг 3: Удаляем backup таблицу (если была)
+            if table_existed:
+                drop_backup_sql = sql.SQL("DROP TABLE IF EXISTS {}.{}").format(
+                    sql.Identifier(target_schema),
+                    sql.Identifier(backup_table),
+                )
+                self.connector.execute_query(drop_backup_sql)
+
+                self.logger.log_etl_progress(
+                    "PG_EXCHANGE_CLEANUP",
+                    {
+                        "Backup": f"{target_schema}.{backup_table}",
+                        "Status": "Dropped",
+                    },
                 )
 
-            except Exception as e:
-                # Rollback: восстанавливаем из backup если что-то пошло не так
-                try:
-                    self.connector.rollback()
+            # Получаем количество строк в новой target таблице
+            count_sql = sql.SQL("SELECT COUNT(*) FROM {}.{}").format(
+                sql.Identifier(target_schema),
+                sql.Identifier(target_table),
+            )
+            result = self.connector.get_records(count_sql)
+            inserted = result[0][0] if result else 0
 
-                    # Если swap успел произойти, откатываем
-                    if table_existed:
-                        # Проверяем, существует ли target (может быть уже переименован)
-                        check_new_target = self.connector.get_records(check_sql, (target_schema, target_table))
-                        new_target_exists = check_new_target and check_new_target[0][0]
+            self.logger.log_etl_progress(
+                "PG_EXCHANGE_COMPLETE",
+                {
+                    "Target": f"{target_schema}.{target_table}",
+                    "Rows": inserted,
+                    "Mode": "Exchange Pattern",
+                },
+            )
 
-                        if new_target_exists:
-                            # Target существует (staging был переименован), удаляем его
-                            drop_new_target_sql = sql.SQL("DROP TABLE IF EXISTS {}.{}").format(
-                                sql.Identifier(target_schema),
-                                sql.Identifier(target_table),
-                            )
-                            self.connector.execute_query(drop_new_target_sql)
+            self._ensure_technical_columns(load_config)
 
-                        # Восстанавливаем из backup
-                        restore_sql = sql.SQL("ALTER TABLE {}.{} RENAME TO {}").format(
-                            sql.Identifier(target_schema),
-                            sql.Identifier(backup_table),
-                            sql.Identifier(target_table),
-                        )
-                        self.connector.execute_query(restore_sql)
+            # Логируем sample если нужно
+            if inserted > 0 and hasattr(load_config, "log_sample_rows") and load_config.log_sample_rows > 0:
+                self._log_target_sample(load_config, load_config.log_sample_rows)
 
-                        self.logger.log_etl_progress(
-                            "PG_EXCHANGE_ROLLBACK",
-                            {
-                                "Target": f"{target_schema}.{target_table}",
-                                "Status": "Restored from backup",
-                                "Error": str(e),
-                            },
-                        )
-                except Exception as rollback_error:
-                    self.logger.log_etl_progress(
-                        "PG_EXCHANGE_ROLLBACK_FAILED",
-                        {
-                            "Error": str(rollback_error),
-                            "Original_Error": str(e),
-                        },
-                    )
-
-                raise
+            return LoadResult(
+                inserted_rows=inserted,
+                updated_rows=0,
+                total_rows=inserted,
+                staging_rows=inserted,
+            )
 
         return self._consume_with_staging(load_config, payload, handler)

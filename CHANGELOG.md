@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Fixed
+
+- Honor PostgreSQL load strategies for internal-query artifacts. Default full
+  refresh preserves existing target identity and constraints; explicit exchange
+  uses one sink-owned transaction without destructive post-rollback compensation.
+  Keep primary errors and all strategy result fields through staging cleanup.
+- Route legacy PostgreSQL query/file loader entry points through the configured
+  strategy while preserving injected target policy and sample callbacks. Remove
+  automatic CASCADE, isolate long staging names and fall back
+  safely when native partition replacement would remove out-of-scope rows.
+  Report inserted replacement rows and removed old rows separately, including
+  native partitions, so public load counters retain their row units.
+  Keep PostgreSQL snapshot-diff hard deletions out of loaded-row counters,
+  including empty snapshots and replay.
+  See the [recovery runbook](docs/source-sink/postgres-to-postgres.md#runbook);
+  upgrading does not reconstruct previously lost constraints.
+
 ## 0.77.0 - 2026-09-10
 
 - Add validated workload `airflow.resources` for CPU, memory and ephemeral

@@ -36,7 +36,16 @@ class PostgresNativePartitionReplacer:
                 inserted_rows=0, updated_rows=0, total_rows=self._count_target(load_config), replaced_rows=0
             )
 
-        partition_plan = self._resolve_partition_plan(load_config, partition.column, values)
+        # Keep catalog/row scope stable until DETACH/ATTACH or predicate fallback.
+        self.connector.execute_query(
+            f"LOCK TABLE {_qualified(load_config.target_schema, load_config.target_table)} IN ACCESS EXCLUSIVE MODE"
+        )
+        if any(value is None for value in values):
+            self._warn(load_config, "NULL partition values require predicate replacement")
+            return None
+        partition_plan = self._resolve_partition_plan(
+            load_config, partition.column, [v for v in values if v is not None]
+        )
         if partition_plan is None:
             return None
 
@@ -51,6 +60,17 @@ class PostgresNativePartitionReplacer:
             if not child_regclass or not partition_bound:
                 self._warn(load_config, f"could not resolve existing partition bound for {partition_column}={value!r}")
                 return None
+            if any(child == child_regclass for _, child, _ in partition_plan):
+                self._warn(load_config, "multiple staged values resolve to the same physical partition")
+                return None
+            outside_scope = self.connector.get_records(
+                f"SELECT EXISTS (SELECT 1 FROM {child_regclass} "
+                f"WHERE {_quote_ident(partition_column)}::text IS DISTINCT FROM %s)",
+                (value,),
+            )
+            if not outside_scope or outside_scope[0][0]:
+                self._warn(load_config, "physical partition contains rows outside the staged value")
+                return None
             partition_plan.append((value, str(child_regclass), str(partition_bound)))
         return partition_plan
 
@@ -63,38 +83,28 @@ class PostgresNativePartitionReplacer:
         partition_plan: list[tuple[str, str, str]],
     ) -> LoadResult:
         inserted_total = 0
-        replaced_partitions = 0
-        replacement_tables: list[str] = []
-        try:
-            for value, child_regclass, partition_bound in partition_plan:
-                replacement_table = f"{load_config.target_table}__dpone_part_{uuid.uuid4().hex[:8]}"
-                replacement_tables.append(replacement_table)
-                self.connector.execute_query(
-                    self._create_replacement_sql(load_config, replacement_table, child_regclass)
-                )
-                inserted_total += self._insert_partition_value_into_table(
-                    load_config, staging, payload.schema, replacement_table, partition_column, value
-                )
-                self.connector.execute_query(self._detach_partition_sql(load_config, child_regclass))
-                self.connector.execute_query(
-                    self._attach_partition_sql(load_config, replacement_table, partition_bound)
-                )
-                replaced_partitions += 1
-                replacement_tables.remove(replacement_table)
-                self.connector.execute_query(f"DROP TABLE IF EXISTS {child_regclass}")
-
-            return LoadResult(
-                inserted_rows=inserted_total,
-                updated_rows=0,
-                total_rows=self._count_target(load_config),
-                replaced_rows=replaced_partitions,
+        deleted_total = 0
+        for value, child_regclass, partition_bound in partition_plan:
+            # The caller holds the parent/children lock through commit. Count
+            # outgoing rows before DETACH; physical partitions are not row units.
+            old_rows = self.connector.get_records(f"SELECT COUNT(*) FROM {child_regclass}")
+            deleted_total += int(old_rows[0][0])
+            replacement_table = f"dpone_part_{uuid.uuid4().hex}"
+            self.connector.execute_query(self._create_replacement_sql(load_config, replacement_table, child_regclass))
+            inserted_total += self._insert_partition_value_into_table(
+                load_config, staging, payload.schema, replacement_table, partition_column, value
             )
-        except Exception:
-            for replacement_table in replacement_tables:
-                self.connector.execute_query(
-                    f"DROP TABLE IF EXISTS {_qualified(load_config.target_schema, replacement_table)}"
-                )
-            raise
+            self.connector.execute_query(self._detach_partition_sql(load_config, child_regclass))
+            self.connector.execute_query(self._attach_partition_sql(load_config, replacement_table, partition_bound))
+            self.connector.execute_query(f"DROP TABLE IF EXISTS {child_regclass}")
+
+        return LoadResult(
+            inserted_rows=inserted_total,
+            updated_rows=0,
+            total_rows=self._count_target(load_config),
+            replaced_rows=inserted_total,
+            hard_deleted_rows=deleted_total,
+        )
 
     def _target_is_declarative_partitioned(self, load_config: Any) -> bool:
         rows = self.connector.get_records(
@@ -110,11 +120,11 @@ class PostgresNativePartitionReplacer:
         )
         return bool(rows and rows[0][0])
 
-    def _partition_values_from_staging(self, staging: Any, partition_column: str) -> list[str]:
+    def _partition_values_from_staging(self, staging: Any, partition_column: str) -> list[str | None]:
         rows = self.connector.get_records(
             f"SELECT DISTINCT {_quote_ident(partition_column)}::text FROM {_qualified(staging.schema, staging.table)}"
         )
-        return [str(row[0]) for row in rows]
+        return [str(row[0]) if row[0] is not None else None for row in rows]
 
     def _existing_partition_for_value(
         self, load_config: Any, partition_column: str, value: str

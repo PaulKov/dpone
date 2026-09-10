@@ -1,0 +1,15 @@
+*.log
+live-direct-*/
+red-null-partition/
+ci-shards/
+kubernetes/image/
+kubernetes/registry-images.json
+kubernetes/cluster/
+kubernetes/controller/
+kubernetes/pods/
+kubernetes/pod-events/
+kubernetes/pod-logs/
+kubernetes/service-files/
+kubernetes/pod-watch-coverage.json
+kubernetes/collector-last-error.txt
+kubernetes/verification.json
