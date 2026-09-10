@@ -57,6 +57,34 @@ The lock timer includes a separately measured observer probe before commit.
 
 ## Final evidence
 
-Final-source performance, direct regression evidence and independent follow-up
-review are pending. Historical Kubernetes and CI receipts remain tied to their
-original sources. No merge, release or production performance claim is made.
+The complete first large-partition campaign at
+`4b6fe37498d54e386f222443c33e97bb03f2eb8b` passed all nine cases, and its
+[verification receipt](verification-performance-4b6fe37.json) independently
+checks the complete matrix, source/producer hashes, row truth, operation order,
+reader observations and summary arithmetic. The [raw report](performance-4b6fe37/report.json)
+contains every attempt, SQL timing and environment setting. The
+[42-case direct campaign](verification-direct-4b6fe37.json) also passed.
+
+| Rows | Load seconds, median (min–max) | Exclusive lock seconds, median (min–max) | Old-child COUNT seconds, median |
+| --- | --- | --- | --- |
+| 100,000 | 0.389 (0.354–0.598) | 0.267 (0.259–0.330) | 0.003 |
+| 1,000,000 | 3.780 (2.940–12.155) | 2.789 (2.073–6.207) | 0.023 |
+| 5,000,000 | 63.875 (55.391–71.458) | 40.254 (37.995–47.591) | 0.984 |
+
+Environment: PostgreSQL 16.15, Python 3.12.11, psycopg 3.3.4, ARM64 Docker VM
+with 10 CPUs and 7.75 GiB RAM; no container CPU/memory quota. PostgreSQL fsync,
+full-page writes and synchronous commit were enabled. The 5m-row child occupied
+1,029,464,064 bytes including indexes. Caches were not flushed and the host was
+not exclusively reserved. Variation across attempts is retained.
+
+The observed old-child COUNT took 0.852–1.244 seconds for 5m rows, about
+2.2–2.6% of the measured lock interval. This is the duration of that call,
+including its round-trip, not an A/B estimate of whole-load slowdown.
+The reader duration includes its own SELECT scan after commit and is not a
+pure lock-wait metric. The exclusive lock interval is separately measured.
+
+Latest-head Actions were absent because the MR conflicts with the newly merged
+Airflow 0.77.0 baseline (`e15ad32`), not because the benchmark failed. The branch
+will incorporate that baseline, retain these exact-source observations, and run
+new final-source evidence. Integration and final independent review are pending;
+no merge to master, release or production SLA claim is made.

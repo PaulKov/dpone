@@ -136,7 +136,7 @@ From the repository root:
 ```bash
 uv sync --frozen --all-extras --group dev
 uv run --no-sync python test_artifacts/postgres-strategy-preservation/run_direct_live.py live-direct-new
-uv run --no-sync python test_artifacts/postgres-strategy-preservation/verify_direct.py live-direct-new
+uv run --no-sync python test_artifacts/postgres-strategy-preservation/verify_direct.py live-direct-new --expected-cases 42 --output test_artifacts/postgres-strategy-preservation/verification-direct-new.json
 ```
 
 Build all four wheels before running `build_live_image.py`. Put
