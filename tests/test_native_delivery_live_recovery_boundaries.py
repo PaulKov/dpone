@@ -1,11 +1,14 @@
 """Independent negative boundaries: safe final rows cannot hide an unsafe transition."""
 
+import json
 from dataclasses import replace
 
 import pytest
+from tools.native_delivery_live_support.artifacts import read_artifact
 from tools.native_delivery_live_support.correctness import failure_recovery
 from tools.native_delivery_live_support.hermetic import HermeticRouteFactory, HermeticRouteSession, produce_fixture
 from tools.native_delivery_live_support.profiles import Dataset
+from tools.native_delivery_live_support.validation import validate_run
 
 
 class SessionFactory(HermeticRouteFactory):
@@ -86,8 +89,7 @@ def test_ordinary_delivery_requires_one_source_query_and_one_publication(tmp_pat
         assert len(result["samples"]) == 4 and all(sample["status"] == "FAIL" for sample in result["samples"])
 
 
-@pytest.mark.parametrize("state", ["old", "new"])
-@pytest.mark.parametrize("receipt_available", [False, True])
+@pytest.mark.parametrize("state,receipt_available", [("old", False), ("new", False), ("new", True)])
 def test_unknown_outcome_accepts_atomic_state_without_claiming_commit_authority(state, receipt_available):
     class AtomicUnknown(HermeticRouteSession):
         def run(self):
@@ -181,3 +183,49 @@ def test_fresh_invocation_cannot_reset_existing_progress(tmp_path, field, value)
 
     result = produce_fixture(tmp_path, SessionFactory(ExistingProgress))
     assert result["fidelity_receipt"]["status"] != "PASS" and result["samples"] == []
+
+
+@pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+def test_unknown_old_target_cannot_gain_an_operation_receipt(strategy):
+    class PhantomReceipt(HermeticRouteSession):
+        def snapshot(self):
+            value = super().snapshot()
+            if self.case == "unknown_commit":
+                value = replace(value, receipt_observed="b" * 64 if self.queries else None)
+            return value
+
+        def run(self):
+            if self.fault == "unknown_commit":
+                self.clock.source_acquired()
+                self.queries += 1
+                self.events += (self.fault,)
+                self.known = False
+                raise RuntimeError("unknown outcome with receipt-only publication")
+            super().run()
+
+    assert recovery_results(PhantomReceipt, strategy)["receipt_first_recovery"] == "FAIL"
+
+
+@pytest.mark.parametrize(
+    "fault,check_id",
+    [
+        ("before_commit", "rollback"),
+        ("after_eof", "source_free_resume"),
+        ("lost_ack", "receipt_first_recovery"),
+        ("unknown_commit", "receipt_first_recovery"),
+    ],
+)
+def test_retained_failure_preserves_metadata_mismatch(tmp_path, fault, check_id):
+    class BadMetadata(HermeticRouteSession):
+        def snapshot(self):
+            value = super().snapshot()
+            return replace(value, metadata_observed="f" * 64) if self.fault == fault and self.queries else value
+
+    result = produce_fixture(tmp_path, SessionFactory(BadMetadata))
+    proof = read_artifact(tmp_path, result["recovery_receipt"])
+    failed = next(item for item in proof["checks"] if item["id"] == check_id)
+    assert failed["status"] == "FAIL" and failed["expected"] != failed["observed"]
+    assert "a" * 64 in json.dumps(failed["expected"]) and "f" * 64 in json.dumps(failed["observed"])
+    raw = read_artifact(tmp_path, failed["evidence"])
+    assert {**failed, "evidence": None} in raw["checks"]
+    assert validate_run(result, tmp_path) == []

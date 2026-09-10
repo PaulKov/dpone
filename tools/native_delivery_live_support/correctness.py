@@ -186,6 +186,29 @@ def _bindings_unchanged(before: Snapshot, after: Snapshot) -> bool:
     )
 
 
+def _recovery_check(case: str, state_valid: bool, bindings: list[dict[str, Any]]) -> dict[str, Any]:
+    """Retain mismatching binding values as well as the aggregate fixture verdict."""
+    status = aggregate(["PASS" if state_valid else "FAIL", *(item["status"] for item in bindings)])
+    expected = {
+        "state_valid": True,
+        "bindings": [
+            {"id": item["id"], "status": "N/A" if item["status"] == "N/A" else "PASS", "value": item["expected"]}
+            for item in bindings
+        ],
+    }
+    observed = {
+        "state_valid": state_valid,
+        "bindings": [{"id": item["id"], "status": item["status"], "value": item["observed"]} for item in bindings],
+    }
+    return check(
+        case,
+        expected,
+        observed,
+        status=status,
+        reason="authoritative_binding_unavailable" if status == "UNVERIFIED" else None,
+    )
+
+
 def failure_recovery(
     factory: RouteFactory, dataset: Dataset, strategy: str, store: ArtifactStore | None = None
 ) -> list[dict[str, Any]]:
@@ -232,6 +255,10 @@ def failure_recovery(
                 if case == "unknown_commit":
                     old_state = initial_rows == before_rows and initial.publications == 0
                     new_state = initial_rows == exact_multiset(fixture.generate()) and initial.publications == 1
+                    if old_state:
+                        checks.append(
+                            check("commit_receipt_binding", before.receipt_observed, initial.receipt_observed)
+                        )
                     checks.append(
                         _hash_check(
                             "metadata_parity",
@@ -316,14 +343,7 @@ def failure_recovery(
                 ok &= fault not in before.fault_events and fault in initial.fault_events
             if case == "receipt_first_recovery":
                 ok &= initial.receipt_probes > before.receipt_probes
-            status = aggregate(["PASS" if ok else "FAIL", *(item["status"] for item in checks)])
-            outcomes[case] = check(
-                case,
-                True,
-                bool(ok),
-                status=status,
-                reason="authoritative_binding_unavailable" if status == "UNVERIFIED" else None,
-            )
+            outcomes[case] = _recovery_check(case, bool(ok), checks)
         except Exception:
             outcomes[case] = check(case, True, False, reason="recovery_fixture_failed")
         finally:
@@ -338,8 +358,14 @@ def failure_recovery(
     recovery_status = aggregate([known_check["status"], unknown_check["status"]])
     outcomes["receipt_first_recovery"] = check(
         "receipt_first_recovery",
-        {"known_commit": True, "unknown_blocks_replay": True},
-        {"known_commit": known_check["status"] == "PASS", "unknown_blocks_replay": unknown_check["status"] == "PASS"},
+        {
+            "known_commit": {"status": "PASS", "value": known_check["expected"]},
+            "unknown_blocks_replay": {"status": "PASS", "value": unknown_check["expected"]},
+        },
+        {
+            "known_commit": {"status": known_check["status"], "value": known_check["observed"]},
+            "unknown_blocks_replay": {"status": unknown_check["status"], "value": unknown_check["observed"]},
+        },
         status=recovery_status,
         reason="authoritative_binding_unavailable" if recovery_status == "UNVERIFIED" else None,
     )

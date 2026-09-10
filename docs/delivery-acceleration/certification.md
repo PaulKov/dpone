@@ -251,11 +251,17 @@ Rollback and the post-EOF boundary must preserve business rows, outside-window
 rows and metadata before recovery, with no publication or completed pipeline.
 For an unknown commit, the initial target must be exactly its prior state or the
 complete replacement, consistent with zero or one publication. Recovery must
+not observe a newly appeared operation receipt while the target remains in its
+prior state: target mutation and receipt publication are atomic. It must
 leave that state and the incomplete pipeline unchanged while outcome authority
 remains unavailable. An unavailable receipt is allowed only in this negative
 replay-blocking fixture; metadata still needs independent authority. For known
 commit recovery, the initial target and receipt must already be correct and
 remain unchanged; completing pending evidence/checkpoint work is allowed.
+Recovery evidence retains structured state and binding checks inside the existing
+`expected`/`observed` fields, including mismatching metadata/receipt hashes and
+both known/unknown branches. A FAIL therefore preserves the observed mismatch
+instead of reducing every condition to a single boolean.
 `recover(source_allowed=False)` must install a source opener that raises if used,
 not merely accept the flag. Recovery fixtures assert no duplicate publication;
 receipt-first recovery asserts no extra stage reads after known commit. For

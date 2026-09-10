@@ -28,7 +28,7 @@ class HermeticRouteSession:
             "a" * 64,
             "a" * 64,
             "b" * 64,
-            "b" * 64,
+            "b" * 64 if self.publications else None,
             self.queries,
             self.publications,
             self.stage_reads,
