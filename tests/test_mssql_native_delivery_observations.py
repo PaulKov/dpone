@@ -205,3 +205,27 @@ def test_nested_repeated_duration_stays_unavailable():
         pass
     assert recorder.snapshot()["durations"]["delivery"]["value"] is None
     assert collector.snapshot()["status"] == "UNVERIFIED"
+
+
+def test_malformed_duration_report_and_unbounded_clock_are_isolated():
+    collector = BoundedNativeDeliveryObserver()
+    ticks = iter([0, 10**400])
+    recorder = collector.recorder(clock=lambda: next(ticks), clock_domain="host", process_id=1, worker_id="worker")
+    with recorder.duration("delivery"):
+        result = 9
+    assert result == 9 and recorder.snapshot()["durations"]["delivery"]["value"] is None
+    report = recorder.snapshot()
+    report["durations"] = ["delivery", "pipeline"]
+    collector.record_diagnostics(report)
+    assert collector.snapshot()["status"] == "UNVERIFIED"
+
+
+def test_oversized_worker_metric_cannot_escape_failure_channel():
+    collector = BoundedNativeDeliveryObserver()
+    recorder = collector.recorder(clock_domain="host", process_id=1, worker_id="worker")
+    report = recorder.snapshot()
+    report["durations"]["delivery"].update(value=10**400, availability="measured", reason=None)
+    collector.record_diagnostics(report)
+    assert collector.snapshot()["status"] == "UNVERIFIED"
+    with pytest.raises(ValueError, match="invalid_metric"):
+        ObservationMetric(10**400, "bytes", "measured", None, "fixture")

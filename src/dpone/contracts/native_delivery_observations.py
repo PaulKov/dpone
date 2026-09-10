@@ -20,6 +20,13 @@ def diagnostic_token(value: str) -> None:
         raise ValueError("observation.invalid_token")
 
 
+def _finite_number(value: float | int | None) -> bool:
+    try:
+        return type(value) in (float, int) and math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 @dataclass(frozen=True)
 class ObservationMetric:
     """A finite measurement with units/provenance, or explicit absence."""
@@ -38,12 +45,7 @@ class ObservationMetric:
         if self.availability == "unavailable":
             valid = self.value is None and self.reason is not None
         else:
-            valid = (
-                self.availability == "measured"
-                and type(self.value) in (float, int)
-                and math.isfinite(self.value)
-                and self.reason is None
-            )
+            valid = self.availability == "measured" and _finite_number(self.value) and self.reason is None
         if not valid:
             raise ValueError("observation.invalid_metric")
 

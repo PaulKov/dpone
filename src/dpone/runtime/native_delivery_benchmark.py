@@ -6,11 +6,8 @@ receipts. The caller must retain trusted real-row producer evidence for live use
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 import statistics
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -18,31 +15,14 @@ from jsonschema import Draft202012Validator
 
 from dpone.contracts.mssql_native_chunks import NativeChunkLimits
 from dpone.contracts.native_delivery_observations import CAMPAIGN_SCHEMA, CHECKS_BY_SCOPE, RECEIPT_SCHEMA, RUN_SCHEMA
-
-
-class BenchmarkInputError(ValueError):
-    """Stable sanitized input failure; never include dataset or exception text."""
-
-
-def content_sha256(content: bytes) -> str:
-    """Hash retained bytes exactly, without reparsing or reserializing."""
-    return hashlib.sha256(content).hexdigest()
-
-
-def canonical_json(payload: Any) -> bytes:
-    """Canonical UTF-8 JSON with finite numbers; usable by independent producers."""
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode(
-        "utf-8"
-    )
-
-
-def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise BenchmarkInputError("duplicate_json_key")
-        result[key] = value
-    return result
+from dpone.runtime.native_delivery_benchmark_artifacts import (
+    BenchmarkArtifacts,
+    BenchmarkInputError,
+    canonical_json,
+    check_output,
+    content_sha256,
+    write_report,
+)
 
 
 def _validate(payload: Any, schema: dict[str, Any]) -> None:
@@ -50,85 +30,8 @@ def _validate(payload: Any, schema: dict[str, Any]) -> None:
         raise BenchmarkInputError("invalid_schema")
 
 
-class _Artifacts:
-    """Retained bytes and paths for hashing, identity checks, and output protection."""
-
-    def __init__(self) -> None:
-        self.bytes: dict[Path, bytes] = {}
-        self.references: list[tuple[dict[str, Any], Path]] = []
-
-    def read(self, path: Path) -> bytes:
-        resolved = path.resolve(strict=True)
-        content = resolved.read_bytes()
-        if resolved in self.bytes and self.bytes[resolved] != content:
-            raise BenchmarkInputError("artifact_changed")
-        self.bytes[resolved] = content
-        return content
-
-    def json(self, path: Path) -> Any:
-        try:
-            payload = json.loads(self.read(path), object_pairs_hook=_unique_object)
-            canonical_json(payload)
-            return payload
-        except (UnicodeError, ValueError, RecursionError):
-            raise BenchmarkInputError("invalid_json") from None
-
-    def reference(self, root: Path, ref: dict[str, Any]) -> Path:
-        relative = Path(ref["path"])
-        if relative.is_absolute() or ".." in relative.parts:
-            raise BenchmarkInputError("artifact_path_escape")
-        resolved = (root / relative).resolve(strict=True)
-        if not resolved.is_relative_to(root.resolve()):
-            raise BenchmarkInputError("artifact_path_escape")
-        if content_sha256(self.read(resolved)) != ref["sha256"]:
-            raise BenchmarkInputError("artifact_hash_mismatch")
-        return resolved
-
-    def export(self, path: Path, status: str) -> dict[str, Any]:
-        reference = {
-            "path": str(path.resolve()),
-            "sha256": content_sha256(self.bytes[path.resolve()]),
-            "status": status,
-        }
-        self.references.append((reference, path.resolve()))
-        return reference
-
-    def relativize(self, root: Path, input_roots: tuple[Path, Path], *, retain: bool) -> None:
-        """Keep references beneath the report, copying evidence only when needed."""
-        destinations = {}
-        for source in input_roots:
-            source = source.resolve()
-            if source.is_relative_to(root):
-                destinations[source] = source
-                continue
-            files = {str(p.relative_to(source)): data for p, data in self.bytes.items() if p.is_relative_to(source)}
-            digest = content_sha256(canonical_json({name: content_sha256(data) for name, data in files.items()}))
-            destination = root / ("native-delivery-evidence-" + digest)
-            if retain:
-                if destination.exists() or destination.is_symlink():
-                    if destination.is_symlink() or not destination.is_dir():
-                        raise BenchmarkInputError("retained_bundle_conflict")
-                    for name, data in files.items():
-                        target = destination / name
-                        if target.resolve() != target.absolute() or target.read_bytes() != data:
-                            raise BenchmarkInputError("retained_bundle_conflict")
-                else:
-                    with tempfile.TemporaryDirectory(dir=root, prefix=".native-delivery-") as temporary:
-                        bundle = Path(temporary) / "bundle"
-                        bundle.mkdir()
-                        for name, data in files.items():
-                            target = bundle / name
-                            target.parent.mkdir(parents=True, exist_ok=True)
-                            target.write_bytes(data)
-                        os.rename(bundle, destination)
-            destinations[source] = destination
-        for reference, original in self.references:
-            source = max((p for p in destinations if original.is_relative_to(p)), key=lambda p: len(p.parts))
-            reference["path"] = str((destinations[source] / original.relative_to(source)).relative_to(root))
-
-
 def _observed_check(
-    store: _Artifacts, root: Path, ref: dict[str, Any], receipt: dict[str, Any], check: dict[str, Any]
+    store: BenchmarkArtifacts, root: Path, ref: dict[str, Any], receipt: dict[str, Any], check: dict[str, Any]
 ) -> None:
     observed = store.json(store.reference(root, ref))
     identity = (
@@ -140,19 +43,26 @@ def _observed_check(
         "sample_id",
         "route",
         "execution",
+        "scope",
+        "fixture",
     )
     if not isinstance(observed, dict) or observed.get("kind") != "native-delivery-live-observation":
         raise BenchmarkInputError("invalid_live_observation")
-    if any(observed.get(key) != receipt[key] for key in identity):
+    if any(canonical_json(observed.get(key)) != canonical_json(receipt[key]) for key in identity):
         raise BenchmarkInputError("live_observation_identity_mismatch")
     if observed.get("status") != ref["status"] or not isinstance(observed.get("checks"), list):
         raise BenchmarkInputError("live_observation_status_mismatch")
-    if {**check, "evidence": None} not in observed["checks"]:
+    if canonical_json({**check, "evidence": None}) not in [canonical_json(item) for item in observed["checks"]]:
         raise BenchmarkInputError("live_observation_check_mismatch")
 
 
 def _receipt(
-    store: _Artifacts, root: Path, ref: dict[str, Any], run: dict[str, Any], scope: str, sample_id: str | None = None
+    store: BenchmarkArtifacts,
+    root: Path,
+    ref: dict[str, Any],
+    run: dict[str, Any],
+    scope: str,
+    sample_id: str | None = None,
 ) -> str:
     receipt = store.json(store.reference(root, ref))
     _validate(receipt, RECEIPT_SCHEMA)
@@ -166,9 +76,13 @@ def _receipt(
         bindings["sample_id"] = sample_id
     if any(receipt[key] != value for key, value in bindings.items()):
         raise BenchmarkInputError("receipt_identity_mismatch")
+    if scope == "sample" and receipt["fixture"]["rows"] != run["workload"]["rows"]:
+        raise BenchmarkInputError("sample_fixture_row_mismatch")
     checks = {check["id"]: check for check in receipt["checks"]}
     if len(checks) != len(receipt["checks"]):
         raise BenchmarkInputError("duplicate_check_id")
+    if checks.keys() - CHECKS_BY_SCOPE[scope]:
+        raise BenchmarkInputError("unknown_check_id")
     statuses = [ref["status"], receipt["status"]]
     live_evidence = False
     for check in checks.values():
@@ -185,12 +99,18 @@ def _receipt(
         if check["status"] == "N/A" or check["method"] == "not_applicable":
             raise BenchmarkInputError("invalid_inapplicable_check")
         statuses.append(check["status"])
-        if check["status"] == "PASS" and check["expected"] != check["observed"]:
+        if check["status"] == "PASS" and canonical_json(check["expected"]) != canonical_json(check["observed"]):
             statuses.append("FAIL")
         if (
             scope == "type_fidelity"
             and check["id"] in {"typed_content", "duplicate_multiplicity"}
             and check["method"] != "exact_typed_multiset"
+        ):
+            statuses.append("UNVERIFIED")
+        if (
+            scope == "sample"
+            and check["id"] in {"typed_content", "duplicate_multiplicity"}
+            and check["method"] not in {"exact_typed_multiset", "versioned_typed_digest"}
         ):
             statuses.append("UNVERIFIED")
         if evidence is None or evidence["status"] != "PASS":
@@ -208,7 +128,7 @@ def _status(statuses: list[str]) -> str:
     return "FAIL" if "FAIL" in statuses else "UNVERIFIED" if any(s != "PASS" for s in statuses) else "PASS"
 
 
-def _run(store: _Artifacts, path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def _run(store: BenchmarkArtifacts, path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     run = store.json(path)
     _validate(run, RUN_SCHEMA)
     limits = run["configuration"]["limits"]
@@ -280,7 +200,7 @@ def _run(store: _Artifacts, path: Path) -> tuple[dict[str, Any], dict[str, Any]]
     }
 
 
-def _campaign(store: _Artifacts, path: Path) -> tuple[list[str], dict[tuple[str, str], Any], bool]:
+def _campaign(store: BenchmarkArtifacts, path: Path) -> tuple[list[str], dict[tuple[str, str], Any], bool]:
     payload = store.json(path)
     if not isinstance(payload, dict):
         raise BenchmarkInputError("invalid_schema")
@@ -313,7 +233,7 @@ def compare(baseline: Path, candidate: Path, *, output: Path | None = None, over
     Schema, identity and file errors raise; missing eligible measurements yield
     UNVERIFIED. No SQL/network is used, and no thresholds are treated as results.
     """
-    store = _Artifacts()
+    store = BenchmarkArtifacts()
     before_ids, before, before_campaign = _campaign(store, baseline)
     after_ids, after, after_campaign = _campaign(store, candidate)
     if set(before_ids) != set(after_ids) or before_campaign != after_campaign:
@@ -377,43 +297,9 @@ def compare(baseline: Path, candidate: Path, *, output: Path | None = None, over
         else Path(os.path.commonpath([baseline.resolve().parent, candidate.resolve().parent]))
     )
     if output is not None:
-        _check_output(output, store, overwrite=overwrite)
+        check_output(output, store, overwrite=overwrite)
     store.relativize(root, (baseline.parent, candidate.parent), retain=output is not None)
     report["sha256"] = content_sha256(canonical_json(report))
     if output is not None:
-        _write_report(output, report, store, overwrite=overwrite)
+        write_report(output, report, store, overwrite=overwrite)
     return report
-
-
-def _check_output(path: Path, store: _Artifacts, *, overwrite: bool) -> None:
-    if (
-        path.is_symlink()
-        or path.resolve() in store.bytes
-        or (path.exists() and any(path.samefile(p) for p in store.bytes))
-    ):
-        raise BenchmarkInputError("output_aliases_evidence")
-    if path.exists() and not overwrite:
-        raise BenchmarkInputError("output_exists_use_overwrite")
-    for retained, content in store.bytes.items():
-        if retained.read_bytes() != content:
-            raise BenchmarkInputError("artifact_changed")
-
-
-def _write_report(path: Path, report: dict[str, Any], store: _Artifacts, *, overwrite: bool) -> None:
-    _check_output(path, store, overwrite=overwrite)
-    temporary: str | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="wb", dir=path.parent, prefix=".native-delivery-", delete=False
-        ) as stream:
-            temporary = stream.name
-            stream.write(canonical_json(report) + b"\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        if overwrite:
-            os.replace(temporary, path)
-        else:
-            os.link(temporary, path)  # Atomic no-clobber publication, including concurrent writers.
-    finally:
-        if temporary is not None:
-            Path(temporary).unlink(missing_ok=True)
