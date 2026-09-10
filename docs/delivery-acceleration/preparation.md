@@ -50,6 +50,16 @@ from business framing, so both projections are encoded independently. A full
 mapping must contain exactly the full contract's names. Values are consumed
 before requesting the next row, including when a driver reuses its mapping.
 
+`digest_prepared_projection(read_rows, *, contract, business_contract,
+max_row_bytes, expected_rows)` performs the separate single-projection integrity
+check. It validates the metadata allowance and encoder before calling the row
+supplier, then encodes each row exactly once. The preparer supplies a fresh SQL
+iterator through that callback because an injected connector may perform I/O
+when the iterator is requested. Contract selection, SELECT construction and the
+independent prepublication boundary remain in the preparer. This helper does not
+reuse the initial readback or calculate an unused second digest. Typed baseline
+expectations are frozen independently of the current helper implementation.
+
 `build_prepared_insert(*, target_sql, source_sql, business_schema, resolved,
 lineage, quote_identifier)` returns a SQL string. `source_sql` is a trusted
 derived source body: explicit SELECTs joined with `UNION ALL`, built from the
@@ -68,6 +78,10 @@ quoter for columns, and delegates metadata to
 Precedence is row hash, lineage, generated placeholder, then ordinary source
 value. Source-supplied framework values cannot override generated expressions.
 Generated columns may be absent from the raw source.
+
+For developer reflection, the schema and lineage parameter annotations retain
+their existing strings. Resolve them with the canonical type namespace as
+specified by [ADR 0058](../adr/0058-verified-release-composition.md).
 
 The helper preserves generated NULLs and the extraction-start `loaded_at`
 placeholder. The finalizer's target-clock UPDATE inside the publication

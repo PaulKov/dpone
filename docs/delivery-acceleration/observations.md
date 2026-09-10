@@ -228,6 +228,22 @@ result to one workload. `structural_checks` remains UNVERIFIED because v1 has no
 input representation authorizing structural counters; DDA-06 supplies separate
 structural test evidence. Optional missing resources limit only their own claims.
 
+## Shared limit validation
+
+`normalize_delivery_limits` in `dpone.contracts.native_delivery_observations`
+owns exact field-set validation beside the v1 run schema. Both the configuration
+producer and offline consumer call it. It uses the existing `NativeChunkLimits`
+validation and returns detached canonical values; missing fields are not filled
+with defaults. Producer field-set errors remain `exact_limits_required`, value
+errors retain their canonical codes, and the consumer maps invalid limits to
+`BenchmarkInputError("invalid_limits")`. Normalized configuration bytes and
+digests are unchanged.
+
+The recorder's observer parameter retains its postponed annotation. Developer
+tools using `typing.get_type_hints` supply the canonical observer type namespace
+under [ADR 0058](../adr/0058-verified-release-composition.md); runtime dataclass
+field reflection and supported exports remain unchanged.
+
 ## Validate and hand off
 
 Run the local focused contract suite without services:

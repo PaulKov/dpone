@@ -112,6 +112,13 @@ if eligibility.plan is None:
 result = execute_native_switch(eligibility.plan, transaction=transaction)
 ```
 
+`NativeSwitchCatalog.transaction_state()` reads one exact transaction-state row
+from the injected session. Construction performs no I/O; each observation is a
+fresh query without caching or retry. The catalog checks row shape, while the
+executor retains authority predicates, session comparisons and the order of
+locks, integrity verification and SWITCH statements. `TRANSACTION_SQL` remains
+in its existing `catalog_sql` module.
+
 `catalog` is `NativeSwitchCatalog` constructed with the injected SQL session;
 `binding`, `interval` and `transaction` come from the approved fixture/caller
 lifecycle described above. This fragment describes integration, not a standalone
