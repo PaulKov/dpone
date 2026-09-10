@@ -1,0 +1,15 @@
+
+==================================== ERRORS ====================================
+______ ERROR collecting tests/test_mssql_native_delivery_observations.py _______
+ImportError while importing test module '/Users/paulkov007/.codex/worktrees/4d98/dpone-public/tests/test_mssql_native_delivery_observations.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_mssql_native_delivery_observations.py:7: in <module>
+    from dpone.contracts.native_delivery_observations import NativeDeliveryObservation, ObservationMetric
+E   ModuleNotFoundError: No module named 'dpone.contracts.native_delivery_observations'
+=========================== short test summary info ============================
+ERROR tests/test_mssql_native_delivery_observations.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!

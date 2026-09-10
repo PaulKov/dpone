@@ -1,0 +1,13 @@
+......................F...............................                   [100%]
+=================================== FAILURES ===================================
+________ test_worker_serialization_roundtrip_and_recorder_failure_merge ________
+
+    def test_worker_serialization_roundtrip_and_recorder_failure_merge():
+        event = observation(metrics={"rss": ObservationMetric(None, "bytes", "unavailable", "provider_absent", "parent_only")})
+>       assert NativeDeliveryObservation.from_dict(event.to_dict()) == event
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: type object 'NativeDeliveryObservation' has no attribute 'from_dict'. Did you mean: 'to_dict'?
+
+tests/test_mssql_native_delivery_observations.py:145: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_mssql_native_delivery_observations.py::test_worker_serialization_roundtrip_and_recorder_failure_merge

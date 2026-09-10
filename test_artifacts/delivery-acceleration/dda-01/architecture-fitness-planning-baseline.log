@@ -1,0 +1,28 @@
+Architecture fitness check for /tmp/dpone-delivery-acceleration-spec/src/dpone
+Status: OK
+Avg clustering: 0.181
+Cross-layer ratio: 0.300
+Max module fan-out: 24 (dpone.app.dbt_promotion_composition)
+Metric findings:
+- [warn] avg_clustering_above_target: Average clustering is controlled but still above the target green zone. (0.1813233335910147 > 0.18)
+Top local clustering diagnostics:
+- dpone.adapters.bounded_window_journal degree=3 coefficient=1.000 inbound=1 outbound=2
+- dpone.backfill.chunk_scope degree=3 coefficient=1.000 inbound=1 outbound=2
+- dpone.backfill.execution_policy_models degree=3 coefficient=1.000 inbound=2 outbound=1
+- dpone.backfill.process_lane_receipt degree=3 coefficient=1.000 inbound=2 outbound=1
+- dpone.gitops.airflow_cluster_doctor degree=3 coefficient=1.000 inbound=0 outbound=3
+- dpone.gitops.airflow_cluster_doctor_commands degree=3 coefficient=1.000 inbound=1 outbound=2
+- dpone.gitops.airflow_mssql_explicit_authority degree=3 coefficient=1.000 inbound=2 outbound=3
+- dpone.manifest.authoring_migration_models degree=3 coefficient=1.000 inbound=3 outbound=0
+- dpone.manifest.authoring_migration_transaction degree=3 coefficient=1.000 inbound=1 outbound=2
+- dpone.manifest.confined_transaction_journal degree=3 coefficient=1.000 inbound=1 outbound=2
+- dpone.ops.routes.run_supervisor_models degree=3 coefficient=1.000 inbound=2 outbound=1
+- dpone.ops.routes.run_supervisor_policy degree=3 coefficient=1.000 inbound=1 outbound=2
+- dpone.readiness.nested_stress degree=3 coefficient=1.000 inbound=0 outbound=3
+- dpone.runtime.cdc.typed_materialization_projection degree=3 coefficient=1.000 inbound=2 outbound=1
+- dpone.runtime.dbt_package_readiness degree=3 coefficient=1.000 inbound=1 outbound=2
+- dpone.runtime.deployment_cache_commit degree=3 coefficient=1.000 inbound=1 outbound=2
+- dpone.runtime.etl.nested_load_config degree=3 coefficient=1.000 inbound=2 outbound=1
+- dpone.runtime.native_wire_mssql_framing degree=3 coefficient=1.000 inbound=2 outbound=1
+- dpone.runtime.sinks.clickhouse_window_admission degree=3 coefficient=1.000 inbound=1 outbound=2
+- dpone.adapters.hermetic_test_memory degree=2 coefficient=1.000 inbound=1 outbound=1
