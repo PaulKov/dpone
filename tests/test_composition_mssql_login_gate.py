@@ -420,7 +420,7 @@ def enrollment_steps(enrollment):
         ("SELECT schema_name", [("dbo",)]),
         ("SELECT p.class", permissions),
         ("SELECT schema_id", [(1, "dbo")]),
-        ("DECLARE @role", [(1,)]),
+        ("DECLARE @role", [(0,)]),
     ]
 
 

@@ -11,6 +11,7 @@ import re
 import secrets
 from dataclasses import dataclass, field
 
+from dpone.adapters.composition_mssql_database_policy import require_database_policy
 from dpone.adapters.composition_mssql_gate_schema import (
     GATE_READER,
     GATE_TRIGGER,
@@ -205,80 +206,14 @@ def require_enrollments(
 
 
 def _require_database_policy(ledger: CompositionMssqlLedger, enrollment: MssqlEnrollment) -> None:
-    """Reject ambient writers and require the bounded role's exact permission set.
-
-    The controller owns the database; dbo owns roles and managed objects. Ordinary bindings
-    are SQL instance users with read-only direct grants, optionally db_datareader.
-    No other user-defined role, executable module or assembly is admitted.
-    """
-    db = f"[{enrollment.database}]"
-    gates = ledger.table("login_gates")
-    ledger.cursor.execute(
-        f"SELECT p.class, p.major_id, s.name, p.permission_name, p.state FROM {db}.sys.database_permissions p "
-        f"JOIN {db}.sys.database_principals u ON p.grantee_principal_id=u.principal_id "
-        f"LEFT JOIN {db}.sys.schemas s ON p.class=3 AND p.major_id=s.schema_id WHERE u.name=?;",
-        enrollment.writer_role,
+    """Retain the existing helper while the catalog policy has a cohesive owner."""
+    require_database_policy(
+        ledger,
+        database=enrollment.database,
+        writer_role=enrollment.writer_role,
+        schemas=enrollment.schemas,
+        guard_id=enrollment.guard_id,
     )
-    observed = set(tuple(value) for value in ledger.cursor.fetchall())
-    expected: set[tuple[int, int, str | None, str, str]] = {
-        (0, 0, None, "CREATE TABLE", "G"),
-        (0, 0, None, "CREATE VIEW", "G"),
-    }
-    ledger.cursor.execute(f"SELECT schema_id, name FROM {db}.sys.schemas;")
-    schema_ids = {name: schema_id for schema_id, name in ledger.cursor.fetchall()}
-    for name in enrollment.schemas:
-        if name not in schema_ids:
-            raise CompositionAdmissionError("login_schema_missing")
-        expected.update(
-            (3, schema_ids[name], name, permission, "G")
-            for permission in ("SELECT", "INSERT", "UPDATE", "DELETE", "REFERENCES", "ALTER", "VIEW DEFINITION")
-        )
-    if observed != expected:
-        raise CompositionAdmissionError("login_role_permissions")
-    ledger.cursor.execute(
-        f"""DECLARE @role sysname = ?, @guard varchar(71) = ?;
-IF NOT EXISTS (SELECT 1 FROM {db}.sys.database_principals
-    WHERE name=@role AND type='R' AND is_fixed_role=0 AND owning_principal_id=1)
- OR EXISTS (SELECT 1 FROM {db}.sys.database_principals WHERE type='R' AND is_fixed_role=0 AND name NOT IN ('public', @role))
- OR EXISTS (SELECT 1 FROM {db}.sys.objects WHERE is_ms_shipped=0 AND type NOT IN ('U','V','PK','UQ','F','D','C','IT'))
- OR EXISTS (SELECT 1 FROM {db}.sys.objects WHERE is_ms_shipped=0 AND principal_id IS NOT NULL AND principal_id<>1)
- OR EXISTS (SELECT 1 FROM {db}.sys.objects o JOIN {db}.sys.schemas s ON o.schema_id=s.schema_id
-    WHERE o.is_ms_shipped=0 AND NOT EXISTS (SELECT 1 FROM {ledger.table("mssql_managed_schemas")} m
-        WHERE m.guard_id=@guard AND m.schema_name=s.name COLLATE Latin1_General_100_BIN2))
- OR EXISTS (SELECT 1 FROM {db}.sys.assemblies WHERE is_user_defined=1)
- OR EXISTS (SELECT 1 FROM {db}.sys.database_principals u WHERE u.principal_id>4 AND u.type<>'R'
-    AND (u.type<>'S' OR u.authentication_type<>1))
- OR EXISTS (SELECT 1 FROM {db}.sys.database_permissions p
-    JOIN {db}.sys.database_principals u ON p.grantee_principal_id=u.principal_id
-    WHERE u.name<>@role AND u.name NOT IN ('dbo','sys','INFORMATION_SCHEMA')
-      AND (p.permission_name NOT IN ('SELECT','VIEW DEFINITION','CONNECT',
-          'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION','VIEW ANY COLUMN MASTER KEY DEFINITION')
-          OR p.state NOT IN ('G','D') OR (u.name='guest' AND p.permission_name='CONNECT' AND p.state='G')))
- OR EXISTS (SELECT 1 FROM {db}.sys.database_role_members m
-    JOIN {db}.sys.database_principals u ON u.principal_id=m.member_principal_id
-    JOIN {db}.sys.database_principals r ON r.principal_id=m.role_principal_id
-    LEFT JOIN {gates} g ON g.login_sid=u.sid
-    WHERE NOT ((r.name=@role AND g.login_sid IS NOT NULL AND u.name COLLATE Latin1_General_100_BIN2=g.login_name)
-          OR (r.name='db_datareader' AND g.login_sid IS NULL)))
- OR EXISTS (SELECT 1 FROM {db}.sys.schemas s JOIN {db}.sys.database_principals u ON s.principal_id=u.principal_id
-    WHERE s.schema_id<16384 AND u.principal_id>4)
- OR EXISTS (SELECT 1 FROM {db}.sys.database_principals u JOIN sys.server_principals p ON p.sid=u.sid
-    LEFT JOIN {gates} g ON g.login_sid=p.sid WHERE u.principal_id>4 AND g.login_sid IS NULL
-    AND (p.type<>'S' OR EXISTS (SELECT 1 FROM sys.server_role_members m WHERE m.member_principal_id=p.principal_id)
-         OR EXISTS (SELECT 1 FROM sys.server_permissions x WHERE x.grantee_principal_id=p.principal_id
-             AND NOT (x.permission_name IN ('CONNECT SQL','VIEW ANY DEFINITION') AND x.state='G'))))
- OR EXISTS (SELECT 1 FROM sys.server_permissions x JOIN sys.server_principals p
-    ON x.grantee_principal_id=p.principal_id WHERE p.name='public'
-    AND NOT (x.state='G' AND ((x.class=100 AND x.permission_name IN ('CONNECT SQL','VIEW ANY DATABASE'))
-        OR (x.class=105 AND x.permission_name='CONNECT' AND x.major_id IN
-            (SELECT endpoint_id FROM sys.endpoints WHERE type=2)))))
- THROW 51000, 'DPONE_COMPOSITION_DATABASE_POLICY', 1;
-SELECT 1;""",
-        enrollment.writer_role,
-        enrollment.guard_id,
-    )
-    if row(ledger.cursor) != (1,):
-        raise CompositionAdmissionError("login_database_policy")
 
 
 def create_login(

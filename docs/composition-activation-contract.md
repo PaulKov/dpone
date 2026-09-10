@@ -104,6 +104,11 @@ For this initial cell the trusted controller must own each dedicated target
 database, the bounded role must be owned by `dbo`, and managed objects must use
 inherited or `dbo` ownership. Read-only principals may not acquire writer authority
 through object or role ownership.
+The catalog policy reports fixed `login_database_policy_*` refusal reasons for
+role/object ownership, unsupported objects, unmanaged scope, assemblies,
+authentication, ambient grants and memberships. These declared policy failures
+are distinct from `control_operation_unknown`, which indicates an unavailable or
+uncertain driver operation. A diagnostic reason never relaxes the predicate.
 LOGON synchronization and DMV visibility still require real tests on the pinned
 SQL Server version before worker activation is enabled.
 

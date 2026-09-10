@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Report exact sanitized SQL target catalog refusal reasons before writer
+  issuance, preserving all existing policy predicates. Keep catalog policy in
+  a separate adapter responsibility from login credentials and enrollment.
+
 - Correct SQL Server gate permission probes to use the server securable's NULL
   class, so valid controller and gate-reader privileges can be observed. Restore
   the controller before returning probe rows, including when the driver consumes
