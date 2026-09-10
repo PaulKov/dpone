@@ -125,6 +125,25 @@ def test_scheduler_reuses_frame_size_with_real_spawned_workers(tmp_path, monkeyp
     assert sum(map(len, target.files)) == sum(sizes)
 
 
+@pytest.mark.parametrize("delta,code", [(1, "encoder_size_authority_changed"), (-1, "chunk_bytes_exceeded")])
+def test_frame_reservation_cannot_override_actual_encoded_bytes(tmp_path, monkeypatch, delta, code):
+    import dpone.runtime.mssql_native_chunks as chunks
+
+    original = chunks.sized_native_frames
+
+    def corrupted(*args, **kwargs):
+        for frame in original(*args, **kwargs):
+            yield replace(frame, encoded_bytes=frame.encoded_bytes + delta)
+
+    monkeypatch.setattr(chunks, "sized_native_frames", corrupted)
+    target = Target()
+    executor, plan, lease, contract = setup(tmp_path, target)
+    with pytest.raises(WindowContractError, match=code):
+        executor.stage(plan, iter([(7,)]), contract, lease)
+    assert not target.files
+    assert NativeChunkJournal(executor.store, lease, plan).completed() is None
+
+
 @pytest.mark.parametrize("mapping", [False, True])
 @pytest.mark.parametrize("view", [False, True])
 def test_spawned_workers_keep_values_from_reused_driver_buffers(tmp_path, mapping, view):

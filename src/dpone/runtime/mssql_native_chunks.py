@@ -36,10 +36,9 @@ from dpone.runtime.mssql_native_chunks_files import (
     NativeRow,
     discard_native_files,
     encode_native_frame,
-    native_frames,
     verify_native_file,
 )
-from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+from dpone.runtime.mssql_native_sized_frames import sized_native_frames
 from dpone.runtime.native_wire_models import SourceNativeWireContract
 
 ImporterFactory = Callable[[], AbstractContextManager[NativeChunkImporter]]
@@ -221,10 +220,9 @@ class BoundedNativeChunks:
         ipc_overhead = len(pickle.dumps(envelope, protocol=5)) + 128
         if ipc_overhead + 64 > limits.max_bytes:
             raise WindowContractError("mssql_native.IPC_metadata_limit_exceeded")
-        frames = native_frames(
+        frames = sized_native_frames(
             rows, contract, limits, check=lambda: self._check(lease, cancelled), ipc_overhead=ipc_overhead
         )
-        encoder = MssqlNativeEncoder(contract, max_row_bytes=limits.max_row_bytes)
         pending: dict[Future[Any], _Work] = {}
         observations: list[dict[str, Any]] = []
         total, ordinal, eof = 0, 0, False
@@ -238,16 +236,16 @@ class BoundedNativeChunks:
                 while not eof or pending:
                     while not eof and len(pending) < limits.parallelism + limits.max_pending:
                         self._check(lease, cancelled)
-                        frame = next(frames, None)
-                        if frame is None:
+                        sized_frame = next(frames, None)
+                        if sized_frame is None:
                             eof = True
                             break
+                        frame, size = sized_frame.rows, sized_frame.encoded_bytes
                         # Reserve one additional stage for UNION ALL preparation.
                         if ordinal + 2 > limits.max_staging_tables:
                             raise WindowContractError("mssql_native.staging_object_limit_exceeded")
                         if len(pickle.dumps(frame, protocol=5)) > limits.max_bytes:
                             raise WindowContractError("mssql_native.IPC_frame_limit_exceeded")
-                        size = sum(encoder.encoded_row_size(row) for row in frame)
                         if total + size > limits.max_total_encoded_bytes:
                             raise WindowContractError("mssql_native.total_encoded_bytes_exceeded")
                         with self.importer_factory() as importer:
