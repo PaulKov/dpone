@@ -4,19 +4,17 @@ This page is the single source of truth for dpone code-quality metrics. It conta
 
 ## Current quality summary
 
-🟡 **YELLOW - architecture hard gates pass locally; clustering target and exact-cap legacy debt remain visible.**
+🔴 **RED - integrated architecture gates fail; merge readiness remains on hold.**
 
-General import/layer checks do not replace the independent architecture gates.
-The clustering hard gate and stricter pre-release cross-layer assertion in
-`tests/test_architecture_fitness_gate.py` pass on the current source. The generated
-dashboard's heuristic `OK` labels do not establish release readiness or replace
-the complete exact-candidate CI suite. Regeneration updates observations, not
-acceptance thresholds; the preferred clustering target remains unmet.
+The current integrated dependency and architecture gates report regressions.
+Generated dashboard labels do not establish acceptance or replace the complete
+exact-candidate CI suite. Regeneration updates observations, not thresholds;
+actual gate receipts determine readiness.
 
 Generic reconciliation/API/type facades are protected by import rules, broad
 facades are lazy/delegating, module-size hard violations are closed and legacy
 warning debt in the canonical `src/dpone` package is held by exact
-non-regression caps. The narrow architecture margin still warrants improvement.
+non-regression caps. Architecture coupling requires further improvement.
 Release governance is split
 into focused catalog sections, so current architecture fitness has no class
 responsibility advisories. `ETLProcessor` is now below the preferred fan-out
