@@ -132,3 +132,29 @@ check PASS, including the exact one-path extension. The 44 documentation/policy
 tests PASS. Independent static review approved this supplement without findings.
 Generation and final integrated documentation/architecture checks remain DDA-06's
 execution responsibility; no passing generation result is claimed here.
+
+## DDA-05 recovery regression module
+
+DDA-06 assigned DDA-05 the single additional path
+`tests/test_native_delivery_live_recovery_boundaries.py`. The full effective
+DDA-05 supplement remains with the integrator at
+`test_artifacts/delivery-acceleration/dda-06/supplemental-contracts/dda-05-recovery-boundaries.yml`.
+The planning owner confirms that assignment; this record introduces no competing
+contract or additional source/shared-file ownership.
+
+The cohesive module covers repeated source/publication operations, rollback
+pipeline markers and unknown-commit partial publication found during independent
+review. It avoids growing the existing 392-SLOC harness test module toward its
+unchanged 400-SLOC hard limit. Correctness fixes remain within DDA-05's existing
+helper paths, with frozen receipt IDs, schemas and explicit environment opt-in.
+
+The effective focused pytest command must run both the existing benchmark tests
+and the new recovery-boundary module. Preserve all other required checks. After
+each implementation correction, independently review the current diff again
+before handoff. The integrator must include the new tracked Python test file
+before regenerating quality metrics and freezing the final validation tree.
+
+No live execution, public SWITCH activation, shared fixture edits, threshold
+changes, publication authority or revision of receipt semantics is authorized.
+Component tests and the actual final integrated gates still require execution;
+the scope confirmation does not claim a passing implementation or lift HOLD.
