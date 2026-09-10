@@ -47,8 +47,10 @@ contains audited baseline `d5ad9aaecc900c24df421b160ed36b4cfc726e45`. Fetch curr
 origin/master and integrate missing upstream changes normally before editing.
 Preserve all later upstream changes. Each dispatch supplies the same committed
 specification as a read-only dependency. If it is not yet in master, import that
-documentation-only commit through a normal Git merge before implementation;
-never reset the checkout to it. Record this dependency commit separately from
+documentation-only commit through a fast-forward before implementation. If an
+existing branch has diverged, use a provenance-preserving cherry-pick -x;
+GitHub rejects merge commits on the implementation branches. Never reset the
+checkout or force-push. Record this dependency commit separately from
 owned implementation edits in the path audit. This imports already authored
 planning inputs; it does not give writers permission to edit shared documents.
 Do not cherry-pick another contributor's unfinished branch.
@@ -211,6 +213,15 @@ Definition of Done:
 9. Publish a reviewable integration PR with linked per-task evidence and explicit code-ready versus live-performance statuses. Do not merge/release/tag/upload or change providers in this task.
 
 ## Evidence and review
+
+The original contracts remain retained at their immutable planning commit.
+The bounded DDA-06 annotation-only scope supplement and confirmation of DDA-01's
+artifact-I/O helper are recorded under
+`test_artifacts/delivery-acceleration/planning-amendments/` in the
+[planning PR](https://github.com/PaulKov/dpone/pull/24). Use the applicable full
+supplement as the effective task contract. These adjustments retain the approved
+algorithms, supported imports, runtime/dataclass dependencies and all quality
+budgets; they do not authorize general ownership expansion.
 
 Task execution evidence belongs under
 `test_artifacts/delivery-acceleration/<lowercase-task-id>/`; each contract owns
