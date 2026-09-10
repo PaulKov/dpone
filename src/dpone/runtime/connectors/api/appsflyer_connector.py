@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
     from vault_kv_client import VaultManager
@@ -69,8 +69,22 @@ class AppsflyerCredentials(APICredentials):
         vault_path: str,
         vault_manager: VaultManager | None = None,
     ) -> AppsflyerCredentials:
-        vm = vault_manager or get_default_manager()
-        mount_point = get_env_code()
+        return cls._from_vault_dependencies(
+            vault_path, vault_manager, env_resolver=get_env_code, manager_factory=get_default_manager
+        )
+
+    @classmethod
+    def _from_vault_dependencies(
+        cls,
+        vault_path: str,
+        vault_manager: VaultManager | None,
+        *,
+        env_resolver: Callable[[], str],
+        manager_factory: Callable[[], VaultManager],
+    ) -> Self:
+        """Resolve credentials using call-local dependencies, including facade resolvers."""
+        vm = vault_manager or manager_factory()
+        mount_point = env_resolver()
         secret = vm.get_secret(mount_point=mount_point, path=vault_path)
         return cls(
             endpoint=secret["endpoint"],
@@ -151,7 +165,7 @@ class AppsflyerConnector(AppsflyerWindowingMixin, AbstractAPIConnector):
         default_app_id: str | None = None,
         timeout: int = DEFAULT_TIMEOUT,
     ) -> AppsflyerConnector:
-        credentials = AppsflyerCredentials.from_vault(vault_path=vault_path, vault_manager=vault_manager)
+        credentials = cls._credentials_from_vault(vault_path, vault_manager)
         retry_config = APIRetryConfig(max_retries=max_retries) if max_retries is not None else None
         rate_limit_config = None
         if rate_limit_delay is not None and rate_limit_delay > 0:
@@ -166,6 +180,11 @@ class AppsflyerConnector(AppsflyerWindowingMixin, AbstractAPIConnector):
             timeout=timeout,
             default_app_id=default_app_id,
         )
+
+    @classmethod
+    def _credentials_from_vault(cls, vault_path: str, vault_manager: VaultManager | None) -> AppsflyerCredentials:
+        """Construct credentials without changing the canonical credential class."""
+        return AppsflyerCredentials.from_vault(vault_path=vault_path, vault_manager=vault_manager)
 
     def health_check(self) -> bool:
         app_id = self.default_app_id

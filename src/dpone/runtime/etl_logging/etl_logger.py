@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import logging
-import sys
 from datetime import datetime
 from typing import Any
 
@@ -405,8 +404,3 @@ class ETLLogger:
 
 
 etl_logger = ETLLogger()
-
-_parent_package = sys.modules.get(__package__)
-if _parent_package is not None:  # pragma: no cover - import compatibility guard
-    setattr(_parent_package, "ETLLogger", ETLLogger)
-    setattr(_parent_package, "etl_logger", etl_logger)

@@ -1,5 +1,24 @@
 # Compatibility
 
+## Removal of logging export patch helper
+
+The exported `dpone.runtime.logging_core.sync_etl_logging_facade` helper is
+removed without a deprecated alias because it performed cross-module namespace
+mutation. Remove calls to that helper. Ordinary imports now bind the same class
+and singleton directly:
+
+```python
+from dpone.runtime.etl_logging import ETLLogger, etl_logger
+from dpone.runtime.logging_core import RuntimeLogger, create_etl_logger
+```
+
+The logging package initializes its implementation when explicitly imported;
+bare `import dpone` remains lazy. Framework services continue accepting an
+injected logger; create one with `create_etl_logger` when the application owns
+configuration. Do not replace classes/functions or synchronize another module's
+exports at import time. Existing AppsFlyer constructor signatures remain unchanged
+while their internal credential dependencies become call-local.
+
 ## Native BCP safety corrections in 0.74.35
 
 Upgrade core and the optional accelerator together. Native provider revision 2

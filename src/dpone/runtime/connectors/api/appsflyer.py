@@ -26,24 +26,13 @@ get_env_code = _connector.get_env_code
 
 
 class AppsflyerCredentials(_BaseAppsflyerCredentials):
-    """Backward-compatible credentials facade.
-
-    Legacy tests and integrations monkeypatch ``dpone.runtime.connectors.api.appsflyer.get_env_code``.
-    The connector implementation lives in ``appsflyer_connector``. This facade keeps that injection point
-    working while delegating the actual parsing logic to the focused connector class.
-    """
+    """Credentials facade passing its resolver dependencies explicitly to the loader."""
 
     @classmethod
     def from_vault(cls, vault_path: str, vault_manager: Any | None = None) -> AppsflyerCredentials:
-        original_get_env_code = _connector.get_env_code
-        original_get_default_manager = _connector.get_default_manager
-        _connector.get_env_code = get_env_code
-        _connector.get_default_manager = get_default_manager
-        try:
-            return super().from_vault(vault_path=vault_path, vault_manager=vault_manager)
-        finally:
-            _connector.get_env_code = original_get_env_code
-            _connector.get_default_manager = original_get_default_manager
+        return cls._from_vault_dependencies(
+            vault_path, vault_manager, env_resolver=get_env_code, manager_factory=get_default_manager
+        )
 
 
 class AppsflyerConnector(_BaseAppsflyerConnector):
@@ -60,19 +49,19 @@ class AppsflyerConnector(_BaseAppsflyerConnector):
         default_app_id: str | None = None,
         timeout: int = _BaseAppsflyerConnector.DEFAULT_TIMEOUT,
     ) -> AppsflyerConnector:
-        original_credentials = _connector.AppsflyerCredentials
-        _connector.AppsflyerCredentials = AppsflyerCredentials
-        try:
-            return super().from_vault(
-                vault_path=vault_path,
-                vault_manager=vault_manager,
-                rate_limit_delay=rate_limit_delay,
-                max_retries=max_retries,
-                default_app_id=default_app_id,
-                timeout=timeout,
-            )
-        finally:
-            _connector.AppsflyerCredentials = original_credentials
+        return super().from_vault(
+            vault_path=vault_path,
+            vault_manager=vault_manager,
+            rate_limit_delay=rate_limit_delay,
+            max_retries=max_retries,
+            default_app_id=default_app_id,
+            timeout=timeout,
+        )
+
+    @classmethod
+    def _credentials_from_vault(cls, vault_path: str, vault_manager: Any | None) -> AppsflyerCredentials:
+        """Select facade credentials through the canonical construction hook."""
+        return AppsflyerCredentials.from_vault(vault_path=vault_path, vault_manager=vault_manager)
 
 
 __all__ = [

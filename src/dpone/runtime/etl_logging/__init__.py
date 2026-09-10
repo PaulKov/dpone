@@ -1,27 +1,10 @@
-# ruff: noqa: F822
-"""ETL logging compatibility facade."""
+"""Own public logging exports without modifying another module's namespace.
 
-from __future__ import annotations
+Import the implementation before binding the singleton whose name also identifies
+its submodule. Python's initial submodule binding then cannot overwrite the public
+singleton. The top-level dpone facade remains lazy.
+"""
 
-from importlib import import_module
-from typing import Any
+from dpone.runtime.etl_logging.etl_logger import ETLLogger, etl_logger
 
-__all__ = [
-    "ETLLogger",
-    "etl_logger",
-]
-
-_EXPORTS: dict[str, str] = {
-    "ETLLogger": "dpone.runtime.etl_logging.etl_logger:ETLLogger",
-    "etl_logger": "dpone.runtime.etl_logging.etl_logger:etl_logger",
-}
-
-
-def __getattr__(name: str) -> Any:
-    target = _EXPORTS.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    module_name, attr = target.split(":")
-    value = getattr(import_module(module_name), attr)
-    globals()[name] = value
-    return value
+__all__ = ["ETLLogger", "etl_logger"]

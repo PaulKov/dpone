@@ -6,6 +6,21 @@ pulling connector/runtime dependencies into the control plane.
 Audience: Airflow platform engineers, DAG repository maintainers, and
 operators diagnosing provider parse failures.
 
+## Live log transport composition
+
+The owned Kubernetes pod operator constructs a provider-compatible pod manager
+with an explicitly injected log-error classifier. Ordinary inheritance intercepts
+the provider's internal log-reader calls; no method is replaced on an existing
+manager or operator. Native credential refresh recreates the same manager type
+with the operator's classifier. Transient, typed log transport errors may fall
+back to ordinary container-status polling; unrelated API, authentication and
+cleanup failures keep their provider behavior.
+
+Existing operator arguments and log settings require no migration. Applications
+extending log behavior should supply owned manager/classifier composition rather
+than install wrappers on `read_pod_logs` or credential-refresh methods. This
+composition does not certify connectivity to a Kubernetes cluster.
+
 Install `apache-airflow-providers-dpone` in Airflow scheduler, DAG processor,
 API server and worker environments. It owns provider discovery and the typed
 `airflow.providers.dpone` namespace. Its dependency `dpone-airflow-pack` is the

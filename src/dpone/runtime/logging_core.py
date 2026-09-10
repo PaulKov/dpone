@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from typing import Any, Protocol, runtime_checkable
 
 from dpone.runtime.etl_logging.etl_logger import ETLLogger as _ConcreteETLLogger
@@ -48,15 +47,4 @@ def create_etl_logger(log_level: str = "INFO", show_colors: bool = True) -> Runt
     return _ConcreteETLLogger(log_level=log_level, show_colors=show_colors)
 
 
-def sync_etl_logging_facade() -> None:
-    """Keep the public lazy ``dpone.runtime.etl_logging`` facade identity stable."""
-
-    parent_package = sys.modules.get("dpone.runtime.etl_logging")
-    if parent_package is not None:  # pragma: no cover - import compatibility guard
-        setattr(parent_package, "ETLLogger", _ConcreteETLLogger)
-        setattr(parent_package, "etl_logger", _etl_logger)
-
-
-sync_etl_logging_facade()
-
-__all__ = ["RuntimeLogger", "create_etl_logger", "etl_logger", "sync_etl_logging_facade"]
+__all__ = ["RuntimeLogger", "create_etl_logger", "etl_logger"]
