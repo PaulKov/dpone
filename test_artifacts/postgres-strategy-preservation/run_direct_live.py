@@ -97,6 +97,7 @@ result = subprocess.run(
         "-m",
         "pytest",
         "tests/integration/postgres/test_postgres_strategy_preservation_live.py",
+        "tests/integration/postgres/test_postgres_snapshot_metrics_live.py",
         "-q",
         "-rA",
         *sys.argv[2:],

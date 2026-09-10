@@ -14,6 +14,8 @@
   safely when native partition replacement would remove out-of-scope rows.
   Report inserted replacement rows and removed old rows separately, including
   native partitions, so public load counters retain their row units.
+  Keep PostgreSQL snapshot-diff hard deletions out of loaded-row counters,
+  including empty snapshots and replay.
   See the [recovery runbook](docs/source-sink/postgres-to-postgres.md#runbook);
   upgrading does not reconstruct previously lost constraints.
 

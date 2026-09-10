@@ -59,6 +59,15 @@ and injected policy/sample behavior. Other engines and the common projection are
 outside this correction. These fixes restore compatibility and truthful evidence
 within the approved scope; no new manifest option or ADR is needed.
 
+A further independent review found the same deleted/loaded unit confusion in
+PostgreSQL `snapshot_diff`. Its missing-key hard deletions belong in
+`hard_deleted_rows`, with existing inserted/updated accounting unchanged.
+Memory and file regressions cover changed snapshots, empty snapshots and replay.
+The maintainer additionally authorized large-partition Docker performance tests:
+measure native refresh, exact old-row count and reader blocking on synthetic
+100k/1m/5m-row partitions with PK/CHECK, retaining source and environment identity.
+These measurements do not introduce a production SLA or a new runtime option.
+
 Restore the existing contract in `docs/postgres.md`: omitted overwrite mode and
 `truncate_insert` preserve an existing target; only explicit `exchange` selects
 object replacement. Artifact format must not override a selected load strategy.

@@ -7,9 +7,9 @@ identity; it does not expand their scope into general route certification.
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -25,11 +25,14 @@ def verify(directory: Path, expected_cases: int = 40) -> dict:
     assert len(files) == expected_cases
     passed = [line for line in (directory / "pytest.log").read_text().splitlines() if line.startswith("PASSED ")]
     assert len(passed) == expected_cases
-    prefix = "PASSED tests/integration/postgres/test_postgres_strategy_preservation_live.py::"
-    assert all(line.startswith(prefix) for line in passed)
+    allowed_modules = {
+        "PASSED tests/integration/postgres/test_postgres_strategy_preservation_live.py",
+        "PASSED tests/integration/postgres/test_postgres_snapshot_metrics_live.py",
+    }
+    assert all(line.split("::", 1)[0] in allowed_modules for line in passed)
     names = [path.name.split("-dp_preserve_", 1)[0] for path in files]
     assert len(set(names)) == expected_cases
-    assert set(names) == {line.removeprefix(prefix) for line in passed}
+    assert set(names) == {line.split("::", 1)[1] for line in passed}
     versions = set()
     for path in files:
         payload = json.loads(path.read_text())
@@ -42,7 +45,7 @@ def verify(directory: Path, expected_cases: int = 40) -> dict:
         versions.add(json.dumps(identity["postgres_version"], sort_keys=True))
     return {
         "status": "PASS",
-        "scope": "40 direct PostgresSink/legacy adapter regression cases on real PostgreSQL; not every route certified",
+        "scope": f"{expected_cases} direct PostgresSink/legacy adapter regression cases on real PostgreSQL; not every route certified",
         "source_commit": environment["source_head"],
         "source_and_test_sha256": digest,
         "case_count": expected_cases,
@@ -57,6 +60,11 @@ def verify(directory: Path, expected_cases: int = 40) -> dict:
 
 
 if __name__ == "__main__":
-    report = verify(ROOT / (sys.argv[1] if len(sys.argv) > 1 else "live-direct-1ff8387"))
-    (ROOT / "verification-direct.json").write_text(json.dumps(report, indent=2) + "\n")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("directory", nargs="?", default="live-direct-1ff8387")
+    parser.add_argument("--expected-cases", type=int, default=40)
+    parser.add_argument("--output", type=Path, default=ROOT / "verification-direct.json")
+    args = parser.parse_args()
+    report = verify(ROOT / args.directory, args.expected_cases)
+    args.output.write_text(json.dumps(report, indent=2) + "\n")
     print(f"PASS: {report['case_count']} cases, source {report['source_commit']}")

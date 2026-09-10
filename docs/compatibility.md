@@ -1240,6 +1240,12 @@ predicate replacement. Replacing three old rows with two new rows reports
 `loaded_rows=2`, `replaced_rows=2`, and `hard_deleted_rows=3`; replay reports
 `hard_deleted_rows=2`. Counts represent rows rather than physical partitions.
 
+For PostgreSQL `snapshot_diff`, missing keys removed by `hard_delete` are
+reported as `hard_deleted_rows`. They do not become `replaced_rows` or increase
+`loaded_rows`. Existing inserted/updated accounting is preserved: a replay with
+two matching keys reports zero inserted rows and two updated rows; an empty
+snapshot can delete old rows while reporting zero loaded rows.
+
 Invalid rows, missing TRUNCATE privileges and incoming foreign keys can now
 correctly fail loads that previously bypassed the target contract. Upgrading
 prevents this replacement defect; it cannot reconstruct constraints lost by an

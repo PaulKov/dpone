@@ -212,7 +212,15 @@ INSERT INTO landing.orders (...)
 SELECT ... FROM staging.orders_stg;
 ```
 
-This fallback is safe and staging-first. A future optimizer can replace it with declarative partition detach/attach when partition metadata is certified.
+This fallback stages the input before deleting matching target rows. Native
+detach/attach remains available when the partition scope and metadata qualify.
+
+Native replacement holds an exclusive lock while validating scope, counting
+old rows, building the replacement and switching partitions. Concurrent readers
+of the parent can wait until commit. The exact old-row count adds work
+proportional to the affected child; `max_partitions_per_run` limits partition
+count, not row count or lock duration. Measure representative row widths,
+indexes and concurrent traffic before choosing an operational window.
 
 ## Cross-links
 

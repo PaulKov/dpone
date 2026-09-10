@@ -12,6 +12,11 @@ The findings and validation status are tracked in
 [independent-review.md](independent-review.md). They change production bytes;
 the original live/CI receipts below remain evidence for their recorded commits.
 
+The next independent review found an additional snapshot-diff metric issue.
+Its correction and the maintainer-requested large-partition Docker measurements
+are tracked in [performance-review.md](performance-review.md), including the
+final candidate's review and validation status.
+
 ## Result and scope
 
 Internal-query, memory and file artifacts now reach the configured PostgreSQL
