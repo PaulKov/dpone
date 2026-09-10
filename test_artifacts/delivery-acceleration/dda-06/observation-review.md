@@ -18,3 +18,14 @@ and the cohesive SQL staging-check extraction. Reviewer `git diff --check` PASS.
 Broad tests and live services were SKIP in this bounded review and remain owned
 by DDA-06. Merge readiness requires actual integrated gates; live performance is
 UNVERIFIED. Documentation explains composition and missing duration authority.
+
+## Final serialization/reserve audit
+
+A follow-up independent audit at 49160c3 approved the annotation-only reserve,
+including canonical type-hint resolution, and the opt-in entrypoint pickle
+roundtrip. It caught the old keyword-wrapper expression still present in the
+pickle size check despite the submission switch. That expression is now restored
+to `pickle.dumps(args, protocol=5) + 128`, matching the actual submitted tuple.
+The preceding provenance statement described the intended final boundary; this
+follow-up records the intervening defect instead of rewriting its history.
+Final re-review and focused checks cover the corrected source.

@@ -283,10 +283,7 @@ class BoundedNativeChunks:
                             self._capacity(importer)
                         total += size
                         args = (contract, frame, directory / f"{ordinal}.native", ordinal, limits.max_row_bytes, size)
-                        if (
-                            len(pickle.dumps((args, {"observed": self.observations.enabled}), protocol=5)) + 128
-                            > limits.max_bytes
-                        ):
+                        if len(pickle.dumps(args, protocol=5)) + 128 > limits.max_bytes:
                             raise WindowContractError("mssql_native.IPC_task_limit_exceeded")
                         with recorder.phase("ipc_submit", ordinal=ordinal, rows=len(frame), encoded_bytes=size):
                             future = encoders.submit(_encode_observed if self.observations.enabled else _encode, *args)
