@@ -7,8 +7,10 @@ Prerequisites: clean checkout, Docker Linux/amd64 daemon, Microsoft ODBC Driver
 PATH is a new directory outside the checkout. No existing service is accepted.
 Only JUnit and a sanitized component summary are retained; no driver errors,
 commands, DSNs, container environment, credentials or broad logs are published.
-Profiles qualify the control ledger, issued-principal gate/recovery or append-only
-nonproduction trust storage. None certifies downstream execution or a route.
+Profiles qualify the control ledger, issued-principal gate/recovery, append-only
+trust or grant registration. Registration owns a fixed two-byte public bulk
+probe inside its container; SQL must independently verify it before permission
+observations. None of these profiles certifies downstream execution or a route.
 """
 
 from __future__ import annotations
@@ -33,51 +35,18 @@ ROOT = Path(__file__).resolve().parents[1]
 SQL_IMAGE = (
     "mcr.microsoft.com/mssql/server:2022-latest@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89"
 )
-TEST_FILE = "tests/integration/composition/test_composition_mssql_store_live.py"
-TEST_CLASS = "tests.integration.composition.test_composition_mssql_store_live"
-EXPECTED_TESTS = (
-    "test_external_ddl_and_mixed_engine_lifecycle",
-    "test_conflict_and_epoch_ceiling_leave_no_partial_mutation",
-    "test_concurrent_same_domain_prepare_has_one_winner",
-    "test_lost_commit_ack_uses_independent_sql_readback",
-    "test_foreign_control_identity_and_corrupt_request_fail_closed",
-    "test_unresolved_attempt_blocks_retirement[RUNNING]",
-    "test_unresolved_attempt_blocks_retirement[COMMIT_UNKNOWN]",
-)
-GATE_CASES = {
-    "tests.integration.composition.test_composition_mssql_gate_live": (
-        "test_installed_gate_policy_and_reader_permissions",
-        "test_issued_principal_has_only_managed_writer_scope",
-        "test_gate_transitions_are_monotonic_and_reconnect_is_denied",
-        "test_stale_and_replayed_attempts_never_issue_credentials",
-        "test_recreated_target_database_blocks_issuance",
-        "test_owner_and_role_permission_drift_block_issuance",
-        "test_concurrent_issuance_returns_credentials_once",
-        "test_missing_or_recreated_sid_cannot_prove_closed",
-    ),
-    "tests.integration.composition.test_composition_mssql_gate_recovery_live": (
-        "test_lost_admission_ack_never_authorizes_replay",
-        "test_lost_journal_ack_never_creates_or_reissues_login",
-        "test_lost_ready_ack_closes_the_real_issued_login",
-        "test_connection_attempts_racing_close_cannot_reconnect",
-        "test_inflight_command_and_open_transaction_block_quiescence",
-        "test_foreign_transaction_blocks_but_observer_does_not",
-        "test_missing_terminal_proof_blocks_overlapping_reuse",
-        "test_real_commit_unknown_requires_explicit_reconciliation",
-    ),
-}
-TRUST_TEST_CLASS = "tests.integration.composition.test_nonproduction_mssql_trust_live"
-TRUST_TESTS = (
-    "test_external_trust_ddl_and_original_byte_readback",
-    "test_append_only_revision_rejects_update_delete_and_replay",
-    "test_trust_revision_change_blocks_same_ledger_compare",
-    "test_concurrent_appends_admit_one_next_revision",
-    "test_invalid_original_hash_or_epoch_cannot_append",
-    "test_read_rejects_changed_trigger_or_schema",
-    "test_insufficient_transaction_lock_never_returns_trust",
-    "test_lost_read_ack_returns_no_trusted_revision",
-    "test_provisioner_can_append_without_schema_bypass",
-)
+# Direct script invocation needs the checkout root for its owned helper module.
+if __name__ == "__main__":
+    sys.path.insert(0, str(ROOT))
+
+from tools import composition_mssql_profiles as profiles  # noqa: E402
+
+EXPECTED_TESTS = profiles.EXPECTED_TESTS
+GATE_CASES = profiles.GATE_CASES
+TEST_CLASS = profiles.TEST_CLASS
+TEST_FILE = profiles.TEST_FILE
+TRUST_TEST_CLASS = profiles.TRUST_TEST_CLASS
+TRUST_TESTS = profiles.TRUST_TESTS
 
 
 class RunFailure(RuntimeError):
@@ -86,13 +55,10 @@ class RunFailure(RuntimeError):
 
 def expected_cases(profile):
     """Closed inventories prevent another profile or partial run from passing."""
-    if profile == "store":
-        return tuple(f"{TEST_CLASS}::{name}" for name in EXPECTED_TESTS)
-    if profile == "gate":
-        return tuple(f"{module}::{name}" for module, names in GATE_CASES.items() for name in names)
-    if profile == "trust":
-        return tuple(f"{TRUST_TEST_CLASS}::{name}" for name in TRUST_TESTS)
-    raise RunFailure("unknown_component_profile")
+    try:
+        return profiles.component_profile(profile).cases
+    except (KeyError, TypeError):
+        raise RunFailure("unknown_component_profile") from None
 
 
 def command(args, *, env=None, timeout=120):
@@ -186,11 +152,7 @@ def provision_database(env):
 def execute_component(output, env, profile="store"):
     """One bounded child pytest process, with sanitized JUnit failure reports."""
     test_files = tuple(dict.fromkeys(node.split("::")[0].replace(".", "/") + ".py" for node in expected_cases(profile)))
-    plugin = (
-        "tests.integration.composition.nonproduction_mssql_trust_live_support"
-        if profile == "trust"
-        else f"tests.integration.composition.mssql_{profile}_live_support"
-    )
+    plugin = profiles.component_profile(profile).plugin
     child_env = env | {
         "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
         "PYTHONDONTWRITEBYTECODE": "1",
@@ -247,11 +209,7 @@ def run(output, profile="store"):
         "status": "FAIL",
         "profile": profile,
         "component_scope": {
-            "sql_server": {
-                "store": "real_dbapi_control_ledger",
-                "gate": "real_issued_principal_gate_and_recovery",
-                "trust": "real_append_only_nonproduction_trust",
-            }[profile],
+            "sql_server": profiles.component_profile(profile).sql_scope,
             "clickhouse": "synthetic_enrollment_metadata_only",
             "route_certification": "UNVERIFIED",
             "native_v2_and_logon_guarantees": "UNVERIFIED",
@@ -294,12 +252,15 @@ def run(output, profile="store"):
             "DPONE_COMPOSITION_RUN_TOKEN": token,
             "DPONE_COMPOSITION_SQL_DATABASE": "dpone_composition_" + token,
         }
-        env.pop("DPONE_RUN_COMPOSITION_MSSQL_GATE_LIVE", None)
-        env.pop("DPONE_RUN_COMPOSITION_MSSQL_TRUST_LIVE", None)
-        if profile == "gate":
-            env["DPONE_RUN_COMPOSITION_MSSQL_GATE_LIVE"] = "1"
-        elif profile == "trust":
-            env["DPONE_RUN_COMPOSITION_MSSQL_TRUST_LIVE"] = "1"
+        for name in (
+            *profiles.PROFILE_FLAGS,
+            "DPONE_COMPOSITION_BULK_FIXTURE_PATH",
+            "DPONE_COMPOSITION_BULK_FIXTURE_BYTES",
+            "DPONE_COMPOSITION_BULK_FIXTURE_SHA256",
+        ):
+            env.pop(name, None)
+        if flag := profiles.component_profile(profile).enable_flag:
+            env[flag] = "1"
         owned_name = "dpone-composition-" + token
         report["owned_container_name"] = owned_name
         report["stage"] = "container_start"
@@ -339,6 +300,25 @@ def run(output, profile="store"):
         if checked(["docker", "image", "inspect", "--format", "{{.Os}}/{{.Architecture}}", image_id]) != "linux/amd64":
             raise RunFailure("image_platform_invalid")
         report["actual_image_id"] = image_id
+        if profile == "registration":
+            report["stage"] = "owned_bulk_fixture"
+            checked(
+                [
+                    "docker",
+                    "exec",
+                    owned_name,
+                    "/bin/sh",
+                    "-c",
+                    "printf '1\\n' > /tmp/dpone-composition-registration-bulk.txt",
+                ]
+            )
+            env.update(
+                {
+                    "DPONE_COMPOSITION_BULK_FIXTURE_PATH": "/tmp/dpone-composition-registration-bulk.txt",
+                    "DPONE_COMPOSITION_BULK_FIXTURE_BYTES": "2",
+                    "DPONE_COMPOSITION_BULK_FIXTURE_SHA256": "sha256:" + hashlib.sha256(b"1\n").hexdigest(),
+                }
+            )
         report["stage"] = "database_provision"
         report.update(provision_database(env))
         report["stage"] = "component_tests"
@@ -371,12 +351,11 @@ def run(output, profile="store"):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--profile", choices=("store", "gate", "trust"), default="store")
+    parser.add_argument("--profile", choices=profiles.PROFILE_NAMES, default="store")
     args = parser.parse_args(argv)
     return run(args.output_dir, args.profile)
 
 
 if __name__ == "__main__":
-    sys.path.insert(0, str(ROOT))
     sys.path.insert(0, str(ROOT / "src"))
     raise SystemExit(main())

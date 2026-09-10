@@ -144,13 +144,14 @@ and `junit.xml`, recording exact source, image, driver and server identity. All
 expected cases must execute without skips. A cleanup failure changes the result
 to FAIL. No raw driver diagnostics or credentials belong in these artifacts.
 
-The workflow runs three independent profiles, each in its own fresh container:
+The workflow runs four independent profiles, each in its own fresh container:
 
 | Profile | Required cases | Evidence scope |
 |---|---|---|
 | `store` (default) | 7 | Real ledger DDL, whole-parent transactions, conflicts, lost acknowledgements and retirement |
 | `gate` | 16 | Real issued credentials, target permissions and continuity, monotonic LOGON closure, races, in-flight transactions and explicit unknown recovery |
 | `trust` | 9 | Real append-only nonproduction trust, original bytes, revision races, schema integrity, lock/acknowledgement failures and bounded provisioner permissions |
+| `registration` | 18 | Exact grant originals and complete membership, historical trust, replay and concurrency, rollback/unknown acknowledgements, catalog/session enforcement and restricted-login permissions |
 
 The gate profile uses the actual closed-gate and quiescence producers. Its
 test-only outcome producer binds observed SQL and independent reconciliation;
@@ -163,6 +164,14 @@ does not verify actual grant signatures, consume grants or authorize workers.
 Its provisioner case verifies database permissions through an impersonated
 database user; it does not qualify a separately authenticated network login.
 Select it with `--profile trust` in the same disposable command.
+The registration profile also uses inert unsigned storage fixtures. It requires
+the real 8 MiB bundle boundary, complete membership and historical-original audits,
+and explicit lost-acknowledgement recovery. Its restricted-login case uses actual
+server/database tokens. The runner creates an exact two-byte public integer file
+inside that new container; administrator SQL must independently read/hash it and
+successfully import it before a restricted principal's bulk-import refusal can
+serve as permission evidence. A missing file or unsupported operation is a failure,
+not a verified denial. Use `--profile registration` to select this inventory.
 Default non-live collection skips all profiles without opening a connection.
 
 This component's ClickHouse rows are synthetic ledger metadata. Route

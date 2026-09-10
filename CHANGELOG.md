@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add an isolated 18-case registration storage profile with exact case inventory,
+  bounded evidence and a runner-owned public bulk-permission fixture. Reuse one
+  closed profile configuration for plugin, opt-in and evidence selection.
+
 - Add immutable nonproduction grant registration and complete execution campaign
   membership under the existing protected transaction. Preserve original bytes
   and historical trust, reject qualification replay, and retain membership across
