@@ -1,6 +1,9 @@
 """A legacy layout cannot acquire native workspace authority by transporting bytes."""
 
 import json
+import sys
+
+import pytest
 
 from dpone.readiness.airflow_compact_pack_release import materialize_compact_pack_release
 from tests.dbt_compact_wire_v2_helpers import SIDECAR, prepare_projects, workspace_service
@@ -31,3 +34,19 @@ def test_native_execution_pack_in_legacy_root_rejects_before_publication(tmp_pat
     assert any("NATIVE_AUTHORITY_REQUIRED" in blocker for blocker in report.blockers)
     assert not (cache / "releases").exists()
     assert not (legacy / "release-set.json").exists()
+
+
+@pytest.mark.parametrize("oversized", [False, True])
+def test_descriptor_bounds_and_recursion_reject_before_source_dispatch(tmp_path, oversized):
+    root = tmp_path / "source"
+    root.mkdir()
+    depth = sys.getrecursionlimit() + 100
+    payload = b'{"schema":"dpone.release-set.v3","nested":' + b"[" * depth + b"0" + b"]" * depth + b"}"
+    if oversized:
+        payload += b" " * (8 * 1024 * 1024 + 1 - len(payload))
+    (root / "release-set.json").write_bytes(payload)
+    cache = tmp_path / "cache"
+    report = materialize_compact_pack_release(pack_root=root, cache_root=cache, xcom_sidecar_image=SIDECAR)
+    assert not report.passed
+    assert "WORKSPACE_INVALID" in report.blockers[0]
+    assert not cache.exists()

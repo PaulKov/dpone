@@ -1,11 +1,23 @@
 """Build-plane readmission of an existing composition into the immutable cache."""
 
 from pathlib import Path
+from typing import Any
 
 from dpone.contracts.strict_json import strict_json_object
 from dpone.gitops.release_set_validation import validate_release_set
 from dpone.manifest.confined_files import read_confined_file
 from dpone.readiness.airflow_compact_pack_release_models import CompactPackReleaseError, CompactPackReleaseReport
+
+
+def read_workspace_release_descriptor(root: Path) -> dict[str, Any]:
+    """Bound descriptor acquisition before parsing or selecting a source verifier."""
+    try:
+        return strict_json_object(read_confined_file(root, "release-set.json", max_bytes=8 * 1024 * 1024))
+    except (ValueError, OSError, TypeError, RecursionError) as exc:
+        raise CompactPackReleaseError(
+            "DPONE_COMPACT_PACK_RELEASE_WORKSPACE_INVALID",
+            "workspace descriptor is invalid or exceeds its metadata bound",
+        ) from exc
 
 
 def materialize_composed_release(
@@ -14,7 +26,7 @@ def materialize_composed_release(
     from dpone.app.release_composition import build_release_composition_service
 
     try:
-        release = strict_json_object(read_confined_file(root, "release-set.json", max_bytes=8 * 1024 * 1024))
+        release = read_workspace_release_descriptor(root)
         if validate_release_set(release).failure is not None:
             raise ValueError("composition metadata is invalid")
         artifacts = release["artifacts"]

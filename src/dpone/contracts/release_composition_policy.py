@@ -244,7 +244,9 @@ def assemble_composition_files(
                 row["pack_fingerprint"] = parsed["pack_fingerprint"]
             artifacts[section].append(row)
     artifacts["composition_sources"] = [
-        _artifact_descriptor(path, path, body) for path, body in sorted(files.items()) if path.startswith("_composition/")
+        _artifact_descriptor(path, path, body)
+        for path, body in sorted(files.items())
+        if path.startswith("_composition/")
     ]
     release: dict[str, Any] = {
         "schema": COMPOSITION_SCHEMA,

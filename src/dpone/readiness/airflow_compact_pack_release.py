@@ -284,17 +284,13 @@ def _materialize_workspace(
     root: Path, cache: Path, *, xcom_sidecar_image: str, dag_ids: Sequence[str] | None
 ) -> CompactPackReleaseReport:
     from dpone.app.dbt_promotion_composition import build_dbt_compact_workspace_release_builder
+    from dpone.readiness.airflow_composed_release_materializer import (
+        materialize_composed_release,
+        read_workspace_release_descriptor,
+    )
     from dpone.readiness.airflow_release_schema_validation import validate_release_set_schema
 
-    try:
-        descriptor = _load_json_object(root / "release-set.json")
-    except CompactPackReleaseError as exc:
-        raise CompactPackReleaseError(
-            "DPONE_COMPACT_PACK_RELEASE_WORKSPACE_INVALID", "workspace descriptor is invalid"
-        ) from exc
-    if descriptor.get("schema") == "dpone.release-set.v3":
-        from dpone.readiness.airflow_composed_release_materializer import materialize_composed_release
-
+    if read_workspace_release_descriptor(root).get("schema") == "dpone.release-set.v3":
         return materialize_composed_release(root, cache, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
 
     if cache.is_relative_to(root.resolve()):
