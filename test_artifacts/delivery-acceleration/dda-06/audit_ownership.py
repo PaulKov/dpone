@@ -48,6 +48,8 @@ IMPORTED_PREFIXES = (
     "f09af01",
     "5761738",
     "38f6603",
+    "b5ad9d2",
+    "33b7ad3",
 )
 FROZEN = {
     "docs/feature-design-data-delivery-acceleration-v1.md",

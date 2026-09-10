@@ -116,3 +116,11 @@ The next independent owner review cycle produced these reviewed follow-ups:
   26 historical non-architecture failures and two collection errors cleared;
   107 focused component/producer cases passed. The original full FAIL remains
   retained, and this replay is not a new full-suite PASS.
+- DDA-05 corrective checkpoints `b5ad9d28e9273543b5c49932f1d458df7942caa8`
+  and `33b7ad30cdb12a0f1804bb1b72570504133f4342` reject repeated timed operations,
+  partial/false-complete recovery states and receipt-only unknown publication.
+  Failure records retain structured target/metadata/receipt bindings inside the
+  existing opaque values; schema and check IDs remain unchanged. A third fresh
+  independent reviewer approved the final exact source after 119 focused cases
+  and 24 additional adversarial probes passed. Its component full suite remains
+  pending the serialized CPU slot after DDA-06; this is not promoted to PASS.
