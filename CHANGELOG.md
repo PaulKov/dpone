@@ -7,6 +7,11 @@
   a separate adapter responsibility from login credentials and enrollment.
   Accept the pinned controller's exact `dbo` membership in fixed `db_owner`,
   while continuing to reject other elevated role members.
+- Add an injectable ClickHouse Atomic whole-snapshot publisher with exact durable
+  intent identities, one-time EXCHANGE claims and explicit UUID reconciliation.
+  Preserve empty and vanished-row snapshots, retain the previous target and
+  reject uncertain or repeated dispatch. Concrete protected adapters and live
+  worker qualification remain required before composition execution is enabled.
 
 - Correct SQL Server gate permission probes to use the server securable's NULL
   class, so valid controller and gate-reader privileges can be observed. Restore
@@ -17,6 +22,18 @@
   credentials, reconnect closure, transaction drain and unknown-outcome recovery.
   Its exact 16-case evidence is separate from the seven-case control-ledger
   profile and does not certify native or transfer worker execution.
+
+- Add strict nonproduction policy, complete synthetic scope and separate
+  qualification/execution grant contracts with exact canonical-byte identities
+  and minimum policy/grant/workload ceilings. Add an injectable authenticator
+  that verifies original grants through the existing GitHub attestation adapter
+  and refreshes external policy, revocation and time before accepting them.
+  Protected counters, physical enrollment and complete worker enforcement remain
+  required before scoped execution. Existing production/native-v2 authority
+  remains unchanged.
+  Add explicit grant-bound activation requests and a read-only SQL provider for
+  externally provisioned append-only trust revisions. Preserve old request
+  decoding and transaction behavior through shared structural/admission helpers.
 
 - Add concrete SQL Server persistence for complete composition occurrences and
   cross-connector guards, with independent commit readback and exact protected

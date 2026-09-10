@@ -1,0 +1,102 @@
+schema_version: 1
+task_id: DPONE-NONPRODUCTION-GRANT-SIGNATURE
+title: Authenticate original nonproduction grants against external GitHub signer pins
+goal: Implement actual offline GitHub-verifier composition, external policy refresh
+  and common grant authentication without enabling scoped execution.
+specification: docs/feature-specs/nonproduction-composition-authority.md
+base_commit: ffc8141380caf30fc086ee5b4623f794575bbafb
+integrator: root
+acceptance_criteria:
+- Verify exact original bounded canonical grant bytes with the existing real offline
+  GitHub adapter; a caller verification report cannot authorize.
+- Strictly bind external NP signer backend, fixed Actions issuer, exact workflow URL@40hexSHA
+  and root-byte digest to the strictly parsed external existing runtime-artifact-trust-policy.v2.
+- Require non_production trust tier and mandatory attestations; reject unsupported
+  Cosign rather than claiming public-key verification authenticates issuer labels.
+- Inject narrow trusted policy/revocation source, signature verifier and independent
+  clock; refresh before and after verification, rejecting expiry, changes, revoked
+  or foreign scope.
+- Keep actual protected enrollment, phase subjects, consumption and resource counters
+  explicit independent obligations; public scoped execution factories remain closed.
+- Preserve all existing production/native-v2 parser behavior and immutable identities.
+- Temporary verification files contain only public artifact/root/bundle bytes, bounded
+  regular files, safe permissions, cleanup; no raw subprocess exception or credential
+  diagnostics.
+- Contract tests cover genuine adapter argv/byte boundaries, tampering, phase/common
+  scope/pin/revocation/expiry races and redacted failures. Doubles are not positive
+  cryptographic evidence.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python
+  - runtime
+  - state
+  - evidence
+  - documentation
+  migration_required: false
+owned_paths:
+- src/dpone/adapters/nonproduction_github_signature.py
+- src/dpone/ports/nonproduction_authentication.py
+- src/dpone/runtime/nonproduction_authentication.py
+- tests/test_nonproduction_github_signature.py
+- tests/test_nonproduction_authenticator.py
+- tests/nonproduction_signature_helpers.py
+integrator_owned_paths: []
+read_only_paths:
+- src/dpone/contracts/nonproduction_scope.py
+- src/dpone/contracts/nonproduction_authority.py
+- src/dpone/contracts/nonproduction_grants.py
+- tests/nonproduction_authority_helpers.py
+- tests/test_nonproduction_authority.py
+- tests/test_nonproduction_grants.py
+- docs
+- src/dpone/adapters/github_artifact_attestation.py
+- src/dpone/adapters/cosign_blob_signature.py
+- src/dpone/contracts/runtime_artifact_attestation.py
+- tests/test_runtime_github_artifact_attestation.py
+- pyproject.toml
+- uv.lock
+forbidden_paths:
+- .git
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+shared_file_owner: root
+dependencies:
+- DPONE-COMPOSITION-ACTIVATION
+required_checks:
+  focused:
+  - red-green authenticator and adapter cases
+  - existing NP148 and old GH attestation tests
+  broad:
+  - ruff and format owned files
+  - mypy owned files
+  - import rules
+  - layer metrics
+  - module size
+  live:
+  - 'UNVERIFIED: genuine signed NP grant corpus and actual campaign remain separate;
+    no keys/workflow/network in this writer task'
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- An authority change exceeds the separately approved nonproduction-composition-authority
+  amendment.
+- Another writer owns the same semantic contract.
+- A live check would access corporate or private systems.

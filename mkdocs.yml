@@ -160,6 +160,7 @@ nav:
           - Composition contracts: release-composition-reference.md
           - Composition operations: release-composition-operations.md
           - Composition activation contract: composition-activation-contract.md
+          - Nonproduction authority contracts: nonproduction-composition-authority.md
           - Workspace promotion: dbt-workspace-promotion.md
       - Runtime observability: observability.md
       - Data Product SLO and incidents: data-product-slo.md

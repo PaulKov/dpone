@@ -57,6 +57,19 @@ Scope must not live only in `provenance`, which the release hash excludes.
 Existing `runtime_context_sha256` does not cover a later execution grant and
 retains its meaning. The new scoped request explicitly binds that grant.
 
+The initial signature adapter is closed to GitHub Artifact Attestations. External
+policy pins the existing runtime-artifact-trust-policy.v2 with non_production
+trust and mandatory attestations. Its signer identity is the canonical composite
+`https://github.com/{signer_workflow}@{signer_digest}`, including the independent
+40-hex workflow commit; this is not a claim about the certificate SAN spelling.
+The Actions issuer, root bytes/digest, repository, predicate and hosted-runner
+requirements must match the external policy. Reopen policy, revocation and clock
+after signature verification; changed trust, backwards time, expiry or stale roots
+reject. Cosign public-key claims remain unsupported by this adapter because key
+possession alone does not authenticate the separate issuer/identity labels.
+Authentication does not consume grants, establish physical enrollment or issue
+credentials; those protected operations remain mandatory.
+
 ## Scope, phases and limits
 
 Common signed claims require canonical source repository/commit, fixture and
@@ -78,6 +91,35 @@ per attempt. Effective limits are the minimum of policy, grant and workload
 limits. Enforce them before reads and while streaming. Source bytes and actual
 HTTP payload bytes remain separate measurements. These are campaign limits,
 not performance certification.
+
+The initial protected counter implementation uses environment/campaign/phase
+pools for distinct workload membership and attempt counts. Qualification export
+rows and source bytes additionally select the exact six-dimensional route;
+execution export rows and source bytes share the whole execution campaign pool.
+Each workload also obeys its lower signed ceiling. Neither grant UUID, policy
+digest, deployment nor activation creates a fresh campaign pool. Replacement
+grants therefore cannot reset consumption. Reservations and measured usage are
+separate: unresolved reservations remain charged, with no automatic refund.
+
+For the initial two export cells, source bytes retain the existing producer
+meaning: complete BCP-native file bytes including field framing for MSSQL, and
+COPY payload bytes before optional gzip after the existing typed source
+projection for PostgreSQL. Actual ClickHouse body payload bytes are measured
+separately at the sender; failed sends retain an incomplete observation and their
+reservation. A complete finite, immutable source-export bound is reserved before
+starting BCP or COPY, covering driver/process read-ahead. Bounded fixture keys,
+types, schema/query pins and actual closed source writers establish that bound;
+expected row counts or statistics alone do not. Unbounded generated dbt outputs
+remain unsupported until their source bound is independently established. No
+TOP/LIMIT clipping or truncating cast may manufacture a complete snapshot.
+
+Protected admission authenticates outside the short global SQL transaction.
+It privately brackets verification with equal append-only trust revisions and
+original snapshots, then rechecks that revision, exact bytes, time and ownership
+inside the transaction that consumes the grant or reserves RUNNING and budgets.
+Authentication results supplied by a caller cannot replace those operations.
+The monotonic trust revision prevents an intervening policy change from being
+hidden by restoring old policy bytes.
 
 Only newly isolated, independently enrolled synthetic PostgreSQL, SQL Server
 and single-node ClickHouse participants qualify. No production reads, business
@@ -118,6 +160,9 @@ Qualification can be reread for deterministic compilation of the same intent
 inside its valid campaign; execution grants cannot migrate to another activation.
 
 ## Implementation scope and rollout
+
+The implemented policy/scope/grant subset and its remaining runtime obligations
+are documented in the [contract reference](../nonproduction-composition-authority.md).
 
 Root owns shared schemas, dispatch, app factories, CLI/provider wiring, workflows,
 changelog and navigation. Narrow canonical contracts and shared structural
