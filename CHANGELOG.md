@@ -5,6 +5,8 @@
 - Report exact sanitized SQL target catalog refusal reasons before writer
   issuance, preserving all existing policy predicates. Keep catalog policy in
   a separate adapter responsibility from login credentials and enrollment.
+  Accept the pinned controller's exact `dbo` membership in fixed `db_owner`,
+  while continuing to reject other elevated role members.
 
 - Correct SQL Server gate permission probes to use the server securable's NULL
   class, so valid controller and gate-reader privileges can be observed. Restore

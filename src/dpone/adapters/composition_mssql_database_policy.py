@@ -84,7 +84,9 @@ WHEN EXISTS (SELECT 1 FROM {db}.sys.database_role_members m
     JOIN {db}.sys.database_principals u ON u.principal_id=m.member_principal_id
     JOIN {db}.sys.database_principals r ON r.principal_id=m.role_principal_id
     LEFT JOIN {gates} g ON g.login_sid=u.sid
-    WHERE NOT ((r.name=@role AND g.login_sid IS NOT NULL AND u.name COLLATE Latin1_General_100_BIN2=g.login_name)
+    WHERE NOT ((u.principal_id=1 AND u.name='dbo' AND u.sid=SUSER_SID(ORIGINAL_LOGIN())
+               AND r.name='db_owner' AND r.is_fixed_role=1)
+          OR (r.name=@role AND g.login_sid IS NOT NULL AND u.name COLLATE Latin1_General_100_BIN2=g.login_name)
           OR (r.name='db_datareader' AND g.login_sid IS NULL))) THEN 9
 WHEN EXISTS (SELECT 1 FROM {db}.sys.schemas s JOIN {db}.sys.database_principals u ON s.principal_id=u.principal_id
     WHERE s.schema_id<16384 AND u.principal_id>4) THEN 10

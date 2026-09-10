@@ -29,6 +29,21 @@ pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql]
 pytest_plugins = ["tests.integration.composition.mssql_gate_live_support"]
 
 
+def _role_memberships(case, label):
+    """Observe bounded member/owner identities; retain no authentication data."""
+    rows = case.target_sql(
+        "SELECT TOP (17) u.principal_id,u.name,u.sid,r.name,r.is_fixed_role,d.owner_sid,"
+        "SUSER_SID(ORIGINAL_LOGIN()) FROM sys.database_role_members m "
+        "JOIN sys.database_principals u ON u.principal_id=m.member_principal_id "
+        "JOIN sys.database_principals r ON r.principal_id=m.role_principal_id "
+        "JOIN sys.databases d ON d.database_id=DB_ID() ORDER BY u.principal_id,r.principal_id;"
+    )
+    case.record(
+        label, {"rows": [[value.hex() if isinstance(value, bytes) else value for value in row] for row in rows]}
+    )
+    return rows
+
+
 def test_installed_gate_policy_and_reader_permissions(gate_case):
     case, env = gate_case, gate_case.environment
     with composition_control_transaction(env.connect, env.schema, env.service_id) as ledger:
@@ -70,6 +85,10 @@ def test_installed_gate_policy_and_reader_permissions(gate_case):
 
 def test_issued_principal_has_only_managed_writer_scope(gate_case):
     case = gate_case
+    controller_sid = case.environment.controller_sid
+    assert _role_memberships(case, "existing_role_memberships") == (
+        (1, "dbo", controller_sid, "db_owner", True, controller_sid, controller_sid),
+    )
     credentials = case.issue()
     worker = case.worker()
     assert execute(worker, "SELECT ORIGINAL_LOGIN(),SUSER_SID(),IS_SRVROLEMEMBER('sysadmin');") == (
@@ -171,6 +190,34 @@ def test_owner_and_role_permission_drift_block_issuance(gate_case):
         case.no_issuance()
     finally:
         case.target_sql(f"REVOKE CONTROL FROM [{env.writer_role}];")
+    original = _role_memberships(case, "role_memberships_before_drift")
+    controller_sid = env.controller_sid
+    assert original == ((1, "dbo", controller_sid, "db_owner", True, controller_sid, controller_sid),)
+    try:
+        case.target_sql(f"CREATE USER [{owner}] FOR LOGIN [{owner}];")
+        assert case.target_sql(
+            "SELECT u.type,u.authentication_type,p.type,p.is_disabled FROM sys.database_principals u "
+            "JOIN sys.server_principals p ON p.sid=u.sid WHERE u.name=?;",
+            owner,
+        ) == (("S", 1, "S", True),)
+        case.target_sql(f"ALTER ROLE [db_owner] ADD MEMBER [{owner}];")
+        drift = _role_memberships(case, "role_memberships_during_drift")
+        assert len(drift) == 2 and drift[0] == original[0]
+        assert drift[1][0] > 4 and drift[1][1] == owner and drift[1][2] != controller_sid
+        assert drift[1][3:] == ("db_owner", True, controller_sid, controller_sid)
+        with pytest.raises(CompositionAdmissionError, match="login_database_policy_role_membership"):
+            case.gate.issue_once(case.attempt)
+        case.no_issuance()
+    finally:
+        # Conditional cleanup also covers a committed DDL statement with a lost ACK.
+        case.target_sql(
+            "IF EXISTS (SELECT 1 FROM sys.database_role_members m "
+            "JOIN sys.database_principals u ON u.principal_id=m.member_principal_id "
+            "JOIN sys.database_principals r ON r.principal_id=m.role_principal_id "
+            f"WHERE u.name=N'{owner}' AND r.name='db_owner') ALTER ROLE [db_owner] DROP MEMBER [{owner}]; "
+            f"IF DATABASE_PRINCIPAL_ID(N'{owner}') IS NOT NULL DROP USER [{owner}];"
+        )
+    assert _role_memberships(case, "role_memberships_after_drift") == original
 
 
 def test_concurrent_issuance_returns_credentials_once(gate_case):

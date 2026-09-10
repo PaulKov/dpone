@@ -104,6 +104,9 @@ For this initial cell the trusted controller must own each dedicated target
 database, the bounded role must be owned by `dbo`, and managed objects must use
 inherited or `dbo` ownership. Read-only principals may not acquire writer authority
 through object or role ownership.
+The controller's exact `dbo` principal may retain its membership in the fixed
+`db_owner` role. This exception requires principal ID 1 and the original
+controller SID; it does not admit any other `db_owner` member.
 The catalog policy reports fixed `login_database_policy_*` refusal reasons for
 role/object ownership, unsupported objects, unmanaged scope, assemblies,
 authentication, ambient grants and memberships. These declared policy failures
