@@ -18,6 +18,11 @@ defines strict whole-snapshot intents and one-time EXCHANGE/recovery policy.
 Concrete ClickHouse gate, catalog, storage and worker qualification remain
 required before that component can participate in actual parent execution.
 
+The internal [scoped owner original](composition-scoped-execution-originals.md)
+describes complete retained reads and helper effects while preserving the
+activation request and attempt write projection. Its pure comparisons do not
+enable this coordinator or the current SQL store to admit scoped execution.
+
 ## Concrete SQL Server persistence
 
 `dpone.adapters.composition_mssql_store.MssqlCompositionActivationStore`

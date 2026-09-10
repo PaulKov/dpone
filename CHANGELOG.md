@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Document the approved candidate for an internal scoped execution owner
+  original that retains all qualified reads and helper effects, binds genuine
+  legacy writes and compares exact
+  original grants, source-seal associations and adjacent epochs. Existing
+  request/attempt bytes remain unchanged; storage, transfer and scoped execution
+  remain unavailable. The isolated codec has not been integrated because its
+  architecture checks remain failing.
+- Document the approved candidate for canonical wide fixture inventories with
+  compatible legacy DTO and SQL wrappers, a strict finite BCP seed renderer and
+  a closed fixture input original that compares the selected route's complete
+  preceding source writers.
+  The isolated implementation has not been integrated because its architecture
+  checks remain failing. These descriptions do not establish actual seed
+  outcomes or export bounds.
+
 - Add bounded internal fixture/qualification plan originals with closed wide
   fixture profiles, complete declared effect and source-generation ordering
   checks, lower-limit validation and exact grant/owner/work-item comparisons.

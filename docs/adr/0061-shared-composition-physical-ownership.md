@@ -59,3 +59,32 @@ over retained v2 ownership. No migration or publication is authorized by this AD
 Independent design review and exact execution/compatibility checks are required
 before integration. Architectural budgets and missing live evidence remain
 release blockers under the existing rules.
+
+## Scoped execution originals and full-scope transfer
+
+Accepted addendum, 2026-09-11, within the approved nonproduction feature. The
+initial implementation is an internal pure codec prerequisite, currently an
+isolated candidate awaiting architecture qualification and integration. Its
+modules are absent from the integrated branch at `dfccfad`. Current schema-v2
+adapters continue rejecting its new envelope; coordinated storage and lifecycle
+support require their own concrete contracts and backend evidence.
+
+**Scoped execution originals and full-scope transfer.** Nonproduction execution uses an explicit immutable scoped owner envelope within the existing shared execution-owner family. The complete envelope's digest E is the owner subject; its embedded unchanged NP activation request keeps digest R. Existing attempt and legacy write-proof originals keep their original formats and meanings. All owner and operation persistence projections explicitly distinguish E from R and derive full retained/selected partitions from the mandatory original envelope; missing attachments cannot downgrade authority.
+
+The initial qualification-to-execution handoff preserves the exact complete authenticated campaign scope and participant directional subjects, physical domains and claim roles, including qualification-only fixture/source/helper/state effects. Those retained writes do not become execution workload permissions. Actual execution effects and the total genuine legacy-write bridge are separately reconstructed from pinned executable originals. Qualification and execution observations are distinct actual originals; neither is fabricated from signed declarations. An explicit scoped object grammar represents real native table/view and PostgreSQL table/enum/sequence identities; the fixed two-fixture qualification grammar does not certify unsupported native recipes.
+
+Every initial transferred domain advances exactly one epoch in the same atomic direct-owner transition, with no additional acquisition or unowned interval. Broader acquisitions mentioned in general architectural prose are an unimplemented future extension requiring their own authenticated qualification semantics, not a fallback in this handoff. Evidence references form an acyclic graph. Retry requires exact committed readback, complete proof of absence, or blocking unknown state. A mandatory full scoped terminal association will close all selected read/write effects and continuing barriers in addition to the unchanged write proof; the pure envelope alone enables none of these runtime capabilities.
+
+
+The exact closed transfer cells also require their known source read: generated
+MSSQL-to-ClickHouse workloads retain at least one MSSQL table/view read, and
+ordinary PostgreSQL-to-MSSQL workloads retain at least one PostgreSQL table read.
+The declared effect's purpose does not alter its access or physical guard.
+Native constant dbt models have no artificial source-read minimum. Exact actual
+source identity and complete executable effects still require protected
+reconstruction; the structural minimum grants no access or generation proof.
+
+A native predecessor may create a downstream transfer's current generation.
+The runtime must establish that generation's finite bound and writer closure
+against the actual executable dependency order. Retained qualification seals and
+history do not prove the contents of a later legitimately changed generation.

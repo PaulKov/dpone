@@ -162,6 +162,8 @@ nav:
           - Composition activation contract: composition-activation-contract.md
           - Nonproduction authority contracts: nonproduction-composition-authority.md
           - Qualification plan originals: nonproduction-qualification-plans.md
+          - Finite fixture inputs and recipes: nonproduction-fixture-inputs.md
+          - Scoped execution owner originals: composition-scoped-execution-originals.md
           - Shared ownership design: composition-shared-ownership.md
           - Shared SQL storage design: composition-shared-sql-storage.md
           - Workspace promotion: dbt-workspace-promotion.md

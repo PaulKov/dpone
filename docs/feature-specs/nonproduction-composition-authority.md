@@ -129,6 +129,13 @@ or calculate a protected bound. Recording qualification consumption or parsing
 those plans cannot authorize seeding, source access or work-item/export
 reservation.
 
+The [finite fixture input contract](../nonproduction-fixture-inputs.md) binds the
+selected route's expected seed generation and canonical implementation originals.
+The [scoped execution original](../composition-scoped-execution-originals.md)
+binds the complete retained scope and its genuine legacy-write projection while
+preserving existing request and attempt bytes. Actual acquisition, generation,
+full terminal evidence and the protected handoff remain separate requirements.
+
 For the initial two export cells, source bytes retain the existing producer
 meaning: complete BCP-native file bytes including field framing for MSSQL, and
 COPY payload bytes before optional gzip after the existing typed source

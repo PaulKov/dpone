@@ -13,6 +13,13 @@ documents, physical guards, owner and operation identities remain unchanged.
 Protected acquisition, actual source bounds, source sealing and the complete
 native/ordinary campaign remain required before scoped execution is available.
 
+Use [finite fixture inputs and recipes](nonproduction-fixture-inputs.md) for the
+separate expected-input original and canonical inventories. Its selected-route
+writer comparison is narrower than the full plan grammar: an otherwise valid
+plan can contain a source writer that the fixed recipe cannot explain. The
+[scoped execution owner](composition-scoped-execution-originals.md) preserves the
+full qualified scope during a future handoff without widening this plan grammar.
+
 ## Original documents
 
 All fields below are required; unknown fields and action-field mixtures reject.

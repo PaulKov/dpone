@@ -12,6 +12,12 @@ Qualification records participate in complete exclusion checks; qualification
 issuance, source sealing and atomic ownership transfer still require their
 protected implementations and campaign evidence.
 
+The [scoped owner envelope](composition-scoped-execution-originals.md) is a
+separate internal prerequisite. Schema-v2 adapters do not decode or store it.
+A coordinated later change must bind owners and full operation domains to `E`
+while unchanged attempts retain `R`, and require full scoped terminal evidence.
+The component results below do not establish those paths.
+
 Existing execution fingerprints normalize some strings, including backslashes.
 Do not replace them with SQL HASHBYTES over the original document. Each original
 family retains its decoder/hash algorithm and separate exact-byte comparison.

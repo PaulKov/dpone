@@ -55,6 +55,14 @@ the closed fixture profiles, work-item effects, source-generation dependencies
 and exact original comparisons. These internal plan codecs provide no physical
 observation, source-bound reservation, seed or execution permission.
 
+The [finite fixture input reference](nonproduction-fixture-inputs.md) defines
+the canonical recipe inventories and expected seed generation for a selected
+route. The [scoped execution owner reference](composition-scoped-execution-originals.md)
+defines the mandatory complete owner original, its unchanged request/attempt
+projection and exact supplied-original comparisons. Neither prerequisite enables
+protected execution or replaces actual generation, physical observation and
+source-bound evidence.
+
 ## Limits, expiry and replay
 
 Every limit is explicit; there are no unlimited or permissive defaults. Effective

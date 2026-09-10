@@ -15,6 +15,11 @@ tables, interfaces, complete history audits and the existing execution projectio
 The [qualification plan originals](nonproduction-qualification-plans.md) define
 the bounded fixture/work-item codecs and declared dependencies used before
 protected acquisition; their comparisons establish no execution authority.
+The [scoped execution owner contract](composition-scoped-execution-originals.md)
+defines the complete envelope and the distinction between its subject `E` and
+the embedded original request subject `R`. Current schema-v2 adapters do not
+admit that envelope; its protected persistence and transfer require a coordinated
+change across ownership, operations, issuers and terminal evidence.
 
 ## Purpose and operator journey
 
@@ -178,11 +183,13 @@ Closure takes a conflicting lock, drains accepted mutations and makes queued
 calls reject. Prepared transactions are disabled and independently checked.
 This requires separate real PostgreSQL permission, queue and recovery tests.
 
-For NP execution, complete source claims remain in a canonical control-scope
-attachment bound to its exact request/grant and independently reopened closure.
+For NP execution, complete source claims remain in the mandatory canonical
+scoped owner original bound to its exact request/grant and independently
+reopened closure. An optional attachment cannot replace this owner original.
 Unchanged occurrence/attempt receipts project only their existing write partition.
-Every admission, issuance, recovery and release still audits the full attachment;
-checking it only in an exporter would leave other mutation paths unfenced.
+The future scoped admission, issuance, recovery and release paths must audit the
+complete scoped owner original; checking it only in an exporter would leave
+other mutation paths unfenced.
 
 ## Components, first slice and validation
 
