@@ -12,6 +12,7 @@ from dpone.contracts.native_mssql_switch import NativeSwitchRejected
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 from dpone.runtime.sinks.mssql_native_staged_load import MssqlNativeStagedLoadService
 from dpone.runtime.sinks.mssql_native_switch import NativeSwitchCatalog, execute_native_switch, plan_native_switch
+from dpone.runtime.sinks.mssql_native_switch.catalog_sql import TRANSACTION_SQL
 from dpone.runtime.sinks.strategies.mssql.mssql_transaction_finalizer import MssqlGenericCommitOutcomeUnknown
 from tests.test_mssql_generic_transaction_governance import (
     _config,
@@ -133,6 +134,23 @@ def test_owner_authority_is_mandatory():
     with pytest.raises(RuntimeError, match="stale fence"):
         execute_native_switch(plan, transaction=tx)
     assert tx.events == []
+
+
+def test_transaction_observations_preserve_authority_lock_integrity_and_switch_order():
+    tx = RowTransaction()
+    plan = tx.plan()
+    tx.events.clear()
+    execute_native_switch(plan, transaction=tx)
+    events = [query for query, _ in tx.events]
+    observations = [index for index, query in enumerate(events) if query == TRANSACTION_SQL]
+    authority = [index for index, query in enumerate(events) if query == "authority"]
+    locks = [index for index, query in enumerate(events) if "TABLOCKX" in query]
+    mutations = [index for index, query in enumerate(events) if query.startswith("ALTER TABLE")]
+    assert len(observations) == len(authority) == len(mutations) == 2
+    assert len(locks) == 3
+    assert authority[0] < observations[0] < locks[0]
+    assert locks[-1] < events.index("verify_prepared") < authority[1] < observations[1] < mutations[0]
+    assert mutations == [len(events) - 2, len(events) - 1]
 
 
 @pytest.mark.parametrize("failure", [1, 2])

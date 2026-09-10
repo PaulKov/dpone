@@ -9,11 +9,9 @@ from dpone.runtime.sinks.mssql_native_switch.catalog import (
     NativeSwitchCatalog,
     count,
     interval_parameters,
-    one,
     qualified,
     quote,
 )
-from dpone.runtime.sinks.mssql_native_switch.catalog_sql import TRANSACTION_SQL
 from dpone.runtime.sinks.mssql_native_switch.planner import plan_native_switch
 
 if TYPE_CHECKING:
@@ -32,9 +30,8 @@ def execute_native_switch(plan: NativeSwitchPlan, *, transaction: NativeSwitchTr
     """
     binding = plan.owner_binding
     transaction.assert_authority(binding)
-    state = one(
-        transaction.query(TRANSACTION_SQL), {"state", "depth", "session_id", "database_id", "xact_abort", "isolation"}
-    )
+    catalog = NativeSwitchCatalog(transaction)
+    state = catalog.transaction_state()
     if (
         state["state"] != 1
         or state["depth"] != 1
@@ -45,7 +42,6 @@ def execute_native_switch(plan: NativeSwitchPlan, *, transaction: NativeSwitchTr
         or state["session_id"] <= 0
     ):
         raise NativeSwitchRejected("transaction_authority_invalid")
-    catalog = NativeSwitchCatalog(transaction)
     if catalog.database() != binding.database:
         raise NativeSwitchRejected("database_binding_mismatch")
     # TABLOCKX + HOLDLOCK also excludes independent non-dpone writers and DDL.
@@ -67,7 +63,7 @@ def execute_native_switch(plan: NativeSwitchPlan, *, transaction: NativeSwitchTr
         interval_parameters(plan.interval),
     )
     transaction.assert_authority(binding)
-    if one(transaction.query(TRANSACTION_SQL), set(state)) != state:
+    if catalog.transaction_state() != state:
         raise NativeSwitchRejected("transaction_authority_invalid")
     partition = plan.partition_number
     transaction.execute(

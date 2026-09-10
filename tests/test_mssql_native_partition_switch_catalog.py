@@ -3,6 +3,7 @@
 import copy
 import json
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,6 +12,52 @@ from dpone.runtime.sinks.mssql_native_switch import NativeSwitchCatalog, execute
 from dpone.runtime.sinks.mssql_native_switch.catalog_parse import parse_table
 from dpone.runtime.sinks.mssql_native_switch.catalog_sql import DATABASE_SQL, TABLE_SQL, TRANSACTION_SQL
 from tests.test_mssql_native_partition_switch import switch_case
+
+
+def test_transaction_state_is_uncached_shape_only_observation_without_constructor_io():
+    rows = [dict(state=0, depth=2, session_id=0, database_id=7, xact_abort=0, isolation=2)]
+    requests = []
+
+    def query(sql, parameters=()):
+        requests.append((sql, parameters))
+        return rows
+
+    catalog = NativeSwitchCatalog(SimpleNamespace(query=query))
+    assert requests == []
+    assert catalog.transaction_state() is rows[0]
+    rows[0] = dict(rows[0], session_id=99)
+    assert catalog.transaction_state() is rows[0]
+    assert requests == [(TRANSACTION_SQL, ()), (TRANSACTION_SQL, ())]
+
+
+@pytest.mark.parametrize("shape", ["empty", "multiple", "missing", "extra"])
+def test_transaction_state_rejects_unknown_row_shape(shape):
+    row = dict(state=1, depth=1, session_id=51, database_id=7, xact_abort=16384, isolation=4)
+    rows = [row]
+    if shape == "empty":
+        rows = []
+    elif shape == "multiple":
+        rows = [row, row]
+    elif shape == "missing":
+        row.pop("state")
+    else:
+        row["unexpected"] = 1
+    catalog = NativeSwitchCatalog(SimpleNamespace(query=lambda sql: rows))
+    with pytest.raises(NativeSwitchRejected, match="metadata_unknown"):
+        catalog.transaction_state()
+
+
+def test_transaction_state_propagates_query_failure_without_retry():
+    failure = OSError("lost session")
+    requests = []
+
+    def query(sql):
+        requests.append(sql)
+        raise failure
+
+    with pytest.raises(OSError) as caught:
+        NativeSwitchCatalog(SimpleNamespace(query=query)).transaction_state()
+    assert caught.value is failure and requests == [TRANSACTION_SQL]
 
 
 def catalog_table(obj, owner_tag):

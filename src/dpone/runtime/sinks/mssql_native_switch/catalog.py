@@ -15,7 +15,7 @@ from dpone.contracts.native_mssql_switch import (
     NativeSwitchSnapshot,
 )
 from dpone.runtime.sinks.mssql_native_switch.catalog_parse import parse_table
-from dpone.runtime.sinks.mssql_native_switch.catalog_sql import DATABASE_SQL, TABLE_SQL
+from dpone.runtime.sinks.mssql_native_switch.catalog_sql import DATABASE_SQL, TABLE_SQL, TRANSACTION_SQL
 
 if TYPE_CHECKING:
     from dpone.ports.native_mssql_switch import NativeSwitchSql
@@ -68,6 +68,17 @@ class NativeSwitchCatalog:
 
     def __init__(self, sql: NativeSwitchSql) -> None:
         self._sql = sql
+
+    def transaction_state(self) -> Mapping[str, object]:
+        """Read one exact transaction observation without granting authority.
+
+        The executor owns all value predicates and comparisons across reads.
+        Each call queries the supplied session; nothing is cached or retried.
+        """
+        return one(
+            self._sql.query(TRANSACTION_SQL),
+            {"state", "depth", "session_id", "database_id", "xact_abort", "isolation"},
+        )
 
     def database(self) -> NativeSwitchDatabase:
         row = one(
