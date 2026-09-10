@@ -208,9 +208,9 @@ class DoomedTransactionCursor:
     """Run the untouched first provider query inside a real constraint CATCH.
 
     SQL Server rolls back doomed transactions at batch end. This one-shot fault
-    therefore observes the provider's real result before explicit rollback in
-    the same batch. Only the separate fault result is consumed here; provider
-    rows are returned unchanged, and completion requires draining the batch.
+    therefore owns a complete 0→0 transaction inside one parameterized RPC.
+    Only acquisition/fault results are consumed here; provider rows are returned
+    unchanged, and completion requires draining through explicit rollback.
     See learn.microsoft.com/en-us/sql/t-sql/functions/xact-state-transact-sql.
     """
 
@@ -226,11 +226,17 @@ class DoomedTransactionCursor:
     def execute(self, sql, *parameters):
         if self.executed:
             raise RuntimeError("fault_cursor_reuse")
-        if parameters != (COMPOSITION_MSSQL_LEDGER_LOCK,):
+        if parameters != (COMPOSITION_MSSQL_LEDGER_LOCK,) or parameters[0] != "dpone:composition-control:v1":
             raise RuntimeError("fault_cursor_subject")
         self.executed = True
         prefix = (
+            "IF @@TRANCOUNT <> 0 THROW 51000, N'fault_outer_transaction', 1; "
             "DECLARE @fault_options int = @@OPTIONS; SET NOCOUNT ON; SET XACT_ABORT ON; "
+            "BEGIN TRANSACTION; DECLARE @fault_lock int; EXEC @fault_lock=sys.sp_getapplock "
+            "@Resource=N'dpone:composition-control:v1',@LockOwner=N'Transaction',"
+            "@LockMode=N'Exclusive',@LockTimeout=0; "
+            "SELECT @fault_lock,@@TRANCOUNT,XACT_STATE(),"
+            "APPLOCK_MODE(N'public',N'dpone:composition-control:v1',N'Transaction'); "
             "CREATE TABLE #dpone_trust_fault (id int NOT NULL PRIMARY KEY); "
             "INSERT INTO #dpone_trust_fault VALUES (1); "
             "BEGIN TRY INSERT INTO #dpone_trust_fault VALUES (1); END TRY BEGIN CATCH "
@@ -243,24 +249,26 @@ class DoomedTransactionCursor:
         )
         # The SQL comes directly from the provider; parameters stay DBAPI-bound.
         self.cursor.execute(prefix + sql + suffix, *parameters)
-        self._require_result()
+        support.require_result_set(self.cursor)
+        acquired = tuple(tuple(row) for row in self.cursor.fetchall())
+        support.record_rows(
+            self.record,
+            "transaction_exclusive",
+            acquired,
+            ("lock_result", "transaction_count", "xact_state", "lock_mode"),
+        )
+        if len(acquired) != 1 or acquired[0][1:] != (1, 1, "Exclusive") or acquired[0][0] not in (0, 1):
+            raise RuntimeError("fault_lock_not_acquired")
+        support.require_result_set(self.cursor, advance=True)
         self.fault_rows = tuple(tuple(row) for row in self.cursor.fetchall())
-        payload: dict[str, object] = {"result_rows": len(self.fault_rows)}
-        if len(self.fault_rows) == 1 and len(self.fault_rows[0]) == 3:
-            payload.update(zip(("sql_error", "transaction_count", "xact_state"), self.fault_rows[0], strict=True))
-        self.record("transaction_fault", payload)
+        support.record_rows(
+            self.record, "transaction_fault", self.fault_rows, ("sql_error", "transaction_count", "xact_state")
+        )
         if self.fault_rows != ((2627, 1, -1),):
             raise RuntimeError("fault_not_doomed")
-        if not self.cursor.nextset():
-            raise RuntimeError("fault_missing_result")
-        self._require_result()
+        support.require_result_set(self.cursor, advance=True)
         self._ready = True
         return self
-
-    def _require_result(self):
-        while self.cursor.description is None:
-            if not self.cursor.nextset():
-                raise RuntimeError("fault_missing_result")
 
     def fetchall(self):
         if not self._ready:
@@ -268,10 +276,7 @@ class DoomedTransactionCursor:
         self._ready = False
         rows = self.cursor.fetchall()
         self.precondition_rows = tuple(tuple(row) for row in rows)
-        payload = {"result_rows": len(rows)}
-        if len(rows) == 1 and len(rows[0]) == 3:
-            payload.update(zip(("transaction_count", "xact_state", "lock_mode"), rows[0], strict=True))
-        self.record("transaction_doomed", payload)
+        support.record_rows(self.record, "transaction_doomed", rows, ("transaction_count", "xact_state", "lock_mode"))
         while self.cursor.nextset():
             if self.cursor.description is not None:
                 raise RuntimeError("fault_extra_result")
@@ -292,17 +297,9 @@ def test_insufficient_transaction_lock_never_returns_trust(trust_case):
         refusals += 1
         for mode in ("Shared", "Exclusive"):
             try:
-                locked = execute(
-                    connection,
-                    "BEGIN TRANSACTION; DECLARE @r int; EXEC @r=sys.sp_getapplock "
-                    "@Resource=?,@LockOwner=N'Transaction',@LockMode=?,@LockTimeout=0; SELECT @r;",
-                    COMPOSITION_MSSQL_LEDGER_LOCK,
-                    mode,
-                )
-                observed = case.record_transaction("transaction_" + mode.lower(), connection)
-                assert observed == ((1, 1, mode),)
-                assert len(locked) == 1 and locked[0][0] >= 0
                 if mode == "Exclusive":
+                    observed = case.record_transaction("transaction_before_fault", connection)
+                    assert observed == ((0, 0, "NoLock"),)
                     options = execute(connection, "SELECT @@OPTIONS;")
                     boundary = DoomedTransactionCursor(cursor, case.record)
                     doomed = CompositionMssqlLedger(boundary, case.schema)
@@ -316,6 +313,9 @@ def test_insufficient_transaction_lock_never_returns_trust(trust_case):
                     observed = case.record_transaction("transaction_after_fault", connection)
                     assert observed == ((0, 0, "NoLock"),)
                 else:
+                    locked = support.acquire_shared_transaction(connection)
+                    assert len(locked) == 1 and locked[0][0] >= 0
+                    assert case.record_transaction("transaction_shared", connection) == ((1, 1, "Shared"),)
                     with pytest.raises(NonproductionAuthorityError) as refused:
                         case.provider().read_revision_in(ledger)
                     assert refused.value.reason == "trust_ledger_lock"

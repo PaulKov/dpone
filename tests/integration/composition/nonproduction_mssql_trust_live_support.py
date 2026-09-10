@@ -43,6 +43,7 @@ _OBSERVATIONS = {
     "transaction_shared",
     "transaction_exclusive",
     "transaction_fault",
+    "transaction_before_fault",
     "transaction_doomed",
     "transaction_after_fault",
     "transaction_final",
@@ -117,6 +118,34 @@ def require_sql_rejection(operation, codes):
         operation()
     assert caught.value.code in codes, "unexpected_sql_rejection"
     return caught.value.code
+
+
+def acquire_shared_transaction(connection):
+    """Keep BEGIN outside pyodbc's prepared parameterized lock RPC."""
+    execute(connection, "BEGIN TRANSACTION;")
+    return execute(
+        connection,
+        "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=?,"
+        "@LockOwner=N'Transaction',@LockMode=N'Shared',@LockTimeout=0; SELECT @r;",
+        COMPOSITION_MSSQL_LEDGER_LOCK,
+    )
+
+
+def record_rows(record, name, rows, columns):
+    """Flatten an actual bounded result shape through the closed sanitizer."""
+    payload = {"result_rows": len(rows)}
+    if len(rows) == 1 and len(rows[0]) == len(columns):
+        payload.update(zip(columns, rows[0], strict=True))
+    record(name, payload)
+
+
+def require_result_set(cursor, *, advance=False):
+    """Position on a real result, rejecting a missing expected batch result."""
+    if advance and not cursor.nextset():
+        raise RuntimeError("fault_missing_result")
+    while cursor.description is None:
+        if not cursor.nextset():
+            raise RuntimeError("fault_missing_result")
 
 
 class LostReadAcknowledgement:
@@ -259,10 +288,7 @@ class TrustCase:
             "SELECT @transaction_count, @transaction_state, @lock_mode;",
             COMPOSITION_MSSQL_LEDGER_LOCK,
         )
-        payload = {"result_rows": len(rows)}
-        if len(rows) == 1 and len(rows[0]) == 3:
-            payload.update(zip(("transaction_count", "xact_state", "lock_mode"), rows[0], strict=True))
-        self.record(name, payload)
+        record_rows(self.record, name, rows, ("transaction_count", "xact_state", "lock_mode"))
         return rows
 
     def cleanup(self):

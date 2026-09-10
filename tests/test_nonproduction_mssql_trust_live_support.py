@@ -99,30 +99,38 @@ def test_transaction_observations_reject_unknown_states_or_raw_strings(payload):
         support.observation_document(payload)
 
 
-def test_transaction_snapshot_records_actual_rows_before_assertions(monkeypatch):
+@pytest.mark.parametrize("observed", [((0, 0, "NoLock"),), ((1, 1, "Exclusive"),)])
+def test_transaction_snapshot_guards_lock_lookup_and_preserves_actual_rows(monkeypatch, observed):
     properties = []
-    case = support.TrustCase(SimpleNamespace(), lambda name, value: properties.append((name, value)))
-    monkeypatch.setattr(support, "execute", lambda *args: ((1, -1, "Exclusive"),))
-    assert case.record_transaction("transaction_after_fault", object()) == ((1, -1, "Exclusive"),)
-    assert len(properties) == 1 and properties[0][0] == "dpone.trust.transaction_after_fault"
-    assert json.loads(properties[0][1]) == {
-        "result_rows": 1,
-        "lock_mode": "Exclusive",
-        "transaction_count": 1,
-        "xact_state": -1,
-    }
 
-
-def test_transaction_snapshot_guards_transaction_owned_lock_lookup(monkeypatch):
     def observe(connection, sql, *parameters):
         assert "IF @transaction_count > 0 AND @transaction_state = 1" in sql
         assert sql.index("IF @transaction_count") < sql.index("APPLOCK_MODE(")
         assert parameters == (support.COMPOSITION_MSSQL_LEDGER_LOCK,)
-        return ((0, 0, "NoLock"),)
+        return observed
 
     monkeypatch.setattr(support, "execute", observe)
-    case = support.TrustCase(SimpleNamespace(), lambda *args: None)
-    assert case.record_transaction("transaction_initial", object()) == ((0, 0, "NoLock"),)
+    case = support.TrustCase(SimpleNamespace(), lambda name, value: properties.append((name, value)))
+    assert case.record_transaction("transaction_initial", object()) == observed
+    assert len(properties) == 1 and properties[0][0] == "dpone.trust.transaction_initial"
+    assert json.loads(properties[0][1]) == dict(
+        result_rows=1, transaction_count=observed[0][0], xact_state=observed[0][1], lock_mode=observed[0][2]
+    )
+
+
+def test_shared_begin_is_direct_and_bound_lock_rpc_keeps_transaction_count(monkeypatch):
+    calls = []
+
+    def observe(*args):
+        calls.append(args)
+        return ((0,),)
+
+    monkeypatch.setattr(support, "execute", observe)
+    connection = object()
+    assert support.acquire_shared_transaction(connection) == ((0,),)
+    assert calls[0] == (connection, "BEGIN TRANSACTION;")
+    assert calls[1][2:] == (support.COMPOSITION_MSSQL_LEDGER_LOCK,)
+    assert not any(word in calls[1][1] for word in ("BEGIN", "COMMIT", "ROLLBACK"))
 
 
 class FaultCursor:
@@ -149,12 +157,14 @@ class FaultCursor:
 def test_doomed_wrapper_preserves_original_sql_parameters_and_real_result_object():
     original = "SELECT @@TRANCOUNT, XACT_STATE(), APPLOCK_MODE(N'public', ?, N'Transaction');"
     observed = [(1, -1, "Exclusive")]
-    cursor = FaultCursor([None, [(2627, 1, -1)], None, observed])
+    cursor = FaultCursor([None, [(0, 1, 1, "Exclusive")], [(2627, 1, -1)], None, observed])
     boundary = DoomedTransactionCursor(cursor, lambda *args: None)
     boundary.execute(original, support.COMPOSITION_MSSQL_LEDGER_LOCK)
     assert boundary.fetchall() is observed
     sql, parameters = cursor.calls[0]
     assert sql.count(original) == 1 and parameters == (support.COMPOSITION_MSSQL_LEDGER_LOCK,)
+    assert "IF @@TRANCOUNT <> 0" in sql and sql.index("BEGIN TRANSACTION") < sql.index("sys.sp_getapplock")
+    assert "@Resource=N'" + support.COMPOSITION_MSSQL_LEDGER_LOCK + "'" in sql
     assert sql.index("BEGIN CATCH") < sql.index(original) < sql.index("ROLLBACK TRANSACTION")
     assert boundary.complete and cursor.index == len(cursor.sets)
     assert boundary.fault_rows == ((2627, 1, -1),) and boundary.precondition_rows == tuple(observed)
@@ -167,16 +177,24 @@ def test_doomed_wrapper_preserves_original_sql_parameters_and_real_result_object
 
 @pytest.mark.parametrize("fault", [[(102, 1, -1)], [(2627, 1, 1)], []])
 def test_doomed_wrapper_requires_actual_constraint_error_and_uncommittable_state(fault):
-    cursor = FaultCursor([fault, [(1, -1, "NoLock")]])
+    cursor = FaultCursor([[(0, 1, 1, "Exclusive")], fault, [(1, -1, "NoLock")]])
     boundary = DoomedTransactionCursor(cursor, lambda *args: None)
     with pytest.raises(RuntimeError, match="fault_not_doomed"):
         boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
     assert not boundary.complete and boundary.precondition_rows == ()
 
 
+@pytest.mark.parametrize("acquired", [[], [(-1, 1, 1, "NoLock")], [(0, 0, 0, "NoLock")]])
+def test_doomed_wrapper_requires_real_exclusive_acquisition(acquired):
+    boundary = DoomedTransactionCursor(FaultCursor([acquired]), lambda *args: None)
+    with pytest.raises(RuntimeError, match="fault_lock_not_acquired"):
+        boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
+    assert not boundary.complete and boundary.fault_rows == ()
+
+
 @pytest.mark.parametrize("extra", [None, [(123,)]])
 def test_doomed_wrapper_requires_complete_batch_without_extra_results(extra):
-    cursor = FaultCursor([[(2627, 1, -1)], [(1, -1, "NoLock")], extra])
+    cursor = FaultCursor([[(0, 1, 1, "Exclusive")], [(2627, 1, -1)], [(1, -1, "NoLock")], extra])
     boundary = DoomedTransactionCursor(cursor, lambda *args: None)
     boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
     if extra is None:
@@ -189,21 +207,20 @@ def test_doomed_wrapper_requires_complete_batch_without_extra_results(extra):
 
 @pytest.mark.parametrize("operation", ["execute", "nextset"])
 def test_doomed_wrapper_driver_failure_is_incomplete_and_cannot_retry(monkeypatch, operation):
-    cursor = FaultCursor([[(2627, 1, -1)], [(1, -1, "NoLock")]])
+    cursor = FaultCursor([[(0, 1, 1, "Exclusive")], [(2627, 1, -1)], [(1, -1, "NoLock")]])
     boundary = DoomedTransactionCursor(cursor, lambda *args: None)
 
     def fail(*args):
         raise RuntimeError("driver_failure")
 
-    if operation == "execute":
-        monkeypatch.setattr(cursor, operation, fail)
-        with pytest.raises(RuntimeError, match="driver_failure"):
-            boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
-    else:
+    if operation == "nextset":
         boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
-        monkeypatch.setattr(cursor, operation, fail)
-        with pytest.raises(RuntimeError, match="driver_failure"):
+    monkeypatch.setattr(cursor, operation, fail)
+    with pytest.raises(RuntimeError, match="driver_failure"):
+        if operation == "nextset":
             boundary.fetchall()
+        else:
+            boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
     assert not boundary.complete
     with pytest.raises(RuntimeError, match="fault_cursor_reuse"):
         boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
