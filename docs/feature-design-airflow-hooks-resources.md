@@ -1,6 +1,6 @@
 # Feature design: Reliable Airflow hooks and workload resources
 
-- Status: APPROVED
+- Status: IMPLEMENTED (live Kubernetes acceptance remains UNVERIFIED)
 - Owner: dpone maintainers; implementation integrator: Codex
 - Issue: maintainer supplied specification, “Reliable Airflow hooks and declarative Kubernetes resources”
 - Target release: next coordinated dpone / dpone-airflow-pack release
@@ -193,3 +193,29 @@ may implement runtime publication/diagnostics in a separate worktree. Codex is
 the integrator and owns resource authoring, shared schemas, docs, changelog,
 validation evidence and final review. Concrete contracts are stored with the
 task evidence before handing off write access.
+
+## Implementation evidence
+
+The implementation is available in [PR #22](https://github.com/PaulKov/dpone/pull/22).
+It includes ordinary release-composition resource preservation, canonical
+manifest/runtime policy ownership and the readiness compatibility facade.
+Independent review found no remaining actionable issues after the integration
+corrections. Focused runtime/resource/composition coverage passed 231 tests;
+the composition, schema and identity integration group passed 163 tests.
+
+Ruff, formatting, mypy, import rules, layer/module budgets, generated references,
+strict documentation rendering and all four distribution builds passed.
+Installed-wheel checks reproduced a failing hook from a read-only workload with
+an unusable XCom destination and preserved its child exit code. The cross-layer
+ratio is 0.2999345835, within the unchanged 0.300 limit.
+
+Exact revisions, full-suite results and logs are recorded in the PR and
+`test_artifacts/airflow-hooks-resources/completion.md`. The first integrated full
+run exposed stale local native-acceleration distribution metadata after the
+0.76.0 update; reinstalling that editable package from current source resolved
+all 23 tests in its contract module without code or test changes.
+
+These are implementation and offline compatibility results. They do not certify
+live scheduling, writable Kubernetes volumes, disk capacity or a published
+package/image combination. Live acceptance requires an approved environment and
+an exact runtime image digest; no publication is authorized by this status.
