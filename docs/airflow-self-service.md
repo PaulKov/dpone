@@ -1,5 +1,10 @@
 # Airflow self-service
 
+For CPU, memory and temporary disk settings, see
+[Configure Airflow workload resources](airflow-workload-resources.md). For
+non-root hooks and OS startup failures, use
+[runtime startup diagnostics](airflow-runtime-startup-diagnostics.md).
+
 The canonical beginner journey is
 [First Airflow DAG in 5 commands](getting-started/first-airflow-dag.md). It
 creates a pipeline, validates it, and previews a provider-loadable DAG without

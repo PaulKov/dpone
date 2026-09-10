@@ -106,6 +106,12 @@ def _runtime_evidence_payload(
             raise
         payload = payloads[-1]
     if payload.get("kind") == "gitops.airflow_runtime_evidence":
+        if _is_failure_signal(status_hint):
+            payload = {
+                **payload,
+                "status": "failed",
+                "blockers": _blockers_from_runtime_output(payload, status="failed"),
+            }
         return payload, None
     return (
         _runtime_output_payload(payload, status_hint=status_hint),

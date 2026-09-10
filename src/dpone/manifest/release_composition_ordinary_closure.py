@@ -12,6 +12,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
 
+from dpone.contracts.airflow_resources import KubernetesResourceError, manifest_airflow_resources
 from dpone.contracts.dbt_relation_writes import DbtRelationWrite, transfer_relation_write
 from dpone.contracts.release_composition_ordinary import OrdinaryReleaseInventoryError
 from dpone.gitops.workload_catalog_models import GitOpsConfigProvenance, GitOpsWorkloadDefinition
@@ -141,10 +142,12 @@ class OrdinaryPackClosureVerifier:
     def _require_single_transfer(manifest: object, workload_id: str) -> None:
         if not isinstance(manifest, Mapping) or manifest.get("name") != workload_id:
             raise OrdinaryReleaseInventoryError("ordinary transfer manifest identity is invalid")
-        if set(manifest) - {"name", "description", "source", "sink"}:
+        if set(manifest) - {"name", "description", "source", "sink", "gitops"}:
             raise OrdinaryReleaseInventoryError(
                 "ordinary composition supports one plain transfer manifest per workload; batch, authoring and hooks are unsupported"
             )
+        if "gitops" in manifest:
+            _require_resource_only_gitops(manifest)
         source = manifest.get("source")
         sink = manifest.get("sink")
         allowed = {"postgres", "mssql", "mysql", "clickhouse"}
@@ -157,6 +160,23 @@ class OrdinaryPackClosureVerifier:
             raise OrdinaryReleaseInventoryError(
                 "ordinary composition requires explicitly declared supported SQL transfer endpoints"
             )
+
+
+def _require_resource_only_gitops(manifest: Mapping[str, Any]) -> None:
+    """Admit bounded Pod sizing without admitting runner or command authority."""
+    gitops = manifest["gitops"]
+    airflow = gitops.get("airflow") if isinstance(gitops, Mapping) else None
+    if (
+        not isinstance(gitops, Mapping)
+        or set(gitops) != {"airflow"}
+        or not isinstance(airflow, Mapping)
+        or set(airflow) != {"resources"}
+    ):
+        raise OrdinaryReleaseInventoryError("ordinary composition permits only gitops.airflow.resources metadata")
+    try:
+        manifest_airflow_resources(manifest)
+    except KubernetesResourceError as exc:
+        raise OrdinaryReleaseInventoryError(str(exc)) from exc
 
 
 def _source_semantics(pack: Mapping[str, Any]) -> dict[str, Any]:

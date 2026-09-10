@@ -9,6 +9,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from dpone.contracts.airflow_deployment import canonical_fingerprint
+from dpone.contracts.airflow_resources import KubernetesResourceError, manifest_airflow_resources
 from dpone.manifest.authoring_folder import (
     AuthoringSourceDependency,
     BoundedYamlFolderFragmentLoader,
@@ -16,6 +17,7 @@ from dpone.manifest.authoring_folder import (
     FolderFragmentLoader,
     collect_sql_file_dependencies,
 )
+from dpone.manifest.authoring_identity import authoring_semantic_material as _semantics
 from dpone.manifest.batch_compiler_impl import BatchManifestCompiler
 from dpone.manifest.errors import ManifestConfigurationError
 from dpone.manifest.pipeline_identity import PipelineId, PipelineIdError
@@ -77,6 +79,10 @@ class AuthoringCompiler:
         include_content_dependencies: bool = True,
     ) -> AuthoringCompilation:
         source = copy.deepcopy(dict(payload))
+        try:
+            resources = manifest_airflow_resources(source)
+        except KubernetesResourceError as exc:
+            raise AuthoringCompilationError(exc.code, str(exc)) from exc
         source_kind = str(source.get("kind") or source.get("schema") or "").strip()
         mode = self._validate_authority(source, source_kind=source_kind, source_path=source_path, root=project_root)
         pipeline_id = _pipeline_identity(source)
@@ -197,10 +203,6 @@ class AuthoringCompiler:
                 "Authoring source could not be compiled into the canonical manifest.",
             ) from exc
         processes = tuple(copy.deepcopy(process.raw_config) for process in compiled)
-        semantic_payload = {
-            "metadata": _semantic_metadata(canonical.get("metadata")),
-            "processes": sorted(processes, key=_process_identity),
-        }
         return AuthoringCompilation(
             authoring_mode=mode,
             source_kind=source_kind,
@@ -208,7 +210,7 @@ class AuthoringCompiler:
             canonical_manifest=canonical,
             processes=processes,
             source_fingerprint=canonical_fingerprint(source_identity),
-            semantic_fingerprint=canonical_fingerprint(semantic_payload),
+            semantic_fingerprint=canonical_fingerprint(_semantics(canonical.get("metadata"), processes, resources)),
             pipeline_id=pipeline_id,
             deprecated_aliases=tuple((*aliases, *recipe_deprecations)),
             dependencies=dependencies,
@@ -365,16 +367,6 @@ def _validate_declared_source(declared: str, *, source_path: Path, root: Path | 
         )
 
 
-def _semantic_metadata(raw: object) -> dict[str, Any]:
-    if not isinstance(raw, Mapping):
-        return {}
-    metadata = {str(key): copy.deepcopy(value) for key, value in raw.items() if str(key) != "recipe"}
-    tags = metadata.get("tags")
-    if isinstance(tags, list) and all(isinstance(tag, str) for tag in tags):
-        metadata["tags"] = sorted(set(tags))
-    return metadata
-
-
 def _pipeline_identity(source: Mapping[str, Any]) -> PipelineId | None:
     metadata = source.get("metadata")
     if not isinstance(metadata, Mapping) or "id" not in metadata:
@@ -384,14 +376,6 @@ def _pipeline_identity(source: Mapping[str, Any]) -> PipelineId | None:
         return PipelineId.parse(raw if isinstance(raw, str) else "")
     except PipelineIdError as exc:
         raise AuthoringCompilationError("DPONE_PIPELINE_ID_INVALID", str(exc)) from exc
-
-
-def _process_identity(process: Mapping[str, Any]) -> tuple[str, str, str]:
-    source = process.get("source")
-    table = source.get("table") if isinstance(source, Mapping) else None
-    schema_name = str(table.get("schema") or "") if isinstance(table, Mapping) else ""
-    table_name = str(table.get("name") or "") if isinstance(table, Mapping) else ""
-    return str(process.get("name") or ""), schema_name, table_name
 
 
 def default_authoring_compiler() -> AuthoringCompiler:

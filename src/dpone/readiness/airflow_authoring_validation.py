@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from dpone.contracts.airflow_resources import manifest_airflow_resources
 from dpone.manifest.authoring import (
     AuthoringCompilation,
     AuthoringCompilationError,
@@ -86,6 +87,9 @@ def authoring_check_view(
     }
     if compilation.recipe_provenance is not None:
         details["recipe_resolution"] = dict(compilation.recipe_provenance)
+    resources = manifest_airflow_resources(payload)
+    if resources is not None:
+        details["airflow_resources"] = resources
     process_view = {**payload, "processes": [dict(process) for process in compilation.processes]}
     return details, process_view
 

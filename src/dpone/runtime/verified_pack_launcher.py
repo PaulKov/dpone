@@ -52,6 +52,7 @@ class VerifiedPackCommand:
     env: Mapping[str, str]
     working_directory: Path
     exit_code_policy: Literal["xcom_gate", "child"] = "xcom_gate"
+    publish_xcom: bool = True
 
 
 class VerifiedPackLauncher:
@@ -147,6 +148,7 @@ class VerifiedPackLauncher:
             argv=argv,
             env=environment,
             working_directory=self._worktree_root,
+            publish_xcom=plan.execution.kind != "pre_hook",
             exit_code_policy=(
                 "child"
                 if plan.execution.kind == "pre_hook" or argv[:3] == ("dpone", "dbt", "execute-pack")

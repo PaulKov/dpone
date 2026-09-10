@@ -150,7 +150,10 @@ all bootstrap commands, process plans, pod projections, and compatibility
 commands. Caller-supplied hashes or producer labels alone are insufficient.
 
 The initial supported manifest has top-level `name`, `source`, `sink`, and
-optionally `description`. `name` matches the workload ID. Source and sink types
+optionally `description` and the resource-only
+[`gitops.airflow.resources`](airflow-workload-resources.md) block. Other `gitops`
+fields remain unsupported. Resources are validated and preserved during source
+reconstruction and strict pack rewriting. `name` matches the workload ID. Source and sink types
 must explicitly be `postgres`, `mssql`, `mysql`, or `clickhouse`; the sink declares
 `connection_ref` and table `schema`/`name`, with optional database. Referenced SQL
 files are included through the normal dependency resolver. Standard manifest
