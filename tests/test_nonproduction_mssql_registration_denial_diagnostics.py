@@ -44,3 +44,46 @@ def test_bulk_denial_helper_rejects_unexpected_success():
 def test_unclassified_diagnostic_accepts_only_boolean():
     with pytest.raises(ValueError, match="unsafe_registration_observation"):
         support.observation_document({"unclassified_sql_error": "private-driver-text"})
+
+
+@pytest.mark.parametrize("code", [15406, 102, 4861, None])
+def test_impersonation_refusal_requires_an_administrator_positive_probe(monkeypatch, code):
+    observed = []
+    case = SimpleNamespace(
+        sql=Mock(return_value=((1,),)),
+        table=str,
+        trigger=str,
+        record=lambda name, value: observed.append((name, value)),
+    )
+    errors = [SqlFailure(229)] * 5 + [SqlFailure(code)]
+    execute = Mock(side_effect=errors)
+    monkeypatch.setattr(live, "execute", execute)
+    if code == 15406:
+        live.observe_storage_denials(case, object())
+    else:
+        with pytest.raises(AssertionError, match="unexpected_sql_rejection"):
+            live.observe_storage_denials(case, object())
+    assert case.sql.call_count == 1 and "EXECUTE AS LOGIN=N'sa'" in case.sql.call_args.args[0]
+    assert observed[0] == ("impersonation_target", {"allowed": 1})
+    assert execute.call_count == 6
+
+
+@pytest.mark.parametrize("rows", [(), ((0,),), ((None,),), ((True,),), ((1,), (1,))])
+def test_invalid_impersonation_target_stops_before_restricted_operations(monkeypatch, rows):
+    observed = []
+    case = SimpleNamespace(sql=Mock(return_value=rows), record=lambda name, value: observed.append((name, value)))
+    execute = Mock()
+    monkeypatch.setattr(live, "execute", execute)
+    with pytest.raises(AssertionError, match="impersonation_target"):
+        live.observe_storage_denials(case, object())
+    assert observed == [("impersonation_target", {"allowed": 0})]
+    execute.assert_not_called()
+
+
+def test_impersonation_error_is_not_a_table_operation_refusal(monkeypatch):
+    case = SimpleNamespace(sql=Mock(return_value=((1,),)), table=str, trigger=str, record=Mock())
+    execute = Mock(side_effect=SqlFailure(15406))
+    monkeypatch.setattr(live, "execute", execute)
+    with pytest.raises(AssertionError, match="unexpected_sql_rejection"):
+        live.observe_storage_denials(case, object())
+    assert execute.call_count == 1

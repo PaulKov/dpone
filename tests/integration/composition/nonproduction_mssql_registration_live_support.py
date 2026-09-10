@@ -49,6 +49,7 @@ BULK_PATH = "/tmp/dpone-composition-registration-bulk.txt"
 DENIAL_OPERATIONS = ("update", "delete", "alter", "truncate", "disable_trigger", "impersonate")
 _OBSERVATIONS = {"state", "bytes", "catalog", "transaction", "race", "fault", "permissions", "history", "cleanup"}
 _OBSERVATIONS.update("denial_" + str(index) for index in range(1, 7))
+_OBSERVATIONS.add("impersonation_target")
 _COUNTS = {
     "rows",
     "members",

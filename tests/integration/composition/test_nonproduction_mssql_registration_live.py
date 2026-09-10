@@ -112,6 +112,26 @@ def storage_denials(case):
     )
 
 
+def observe_storage_denials(case, connection):
+    """Prove the fixed target is impersonatable before observing permission denial.
+
+    SQL Server 2022 error15406 also covers missing/non-impersonatable principals.
+    An independent administrator executes the exact target first; only the
+    restricted impersonation operation may then accept that observed code.
+    """
+    rows = case.sql("EXECUTE AS LOGIN=N'sa'; SELECT CASE WHEN SUSER_SNAME()=N'sa' THEN 1 ELSE 0 END; REVERT;")
+    allowed = rows == ((1,),) and type(rows[0][0]) is int
+    case.record("impersonation_target", {"allowed": int(allowed)})
+    assert allowed, "impersonation_target"
+    denied = []
+    for index, (label, statement) in enumerate(storage_denials(case), 1):
+        codes = {15406} if label == "impersonate" else {229, 1088, 15151, 15247}
+        denied.append(
+            observe_denial(case, index, label, lambda statement=statement: execute(connection, statement), codes)
+        )
+    return denied
+
+
 def require_history_cycle(case, original_policy, grant):
     """Refuse epoch rollback, then observe exact B-C-B policy bytes at that epoch."""
     newer, revision = case.policy, case.expected

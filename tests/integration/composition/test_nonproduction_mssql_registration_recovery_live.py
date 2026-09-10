@@ -15,8 +15,7 @@ from tests.integration.composition.mssql_gate_live_provisioning import execute
 from tests.integration.composition.nonproduction_mssql_trust_live_support import require_sql_rejection
 from tests.integration.composition.test_nonproduction_mssql_registration_live import (
     expanded,
-    observe_denial,
-    storage_denials,
+    observe_storage_denials,
 )
 from tests.nonproduction_authority_helpers import limits, qualification
 
@@ -327,16 +326,7 @@ def test_restricted_login_cannot_bypass_registration_storage(registration_case):
                     probe,
                 ) == ((1, 0),)
                 denied = [require_sql_rejection(lambda: execute(connection, bulk), {229, 4834})]
-                for index, (label, statement) in enumerate(storage_denials(case), 1):
-                    denied.append(
-                        observe_denial(
-                            case,
-                            index,
-                            label,
-                            lambda statement=statement: execute(connection, statement),
-                            {229, 1088, 15151, 15247},
-                        )
-                    )
+                denied.extend(observe_storage_denials(case, connection))
                 execute(connection, f"INSERT INTO {probe} VALUES (2);")
             finally:
                 execute(connection, "REVERT;")
