@@ -127,7 +127,21 @@ def _forbidden_reason(member_name: str) -> str | None:
         return "VCS_FILE"
     if any(part == ".env" or part.startswith(".env.") for part in components):
         return "ENV_FILE"
+    if any(_startup_hook_component(part) for part in components):
+        return "PYTHON_STARTUP_HOOK"
     return None
+
+
+def _startup_hook_component(component: str) -> bool:
+    """Reject startup modules/packages and path hooks without reading payloads."""
+
+    name = component.casefold()
+    if name.endswith(".pth"):
+        return True
+    stem = name.split(".", 1)[0]
+    return stem in {"sitecustomize", "usercustomize"} and (
+        name == stem or name.endswith((".py", ".pyc", ".pyo", ".so", ".pyd"))
+    )
 
 
 def _scan_member_names(names: Iterable[str]) -> tuple[int, tuple[ForbiddenMember, ...], int, tuple[Blocker, ...]]:

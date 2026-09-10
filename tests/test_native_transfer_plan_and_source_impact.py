@@ -37,7 +37,7 @@ def test_manifest_schemas_expose_runtime_storage_and_native_transfer_options() -
     batch_wire = batch_schema["definitions"]["native_transfer_wire_policy"]
     assert "typed_binary" in wire["properties"]["mode"]["enum"]
     assert wire["properties"]["source_native_format"]["enum"] == ["auto", "odbc_row_stream", "bcp_native"]
-    assert wire["properties"]["binary_format"]["enum"] == ["rowbinary", "native"]
+    assert wire["properties"]["binary_format"]["enum"] == ["rowbinary", "native", "mssql_native"]
     assert "block_rows" in wire["properties"]
     assert "block_bytes" in wire["properties"]
     assert set(batch_wire["properties"]["null_policy"]["enum"]) == {"sidecar", "source_marker", "not_nullable_only"}

@@ -6,12 +6,14 @@ from collections.abc import Mapping
 from typing import Any
 
 
-def supports_staged_load(sink: Any) -> bool:
+def supports_staged_load(sink: Any, load_config: Any = None) -> bool:
     """Return True when the sink exposes the staged load abort port."""
 
-    return all(
+    available = all(
         callable(getattr(sink, name, None)) for name in ("stage_payload", "finalize_staged_load", "abort_staged_load")
     )
+    admission = getattr(sink, "supports_staged_load_for", None)
+    return available and (bool(admission(load_config)) if callable(admission) else True)
 
 
 def requested_finalization_phase(load_config: Any) -> str:

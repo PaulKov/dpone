@@ -32,11 +32,13 @@ class DefaultProcessRunner:
         backfill_orchestrator_factory: Any | None = None,
         backfill_state_store_factory: Any | None = None,
         window_runtime_factory: Any | None = None,
+        native_runtime_factory: Any | None = None,
     ) -> None:
         self._route_capability_factory = route_capability_factory
         self._backfill_orchestrator_factory = backfill_orchestrator_factory
         self._backfill_state_store_factory = backfill_state_store_factory
         self._window_runtime_factory = window_runtime_factory
+        self._native_runtime_factory = native_runtime_factory
 
     def run(
         self,
@@ -53,6 +55,22 @@ class DefaultProcessRunner:
         from dpone.runtime.route_runtime_factory import RouteCapabilityRuntimeFactory
 
         run_context = _runtime_context(context, process.config.name)
+        from dpone.manifest.mssql_native_policy import native_requested, validate_native_config
+
+        if native_requested(process.config.load_config):
+            validate_native_config(process.config.load_config)
+            if self._native_runtime_factory is None:
+                raise ETLProcessError(
+                    "mssql_native.composition_required: configure NativeMssqlRuntime through "
+                    "DefaultProcessRunner(native_runtime_factory=...)"
+                )
+            result = self._native_runtime_factory(process.config).run(
+                process.config.load_config, owner=run_context.run_id
+            )
+            process.current_state = result
+            if result.status != "success":
+                raise ETLProcessError(f"ETL process {process.config.name} failed: {result.errors}")
+            return result
         if (getattr(process.config.load_config, "options", None) or {}).get("rolling_window") is not None:
             if self._window_runtime_factory is None:
                 raise ETLProcessError(

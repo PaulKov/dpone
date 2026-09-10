@@ -29,6 +29,7 @@ from dpone.config.mssql_strategy_contract_validation import (
 )
 from dpone.config.source_scope_contract import SourceScopeContractError, resolve_source_scope
 from dpone.contracts.connector_declarations import canonical_endpoint_type
+from dpone.contracts.rolling_window import RollingWindowSpec
 from dpone.contracts.sink_dialect import is_mssql_dialect
 
 
@@ -80,7 +81,34 @@ def incremental_merge_policy(load_config: Any) -> IncrementalMergePolicy:
 
 
 def partition_replace_policy(load_config: Any) -> PartitionReplacePolicy:
-    raw = getattr(load_config, "partition", None) or options(load_config).get("partition") or {}
+    configured = options(load_config)
+    window = configured.get("mssql_native_window")
+    raw = getattr(load_config, "partition", None) or configured.get("partition") or {}
+    if window is not None:
+        native = configured.get("native_transfer", {})
+        wire = native.get("wire", {}) if isinstance(native, Mapping) else {}
+        if (
+            not isinstance(wire, Mapping)
+            or wire.get("mode") != "typed_binary"
+            or wire.get("binary_format") != "mssql_native"
+            or configured.get("source_type") != "clickhouse"
+            or configured.get("sink_type") != "mssql"
+            or raw
+        ):
+            blocked(
+                "mssql.strategy.partition_replace.native_window",
+                "authored native window requires the exact native route and no legacy partition policy",
+            )
+        spec = RollingWindowSpec.from_mapping(window)
+        return PartitionReplacePolicy(
+            column=spec.column,
+            value_expression=None,
+            values_from_staging=False,
+            max_partitions_per_run=1,
+            native=False,
+            native_mode="fallback",
+            require_native=False,
+        )
     if not isinstance(raw, Mapping):
         blocked("mssql.strategy.partition_replace.partition", "partition must be an object")
     allowed = {

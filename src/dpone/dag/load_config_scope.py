@@ -25,9 +25,12 @@ def resolve_load_scopes(
     source_custom_predicate = source_options.get("custom_predicate")
     sink_custom_predicate = strategy_config.get("custom_predicate")
     portable_scope_raw = strategy_config.get("portable_scope")
+    native = source_options.get("native_transfer") or {}
+    wire = native.get("wire") or {} if isinstance(native, Mapping) else {}
+    native_mssql = isinstance(wire, Mapping) and wire.get("binary_format") == "mssql_native"
     if "window" in strategy_config:
         if (
-            strategy_config.get("mode") != "replace"
+            strategy_config.get("mode") != ("partition_replace" if native_mssql else "replace")
             or strategy_config.get("atomicity") != "target_atomic"
             or source_custom_predicate
             or sink_custom_predicate
@@ -37,7 +40,8 @@ def resolve_load_scopes(
                 "rolling_window_requires_atomic_replace: no additional custom or portable predicates"
             )
         try:
-            options["rolling_window"] = RollingWindowSpec.from_mapping(strategy_config["window"]).to_dict()
+            key = "mssql_native_window" if native_mssql else "rolling_window"
+            options[key] = RollingWindowSpec.from_mapping(strategy_config["window"]).to_dict()
         except ValueError as exc:
             raise DagConfigurationError(str(exc)) from exc
     elif "atomicity" in strategy_config:
