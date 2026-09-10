@@ -1,6 +1,6 @@
 # Feature design: Reliable Airflow hooks and workload resources
 
-- Status: IMPLEMENTED (live Kubernetes acceptance remains UNVERIFIED)
+- Status: IMPLEMENTED (acceptance is recorded for each assessed commit and image)
 - Owner: dpone maintainers; implementation integrator: Codex
 - Issue: maintainer supplied specification, “Reliable Airflow hooks and declarative Kubernetes resources”
 - Target release: next coordinated dpone / dpone-airflow-pack release
@@ -39,8 +39,10 @@ Runtime service files, separate pre-hooks, bounded workload resources, safe
 startup diagnostics, contract tests and self-service documentation are in scope.
 Data-transfer algorithms, PVC provisioning, cluster configuration, arbitrary Pod
 overrides and per-hook resource overrides are non-goals. The maintainer approved
-local Docker/minikube live testing on 2026-09-10. Kubernetes acceptance remains
-UNVERIFIED until the complete live matrix and independent review are recorded.
+local Docker/minikube live testing on 2026-09-10. A live acceptance result requires
+the complete matrix, original Pod/service-file evidence and independent review
+for the assessed runtime image. The PR records the current result; incomplete
+or missing evidence remains UNVERIFIED.
 
 ## Public contract
 
@@ -204,8 +206,13 @@ inheritance, unchanged defaults, identity changes, strict Pod preservation,
 hook dependency failure, explicit publication and EACCES/ENOENT/ENOSPC.
 Integration: real non-root local subprocess with a read-only workload directory
 and unusable XCom path; full offline strict pack construction/loading/Pod route.
-Live Kubernetes: UNVERIFIED without approved environment. No transport or
-performance certification is implied. Run focused tests before project Python,
+Live Kubernetes uses the approved local Docker/minikube environment, pinned
+package wheels and image digests. The matrix covers strict hook/runtime
+execution, declared and absent resources, replay, SQL failures, corrupt remote
+artifacts, and real EROFS/ENOENT/ENOSPC diagnostics. The PostgreSQL fixture uses
+nullable synthetic columns with exact row and hook-count reconciliation; this
+does not certify target-constraint preservation by a load strategy. No transport
+or performance certification is implied. Run focused tests before project Python,
 architecture, documentation and package gates, then independent review.
 
 Documentation includes a minimal configuration, exact defaults, inspectable
@@ -242,7 +249,13 @@ The PR records the assessed revision and current validation/review outcome.
 Placement-fix red/green logs, broad validation and fresh-review evidence are under
 `test_artifacts/airflow-hooks-resources/process-placement-fix/`.
 
-These are implementation and offline compatibility results. They do not certify
-live scheduling, writable Kubernetes volumes, disk capacity or a published
-package/image combination. Live acceptance requires an approved environment and
-an exact runtime image digest; no publication is authorized by this status.
+The historical results above establish implementation and offline compatibility.
+Local Kubernetes evidence is stored separately under
+`test_artifacts/airflow-hooks-resources/live-minikube-<commit>-<date>/`, with the
+source commit, wheel hashes, raw image manifests, Pod UIDs, original service
+files, diagnostic suite and generated verification report. Select one completed
+controller attempt when validating; failed attempts remain separate evidence.
+Airflow `DAG.test` exercises real task instances and Kubernetes Pods locally,
+but does not certify a production scheduler/executor deployment, API
+authentication, high availability, disk capacity or a published package/image
+combination. No publication is authorized by this status.
