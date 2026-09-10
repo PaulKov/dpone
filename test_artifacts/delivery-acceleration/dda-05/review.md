@@ -32,6 +32,17 @@ in-memory reproduction and approved the component for integration review with no
 remaining significant findings. The local reader also requires a live successful
 warmup before counting live timed samples.
 
+An additional targeted reviewer reproduction caught mutable row mapping aliasing
+in before-image snapshots. `capture_rows` now validates immutable typed scalars
+and copies each mapping immediately. Regressions cover reused dictionaries,
+in-place publication/recovery mutation, and legitimate full-refresh replacement.
+The independent reviewer reran all reproductions and restored final approval.
+No protocol or schema changed. Focused tests now include 70 passing cases.
+
+DDA-01 independently consumed the retained v1 fixture and produced UNVERIFIED
+with a null ratio; its evidence is retained by that owner. The producer/consumer
+interop is a hermetic schema PASS, not live certification.
+
 Focused tests pass. Broad non-live pytest is still running and its final summary
 will be recorded in the completion report. This record does not claim merge readiness.
 Live SQL, BCP, containers, performance and SWITCH execution: **SKIP/UNVERIFIED**;

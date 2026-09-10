@@ -8,7 +8,7 @@ from typing import Any
 from .artifacts import ArtifactStore, canonical_json, digest
 from .execution import SHA, DeliveryClock, RouteFactory, Snapshot
 from .maintenance import record_owner
-from .profiles import Dataset, exact_multiset, multiset_summary
+from .profiles import Dataset, capture_rows, exact_multiset, multiset_summary
 
 SAMPLE_CHECKS = (
     "typed_content",
@@ -175,7 +175,7 @@ def failure_recovery(
                 record_owner(store, session, case)
             before = session.snapshot()
             before_rows = exact_multiset(before.rows)
-            before_outside = tuple(before.outside_rows)
+            before_outside = capture_rows(before.outside_rows)
             fault = {
                 "rollback": "before_commit",
                 "source_free_resume": "after_eof",
@@ -191,7 +191,7 @@ def failure_recovery(
                 failed = True  # Never persist exception text from connectors.
             initial = session.snapshot()
             initial_rows = exact_multiset(initial.rows)
-            initial_outside = tuple(initial.outside_rows)
+            initial_outside = capture_rows(initial.outside_rows)
             if case in {"source_free_resume", "receipt_first_recovery", "unknown_commit"}:
                 recover_failed = False
                 try:
@@ -209,6 +209,10 @@ def failure_recovery(
                         and initial.source_queries == after.source_queries
                         and initial_rows == exact_multiset(after.rows)
                         and exact_multiset(initial_outside) == exact_multiset(after.outside_rows)
+                        and (
+                            strategy != "partition_replace"
+                            or exact_multiset(initial_outside) == exact_multiset(before_outside)
+                        )
                         and initial.stage_reads == after.stage_reads
                     )
                 else:

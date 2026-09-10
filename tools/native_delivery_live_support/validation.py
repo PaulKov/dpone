@@ -185,4 +185,4 @@ def validate_run(envelope: dict[str, Any], root: Path) -> list[dict[str, Any]]:
 def require_comparable(baseline: dict[str, Any], candidate: dict[str, Any]) -> None:
     """Reject workload, limits, server, resource or physical layout drift."""
     for key in ("workload", "configuration", "environment", "route"):
-        _require(baseline[key] == candidate[key])
+        _require(canonical_json(baseline[key]) == canonical_json(candidate[key]))
