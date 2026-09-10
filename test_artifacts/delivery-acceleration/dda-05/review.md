@@ -39,14 +39,25 @@ in-place publication/recovery mutation, and legitimate full-refresh replacement.
 The independent reviewer reran all reproductions and restored final approval.
 No protocol or schema changed. Focused tests now include 70 passing cases.
 
-DDA-01 independently consumed the retained v1 fixture and produced UNVERIFIED
-with a null ratio; its evidence is retained by that owner. The producer/consumer
-interop is a hermetic schema PASS, not live certification.
+DDA-01 independently consumed both the retained v1 absence fixture and actual
+timed hermetic output (one warmup and three samples) from the final producer.
+Both comparisons returned UNVERIFIED with a null ratio. DDA-06 also exercised
+the actual producer through its integrated DDA-01 consumer. Evidence is retained
+by those owners. These are hermetic schema/interoperability passes, not live
+certification.
 
-Focused tests pass. Broad non-live pytest is still running and its final summary
-will be recorded in the completion report. This record does not claim merge readiness.
+Focused tests pass (70 cases). Broad non-live pytest completed with 20,863 passes,
+570 skips and two failures in unchanged Airflow directory-permission tests.
+The failures reproduce when macOS strips setgid under the default GID-0 temporary
+parent; all 10 tests in that file pass under a newly created effective-group
+parent without code changes. See the [completion report](completion.md) and
+retained original/controlled logs. The broad run started at `518cc16`; final
+Python changes at `f09af01` have separate focused and independent-review proof.
+The component is ready for review, with no merge/release readiness assertion.
 Live SQL, BCP, containers, performance and SWITCH execution: **SKIP/UNVERIFIED**;
-no disposable environment was approved and DDA-06 supplies the real factory.
+no disposable environment was approved. An application/environment supplies the
+reviewed real factory and authoritative visibility probe; DDA-06 owns shared
+runtime integration and navigation, not a bundled default live factory.
 
 `contract-fixture.json` and its immutable artifacts were produced by
 `generate_contract_fixture.py`; they intentionally record SKIP/hermetic and dirty
