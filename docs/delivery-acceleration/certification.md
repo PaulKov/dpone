@@ -8,8 +8,9 @@ the real route factory and environment are supplied and exercised**.
 
 The [approved design](../feature-design-data-delivery-acceleration-v1.md) defines
 the report envelope. Read the [native transport prerequisites](../mssql-native-transport.md)
-before enabling services. DDA-06 owns real runtime composition, shared fixtures,
-navigation and activation decisions. No production command, manifest, wire,
+before enabling services. DDA-06 owns shared runtime integration, shared fixtures,
+navigation and activation decisions. An approved application/environment supplies
+the real route factory and authoritative visibility probe. No production command, manifest, wire,
 journal, checkpoint or receipt format changes here. Native SWITCH remains
 publicly rejected; its fixtures exercise an isolated component only.
 
@@ -68,9 +69,11 @@ export DPONE_RUN_INTEGRATION_LIVE=1
 export DPONE_DDA_DISPOSABLE_APPROVED=1
 ```
 
-Set `DPONE_DDA_ROUTE_FACTORY` to the reviewed DDA-06 `module:callable` available
+Set `DPONE_DDA_ROUTE_FACTORY` to the reviewed application/environment `module:callable` available
 in the selected interpreter, and `DPONE_DDA_LIMITS_FILE` to the absolute limits
-file. There is no bundled real factory in this DDA-05 contribution. A manifest's
+file. Neither this harness nor the shared integration bundles a default live
+factory or invents visibility-probe authority. The application/environment must
+implement the protocol below using its approved services. A manifest's
 plan alone cannot compose the route. The factory must use actual
 `NativeMssqlRuntime`, native source, bounded importer and BCP. Isolated SWITCH
 uses its own catalog admission and caller-owned transaction authority.
@@ -107,6 +110,22 @@ pass the absolute path to this harness script, with `--adapter baseline` and a
 different output. The factory must be available in that interpreter and must
 identify the same checkout as the imported dpone. Selecting `baseline` in the
 candidate environment fails instead of relabeling current code.
+
+Set `DPONE_DDA_BASELINE_CHECKOUT` to the existing audited baseline checkout and
+`DPONE_DDA_HARNESS_PATH` to the absolute path of this reviewed harness script.
+After preparing that checkout's locked dependencies, run:
+
+```bash
+(
+  cd "$DPONE_DDA_BASELINE_CHECKOUT" || exit 2
+  uv run --locked --no-sync python "$DPONE_DDA_HARNESS_PATH" run \
+    --adapter baseline --factory "$DPONE_DDA_ROUTE_FACTORY" \
+    --profile unicode --rows 10000 --seed 7 --trials 3 \
+    --strategy partition_replace --mode bounded_native \
+    --limits "$DPONE_DDA_LIMITS_FILE" \
+    --output /tmp/dpone-dda5/baseline-unicode.json
+)
+```
 
 Profiles are `narrow`, `wide` (200 columns total), `unicode`, `decimal`, `null`,
 `binary` and `skewed`. All include an integer and UTC temporal column, deterministic
