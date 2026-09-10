@@ -16,6 +16,9 @@
 
 ### Fixed
 
+- Keep the delivery benchmark launch compatible with the pinned baseline's
+  canonical limit model. Require the final report verdict in both live delivery
+  tests, including identity failures detected after successful component proofs.
 - Honor PostgreSQL load strategies for internal-query artifacts. Default full
   refresh preserves existing target identity and constraints; explicit exchange
   uses one sink-owned transaction without destructive post-rollback compensation.

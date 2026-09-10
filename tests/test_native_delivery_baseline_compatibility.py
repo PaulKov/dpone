@@ -124,7 +124,7 @@ def test_absolute_current_harness_executes_real_baseline_and_retains_honest_iden
     assert Path(identity["model_file"]).resolve() == checkout / "src/dpone/contracts/mssql_native_chunks.py"
     assert identity["candidate_helper_available"] is False
     assert identity["prefix"] != identity["base_prefix"]
-    assert report["subject"] == {"commit": BASELINE_COMMIT, "dirty": False, "adapter": "baseline"}
+    assert report["subject"] == {"commit": BASELINE_COMMIT, "dirty": False}
     assert report["status"] == "UNVERIFIED"
     assert identity["configuration"] == report["configuration"]
     assert report["configuration"]["sha256"] == "4ceac4f9c46a4280916ce9df6d7038e55a1ea0f0b0540edb1a116c62b61c4054"

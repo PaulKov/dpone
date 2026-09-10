@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from tests.integration.mssql.clickhouse_mssql_delivery_support import live_factory, redacted_live
+from tests.integration.mssql.clickhouse_mssql_delivery_support import assert_live_report, live_factory, redacted_live
 from tools.native_delivery_live_support.artifacts import ArtifactStore
 from tools.native_delivery_live_support.execution import ExecutionAdapter
 from tools.native_delivery_live_support.profiles import PROFILES, Dataset
@@ -24,8 +24,4 @@ def test_real_bounded_delivery_fidelity_and_recovery(tmp_path, profile, strategy
         route=route,
         store=ArtifactStore(tmp_path / "run.json"),
     )
-    assert report["fidelity_receipt"]["status"] == "PASS"
-    assert report["recovery_receipt"]["status"] == "PASS"
-    assert len(report["samples"]) == 4
-    assert all(sample["status"] == "PASS" for sample in report["samples"])
-    # Dirty code remains UNVERIFIED in the report even if these assertions pass.
+    assert_live_report(report, execution=factory.execution)

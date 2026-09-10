@@ -26,6 +26,16 @@ def redacted_live(function):
     return guarded
 
 
+def assert_live_report(report, *, execution):
+    """Accept complete live proofs, allowing dirty development without certification."""
+    assert execution == "live"
+    dirty = report.get("subject", {}).get("dirty") is True or report.get("producer", {}).get("dirty") is True
+    assert report.get("status") == "PASS" or (report.get("status") == "UNVERIFIED" and dirty)
+    assert report["fidelity_receipt"]["status"] == report["recovery_receipt"]["status"] == "PASS"
+    assert len(report["samples"]) == 4
+    assert all(sample["status"] == "PASS" for sample in report["samples"])
+
+
 def live_factory(strategy: str, mode: str):
     """Gate before factory import, credentials, SQL or subprocess discovery."""
     if not approved():

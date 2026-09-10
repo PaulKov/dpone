@@ -111,6 +111,13 @@ different output. The factory must be available in that interpreter and must
 identify the same checkout as the imported dpone. Selecting `baseline` in the
 candidate environment fails instead of relabeling current code.
 
+The baseline interpreter must resolve dpone only from the pinned baseline source.
+The current harness uses that source's `NativeChunkLimits` model; it requires no
+candidate-only contract helper. Keep the factory module and generated outputs
+outside both checkouts, and do not add candidate `src` to the baseline import
+path. A hermetic factory can verify this launch path, but its report remains
+UNVERIFIED and supplies no live certification.
+
 Set `DPONE_DDA_BASELINE_CHECKOUT` to the existing audited baseline checkout and
 `DPONE_DDA_HARNESS_PATH` to the absolute path of this reviewed harness script.
 After preparing that checkout's locked dependencies, run:
@@ -126,6 +133,16 @@ After preparing that checkout's locked dependencies, run:
     --output /tmp/dpone-dda5/baseline-unicode.json
 )
 ```
+
+Inspect the final report status as well as its component receipts. The opt-in
+bounded-delivery and isolated-SWITCH tests reject FAIL, SKIP, missing or unknown
+status even when every trial passed: the final identity check can still fail
+after cleanup. Both tests require live execution, successful fidelity/recovery
+receipts and all four successful samples (one warmup and three trials).
+For development, UNVERIFIED is accepted only when the subject or producer has
+an explicit boolean `dirty: true` and all the same proofs pass. This allowance
+does not authorize performance certification; clean UNVERIFIED and hermetic
+execution cannot pass the live-test assertion.
 
 Profiles are `narrow`, `wide` (200 columns total), `unicode`, `decimal`, `null`,
 `binary` and `skewed`. All include an integer and UTC temporal column, deterministic

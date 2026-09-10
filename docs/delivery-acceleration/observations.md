@@ -231,10 +231,12 @@ structural test evidence. Optional missing resources limit only their own claims
 ## Shared limit validation
 
 `normalize_delivery_limits` in `dpone.contracts.native_delivery_observations`
-owns exact field-set validation beside the v1 run schema. Both the configuration
-producer and offline consumer call it. It uses the existing `NativeChunkLimits`
-validation and returns detached canonical values; missing fields are not filled
-with defaults. Producer field-set errors remain `exact_limits_required`, value
+owns the offline consumer's exact field-set validation beside the v1 run schema.
+The external harness also runs against the frozen baseline, where this helper
+does not exist. It derives the field set from that interpreter's canonical
+`NativeChunkLimits` dataclass, invokes its constructor and returns detached
+canonical values. It never imports candidate dpone into the baseline environment.
+Missing fields are not filled with defaults. Producer field-set errors remain `exact_limits_required`, value
 errors retain their canonical codes, and the consumer maps invalid limits to
 `BenchmarkInputError("invalid_limits")`. Normalized configuration bytes and
 digests are unchanged.

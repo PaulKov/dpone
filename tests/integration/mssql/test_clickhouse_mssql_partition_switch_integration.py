@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from tests.integration.mssql.clickhouse_mssql_delivery_support import live_factory, redacted_live
+from tests.integration.mssql.clickhouse_mssql_delivery_support import assert_live_report, live_factory, redacted_live
 from tools.native_delivery_live_support.artifacts import ArtifactStore
 from tools.native_delivery_live_support.execution import DeliveryClock, ExecutionAdapter
 from tools.native_delivery_live_support.maintenance import record_owner
@@ -24,8 +24,7 @@ def test_real_isolated_switch_empty_window_and_receipt_first_recovery(tmp_path):
         store=ArtifactStore(tmp_path / "run.json"),
     )
     assert report["route"]["mode"] == "isolated_switch"
-    assert report["fidelity_receipt"]["status"] == report["recovery_receipt"]["status"] == "PASS"
-    assert all(sample["status"] == "PASS" for sample in report["samples"])
+    assert_live_report(report, execution=factory.execution)
 
 
 @pytest.mark.parametrize("fault", ["nonempty_switch_out", "layout_drift", "owner_drift", "between_switches"])
