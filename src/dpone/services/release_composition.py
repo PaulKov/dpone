@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, Literal
 
+from dpone.contracts.composition_sources import CompositionSourceSnapshot
 from dpone.contracts.dbt_relation_writes import require_distinct_logical_writes
 from dpone.contracts.release_composition import (
     COMPOSITION_PROFILE,
@@ -24,6 +25,8 @@ from dpone.manifest.release_composition_files import (
 )
 
 if TYPE_CHECKING:
+    from dpone.contracts.dbt_source_inventory_binding import DbtReleaseSources
+    from dpone.contracts.release_composition_ordinary import OrdinaryReleaseCapture
     from dpone.ports.dbt_release_files import ConfinedReleaseFileReader, VerifiedWorkspaceReleaseCapture
     from dpone.ports.release_composition import (
         CompositionIntegrity,
@@ -199,7 +202,9 @@ class VerifiedCompositionReleaseCapture:
         ordinary: OrdinaryReleaseInventoryReaderPort,
         integrity: CompositionIntegrity,
         read_file: ConfinedReleaseFileReader,
+        read_transfer_source: Callable[[Mapping[str, Any]], bytes] | None = None,
     ) -> None:
+        self._read_transfer_source = read_transfer_source
         self._native = native
         self._ordinary = ordinary
         self._integrity = integrity
@@ -208,6 +213,36 @@ class VerifiedCompositionReleaseCapture:
     def capture_verified_files(
         self, root: Path, *, release_payload: bytes, expected_release_id: str
     ) -> Mapping[str, bytes]:
+        return self._capture(root, release_payload=release_payload, expected_release_id=expected_release_id)[0]
+
+    def read_sources(self, root: Path, *, expected_release_id: str) -> CompositionSourceSnapshot:
+        """Independently readmit the whole parent before physical preparation."""
+        payload = self._read(root, "release-set.json", max_bytes=8 * 1024 * 1024)
+        files, native, ordinary = self._capture(root, release_payload=payload, expected_release_id=expected_release_id)
+        if self._read_transfer_source is None:
+            raise ValueError("composition source reading requires an explicit bounded archive reader")
+        release = strict_json_object(payload)
+        transfer_ids = {
+            row.resource_id for row in (*native.relation_writes, *ordinary.relation_writes) if row.kind == "transfer"
+        }
+        manifests = tuple(
+            sorted(
+                (row["id"], self._read_transfer_source(strict_json_object(files[row["path"]])))
+                for row in release["artifacts"]["workload_packs"]
+                if row["id"] in transfer_ids
+            )
+        )
+        return CompositionSourceSnapshot(
+            release_id=expected_release_id,
+            native=native,
+            ordinary=ordinary,
+            workload_pins=tuple(sorted((row["id"], row["sha256"]) for row in release["artifacts"]["workload_packs"])),
+            transfer_manifests=manifests,
+        )
+
+    def _capture(
+        self, root: Path, *, release_payload: bytes, expected_release_id: str
+    ) -> tuple[Mapping[str, bytes], DbtReleaseSources, OrdinaryReleaseCapture]:
         release = strict_json_object(release_payload)
         if release.get("release_id") != expected_release_id or len(release_payload) > 8 * 1024 * 1024:
             raise ValueError("composition release identity or metadata budget differs")
@@ -222,10 +257,12 @@ class VerifiedCompositionReleaseCapture:
             frozen.mkdir()
             write_private_files(frozen, files)
             self._integrity.verify(frozen)
-            self._verify_sources(Path(temporary), release, files)
-        return files
+            native, ordinary = self._verify_sources(Path(temporary), release, files)
+        return files, native, ordinary
 
-    def _verify_sources(self, stage: Path, release: Mapping[str, Any], files: Mapping[str, bytes]) -> None:
+    def _verify_sources(
+        self, stage: Path, release: Mapping[str, Any], files: Mapping[str, bytes]
+    ) -> tuple[DbtReleaseSources, OrdinaryReleaseCapture]:
         native = composition_native_release(release)
         native_files = {row["path"]: files[row["path"]] for rows in native["artifacts"].values() for row in rows}
         native_files.update({original: files[source] for original, source in NATIVE_SIDECARS.items()})
@@ -259,3 +296,5 @@ class VerifiedCompositionReleaseCapture:
             if files.get(path) != body:
                 raise ValueError("composition ordinary transport differs from verified source")
         require_distinct_logical_writes((*source.relation_writes, *ordinary.relation_writes))
+
+        return source, ordinary

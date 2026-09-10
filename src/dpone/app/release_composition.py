@@ -1,5 +1,8 @@
 """Explicit construction of source admission, transport and immutable publication."""
 
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 from dpone.app.dbt_promotion_composition import build_dbt_release_source_reader
 from dpone.contracts.release_composition_ordinary import OrdinaryReleaseInventoryError
 from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
@@ -69,3 +72,25 @@ def _unpack_verified(pack, root):
         verify_runtime_payload_tree(archive, root)
     except InitFetchError as exc:
         raise OrdinaryReleaseInventoryError("ordinary archive is invalid; regenerate the source pack") from exc
+
+
+def build_composition_source_reader() -> VerifiedCompositionReleaseCapture:
+    """Construct complete parent readmission with bounded ordinary archive access.
+
+    Unlike the native single-member reader, ordinary archives can legitimately
+    contain declared SQL files and generated runtime manifests.
+    """
+    return VerifiedCompositionReleaseCapture(
+        native=build_dbt_release_source_reader(),
+        ordinary=build_ordinary_release_inventory_reader(),
+        integrity=DbtReleaseIntegrityService(),
+        read_file=read_confined_file,
+        read_transfer_source=_read_transfer_source,
+    )
+
+
+def _read_transfer_source(pack):
+    with TemporaryDirectory(prefix="dpone-composition-transfer-") as temporary:
+        root = Path(temporary)
+        _unpack_verified(pack, root)
+        return read_confined_file(root, pack["workload"]["manifest"], max_bytes=8 * 1024 * 1024)

@@ -1730,3 +1730,8 @@ all readers before using v3. Composition activation is unavailable until physica
 admission covers every constituent; see the
 [contracts](release-composition-reference.md) and
 [migration and recovery guide](release-composition-operations.md).
+
+The [parent activation contract](composition-activation-contract.md) adds a
+separate full-composition coordinator without changing native-v2 authority.
+Default activation remains unavailable pending protected backend/worker
+integration and actual downstream evidence.

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Add complete composition source, physical-domain, occurrence and attempt
+  contracts, plus a separate injectable parent activation coordinator. Preserve
+  native-v2 authority and reject partial or stale parent readbacks. Protected
+  backend/worker integration remains pending; default public activation stays
+  unavailable and this base change does not certify downstream execution.
+- Admit explicit bounded external target-atomic MSSQL state in ordinary transfer
+  sources with deterministic logical-outlet reconstruction while preserving
+  existing SQL-file delivery.
+
 ## 0.75.0 - 2026-09-10
 
 - Add verified release composition for a complete native dbt workspace and
