@@ -1,0 +1,23 @@
+ERROR: Layer metrics gate failed: 1 issue(s)
+Layer metrics check for /Users/paulkov007/.codex/worktrees/4d98/dpone-public/src/dpone
+Status: FAIL
+Current: layers=58, edges=9165, intra_ratio=0.700, cross_ratio=0.300, max_cross_flow=216
+Excluded layers: dpone.compat
+Thresholds:
+  - min_intra_layer_ratio: 0.55
+  - max_cross_layer_ratio: 0.45
+  - max_top_cross_layer_flow: n/a
+  - allowed_ratio_regression: 0.020
+  - allowed_flow_regression: 5
+Baseline:
+  - intra_ratio: 0.701 (delta -0.001)
+  - cross_ratio: 0.299 (delta +0.001)
+  - max_cross_flow: 209 (delta +7)
+Top cross-layer flows:
+  - dpone.runtime -> dpone.contracts: 216
+  - dpone.services -> dpone.contracts: 152
+  - dpone.services -> dpone.gitops: 109
+  - dpone.adapters -> dpone.ports: 102
+  - dpone.commands -> dpone.services: 100
+Issues (1):
+  - [ERROR] TOP_CROSS_LAYER_FLOW_REGRESSION: Largest cross-layer flow regressed beyond allowed tolerance, current=216, threshold=214, baseline=209
