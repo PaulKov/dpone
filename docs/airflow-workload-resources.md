@@ -100,6 +100,16 @@ tables/overrides) so a whole-object template cannot conceal their structure.
 Validation also checks the final rendered process; its diagnostic uses
 `compiled_processes[0].gitops.airflow.resources` for the first resolved process.
 Typed templates in ordinary process settings and connector options remain supported.
+The string shorthand `tables: ["{{ table_name }}"]` also remains supported:
+each string denotes a table name, never a process configuration object.
+Custom `convention`/`conventions` presets cannot declare Airflow resources, either
+at their root or inside process defaults. Each preset is checked before merge,
+so a later preset or manifest override cannot erase an invalid declaration.
+The error identifies the preset, for example
+`conventions[preset.yaml].defaults.gitops.airflow.resources`. Move the resource
+block to the pipeline manifest root, or use the workload catalog's documented
+`airflow.resources` defaults for shared resource settings. Ordinary convention
+vars, naming and process defaults retain their existing merge behavior.
 
 Move `pod_template_dict`, `pod_template_file`, `full_pod_spec`,
 `container_resources` or direct `resources` from `operator_overrides` into the

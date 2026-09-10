@@ -292,3 +292,26 @@ def test_opaque_authoring_templates_cannot_hide_resource_declarations(tmp_path: 
         assert field in errors[0]["message"]
     else:
         assert errors[0]["code"] == "DPONE_AUTHORING_SOURCE_AMBIGUOUS"
+
+
+@pytest.mark.parametrize("with_resources", [False, True])
+def test_templated_table_name_shorthand_retains_mapping_form_semantics(tmp_path: Path, with_resources: bool) -> None:
+    source, _ = _source(tmp_path, "defaults", placement_root=True)
+    if not with_resources:
+        source.pop("gitops")
+    schema = source["schemas"]["src"]
+    process = schema["tables"][0]["overrides"]
+    process["source"]["table"].pop("name")
+    source["defaults"] = process
+    source["vars"] = {"table_name": "orders"}
+    schema["tables"] = ["{{ table_name }}"]
+    compiler = default_authoring_compiler()
+    path = tmp_path / "pipeline.yaml"
+
+    shorthand = compiler.compile(source, source_path=path, project_root=tmp_path)
+    schema["tables"] = [{"table": "{{ table_name }}"}]
+    full_form = compiler.compile(source, source_path=path, project_root=tmp_path)
+
+    assert shorthand.processes[0]["source"]["table"]["name"] == "orders"
+    assert shorthand.processes == full_form.processes
+    assert shorthand.semantic_fingerprint == full_form.semantic_fingerprint

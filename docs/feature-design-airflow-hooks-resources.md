@@ -80,10 +80,15 @@ manifest schema: dynamic/scalar containers fail before merge or normalization
 can erase a declaration, including declarations overridden later. The guard
 also requires literal authoring containers, preventing opaque whole-object
 templates in discarded defaults/schema/table scopes. The final
-rendered process is checked too. Ordinary typed process templates remain
-supported. Traversal follows authoring
+rendered process is checked too. Ordinary typed process templates and templated
+table-name shorthand remain supported. Traversal follows authoring
 containers and leaves connector/application data alone. Reconcile preserves
 the safe diagnostic before writing artifacts.
+Every resolved convention preset is checked before merging: presets are process
+conventions, not workload resource authority. Root or process-scoped resource
+declarations in a preset fail even when later layers override them. Shared
+workload resource defaults belong in the workload catalog. The self-service
+universal-validation boundary preserves the resource code and preset field path.
 
 The ordinary release-composition verifier added in 0.75.0 admits this validated
 resource-only manifest metadata during source reconstruction. Other `gitops`
@@ -218,8 +223,8 @@ manifest/runtime policy ownership and the readiness compatibility facade.
 Independent review identified resource declarations lost in process projection,
 typed rendering and merges. The correction validates literal authoring
 containers before projection/merge and final process configurations after
-rendering. Its focused group passes 281 tests, including 75 placement, recovery,
-template and connector-data cases; review also exercises independent inputs.
+rendering. Its focused group includes placement, convention, recovery, template
+and connector-data cases; review also exercises independent inputs.
 
 The earlier integrated implementation passed 20,896 offline tests with 570
 skipped at `7efaa12c3d40fe2087248cde384b9bc79f3f8097`, plus static, architecture,

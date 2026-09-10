@@ -28,6 +28,7 @@ from typing import Any
 
 import yaml
 
+from dpone.manifest.airflow_resources import reject_process_airflow_resources, reject_process_resource_declaration
 from dpone.manifest.batch_merge import deep_merge
 from dpone.manifest.errors import ManifestConfigurationError
 
@@ -160,7 +161,10 @@ def apply_conventions(raw: Mapping[str, Any], *, manifest_path: Path) -> dict[st
 
     patch: dict[str, Any] = {}
     for c in convs:
-        patch = deep_merge(patch, _load_patch(c, manifest_path=manifest_path))
+        layer = _load_patch(c, manifest_path=manifest_path)
+        reject_process_resource_declaration(layer, field=f"conventions[{c}]")
+        reject_process_airflow_resources(layer, field=f"conventions[{c}]")
+        patch = deep_merge(patch, layer)
 
     # user manifest overrides convention defaults
     return deep_merge(patch, dict(raw))

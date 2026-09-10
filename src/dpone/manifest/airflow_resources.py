@@ -22,7 +22,7 @@ class AirflowResourcePlacementError(KubernetesResourceError, ManifestConfigurati
     """
 
 
-def reject_process_airflow_resources(payload: Mapping[str, Any]) -> None:
+def reject_process_airflow_resources(payload: Mapping[str, Any], *, field: str = "") -> None:
     """Reject resource declarations outside the manifest root before projection.
 
     Inspect only authoring containers, never arbitrary connector options or
@@ -30,18 +30,19 @@ def reject_process_airflow_resources(payload: Mapping[str, Any]) -> None:
     compiler boundary: classic manifests can bypass the authoring compiler.
     """
 
+    prefix = f"{field}." if field else ""
     processes = payload.get("processes")
-    _reject_dynamic_container(processes, field="processes")
+    _reject_dynamic_container(processes, field=f"{prefix}processes")
     if isinstance(processes, list | tuple):
         for index, process in enumerate(processes):
-            reject_process_resource_declaration(process, field=f"processes[{index}]")
-    reject_process_resource_declaration(payload.get("defaults"), field="defaults")
+            reject_process_resource_declaration(process, field=f"{prefix}processes[{index}]")
+    reject_process_resource_declaration(payload.get("defaults"), field=f"{prefix}defaults")
     schemas = payload.get("schemas")
-    _reject_dynamic_container(schemas, field="schemas")
+    _reject_dynamic_container(schemas, field=f"{prefix}schemas")
     if not isinstance(schemas, Mapping):
         return
     for name, schema in schemas.items():
-        field = f"schemas.{name}"
+        field = f"{prefix}schemas.{name}"
         reject_process_resource_declaration(schema, field=field)
         if not isinstance(schema, Mapping):
             continue
@@ -51,9 +52,10 @@ def reject_process_airflow_resources(payload: Mapping[str, Any]) -> None:
         if not isinstance(tables, list | tuple):
             continue
         for index, table in enumerate(tables):
-            table_field = f"{field}.tables[{index}]"
-            reject_process_resource_declaration(table, field=table_field)
+            # String table specs are names (including templates), never process objects.
             if isinstance(table, Mapping):
+                table_field = f"{field}.tables[{index}]"
+                reject_process_resource_declaration(table, field=table_field)
                 reject_process_resource_declaration(table.get("overrides"), field=f"{table_field}.overrides")
 
 
