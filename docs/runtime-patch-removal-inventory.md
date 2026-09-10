@@ -79,7 +79,7 @@ direct initialization helpers and constructors, classmethod argument provenance,
 eager annotations, registry overlays and recognized dynamic installation.
 Nonregular inputs, including FIFOs, fail before reading. Instance data injection,
 subclass definitions and own-module re-exports pass. On the integrated review
-branch, the scan passed for 3,722 source files with no findings; the gate has 56
+branch, the scan passed for 3,722 source files with no findings; the gate has 57
 synthetic regression cases.
 
 This finite syntax policy cannot prove absence of arbitrary dynamic Python
