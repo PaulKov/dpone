@@ -17,7 +17,7 @@ from dpone.manifest.authoring_folder import (
     FolderFragmentLoader,
     collect_sql_file_dependencies,
 )
-from dpone.manifest.authoring_identity import authoring_semantic_fingerprint
+from dpone.manifest.authoring_identity import authoring_semantic_material as _semantics
 from dpone.manifest.batch_compiler_impl import BatchManifestCompiler
 from dpone.manifest.errors import ManifestConfigurationError
 from dpone.manifest.pipeline_identity import PipelineId, PipelineIdError
@@ -210,7 +210,7 @@ class AuthoringCompiler:
             canonical_manifest=canonical,
             processes=processes,
             source_fingerprint=canonical_fingerprint(source_identity),
-            semantic_fingerprint=authoring_semantic_fingerprint(canonical.get("metadata"), processes, resources),
+            semantic_fingerprint=canonical_fingerprint(_semantics(canonical.get("metadata"), processes, resources)),
             pipeline_id=pipeline_id,
             deprecated_aliases=tuple((*aliases, *recipe_deprecations)),
             dependencies=dependencies,

@@ -90,7 +90,6 @@ def compact_pack_execution_policy(effective_config: dict[str, Any]) -> dict[str,
 
 
 __all__ = [
-    "compact_pack_execution_policy",
     "compact_pack_artifact_index",
     "compact_pack_image_pull_secrets",
     "compact_pack_outcome_gate",

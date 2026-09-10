@@ -6,17 +6,15 @@ import copy
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from dpone.contracts.airflow_deployment import canonical_fingerprint
 
-
-def authoring_semantic_fingerprint(
+def authoring_semantic_material(
     metadata: object, processes: Sequence[Mapping[str, Any]], resources: Mapping[str, Any] | None
-) -> str:
+) -> dict[str, Any]:
     """Bind resource-only changes to selection while preserving absent defaults."""
     material = {"metadata": _semantic_metadata(metadata), "processes": sorted(processes, key=_process_identity)}
     if resources is not None:
         material["airflow_resources"] = resources
-    return canonical_fingerprint(material)
+    return material
 
 
 def _semantic_metadata(raw: object) -> dict[str, Any]:
