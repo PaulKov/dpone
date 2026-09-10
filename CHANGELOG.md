@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reject Python startup-hook members in wheel/sdist inspection, including `.pth`
+  files and source, compiled, or package forms of `sitecustomize`/`usercustomize`.
+  Archive inspection remains metadata-only.
+
 ## 0.74.36 - 2026-09-09
 
 - Add opt-in bounded atomic rolling-window Python composition with a PostgreSQL
