@@ -69,6 +69,8 @@ class BoundaryConnection:
 def connection(monkeypatch):
     definitions = {check.name: "OFFLINE ONLY " + check.name for table in COMPOSITION_TABLES for check in table.checks}
     monkeypatch.setattr(reference, "CHECK_DEFINITIONS", definitions)
+    monkeypatch.setattr(reference, "CHECK_METADATA", {name: (0, 0) for name in definitions})
+    monkeypatch.setattr(reference, "CHECK_DATABASE_COLLATION", "Latin1_General_100_BIN2")
     monkeypatch.setattr(
         reference, "CHECK_DDL_SHA256", "sha256:" + sha256(render_composition_mssql_schema().encode()).hexdigest()
     )
@@ -83,7 +85,7 @@ def test_same_observed_transaction_commits_once_after_body(connection):
     assert observed == [7]
     assert connection.commits == 1 and connection.rollbacks == 0
     assert connection.closed and connection.value.closed
-    assert len(connection.value.catalog.calls) == 2 + len(COMPOSITION_TABLES) * 9
+    assert len(connection.value.catalog.calls) == 3 + len(COMPOSITION_TABLES) * 9
 
 
 @pytest.mark.parametrize(

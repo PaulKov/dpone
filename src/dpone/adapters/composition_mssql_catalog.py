@@ -8,6 +8,7 @@ DENYs and concurrent DDL. Optional NP/gate groups and incoming gate FKs have the
 
 from __future__ import annotations
 
+import re
 from hashlib import sha256
 
 from dpone.adapters import composition_mssql_check_definitions as reference
@@ -27,18 +28,51 @@ from dpone.ports.sql_connection import SqlControlCursor
 Rows = tuple[tuple[object, ...], ...]
 
 
-def _check_reference() -> dict[str, str]:
-    names = {check.name for table in COMPOSITION_TABLES for check in table.checks}
-    values = reference.CHECK_DEFINITIONS
-    digest = "sha256:" + sha256(render_composition_mssql_schema().encode("utf-8")).hexdigest()
+def require_check_reference(
+    tables: tuple[CompositionTable, ...],
+    definitions: dict[str, str],
+    metadata: dict[str, tuple[int, int]],
+    collation: str,
+    ddl_digest: str,
+    expected_digest: str,
+    reason: str,
+) -> None:
+    """Validate the complete generated core/gate reference before catalog I/O."""
+    names = {check.name for table in tables for check in table.checks}
     if (
-        type(values) is not dict
-        or set(values) != names
-        or reference.CHECK_DDL_SHA256 != digest
-        or any(type(value) is not str or not value for value in values.values())
+        type(definitions) is not dict
+        or set(definitions) != names
+        or type(metadata) is not dict
+        or set(metadata) != names
+        or type(collation) is not str
+        or re.fullmatch(r"[A-Za-z0-9_]{1,128}", collation) is None
+        or type(ddl_digest) is not str
+        or ddl_digest != expected_digest
+        or any(type(value) is not str or not 1 <= len(value) <= 65536 for value in definitions.values())
     ):
-        raise CompositionAdmissionError("control_schema_reference")
-    return dict(values)
+        raise CompositionAdmissionError(reason)
+    try:
+        if any(len(value.encode("utf-16le")) > 131072 for value in definitions.values()):
+            raise CompositionAdmissionError(reason)
+    except UnicodeError:
+        raise CompositionAdmissionError(reason) from None
+    for table in tables:
+        for check in table.checks:
+            value = metadata[check.name]
+            if (
+                type(value) is not tuple
+                or len(value) != 2
+                or type(value[0]) is not int
+                or not 0 <= value[0] <= len(table.columns)
+                or type(value[1]) is not int
+                or value[1] not in (0, 1)
+            ):
+                raise CompositionAdmissionError(reason)
+
+
+def require_check_collation(cursor: SqlControlCursor, collation: str) -> None:
+    """Read the current database default independently of captured reference bytes."""
+    _require(cursor, "collation", "d.collation_name FROM sys.databases d WHERE d.database_id=DB_ID();", ((collation,),))
 
 
 def _require(cursor: SqlControlCursor, part: str, query: str, expected: Rows, *parameters: object) -> None:
@@ -64,8 +98,19 @@ def require_composition_mssql_schema(cursor: SqlControlCursor, control_schema: s
     except ValueError:
         raise CompositionAdmissionError("control_schema") from None
     try:
-        checks = _check_reference()
+        checks, metadata = reference.CHECK_DEFINITIONS, reference.CHECK_METADATA
+        collation = reference.CHECK_DATABASE_COLLATION
+        require_check_reference(
+            COMPOSITION_TABLES,
+            checks,
+            metadata,
+            collation,
+            reference.CHECK_DDL_SHA256,
+            "sha256:" + sha256(render_composition_mssql_schema().encode("utf-8")).hexdigest(),
+            "control_schema_reference",
+        )
         require_composition_catalog_visibility(cursor, schema)
+        require_check_collation(cursor, collation)
         legacy = ",".join("N'composition_" + name + "'" for name in LEGACY_COMPOSITION_OBJECTS)
         _require(
             cursor, "legacy", f"name FROM sys.objects WHERE schema_id=SCHEMA_ID(?) AND name IN ({legacy});", (), schema
@@ -76,6 +121,7 @@ def require_composition_mssql_schema(cursor: SqlControlCursor, control_schema: s
                 schema,
                 table,
                 checks,
+                metadata,
                 CompositionTrigger(
                     "composition_" + table.name + "_invariant",
                     composition_invariant_trigger_sql(schema, table.name),
@@ -109,6 +155,7 @@ def inspect_composition_table(
     schema: str,
     table: CompositionTable,
     checks: dict[str, str],
+    metadata: dict[str, tuple[int, int]],
     trigger: CompositionTrigger,
 ) -> None:
     """Inspect fixed metadata from a closed core/gate wrapper; no admission alone."""
@@ -171,7 +218,7 @@ def inspect_composition_table(
         name,
     )
     _keys(cursor, name, table, order)
-    _constraints(cursor, schema, name, table, checks, order, trigger.name)
+    _constraints(cursor, schema, name, table, checks, metadata, order, trigger.name)
     _modules(cursor, schema, name, trigger, order)
     _require(
         cursor,
@@ -228,6 +275,7 @@ def _constraints(
     name: str,
     table: CompositionTable,
     checks: dict[str, str],
+    metadata: dict[str, tuple[int, int]],
     order: str,
     trigger: str,
 ) -> None:
@@ -251,7 +299,18 @@ def _constraints(
         name,
     )
     expected: Rows = tuple(
-        (check.name, schema, 0, checks[check.name], len(checks[check.name].encode("utf-16le")), 0, 0, 0, 0, 0)
+        (
+            check.name,
+            schema,
+            metadata[check.name][0],
+            checks[check.name],
+            len(checks[check.name].encode("utf-16le")),
+            0,
+            0,
+            0,
+            metadata[check.name][1],
+            0,
+        )
         for check in sorted(table.checks, key=lambda value: value.name)
     )
     maximum = max((len(checks[check.name].encode("utf-16le")) for check in table.checks), default=0)

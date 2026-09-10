@@ -20,18 +20,25 @@ def gate_catalog(monkeypatch):
         for check in table.checks
     }
     monkeypatch.setattr(reference, "CHECK_DEFINITIONS", definitions)
+    monkeypatch.setattr(reference, "CHECK_METADATA", {name: (0, 0) for name in definitions})
+    monkeypatch.setattr(reference, "CHECK_DATABASE_COLLATION", "Latin1_General_100_BIN2")
     monkeypatch.setattr(
         reference,
         "CHECK_DDL_SHA256",
         "sha256:" + sha256(render_composition_mssql_login_gate(control_database="dpone_control").encode()).hexdigest(),
     )
-    rows = expected_rows(tables=COMPOSITION_GATE_TABLES, definitions=definitions, trigger_for=gate_table_trigger)
+    rows = expected_rows(
+        tables=COMPOSITION_GATE_TABLES,
+        definitions=definitions,
+        metadata=reference.CHECK_METADATA,
+        trigger_for=gate_table_trigger,
+    )
     return Cursor(rows)
 
 
 def test_complete_gate_catalog_keeps_exact_existing_update_delete_events(gate_catalog):
     require_composition_mssql_gate_schema(gate_catalog, "control")
-    assert len(gate_catalog.calls) == 1 + 4 * 9
+    assert len(gate_catalog.calls) == 2 + 4 * 9
     for table in COMPOSITION_GATE_TABLES:
         key = f"[control].[composition_{table.name}]"
         events = gate_catalog.rows[key, "events"]
@@ -79,3 +86,50 @@ def test_no_check_managed_schema_table_still_rejects_added_check(gate_catalog):
     gate_catalog.rows[key] = (("unexpected",),)
     with pytest.raises(CompositionAdmissionError, match="control_schema_checks"):
         require_composition_mssql_gate_schema(gate_catalog, "control")
+
+
+@pytest.mark.parametrize(
+    "attribute,value",
+    [
+        ("CHECK_METADATA", {}),
+        ("CHECK_METADATA", None),
+        ("CHECK_DATABASE_COLLATION", ""),
+        ("CHECK_DATABASE_COLLATION", None),
+    ],
+)
+def test_gate_missing_metadata_or_collation_rejects_before_reads(gate_catalog, monkeypatch, attribute, value):
+    monkeypatch.setattr(reference, attribute, value)
+    with pytest.raises(CompositionAdmissionError, match="login_gate_schema_reference$"):
+        require_composition_mssql_gate_schema(gate_catalog, "control")
+    assert gate_catalog.calls == []
+
+
+def test_gate_compares_current_database_collation(gate_catalog):
+    gate_catalog.rows["database", "collation"] = (("SQL_Latin1_General_CP1_CI_AS",),)
+    with pytest.raises(CompositionAdmissionError, match="control_schema_collation$"):
+        require_composition_mssql_gate_schema(gate_catalog, "control")
+
+
+def test_gate_captured_column_and_table_bindings_are_both_exact(gate_catalog, monkeypatch):
+    # Controlled SQL observed these bindings; expressions remain deliberately fake.
+    metadata = {
+        "ck_c_login_closed": (0, 1),
+        "ck_c_login_family": (2, 1),
+        "ck_c_login_state": (5, 1),
+        "ck_c_mssql_database_id": (3, 1),
+        "ck_c_mssql_gate_evidence_document": (3, 1),
+    }
+    monkeypatch.setattr(reference, "CHECK_METADATA", metadata)
+    rows = expected_rows(
+        tables=COMPOSITION_GATE_TABLES,
+        definitions=reference.CHECK_DEFINITIONS,
+        metadata=metadata,
+        trigger_for=gate_table_trigger,
+    )
+    require_composition_mssql_gate_schema(Cursor(rows), "control")
+    key = ("[control].[composition_login_gates]", "checks")
+    row = list(rows[key][0])
+    row[2] = 5
+    rows[key] = (tuple(row), *rows[key][1:])
+    with pytest.raises(CompositionAdmissionError, match="control_schema_checks$"):
+        require_composition_mssql_gate_schema(Cursor(rows), "control")

@@ -276,7 +276,9 @@ class DoomedTransactionCursor:
         self._ready = False
         rows = self.cursor.fetchall()
         self.precondition_rows = tuple(tuple(row) for row in rows)
-        support.record_rows(self.record, "transaction_doomed", rows, ("transaction_count", "xact_state", "lock_mode"))
+        support.record_rows(
+            self.record, "transaction_doomed", rows, ("transaction_count", "xact_state", "lock_mode", "transaction_id")
+        )
         while self.cursor.nextset():
             if self.cursor.description is not None:
                 raise RuntimeError("fault_extra_result")
@@ -307,7 +309,7 @@ def test_insufficient_transaction_lock_never_returns_trust(trust_case):
                         case.provider().read_revision_in(doomed)
                     assert refused.value.reason == "trust_ledger_lock"
                     assert boundary.complete and boundary.fault_rows == ((2627, 1, -1),)
-                    assert boundary.precondition_rows == ((1, -1, "NoLock"),)
+                    assert boundary.precondition_rows == ((1, -1, "NoLock", None),)
                     assert execute(connection, "SELECT @@OPTIONS;") == options
                     assert execute(connection, "SELECT OBJECT_ID(N'tempdb..#dpone_trust_fault');") == ((None,),)
                     observed = case.record_transaction("transaction_after_fault", connection)

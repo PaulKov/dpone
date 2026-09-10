@@ -1,6 +1,5 @@
 """Offline catalog projections; fabricated CHECK text is never live SQL proof."""
 
-import re
 from copy import deepcopy
 from hashlib import sha256
 
@@ -8,131 +7,11 @@ import pytest
 
 from dpone.adapters import composition_mssql_catalog as catalog
 from dpone.adapters import composition_mssql_check_definitions as reference
-from dpone.adapters.composition_mssql_invariants import composition_invariant_trigger_sql
 from dpone.adapters.composition_mssql_layout import COMPOSITION_TABLES, LEGACY_COMPOSITION_OBJECTS
 from dpone.adapters.composition_mssql_schema import render_composition_mssql_schema
 from dpone.contracts.composition_activation import CompositionAdmissionError
-
-
-def expected_rows(schema="control", *, tables=COMPOSITION_TABLES, definitions=None, trigger_for=None):
-    """Independent projected values from the frozen physical layout."""
-    rows: dict[tuple[str, str], tuple[tuple[object, ...], ...]] = {
-        (schema, "visibility"): ((schema, 1, 1, 0),),
-        (schema, "legacy"): (),
-    }
-    definitions = reference.CHECK_DEFINITIONS if definitions is None else definitions
-    for table in tables:
-        name = f"[{schema}].[composition_{table.name}]"
-        rows[name, "table"] = ((schema, "composition_" + table.name, 1, 1, *([0] * 17), None, None),)
-        rows[name, "columns"] = tuple(
-            (
-                index,
-                column.name,
-                column.sql_type,
-                column.length,
-                column.collation,
-                int(column.nullable),
-                1,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                None,
-                0,
-                0,
-                0,
-                0,
-                0,
-                int(column.sql_type in {"varchar", "nvarchar", "binary", "varbinary"}),
-            )
-            for index, column in enumerate(table.columns, 1)
-        )
-        rows[name, "keys"] = tuple(
-            (
-                key.name,
-                column,
-                index,
-                index,
-                0,
-                0,
-                int(key.primary),
-                1,
-                int(not key.primary),
-                1 if key.primary else 2,
-                0,
-                0,
-                0,
-                None,
-                0,
-                key.name,
-                "PRIMARY_KEY_CONSTRAINT" if key.primary else "UNIQUE_CONSTRAINT",
-            )
-            for key in sorted(table.keys, key=lambda value: value.name)
-            for index, column in enumerate(key.columns, 1)
-        )
-        rows[name, "foreign_keys"] = tuple(
-            (foreign.name, schema, index, column, schema, "composition_" + foreign.target, target, 0, 0, 0, 0, 0, 0)
-            for foreign in sorted(table.foreign_keys, key=lambda value: value.name)
-            for index, (column, target) in enumerate(zip(foreign.columns, foreign.target_columns, strict=True), 1)
-        )
-        rows[name, "checks"] = tuple(
-            (
-                check.name,
-                schema,
-                0,
-                definitions[check.name],
-                len(definitions[check.name].encode("utf-16le")),
-                0,
-                0,
-                0,
-                0,
-                0,
-            )
-            for check in sorted(table.checks, key=lambda value: value.name)
-        )
-        module = trigger_for(schema, table.name) if trigger_for else None
-        trigger = module.name if module else "composition_" + table.name + "_invariant"
-        objects = [(check.name, "CHECK_CONSTRAINT", schema, 0) for check in table.checks]
-        objects += [
-            (key.name, "PRIMARY_KEY_CONSTRAINT" if key.primary else "UNIQUE_CONSTRAINT", schema, 0)
-            for key in table.keys
-        ]
-        objects += [(foreign.name, "FOREIGN_KEY_CONSTRAINT", schema, 0) for foreign in table.foreign_keys]
-        rows[name, "objects"] = tuple(sorted((*objects, (trigger, "SQL_TRIGGER", schema, 0))))
-        raw = (module.definition if module else composition_invariant_trigger_sql(schema, table.name)).encode(
-            "utf-16le"
-        )
-        rows[name, "triggers"] = (
-            (trigger, schema, "SQL_TRIGGER", 1, 0, 0, 0, 0, 1, 1, None, 0, 0, sha256(raw).digest(), len(raw)),
-        )
-        rows[name, "events"] = tuple(
-            (trigger, event, 0, 0) for event in (module.events if module else ("DELETE", "INSERT", "UPDATE"))
-        )
-        rows[name, "row_security"] = ()
-    return rows
-
-
-class Cursor:
-    def __init__(self, rows):
-        self.rows, self.calls = deepcopy(rows), []
-
-    def execute(self, sql, *parameters):
-        match = re.match(r"SELECT TOP \((\d+)\) /\* composition_schema:(\w+) \*/ ", sql)
-        assert match, "only bounded catalog SELECTs are allowed"
-        self.key = (parameters[-1], match[2])
-        self.calls.append((sql, parameters, int(match[1]), self.key))
-        return self
-
-    def fetchall(self):
-        return self.rows[self.key]
-
-    def fetchone(self):
-        raise AssertionError("complete bounded projections are required")
-
-    def close(self):
-        raise AssertionError("the caller owns the cursor")
+from tests.composition_mssql_catalog_helpers import Cursor as Cursor
+from tests.composition_mssql_catalog_helpers import expected_rows as expected_rows
 
 
 @pytest.fixture
@@ -141,13 +20,16 @@ def verified_reference(monkeypatch):
         check.name: "OFFLINE FIXTURE ONLY: " + check.name for table in COMPOSITION_TABLES for check in table.checks
     }
     monkeypatch.setattr(reference, "CHECK_DEFINITIONS", values)
+    monkeypatch.setattr(reference, "CHECK_METADATA", {name: (0, 0) for name in values})
+    monkeypatch.setattr(reference, "CHECK_DATABASE_COLLATION", "Latin1_General_100_BIN2")
     monkeypatch.setattr(
         reference, "CHECK_DDL_SHA256", "sha256:" + sha256(render_composition_mssql_schema().encode()).hexdigest()
     )
     return values
 
 
-def test_empty_reference_fails_before_catalog_reads():
+def test_empty_reference_fails_before_catalog_reads(monkeypatch):
+    monkeypatch.setattr(reference, "CHECK_DEFINITIONS", {})
     cursor = Cursor({})
     with pytest.raises(CompositionAdmissionError, match="control_schema_reference"):
         catalog.require_composition_mssql_schema(cursor, "control")
@@ -159,7 +41,7 @@ def test_exact_complete_shape_and_row_bounds(schema, verified_reference):
     rows = expected_rows(schema)
     cursor = Cursor(rows)
     catalog.require_composition_mssql_schema(cursor, schema)
-    assert len(cursor.calls) == len(rows) == 74
+    assert len(cursor.calls) == len(rows) == 75
     assert all(limit == len(rows[key]) + 1 for _, _, limit, key in cursor.calls)
     assert all("COMMIT" not in sql and "ROLLBACK" not in sql for sql, _, _, _ in cursor.calls)
 
@@ -331,3 +213,84 @@ def test_narrower_metadata_denials_or_unknown_observations_reject(denied, verifi
     rows["control", "visibility"] = (("control", 1, 1, denied),)
     with pytest.raises(CompositionAdmissionError, match="control_schema_visibility"):
         catalog.require_composition_mssql_schema(Cursor(rows), "control")
+
+
+def test_current_database_collation_must_match_pin(verified_reference, monkeypatch):
+    metadata = {name: (0, 0) for name in verified_reference}
+    monkeypatch.setattr(reference, "CHECK_METADATA", metadata, raising=False)
+    monkeypatch.setattr(reference, "CHECK_DATABASE_COLLATION", "Latin1_General_100_BIN2", raising=False)
+    rows = expected_rows()
+    rows["database", "collation"] = (("SQL_Latin1_General_CP1_CI_AS",),)
+    with pytest.raises(CompositionAdmissionError, match="control_schema_collation"):
+        catalog.require_composition_mssql_schema(Cursor(rows), "control")
+
+
+def test_missing_metadata_rejects_before_catalog_reads(verified_reference, monkeypatch):
+    monkeypatch.setattr(reference, "CHECK_METADATA", {}, raising=False)
+    monkeypatch.setattr(reference, "CHECK_DATABASE_COLLATION", "Latin1_General_100_BIN2", raising=False)
+    cursor = Cursor({})
+    with pytest.raises(CompositionAdmissionError, match="control_schema_reference"):
+        catalog.require_composition_mssql_schema(cursor, "control")
+    assert cursor.calls == []
+
+
+@pytest.mark.parametrize(
+    "value", [None, [], (0,), (0, 0, 0), (True, 0), (0, False), (1.0, 0), (-1, 0), (99, 0), (0, 2)]
+)
+def test_malformed_metadata_never_reaches_the_catalog(value, verified_reference, monkeypatch):
+    metadata = dict(reference.CHECK_METADATA)
+    metadata["ck_c_authority_singleton"] = value
+    monkeypatch.setattr(reference, "CHECK_METADATA", metadata)
+    cursor = Cursor({})
+    with pytest.raises(CompositionAdmissionError, match="control_schema_reference$"):
+        catalog.require_composition_mssql_schema(cursor, "control")
+    assert cursor.calls == []
+
+
+@pytest.mark.parametrize("damage", ["missing", "extra", "nonmapping"])
+def test_metadata_inventory_is_closed(damage, verified_reference, monkeypatch):
+    metadata = dict(reference.CHECK_METADATA)
+    if damage == "missing":
+        metadata.pop("ck_c_authority_singleton")
+    elif damage == "extra":
+        metadata["another_table_check"] = (0, 0)
+    monkeypatch.setattr(reference, "CHECK_METADATA", list(metadata) if damage == "nonmapping" else metadata)
+    cursor = Cursor({})
+    with pytest.raises(CompositionAdmissionError, match="control_schema_reference$"):
+        catalog.require_composition_mssql_schema(cursor, "control")
+    assert cursor.calls == []
+
+
+@pytest.mark.parametrize("value", [None, "", True, "unknown collation", "x" * 129])
+def test_malformed_collation_pin_rejects_before_reads(value, verified_reference, monkeypatch):
+    monkeypatch.setattr(reference, "CHECK_DATABASE_COLLATION", value)
+    cursor = Cursor({})
+    with pytest.raises(CompositionAdmissionError, match="control_schema_reference$"):
+        catalog.require_composition_mssql_schema(cursor, "control")
+    assert cursor.calls == []
+
+
+@pytest.mark.parametrize("field,value", [(2, 2), (8, 0), (5, 1), (6, 1), (7, 1), (9, 1), (2, True), (8, True)])
+def test_nonzero_captured_binding_is_exact_and_unsafe_flags_remain_zero(field, value, verified_reference, monkeypatch):
+    metadata = dict(reference.CHECK_METADATA)
+    metadata["ck_c_authority_singleton"] = (1, 1)
+    monkeypatch.setattr(reference, "CHECK_METADATA", metadata)
+    rows = expected_rows()
+    catalog.require_composition_mssql_schema(Cursor(rows), "control")
+    key = ("[control].[composition_authority]", "checks")
+    row = list(rows[key][0])
+    row[field] = value
+    rows[key] = (tuple(row), *rows[key][1:])
+    with pytest.raises(CompositionAdmissionError, match="control_schema_checks$"):
+        catalog.require_composition_mssql_schema(Cursor(rows), "control")
+
+
+@pytest.mark.parametrize("expression", ["😀" * 32769, "\ud800"], ids=["utf16_overflow", "invalid_utf16"])
+def test_impossible_reference_expression_rejects_before_reads(expression, verified_reference, monkeypatch):
+    definitions = dict(verified_reference)
+    definitions["ck_c_authority_singleton"] = expression
+    monkeypatch.setattr(reference, "CHECK_DEFINITIONS", definitions)
+    cursor = Cursor({})
+    with pytest.raises(CompositionAdmissionError, match="control_schema_reference$"):
+        catalog.require_composition_mssql_schema(cursor, "control")
+    assert cursor.calls == []

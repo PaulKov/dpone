@@ -10,6 +10,8 @@ from hashlib import sha256
 from dpone.adapters import composition_mssql_gate_check_definitions as reference
 from dpone.adapters.composition_mssql_catalog import (
     inspect_composition_table,
+    require_check_collation,
+    require_check_reference,
     require_composition_catalog_visibility,
 )
 from dpone.adapters.composition_mssql_gate_layout import COMPOSITION_GATE_TABLES
@@ -23,22 +25,25 @@ def require_composition_mssql_gate_schema(cursor: SqlControlCursor, control_sche
     """Audit every fixed gate table and module; LOGON policy is checked by its owner."""
     try:
         schema = require_control_schema(control_schema)
-        names = {check.name for table in COMPOSITION_GATE_TABLES for check in table.checks}
-        values = reference.CHECK_DEFINITIONS
+        values, metadata = reference.CHECK_DEFINITIONS, reference.CHECK_METADATA
+        collation = reference.CHECK_DATABASE_COLLATION
         digest = (
             "sha256:"
             + sha256(render_composition_mssql_login_gate(control_database="dpone_control").encode("utf-8")).hexdigest()
         )
-        if (
-            type(values) is not dict
-            or set(values) != names
-            or reference.CHECK_DDL_SHA256 != digest
-            or any(type(value) is not str or not value for value in values.values())
-        ):
-            raise CompositionAdmissionError("login_gate_schema_reference")
+        require_check_reference(
+            COMPOSITION_GATE_TABLES,
+            values,
+            metadata,
+            collation,
+            reference.CHECK_DDL_SHA256,
+            digest,
+            "login_gate_schema_reference",
+        )
         require_composition_catalog_visibility(cursor, schema)
+        require_check_collation(cursor, collation)
         for table in COMPOSITION_GATE_TABLES:
-            inspect_composition_table(cursor, schema, table, dict(values), gate_table_trigger(schema, table.name))
+            inspect_composition_table(cursor, schema, table, values, metadata, gate_table_trigger(schema, table.name))
     except CompositionAdmissionError:
         raise
     except Exception:

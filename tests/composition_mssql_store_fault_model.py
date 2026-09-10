@@ -142,7 +142,7 @@ class Cursor:
             return [(result,)]
         match = re.match(r"SELECT TOP \((\d+)\) /\* composition_schema:(\w+) \*/ ", sql)
         if match:
-            return list(c.data["catalog"][parameters[-1], match[2]][: int(match[1])])
+            return list(c.data["catalog"][parameters[-1] if parameters else "database", match[2]][: int(match[1])])
         if sql.startswith("INSERT ") or "UPDATE [dpone_control]" in sql:
             assert c.transaction_id is not None and d.lock_owner == c.transaction_id
             return mutate(c.data, sql, parameters)

@@ -8,8 +8,9 @@
   hashes and replay identities. Historical retired reads permit a correctly
   admitted successor while fresh issuance still requires ACTIVE/RUNNING.
   Initial installation requires a new isolated ledger; no automatic adoption
-  or migration is provided. Generated SQL CHECK references and schema-v2 live
-  qualification remain pending, and public execution factories stay closed.
+  or migration is provided. Generated SQL CHECK references pin controlled
+  original expressions, column bindings and database collation. Schema-v2 live
+  qualification remains pending, and public execution factories stay closed.
 - Keep nonproduction trust reads and registrations in one observed SQL
   transaction. Recheck the original trust revision around clock callbacks,
   writes and successful returns without changing historical grant validity.

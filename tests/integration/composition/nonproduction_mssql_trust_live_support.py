@@ -105,6 +105,8 @@ def observation_document(payload):
             continue
         if key == "xact_state" and type(value) is int and value in {-1, 0, 1}:
             continue
+        if key == "transaction_id" and (value is None or (type(value) is int and 1 <= value < 2**63)):
+            continue
         if key == "lock_result" and type(value) is int and value in {-999, -3, -2, -1, 0, 1}:
             continue
         if key == "lock_mode" and type(value) is str and value in {"NoLock", "Shared", "Exclusive", "Update"}:

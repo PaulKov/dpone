@@ -78,16 +78,30 @@ Runtime mutations use `OUTPUT INTO` because the tables have AFTER triggers.
 SQL Server's stored CHECK expressions must be captured from the reviewed DDL in
 a newly owned synthetic database. `tools/composition_mssql_check_catalog.py`
 provides separate core and gate capture/render functions. They preserve original
-expression text and reject an incomplete inventory, unexpected flags or a
-different DDL digest. The checked-in reference modules are generated outputs;
+expression text, each CHECK's column binding and its database-collation dependency
+bit. A CHECK may be table-bound or column-bound even when the renderer emits a
+separate named constraint. Disabled, untrusted, replication and system-named
+constraints remain forbidden. The runtime compares the complete observed metadata
+with the generated reference exactly; it also compares the actual control
+database collation with the separately captured pin. An incomplete inventory,
+changed definition, binding, dependency bit, collation or DDL digest rejects the
+audit. The checked-in reference modules are generated outputs;
 never reconstruct their strings manually or adopt a runtime database as a
 reference.
+
+The current core and gate references were generated from the independently
+verified original captures of commit `ded0daaf48334dd9e2a00d54f1e00d9effa41e4f`
+in [SQL component run 34526971093](https://github.com/PaulKov/dpone/actions/runs/34526971093).
+They contain 37 core and 5 gate CHECKs and pin the observed control database
+collation `SQL_Latin1_General_CP1_CI_AS`. That capture run failed admission with
+empty references; it remains a failed run. The subsequent committed runtime
+must pass the complete component suite before this layout is qualified.
 
 While these references are empty, the corresponding catalog audit rejects with
 `control_schema_reference` or `login_gate_schema_reference`. The first controlled
 capture run is therefore expected to fail admission. Retain its original JUnit
 capture properties and failed result. Verify source, producer, server image and
-version, database compatibility level, session SET observations and artifact
+version, database compatibility level and collation, session SET observations and artifact
 identity before feeding those originals to the generator. Commit the generated
 references, then rerun all four exact SQL profiles from that commit. A successful
 capture or an older schema-v1 pass is not a schema-v2 qualification result.
@@ -98,12 +112,17 @@ with profiles `store` and `gate` for the captures, retaining each original
 property `dpone.composition.check_catalog`; its companion is
 `dpone.composition.check_catalog_context`. The gate properties are
 `dpone.gate.check_catalog` and `dpone.gate.check_catalog_context`. Missing or
-unverified context blocks acceptance of a reference. Match these observations to
+unverified context blocks acceptance of a reference. The companion's
+`database_collation` comes from `sys.databases.collation_name` on the same capture
+cursor. Earlier captures without this field cannot supply a reference; repeat the
+controlled capture instead of assuming the server image's default. Match these observations to
 the source and image identities in that run's summary and original archive.
 
-After verifying provenance, pass the decoded core JSON to
-`tools.composition_mssql_check_catalog.render_reference` and the gate JSON to
-`render_gate_reference`. Write their returned text unchanged to
+After verifying provenance, pass each decoded catalog and its original companion
+context to `tools.composition_mssql_check_catalog.render_reference(observation, context)`
+for core, or `render_gate_reference(observation, context)` for gate. The producer
+uses the locked Ruff formatter and repository configuration, preserving the
+original string values; a formatter failure produces no reference. Write their returned text unchanged to
 `src/dpone/adapters/composition_mssql_check_definitions.py` and
 `src/dpone/adapters/composition_mssql_gate_check_definitions.py`, respectively.
 Keep the original captures alongside the generated-source hash manifest. The
