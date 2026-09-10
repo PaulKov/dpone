@@ -520,3 +520,58 @@ def test_maintenance_rejects_repeat_publication(tmp_path):
     factory.attach = lambda owner: session
     result = maintain(factory, action="recover", owner=session.invocation_id, store=ArtifactStore(tmp_path / "op.json"))
     assert result["status"] == "UNVERIFIED"
+
+
+def test_producer_drift_fails_even_when_subject_is_unchanged(tmp_path, fake_rss, monkeypatch):
+    state = {"commit": "a" * 40, "dirty": False}
+    monkeypatch.setattr("tools.native_delivery_live_support.runner.git_identity", lambda path: dict(state))
+    factory = FakeFactory()
+    original = factory.open
+
+    def changing(*args, **kwargs):
+        state["dirty"] = True
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(factory, "open", changing)
+    envelope = produce(tmp_path, factory)
+    assert envelope["status"] == "FAIL"
+    assert any("identity changed" in note for note in envelope["limitations"])
+
+
+def test_live_fixture_exceptions_are_redacted_without_chaining():
+    from tests.integration.mssql.clickhouse_mssql_delivery_support import redacted_live
+
+    @redacted_live
+    def unsafe():
+        raise RuntimeError("secret://user:password@host")
+
+    with pytest.raises(pytest.fail.Exception) as error:
+        unsafe()
+    assert "secret" not in str(error.value)
+    assert error.value.__context__ is None
+
+
+@pytest.mark.parametrize("expected,observed", [(True, 1), (False, 0), ({"rows": True}, {"rows": 1})])
+def test_json_assertions_do_not_coerce_booleans(expected, observed):
+    from tools.native_delivery_live_support.correctness import check
+
+    assert check("typed_content", expected, observed)["status"] == "FAIL"
+
+
+def test_live_factory_setup_failure_has_no_driver_exception_chain(tmp_path, monkeypatch):
+    from tests.integration.mssql.clickhouse_mssql_delivery_support import live_factory
+
+    for name in APPROVAL_FLAGS:
+        monkeypatch.setenv(name, "1")
+    limits = tmp_path / "limits.json"
+    limits.write_text(json.dumps(LIMITS))
+    monkeypatch.setenv("DPONE_DDA_LIMITS_FILE", str(limits))
+    monkeypatch.setenv("DPONE_DDA_ROUTE_FACTORY", "fake:factory")
+
+    def unsafe(*args, **kwargs):
+        raise RuntimeError("secret driver failure")
+
+    monkeypatch.setattr("tests.integration.mssql.clickhouse_mssql_delivery_support.load_factory", unsafe)
+    with pytest.raises(pytest.fail.Exception) as error:
+        live_factory("full_refresh", "bounded_native")
+    assert error.value.__context__ is None and "secret" not in str(error.value)

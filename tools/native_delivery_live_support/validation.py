@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .artifacts import digest, read_artifact
+from .artifacts import canonical_json, digest, read_artifact
 from .correctness import RECOVERY_CHECKS, SAMPLE_CHECKS
 from .profiles import Dataset
 from .runner import configuration, route_record
@@ -75,7 +75,7 @@ def _receipt(
         if item["status"] != "PASS":
             _require(isinstance(item["reason"], str) and bool(item["reason"]))
         else:
-            _require(item["expected"] == item["observed"])
+            _require(canonical_json(item["expected"]) == canonical_json(item["observed"]))
         if item["status"] == "N/A":
             _require(
                 item["id"] == "outside_window_unchanged"
@@ -103,8 +103,9 @@ def _receipt(
                 "route",
                 "execution",
             ):
-                _require(observed[key] == value[key])
-            _require(any(c == {**item, "evidence": None} for c in observed["checks"]))
+                _require(canonical_json(observed[key]) == canonical_json(value[key]))
+            _require(observed["scope"] == scope and canonical_json(observed["fixture"]) == canonical_json(fixture))
+            _require(any(canonical_json(c) == canonical_json({**item, "evidence": None}) for c in observed["checks"]))
         elif item["status"] == "PASS":
             raise ValueError("missing_retained_observation")
     return value
@@ -173,7 +174,7 @@ def validate_run(envelope: dict[str, Any], root: Path) -> list[dict[str, Any]]:
         if good:
             _require(sample["visibility_seconds"]["value"] <= sample["pipeline_seconds"]["value"])
         if sample["is_warmup"]:
-            warmup |= good
+            warmup |= good and proof["execution"] == "live"
         elif good and warmup and proof["execution"] == "live":
             eligible.append(sample)
     live = all(proof["execution"] == "live" and proof["status"] == "PASS" for proof in (fidelity, recovery))

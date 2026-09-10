@@ -23,8 +23,17 @@ explicit finalization/owner recording for the isolated live SWITCH fixture.
 The generic DDA-01 consumer retains opaque digest semantics; DDA-05's inspector
 knows its own generator/preimages. No shared schema was changed.
 
-A second fresh-context independent review is in progress. Broad tests and final
-module-size evidence are in progress. This record does not claim merge readiness.
+A second fresh-context independent test/certification reviewer found four further
+issues: unknown-outcome recovery had to preserve both target multisets; maintenance
+had to reject duplicate publication; live pytest setup exceptions needed a redacted
+boundary; and the independently located producer checkout needed drift checks.
+All four were corrected with regression tests. The reviewer reran each independent
+in-memory reproduction and approved the component for integration review with no
+remaining significant findings. The local reader also requires a live successful
+warmup before counting live timed samples.
+
+Focused tests pass. Broad non-live pytest is still running and its final summary
+will be recorded in the completion report. This record does not claim merge readiness.
 Live SQL, BCP, containers, performance and SWITCH execution: **SKIP/UNVERIFIED**;
 no disposable environment was approved and DDA-06 supplies the real factory.
 
