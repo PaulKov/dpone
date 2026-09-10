@@ -1,12 +1,26 @@
 """Protected database documents cannot weaken immutable parent authority."""
 
 import json
+from dataclasses import asdict
 
 import pytest
 
 from dpone.contracts.composition_activation import CompositionAdmissionError
-from dpone.contracts.composition_persistence import decode_activation_request, encode_activation_request
+from dpone.contracts.composition_persistence import (
+    decode_activation_request,
+    encode_activation_request,
+    encode_physical_resource,
+)
 from tests.test_composition_activation_contract import digest, request
+
+
+def test_physical_original_encoding_preserves_the_existing_adapter_entrypoint():
+    from dpone.adapters.composition_mssql_store_queries import resource_document
+
+    value = request().resources[0]
+    original = json.dumps(asdict(value), sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    assert encode_physical_resource(value) == original
+    assert resource_document is encode_physical_resource
 
 
 def test_roundtrip_retains_complete_parent_and_original_catalog_subject():

@@ -6,8 +6,6 @@ No helper acquires writer-session authority or modifies enrollment identities.
 
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from dpone.adapters.composition_mssql_schema import (
     COMPOSITION_MSSQL_LEDGER_LOCK,
     COMPOSITION_MSSQL_SCHEMA_VERSION,
@@ -30,13 +28,8 @@ from dpone.contracts.composition_control import (
     encode_activation_request,
     require_composition_attempt_scope,
 )
-from dpone.contracts.strict_json import canonical_json_bytes
+from dpone.contracts.composition_persistence import encode_physical_resource as resource_document
 from dpone.ports.sql_connection import SqlControlCursor
-
-
-def resource_document(resource: CompositionPhysicalResource) -> bytes:
-    """Keep the original physical observation and exact write partition as bytes."""
-    return canonical_json_bytes(asdict(resource))
 
 
 class CompositionMssqlLedger:

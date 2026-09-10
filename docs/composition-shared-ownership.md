@@ -4,7 +4,11 @@ This is the implementation design for the already approved
 [nonproduction composition campaign](feature-specs/nonproduction-composition-authority.md).
 The shared schema-v2 core and qualification lifecycle described here are
 **not yet implemented or live-qualified**. [ADR 0061](adr/0061-shared-composition-physical-ownership.md)
-records the architecture decision. Existing public scoped factories remain closed.
+records the architecture decision. The closed owner, physical-claim and
+qualification-operation records are implemented as structural contracts only.
+Existing public scoped factories remain closed.
+The [SQL implementation contract](composition-shared-sql-storage.md) freezes
+tables, interfaces, complete history audits and the existing execution projections.
 
 ## Purpose and operator journey
 
@@ -47,6 +51,19 @@ Actions are closed to `fixture_seed`, `route_qualification` and `source_seal`.
 There are no invented pack, deployment or Airflow fields. These internal journal
 records are structural data; they add no seventh external authority family.
 
+Qualification replay uses the derived `invocation_key`: SHA-256 of canonical
+UTF-8 JSON with schema `dpone.composition-qualification-invocation-key.v1` and
+exact fields `owner_key`, `work_item_id`, `runner_invocation_id`, `try_number`.
+This property adds no field to the original operation document and leaves its
+operation hash unchanged. Changed action, plan subjects or guard epochs cannot
+turn the same invocation into a new admission. SQL stores the compact replay key
+beside the complete original operation bytes and enforces uniqueness of
+`(operation_family, replay_key)`. Execution retains its original attempt hash as
+both keys. Every duplicate rejects a new admission, even with identical originals;
+recovery independently compares retained bytes. Every protected read recomputes
+both keys and validates the complete owner and scope. Full Unicode work-item IDs
+remain intact without a truncated text index or a second writable replay journal.
+
 The single protected database retains `dpone:composition-control:v1` as its exact
 transaction-owned lock resource. Its suffix is not the storage-schema version.
 The following tables replace the unmerged activation-only layout:
@@ -57,7 +74,7 @@ The following tables replace the unmerged activation-only layout:
 | `composition_owners` | Unique kind/id and immutable original subject; kind-specific lifecycle state |
 | `composition_domains` | Immutable physical identity, bounded monotonically increasing epoch and one nullable owner FK |
 | `composition_owner_domains` | Complete immutable acquired scope and epochs, including retained source claims |
-| `composition_operations` | One typed original operation, owner FK, state and exact terminal proof references |
+| `composition_operations` | One typed original operation, owner FK, unique family/replay key, state and exact terminal proof references |
 | `composition_operation_domains` | Complete immutable selected scope and epochs; missing partitions reject |
 | `composition_issued_authorities` | Immutable operation/principal association and globally unique connector/service/principal |
 | `composition_proofs` | Typed original closure, quiescence and outcome records for the exact owner/operation/scope |
@@ -187,6 +204,20 @@ attempt, proof and physical guard bytes. No source/read attachment can silently
 widen an old public receipt or relax its reader.
 Qualification lifecycle transitions and terminal-proof dispatch also remain
 closed in this first slice; structural parsing alone never makes them available.
+The initial shared proof table accepts execution proofs only, with a matching
+operation-family foreign key. A qualification terminal label is always an
+overlapping blocker. A later qualification proof family requires an explicit
+codec, real producer, protected catalog evolution and fresh evidence before it
+can enable release or transfer; the schema does not reserve unnamed variants.
+
+Base ledger operations audit the eight common tables and reject the old writable
+activation/attempt tables. Trust and registration retain their separate exact
+catalog checks. The MSSQL gate group is optional for a ledger that has never
+issued an MSSQL writer. Every gate entrypoint requires the complete group and
+server barrier. Once an immutable issuance row records an MSSQL principal,
+terminal proof and release checks also require its exact gate, SID/name,
+enrollment and original gate evidence. Disappearance of all optional gate objects
+cannot erase that durable dependency or permit release.
 
 Run focused contracts and existing execution/store/gate/trust/registration tests,
 then the required Ruff, format, mypy, import, architecture, layer, exact module-size

@@ -25,6 +25,21 @@ pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql]
 registration_case = support.registration_case
 
 
+def require_restricted_identity(case, connection, login):
+    """Record raw effective-role/permission results; NULL never means denial."""
+    rows = execute(
+        connection,
+        "SELECT SUSER_SNAME(),USER_NAME(),IS_SRVROLEMEMBER('sysadmin'),IS_MEMBER('db_owner'),"
+        "HAS_PERMS_BY_NAME(NULL,NULL,'CONTROL SERVER'),HAS_PERMS_BY_NAME(NULL,NULL,'ADMINISTER BULK OPERATIONS');",
+    )
+    payload = {"result_rows": len(rows)}
+    if len(rows) == 1 and len(rows[0]) == 6:
+        payload.update(login_matches=rows[0][0] == login, user_matches=rows[0][1] == login)
+        payload.update(zip(("sysadmin", "db_owner", "control_server", "bulk_operations"), rows[0][2:], strict=True))
+    case.record("permissions", payload)
+    assert rows == ((login, login, 0, 0, 0, 0),), "restricted_principal_identity"
+
+
 class BoundaryConnection:
     """Faults delegate real SQL; completed commits and partial rows are observed."""
 
@@ -296,11 +311,7 @@ def test_restricted_login_cannot_bypass_registration_storage(registration_case):
         with closing(case.connect()) as connection:
             try:
                 execute(connection, f"EXECUTE AS LOGIN=N'{login}';")
-                assert execute(
-                    connection,
-                    "SELECT SUSER_SNAME(),USER_NAME(),IS_SRVROLEMEMBER('sysadmin'),IS_MEMBER('db_owner'),"
-                    "HAS_PERMS_BY_NAME(NULL,'SERVER','CONTROL SERVER'),HAS_PERMS_BY_NAME(NULL,'SERVER','ADMINISTER BULK OPERATIONS');",
-                ) == ((login, login, 0, 0, 0, 0),)
+                require_restricted_identity(case, connection, login)
                 tokens = execute(
                     connection, "SELECT COUNT(*) FROM sys.login_token; SELECT COUNT(*) FROM sys.user_token;"
                 )
@@ -336,7 +347,7 @@ def test_restricted_login_cannot_bypass_registration_storage(registration_case):
         case.register(grant, factory=lambda: case.impersonate(login))
         assert case.read(grant) is not None and len(case.snapshot()[1]) == 3
         case.record(
-            "permissions",
+            "state",
             {"denied": len(denied), "allowed": 3, "token_rows": sum(row[0] for row in tokens), "sql_error": denied[0]},
         )
     finally:

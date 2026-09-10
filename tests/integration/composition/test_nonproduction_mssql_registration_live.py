@@ -9,16 +9,19 @@ from uuid import uuid4
 import pytest
 from tests.integration.composition import nonproduction_mssql_registration_live_support as support
 from tests.integration.composition.mssql_gate_live_provisioning import execute
-from tests.integration.composition.nonproduction_mssql_trust_live_support import require_sql_rejection
+from tests.integration.composition.nonproduction_mssql_trust_live_support import (
+    acquire_shared_transaction,
+    require_sql_rejection,
+)
 from tests.nonproduction_authority_helpers import NOW, digest, limits, qualification
 
-from dpone.adapters.composition_mssql_schema import COMPOSITION_MSSQL_LEDGER_LOCK
 from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.adapters.nonproduction_mssql_registration_schema import (
     REGISTRATION_COLUMNS,
     nonproduction_registration_trigger_sql,
 )
 from dpone.contracts.composition_activation import CompositionAdmissionError
+from dpone.contracts.nonproduction_registration import NonproductionRegistrationOriginals
 from dpone.contracts.nonproduction_scope import NonproductionAuthorityError
 
 pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql]
@@ -45,6 +48,25 @@ def raw_insert(case, row):
         f"VALUES ({', '.join('?' for _ in row)});",
         *row,
     )
+
+
+def originals_for(grant, policy, **changes):
+    """Complete expected originals, shared by fixture-input and real-byte checks."""
+    values = support.inputs(grant, policy) | changes
+    return NonproductionRegistrationOriginals(
+        values["grant_bytes"], values["signature_bundle"], values["signature_subject_bytes"], values["request_bytes"]
+    )
+
+
+def require_history_cycle(case, original_policy, grant):
+    """Refuse epoch rollback, then observe exact B-C-B policy bytes at that epoch."""
+    newer, revision = case.policy, case.expected
+    require_sql_rejection(lambda: case.append_policy(original_policy), {51000})
+    assert case.trust.provider().read_revision() == revision and case.policy == newer
+    case.append_policy(replace(newer, revoked_grant_ids=tuple(sorted((*newer.revoked_grant_ids, str(uuid4()))))))
+    case.append_policy(newer)
+    assert case.expected.snapshot == revision.snapshot and case.expected.revision == revision.revision + 2
+    case.reject_read(grant, "trust_revision_changed", expected=revision)
 
 
 def test_external_registration_ddl_and_catalog(registration_case):
@@ -75,6 +97,7 @@ def test_complete_binary_originals_survive_independent_readback(registration_cas
     grant = case.grant()
     bundle = bytes(range(256)) * (8 * 1024 * 1024 // 256)
     first = case.register(grant, signature_bundle=bundle)
+    assert first.originals == originals_for(grant, case.policy, signature_bundle=bundle)
     reopened = case.read(grant)
     assert reopened == first and reopened.originals.bundle_bytes == bundle
     row = case.original_row(grant.consumption_subject_sha256)
@@ -202,7 +225,7 @@ def test_paged_history_audits_later_originals(registration_case):
 
 def test_historical_reads_survive_current_trust_changes(registration_case):
     case = registration_case
-    first_policy, first_revision = case.policy, case.expected
+    first_policy = case.policy
     grant, qualified = case.grant(), qualification(case.policy)
     revoked_unused = str(uuid4())
     originals = (case.register(grant), case.register(qualified))
@@ -217,11 +240,9 @@ def test_historical_reads_survive_current_trust_changes(registration_case):
     case.clock = lambda: NOW + timedelta(hours=2)
     assert (case.read(grant), case.read(qualified)) == originals
     case.reject(case.grant(), "expired_or_not_yet_valid")
-    case.append_policy(first_policy)
-    assert case.expected.snapshot == first_revision.snapshot and case.expected.revision == 3
-    case.reject_read(grant, "trust_revision_changed", expected=first_revision)
+    require_history_cycle(case, first_policy, grant)
     assert (case.read(grant), case.read(qualified)) == originals
-    case.record("history", {"rows": 2, "members": 3, "revision": 3, "denied": 3})
+    case.record("history", {"rows": 2, "members": 3, "revision": 4, "denied": 4})
 
 
 def test_actual_ledger_identity_revision_and_clock_preconditions(registration_case):
@@ -232,12 +253,7 @@ def test_actual_ledger_identity_revision_and_clock_preconditions(registration_ca
         for shared in (False, True):
             try:
                 if shared:
-                    result = execute(
-                        connection,
-                        "BEGIN TRANSACTION; DECLARE @r int; EXEC @r=sys.sp_getapplock "
-                        "@Resource=?,@LockMode=N'Shared',@LockOwner=N'Transaction',@LockTimeout=0; SELECT @r;",
-                        COMPOSITION_MSSQL_LEDGER_LOCK,
-                    )
+                    result = acquire_shared_transaction(connection)
                     assert len(result) == 1 and result[0][0] in {0, 1}
                 with pytest.raises(NonproductionAuthorityError, match="trust_ledger_lock"):
                     case.store().read_in(ledger, grant.consumption_subject_sha256, expected_revision=case.expected)

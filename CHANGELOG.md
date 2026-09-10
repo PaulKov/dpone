@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add strict internal qualification owner, complete physical-claim and operation
+  records, including replay identity for the actual invocation. Preserve existing
+  physical guard and execution document hashes. These structural values do not
+  enable protected ownership, qualification issuance or execution factories.
+
 - Add an isolated 18-case registration storage profile with exact case inventory,
   bounded evidence and a runner-owned public bulk-permission fixture. Reuse one
   closed profile configuration for plugin, opt-in and evidence selection.

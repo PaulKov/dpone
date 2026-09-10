@@ -162,6 +162,7 @@ nav:
           - Composition activation contract: composition-activation-contract.md
           - Nonproduction authority contracts: nonproduction-composition-authority.md
           - Shared ownership design: composition-shared-ownership.md
+          - Shared SQL storage design: composition-shared-sql-storage.md
           - Workspace promotion: dbt-workspace-promotion.md
       - Runtime observability: observability.md
       - Data Product SLO and incidents: data-product-slo.md

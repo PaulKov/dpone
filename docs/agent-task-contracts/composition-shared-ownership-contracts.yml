@@ -1,0 +1,101 @@
+schema_version: 1
+task_id: DPONE-COMPOSITION-SHARED-OWNERSHIP-CONTRACTS
+title: Model explicit internal qualification and execution ownership
+goal: Add closed pure owner, physical-claim and qualification-operation records for the approved shared core
+specification: docs/feature-specs/nonproduction-composition-authority.md
+base_commit: 70ed730f91b4b6fc67e8edae7317cec952e11f0a
+integrator: root
+acceptance_criteria:
+- Implement only structural pure records/codecs required by docs/composition-shared-ownership.md
+  and ADR0061. No authentication, SQL, acquisition, lifecycle transition, terminal permission,
+  source sealing, transfer or factory is authorized by a constructed value.
+- Closed owner reference has kind execution or qualification and real canonical nonzero UUID;
+  owner_key uses exact canonical UTF-8 SHA256 with schema dpone.composition-control-owner-key.v2.
+  The same UUID in different kinds produces different owner keys, never different physical guards.
+- Explicit internal physical claims support exactly mssql, clickhouse and postgres, with independently
+  pinned service incarnation and physical-subject digest. Existing MSSQL/CH guard bytes must match
+  CompositionPhysicalDomain exactly; old classes/readers remain unchanged and reject postgres.
+  If shared guard-formula extraction is needed, report a precise root-owned helper seam rather
+  than duplicating a public reader or editing outside ownership.
+- Claims bind complete sorted unique read/write/effect subjects and role without permitting role,
+  owner, phase, campaign, grant or aliases to alter physical guard identity. Freeze exact claim fields
+  with root before implementation; there is no caller-authenticated enrollment or optional partial scope.
+- Protected qualification owner codec binds actual run, qualification consumption key, grant/fixture-plan/
+  qualification-plan/scope digests, environment and campaign. Exact original bytes and hashes are
+  immutable subject data. Do not fabricate execution request, release, deployment or native pack.
+- Protected qualification operation codec binds owner/run/original grant+plans, plan-selected stable
+  work item and work-item subject, closed action fixture_seed/route_qualification/source_seal,
+  actual controlled runner invocation and positive try plus complete sorted guard epochs.
+  Exact byte hashing uses its own internal family; no path-normalizing fingerprint or synthesized
+  Airflow identity. Freeze concrete fields and API with root before editing.
+- Use bounded canonical JSON with duplicate/unknown/noncanonical/invalid-type rejection, closed
+  discriminators, digest/UUID checks, nonempty complete partitions and bigint-safe positive epochs.
+  Distinguish structural comparison from protected row uniqueness, observed actual invocation and
+  independent reopened plan/authentication obligations. Existing execution attempt/proof bytes stay identical.
+- Preserve six external NP authority families and all production/native-v2 readers/hashes. Existing
+  execution lifecycle/attempt/proof classes remain read-only. Qualification terminal proof/lifecycle
+  dispatch is unavailable in this slice; no false terminal result from an empty authority set.
+- Add the independently reviewed derived invocation_key property using schema
+  dpone.composition-qualification-invocation-key.v1 and exact owner_key, work_item_id,
+  runner_invocation_id, try_number canonical fields. Preserve original operation bytes/hash;
+  changed action/subjects/epochs cannot change the invocation key. Revalidate original structural
+  invariants, preserve exact Unicode/slash semantics and fixed error translation. The SQL replay
+  index rejects every duplicate; a derived key alone authorizes nothing. Normative refinement is
+  docs/composition-shared-ownership.md; root retains the independent amendment review artifact.
+- Red-green exact identities/byte round trips, changed owner kind/run/plan/action/invocation/try/epochs,
+  malformed fields, duplicate subjects/guards, bounds, legacy guard equality and old-reader rejection.
+  Keep cohesive contract modules below canonical warning threshold without new generic registries.
+public_contract_impact:
+  level: compatible
+  surfaces: [python, state, evidence, documentation]
+  migration_required: false
+owned_paths:
+- src/dpone/contracts/composition_ownership.py
+- src/dpone/contracts/composition_qualification_operation.py
+- tests/test_composition_ownership.py
+- tests/test_composition_qualification_operation.py
+- tests/test_composition_qualification_invocation.py
+integrator_owned_paths: []
+read_only_paths:
+- docs
+- src/dpone/contracts/composition_activation.py
+- src/dpone/contracts/composition_physical.py
+- src/dpone/contracts/composition_attempt.py
+- src/dpone/contracts/composition_proof.py
+- src/dpone/contracts/composition_persistence.py
+- src/dpone/contracts/nonproduction_scope.py
+- src/dpone/contracts/nonproduction_grants.py
+- src/dpone/contracts/strict_json.py
+- src/dpone/adapters
+forbidden_paths:
+- .git
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- docs
+- tests/conftest.py
+shared_file_owner: root
+dependencies: [DPONE-NONPRODUCTION-REGISTRATION]
+required_checks:
+  focused:
+  - pure exact-byte and identity red-green contracts and unchanged execution compatibility
+  broad:
+  - owned Ruff and format
+  - explicit owned mypy
+  - import and layer rules
+  - canonical module size without warning debt
+  - independent fresh review
+  live:
+  - 'N/A: structural contracts do not execute SQL or establish physical ownership'
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
+- Concrete fields or algorithm remain unresolved by root review.

@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass
 from uuid import UUID
 
 from dpone.contracts.airflow_deployment import canonical_fingerprint, is_canonical_sha256_digest
+from dpone.contracts.composition_physical_identity import composition_physical_guard_id
 
 
 class CompositionAdmissionError(ValueError):
@@ -117,13 +118,10 @@ class CompositionPhysicalResource:
         require_text(self.service_id)
         if self.connector not in {"mssql", "clickhouse"}:
             raise CompositionAdmissionError("physical_capability")
-        expected = canonical_fingerprint(
-            {
-                "schema": "dpone.composition-physical-domain.v1",
-                "connector": self.connector,
-                "service_id": self.service_id,
-                "physical_subject_sha256": self.physical_subject_sha256,
-            }
+        expected = composition_physical_guard_id(
+            connector=self.connector,
+            service_id=self.service_id,
+            physical_subject_sha256=self.physical_subject_sha256,
         )
         if self.guard_id != expected:
             raise CompositionAdmissionError("physical_guard")

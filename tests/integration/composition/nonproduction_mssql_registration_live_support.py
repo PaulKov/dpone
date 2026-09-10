@@ -313,6 +313,12 @@ def observation_document(payload):
     if type(payload) is not dict or not payload or len(payload) > 16:
         raise ValueError("unsafe_registration_observation")
     for key, value in payload.items():
+        if key in {"sysadmin", "db_owner", "control_server", "bulk_operations"} and (
+            value is None or type(value) is int and value in {0, 1}
+        ):
+            continue
+        if key in {"login_matches", "user_matches"} and type(value) is bool:
+            continue
         if (
             key in _COUNTS
             and type(value) is int

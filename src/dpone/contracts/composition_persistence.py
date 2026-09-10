@@ -25,6 +25,15 @@ from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 _MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
 
 
+def encode_physical_resource(resource: CompositionPhysicalResource) -> bytes:
+    """Retain the legacy observation and write partition as exact original bytes.
+
+    The caller validates the resource's own family. This shared serializer keeps
+    the existing SQL adapter encoding without tightening legacy service values.
+    """
+    return canonical_json_bytes(asdict(resource))
+
+
 def encode_activation_request(request: CompositionActivationRequest) -> bytes:
     """Return the canonical, detached bytes retained across catalog changes."""
     request.__post_init__()

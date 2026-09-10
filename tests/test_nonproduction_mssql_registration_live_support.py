@@ -4,16 +4,18 @@ import json
 import os
 import subprocess
 import sys
+from contextlib import nullcontext
 from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
+from unittest.mock import Mock
 from xml.etree import ElementTree
 
 import pytest
 
-from dpone.contracts.nonproduction_registration import NonproductionRegistrationOriginals, require_execution_memberships
+from dpone.contracts.nonproduction_registration import require_execution_memberships
 from dpone.contracts.nonproduction_scope import NonproductionAuthorityError
 from tests.integration.composition import nonproduction_mssql_registration_live_support as support
 from tests.integration.composition import test_nonproduction_mssql_registration_live as live
@@ -21,7 +23,7 @@ from tests.integration.composition import test_nonproduction_mssql_registration_
 from tests.integration.composition.mssql_gate_live_provisioning import SqlFailure
 from tests.integration.composition.test_nonproduction_mssql_registration_live import expanded
 from tests.nonproduction_authority_helpers import NOW, execution, limits
-from tests.nonproduction_signature_helpers import github_policy
+from tests.nonproduction_signature_helpers import github_policy, trust
 
 CASES = (
     (
@@ -85,10 +87,7 @@ def test_exact_owned_scope_without_driver_import():
 def test_complete_fixture_request_binds_the_unmodified_full_grant(count):
     policy = github_policy()
     grant = expanded(execution(policy), count)
-    values = support.inputs(grant, policy)
-    originals = NonproductionRegistrationOriginals(
-        values["grant_bytes"], values["signature_bundle"], values["signature_subject_bytes"], values["request_bytes"]
-    )
+    originals = live.originals_for(grant, policy)
     assert originals.grant == grant and len(originals.grant.workloads) == count
 
 
@@ -103,10 +102,7 @@ def test_live_ceiling_candidates_are_valid_originals_but_exceed_retained_union(l
         *grant.workloads[1:],
     )
     grant = replace(grant, workloads=workloads, limits=limits(max_workloads=3 if lower == "grant" else 64))
-    values = support.inputs(grant, policy)
-    NonproductionRegistrationOriginals(
-        values["grant_bytes"], values["signature_bundle"], values["signature_subject_bytes"], values["request_bytes"]
-    )
+    live.originals_for(grant, policy)
     with pytest.raises(NonproductionAuthorityError, match="membership_budget"):
         require_execution_memberships(grant, policy, tuple(row.workload_id for row in execution(policy).workloads))
 
@@ -133,13 +129,7 @@ def test_initial_live_pool_candidate_reaches_pool_check_after_current_policy_val
             return ()
 
         def reject(self, grant, reason):
-            values = support.inputs(grant, self.policy)
-            originals = NonproductionRegistrationOriginals(
-                values["grant_bytes"],
-                values["signature_bundle"],
-                values["signature_subject_bytes"],
-                values["request_bytes"],
-            )
+            originals = live.originals_for(grant, self.policy)
             originals.require_policy(
                 self.policy.to_bytes(), self.policy.policy_sha256, self.policy.revocation_epoch, NOW
             )
@@ -150,6 +140,48 @@ def test_initial_live_pool_candidate_reaches_pool_check_after_current_policy_val
 
     with pytest.raises(StopAfterClaims):
         live.test_complete_campaign_membership_obeys_current_ceilings(ClaimPhase())
+
+
+def test_history_cycle_refuses_downgrade_then_reopens_exact_newer_epoch_policy():
+    original = github_policy()
+    newer = replace(
+        original, revocation_epoch=original.revocation_epoch + 1, revoked_grant_ids=(execution(original).grant_id,)
+    )
+    case = SimpleNamespace(policy=newer, expected=SimpleNamespace(revision=2, snapshot=trust(newer)))
+    changes, stale = [], []
+
+    def append(value):
+        changes.append(value)
+        if value.revocation_epoch < case.policy.revocation_epoch:
+            raise SqlFailure(51000)
+        case.policy = value
+        case.expected = SimpleNamespace(revision=case.expected.revision + 1, snapshot=trust(value))
+
+    case.append_policy = append
+    case.trust = SimpleNamespace(provider=lambda: SimpleNamespace(read_revision=lambda: case.expected))
+    case.reject_read = lambda grant, reason, expected: stale.append((reason, expected))
+    live.require_history_cycle(case, original, execution(original))
+    assert changes[0] == original and changes[-1] == newer and len(changes) == 3
+    assert changes[1].revocation_epoch == newer.revocation_epoch and changes[1] != newer
+    assert case.expected.revision == 4 and case.expected.snapshot == trust(newer)
+    assert stale[0][0] == "trust_revision_changed" and stale[0][1].revision == 2
+
+
+@pytest.mark.parametrize("permission,matches", [(0, True), (1, True), (None, True), (0, False)])
+def test_principal_probe_preserves_raw_permissions_before_exact_assertion(monkeypatch, permission, matches):
+    evidence = []
+    rows = (("private-login", "private-login", 0, 0, permission, permission),)
+    probe = Mock(return_value=rows)
+    monkeypatch.setattr(recovery, "execute", probe)
+    case = SimpleNamespace(
+        record=lambda name, payload: evidence.append((name, json.loads(support.observation_document(payload))))
+    )
+    login = "private-login" if matches else "different-private-login"
+    with nullcontext() if permission == 0 and matches else pytest.raises(AssertionError):
+        recovery.require_restricted_identity(case, object(), login)
+    assert "HAS_PERMS_BY_NAME(NULL,NULL," in probe.call_args.args[1]
+    assert evidence[0][1]["control_server"] is permission and "private-login" not in repr(evidence)
+    assert evidence[0][1]["login_matches"] is matches and evidence[0][1]["user_matches"] is matches
 
 
 @pytest.mark.parametrize("field", ["PATH", "BYTES", "SHA256"])
