@@ -5,12 +5,14 @@ from __future__ import annotations
 import pickle
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 from dpone.contracts.bounded_window import WindowContractError
-from dpone.contracts.mssql_native_chunks import NativeChunkLimits
 from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
 from dpone.runtime.native_wire_models import SourceNativeWireContract
+
+if TYPE_CHECKING:
+    from dpone.contracts.mssql_native_chunks import NativeChunkLimits
 
 NativeRow: TypeAlias = Sequence[object] | Mapping[str, object]
 
