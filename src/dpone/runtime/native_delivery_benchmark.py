@@ -26,7 +26,11 @@ from dpone.runtime.native_delivery_benchmark_artifacts import (
 
 
 def _validate(payload: Any, schema: dict[str, Any]) -> None:
-    if not Draft202012Validator(schema).is_valid(payload):
+    if (
+        not isinstance(payload, dict)
+        or type(payload.get("schema_version")) is not int
+        or not Draft202012Validator(schema).is_valid(payload)
+    ):
         raise BenchmarkInputError("invalid_schema")
 
 
@@ -76,6 +80,8 @@ def _receipt(
         bindings["sample_id"] = sample_id
     if any(receipt[key] != value for key, value in bindings.items()):
         raise BenchmarkInputError("receipt_identity_mismatch")
+    if type(receipt["fixture"]["rows"]) is not int:
+        raise BenchmarkInputError("invalid_fixture_integer")
     if scope == "sample" and receipt["fixture"]["rows"] != run["workload"]["rows"]:
         raise BenchmarkInputError("sample_fixture_row_mismatch")
     checks = {check["id"]: check for check in receipt["checks"]}
@@ -131,6 +137,8 @@ def _status(statuses: list[str]) -> str:
 def _run(store: BenchmarkArtifacts, path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     run = store.json(path)
     _validate(run, RUN_SCHEMA)
+    if any(type(run["workload"][key]) is not int for key in ("seed", "rows", "columns")):
+        raise BenchmarkInputError("invalid_workload_integer")
     limits = run["configuration"]["limits"]
     if set(limits) != set(NativeChunkLimits.__dataclass_fields__):
         raise BenchmarkInputError("invalid_limits")
@@ -158,6 +166,7 @@ def _run(store: BenchmarkArtifacts, path: Path) -> tuple[dict[str, Any], dict[st
             observed = store.json(store.reference(path.parent, sample["observations"]))
             if (
                 not isinstance(observed, dict)
+                or type(observed.get("schema_version")) is not int
                 or observed.get("schema_version") != 1
                 or observed.get("kind") != "native-delivery-observations"
             ):
@@ -257,7 +266,7 @@ def compare(baseline: Path, candidate: Path, *, output: Path | None = None, over
         left, left_summary = before[key]
         right, right_summary = after[key]
         for identity in ("route", "workload", "configuration", "environment"):
-            if left[identity] != right[identity]:
+            if canonical_json(left[identity]) != canonical_json(right[identity]):
                 raise BenchmarkInputError(f"{identity}_drift")
         status = _status([left_summary["status"], right_summary["status"]])
         ratio = right_summary["median_seconds"] / left_summary["median_seconds"] if status == "PASS" else None

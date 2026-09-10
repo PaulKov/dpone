@@ -492,3 +492,35 @@ def test_raw_schema_version_boolean_is_not_integer_identity(tmp_path):
     mutate_receipt(candidate, 1, substitute)
     with pytest.raises(BenchmarkInputError, match="live_observation_identity_mismatch"):
         compare(baseline, candidate)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda r: r.update(schema_version=1.0),
+        lambda r: r["workload"].update(seed=1.0),
+        lambda r: r["environment"].update(resource_profile={"cpus": 2.0}),
+    ],
+)
+def test_identity_records_do_not_coerce_integer_or_resource_types(tmp_path, change):
+    from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+
+    baseline, candidate = run_fixture(tmp_path / "b"), run_fixture(tmp_path / "c")
+    mutate(candidate, change)
+    with pytest.raises(BenchmarkInputError):
+        compare(baseline, candidate)
+
+
+@pytest.mark.parametrize("version", [True, 1.0])
+def test_observation_sidecar_version_requires_integer(tmp_path, version):
+    from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+
+    baseline, candidate = run_fixture(tmp_path / "b"), run_fixture(tmp_path / "c")
+    ref = retain(
+        candidate.parent,
+        "observations.json",
+        dict(schema_version=version, kind="native-delivery-observations", status="PASS"),
+    )
+    mutate(candidate, lambda r: r["samples"][1].update(observations=ref))
+    with pytest.raises(BenchmarkInputError, match="invalid_observations"):
+        compare(baseline, candidate)
