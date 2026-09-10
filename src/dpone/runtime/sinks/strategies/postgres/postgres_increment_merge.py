@@ -268,7 +268,7 @@ class PostgresPartitionReplaceStrategy(PostgresIncrementMergeStrategy):
             DELETE FROM {}.{} AS t
             WHERE EXISTS (
                 SELECT 1 FROM {}.{} AS s
-                WHERE s.{}::text = t.{}::text
+                WHERE s.{}::text IS NOT DISTINCT FROM t.{}::text
             )
             """
         ).format(

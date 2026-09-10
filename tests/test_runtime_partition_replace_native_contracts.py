@@ -166,6 +166,8 @@ def test_postgres_partition_replace_uses_declarative_detach_attach_when_bounds_r
                 return [("landing.orders_20260603",)]
             if "pg_get_expr" in text:
                 return [("FOR VALUES FROM ('2026-06-03') TO ('2026-06-04')",)]
+            if "IS DISTINCT FROM" in text:
+                return [(False,)]
             if "COUNT(*) FROM" in text:
                 return [(100,)]
             return []

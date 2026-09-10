@@ -10,27 +10,27 @@ if TYPE_CHECKING:
 
 from abc import ABC
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 from psycopg import sql
 
 from dpone.contracts.technical_columns import include_technical_columns
 from dpone.runtime.artifact_models import StagingTableArtifact
-from dpone.runtime.internal_query_artifact import InternalQueryArtifact
 from dpone.runtime.sink_logging import ETLLogger, etl_logger
 from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.strategies.base import SinkStrategy
-from dpone.runtime.sinks.strategies.postgres.file_export_loader import PostgresFileExportLoader
-from dpone.runtime.sinks.strategies.postgres.internal_query_loader import PostgresInternalQueryLoader
 from dpone.runtime.sinks.strategies.postgres.staging_sql_helper import PostgresStagingSqlHelper
 from dpone.runtime.sinks.strategies.postgres.target_table_manager import PostgresTargetTableManager
 
-_FILE_EXPORT_DELEGATES = {
-    "_load_from_file_export": "load",
-    "_load_from_file_export_standard": "load_standard",
-    "_load_from_file_export_with_truncate": "load_with_truncate",
-    "_load_from_file_export_with_exchange": "load_with_exchange",
-}
+_FILE_EXPORT_DELEGATES = frozenset(
+    {
+        "_load_from_file_export",
+        "_load_from_file_export_standard",
+        "_load_from_file_export_with_truncate",
+        "_load_from_file_export_with_exchange",
+    }
+)
 
 _TARGET_TABLE_DELEGATES = {
     "_ensure_target_table": "ensure_target_table",
@@ -59,18 +59,6 @@ class PostgresStrategyBase(SinkStrategy, ABC):
             logger=self.logger,
             include_technical_columns=self._include_technical_columns,
         )
-        self.file_export_loader = PostgresFileExportLoader(
-            connector=self.connector,
-            logger=self.logger,
-            target_table_manager=self.target_table_manager,
-            log_target_sample=self._log_target_sample,
-        )
-        self.internal_query_loader = PostgresInternalQueryLoader(
-            connector=self.connector,
-            logger=self.logger,
-            target_table_manager=self.target_table_manager,
-            log_target_sample=self._log_target_sample,
-        )
         self.staging_sql_helper = PostgresStagingSqlHelper(
             connector=self.connector,
             logger=self.logger,
@@ -79,15 +67,19 @@ class PostgresStrategyBase(SinkStrategy, ABC):
         )
 
     def __getattr__(self, name: str) -> Any:
-        if name == "_load_from_internal_query":
-            return self.internal_query_loader.load
-        if name in _FILE_EXPORT_DELEGATES:
-            return getattr(self.file_export_loader, _FILE_EXPORT_DELEGATES[name])
+        if name == "_load_from_internal_query" or name in _FILE_EXPORT_DELEGATES:
+            return self._load_legacy_artifact
         if name in _TARGET_TABLE_DELEGATES:
             return getattr(self.target_table_manager, _TARGET_TABLE_DELEGATES[name])
         if name in _STAGING_SQL_DELEGATES:
             return getattr(self.staging_sql_helper, _STAGING_SQL_DELEGATES[name])
         raise AttributeError(f"{self.__class__.__name__!s} has no attribute {name!r}")
+
+    def _load_legacy_artifact(self, load_config: Any, payload: LoadPayload, artifact: Any = None) -> LoadResult:
+        """Keep legacy helpers within the selected strategy and caller transaction."""
+        if artifact is not None:
+            payload = payload.rebind(artifact=artifact)
+        return self.load(load_config, payload)
 
     def _include_technical_columns(self, load_config: Any) -> bool:
         """Whether to ensure/populate technical columns __dpone__loaded_at/__dpone__deleted_at.
@@ -108,13 +100,7 @@ class PostgresStrategyBase(SinkStrategy, ABC):
         payload: LoadPayload,
         handler: Callable[[StagingTableArtifact], LoadResult],
     ) -> LoadResult:
-        if isinstance(payload.artifact, InternalQueryArtifact):
-            return self._load_from_internal_query(load_config, payload)
-
-        # FileExportArtifact (CSV/binary) materializes into staging, then the strategy
-        # handler runs (merge/append/truncate/exchange). Do not short-circuit to the
-        # DROP+CREATE file-export loader — that broke incremental_merge accumulation
-        # for cross-DB routes such as mysql→postgres.
+        # Transport materializes rows; only the selected handler chooses write semantics.
         staging_artifact = payload.artifact.materialize(
             self.staging_manager,
             load_config,
@@ -122,24 +108,26 @@ class PostgresStrategyBase(SinkStrategy, ABC):
         )
         try:
             result = handler(staging_artifact)
-            return LoadResult(
-                inserted_rows=result.inserted_rows,
-                updated_rows=result.updated_rows,
-                total_rows=result.total_rows,
-                state=result.state,
-                staging_rows=staging_artifact.row_count,
-            )
-        finally:
-            staging_artifact.cleanup()
+        except BaseException as primary_error:
+            try:
+                staging_artifact.cleanup()
+            except BaseException as cleanup_error:
+                add_note = getattr(primary_error, "add_note", None)
+                if callable(add_note):
+                    add_note(f"staging cleanup failed: {type(cleanup_error).__name__}")
+            raise
+        staging_artifact.cleanup()
+        return replace(result, staging_rows=staging_artifact.row_count)
 
     def _log_target_sample(self, load_config: Any, max_rows: int = 5) -> None:
         """Логирует sample данных из целевой таблицы."""
+        query = sql.SQL("SELECT * FROM {}.{} LIMIT %s").format(
+            sql.Identifier(load_config.target_schema),
+            sql.Identifier(load_config.target_table),
+        )
+        # A failed SQL query aborts the transaction; preserve its diagnostic.
+        rows = self.connector.get_records(query, (max_rows,), as_dict=True)
         try:
-            query = sql.SQL("SELECT * FROM {}.{} LIMIT %s").format(
-                sql.Identifier(load_config.target_schema),
-                sql.Identifier(load_config.target_table),
-            )
-            rows = self.connector.get_records(query, (max_rows,), as_dict=True)
             if rows:
                 self.logger.log_data_sample("TARGET", rows, max_rows)
         except Exception:

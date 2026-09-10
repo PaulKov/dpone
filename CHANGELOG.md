@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Fixed
+
+- Honor PostgreSQL load strategies for internal-query artifacts. Default full
+  refresh preserves existing target identity and constraints; explicit exchange
+  uses one sink-owned transaction without destructive post-rollback compensation.
+  Keep primary errors and all strategy result fields through staging cleanup.
+- Route legacy PostgreSQL query/file loader entry points through the configured
+  strategy, remove automatic CASCADE, isolate long staging names and fall back
+  safely when native partition replacement would remove out-of-scope rows.
+  See the [recovery runbook](docs/source-sink/postgres-to-postgres.md#runbook);
+  upgrading does not reconstruct previously lost constraints.
+
 ## 0.76.0 - 2026-09-10
 
 ### Added

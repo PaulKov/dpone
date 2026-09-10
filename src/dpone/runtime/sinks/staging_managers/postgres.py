@@ -33,7 +33,7 @@ class PostgresStagingManager(StagingManager):
         staging_schema = load_config.staging_schema or load_config.target_schema
 
         columns_sql = sql.SQL(", ".join(f'"{column}" {dtype}' for column, dtype in schema))
-        create_sql = sql.SQL("CREATE TABLE IF NOT EXISTS {}.{} ({})").format(
+        create_sql = sql.SQL("CREATE TABLE {}.{} ({})").format(
             sql.Identifier(staging_schema),
             sql.Identifier(table_name),
             columns_sql,
@@ -135,7 +135,7 @@ class PostgresStagingManager(StagingManager):
         )
 
     def drop(self, artifact: StagingTableArtifact) -> None:
-        drop_sql = sql.SQL("DROP TABLE IF EXISTS {}.{} CASCADE").format(
+        drop_sql = sql.SQL("DROP TABLE IF EXISTS {}.{}").format(
             sql.Identifier(artifact.schema),
             sql.Identifier(artifact.table),
         )
@@ -143,8 +143,9 @@ class PostgresStagingManager(StagingManager):
         self.logger.log_etl_progress("STAGING_DROPPED", {"Table": artifact.qualified_name()})
 
     def _generate_table_name(self, base: str) -> str:
-        suffix = uuid.uuid4().hex[:8]
-        return f"stg_{base}_{suffix}"
+        # PostgreSQL identifiers are limited to 63 bytes; retain the entire UUID.
+        name = f"stg_{uuid.uuid4().hex}_{base}"
+        return name.encode("utf-8")[:63].decode("utf-8", errors="ignore")
 
     def _count_rows(self, artifact: StagingTableArtifact) -> int:
         count_sql = sql.SQL("SELECT COUNT(*) FROM {}.{}").format(

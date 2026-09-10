@@ -82,6 +82,55 @@ See [Postgres XMin deep dive](postgres-xmin.md) for the full algorithm and code-
 | `replace` | Delete rows matching `custom_predicate`, then insert staged rows. |
 | `partition_replace` | Native declarative partition detach/attach when possible; partition-column delete/insert fallback otherwise. |
 
+### Refresh an existing table without replacing its structure
+
+For a pre-provisioned target, use this `sink` fragment in your manifest:
+
+```yaml
+sink:
+  type: postgres
+  connection_id: postgres_target
+  table: {schema: landing, name: orders}
+  strategy:
+    mode: full_refresh
+    overwrite_type: truncate_insert
+```
+
+Omitting `overwrite_type` has the same behavior. Internal queries, files and
+in-memory rows first populate owned staging, then run the selected strategy.
+Default refresh replaces rows inside the existing table: its logical OID,
+constraints, indexes, defaults, grants, triggers and view dependencies remain.
+An empty source empties the target. Creating an absent target derives column
+names and types; it does **not** copy all source constraints. Provision approved
+target DDL before the first run when constraints must be enforced.
+
+The runtime role needs staging schema creation/table privileges and target
+`TRUNCATE`/`INSERT` privileges (plus schema-evolution privileges when needed).
+Constraint violations reject the insertion; a confirmed rollback restores the
+previous committed rows. Incoming foreign keys reject TRUNCATE without CASCADE
+or automatic mode switching. TRUNCATE takes an exclusive lock and has MVCC
+limitations; plan a load window or configure database lock/statement timeouts.
+See [PostgreSQL TRUNCATE](https://www.postgresql.org/docs/16/sql-truncate.html).
+
+Only explicit `overwrite_type: exchange` replaces the database object. Exchange
+can discard target metadata and can fail when views or other objects depend on
+the target. It has no zero-downtime or dependency-preservation guarantee.
+`PostgresSink.load` owns begin/commit/rollback for both full-refresh modes;
+PostgreSQL transactional DDL performs rollback without a compensating target DROP.
+Direct strategy calls require a caller-owned transaction; use `PostgresSink.load`
+for the public Python loading boundary. Append micro-batch commits retain their
+separate existing behavior.
+
+Native `partition_replace` holds an exclusive target lock while checking scope.
+If a physical partition contains values outside the staged value, or several
+staged values map to one child, the existing predicate fallback preserves other
+rows. NULL partition values use null-safe predicate replacement, so replay
+replaces previous NULL rows. `native_mode: required` rejects such a plan before
+replacement.
+
+For run artifacts, independent catalog checks and repair of previously damaged
+targets, follow the [Postgres-to-Postgres runbook](source-sink/postgres-to-postgres.md#runbook).
+
 ## `incremental_merge` SQL
 
 Default `delete_insert`:

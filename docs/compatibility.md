@@ -1221,3 +1221,18 @@ all readers before using v3. Composition activation is unavailable until physica
 admission covers every constituent; see the
 [contracts](release-composition-reference.md) and
 [migration and recovery guide](release-composition-operations.md).
+
+## PostgreSQL strategy-preserving refresh correction
+
+PostgreSQL internal queries now honor the selected strategy. Omitted overwrite
+mode and `truncate_insert` preserve an existing target, matching file/memory
+loads. Manifest fields, Python call signatures and result fields are unchanged.
+Legacy direct internal-query/file loader calls delegate to the configured sink
+strategy, including the historically named exchange helpers; only configured
+`overwrite_type: exchange` selects replacement. Prefer `PostgresSink.load`.
+
+Invalid rows, missing TRUNCATE privileges and incoming foreign keys can now
+correctly fail loads that previously bypassed the target contract. Upgrading
+prevents this replacement defect; it cannot reconstruct constraints lost by an
+earlier runtime. Restore them from approved DDL using the
+[PostgreSQL recovery runbook](source-sink/postgres-to-postgres.md#recover-a-previously-replaced-target).
