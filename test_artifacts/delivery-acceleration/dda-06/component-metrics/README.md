@@ -42,11 +42,15 @@ tracked-file digest. It verified all four raw documentation outcomes and the
 single-file diff, then approved the docs-only handoff with no findings. This
 paragraph records the review transcript; it is not an executable gate receipt.
 
-DDA-02 must finish its active full suite before changing that checkout's HEAD,
-confirm that its Python inputs and surrounding document prose still match,
-import the reviewed commit through `cherry-pick -x`, and rerun the canonical
-freshness check on the recipient branch. That recipient outcome remains pending
-until reported by its owner. A mismatch requires regeneration, not manual edits.
+DDA-02 finished its frozen full suite before importing the reviewed commit with
+`cherry-pick -x` as `d3ac05c7d3f9d6b15bfdf6fec58f5dda5ae08d44`. The recipient
+verified unchanged Python inputs and surrounding prose, then passed canonical
+freshness and documentation checks. Its independently reviewed
+[final completion](https://github.com/PaulKov/dpone/blob/b9b47121788a67463f829bb1589c763d71728efc/test_artifacts/delivery-acceleration/dda-02/followup-01/README.md)
+retains that outcome and the full component result: 20,848 passed, 574 skipped,
+exit 0 on `61bcebc0c96b4db535bd4494de6f30cb15d11d18`. This later component
+artifact is linked separately; its dashboard is not imported into the combined
+integration branch.
 
 No runtime/API or user-journey behavior changed. Existing dashboard warning
 values remain visible. Architecture HOLD and live performance UNVERIFIED are

@@ -1,8 +1,9 @@
 # DDA-06 integration and validation plan
 
-Status: shared implementation reviewed; additional owner review fixes are being
-integrated before the final checks. Architecture HOLD and live performance
-UNVERIFIED remain explicit.
+Status: shared implementation and reviewed owner corrections are integrated.
+Final local checks are complete on frozen `be7655a`; see
+[completion.md](completion.md) and [final-checks.md](final-checks.md). Architecture
+HOLD and live performance UNVERIFIED remain explicit.
 
 ## Identity and ownership
 
