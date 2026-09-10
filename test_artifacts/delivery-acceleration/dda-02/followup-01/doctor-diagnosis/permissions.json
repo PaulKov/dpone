@@ -1,0 +1,25 @@
+{
+  "time_utc": "2026-09-10T17:15:55Z",
+  "uid": 502,
+  "gid": 20,
+  "paths": [
+    {
+      "path": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r",
+      "uid": 502,
+      "gid": 20,
+      "mode": "0o700"
+    },
+    {
+      "path": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/actual-helper-fixture",
+      "uid": 502,
+      "gid": 20,
+      "mode": "0o755"
+    },
+    {
+      "path": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/actual-helper-fixture/venv",
+      "uid": 502,
+      "gid": 20,
+      "mode": "0o755"
+    }
+  ]
+}

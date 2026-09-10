@@ -1,0 +1,74 @@
+OUTER_START
+Timeout (0:00:10)!
+Thread 0x0000000208a7f100 (most recent call first):
+  File "/Users/paulkov007/.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/dataclasses.py", line 473 in _create_fn
+  File "/Users/paulkov007/.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/dataclasses.py", line 619 in _init_fn
+  File "/Users/paulkov007/.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/dataclasses.py", line 1063 in _process_class
+  File "/Users/paulkov007/.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/dataclasses.py", line 1265 in wrap
+  File "/Users/paulkov007/.codex/worktrees/c38d/dpone-public/src/dpone/runtime/extraction_lifecycle.py", line 93 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "/Users/paulkov007/.codex/worktrees/c38d/dpone-public/src/dpone/runtime/artifact_models.py", line 8 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "/Users/paulkov007/.codex/worktrees/c38d/dpone-public/src/dpone/runtime/source_materialization.py", line 9 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "/Users/paulkov007/.codex/worktrees/c38d/dpone-public/src/dpone/runtime/native_snapshot_evidence.py", line 10 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "/Users/paulkov007/.codex/worktrees/c38d/dpone-public/src/dpone/runtime/native_snapshot_optimization.py", line 13 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "/Users/paulkov007/.codex/worktrees/c38d/dpone-public/src/dpone/readiness/native_snapshot_planning.py", line 7 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "/Users/paulkov007/.codex/worktrees/c38d/dpone-public/src/dpone/readiness/managed_native_transfer_plan.py", line 8 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1415 in _handle_fromlist
+  File "/Users/paulkov007/.codex/worktrees/c38d/dpone-public/src/dpone/readiness/managed_planning.py", line 17 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1387 in _gcd_import
+  File "/Users/paulkov007/.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/importlib/__init__.py", line 90 in import_module
+  File "/Users/paulkov007/.codex/worktrees/c38d/dpone-public/src/dpone/lazy_exports.py", line 22 in resolve_export
+  File "/Users/paulkov007/.codex/worktrees/c38d/dpone-public/src/dpone/readiness/managed.py", line 34 in __getattr__
+  File "/Users/paulkov007/.codex/worktrees/c38d/dpone-public/src/dpone/readiness/__init__.py", line 19 in <module>
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap_external>", line 999 in exec_module
+  File "<frozen importlib._bootstrap>", line 935 in _load_unlocked
+  File "<frozen importlib._bootstrap>", line 1331 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "<frozen importlib._bootstrap>", line 488 in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1310 in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 1360 in _find_and_load
+  File "<string>", line 7 in <module>
+HEALTH_IMPORT_SECONDS 18.533834457979538 CPU_SECONDS 8.599583
+DUAL_PROBE_SECONDS 1.029057209030725
+RESULT PythonImportHealth(passed=True, reason_code=None, summary='module import succeeded')

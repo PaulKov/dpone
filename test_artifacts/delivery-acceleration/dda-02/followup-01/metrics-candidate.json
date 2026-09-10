@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "base": "61bcebc0c96b4db535bd4494de6f30cb15d11d18",
+  "candidate": "0921292a86aae1173f0e0117eee756aa8b308a11",
+  "candidate_changed_paths": [
+    "docs/quality-metrics.md"
+  ],
+  "tracked_python_files": 5808,
+  "tracked_python_unchanged": true,
+  "outside_generated_markers_unchanged": true,
+  "candidate_document_sha256": "64af8270add0193990edaad8e7e05f30ed247192b2ccb868e786b8999e99bb9e",
+  "operation": "c1a88ade6293f189da9f24c6a9f77e305278663a",
+  "application": "pending current full suite completion"
+}

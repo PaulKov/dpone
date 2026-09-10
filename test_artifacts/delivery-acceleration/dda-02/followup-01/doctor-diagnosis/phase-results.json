@@ -1,0 +1,10 @@
+{
+  "head": "61bcebc0c96b4db535bd4494de6f30cb15d11d18",
+  "status": "PASS",
+  "returncode": 0,
+  "seconds": 19.696812707930803,
+  "fixture_producer": "tests.doctor_import_test_support._probe_clean_venv_python",
+  "environment_producer": "tests.doctor_import_test_support._outer_probe_environment",
+  "python": "/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/actual-helper-fixture/venv/bin/python",
+  "log": "/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/phase.log"
+}

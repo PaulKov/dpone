@@ -1,0 +1,32 @@
+{
+  "head": "61bcebc0c96b4db535bd4494de6f30cb15d11d18",
+  "planning_dependency": "f3682940f8864563cde0e6b6ecee60f746b49020",
+  "git_status_before": "?? test_artifacts/delivery-acceleration/dda-02/followup-01/",
+  "source_sha256": {
+    "src/dpone/runtime/sinks/mssql_native_prepared_digests.py": "00828037204874b5dec5db7859c70e7a4c73e805a9ae5480b785756d261f004f",
+    "src/dpone/runtime/sinks/mssql_native_prepared_insert.py": "c7e23ded0f07361373f30ff69fdeaa8ac8b3f9765c3fae0417038787bab36a2a",
+    "docs/delivery-acceleration/preparation.md": "40ae68fa0e61d156b19be25488ca26b44de4c9a890571535441a003f7e12162e",
+    "tests/test_mssql_native_integrity_readbacks.py": "c2f3a96b350e638a10b9cd24998256031711fcd8700e22bbba07c98d052e20c6",
+    "tests/test_mssql_native_metadata_insert.py": "5111bf41598ac449ed5918ef8ef152475d4214541950c8e45adfa9e8f69576f4",
+    "tests/test_mssql_native_metadata_insert_parity.py": "7c28c0da6f0233706dc7148b16f528dff8693ff47fbd140f336cb5bfe0cc2056"
+  },
+  "checks": [
+    {
+      "command": [
+        "uv",
+        "run",
+        "pytest",
+        "tests/test_mssql_native_integrity_readbacks.py",
+        "tests/test_mssql_native_metadata_insert.py",
+        "tests/test_mssql_native_metadata_insert_parity.py",
+        "tests/test_mssql_native_staged_verification.py",
+        "tests/test_mssql_native_lineage_authority.py",
+        "-q"
+      ],
+      "status": "PASS",
+      "exit_code": 0,
+      "seconds": 14.35,
+      "log": "focused.log"
+    }
+  ]
+}

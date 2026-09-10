@@ -1,0 +1,44 @@
+{
+  "copies": [
+    {
+      "source": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/diagnose.py",
+      "archive": "diagnose.py.txt",
+      "sha256": "f52def43a5e56b3ea020134c4b60f1add884f842dee8b3b230f45e3733aa7a80"
+    },
+    {
+      "source": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/phase_child.py",
+      "archive": "phase_child.py.txt",
+      "sha256": "8d40c4ecef07c297605cc44fd895f336704339b07af47d29e80449917314ae20"
+    },
+    {
+      "source": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/phase.log",
+      "archive": "phase.log",
+      "sha256": "0fd3704d2111180b5fa7efa71e6e247f62a43434c38da4dfe31e8de7c060035f"
+    },
+    {
+      "source": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/phase-results.json",
+      "archive": "phase-results.json",
+      "sha256": "47a0c291a693aff33465582df873ba33baf0866e7946bb5784d01d1fe8c852b8"
+    },
+    {
+      "source": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/exact-test.log",
+      "archive": "exact-test.log",
+      "sha256": "c624a3077a3eea263078ad6b6a5afe72b76dc9e2c199c0a8c489fa4095c3e4ae"
+    },
+    {
+      "source": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/exact-test-results.json",
+      "archive": "exact-test-results.json",
+      "sha256": "5f10583bda190ba078cef49d1452102a10e8dc4c5243d49d9fa40ee0bd3441d5"
+    },
+    {
+      "source": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/concurrent-python-processes.log",
+      "archive": "concurrent-python-processes.log",
+      "sha256": "9e0f5ab7985f58ae004c9382f829aef196fa41b9c692869d3c84ede4a2a1d943"
+    },
+    {
+      "source": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/permissions.json",
+      "archive": "permissions.json",
+      "sha256": "eeed4a974b1d7e012de4b7244b1c3e3df8f6f60372f728ae21d802be3ff12255"
+    }
+  ]
+}

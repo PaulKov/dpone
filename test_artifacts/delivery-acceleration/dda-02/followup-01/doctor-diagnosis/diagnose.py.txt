@@ -1,0 +1,66 @@
+from __future__ import annotations
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+root = Path(__file__).resolve().parent
+repository = Path('/Users/paulkov007/.codex/worktrees/c38d/dpone-public')
+head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repository, text=True).strip()
+sys.path.insert(0, str(repository))
+sys.path.insert(0, str(repository / 'src'))
+from tests.doctor_import_test_support import _outer_probe_environment, _probe_clean_venv_python
+fixture_root = root / 'actual-helper-fixture'
+python = _probe_clean_venv_python(fixture_root)
+module_name = '_dpone_env_derived_runtime_state'
+module_body = "import os, sys\nassert os.environ['PYTHONTRACEMALLOC'] == '5'\nimport tracemalloc\nassert tracemalloc.is_tracing()\nassert tracemalloc.get_traceback_limit() == 5\nassert 'tracemalloc' not in sys._xoptions\n"
+(root / (module_name + '.py')).write_text(module_body, encoding='utf-8')
+phase_script = """import os, sys, time, faulthandler
+faulthandler.dump_traceback_later(10, repeat=True)
+start = time.monotonic()
+cpu_start = time.process_time()
+print('OUTER_START', flush=True)
+sys.path.insert(0, sys.argv[1])
+from dpone.readiness.python_import_health import probe_python_import
+imported = time.monotonic()
+print('HEALTH_IMPORT_SECONDS', imported - start, 'CPU_SECONDS', time.process_time() - cpu_start, flush=True)
+result = probe_python_import('_dpone_env_derived_runtime_state')
+print('DUAL_PROBE_SECONDS', time.monotonic() - imported, flush=True)
+print('RESULT', repr(result), flush=True)
+os._exit(0 if result.passed else 1)
+"""
+(root / 'phase_child.py').write_text(phase_script, encoding='utf-8')
+environment = _outer_probe_environment()
+environment['PYTHONTRACEMALLOC'] = '5'
+started = time.monotonic()
+with (root / 'phase.log').open('w', encoding='utf-8') as log:
+    try:
+        completed = subprocess.run([str(python), '-c', phase_script, str(root)], cwd=repository,
+                                   env=environment, stdout=log, stderr=log, text=True, timeout=30)
+        status = 'PASS' if completed.returncode == 0 else 'FAIL'
+        returncode = completed.returncode
+    except subprocess.TimeoutExpired:
+        status = 'TIMEOUT'
+        returncode = None
+phase = {'head': head, 'status': status, 'returncode': returncode, 'seconds': time.monotonic() - started,
+         'fixture_producer': 'tests.doctor_import_test_support._probe_clean_venv_python',
+         'environment_producer': 'tests.doctor_import_test_support._outer_probe_environment',
+         'python': str(python), 'log': str(root / 'phase.log')}
+(root / 'phase-results.json').write_text(json.dumps(phase, indent=2) + '\n', encoding='utf-8')
+print(json.dumps(phase, indent=2), flush=True)
+print((root / 'phase.log').read_text(), flush=True)
+
+node = "tests/test_doctor_import_integration.py::test_import_probe_replays_effective_env_derived_runtime_state[PYTHONTRACEMALLOC-5-import tracemalloc\\nassert tracemalloc.is_tracing()\\nassert tracemalloc.get_traceback_limit() == 5\\nassert 'tracemalloc' not in sys._xoptions\\n]"
+command = ['uv', 'run', '--locked', '--no-sync', '--offline', '--no-python-downloads', 'pytest',
+           node, '-q', '-p', 'no:cacheprovider', '--tb=short', '--durations=5']
+started = time.monotonic()
+completed = subprocess.run(command, cwd=repository, capture_output=True, text=True, timeout=55)
+(root / 'exact-test.log').write_text(completed.stdout + completed.stderr, encoding='utf-8')
+test = {'head': head, 'command': command, 'status': 'PASS' if completed.returncode == 0 else 'FAIL',
+        'returncode': completed.returncode, 'seconds': time.monotonic() - started,
+        'log': str(root / 'exact-test.log')}
+(root / 'exact-test-results.json').write_text(json.dumps(test, indent=2) + '\n', encoding='utf-8')
+print(json.dumps(test, indent=2), flush=True)
+print(completed.stdout + completed.stderr, flush=True)
