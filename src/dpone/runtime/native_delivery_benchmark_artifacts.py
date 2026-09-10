@@ -80,11 +80,11 @@ class BenchmarkArtifacts:
 
     def export(self, path: Path, status: str) -> dict[str, Any]:
         reference = {
-            "path": str(path.resolve()),
+            "path": str(path.absolute()),
             "sha256": content_sha256(self.bytes[path.resolve()]),
             "status": status,
         }
-        self.references.append((reference, path.resolve()))
+        self.references.append((reference, path.absolute()))
         return reference
 
     def relativize(self, root: Path, input_roots: tuple[Path, Path], *, retain: bool) -> None:

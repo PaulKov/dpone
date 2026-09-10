@@ -449,6 +449,98 @@ def test_bundled_internal_symlink_reference_keeps_retained_bytes(tmp_path):
     assert compare(destination / result["baseline"]["path"], retained)["status"] == "UNVERIFIED"
 
 
+@pytest.mark.parametrize("destination", ["memory", "same_tree", "bundle"])
+@pytest.mark.parametrize("directory_alias", [False, True])
+def test_exported_run_alias_preserves_relative_evidence(tmp_path, destination, directory_alias):
+    baseline = run_fixture(tmp_path / "b", execution="live")
+    candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+    (candidate.parent / "payload").mkdir()
+    candidate.rename(candidate.parent / "payload" / "run.json")
+    candidate.symlink_to("payload/run.json")
+    if directory_alias:
+        alias = tmp_path / "candidate-alias"
+        alias.symlink_to(candidate.parent, target_is_directory=True)
+        candidate = alias / candidate.name
+    root = tmp_path / "reports" if destination == "bundle" else tmp_path
+    root.mkdir(exist_ok=True)
+    output = None if destination == "memory" else root / "comparison.json"
+    result = compare(baseline, candidate, output=output)
+    retained = root / result["candidate"]["path"]
+    assert result["status"] == "PASS"  # Synthetic live-shape branch, not live certification.
+    assert result["workloads"][0]["candidate"]["envelope"]["path"] == result["candidate"]["path"]
+    assert content_sha256(retained.read_bytes()) == result["candidate"]["sha256"]
+    assert (retained.parent / "fidelity.json").is_file()
+    assert compare(root / result["baseline"]["path"], retained)["workloads"][0]["ratio"] == 0.8
+
+
+@pytest.mark.parametrize("destination", ["memory", "same_tree", "bundle"])
+def test_exported_campaign_alias_preserves_relative_runs(tmp_path, destination):
+    baseline = campaign(tmp_path / "b", [run_fixture(tmp_path / "b" / "case")], ["narrow"])
+    candidate = campaign(tmp_path / "c", [run_fixture(tmp_path / "c" / "case")], ["narrow"])
+    (candidate.parent / "payload").mkdir()
+    candidate.rename(candidate.parent / "payload" / "campaign.json")
+    candidate.symlink_to("payload/campaign.json")
+    root = tmp_path / "reports" if destination == "bundle" else tmp_path
+    root.mkdir(exist_ok=True)
+    output = None if destination == "memory" else root / "comparison.json"
+    result = compare(baseline, candidate, output=output)
+    assert compare(root / result["baseline"]["path"], root / result["candidate"]["path"])["status"] == "UNVERIFIED"
+
+
+def diagnostic_snapshot(*, failure=None):
+    from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
+
+    collector = BoundedNativeDeliveryObserver(max_observations=1)
+    recorder = collector.recorder(clock_domain="host", process_id=1, worker_id="worker", clock=lambda: 0)
+    if failure == "clock":
+        recorder = collector.recorder(clock_domain="host", process_id=1, worker_id="worker", clock=lambda: -1)
+    with recorder.phase("encode"):
+        pass
+    if failure == "overflow":
+        with recorder.phase("encode"):
+            pass
+    return collector.snapshot()
+
+
+@pytest.mark.parametrize("failure,expected", [(None, "PASS"), ("clock", "UNVERIFIED"), ("overflow", "UNVERIFIED")])
+def test_sidecar_reconstructs_real_collector_diagnostic_status(tmp_path, failure, expected):
+    baseline = run_fixture(tmp_path / "b", execution="live")
+    candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+    snapshot = diagnostic_snapshot(failure=failure)
+    ref = retain(candidate.parent, "observations.json", snapshot, status=snapshot["status"])
+    mutate(candidate, lambda run: run["samples"][1].update(observations=ref))
+    result = compare(baseline, candidate)
+    assert result["status"] == expected
+    assert result["workloads"][0]["ratio"] == (0.8 if expected == "PASS" else None)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda s: s["observations"][0].update(schema_version=999),
+        lambda s: s["observations"][0].update(schema_version=True),
+        lambda s: s["observations"][0].pop("metrics"),
+        lambda s: s["recorders"][0].update(status="UNVERIFIED", limitations=["observer_failed"]),
+        lambda s: s["limitations"].append("capacity_exceeded"),
+        lambda s: s["aggregates"][0]["work_seconds"].update(value=100),
+        lambda s: s.update(capacity=0),
+        lambda s: s["observations"].append(s["observations"][0]),
+        lambda s: s.update(unknown_field="unsupported"),
+    ],
+)
+def test_malformed_or_inconsistent_sidecar_never_authorizes_pass(tmp_path, change):
+    from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+
+    baseline = run_fixture(tmp_path / "b", execution="live")
+    candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+    snapshot = diagnostic_snapshot()
+    change(snapshot)
+    ref = retain(candidate.parent, "observations.json", snapshot)
+    mutate(candidate, lambda run: run["samples"][1].update(observations=ref))
+    with pytest.raises(BenchmarkInputError, match="invalid_observations"):
+        compare(baseline, candidate)
+
+
 def test_evidence_assertions_preserve_json_scalar_types(tmp_path):
     from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
 

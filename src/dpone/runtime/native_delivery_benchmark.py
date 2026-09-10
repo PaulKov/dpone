@@ -23,6 +23,7 @@ from dpone.runtime.native_delivery_benchmark_artifacts import (
     content_sha256,
     write_report,
 )
+from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
 
 
 def _validate(payload: Any, schema: dict[str, Any]) -> None:
@@ -171,6 +172,12 @@ def _run(store: BenchmarkArtifacts, path: Path) -> tuple[dict[str, Any], dict[st
                 or observed.get("kind") != "native-delivery-observations"
             ):
                 raise BenchmarkInputError("invalid_observations")
+            try:
+                reconstructed = BoundedNativeDeliveryObserver.from_snapshot(observed).snapshot()
+                if canonical_json(reconstructed) != canonical_json(observed):
+                    raise ValueError("inconsistent_snapshot")
+            except (KeyError, TypeError, ValueError, AttributeError):
+                raise BenchmarkInputError("invalid_observations") from None
             if observed.get("status") != "PASS" or sample["observations"]["status"] != "PASS":
                 status = _status([status, "UNVERIFIED"])
         timing = [sample[key] for key in ("visibility_seconds", "pipeline_seconds")]
@@ -242,6 +249,7 @@ def compare(baseline: Path, candidate: Path, *, output: Path | None = None, over
     Schema, identity and file errors raise; missing eligible measurements yield
     UNVERIFIED. No SQL/network is used, and no thresholds are treated as results.
     """
+    baseline, candidate = (path.parent.resolve() / path.name for path in (baseline, candidate))
     store = BenchmarkArtifacts()
     before_ids, before, before_campaign = _campaign(store, baseline)
     after_ids, after, after_campaign = _campaign(store, candidate)
@@ -301,9 +309,7 @@ def compare(baseline: Path, candidate: Path, *, output: Path | None = None, over
         "limitations": limitations,
     }
     root = (
-        output.parent.resolve()
-        if output is not None
-        else Path(os.path.commonpath([baseline.resolve().parent, candidate.resolve().parent]))
+        output.parent.resolve() if output is not None else Path(os.path.commonpath([baseline.parent, candidate.parent]))
     )
     if output is not None:
         check_output(output, store, overwrite=overwrite)
