@@ -190,6 +190,8 @@ def sql_case():
 def pytest_runtest_makereport(item, call):
     """Retain actual outcomes while excluding driver/credential diagnostics."""
     outcome = yield
+    if not item.nodeid.startswith("tests/integration/composition/test_composition_mssql_store_live.py::"):
+        return
     report = outcome.get_result()
     if report.failed:
         report.longrepr = "SQL component test failed; sensitive driver diagnostics suppressed"

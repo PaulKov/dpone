@@ -1,4 +1,4 @@
-# Real protected-ledger SQL only; this does not certify a route or full parent.
+# Real SQL ledger and gate components; this does not certify a route or full parent.
 name: Composition SQL Server component
 
 on:
@@ -19,9 +19,13 @@ permissions:
 
 jobs:
   control-ledger:
-    name: Composition protected ledger / SQL Server 2022
+    name: Composition ${{ matrix.profile }} / SQL Server 2022
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [store, gate]
     steps:
       - name: Checkout exact candidate head
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -57,17 +61,20 @@ jobs:
         run: uv sync --locked --extra mssql
 
       - name: Run on a newly disposable SQL Server
+        env:
+          COMPONENT_PROFILE: ${{ matrix.profile }}
         run: |
           uv run python tools/composition_mssql_synthetic.py \
-            --output-dir "$RUNNER_TEMP/composition-mssql-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            --profile "$COMPONENT_PROFILE" \
+            --output-dir "$RUNNER_TEMP/composition-mssql-${COMPONENT_PROFILE}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Retain sanitized component observations
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: composition-mssql-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: composition-mssql-${{ matrix.profile }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/composition-mssql-${{ github.run_id }}-${{ github.run_attempt }}/summary.json
-            ${{ runner.temp }}/composition-mssql-${{ github.run_id }}-${{ github.run_attempt }}/junit.xml
+            ${{ runner.temp }}/composition-mssql-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}/summary.json
+            ${{ runner.temp }}/composition-mssql-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}/junit.xml
           if-no-files-found: error
           retention-days: 90

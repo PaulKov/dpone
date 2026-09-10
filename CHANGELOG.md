@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add an isolated SQL Server gate qualification profile covering actual issued
+  credentials, reconnect closure, transaction drain and unknown-outcome recovery.
+  Its exact 16-case evidence is separate from the seven-case control-ledger
+  profile and does not certify native or transfer worker execution.
+
 - Add concrete SQL Server persistence for complete composition occurrences and
   cross-connector guards, with independent commit readback and exact protected
   attempt/proof closure before retirement or successor admission. Add one-time

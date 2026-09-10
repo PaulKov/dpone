@@ -116,7 +116,8 @@ on an explicitly approved disposable runner is:
 ```bash
 uv sync --locked --extra mssql
 uv run python tools/composition_mssql_synthetic.py \
-  --output-dir "$RUNNER_TEMP/composition-mssql-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+  --profile gate \
+  --output-dir "$RUNNER_TEMP/composition-mssql-gate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 ```
 
 The output must be a new directory outside the checkout. The runner creates its
@@ -126,9 +127,26 @@ and `junit.xml`, recording exact source, image, driver and server identity. All
 expected cases must execute without skips. A cleanup failure changes the result
 to FAIL. No raw driver diagnostics or credentials belong in these artifacts.
 
+The workflow runs two independent profiles, each in its own fresh container:
+
+| Profile | Required cases | Evidence scope |
+|---|---|---|
+| `store` (default) | 7 | Real ledger DDL, whole-parent transactions, conflicts, lost acknowledgements and retirement |
+| `gate` | 16 | Real issued credentials, target permissions and continuity, monotonic LOGON closure, races, in-flight transactions and explicit unknown recovery |
+
+The gate profile uses the actual closed-gate and quiescence producers. Its
+test-only outcome producer binds observed SQL and independent reconciliation;
+it does not qualify the future native/transfer worker outcome producer. The
+runner rejects a missing, skipped, duplicate or foreign case, including results
+from the other profile. JUnit retains bounded numeric SQL error identifiers and
+fixed domain reasons for failure diagnosis; raw driver messages stay suppressed.
+Default non-live collection skips both profiles without opening a connection.
+
 This component's ClickHouse rows are synthetic ledger metadata. Route
-qualification, LOGON concurrency and complete worker execution remain separate
-observations; a component PASS must not be reported as their certification.
+qualification and complete worker execution remain separate observations;
+a component PASS must not be reported as their certification. LOGON conclusions
+require a green `gate` result on the exact source and pinned server version;
+the `store` profile supplies no such evidence.
 
 ## Required downstream matrix
 

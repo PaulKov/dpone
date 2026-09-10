@@ -5,6 +5,7 @@ import os
 import subprocess
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from tools import composition_mssql_synthetic as runner
@@ -213,3 +214,56 @@ def test_output_under_checkout_is_refused_without_side_effects(monkeypatch, harn
     monkeypatch.setattr(runner, "ROOT", output.parent)
     assert runner.run(output) == 1
     assert not calls and not output.exists()
+
+
+@pytest.mark.parametrize("profile,count", [("store", 7), ("gate", 16)])
+def test_profiles_have_closed_disjoint_case_inventories(tmp_path, profile, count):
+    cases = runner.expected_cases(profile)
+    assert len(cases) == len(set(cases)) == count
+    path = tmp_path / "junit.xml"
+    suite = ET.Element("testsuite", tests=str(count), failures="0", errors="0", skipped="0")
+    for node in cases:
+        module, name = node.split("::")
+        ET.SubElement(suite, "testcase", classname=module, name=name)
+    ET.ElementTree(suite).write(path)
+    assert runner.validate_results(path, profile)["totals"]["passed"] == count
+    other = "gate" if profile == "store" else "store"
+    with pytest.raises(runner.RunFailure, match="junit_incomplete"):
+        runner.validate_results(path, other)
+
+
+def test_gate_child_collects_only_exact_gate_cases_and_skips_without_optin(tmp_path):
+    from tools.ci.assert_junit_executed import junit_cases
+
+    env = dict(os.environ)
+    env.pop("DPONE_RUN_COMPOSITION_MSSQL_GATE_LIVE", None)
+    env.pop("DPONE_RUN_COMPOSITION_MSSQL_LIVE", None)
+    with pytest.raises(runner.RunFailure, match="junit_incomplete_or_not_green"):
+        runner.execute_component(tmp_path, env, "gate")
+    cases = junit_cases(tmp_path / "junit.xml")
+    assert len(cases) == 16
+    assert {case.node_id for case in cases} == set(runner.expected_cases("gate"))
+    assert all(case.status == "skipped" for case in cases)
+
+
+def test_unknown_profile_is_rejected_before_side_effects(harness):
+    calls, _, output = harness
+    with pytest.raises(runner.RunFailure, match="unknown_component_profile"):
+        runner.run(output, "all")
+    assert not calls and not output.exists()
+
+
+@pytest.mark.parametrize("own_case", [True, False])
+def test_store_plugin_sanitizes_only_its_live_cases(own_case):
+    from tests.integration.composition.mssql_store_live_support import pytest_runtest_makereport
+
+    report = SimpleNamespace(failed=True, longrepr="original diagnostic", sections=[("capture", "output")])
+    node = runner.TEST_FILE + "::test_example" if own_case else "tests/test_other.py::test_example"
+    hook = pytest_runtest_makereport(SimpleNamespace(nodeid=node), None)
+    next(hook)
+    with pytest.raises(StopIteration):
+        hook.send(SimpleNamespace(get_result=lambda: report))
+    if own_case:
+        assert report.longrepr != "original diagnostic" and report.sections == []
+    else:
+        assert report.longrepr == "original diagnostic" and report.sections == [("capture", "output")]

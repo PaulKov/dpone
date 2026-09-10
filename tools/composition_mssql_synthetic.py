@@ -7,7 +7,8 @@ Prerequisites: clean checkout, Docker Linux/amd64 daemon, Microsoft ODBC Driver
 PATH is a new directory outside the checkout. No existing service is accepted.
 Only JUnit and a sanitized component summary are retained; no driver errors,
 commands, DSNs, container environment, credentials or broad logs are published.
-This is control-ledger SQL evidence, never downstream/route certification.
+Profiles qualify the control ledger or issued-principal gate and recovery.
+Neither profile certifies downstream execution or a source-to-sink route.
 """
 
 from __future__ import annotations
@@ -43,10 +44,41 @@ EXPECTED_TESTS = (
     "test_unresolved_attempt_blocks_retirement[RUNNING]",
     "test_unresolved_attempt_blocks_retirement[COMMIT_UNKNOWN]",
 )
+GATE_CASES = {
+    "tests.integration.composition.test_composition_mssql_gate_live": (
+        "test_installed_gate_policy_and_reader_permissions",
+        "test_issued_principal_has_only_managed_writer_scope",
+        "test_gate_transitions_are_monotonic_and_reconnect_is_denied",
+        "test_stale_and_replayed_attempts_never_issue_credentials",
+        "test_recreated_target_database_blocks_issuance",
+        "test_owner_and_role_permission_drift_block_issuance",
+        "test_concurrent_issuance_returns_credentials_once",
+        "test_missing_or_recreated_sid_cannot_prove_closed",
+    ),
+    "tests.integration.composition.test_composition_mssql_gate_recovery_live": (
+        "test_lost_admission_ack_never_authorizes_replay",
+        "test_lost_journal_ack_never_creates_or_reissues_login",
+        "test_lost_ready_ack_closes_the_real_issued_login",
+        "test_connection_attempts_racing_close_cannot_reconnect",
+        "test_inflight_command_and_open_transaction_block_quiescence",
+        "test_foreign_transaction_blocks_but_observer_does_not",
+        "test_missing_terminal_proof_blocks_overlapping_reuse",
+        "test_real_commit_unknown_requires_explicit_reconciliation",
+    ),
+}
 
 
 class RunFailure(RuntimeError):
     """A fixed, secret-free failure reason suitable for public evidence."""
+
+
+def expected_cases(profile):
+    """Closed inventories prevent another profile or partial run from passing."""
+    if profile == "store":
+        return tuple(f"{TEST_CLASS}::{name}" for name in EXPECTED_TESTS)
+    if profile == "gate":
+        return tuple(f"{module}::{name}" for module, names in GATE_CASES.items() for name in names)
+    raise RunFailure("unknown_component_profile")
 
 
 def command(args, *, env=None, timeout=120):
@@ -73,14 +105,14 @@ def source_identity():
     return sha, clean
 
 
-def validate_results(path):
+def validate_results(path, profile="store"):
     """Reuse existing JUnit readers, then bind exact cases and observed counts."""
     from tools.ci.assert_junit_executed import evaluate_junit, junit_cases, summarize_junit
 
     try:
-        ok, _ = evaluate_junit(path, min_passed=len(EXPECTED_TESTS), max_skipped=0)
+        expected = set(expected_cases(profile))
+        ok, _ = evaluate_junit(path, min_passed=len(expected), max_skipped=0)
         totals, cases = summarize_junit(path), junit_cases(path)
-        expected = {f"{TEST_CLASS}::{name}" for name in EXPECTED_TESTS}
         if (
             not ok
             or len(cases) != len(expected)
@@ -137,8 +169,9 @@ def provision_database(env):
         raise RunFailure("database_provision_failed") from None
 
 
-def execute_component(output, env):
+def execute_component(output, env, profile="store"):
     """One bounded child pytest process, with sanitized JUnit failure reports."""
+    test_files = tuple(dict.fromkeys(node.split("::")[0].replace(".", "/") + ".py" for node in expected_cases(profile)))
     child_env = env | {
         "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
         "PYTHONDONTWRITEBYTECODE": "1",
@@ -151,18 +184,20 @@ def execute_component(output, env):
             sys.executable,
             "-m",
             "pytest",
-            TEST_FILE,
+            *test_files,
             "-q",
             "-o",
             "addopts=",
             "-p",
             "no:cacheprovider",
             "-p",
-            "tests.integration.composition.mssql_store_live_support",
+            f"tests.integration.composition.mssql_{profile}_live_support",
             "--tb=no",
             "--show-capture=no",
             "-o",
             "junit_logging=no",
+            "-o",
+            "junit_family=xunit1",
             "-o",
             "junit_log_passing_tests=false",
             "--junitxml",
@@ -173,11 +208,12 @@ def execute_component(output, env):
     )
     if result.returncode:
         raise RunFailure("component_pytest_failed")
-    return validate_results(output / "junit.xml")
+    return validate_results(output / "junit.xml", profile)
 
 
-def run(output):
+def run(output, profile="store"):
     """Own the full lifecycle; cleanup failure overrides any otherwise green run."""
+    cases = expected_cases(profile)
     output = output.resolve()
     if output == ROOT or ROOT in output.parents:
         print('{"status":"FAIL","reason":"output_must_be_outside_checkout"}')
@@ -190,20 +226,25 @@ def run(output):
     report = {
         "schema_version": "dpone.composition-mssql-component.v1",
         "status": "FAIL",
+        "profile": profile,
         "component_scope": {
-            "sql_server": "real_dbapi_control_ledger",
+            "sql_server": "real_dbapi_control_ledger"
+            if profile == "store"
+            else "real_issued_principal_gate_and_recovery",
             "clickhouse": "synthetic_enrollment_metadata_only",
             "route_certification": "UNVERIFIED",
             "native_v2_and_logon_guarantees": "UNVERIFIED",
             "worker_execution": "UNVERIFIED",
             "terminal_proof_producers": "UNVERIFIED",
+            "gate_and_quiescence_producers": "real_sql" if profile == "gate" else "UNVERIFIED",
+            "outcome_producer": "test_fixture_sql_observations" if profile == "gate" else "UNVERIFIED",
         },
         "image_reference": SQL_IMAGE,
         "host_system": platform.system(),
         "host_machine": platform.machine(),
         "python_version": platform.python_version(),
         "pytest_version": version("pytest"),
-        "expected_test_count": len(EXPECTED_TESTS),
+        "expected_test_count": len(cases),
         "cleanup": "N/A",
         "junit_path": "junit.xml",
     }
@@ -232,6 +273,9 @@ def run(output):
             "DPONE_COMPOSITION_RUN_TOKEN": token,
             "DPONE_COMPOSITION_SQL_DATABASE": "dpone_composition_" + token,
         }
+        env.pop("DPONE_RUN_COMPOSITION_MSSQL_GATE_LIVE", None)
+        if profile == "gate":
+            env["DPONE_RUN_COMPOSITION_MSSQL_GATE_LIVE"] = "1"
         owned_name = "dpone-composition-" + token
         report["owned_container_name"] = owned_name
         report["stage"] = "container_start"
@@ -274,7 +318,7 @@ def run(output):
         report["stage"] = "database_provision"
         report.update(provision_database(env))
         report["stage"] = "component_tests"
-        report.update(execute_component(output, env))
+        report.update(execute_component(output, env, profile))
         report["stage"] = "source_readback"
         after_sha, after_clean = source_identity()
         report.update(source_commit_after=after_sha, source_clean_after=after_clean)
@@ -303,7 +347,9 @@ def run(output):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
-    return run(parser.parse_args(argv).output_dir)
+    parser.add_argument("--profile", choices=("store", "gate"), default="store")
+    args = parser.parse_args(argv)
+    return run(args.output_dir, args.profile)
 
 
 if __name__ == "__main__":
