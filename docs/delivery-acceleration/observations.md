@@ -3,12 +3,17 @@
 This guide helps platform engineers and maintainers explain bounded native
 ClickHouse-to-MSSQL work and compare retained benchmark runs. Start with the
 [native transport guide](../mssql-native-transport.md) and the
-[approved design](../feature-design-data-delivery-acceleration-v1.md).
+[approved design](../feature-design-data-delivery-acceleration-v1.md). The integrated
+journey is documented in the [delivery acceleration overview](index.md).
 
 The DDA-01 component adds optional diagnostics and an offline developer tool.
 DDA-06 owns runtime composition, navigation and the operations journey; DDA-05
-owns real-row benchmark production. This component alone does not wire observers
-into the existing runtime or establish measured acceleration. Existing manifests,
+owns real-row benchmark production. In the integrated runtime,
+`NativeDeliverySession` connects bounded phase observations. Diagnostic delivery and
+pipeline totals intentionally remain unavailable because the runtime has no
+independent target visibility probe; the DDA-05 harness owns those measured
+boundaries. The standalone DDA-01 component does not wire runtime call sites or
+establish measured acceleration. Existing manifests,
 CLI defaults, tuple frames, journals, receipts and recovery remain compatible.
 No migration is required. Public native partition SWITCH remains rejected.
 
@@ -44,8 +49,11 @@ when diagnostics are omitted. Its phase/duration scopes perform no clock reads.
 The frozen port is `NativeDeliveryObserver.record(observation) -> None`. Recorders
 catch ordinary clock/observer errors, preserve the original business exception,
 and expose stable failure codes; connector exception messages are never copied.
-Cancellation retains a separate cancelled attempt. Retry identifiers do not
-replace previous attempts.
+Python cancellation (`CancelledError` or `KeyboardInterrupt`) records a separate
+cancelled attempt. Cooperative native cancellation and lease loss retain
+`WindowContractError` and therefore record failed when raised inside an observed
+phase; instrumentation does
+not translate business exceptions. Retry identifiers do not replace attempts.
 
 `collector.recorder(...)` connects the recorder's diagnostic callback explicitly.
 `collector.snapshot()` includes all retained recorder failure channels. When
@@ -229,7 +237,10 @@ field test a branch of the consumer; they are not live measurements.
 DDA-06 must connect optional keyword-only observer arguments at composition
 seams, forward bounded worker payloads, retain recorder failure channels, and
 place the two duration boundaries at actual visibility and pipeline completion.
-It must preserve the legacy journal dictionaries and add the English navigation,
+The integrated runtime must leave total durations unavailable until an
+independent visibility probe exists; it must not infer visibility from a finalizer
+return. DDA-05's harness owns the current measured total boundaries. Preserve the
+legacy journal dictionaries and add the English navigation,
 overview/runbook and changelog entries in its owned paths. Validate the independent
 DDA-05 producer and this consumer together before merging integration. Review the
 [task plan](../data-delivery-acceleration-tasks.md) for ownership and the
