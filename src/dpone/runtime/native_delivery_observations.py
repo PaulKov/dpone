@@ -53,6 +53,7 @@ def _valid_report(report: dict[str, Any]) -> bool:
             or not isinstance(report["limitations"], list)
             or len(report["limitations"]) > len(_DIAGNOSTICS)
             or not set(report["limitations"]) <= _DIAGNOSTICS
+            or not isinstance(report["durations"], dict)
             or set(report["durations"]) != {"delivery", "pipeline"}
         ):
             return False
@@ -238,7 +239,7 @@ class NativeDeliveryRecorder:
     def _tick(self) -> int | None:
         try:
             value = self._clock()
-            if type(value) is not int or value < 0:
+            if type(value) is not int or not 0 <= value <= 2**63 - 1:
                 raise ValueError("invalid_clock")
             return value
         except Exception:

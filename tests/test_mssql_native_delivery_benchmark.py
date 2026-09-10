@@ -104,6 +104,8 @@ def run_fixture(root, *, commit="a" * 40, seconds=10, execution="hermetic"):
                         "sample_id",
                         "route",
                         "execution",
+                        "scope",
+                        "fixture",
                         "checks",
                         "status",
                     )
@@ -244,6 +246,8 @@ def test_failed_fidelity_blocks_success_despite_fast_samples(tmp_path):
                         "sample_id",
                         "route",
                         "execution",
+                        "scope",
+                        "fixture",
                         "status",
                     )
                 },
@@ -339,7 +343,7 @@ def test_atomic_output_hash_overwrite_and_alias_protection(tmp_path):
 
 
 def test_atomic_write_failure_preserves_previous_report_and_cleans_temp(tmp_path, monkeypatch):
-    import dpone.runtime.native_delivery_benchmark as module
+    import dpone.runtime.native_delivery_benchmark_artifacts as module
 
     baseline, candidate = run_fixture(tmp_path / "b"), run_fixture(tmp_path / "c")
     output = tmp_path / "comparison.json"
@@ -356,7 +360,7 @@ def test_atomic_write_failure_preserves_previous_report_and_cleans_temp(tmp_path
 
 
 def test_atomic_no_clobber_concurrent_publication(tmp_path, monkeypatch):
-    import dpone.runtime.native_delivery_benchmark as module
+    import dpone.runtime.native_delivery_benchmark_artifacts as module
 
     baseline, candidate = run_fixture(tmp_path / "b"), run_fixture(tmp_path / "c")
     output = tmp_path / "comparison.json"
@@ -431,3 +435,60 @@ def test_output_outside_input_tree_retains_relative_verified_evidence(tmp_path):
         assert content_sha256(path.read_bytes()) == ref["sha256"]
         assert (path.parent / "sample-1.json").exists()
     assert compare(baseline, candidate, output=output, overwrite=True) == result
+
+
+def test_bundled_internal_symlink_reference_keeps_retained_bytes(tmp_path):
+    baseline, candidate = run_fixture(tmp_path / "b"), run_fixture(tmp_path / "c")
+    (candidate.parent / "alias.json").symlink_to("fidelity.json")
+    mutate(candidate, lambda r: r["fidelity_receipt"].update(path="alias.json"))
+    destination = tmp_path / "reports"
+    destination.mkdir()
+    result = compare(baseline, candidate, output=destination / "comparison.json")
+    retained = destination / result["candidate"]["path"]
+    assert (retained.parent / "alias.json").read_bytes() == (candidate.parent / "fidelity.json").read_bytes()
+    assert compare(destination / result["baseline"]["path"], retained)["status"] == "UNVERIFIED"
+
+
+def test_evidence_assertions_preserve_json_scalar_types(tmp_path):
+    from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+
+    baseline, candidate = run_fixture(tmp_path / "b"), run_fixture(tmp_path / "c")
+
+    def substitute(receipt):
+        proof = json.loads((candidate.parent / receipt["checks"][0]["evidence"]["path"]).read_text())
+        receipt["checks"][0].update(expected={"rows": 1}, observed={"rows": 1})
+        proof["checks"][0].update(expected={"rows": True}, observed={"rows": True})
+        ref = retain(candidate.parent, "scalar-substitution.json", proof)
+        for check in receipt["checks"]:
+            check["evidence"] = ref
+
+    mutate_receipt(candidate, 1, substitute)
+    with pytest.raises(BenchmarkInputError, match="live_observation_check_mismatch"):
+        compare(baseline, candidate)
+
+
+def test_cli_argument_errors_do_not_echo_sensitive_unrecognized_values(capsys):
+    from tools.native_delivery_benchmark import main
+
+    with pytest.raises(SystemExit) as caught:
+        main(["compare", "--baseline", "b.json", "--candidate", "c.json", "--output", "out.json", "--password=SECRET"])
+    assert caught.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == "" and "SECRET" not in captured.err
+
+
+def test_raw_schema_version_boolean_is_not_integer_identity(tmp_path):
+    from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+
+    baseline, candidate = run_fixture(tmp_path / "b"), run_fixture(tmp_path / "c")
+
+    def substitute(receipt):
+        proof = json.loads((candidate.parent / receipt["checks"][0]["evidence"]["path"]).read_text())
+        proof["schema_version"] = True
+        ref = retain(candidate.parent, "bool-schema.json", proof)
+        for check in receipt["checks"]:
+            check["evidence"] = ref
+
+    mutate_receipt(candidate, 1, substitute)
+    with pytest.raises(BenchmarkInputError, match="live_observation_identity_mismatch"):
+        compare(baseline, candidate)
