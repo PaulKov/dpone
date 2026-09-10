@@ -71,10 +71,10 @@ def require_gate_policy(ledger: CompositionMssqlLedger, database: str) -> None:
         "p.name, p.type, p.is_disabled, "
         "(SELECT COUNT(*) FROM sys.server_trigger_events e JOIN sys.server_triggers x ON x.object_id=e.object_id "
         "WHERE e.type_desc='LOGON' AND x.is_disabled=0), "
-        "HAS_PERMS_BY_NAME(NULL, 'SERVER', 'VIEW SERVER STATE'), "
-        "HAS_PERMS_BY_NAME(NULL, 'SERVER', 'VIEW ANY DEFINITION'), "
+        "HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW SERVER STATE'), "
+        "HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW ANY DEFINITION'), "
         "CASE WHEN CONVERT(int, SERVERPROPERTY('ProductMajorVersion')) < 16 THEN 1 "
-        "ELSE HAS_PERMS_BY_NAME(NULL, 'SERVER', 'VIEW SERVER PERFORMANCE STATE') END "
+        "ELSE HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW SERVER PERFORMANCE STATE') END "
         "FROM sys.server_triggers t JOIN sys.server_sql_modules m ON m.object_id=t.object_id "
         "JOIN sys.server_principals p ON p.principal_id=m.execute_as_principal_id WHERE t.name=?;",
         GATE_TRIGGER,
@@ -123,10 +123,10 @@ def require_gate_policy(ledger: CompositionMssqlLedger, database: str) -> None:
         raise CompositionAdmissionError("login_gate_permission_policy")
     cursor.execute(
         f"EXECUTE AS LOGIN = N'{GATE_READER}'; "
-        "BEGIN TRY SELECT HAS_PERMS_BY_NAME(NULL, 'SERVER', 'VIEW SERVER STATE'), "
-        "HAS_PERMS_BY_NAME(NULL, 'SERVER', 'VIEW ANY DEFINITION'), "
+        "BEGIN TRY SELECT HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW SERVER STATE'), "
+        "HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW ANY DEFINITION'), "
         "CASE WHEN CONVERT(int, SERVERPROPERTY('ProductMajorVersion')) < 16 THEN 1 "
-        "ELSE HAS_PERMS_BY_NAME(NULL, 'SERVER', 'VIEW SERVER PERFORMANCE STATE') END, "
+        "ELSE HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW SERVER PERFORMANCE STATE') END, "
         "HAS_PERMS_BY_NAME(?, 'OBJECT', 'SELECT'); REVERT; END TRY BEGIN CATCH REVERT; THROW; END CATCH;",
         ledger.table("login_gates"),
     )

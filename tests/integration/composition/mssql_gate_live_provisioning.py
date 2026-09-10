@@ -13,7 +13,14 @@ import secrets
 from contextlib import closing
 from uuid import uuid4
 
-from dpone.adapters.composition_mssql_gate_schema import GATE_READER, render_composition_mssql_login_gate
+from dpone.adapters.composition_mssql_gate_schema import (
+    GATE_READER,
+    GATE_TRIGGER,
+    login_trigger_sql,
+    module_sha256,
+    monotonic_trigger_sql,
+    render_composition_mssql_login_gate,
+)
 from dpone.adapters.composition_mssql_schema import render_composition_mssql_schema
 
 
@@ -167,6 +174,95 @@ class ProvisionedGate:
         )
         assert len(pins) == 1 and pins[0][0] > 4 and pins[0][3] == self.controller_sid
         return name, pins[0]
+
+    def observe_policy(self):
+        """Retain only bounded catalog facts; never SQL bodies or driver text.
+
+        The two permission forms are observed independently for diagnosis.
+        Neither their values nor observed module hashes change runtime policy.
+        """
+        logon = self.sql(
+            "SELECT TOP (2) DB_NAME(),t.is_disabled,DATALENGTH(m.definition),"
+            "HASHBYTES('SHA2_256',CONVERT(varbinary(max),m.definition)),m.execute_as_principal_id,"
+            "p.principal_id,p.sid,p.type,p.is_disabled,"
+            "CASE WHEN p.name=? AND p.sid=SUSER_SID(?) THEN 1 ELSE 0 END,"
+            "(SELECT COUNT(*) FROM sys.server_trigger_events e JOIN sys.server_triggers x ON x.object_id=e.object_id "
+            "WHERE e.type_desc='LOGON' AND x.is_disabled=0) "
+            "FROM sys.server_triggers t LEFT JOIN sys.server_sql_modules m ON m.object_id=t.object_id "
+            "LEFT JOIN sys.server_principals p ON p.principal_id=m.execute_as_principal_id WHERE t.name=?;",
+            GATE_READER,
+            GATE_READER,
+            GATE_TRIGGER,
+        )
+        monotonic = self.sql(
+            "SELECT TOP (2) t.is_disabled,DATALENGTH(m.definition),HASHBYTES('SHA2_256',CONVERT(varbinary(max),m.definition)) "
+            "FROM sys.triggers t LEFT JOIN sys.sql_modules m ON m.object_id=t.object_id WHERE t.object_id=OBJECT_ID(?);",
+            f"[{self.schema}].[composition_login_gate_monotonic]",
+        )
+        permissions = ("VIEW SERVER STATE", "VIEW ANY DEFINITION", "VIEW SERVER PERFORMANCE STATE")
+        projection = ",".join(
+            f"HAS_PERMS_BY_NAME(NULL,'SERVER','{permission}'),HAS_PERMS_BY_NAME(NULL,NULL,'{permission}')"
+            for permission in permissions
+        )
+        controller_permissions = self.sql("SELECT " + projection + ";")
+        reader_permissions = self.sql(
+            f"EXECUTE AS LOGIN=N'{GATE_READER}'; BEGIN TRY SELECT {projection},"
+            "HAS_PERMS_BY_NAME(?,'OBJECT','SELECT'),"
+            "CASE WHEN SUSER_SID()=SUSER_SID(?) THEN 1 ELSE 0 END; REVERT; END TRY BEGIN CATCH REVERT; THROW; END CATCH;",
+            self.table("login_gates"),
+            GATE_READER,
+        )
+        grants = self.sql(
+            "SELECT TOP (65) x.state,x.permission_name FROM sys.server_permissions x "
+            "JOIN sys.server_principals p ON p.principal_id=x.grantee_principal_id WHERE p.name=? ORDER BY x.permission_name,x.state;",
+            GATE_READER,
+        )
+
+        def rows(values, columns):
+            return [
+                {
+                    key: value.hex() if isinstance(value, bytes) else value
+                    for key, value in zip(columns, row, strict=True)
+                }
+                for row in values
+            ]
+
+        permission_columns = tuple(
+            permission.lower().replace(" ", "_") + suffix
+            for permission in permissions
+            for suffix in ("_server_class", "_null_class")
+        )
+        expected_logon = login_trigger_sql(self.database.database, self.schema)
+        expected_monotonic = monotonic_trigger_sql(self.schema)
+        return {
+            "expected_control_database": self.database.database,
+            "expected_logon_sha256": module_sha256(expected_logon).hex(),
+            "expected_logon_utf16_bytes": len(expected_logon.encode("utf-16le")),
+            "expected_monotonic_sha256": module_sha256(expected_monotonic).hex(),
+            "expected_monotonic_utf16_bytes": len(expected_monotonic.encode("utf-16le")),
+            "logon": rows(
+                logon,
+                (
+                    "control_database",
+                    "disabled",
+                    "definition_utf16_bytes",
+                    "sha256",
+                    "execute_as_principal_id",
+                    "joined_principal_id",
+                    "reader_sid",
+                    "reader_type",
+                    "reader_disabled",
+                    "reader_identity_matches",
+                    "enabled_logon_trigger_count",
+                ),
+            ),
+            "monotonic": rows(monotonic, ("disabled", "definition_utf16_bytes", "sha256")),
+            "controller_permissions": rows(controller_permissions, permission_columns),
+            "reader_permissions": rows(
+                reader_permissions, (*permission_columns, "gate_select", "effective_sid_matches")
+            ),
+            "reader_server_grants": rows(grants, ("state", "permission")),
+        }
 
     def auxiliary_owner(self):
         """A disabled disposable principal used only for the foreign-owner fault."""

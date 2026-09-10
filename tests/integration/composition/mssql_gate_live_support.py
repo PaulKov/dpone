@@ -310,6 +310,7 @@ def gate_environment():
 
 @pytest.fixture
 def gate_case(gate_environment, record_property):
+    record_property("dpone.gate.installed_policy", observation_document(gate_environment.observe_policy()))
     case = GateCase(gate_environment, record_property)
     try:
         yield case

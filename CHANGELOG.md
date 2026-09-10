@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Correct SQL Server gate permission probes to use the server securable's NULL
+  class, so valid controller and gate-reader privileges can be observed.
+
 - Add an isolated SQL Server gate qualification profile covering actual issued
   credentials, reconnect closure, transaction drain and unknown-outcome recovery.
   Its exact 16-case evidence is separate from the seven-case control-ledger

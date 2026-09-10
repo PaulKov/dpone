@@ -80,6 +80,30 @@ def test_external_provisioning_keeps_server_grants_in_master_and_lifeline_in_con
     environment.close()
 
 
+def test_policy_diagnostics_preserve_observed_nulls_and_hash_mismatch_without_sql_bodies(monkeypatch):
+    environment = ProvisionedGate(SimpleNamespace(database="owned_control"))
+    returned = iter(
+        (
+            (("owned_control", False, 123, b"x" * 32, 257, 257, b"s" * 16, "S", True, 1, 1),),
+            ((False, 456, b"y" * 32),),
+            ((None, 1, None, 1, None, 1),),
+            ((None, 1, None, 1, None, 1, 1, 1),),
+            (("G", "VIEW SERVER STATE"),),
+        )
+    )
+    monkeypatch.setattr(environment, "sql", lambda *_: next(returned))
+    observed = environment.observe_policy()
+    assert observed["logon"][0]["sha256"] == (b"x" * 32).hex()
+    assert observed["logon"][0]["sha256"] != observed["expected_logon_sha256"]
+    assert observed["logon"][0]["reader_identity_matches"] == 1
+    assert observed["controller_permissions"][0]["view_server_state_server_class"] is None
+    assert observed["controller_permissions"][0]["view_server_state_null_class"] == 1
+    assert observed["reader_permissions"][0]["effective_sid_matches"] == 1
+    document = support.observation_document(observed)
+    assert "CREATE TRIGGER" not in document and "SELECT " not in document
+    assert json.loads(document)["reader_server_grants"] == [{"state": "G", "permission": "VIEW SERVER STATE"}]
+
+
 def test_connection_scope_rejects_unowned_database_before_driver(monkeypatch):
     environment = ProvisionedGate(SimpleNamespace(database="owned", password="never-print", port=49152))
     with pytest.raises(RuntimeError, match="fixture_database_scope"):

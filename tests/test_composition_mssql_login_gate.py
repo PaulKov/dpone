@@ -515,6 +515,28 @@ def test_installed_gate_policy_matches_exact_bytes_disabled_reader_and_visibilit
     assert not cursor.steps
 
 
+@pytest.mark.parametrize("context", ["controller", "reader"])
+def test_server_permission_checks_use_the_sql_server_securable_contract(context):
+    """An invalid SERVER class yields NULL, even when the principal has rights."""
+
+    class ServerPermissionCursor(Cursor):
+        def execute(self, sql, *parameters):
+            result = super().execute(sql, *parameters)
+            selected = (
+                sql.startswith("SELECT DB_NAME()") if context == "controller" else sql.startswith("EXECUTE AS LOGIN")
+            )
+            if selected and "HAS_PERMS_BY_NAME(NULL, 'SERVER'," in sql:
+                values = list(self.rows[0])
+                start = 7 if context == "controller" else 0
+                values[start : start + 3] = [None, None, None]
+                self.rows = [tuple(values)]
+            return result
+
+    cursor = ServerPermissionCursor(policy_steps())
+    require_gate_policy(CompositionMssqlLedger(cursor, "dpone_control"), "Control")
+    assert not cursor.steps
+
+
 @pytest.mark.parametrize(
     "column,replacement", [(1, True), (2, b"foreign-trigger"), (5, False), (6, 2), (7, None), (8, 0), (9, 0)]
 )
