@@ -1,0 +1,195 @@
+{
+  "integrity_status": "PASS",
+  "acceptance_status": "PASS",
+  "source_commit": "7c25ce910ff4e3a929b46aa01237840ae92ef512",
+  "checked_receipts": [
+    {
+      "name": "remediation-retry-airflow-contracts",
+      "status": "PASS",
+      "receipt_sha256": "0f18f82c996cd36322b8f161e4d04348453c75b36532ad6bbf11e746a556e3ca",
+      "log_sha256": "f5935c45a1cb6156fcadbb38ae12c9c6e7e473682b77856ef8c0be2019fa82d6",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-architecture-tests",
+      "status": "PASS",
+      "receipt_sha256": "d374ec74a2a79833bd91b92dba5eeb695b2812b3c67a1b57776994773793608a",
+      "log_sha256": "8876c9830608f9c64826246c16b2934e04138061819f176caaad11a1cf8ba140",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-architecture",
+      "status": "PASS",
+      "receipt_sha256": "90583cbea4ed00f78ea91f27ac42ea292d4fc0c9cec38b344f7207c62058f993",
+      "log_sha256": "6adb57daef1456052dc18525a077943e2d7a53ff09f90b85d839bd57fd864a1b",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-authority-regressions",
+      "status": "PASS",
+      "receipt_sha256": "b8b87e88df97ec2dfb2ed1be37cb65f9f5ac623e485f7dc9552ebfbe84efb52e",
+      "log_sha256": "550b41caa02a238c7305eabb75646346956f2f3872f75979a6466521f957cbd5",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-build-airflow-pack",
+      "status": "PASS",
+      "receipt_sha256": "35019534221112fd2f2c2379d92dd9537cc429a4f61c7693f26243fa0cf17ca5",
+      "log_sha256": "a6eb32b1ab826bd3bab1fbdc194ccc0a204a1c0b42052cecce7777808968eaee",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-build-airflow-provider",
+      "status": "PASS",
+      "receipt_sha256": "a1210e8bb1fded9b4aa5aed3c6cb2549965ec6cd16d7eb6b1b5335cf82854a10",
+      "log_sha256": "d1e9161ff1658b438b56cd90a75b7f598d32873aacc4f0803ec34005695f49aa",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-compatibility",
+      "status": "PASS",
+      "receipt_sha256": "fc08f54977896917669b0b3342d17e411298f896adf2dc3c99106fa7f20daf2b",
+      "log_sha256": "ace6e35f8d0f942b41ab961801241e2567bea62b64ae81088ed17fe03de9a4fc",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-docs",
+      "status": "PASS",
+      "receipt_sha256": "27efe7c724a0498739114627737a3caf531918450b04d1bef4a930b33cc07813",
+      "log_sha256": "ec0af758e91fe0616a465d1d62d377d57dff153f57fcc68cc14a4e200d60e130",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-format",
+      "status": "PASS",
+      "receipt_sha256": "4b8c433d0e849d9147f83447e8a0ecf0a4f84646c86e692b9fac8090a75ec2f5",
+      "log_sha256": "42dcb498f7a97d14cc61aab69ba159b61770640a66c35181a62753569b21829d",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-imports",
+      "status": "PASS",
+      "receipt_sha256": "d867be6556ccae0f261aa9e02f94f8821028e103a6be861b582efeed6d02bfaf",
+      "log_sha256": "c5c49921dc979452eabca48123445542eb75bb5f1b6b93f6aa5d8918542ef8fd",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-language",
+      "status": "PASS",
+      "receipt_sha256": "5f1c5bf90e0d6f350c099afcf0ab1ed05095397b7a8d079d51ff99c2b957a9e1",
+      "log_sha256": "5cba8a0d336f6301764b9e7cb54d2168880bd1238a4afa7c45b0666fad715409",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-layers",
+      "status": "PASS",
+      "receipt_sha256": "70f94c28b42b2826f644f01bc4216728bdf3eb56c2c9f5f5f7f125dae5371a00",
+      "log_sha256": "a282ff553f588b34c20d802902273d6bef43f0a645b1ea73f6fbbc8cd55f850e",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-metrics-freshness",
+      "status": "PASS",
+      "receipt_sha256": "7d456edbeb7e8feff6243e2c9c4541c54debafcd3943bbef88bfd18518cedd1f",
+      "log_sha256": "26197228be9bdbbe9a7ba750100872e4accb175041beb9b040fe6db2054a7892",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-mkdocs",
+      "status": "PASS",
+      "receipt_sha256": "914f5cf6400c63f6fa5e53fb4ddf8f707f39719b80a2eed284e5ff76a6feb9d5",
+      "log_sha256": "e7f93cb3678d874471a9542849613abba157beff9cb14d247a22ecb3d649fccd",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-modules",
+      "status": "PASS",
+      "receipt_sha256": "0c2ed214a955ecef41f636fa3a74fece3c5239d7ebe8c56b86acf012b5d7ae42",
+      "log_sha256": "9dc0deb6bc40dbb97f70129c2f1b3e6db318268713d478f5b956f111c8d3c8f5",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-mypy",
+      "status": "PASS",
+      "receipt_sha256": "0bcb8eb791fdbee268c3a3f190ad327088f8d455facbaced90c20ec5e6e3d0ed",
+      "log_sha256": "ab26e0d0746c69dcaf85bba719d10f711c148d34255f257fea5df8c9daa3b70e",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-native-focused",
+      "status": "PASS",
+      "receipt_sha256": "ef87daf4e02ba7163f36b5487376c08d096e7cbe255eeef2f965e927045348c0",
+      "log_sha256": "aff7a439abe89c21c4bd1715f321a8ac246e451a8d00ab7070ebb721ae41b007",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-ownership",
+      "status": "PASS",
+      "receipt_sha256": "e5b52a79ef148bb8d654e1073bdfcd002ece4d5e13711ea531e24ddddf56dca6",
+      "log_sha256": "833411f8c4d79cfd5cb8fb860b760c52ea43f580cedc93d418abf5972eb6a5e3",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-package-metadata",
+      "status": "PASS",
+      "receipt_sha256": "fb61af18fe99fa8228aae7cf0d70b8260fc90c247604fbd932d2217667c74fe1",
+      "log_sha256": "629ed23e3a4f07f9fce2668c221f09cc6b0b5ae272d2e13e0bf97236e191bf7d",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-references",
+      "status": "PASS",
+      "receipt_sha256": "767d75c8da0e993ccf22515b8226459489643571e8e3cdf7ae0a1dc3c5635975",
+      "log_sha256": "27487fb254e451dd9eadd3eba343c42f9f2d5a7a59d72fda4d936a3864a72bb2",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-ruff",
+      "status": "PASS",
+      "receipt_sha256": "fe3337b178b2b2deab0eb1bf81da3f0c9f155b67a06dcb91df8036232b633d55",
+      "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "source_unchanged": true
+    },
+    {
+      "name": "remediation-retry-selection",
+      "status": "PASS",
+      "receipt_sha256": "3f09cf4327ad4a1c7bf5ee4e755258234862c4c79f7310ee91ac9594f79b2f78",
+      "log_sha256": "074a918ceef45d892846c0a54b31430c352b766698795cbdd0d92121d572a680",
+      "source_unchanged": true
+    }
+  ],
+  "junit_reports": [
+    {
+      "name": "native-focused",
+      "path": "remediation-retry-native-focused-junit.xml",
+      "sha256": "14a4c47ff1a7a1f641c4dc09b7047e329a6bf7c81680a8e896ed94064d1a11c3",
+      "tests": 520,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 520
+    },
+    {
+      "name": "authority-regressions",
+      "path": "remediation-retry-authority-regressions-junit.xml",
+      "sha256": "7dc6e227c774efa20b01efe0aef78c0fa2a95dd4e85ab9350b6107f342b00283",
+      "tests": 296,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 296
+    },
+    {
+      "name": "architecture-tests",
+      "path": "remediation-retry-architecture-tests-junit.xml",
+      "sha256": "3deb4d3611b5c0e5b09f374a1cccdcaef75710e3f2e3929ce6f393dc0b9dcee7",
+      "tests": 41,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 41
+    }
+  ],
+  "full_suite_status": "RUNNING: separate receipt",
+  "selection_coverage": "Selected pytest keyword slices are covered by the complete non-live suite; live checks excluded, not counted as passes."
+}
