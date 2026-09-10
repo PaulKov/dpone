@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import re
 
+from dpone_airflow_pack.kubernetes_resources import QUANTITY_PATTERN, RESOURCE_NAMES
+
 PROVIDER_EXECUTION_SCHEMA = "dpone.airflow-provider-execution.v1"
 RETRY_AUTHORITY_SCHEMA = "dpone.airflow-retry-authority.v1"
 RETRY_AUTHORITY_MODE = "postgres_xmin_initial_mssql_target_atomic_v1"
@@ -59,6 +61,10 @@ def provider_execution_json_schema() -> dict[str, object]:
         "type": "object",
         "minProperties": 1,
         "maxProperties": MAX_RESOURCE_ENTRIES,
+        "properties": {
+            name: {"type": "string", "maxLength": 64, "pattern": rf"^{QUANTITY_PATTERN}$"}
+            for name in sorted(RESOURCE_NAMES)
+        },
         "propertyNames": {
             "type": "string",
             "minLength": 1,

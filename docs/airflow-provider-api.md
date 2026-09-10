@@ -244,7 +244,8 @@ process plan, and fails closed for every multi-process pack. Whole-workload
 projections are accepted only when top-level Airflow tasks cover every
 process-local separate hook with the same selector, argv, dependencies and
 execution policy. Pre-hook child failures propagate a non-zero task exit after
-bounded XCom evidence is written.
+diagnostics are captured under `/var/lib/dpone/run`; they do not publish XCom. See
+[startup service files](airflow-runtime-startup-diagnostics.md).
 
 Strict tasks default to `retries=0`. A bounded positive value is accepted only
 when the authenticated workload pack contains compiler-issued
@@ -269,8 +270,10 @@ KPO; externalized hooks and outcome tasks remain at zero retries because their
 side effects are not covered by the chunk target fence.
 
 The strict release compiler carries only `pool` and `retries` from a DAG
-specification into the immutable release. Legacy hints such as `in_cluster` and
-every executable or pod-security override are removed before the DAG-spec
+specification into the immutable release. Resource-capable Pod overrides are
+rejected with migration guidance to [workload resources](airflow-workload-resources.md).
+Other legacy hints such as `in_cluster` and executable or pod-security overrides
+are removed before the DAG-spec
 fingerprint is recomputed. Deploy this compiler behavior only with a
 coordinated `dpone-airflow-pack` and `apache-airflow-providers-dpone` version of
 at least `0.74.20`; older readers reject the retained closed override surface.

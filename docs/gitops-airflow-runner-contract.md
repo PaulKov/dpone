@@ -1,5 +1,10 @@
 ## Compact Airflow runner contract
 
+For CPU, memory and temporary disk settings, see
+[Configure Airflow workload resources](airflow-workload-resources.md). For
+non-root hooks and OS startup failures, use
+[runtime startup diagnostics](airflow-runtime-startup-diagnostics.md).
+
 Environment and domain defaults configure Kubernetes placement and runner-local
 assets through a single `airflow.runner` block. This mirrors how mature
 platforms split concerns:

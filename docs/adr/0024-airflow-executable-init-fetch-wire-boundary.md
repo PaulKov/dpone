@@ -274,6 +274,33 @@ provider-owned pod annotation. Producer and provider must use this same
 projection, preventing admission-time failures and prefix-truncation
 collisions without breaking existing short IDs.
 
+### Bounded resources and explicit service-file publication (2026-09-10)
+
+Workload authoring exposes `airflow.resources` (`gitops.airflow.resources` in
+manifests) for CPU, memory and ephemeral-storage requests/limits. The
+dependency-light provider owns their shared quantity/structural validator;
+canonical core authoring policy composes it without importing an Airflow or
+Kubernetes SDK. The compiler validates and projects these values before pack
+identity is computed. Resource-only changes also enter authoring semantic
+identity so selective builds cannot omit them. Absent settings preserve legacy
+identity and Pod defaults. Existing v1 extended resource names retain bounded
+structural compatibility; the new authoring surface admits only three names.
+
+Runtime and separate-hook base containers inherit the same resources. No
+arbitrary Pod override is enabled; resource-capable overrides are rejected
+before strict rewriting can discard them. Init-fetch and sidecar resource
+policy remain unchanged. The resource guide specifies exact quantity bounds,
+comparison, precedence and upgrade behavior.
+
+Verified execution derives XCom publication independently from the child exit
+policy. Runtime/dbt publish through the KPO-provided writable XCom volume;
+pre-hooks use the existing writable run emptyDir and never require XCom path
+access. Canonical runtime helpers prepare service files and report safe OS
+failure stage/type/errno. Workload/artifact mounts remain read-only, hook child
+failures still block runtime, and no security-context authority is added.
+See [resources](../airflow-workload-resources.md) and
+[startup diagnostics](../airflow-runtime-startup-diagnostics.md).
+
 ### Record the current trusted computing base
 
 For this increment, the trusted computing base includes:

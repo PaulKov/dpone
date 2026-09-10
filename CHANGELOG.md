@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add validated workload `airflow.resources` for CPU, memory and ephemeral
+  storage; preserve requests/limits through strict delivery and bind resource
+  changes to authoring selection and artifact identity. Reject resource-capable
+  Pod overrides with migration guidance instead of discarding them.
+- Fix separate Airflow hooks requiring `/airflow/xcom` despite disabled XCom.
+  Keep hook diagnostics on the writable run volume, preserve child failures,
+  and report safe startup stage, exception type and errno without raw argv.
+
 ## 0.74.36 - 2026-09-09
 
 - Add opt-in bounded atomic rolling-window Python composition with a PostgreSQL

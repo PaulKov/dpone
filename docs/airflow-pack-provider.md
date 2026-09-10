@@ -1,5 +1,10 @@
 # Formal Airflow provider and lightweight pack reader
 
+For CPU, memory and temporary disk settings, see
+[Configure Airflow workload resources](airflow-workload-resources.md). For
+non-root hooks and OS startup failures, use
+[runtime startup diagnostics](airflow-runtime-startup-diagnostics.md).
+
 Purpose: install and operate the parse-safe dpone provider in Airflow without
 pulling connector/runtime dependencies into the control plane.
 

@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 
+from dpone.contracts.airflow_resources import KubernetesResourceError, workload_airflow_resources
 from dpone.gitops.workload_catalog_models import (
     GitOpsConfigProvenance,
     GitOpsWorkloadCatalogReport,
@@ -46,6 +47,11 @@ class WorkloadCatalogResolver:
             *self._inferred_workloads(root_path, root, env=env),
         ]
         blockers = list(_duplicate_id_blockers(workloads))
+        for workload in workloads:
+            try:
+                workload_airflow_resources(workload.effective_config)
+            except KubernetesResourceError as exc:
+                blockers.append(issue(code=exc.code, message=str(exc), path=workload.workload_id))
         return GitOpsWorkloadCatalogReport(
             workload_set=root_label,
             env=env,

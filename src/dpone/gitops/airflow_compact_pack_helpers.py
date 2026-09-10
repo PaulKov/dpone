@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from dpone.gitops.airflow_asset_partition import normalize_asset_items
 from dpone.gitops.workload_catalog_models import GitOpsWorkloadDefinition
 from dpone.gitops.workload_dependencies import WorkloadDependencyResolver, WorkloadFileDependency
 
@@ -78,7 +79,18 @@ def compact_pack_runtime_image_pull_policy(image: str) -> str:
     return "IfNotPresent"
 
 
+def compact_pack_execution_policy(effective_config: dict[str, Any]) -> dict[str, Any]:
+    airflow = dict_mapping(effective_config.get("airflow"))
+    execution = dict_mapping(airflow.get("execution"))
+    normalized = dict(execution)
+    for asset_field in ("inlets", "outlets"):
+        if asset_field in normalized:
+            normalized[asset_field] = normalize_asset_items(normalized[asset_field])
+    return normalized
+
+
 __all__ = [
+    "compact_pack_execution_policy",
     "compact_pack_artifact_index",
     "compact_pack_image_pull_secrets",
     "compact_pack_outcome_gate",
