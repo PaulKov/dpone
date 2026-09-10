@@ -1,0 +1,37 @@
+{
+  "checked_commit": "33b7ad30cdb12a0f1804bb1b72570504133f4342",
+  "command": [
+    "uv",
+    "run",
+    "--locked",
+    "--no-sync",
+    "pytest",
+    "-m",
+    "not integration_live",
+    "-n",
+    "auto",
+    "--dist",
+    "loadfile",
+    "--basetemp",
+    "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dpone-dda05-final-33b7ad3-2pxzu_dl/pytest"
+  ],
+  "cwd": "/Users/paulkov007/.codex/worktrees/e7c8/dpone-public",
+  "temp_parent": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dpone-dda05-final-33b7ad3-2pxzu_dl",
+  "effective_gid": 20,
+  "temp_parent_gid": 20,
+  "probe_mode": "0o2777",
+  "controlled_environment": {
+    "DPONE_RUN_INTEGRATION": "0",
+    "DPONE_RUN_INTEGRATION_LIVE": "0",
+    "DPONE_DDA_DISPOSABLE_APPROVED": "0",
+    "PYTEST_XDIST_AUTO_NUM_WORKERS": "2"
+  },
+  "started_at": "2026-09-10T17:40:34.581968+00:00",
+  "status": "PASS",
+  "ended_at": "2026-09-10T18:01:48.860021+00:00",
+  "elapsed_seconds": 1274.27,
+  "exit_code": 0,
+  "final_head": "33b7ad30cdb12a0f1804bb1b72570504133f4342",
+  "final_worktree_status": "",
+  "source_identity_status": "PASS"
+}

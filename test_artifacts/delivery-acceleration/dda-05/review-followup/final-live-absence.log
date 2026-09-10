@@ -1,0 +1,3 @@
+sssssssssssssssssss                                                      [100%]
+=========================== short test summary info ============================
+SKIPPED [19] tests/integration/mssql/clickhouse_mssql_delivery_support.py:32: SKIP: DDA disposable environment is not explicitly approved

@@ -1,0 +1,151 @@
+[
+  {
+    "strategy": "partition_replace",
+    "case": "normal",
+    "status": "PASS",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "partition_replace",
+    "case": "old_missing_receipt",
+    "status": "PASS",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "partition_replace",
+    "case": "old_phantom_receipt",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "partition_replace",
+    "case": "new_missing_receipt",
+    "status": "PASS",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "partition_replace",
+    "case": "new_wrong_receipt",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "partition_replace",
+    "case": "new_missing_expected",
+    "status": "UNVERIFIED",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "partition_replace",
+    "case": "missing_metadata",
+    "status": "UNVERIFIED",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "partition_replace",
+    "case": "unknown_stage_read",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "partition_replace",
+    "case": "unknown_business_change",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "partition_replace",
+    "case": "unknown_extra_publication",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "partition_replace",
+    "case": "known_metadata_drift",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "partition_replace",
+    "case": "known_pending_pipeline",
+    "status": "PASS",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "normal",
+    "status": "PASS",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "old_missing_receipt",
+    "status": "PASS",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "old_phantom_receipt",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "new_missing_receipt",
+    "status": "PASS",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "new_wrong_receipt",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "new_missing_expected",
+    "status": "UNVERIFIED",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "missing_metadata",
+    "status": "UNVERIFIED",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "unknown_stage_read",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "unknown_business_change",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "unknown_extra_publication",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "known_metadata_drift",
+    "status": "FAIL",
+    "verdict": "PASS"
+  },
+  {
+    "strategy": "full_refresh",
+    "case": "known_pending_pipeline",
+    "status": "PASS",
+    "verdict": "PASS"
+  },
+  {
+    "case": "frozen_v1_compatibility",
+    "verdict": "PASS",
+    "eligible_live_samples": 0
+  }
+]

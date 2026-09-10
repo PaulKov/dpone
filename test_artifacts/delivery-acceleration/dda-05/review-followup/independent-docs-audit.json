@@ -1,0 +1,61 @@
+{
+  "artifact_dir": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda05-doc-audit-dc5_bb2d",
+  "yaml_and_json_examples": "PASS",
+  "local_report_links": "PASS",
+  "rendered_sections": "PASS",
+  "checks": [
+    {
+      "case": "--help",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "case": "run --help",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "case": "inspect --help",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "case": "recover --help",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "case": "cleanup --help",
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "case": "absence",
+      "exit": 0,
+      "stdout": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda05-doc-audit-dc5_bb2d/absence.json: SKIP",
+      "stderr": ""
+    },
+    {
+      "case": "inspect",
+      "exit": 0,
+      "stdout": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda05-doc-audit-dc5_bb2d/absence.json: SKIP; eligible_trials=0",
+      "stderr": ""
+    },
+    {
+      "case": "refuse_existing",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "native_delivery.invalid_input_or_execution; inspect configuration, factory and retained evidence"
+    }
+  ],
+  "subject": {
+    "commit": "33b7ad30cdb12a0f1804bb1b72570504133f4342",
+    "dirty": false
+  },
+  "producer": {
+    "commit": "33b7ad30cdb12a0f1804bb1b72570504133f4342",
+    "dirty": false,
+    "name": "dpone-native-delivery-live",
+    "version": "1"
+  }
+}

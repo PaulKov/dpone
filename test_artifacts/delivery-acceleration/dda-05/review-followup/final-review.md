@@ -1,5 +1,9 @@
 # DDA-05 receipt atomicity and diagnostic evidence correction
 
+> Historical corrective record authored before final validation. The subsequent
+> independent approvals and completed frozen full gate are recorded in
+> [the final completion report](completion.md). Original logs remain unchanged.
+
 A second fresh-context read-only certification reviewer assessed exact commit
 `b5ad9d28e9273543b5c49932f1d458df7942caa8`. All 114 focused tests passed, but an
 independent reproduction found two remaining issues and returned REQUEST CHANGES:
