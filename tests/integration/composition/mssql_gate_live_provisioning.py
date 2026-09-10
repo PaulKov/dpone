@@ -129,8 +129,10 @@ class ProvisionedGate:
             "Dp1!" + secrets.token_urlsafe(32),
         )
         self.recover(f"ALTER LOGIN [{GATE_READER}] DISABLE; CREATE USER [{GATE_READER}] FOR LOGIN [{GATE_READER}];")
+        # Server permission GRANT requires master (SQL Server error 4621).
+        # Dedicated sessions leave the recovery lifeline in its control DB.
         for permission in ("VIEW SERVER STATE", "VIEW ANY DEFINITION", "VIEW SERVER PERFORMANCE STATE"):
-            self.recover(f"GRANT {permission} TO [{GATE_READER}];")
+            self.sql(f"GRANT {permission} TO [{GATE_READER}];", database="master")
         batches = gate_batches(self.database.database, self.schema)
         for batch in batches[:-1]:
             self.recover(batch)
@@ -141,7 +143,7 @@ class ProvisionedGate:
             f"CREATE TABLE [{self.schema}].[synthetic_outcomes] (evidence_sha256 varchar(71) NOT NULL PRIMARY KEY, "
             "attempt_sha256 varchar(71) NOT NULL, evidence_document varbinary(max) NOT NULL);"
         )
-        self.recover(batches[-1])
+        self.sql(batches[-1], database="master")
 
     def new_target(self):
         """Create and observe fresh physical identity before any enrollment row."""
