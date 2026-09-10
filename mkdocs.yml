@@ -169,6 +169,12 @@ nav:
       - Adaptive native transfer: native-transfer-industrial-runtime.md
       - Atomic rolling windows: rolling-window.md
       - MSSQL native transport: mssql-native-transport.md
+      - Delivery acceleration:
+          - Overview and first success: delivery-acceleration/index.md
+          - Prepared metadata and integrity: delivery-acceleration/preparation.md
+          - Sized frame handoff: delivery-acceleration/frames.md
+          - Isolated partition SWITCH: delivery-acceleration/partition-switch.md
+          - Operations and recovery: delivery-acceleration/operations.md
       - Object storage staging: object-storage-staging.md
       - Supply-chain evidence: supply-chain.md
       - SLSA release self-assessment: supply-chain-slsa.md
@@ -615,6 +621,7 @@ nav:
       - ADR 0056: adr/0056-public-snapshot-governance-recovery.md
       - ADR 0057: adr/0057-bounded-window-atomic-publication.md
       - ADR 0058: adr/0058-verified-release-composition.md
+      - ADR 0062: adr/0062-isolated-mssql-switch-activation.md
 
 extra:
   generator: false
