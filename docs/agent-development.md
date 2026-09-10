@@ -76,9 +76,24 @@ uv run python tools/agent_policy/task_contract.py test_artifacts/agent-policy/my
 ### 5. Integrate and review
 
 The integrator owns shared schemas, registries, dependency files, workflows,
-MkDocs navigation, changelog, and common fixtures. After integration, a
-fresh-context reviewer examines correctness, compatibility, silent-data-risk,
-tests, docs, and evidence.
+MkDocs navigation, changelog, and common fixtures. After every feature
+implementation, including one implemented by a single agent, the integrator
+must obtain an independent subagent review before reporting completion or
+merging the change.
+
+Choose a reviewer that did not implement the feature and start it with a fresh
+context. Provide the approved contract, base and candidate commits, applicable
+repository rules, and evidence paths. The reviewer inspects the final diff and
+actual execution paths for correctness, compatibility, silent data loss or
+duplication, failure and recovery behavior, tests, docs, and evidence.
+
+Record the reviewed commit, scope, findings with severity and file/line
+references, validation limits, and verdict in the task artifacts. Resolve
+blocking findings, validate fixes, and ask the independent reviewer to review
+the changed scope. Include the final verdict, evidence link, and any remaining
+findings in the completion report. Author self-review does not satisfy this
+requirement. If a subagent is unavailable, record `UNVERIFIED` and leave the
+feature's review requirement open.
 
 ### 6. Validate
 

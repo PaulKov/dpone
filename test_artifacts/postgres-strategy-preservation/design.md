@@ -48,6 +48,17 @@ needed to obtain the already documented default.
 
 ## Scope and public contract
 
+Independent review follow-up: retain the target manager and sample callback
+injected into historical query/file loaders through the existing composition
+boundary. Callback errors fail before commit. For PostgreSQL `partition_replace`,
+publish incoming replacement rows as `replaced_rows` and outgoing old rows as
+`hard_deleted_rows`; this keeps `loaded_rows` correct when counts differ. Count
+native outgoing rows under the existing exclusive lock before DETACH. Regression
+proof covers three old rows replaced by two new rows, replay, empty old scope,
+and injected policy/sample behavior. Other engines and the common projection are
+outside this correction. These fixes restore compatibility and truthful evidence
+within the approved scope; no new manifest option or ADR is needed.
+
 Restore the existing contract in `docs/postgres.md`: omitted overwrite mode and
 `truncate_insert` preserve an existing target; only explicit `exchange` selects
 object replacement. Artifact format must not override a selected load strategy.

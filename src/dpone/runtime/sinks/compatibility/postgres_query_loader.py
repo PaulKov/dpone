@@ -8,6 +8,7 @@ from typing import Any
 from dpone.runtime.sink_logging import ETLLogger, etl_logger
 from dpone.runtime.sinks.load_payload import LoadPayload
 from dpone.runtime.sinks.load_result import LoadResult
+from dpone.runtime.sinks.postgres_strategy_factory import PostgresSinkCompositionFactory
 from dpone.runtime.sinks.strategies.postgres.target_table_manager import PostgresTargetTableManager
 
 
@@ -30,4 +31,8 @@ class PostgresInternalQueryLoader:
         """Preserve the historical call signature through the strategy entry point."""
         from dpone.runtime.sinks.postgres import PostgresSink
 
-        return PostgresSink(self.connector, None, self.logger).load(load_config, payload)
+        composition = PostgresSinkCompositionFactory(
+            target_table_manager=self.target_table_manager,
+            log_target_sample=self._log_target_sample,
+        )
+        return PostgresSink(self.connector, None, self.logger, composition).load(load_config, payload)

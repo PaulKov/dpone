@@ -1229,7 +1229,16 @@ mode and `truncate_insert` preserve an existing target, matching file/memory
 loads. Manifest fields, Python call signatures and result fields are unchanged.
 Legacy direct internal-query/file loader calls delegate to the configured sink
 strategy, including the historically named exchange helpers; only configured
-`overwrite_type: exchange` selects replacement. Prefer `PostgresSink.load`.
+`overwrite_type: exchange` selects replacement. Their injected target-table
+manager and sample callback remain authoritative: delegation does not replace
+them with default target policy or sample logging. A failing callback aborts the
+sink transaction before commit. Prefer `PostgresSink.load`.
+
+For PostgreSQL `partition_replace`, `replaced_rows` counts inserted replacement
+rows and `hard_deleted_rows` counts removed old rows, for both native and
+predicate replacement. Replacing three old rows with two new rows reports
+`loaded_rows=2`, `replaced_rows=2`, and `hard_deleted_rows=3`; replay reports
+`hard_deleted_rows=2`. Counts represent rows rather than physical partitions.
 
 Invalid rows, missing TRUNCATE privileges and incoming foreign keys can now
 correctly fail loads that previously bypassed the target contract. Upgrading

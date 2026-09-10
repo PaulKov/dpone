@@ -10,7 +10,9 @@ import pytest
 
 from dpone.config import LoadStrategy
 from dpone.runtime.artifacts import FileExportArtifact, InMemoryRowsArtifact
+from dpone.runtime.etl.result_metrics import populate_success_result
 from dpone.runtime.sinks.load_payload import LoadPayload
+from dpone.runtime.sinks.strategies.postgres.target_table_manager import PostgresTargetTableManager
 from tests.integration.postgres.strategy_preservation_support import BUSINESS_SCHEMA, PreservationLab
 
 pytestmark = [pytest.mark.integration_live, pytest.mark.integration_postgres]
@@ -177,7 +179,8 @@ def test_scoped_strategies_preserve_unrelated_rows(lab, strategy):
     assert lab.rows() == [(1, "new", "2026-01-02"), (90, "previous", "2026-01-01")]
     assert result.staging_rows == 1
     if strategy is LoadStrategy.PARTITION_REPLACE:
-        assert result.replaced_rows == 0
+        assert result.replaced_rows == 1
+        assert result.hard_deleted_rows == 0
     lab.snapshot("scoped")
     lab.assert_transaction(committed=True)
 
@@ -189,11 +192,14 @@ def test_native_partition_scope_and_fallback(lab, native_mode, wide):
     lab.execute(
         f"CREATE TABLE {lab.schema}.january PARTITION OF {lab.schema}.target FOR VALUES FROM ('2026-01-01') TO ('2026-02-01')"
     )
-    lab.execute(f"INSERT INTO {lab.schema}.target VALUES (90,'previous','2026-01-01')")
+    lab.execute(
+        f"INSERT INTO {lab.schema}.target VALUES (90,'old','2026-01-01'),(92,'old','2026-01-01'),(93,'old','2026-01-01')"
+    )
     if wide:
         lab.execute(f"INSERT INTO {lab.schema}.target VALUES (91,'outside','2026-01-02')")
     before = lab.snapshot("before")
-    lab.source([(1, "new", "2026-01-01")])
+    new_rows = [(1, "new", "2026-01-01"), (2, "second", "2026-01-01")]
+    lab.source(new_rows)
     cfg = lab.config(
         load_strategy=LoadStrategy.PARTITION_REPLACE,
         partition={"column": "event_day", "values_from_staging": True, "native": True, "native_mode": native_mode},
@@ -203,12 +209,17 @@ def test_native_partition_scope_and_fallback(lab, native_mode, wide):
             lab.load(cfg)
         assert lab.snapshot("native-rejected") == before
         return
-    result = lab.load(cfg)
-    assert lab.rows() == [(1, "new", "2026-01-01")] + ([(91, "outside", "2026-01-02")] if wide else [])
-    assert result.replaced_rows == 1
-    events = lab.last_events()
-    assert any("DETACH PARTITION" in e.get("sql", "") for e in events) is not wide
-    lab.snapshot("native-or-fallback")
+    for attempt in range(2):
+        result = lab.load(cfg)
+        assert lab.rows() == new_rows + ([(91, "outside", "2026-01-02")] if wide else [])
+        public = {}
+        populate_success_result(public, result, validation_info=None, reconciliation_metrics=None)
+        assert public["loaded_rows"] == public["inserted_rows"] == public["replaced_rows"] == 2
+        assert public["hard_deleted_rows"] == (3 if attempt == 0 else 2)
+        assert public["final_rows"] == (3 if wide else 2)
+        events = lab.last_events()
+        assert any("DETACH PARTITION" in e.get("sql", "") for e in events) is not wide
+        lab.snapshot(f"native-or-fallback-{attempt}")
 
 
 def test_multiple_values_in_same_native_child_preserve_rows(lab):
@@ -289,9 +300,17 @@ def test_legacy_file_loader_preserves_strategy_and_releases_file(lab, tmp_path, 
     path.write_text(f"1,{'new' if valid else 'invalid'},2026-01-01\n")
     artifact = FileExportArtifact(str(path), columns=["id", "name", "event_day"], compressed=False, format="csv")
     batch = LoadPayload(artifact, BUSINESS_SCHEMA)
-    loader = PostgresFileExportLoader(lab.connector, None, None, lambda *_: None)
+    calls = []
+
+    class TargetPolicy(PostgresTargetTableManager):
+        def ensure_target_table(self, load_config, schema):
+            calls.append("target")
+            return super().ensure_target_table(load_config, schema)
+
+    manager = TargetPolicy(lab.connector, None, lambda _: False)
+    loader = PostgresFileExportLoader(lab.connector, None, manager, lambda *_: calls.append("sample"))
     call = getattr(loader, entry)
-    args = [lab.config(), batch] + ([] if entry == "load" else [artifact])
+    args = [lab.config(log_sample_rows=1), batch] + ([] if entry == "load" else [artifact])
     if valid:
         assert call(*args).inserted_rows == 1
         assert lab.snapshot("loaded")["metadata"] == before["metadata"]
@@ -299,6 +318,7 @@ def test_legacy_file_loader_preserves_strategy_and_releases_file(lab, tmp_path, 
         with pytest.raises(psycopg.errors.CheckViolation):
             call(*args)
         assert lab.snapshot("rejected") == before
+    assert calls == (["target", "sample"] if valid else ["target"])
     assert not path.exists()
 
 

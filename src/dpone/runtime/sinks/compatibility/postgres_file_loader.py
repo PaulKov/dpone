@@ -11,6 +11,7 @@ from dpone.runtime.file_artifacts import FileExportArtifact
 from dpone.runtime.sink_logging import ETLLogger, etl_logger
 from dpone.runtime.sinks.load_payload import LoadPayload
 from dpone.runtime.sinks.load_result import LoadResult
+from dpone.runtime.sinks.postgres_strategy_factory import PostgresSinkCompositionFactory
 from dpone.runtime.sinks.staging_managers.postgres import PostgresStagingManager
 from dpone.runtime.sinks.strategies.postgres.target_table_manager import PostgresTargetTableManager
 
@@ -73,8 +74,14 @@ class PostgresFileExportLoader:
         """Retain loader signatures; the configured strategy owns write semantics."""
         from dpone.runtime.sinks.postgres import PostgresSink
 
+        composition = PostgresSinkCompositionFactory(
+            target_table_manager=self.target_table_manager,
+            log_target_sample=self._log_target_sample,
+        )
         try:
-            return PostgresSink(self.connector, None, self.logger).load(load_config, payload.rebind(artifact=artifact))
+            return PostgresSink(self.connector, None, self.logger, composition).load(
+                load_config, payload.rebind(artifact=artifact)
+            )
         finally:
             # Historical standalone loaders own their temporary export file.
             # cleanup_file is best-effort and cannot hide a database OSError.

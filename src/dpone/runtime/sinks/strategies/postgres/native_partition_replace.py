@@ -83,8 +83,12 @@ class PostgresNativePartitionReplacer:
         partition_plan: list[tuple[str, str, str]],
     ) -> LoadResult:
         inserted_total = 0
-        replaced_partitions = 0
+        deleted_total = 0
         for value, child_regclass, partition_bound in partition_plan:
+            # The caller holds the parent/children lock through commit. Count
+            # outgoing rows before DETACH; physical partitions are not row units.
+            old_rows = self.connector.get_records(f"SELECT COUNT(*) FROM {child_regclass}")
+            deleted_total += int(old_rows[0][0])
             replacement_table = f"dpone_part_{uuid.uuid4().hex}"
             self.connector.execute_query(self._create_replacement_sql(load_config, replacement_table, child_regclass))
             inserted_total += self._insert_partition_value_into_table(
@@ -92,14 +96,14 @@ class PostgresNativePartitionReplacer:
             )
             self.connector.execute_query(self._detach_partition_sql(load_config, child_regclass))
             self.connector.execute_query(self._attach_partition_sql(load_config, replacement_table, partition_bound))
-            replaced_partitions += 1
             self.connector.execute_query(f"DROP TABLE IF EXISTS {child_regclass}")
 
         return LoadResult(
             inserted_rows=inserted_total,
             updated_rows=0,
             total_rows=self._count_target(load_config),
-            replaced_rows=replaced_partitions,
+            replaced_rows=inserted_total,
+            hard_deleted_rows=deleted_total,
         )
 
     def _target_is_declarative_partitioned(self, load_config: Any) -> bool:

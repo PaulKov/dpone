@@ -49,15 +49,28 @@ _STAGING_SQL_DELEGATES = {
 class PostgresStrategyBase(SinkStrategy, ABC):
     """Общий базовый класс для стратегий PostgreSQL."""
 
-    def __init__(self, connector, logger: ETLLogger | None, staging_manager):
+    def __init__(
+        self,
+        connector,
+        logger: ETLLogger | None,
+        staging_manager,
+        *,
+        target_table_manager: PostgresTargetTableManager | None = None,
+        log_target_sample: Callable[[Any, int], None] | None = None,
+    ):
         self.connector = connector
         self.logger = logger or etl_logger
         self.staging_manager = staging_manager
 
-        self.target_table_manager = PostgresTargetTableManager(
-            connector=self.connector,
-            logger=self.logger,
-            include_technical_columns=self._include_technical_columns,
+        self._target_sample_callback = log_target_sample
+        self.target_table_manager = (
+            target_table_manager
+            if target_table_manager is not None
+            else PostgresTargetTableManager(
+                connector=self.connector,
+                logger=self.logger,
+                include_technical_columns=self._include_technical_columns,
+            )
         )
         self.staging_sql_helper = PostgresStagingSqlHelper(
             connector=self.connector,
@@ -121,6 +134,9 @@ class PostgresStrategyBase(SinkStrategy, ABC):
 
     def _log_target_sample(self, load_config: Any, max_rows: int = 5) -> None:
         """Логирует sample данных из целевой таблицы."""
+        if self._target_sample_callback is not None:
+            self._target_sample_callback(load_config, max_rows)
+            return
         query = sql.SQL("SELECT * FROM {}.{} LIMIT %s").format(
             sql.Identifier(load_config.target_schema),
             sql.Identifier(load_config.target_table),

@@ -16,6 +16,7 @@ public_contract_impact:
   migration_required: false
 owned_paths:
   - src/dpone/runtime/sinks/postgres.py
+  - src/dpone/runtime/sinks/postgres_strategy_factory.py
   - src/dpone/runtime/sinks/compatibility
   - src/dpone/runtime/sinks/strategies/postgres
   - src/dpone/runtime/sinks/staging_managers/postgres.py

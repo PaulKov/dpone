@@ -4,6 +4,12 @@ Production source: `1ff83879fc7640d358cad15402672eafddcabf41`.
 Baseline: `d5ad9aaecc900c24df421b160ed36b4cfc726e45`.
 MR: <https://github.com/PaulKov/dpone/pull/31>.
 
+**Independent review follow-up:** a new reviewer found two P2 regressions in
+`648237b6`: ignored legacy-loader dependencies and incorrect partition row
+metrics. Fixes and their current validation status are tracked in
+[independent-review.md](independent-review.md). They change production bytes;
+the original live/CI receipts below remain evidence for their recorded commits.
+
 ## Result and scope
 
 Internal-query, memory and file artifacts now reach the configured PostgreSQL
@@ -23,6 +29,8 @@ The design and task contracts are recorded in [design.md](design.md),
 [task-contract.yml](task-contract.yml), and
 [live-test-contract.yml](live-test-contract.yml).
 Independent code and proof reviews are recorded in [review.md](review.md).
+The later independent review and finding disposition are recorded separately in
+[independent-review.md](independent-review.md).
 
 ## Validation
 

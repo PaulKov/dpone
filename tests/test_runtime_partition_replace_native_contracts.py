@@ -186,7 +186,8 @@ def test_postgres_partition_replace_uses_declarative_detach_attach_when_bounds_r
     result = strategy.load(cfg, LoadPayload(artifact=_Artifact(), schema=[("id", "bigint"), ("business_date", "date")]))
 
     joined = "\n".join(query for query, _ in connector.queries)
-    assert result.replaced_rows == 1
+    assert result.replaced_rows == result.inserted_rows == 2
+    assert result.hard_deleted_rows == 100
     assert "DETACH PARTITION" in joined
     assert "landing.orders_20260603" in joined
     assert "ATTACH PARTITION" in joined

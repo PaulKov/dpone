@@ -9,8 +9,11 @@
   uses one sink-owned transaction without destructive post-rollback compensation.
   Keep primary errors and all strategy result fields through staging cleanup.
 - Route legacy PostgreSQL query/file loader entry points through the configured
-  strategy, remove automatic CASCADE, isolate long staging names and fall back
+  strategy while preserving injected target policy and sample callbacks. Remove
+  automatic CASCADE, isolate long staging names and fall back
   safely when native partition replacement would remove out-of-scope rows.
+  Report inserted replacement rows and removed old rows separately, including
+  native partitions, so public load counters retain their row units.
   See the [recovery runbook](docs/source-sink/postgres-to-postgres.md#runbook);
   upgrading does not reconstruct previously lost constraints.
 
