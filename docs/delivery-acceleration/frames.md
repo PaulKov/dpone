@@ -6,8 +6,12 @@ existing source, worker and recovery contracts. Operators can use the limit and
 failure tables to interpret failures without treating a size as data evidence.
 
 DDA-03 supplies the frame component and a local scheduler handoff fixture.
-DDA-06 owns scheduler integration and its spawned-worker regression tests.
-The component alone does not remove the active scheduler's second sizing pass.
+The [DDA-06 integration overview](https://github.com/PaulKov/dpone/blob/fefeab978749f930bc53143f7ccb25a45874973a/docs/delivery-acceleration/index.md)
+describes the integrated scheduler, which now reuses the producer's reservation
+without a second scheduler sizing pass. The standalone DDA-03 component commit
+keeps scheduler wiring outside its scope. The integration recipe below records
+the implemented wiring for review and backports.
+
 Live route correctness and throughput remain **UNVERIFIED** until measured in an
 explicitly approved disposable environment. See the
 [delivery acceleration plan](../data-delivery-acceleration-tasks.md) and
@@ -78,7 +82,7 @@ iterator; neither closes the caller's source.
 | Native `max_bytes` | Maximum native payload per frame; the accumulated size is reused as the scheduler reservation. |
 | Conservative producer IPC bound | Starts at `64 + ipc_overhead`, adds `len(pickle.dumps(row, protocol=5)) + 16` per detached row, and splits before exceeding `max_bytes`. One row plus overhead must fit independently. |
 | Exact frame IPC bound | The scheduler checks `len(pickle.dumps(frame.rows, protocol=5)) <= max_bytes`. |
-| Exact submitted-task IPC bound | The scheduler checks the complete worker arguments, serialized with protocol 5, plus 128 bytes against `max_bytes`. |
+| Exact submitted-task IPC bound | The scheduler checks `len(pickle.dumps(args, protocol=5)) + 128 <= max_bytes`; `args` contains the complete worker positional arguments, unchanged by optional observations. |
 | `max_total_encoded_bytes` | The scheduler bounds cumulative reservations across all frames. |
 | Spool payload bound | Existing pending/concurrency limits and `spool_payload_bound` bound retained native payload; format/receipt files are separately accounted. |
 | `stage_allocated_bytes_stop_threshold` | Observed SQL allocation stop threshold, checked through the importer. |
@@ -92,49 +96,61 @@ unchanged. The size is transient memory metadata, never retained evidence.
 
 ## DDA-06 scheduler integration recipe
 
-Apply these changes only in DDA-06's owned
-`src/dpone/runtime/mssql_native_chunks.py`:
+This records the wiring already implemented by DDA-06 in
+`src/dpone/runtime/mssql_native_chunks.py`; it is a review checklist, not pending
+work for users of that integration. The immutable
+[integration test source](https://github.com/PaulKov/dpone/blob/fefeab978749f930bc53143f7ccb25a45874973a/tests/test_mssql_native_delivery_integration.py)
+binds the structural expectations. Shared scheduler changes remain DDA-06-owned.
 
-1. Import `sized_native_frames` from
-   `dpone.runtime.mssql_native_sized_frames`. Replace the call to `native_frames`
-   with this generator, keeping the existing source, contract, limits,
-   cancellation callback and `ipc_overhead` arguments.
-2. Keep construction and checking of the worst-case worker envelope unchanged:
+1. The scheduler imports `sized_native_frames` from
+   `dpone.runtime.mssql_native_sized_frames` and consumes it with the existing
+   source, contract, limits, cancellation callback and `ipc_overhead` arguments.
+2. The worst-case worker envelope remains independently checked:
    `ipc_overhead = len(pickle.dumps(envelope, protocol=5)) + 128`, followed by the
    `ipc_overhead + 64 > limits.max_bytes` metadata rejection.
-3. Read `sized_frame = next(frames, None)`; test `is None` for EOF. Do not use
-   row truthiness, because the empty frame is required authority. Set
-   `frame = sized_frame.rows` and `size = sized_frame.encoded_bytes`.
-4. Remove the scheduler's sizing-only `MssqlNativeEncoder` instance, its import
-   if now unused, and `sum(encoder.encoded_row_size(row) for row in frame)`.
-   Retain the staging-object limit, exact frame pickle check, cumulative byte
-   limit, importer capacity check, and `total += size` in their current order.
-5. Preserve the exact submitted arguments:
+3. `sized_frame = next(frames, None)` uses `is None` for EOF. Empty rows are still
+   required authority. The scheduler takes `frame = sized_frame.rows` and
+   `size = sized_frame.encoded_bytes`.
+4. The scheduler's sizing-only `MssqlNativeEncoder` instance and repeated
+   `sum(encoder.encoded_row_size(row) for row in frame)` are removed. Staging-object,
+   exact frame pickle, cumulative byte and importer capacity checks retain their
+   existing order before `total += size`. Independent source adaptation and
+   worker value validation remain in place.
+5. Worker positional arguments remain
    `(contract, frame, directory / f"{ordinal}.native", ordinal,
-   limits.max_row_bytes, size)`. Serialize and check this entire tuple plus 128
-   bytes before submitting `_encode`. The worker receives the same row tuple,
-   not a `SizedNativeFrame`. Its last argument remains the reserved size.
-6. Keep `_Work(ordinal, size)`. Before `journal.attempt` or import, require
-   `file.encoded_bytes == work.encoded_bytes`; otherwise raise
-   `mssql_native.encoder_size_authority_changed`. Keep worker validation,
-   file verification, capacity, fencing, retries and EOF/receipt completion.
-7. Preserve `frames.close()` in `_stage` cleanup and caller-owned source closure
-   in `stage`, including primary-error preservation. Do not add a second source
-   close to the frame helper.
+   limits.max_row_bytes, size)`. The exact task check serializes `args` with
+   protocol 5 and adds 128 bytes. Optional observations select `_encode_observed`
+   instead of `_encode`; both receive the same positional arguments. The worker
+   receives the same row tuple, not a `SizedNativeFrame`; its last positional
+   argument remains the reservation.
+6. `_Work(ordinal, size)` retains the reservation. Before `journal.attempt` or
+   import, `file.encoded_bytes == work.encoded_bytes` is required; a mismatch raises
+   `mssql_native.encoder_size_authority_changed`. Worker validation, file
+   verification, capacity, fencing, retries and EOF/receipt completion remain.
+7. `_stage` closes `frames` during cleanup; `stage` closes its source and preserves
+   primary errors. The frame helper does not add a second source close.
 
 The executable handoff double is `_submission` in
 `tests/test_mssql_native_sized_frames.py`. Its call-counter test compares the old
-scheduler pattern (two size calls per row) with the proposed consumer (one per
+scheduler pattern (two size calls per row) with the cached-size consumer (one per
 row), preserves identical frame groups, and runs the unchanged file encoder.
 This is deterministic structural proof, not a latency or throughput benchmark.
+The component double and integrated scheduler retain the same positional task
+envelope; optional observation dispatch adds no serialized keyword arguments.
 
-After wiring, DDA-06 must run and extend
-`tests/test_mssql_native_chunks_execution.py` with real spawned workers and local
-target doubles: cached reservation reuse, a mismatched worker file size rejected
-before journal/import acceptance, exact frame/task and cumulative limits,
-mutable-buffer snapshots, empty authority, cancellation/source closure, retained
-byte retries, and recovery. Compare full frame/task pickle boundaries and errors
-against the existing scheduler. DDA-05/DDA-06 own approved live route evidence.
+DDA-06 has exercised real spawned workers with local target doubles for cached
+reservation reuse, Mapping/tuple inputs, mutable buffers and poisoned reservations
+that must fail before acceptance. Its preliminary
+[82-case frame log](https://github.com/PaulKov/dpone/blob/fefeab978749f930bc53143f7ccb25a45874973a/test_artifacts/delivery-acceleration/dda-06/green-frames.log)
+and [57-case structural/observation log](https://github.com/PaulKov/dpone/blob/fefeab978749f930bc53143f7ccb25a45874973a/test_artifacts/delivery-acceleration/dda-06/observation-wiring-reviewed.log)
+record focused hermetic results. These are distinct from DDA-03's local handoff
+fixture and do not establish a complete final integration gate or live timings.
+The subsequent [417-case focused receipt](https://github.com/PaulKov/dpone/blob/7b3b14559f4820394501dfa19dc628cd49430b03/test_artifacts/delivery-acceleration/dda-06/native-focused.json)
+records PASS on the pinned `fefeab9` integration source, including the unchanged
+positional task envelope described above.
+DDA-06 must retain and rerun the full frame/task/cumulative-limit, empty-authority,
+cancellation/closure, retry and recovery coverage on its final frozen integration
+commit. DDA-05/DDA-06 own approved live route evidence.
 
 ## Diagnose and verify
 
