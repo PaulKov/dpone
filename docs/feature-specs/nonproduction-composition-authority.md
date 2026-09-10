@@ -57,6 +57,19 @@ Scope must not live only in `provenance`, which the release hash excludes.
 Existing `runtime_context_sha256` does not cover a later execution grant and
 retains its meaning. The new scoped request explicitly binds that grant.
 
+The initial signature adapter is closed to GitHub Artifact Attestations. External
+policy pins the existing runtime-artifact-trust-policy.v2 with non_production
+trust and mandatory attestations. Its signer identity is the canonical composite
+`https://github.com/{signer_workflow}@{signer_digest}`, including the independent
+40-hex workflow commit; this is not a claim about the certificate SAN spelling.
+The Actions issuer, root bytes/digest, repository, predicate and hosted-runner
+requirements must match the external policy. Reopen policy, revocation and clock
+after signature verification; changed trust, backwards time, expiry or stale roots
+reject. Cosign public-key claims remain unsupported by this adapter because key
+possession alone does not authenticate the separate issuer/identity labels.
+Authentication does not consume grants, establish physical enrollment or issue
+credentials; those protected operations remain mandatory.
+
 ## Scope, phases and limits
 
 Common signed claims require canonical source repository/commit, fixture and
@@ -118,6 +131,9 @@ Qualification can be reread for deterministic compilation of the same intent
 inside its valid campaign; execution grants cannot migrate to another activation.
 
 ## Implementation scope and rollout
+
+The implemented policy/scope/grant subset and its remaining runtime obligations
+are documented in the [contract reference](../nonproduction-composition-authority.md).
 
 Root owns shared schemas, dispatch, app factories, CLI/provider wiring, workflows,
 changelog and navigation. Narrow canonical contracts and shared structural

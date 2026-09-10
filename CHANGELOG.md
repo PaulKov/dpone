@@ -12,6 +12,15 @@
   Its exact 16-case evidence is separate from the seven-case control-ledger
   profile and does not certify native or transfer worker execution.
 
+- Add strict nonproduction policy, complete synthetic scope and separate
+  qualification/execution grant contracts with exact canonical-byte identities
+  and minimum policy/grant/workload ceilings. Add an injectable authenticator
+  that verifies original grants through the existing GitHub attestation adapter
+  and refreshes external policy, revocation and time before accepting them.
+  Protected counters, physical enrollment and complete worker enforcement remain
+  required before scoped execution. Existing production/native-v2 authority
+  remains unchanged.
+
 - Add concrete SQL Server persistence for complete composition occurrences and
   cross-connector guards, with independent commit readback and exact protected
   attempt/proof closure before retirement or successor admission. Add one-time
