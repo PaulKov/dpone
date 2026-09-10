@@ -122,12 +122,14 @@ def require_gate_policy(ledger: CompositionMssqlLedger, database: str) -> None:
     if row(cursor) != (1,):
         raise CompositionAdmissionError("login_gate_permission_policy")
     cursor.execute(
+        "DECLARE @reader_visibility TABLE (server_state int, definitions int, performance_state int, gate_select int); "
         f"EXECUTE AS LOGIN = N'{GATE_READER}'; "
-        "BEGIN TRY SELECT HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW SERVER STATE'), "
+        "BEGIN TRY INSERT INTO @reader_visibility SELECT HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW SERVER STATE'), "
         "HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW ANY DEFINITION'), "
         "CASE WHEN CONVERT(int, SERVERPROPERTY('ProductMajorVersion')) < 16 THEN 1 "
         "ELSE HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW SERVER PERFORMANCE STATE') END, "
-        "HAS_PERMS_BY_NAME(?, 'OBJECT', 'SELECT'); REVERT; END TRY BEGIN CATCH REVERT; THROW; END CATCH;",
+        "HAS_PERMS_BY_NAME(?, 'OBJECT', 'SELECT'); REVERT; END TRY BEGIN CATCH REVERT; THROW; END CATCH; "
+        "SELECT server_state, definitions, performance_state, gate_select FROM @reader_visibility;",
         ledger.table("login_gates"),
     )
     if row(cursor) != (1, 1, 1, 1):

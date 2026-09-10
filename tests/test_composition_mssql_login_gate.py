@@ -522,9 +522,7 @@ def test_server_permission_checks_use_the_sql_server_securable_contract(context)
     class ServerPermissionCursor(Cursor):
         def execute(self, sql, *parameters):
             result = super().execute(sql, *parameters)
-            selected = (
-                sql.startswith("SELECT DB_NAME()") if context == "controller" else sql.startswith("EXECUTE AS LOGIN")
-            )
+            selected = sql.startswith("SELECT DB_NAME()") if context == "controller" else "EXECUTE AS LOGIN" in sql
             if selected and "HAS_PERMS_BY_NAME(NULL, 'SERVER'," in sql:
                 values = list(self.rows[0])
                 start = 7 if context == "controller" else 0
@@ -555,6 +553,14 @@ def test_reader_impersonation_must_prove_gate_select_and_full_session_visibility
     steps[-1] = (steps[-1][0], [(1, 1, None, 1)])
     with pytest.raises(CompositionAdmissionError, match="login_gate_reader_visibility"):
         require_gate_policy(CompositionMssqlLedger(Cursor(steps), "dpone_control"), "Control")
+
+
+def test_reader_probe_restores_controller_before_emitting_the_result_set():
+    """A caller may close/cancel after its first row; REVERT must already run."""
+    cursor = Cursor(policy_steps())
+    require_gate_policy(CompositionMssqlLedger(cursor, "dpone_control"), "Control")
+    probe = cursor.calls[-1][0]
+    assert probe.index("REVERT;") < probe.rindex("SELECT ")
 
 
 @pytest.mark.parametrize("observer", [[], [(None,)], [(True,)], [(0,)], [(123,), (456,)]])

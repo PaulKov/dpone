@@ -3,7 +3,9 @@
 ## Unreleased
 
 - Correct SQL Server gate permission probes to use the server securable's NULL
-  class, so valid controller and gate-reader privileges can be observed.
+  class, so valid controller and gate-reader privileges can be observed. Restore
+  the controller before returning probe rows, including when the driver consumes
+  only the first result set.
 
 - Add an isolated SQL Server gate qualification profile covering actual issued
   credentials, reconnect closure, transaction drain and unknown-outcome recovery.

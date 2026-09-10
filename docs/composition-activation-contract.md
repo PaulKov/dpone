@@ -107,6 +107,10 @@ through object or role ownership.
 LOGON synchronization and DMV visibility still require real tests on the pinned
 SQL Server version before worker activation is enabled.
 
+The gate-reader permission probe restores the controller before it emits its
+result set. A driver that reads only the first row must not leave subsequent
+ledger or login operations running under the reader's restricted identity.
+
 ## Disposable SQL component check
 
 The `Composition SQL Server component` GitHub workflow uses a clean candidate

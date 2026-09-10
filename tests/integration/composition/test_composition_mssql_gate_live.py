@@ -33,6 +33,18 @@ def test_installed_gate_policy_and_reader_permissions(gate_case):
     case, env = gate_case, gate_case.environment
     with composition_control_transaction(env.connect, env.schema, env.service_id) as ledger:
         require_gate_policy(ledger, env.database.database)
+        ledger.cursor.execute("SELECT SUSER_SID(), SUSER_SID(ORIGINAL_LOGIN());")
+        identities = tuple(tuple(row) for row in ledger.cursor.fetchall())
+        case.record(
+            "controller_restored",
+            {
+                "expected_controller_sid": env.controller_sid.hex(),
+                "observed_effective_and_original_sids": [
+                    [value.hex() if isinstance(value, bytes) else None for value in row] for row in identities
+                ],
+            },
+        )
+        assert identities == ((env.controller_sid, env.controller_sid),)
     rows = case.sql(
         "SELECT t.is_disabled,HASHBYTES('SHA2_256',CONVERT(varbinary(max),m.definition)) FROM sys.server_triggers t JOIN sys.server_sql_modules m ON m.object_id=t.object_id WHERE t.name=?;",
         GATE_TRIGGER,
