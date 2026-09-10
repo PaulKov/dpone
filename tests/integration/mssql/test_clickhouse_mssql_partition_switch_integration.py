@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from tests.integration.mssql.clickhouse_mssql_delivery_support import live_factory
+from tests.integration.mssql.clickhouse_mssql_delivery_support import live_factory, redacted_live
 from tools.native_delivery_live_support.artifacts import ArtifactStore
 from tools.native_delivery_live_support.execution import DeliveryClock, ExecutionAdapter
 from tools.native_delivery_live_support.maintenance import record_owner
@@ -13,6 +13,7 @@ from tools.native_delivery_live_support.runner import run_benchmark
 pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql]
 
 
+@redacted_live
 def test_real_isolated_switch_empty_window_and_receipt_first_recovery(tmp_path):
     factory, config, route = live_factory("partition_replace", "isolated_switch")
     report = run_benchmark(
@@ -28,6 +29,7 @@ def test_real_isolated_switch_empty_window_and_receipt_first_recovery(tmp_path):
 
 
 @pytest.mark.parametrize("fault", ["nonempty_switch_out", "layout_drift", "owner_drift", "between_switches"])
+@redacted_live
 def test_real_switch_rejection_or_transaction_rollback_preserves_target(tmp_path, fault):
     factory, _, route = live_factory("partition_replace", "isolated_switch")
     session = factory.open(Dataset("narrow", 16), case=fault, clock=DeliveryClock())

@@ -4,11 +4,26 @@ from __future__ import annotations
 
 import json
 import os
+from functools import wraps
 
 import pytest
 from tools.native_delivery_live_benchmark import approved
 from tools.native_delivery_live_support.execution import load_factory
 from tools.native_delivery_live_support.runner import configuration, route_record
+
+
+def redacted_live(function):
+    """Keep connector/setup exceptions out of pytest output, including chained text."""
+
+    @wraps(function)
+    def guarded(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except Exception:
+            pass
+        pytest.fail("DDA live fixture failed; inspect retained sanitized artifacts and approved factory", pytrace=False)
+
+    return guarded
 
 
 def live_factory(strategy: str, mode: str):
@@ -21,11 +36,14 @@ def live_factory(strategy: str, mode: str):
         pytest.skip("UNVERIFIED: real route factory or explicit limits file is unavailable")
     from pathlib import Path
 
+    failed = False
     try:
         config = configuration(json.loads(Path(limits_path).read_text(encoding="utf-8")))
         route = route_record(strategy, mode)
         factory = load_factory(reference, configuration=config, route=route)
     except Exception:
+        failed = True
+    if failed:
         pytest.fail(
             "Live factory preparation failed; inspect approved configuration (diagnostics redacted)", pytrace=False
         )

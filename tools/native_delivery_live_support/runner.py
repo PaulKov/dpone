@@ -53,6 +53,18 @@ def _envelope(
     }
 
 
+def _identities_match(adapter: ExecutionAdapter, envelope: dict[str, Any]) -> bool:
+    try:
+        producer = git_identity(Path(__file__).resolve().parents[2])
+        return (
+            adapter.subject() == envelope["subject"]
+            and environment_record(adapter.factory) == envelope["environment"]
+            and all(envelope["producer"][key] == value for key, value in producer.items())
+        )
+    except Exception:
+        return False
+
+
 def absent_run(
     store: ArtifactStore,
     dataset: Dataset,
@@ -137,7 +149,7 @@ def _trial(
     status, reason, known = "FAIL", "trial_failed", False
     session = None
     try:
-        if adapter.subject() != envelope["subject"] or environment_record(adapter.factory) != envelope["environment"]:
+        if not _identities_match(adapter, envelope):
             raise ValueError("trial_identity_drift")
         session = adapter.factory.open(dataset, case=sample_id, clock=clock)
         record_owner(store, session, sample_id)
@@ -167,7 +179,7 @@ def _trial(
                 if value is None
                 else measured(value, unit, "target_session_observation")
             )
-        if adapter.subject() != envelope["subject"] or environment_record(adapter.factory) != envelope["environment"]:
+        if not _identities_match(adapter, envelope):
             status, reason = "FAIL", "trial_identity_drift"
     except Exception:
         status, reason = "FAIL", "trial_execution_failed"
@@ -263,5 +275,8 @@ def run_benchmark(
         envelope["limitations"].append("Hermetic execution or dirty code cannot authorize performance certification.")
     if route["mode"] == "isolated_switch":
         envelope["limitations"].append("Isolated SWITCH component only; public native SWITCH remains rejected.")
+    if not _identities_match(adapter, envelope):
+        envelope["status"] = "FAIL"
+        envelope["limitations"].append("Producer, subject or environment identity changed during execution.")
     store.publish(envelope)
     return envelope

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from .artifacts import ArtifactStore, digest
+from .artifacts import ArtifactStore, canonical_json, digest
 from .execution import SHA, DeliveryClock, RouteFactory, Snapshot
 from .maintenance import record_owner
 from .profiles import Dataset, exact_multiset, multiset_summary
@@ -38,7 +38,7 @@ def check(
     status: str | None = None,
     reason: str | None = None,
 ) -> dict[str, Any]:
-    outcome = status or ("PASS" if expected == observed else "FAIL")
+    outcome = status or ("PASS" if canonical_json(expected) == canonical_json(observed) else "FAIL")
     return {
         "id": name,
         "status": outcome,
