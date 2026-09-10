@@ -2,14 +2,24 @@
 
 ## Unreleased
 
-- Keep native MSSQL preparation/publication locks on an independent session so
-  successful lost-COMMIT-acknowledgement reconciliation can complete evidence
-  and checkpoints without a spurious lock-release failure.
+## 0.76.0 - 2026-09-10
+
+### Added
 
 - Add opt-in Python composition for bounded native ClickHouse to MSSQL transport,
   independent verified staging, exact authored interval publication and fenced
   source-free recovery. Live interoperability/performance remain unverified;
-  see the native transport guide for required deployment authorities.
+  see the [native transport guide](docs/mssql-native-transport.md) for required
+  deployment authorities and composition. Existing transport defaults remain
+  unchanged; a native manifest requires an injected `native_runtime_factory`.
+
+### Fixed
+
+- Keep native MSSQL preparation/publication locks on an independent session so
+  successful lost-COMMIT-acknowledgement reconciliation can complete evidence
+  and checkpoints without a spurious lock-release failure.
+
+### Security
 
 - Reject Python startup-hook members in wheel/sdist inspection, including `.pth`
   files and source, compiled, or package forms of `sitecustomize`/`usercustomize`.
