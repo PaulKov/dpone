@@ -133,7 +133,8 @@ shared_file_owner: DDA-06 delivery acceleration integrator
 dependencies: []
 required_checks:
   focused:
-  - uv run pytest tests/test_native_delivery_live_benchmark.py -q
+  - uv run pytest tests/test_native_delivery_live_benchmark.py tests/test_native_delivery_live_recovery_boundaries.py
+    -q
   broad:
   - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
   - uv run ruff check .
