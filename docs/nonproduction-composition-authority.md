@@ -22,6 +22,8 @@ authority and reject the new family.
 | `dpone.contracts.nonproduction_grants.parse_nonproduction_grant(raw)` | Decode exactly the qualification or execution variant |
 | `validate_grant_subject(...)` in the grant module | Compare common policy, signature subject, scope, clock and current revocation epoch |
 | `NonproductionQualificationGrant.require_qualification_subject(...)` | Compare the exact qualification run and fixture/qualification plan subjects |
+| `dpone.contracts.nonproduction_plan_pair.require_qualification_plan_originals(...)` | Decode both bounded plan originals and compare their full declared scope with the original grant |
+| `pair.require_operation(operation, owner=...)` on the returned original pair | Select the exact work item after complete owner/operation comparison |
 | `NonproductionExecutionGrant.require_execution_subject(...)` | Compare the qualified set, native/parent releases, deployment, activation and all workload pins |
 | `dpone.runtime.nonproduction_authentication.NonproductionGrantAuthenticator` | Authenticate original qualification/execution grants and refresh independent trust after verification |
 | `dpone.ports.nonproduction_authentication.NonproductionTrustProvider` | Supply an independently configured policy, verifier-policy pins and current revocation snapshot |
@@ -47,6 +49,11 @@ Participant effects are sorted canonical digests. Their presence cannot prove
 that a connection reaches the enrolled service, that role grants are exclusive,
 or that manifests declare every actual read/write/helper/staging/state effect.
 Those facts require independent physical and complete-source verification.
+
+The [qualification plan reference](nonproduction-qualification-plans.md) defines
+the closed fixture profiles, work-item effects, source-generation dependencies
+and exact original comparisons. These internal plan codecs provide no physical
+observation, source-bound reservation, seed or execution permission.
 
 ## Limits, expiry and replay
 
@@ -188,10 +195,12 @@ Complete pool audit reads grant history one original record at a time in stable
 key order, including each original signature bundle and historical trust revision.
 It retains at most 64 distinct membership identities; an extra membership row
 rejects. Memory is bounded, but total audit work grows with registration history
-while holding the global lock. SQL concurrency, rollback, permission enforcement
-and audit duration for this registration component remain **UNVERIFIED** until
-the corresponding isolated SQL scenarios pass. Cumulative attempt and source
-budgets remain separate implementation work.
+while holding the global lock. The 18 isolated registration cases cover
+concurrency, rollback, lost acknowledgement, historical originals and permission
+enforcement in the [recorded component run](composition-shared-sql-storage.md#observed-sql-component-evidence).
+Large-history audit latency and capacity remain **UNVERIFIED**; component success
+does not establish a performance limit. Cumulative attempt and source budgets
+remain separate implementation work.
 
 ## Scoped activation request
 

@@ -1,0 +1,170 @@
+schema_version: 1
+task_id: DPONE-NONPRODUCTION-PLAN-CODECS
+title: Closed qualification plan originals and exact work-item comparison
+goal: Implement the reviewed pure internal plan-codec prerequisite without enabling qualification authority or
+  changing production/native-v2 behavior.
+specification: docs/feature-specs/nonproduction-composition-authority.md
+base_commit: 54a67f9e4c049ea63448c0e93bddf12c97654b73
+integrator: root
+shared_file_owner: root
+acceptance_criteria:
+- APPROVED within the maintainer-approved nonproduction feature. The exact closed schemas, generation DAG rules,
+  helper/source identity checks and complete comparison in docs/nonproduction-qualification-plans.md are normative.
+  Implement only the nine new owned paths; no qualification lifecycle or authority is enabled.
+- Use exactly dpone.nonproduction-fixture-plan.v1 and dpone.nonproduction-qualification-plan.v1 internal originals,
+  closed action variants and dpone.nonproduction-qualification-work-item.v1 complete item hash preimages. Keep
+  existing grant/scope/owner/operation/invocation/counter/physical formulas and all production/native-v2 bytes
+  unchanged; no seventh external authority family.
+- 'Implement only the two fixed profiles: mssql_clickhouse_bcp_wide_v1 uses the existing 202-column recipe and
+  exact parameters row_count (strict int 0..100000); postgres_mssql_wide_v1 uses the existing 128-column recipe
+  and exact parameters watermark_key_3 (strict bool). BCP seed_step is initial. PG seed_steps are initial and
+  watermark_3 only if enabled; watermark_3 requires a transitive same-fixture initial predecessor.'
+- Pin recipe descriptor paths exactly to tools/mssql_clickhouse_bcp_native_fixtures.py or tests/integration/postgres/postgres_mssql_wide_fixtures.py,
+  according to profile. Descriptors retain full original digest and strict bounded byte size, but do not reopen
+  or authenticate data. Upstream source bundle, fixture/generator, toolchain/image and intent pins retain their
+  existing scope meaning.
+- BCP bindings are exactly source and target table IDs with mssql/clickhouse connectors. PG bindings are exactly
+  source and target table IDs, enum ID and the four sequence IDs associated with c_smallserial, c_serial, c_identity
+  and c_bigserial, with postgres source/helpers and mssql target. Reject arbitrary row IDs, profile parameters,
+  object kinds, executable SQL and dynamic/default names.
+- 'Objects are table on postgres/mssql/clickhouse or enum/sequence on postgres only. Qualified names are exact
+  identifier-part arrays: three parts on PostgreSQL/MSSQL, two on ClickHouse. Explicit ASCII-safe identifiers
+  have length bounds of 63/128/128. Reject SQL fragments, wildcards, dotted-name strings, path-relative names
+  and arbitrary URLs. Preserve full Unicode logical item/object IDs without normalization.'
+- Action-specific item fields are exact. Seed selects a closed seed_step; route selects an exact six-dimensional
+  signed-scope route with matching source/sink profile, reviewed_case_original and source_bound; source_bound
+  uses only mssql_bcp_native_file or postgres_copy_payload matching the source and original input/projection/derivation
+  descriptors. Seal has exact retained_source_ids and seal_recipe_original, participant read effects only and
+  no route/export accounting fallback. No computed bound maxima or verification claim is introduced.
+- 'Validate known per-item effects independently of the full union: every route has its own source-read and target-write,
+  every seed its source-write, initial PostgreSQL seed enum read/write and four sequence writes, watermark_3 source-write
+  and enum-read without fabricated mandatory sequence use, and seal its exact source-read with no participant
+  writes. Additional declared effects require exact references, signed union and selected guards; physical truth
+  remains a later resolver obligation.'
+- Each original is at most 1 MiB; fixture count and total distinct seed/route/seal work-item count are each at
+  most 64; participants at most 256; declared objects, effect edges and aggregate read/write subjects are bounded
+  at 8192. Arrays reject unsorted/duplicate ingress. Validate every reference, full object/fixture/item usage,
+  complete route/scope union and an acyclic predecessor graph without normalizing or clipping.
+- All work items count separately within existing environment/campaign/qualification membership keyed by exact
+  work_item_id. Add no counters, keys or parser-side charges. Structurally enforce the total item count against
+  the original grant and every item lower max_workloads, the complete grant validity window against each item
+  max_validity_seconds, and grant/item lower ceiling minima. No clock or inferred policy object is permitted;
+  current policy minima and retained replacement history remain later protected obligations.
+- require_qualification_plan_originals reopens canonical bytes against the exact original qualification grant,
+  returns immutable documentary originals and requires exact scope/plan hashes. Pair require_operation revalidates
+  the complete pair, selects the exact full item hash/action, calls operation.require_owner(owner), compares full
+  original owner/grant/run/plan fields and exact declared selected guard membership. Compare owner claim projections
+  including role/read/write/service/domain without manufacturing observation_sha256; current epochs and physical
+  observation truth remain unavailable.
+- Current signed participants have no role field. Derive retained domains from fixture source bindings, combine
+  with complete-plan writes to determine owner role, and compare every full owner claim projection. Arbitrary
+  reads do not imply retained source. Reject non-retained read-only domains that current owner roles cannot represent.
+  Selecting a seal never narrows the full owner comparison or fabricates an observation digest.
+- Preserve original errors as specified by the approved contract; use value-free NP plan errors for new comparisons.
+  No SQL, credentials, signing, clock, source access, callbacks, factories, artifact downloading, runner generation/observation,
+  lifecycle transition, reservation, fake DTO authority or fallback belongs in these pure contracts.
+- Use RED/GREEN for meaningful closed-shape, identity, lower-limit, scope/role, graph, ownership and operation
+  tests, preserving original compatibility fixtures. Explicitly test opaque owner observation digests remain original
+  and operation.require_owner rejects substituted complete originals; matching declarations cannot claim enrollment
+  or epoch observation.
+- New values/pair modules own shared value validation and cross-original graph/identity algorithms, not mechanical
+  size shards. Keep every owned file at or below the 350 SLOC warning boundary, with canonical budgets unchanged.
+  Stop rather than edit existing semantic owners or create unowned paths.
+- Use the separate root-prepared /tmp/dpone-composition-v3-plan-originals worktree at exact baseline 54a67f9e4c049ea63448c0e93bddf12c97654b73
+  and independent offline /tmp/dpone-v3-plan-codecs-env environment. Freeze final owned/prerequisite hashes and
+  obtain fresh independent review. Do not commit, push, run local/live SQL or interact with PyPI. Root owns documentation/integration
+  and all existing paths.
+- Exactly one initial seed per fixture; at most one enabled PG watermark_3. Every selected route/seal requires
+  its own initial ancestor. All declared writers to each retained source must be pairwise ordered; each route
+  must be comparable with every such writer and cannot write its own source. Seal follows all source writers;
+  no seal-to-seed/route path anywhere in the owner. Seals remain optional documentary work, with no completion/transfer
+  claim. Preserve both initial-route-watermark-route and initial-watermark-final-route orders.
+- PG enum/four sequences require the source service/domain and exact database/schema. Reject duplicate fixture
+  source identities by connector/service/domain/subject, independently of object IDs. Backend alias equivalence
+  and actual generation/closure are later protected observations.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python_api
+  - state
+  - evidence
+  migration_required: false
+owned_paths:
+- src/dpone/contracts/nonproduction_plan_values.py
+- src/dpone/contracts/nonproduction_fixture_plan.py
+- src/dpone/contracts/nonproduction_qualification_plan.py
+- src/dpone/contracts/nonproduction_plan_pair.py
+- tests/nonproduction_plan_helpers.py
+- tests/test_nonproduction_plan_values.py
+- tests/test_nonproduction_fixture_plan.py
+- tests/test_nonproduction_qualification_plan.py
+- tests/test_nonproduction_plan_pair.py
+integrator_owned_paths: []
+read_only_paths:
+- AGENTS.md
+- src/dpone/AGENTS.md
+- tests/AGENTS.md
+- docs
+- src/dpone/contracts/nonproduction_scope.py
+- src/dpone/contracts/nonproduction_authority.py
+- src/dpone/contracts/nonproduction_grants.py
+- src/dpone/contracts/nonproduction_registration.py
+- src/dpone/contracts/composition_qualification_operation.py
+- src/dpone/contracts/composition_ownership.py
+- src/dpone/contracts/composition_physical_identity.py
+- src/dpone/contracts/strict_json.py
+- src/dpone/contracts/airflow_deployment.py
+- src/dpone/ports
+- src/dpone/adapters
+- src/dpone/runtime
+- src/dpone/services
+- tools
+- tests/nonproduction_authority_helpers.py
+- tests/nonproduction_signature_helpers.py
+- tests/integration
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- tests/conftest.py
+dependencies:
+- docs/nonproduction-qualification-plans.md
+- docs/adr/0061-shared-composition-physical-ownership.md
+- Exact base commit and separate writer worktree with a complete read-only prerequisite manifest.
+required_checks:
+  focused:
+  - RED/GREEN strict fixture/profile/object/action codecs and byte/hash vectors.
+  - Pair closure, DAG, original grant limits/window and exact owner/operation projection tests.
+  - Existing nonproduction authority/grant and qualification owner/operation/invocation compatibility suites.
+  broad:
+  - Ruff check and Ruff format --check for every owned file.
+  - Cold mypy --config-file mypy.ini --no-incremental naming every owned source/test/helper.
+  - Canonical module size, import rules, graph/layer observation and change-aware plan; do not change budgets
+    or claim preexisting graph FAIL as PASS.
+  - Exact source/prerequisite freeze and fresh independent source review; root owns the final full repository
+    gate.
+  live:
+  - 'N/A for this codec-only writer: no SQL, signatures, seeding, reservations, runner or source-bound certification.'
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
+- Any descriptor/bound/runner/physical truth would need to be fabricated to make a test or API succeed.
+- The adopted generation/order/helper rules conflict with an existing approved invariant; stop and report, without
+  widening ownership.

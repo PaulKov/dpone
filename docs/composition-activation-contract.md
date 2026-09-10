@@ -39,7 +39,9 @@ visibility. Legacy writable table names reject admission. See the
 [shared SQL storage reference](composition-shared-sql-storage.md) for generated
 CHECK provenance and initial installation. The protected backend must separately
 verify database continuity, role permissions, exclusive enrollment and installed
-writer gates. Schema-v2 live qualification remains pending.
+writer gates. The [schema-v2 component result](composition-shared-sql-storage.md#observed-sql-component-evidence)
+records all 50 SQL cases at the named source commit; complete worker
+qualification remains pending.
 
 The store uses one short transaction-owned application lock in the control
 database to serialize ledger changes. It also observes the actual SQL transaction

@@ -121,9 +121,13 @@ a candidate cannot replace that occurrence or its authority.
 History remains readable after expiry/revocation against its original trust
 revision and registration time. New admission must verify current authority.
 Qualification work-item identities and any lower per-item limits require the
-original, independently reopened fixture/qualification plans. Until that plan
-model exists, recording qualification consumption cannot authorize seeding,
-source access or work-item/export reservation.
+original, independently reopened fixture/qualification plans. The
+[closed plan model](../nonproduction-qualification-plans.md) compares exact
+originals, profiles, declared source-generation order and full scope/owner
+subjects. It does not independently acquire originals, observe source generation
+or calculate a protected bound. Recording qualification consumption or parsing
+those plans cannot authorize seeding, source access or work-item/export
+reservation.
 
 For the initial two export cells, source bytes retain the existing producer
 meaning: complete BCP-native file bytes including field framing for MSSQL, and

@@ -4,8 +4,10 @@ This developer reference implements the already approved
 [shared physical ownership design](composition-shared-ownership.md) and
 [ADR 0061](adr/0061-shared-composition-physical-ownership.md).
 The first SQL schema-v2 implementation covers the shared journal, execution
-store, login gates and historical proof checks. **Schema-v2 live qualification
-remains unverified.** Existing scoped execution factories remain closed.
+store, login gates and historical proof checks. The controlled component result
+below covers those SQL paths at its exact source commit. **Complete qualification
+and worker execution remain unverified.** Existing scoped execution factories
+remain closed.
 Qualification records participate in complete exclusion checks; qualification
 issuance, source sealing and atomic ownership transfer still require their
 protected implementations and campaign evidence.
@@ -95,7 +97,7 @@ in [SQL component run 34526971093](https://github.com/PaulKov/dpone/actions/runs
 They contain 37 core and 5 gate CHECKs and pin the observed control database
 collation `SQL_Latin1_General_CP1_CI_AS`. That capture run failed admission with
 empty references; it remains a failed run. The subsequent committed runtime
-must pass the complete component suite before this layout is qualified.
+passed the complete component suite as recorded below.
 
 While these references are empty, the corresponding catalog audit rejects with
 `control_schema_reference` or `login_gate_schema_reference`. The first controlled
@@ -128,6 +130,41 @@ original string values; a formatter failure produces no reference. Write their r
 Keep the original captures alongside the generated-source hash manifest. The
 next committed-source run must execute all `store`, `gate`, `trust` and
 `registration` cases with no skips and successful cleanup.
+
+## Observed SQL component evidence
+
+Commit `54a67f9e4c049ea63448c0e93bddf12c97654b73` passed all 50 original
+SQL component cases in
+[run 34529098877](https://github.com/PaulKov/dpone/actions/runs/34529098877).
+The evidence combines the original successful profiles from attempt 1 with the
+registration-only retry in attempt 2:
+
+| Profile | Original attempt | Cases | Result |
+|---|---|---:|---|
+| Store | 1 | 7 | PASS |
+| Gate | 1 | 16 | PASS |
+| Trust | 1 | 9 | PASS |
+| Registration | 2 | 18 | PASS |
+
+All 50 cases have zero failures, errors and skips. Each profile's original
+archive matched its GitHub API digest, retained the exact clean source before
+and after execution, and passed owned-container cleanup. Actual core/gate
+catalog captures match the committed 37/5 CHECK references, metadata, DDL pins
+and observed database collation. The SQL image is pinned to
+`mcr.microsoft.com/mssql/server:2022-latest@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89`.
+
+Attempt 1 remains CANCELLED: registration's Ubuntu package-index update stalled
+until the existing 25-minute job limit, before dependencies or SQL tests ran.
+It produced no registration JUnit or summary. The retry changed no source,
+workflow, image pin or timeout. Attempt 2's copied successful job records are
+not new executions of the first three profiles; their original attempt-1
+artifacts remain the evidence.
+
+This result qualifies the named component cases. It does not supply genuine
+signed route qualifications, complete physical read/write admission, source
+seals, ClickHouse publication or current/provider/worker execution. Later code
+changes require the appropriate current-source checks; the earlier failed
+capture and setup results remain retained history.
 
 ## Optional MSSQL gate deployment and proof family
 

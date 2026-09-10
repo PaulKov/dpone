@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add bounded internal fixture/qualification plan originals with closed wide
+  fixture profiles, complete declared effect and source-generation ordering
+  checks, lower-limit validation and exact grant/owner/work-item comparisons.
+  These codecs provide no physical observation, reservation or execution
+  authority and preserve existing production/native-v2 identities.
+
 - Move internal composition execution storage to one schema-v2 ownership and
   operation journal. Audit complete original scope, transaction continuity,
   table metadata and retained gate proofs; preserve existing execution bytes,
@@ -9,8 +15,10 @@
   admitted successor while fresh issuance still requires ACTIVE/RUNNING.
   Initial installation requires a new isolated ledger; no automatic adoption
   or migration is provided. Generated SQL CHECK references pin controlled
-  original expressions, column bindings and database collation. Schema-v2 live
-  qualification remains pending, and public execution factories stay closed.
+  original expressions, column bindings and database collation. Controlled
+  schema-v2 component evidence covers all 50 cases at the documented source
+  commit; complete qualification remains pending and public execution factories
+  stay closed.
 - Keep nonproduction trust reads and registrations in one observed SQL
   transaction. Recheck the original trust revision around clock callbacks,
   writes and successful returns without changing historical grant validity.
