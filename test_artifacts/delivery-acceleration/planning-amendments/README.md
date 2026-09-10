@@ -92,3 +92,16 @@ supplement. The baseline and budget files remain unchanged.
 Implementation tests and the integrated architecture/module-size gates remain
 UNVERIFIED for this supplement until DDA-06 executes and records them. The
 dependency-removal count is a scope estimate, not a prediction of a passing gate.
+
+## Excluded PostgreSQL reserve
+
+A further function-annotation candidate, ResolvedBindingConnection in
+`src/dpone/runtime/sources/postgres_source_authority.py`, is excluded from this
+supplement. Read-only inspection found active edits in six PostgreSQL worktrees
+and an explicit existing ownership contract for that file. Technical compatibility
+of an import cleanup does not transfer ownership to DDA-06.
+
+The file remains outside DDA-06's authorized paths. Preserve the PostgreSQL
+owner's changes and do not import that separate prototype as part of this scope
+adjustment. If actual integrated dependency or clustering metrics still exceed
+their limits, report FAIL and keep integration on HOLD with the measured result.
