@@ -27,6 +27,7 @@ from dpone.runtime.deployment_cache_promotion_policy import DeploymentCachePromo
 from dpone.runtime.deployment_cache_workspace_activation import DeploymentCacheWorkspaceActivation
 
 if TYPE_CHECKING:
+    from dpone.ports.composition_activation import CompositionActivationCoordinatorPort
     from dpone.ports.dbt_workspace_activation import DbtWorkspaceActivationCoordinatorPort
 
 
@@ -42,6 +43,7 @@ class DeploymentCacheMaterializer:
         allowed_promoters: tuple[str, ...] | None = None,
         max_artifact_bytes: int = DEFAULT_MAX_CACHE_ARTIFACT_BYTES,
         workspace_activation: DbtWorkspaceActivationCoordinatorPort | None = None,
+        composition_activation_coordinator: CompositionActivationCoordinatorPort | None = None,
     ) -> None:
         self._cache_root = Path(cache_root).resolve(strict=False)
         self._promotion_policy = DeploymentCachePromotionPolicy(
@@ -50,7 +52,9 @@ class DeploymentCacheMaterializer:
             allowed_promoters=allowed_promoters,
             error_factory=DeploymentCacheError,
         )
-        self._workspace_activation = DeploymentCacheWorkspaceActivation(workspace_activation)
+        self._workspace_activation = DeploymentCacheWorkspaceActivation(
+            workspace_activation, composition_coordinator=composition_activation_coordinator
+        )
         self._current_state = DeploymentCacheCurrentState(self._cache_root)
         self._projection_validator = DeploymentCacheProjectionValidator(
             self._cache_root,

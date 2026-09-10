@@ -5,19 +5,27 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from dpone.contracts.composition_activation import CompositionActivationOccurrence
 from dpone.contracts.release_composition import COMPOSITION_ADMISSION
 from dpone.gitops.release_set_validation import release_activation_failure
 from dpone.runtime.deployment_cache_common import DeploymentCacheError
 
 if TYPE_CHECKING:
+    from dpone.ports.composition_activation import CompositionActivationCoordinatorPort
     from dpone.ports.dbt_workspace_activation import DbtWorkspaceActivationCoordinatorPort
 
 
 class DeploymentCacheWorkspaceActivation:
     """Validate coordinator readback before and after local pointer mutation."""
 
-    def __init__(self, coordinator: DbtWorkspaceActivationCoordinatorPort | None) -> None:
+    def __init__(
+        self,
+        coordinator: DbtWorkspaceActivationCoordinatorPort | None,
+        *,
+        composition_coordinator: CompositionActivationCoordinatorPort | None = None,
+    ) -> None:
         self._coordinator = coordinator
+        self._composition_coordinator = composition_coordinator
 
     def prepare_occurrence(
         self,
@@ -31,11 +39,9 @@ class DeploymentCacheWorkspaceActivation:
         previous_deployment_id: str | None,
     ) -> Any | None:
         failure = release_activation_failure(dbt_wire)
-        if dbt_wire == COMPOSITION_ADMISSION and failure is not None:
-            raise DeploymentCacheError(failure.code, failure.message)
         if failure is None:
             return None
-        coordinator = self._coordinator
+        coordinator: Any = self._composition_coordinator if dbt_wire == COMPOSITION_ADMISSION else self._coordinator
         if coordinator is None:
             raise DeploymentCacheError(failure.code, failure.message)
         try:
@@ -56,6 +62,8 @@ class DeploymentCacheWorkspaceActivation:
                 previous_deployment_id=previous_deployment_id,
             )
             prepared.__post_init__()
+            if dbt_wire == COMPOSITION_ADMISSION:
+                _require_parent_state(prepared, "PREPARED")
             return prepared
         except DeploymentCacheError:
             raise
@@ -66,7 +74,11 @@ class DeploymentCacheWorkspaceActivation:
         if prepared is None:
             return
         try:
-            coordinator = self._coordinator
+            coordinator: Any = (
+                self._composition_coordinator
+                if isinstance(prepared, CompositionActivationOccurrence)
+                else self._coordinator
+            )
             if coordinator is None:
                 raise ValueError("workspace activation coordinator disappeared")
             active = coordinator.activate(prepared, projection_root=projection_root)
@@ -79,9 +91,15 @@ class DeploymentCacheWorkspaceActivation:
                 previous_deployment_id=prepared.request.previous_deployment_id,
             )
             active.__post_init__()
+            if isinstance(prepared, CompositionActivationOccurrence):
+                _require_parent_state(active, "ACTIVE")
+                if active.request != prepared.request or active.receipt.guard_epochs != prepared.receipt.guard_epochs:
+                    raise ValueError("composition ACTIVE acknowledgement differs from prepared authority")
         except Exception:
             raise DeploymentCacheError(
-                "DPONE_DBT_WORKSPACE_ACTIVATION_COMMIT_UNKNOWN",
+                "DPONE_COMPOSITION_ACTIVATION_COMMIT_UNKNOWN"
+                if isinstance(prepared, CompositionActivationOccurrence)
+                else "DPONE_DBT_WORKSPACE_ACTIVATION_COMMIT_UNKNOWN",
                 "workspace pointer changed but durable ACTIVE acknowledgement was not observed",
                 details={"state_may_have_changed": True, "recovery_required": True},
             ) from None
@@ -98,11 +116,9 @@ class DeploymentCacheWorkspaceActivation:
         previous_deployment_id: str | None,
     ) -> None:
         failure = release_activation_failure(dbt_wire)
-        if dbt_wire == COMPOSITION_ADMISSION and failure is not None:
-            raise DeploymentCacheError(failure.code, failure.message)
         if failure is None:
             return
-        coordinator = self._coordinator
+        coordinator: Any = self._composition_coordinator if dbt_wire == COMPOSITION_ADMISSION else self._coordinator
         if coordinator is None or activation_id is None:
             raise DeploymentCacheError(failure.code, failure.message)
         try:
@@ -123,10 +139,18 @@ class DeploymentCacheWorkspaceActivation:
                 previous_deployment_id=previous_deployment_id,
             )
             active.__post_init__()
+            if dbt_wire == COMPOSITION_ADMISSION:
+                _require_parent_state(active, "ACTIVE")
         except DeploymentCacheError:
             raise
         except Exception:
             raise DeploymentCacheError(failure.code, failure.message) from None
+
+
+def _require_parent_state(value: object, state: str) -> None:
+    if not isinstance(value, CompositionActivationOccurrence):
+        raise ValueError("composition requires complete typed parent authority")
+    value.require_state(state)
 
 
 def _require_coordinates(
