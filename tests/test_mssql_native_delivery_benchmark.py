@@ -524,3 +524,22 @@ def test_observation_sidecar_version_requires_integer(tmp_path, version):
     mutate(candidate, lambda r: r["samples"][1].update(observations=ref))
     with pytest.raises(BenchmarkInputError, match="invalid_observations"):
         compare(baseline, candidate)
+
+
+def test_envelope_provenance_and_version_accept_frozen_descriptive_strings(tmp_path):
+    baseline, candidate = run_fixture(tmp_path / "b"), run_fixture(tmp_path / "c")
+
+    def describe(run):
+        run["producer"]["version"] = "1.0+hermetic"
+        for sample in run["samples"]:
+            sample["metrics"]["rss"] = dict(
+                value=None,
+                unit="bytes",
+                availability="unavailable",
+                reason="provider absent",
+                provenance="psutil process tree (parent + descendants)",
+            )
+
+    mutate(baseline, describe)
+    mutate(candidate, describe)
+    assert compare(baseline, candidate)["status"] == "UNVERIFIED"

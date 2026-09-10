@@ -126,7 +126,6 @@ def _enum(*values: str) -> dict[str, Any]:
 
 
 _TEXT = {"type": "string", "minLength": 1}
-_TOKEN = {"type": "string", "pattern": r"^[A-Za-z0-9_.:-]{1,128}$"}
 _SHA = {"type": "string", "pattern": "^[0-9a-f]{64}$"}
 _COMMIT = {"type": "string", "pattern": "^[0-9a-f]{40}$"}
 _BOOL = {"type": "boolean"}
@@ -136,10 +135,10 @@ _REASON = {"type": ["string", "null"]}
 _LIMITATIONS = {"type": "array", "items": _TEXT}
 _METRIC = _record(
     value={"type": ["number", "null"]},
-    unit=_TOKEN,
+    unit=_TEXT,
     availability=_enum("measured", "unavailable"),
     reason=_REASON,
-    provenance=_TOKEN,
+    provenance=_TEXT,
 )
 _METRIC["allOf"] = [
     {
@@ -156,7 +155,7 @@ _ROUTE = _record(
     mode=_enum("bounded_native", "isolated_switch"),
 )
 _SAMPLE = _record(
-    id=_TOKEN,
+    id=_TEXT,
     is_warmup=_BOOL,
     status=_STATUS,
     reason=_REASON,
@@ -167,7 +166,7 @@ _SAMPLE = _record(
     metrics={"type": "object", "additionalProperties": _METRIC},
 )
 _CHECK = _record(
-    id=_TOKEN,
+    id=_TEXT,
     status=_enum("PASS", "FAIL", "SKIP", "UNVERIFIED", "N/A"),
     method=_enum(
         "exact_typed_multiset", "versioned_typed_digest", "transaction_fixture", "live_observation", "not_applicable"
@@ -189,11 +188,11 @@ CHECKS_BY_SCOPE = {
 RUN_SCHEMA = _record(
     schema_version={"const": 1, "type": "integer"},
     kind={"const": "native-delivery-run"},
-    producer=_record(name=_TOKEN, version=_TOKEN, commit=_COMMIT, dirty=_BOOL),
+    producer=_record(name=_TEXT, version=_TEXT, commit=_COMMIT, dirty=_BOOL),
     subject=_record(commit=_COMMIT, dirty=_BOOL),
     route=_ROUTE,
     workload=_record(
-        id=_TOKEN, seed={"type": "integer"}, rows=_COUNT, columns={"type": "integer", "minimum": 1}, sha256=_SHA
+        id=_TEXT, seed={"type": "integer"}, rows=_COUNT, columns={"type": "integer", "minimum": 1}, sha256=_SHA
     ),
     configuration=_record(sha256=_SHA, limits={"type": "object"}),
     environment=_record(
@@ -215,18 +214,18 @@ RECEIPT_SCHEMA = _record(
     workload_sha256=_SHA,
     configuration_sha256=_SHA,
     environment_sha256=_SHA,
-    sample_id=_TOKEN,
+    sample_id=_TEXT,
     route=_ROUTE,
     scope=_enum(*CHECKS_BY_SCOPE),
     execution=_enum("hermetic", "live"),
-    fixture=_record(id=_TOKEN, rows=_COUNT, sha256=_SHA),
+    fixture=_record(id=_TEXT, rows=_COUNT, sha256=_SHA),
     checks={"type": "array", "items": _CHECK},
     status=_STATUS,
 )
 CAMPAIGN_SCHEMA = _record(
     schema_version={"const": 1, "type": "integer"},
     kind={"const": "native-delivery-campaign"},
-    workloads={"type": "array", "items": _TOKEN, "minItems": 1, "uniqueItems": True},
+    workloads={"type": "array", "items": _TEXT, "minItems": 1, "uniqueItems": True},
     runs={"type": "array", "items": _REF},
     limitations=_LIMITATIONS,
 )
