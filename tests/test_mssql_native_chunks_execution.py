@@ -102,6 +102,29 @@ def test_import_retries_only_retained_identical_bytes(tmp_path):
     assert target.settled == ["run-0-0", "run-0-1"]
 
 
+@pytest.mark.parametrize("rows", [[(9,), (9,)], [{"value": 9}, {"value": 9}]])
+def test_scheduler_reuses_frame_size_with_real_spawned_workers(tmp_path, monkeypatch, rows):
+    from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+
+    sizes = []
+    original = MssqlNativeEncoder.encoded_row_size
+
+    def measured_size(self, row):
+        size = original(self, row)
+        sizes.append(size)
+        return size
+
+    monkeypatch.setattr(MssqlNativeEncoder, "encoded_row_size", measured_size)
+    target = Target()
+    executor, plan, lease, contract = setup(tmp_path, target)
+    result = executor.stage(plan, iter(rows), contract, lease)
+    # Spawned encoders validate their own values. The parent sizes each frame
+    # once; the scheduler must reuse that reservation rather than walk it again.
+    assert len(sizes) == len(rows)
+    assert sum(sizes) == sum(receipt.encoded_bytes for receipt in result.receipts)
+    assert sum(map(len, target.files)) == sum(sizes)
+
+
 def test_retry_exhaustion_requires_reextraction(tmp_path):
     target = Target(failures=3)
     executor, plan, lease, contract = setup(tmp_path, target)

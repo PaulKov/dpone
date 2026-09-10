@@ -31,6 +31,7 @@ class MemoryConnector:
         self.tables = {"[db].[stage].[chunk0]": [{"n": 7}, {"n": 7}], "[db].[stage].[chunk1]": [{"n": 7}]}
         self.properties = {}
         self.statements = []
+        self.typed_readbacks = []
 
     def quote_identifier(self, name):
         return "[" + name.replace("]", "]]") + "]"
@@ -86,6 +87,7 @@ class MemoryConnector:
         return []
 
     def get_records_iterator(self, sql):
+        self.typed_readbacks.append(sql)
         names = re.findall(r"\[([^\]]+)\]", sql.split(" FROM ", 1)[0])
         return iter({name: row[name] for name in names} for row in self.tables[sql.split(" FROM ", 1)[1]])
 
@@ -214,6 +216,10 @@ def test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepare
         assert any(" UNION ALL " in sql for sql in connector.statements)
     assert journal.state["stage"]["consumed_payload_evidence"]["actual_native_rows"] == sum(counts)
     preparer.reverify(prepared)
+    # One initial dual digest plus an independent prepublication full digest.
+    # Restoring below deliberately adds another boundary and therefore a scan.
+    assert len(connector.typed_readbacks) == 2
+    assert not any(sql.startswith("UPDATE n SET ") for sql in connector.statements)
     if default_lineage:
         assert tuple(prepared.staging.columns) == (
             "n",
