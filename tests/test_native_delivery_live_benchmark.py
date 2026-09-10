@@ -12,11 +12,12 @@ from tools.native_delivery_live_support.artifacts import ArtifactStore, canonica
 from tools.native_delivery_live_support.correctness import failure_recovery
 from tools.native_delivery_live_support.execution import (
     ExecutionAdapter,
-    Snapshot,
     environment_record,
     measured,
     unavailable,
 )
+from tools.native_delivery_live_support.hermetic import HermeticRouteFactory as FakeFactory
+from tools.native_delivery_live_support.hermetic import HermeticRouteSession as FakeSession
 from tools.native_delivery_live_support.profiles import PROFILES, Dataset, exact_multiset
 from tools.native_delivery_live_support.runner import configuration, route_record, run_benchmark
 from tools.native_delivery_live_support.validation import require_comparable, validate_metric, validate_run
@@ -31,97 +32,6 @@ LIMITS = {
     "max_staging_tables": 128,
     "parallelism": 1,
 }
-
-
-class FakeSession:
-    """Local protocol double; intentionally incapable of conferring live authority."""
-
-    def __init__(self, dataset, case, clock):
-        self.invocation_id = "58ca9aad-f6a9-47cd-a7a2-1fe9eebc4e00"
-        self.dataset, self.case, self.clock = dataset, case, clock
-        self.rows = [{"old": 1}]
-        self.outside = [{"outside": "unchanged"}]
-        self.queries, self.publications, self.stage_reads = 0, 0, 0
-        self.known, self.cleaned, self.closed = True, False, False
-        self.fault = None
-        self.events, self.probes, self.complete = (), 0, False
-
-    def snapshot(self):
-        return Snapshot(
-            self.rows,
-            self.outside,
-            "a" * 64,
-            "a" * 64,
-            "b" * 64,
-            "b" * 64,
-            self.queries,
-            self.publications,
-            self.stage_reads,
-            self.known,
-            128,
-            fault_events=self.events,
-            receipt_probes=self.probes,
-            pipeline_complete=self.complete,
-        )
-
-    def arm_fault(self, fault):
-        self.fault = fault
-
-    def run(self):
-        self.clock.source_acquired()
-        self.queries += 1
-        if self.fault:
-            self.events += (self.fault,)
-        if self.fault in {"before_commit", "after_eof"}:
-            raise RuntimeError("secret driver text must never be reported")
-        self._publish()
-        if self.fault == "unknown_commit":
-            self.known = False
-            self.complete = False
-            raise RuntimeError("secret connection URL")
-        if self.fault == "lost_ack":
-            self.probes += 1
-        self.clock.committed_visible()
-
-    def _publish(self):
-        self.rows = list(self.dataset.generate())
-        self.publications += 1
-        self.complete = True
-
-    def recover(self, *, source_allowed):
-        assert source_allowed is False
-        if not self.known:
-            raise RuntimeError("unknown commit blocks replay")
-        if not self.publications:
-            self._publish()
-
-    def cleanup(self):
-        assert self.known
-        self.cleaned = True
-
-    def close(self):
-        self.closed = True
-
-
-class FakeFactory:
-    execution = "hermetic"
-    subject_checkout = Path(__file__).resolve().parents[1]
-
-    def __init__(self):
-        self.sessions = []
-        self.layout = "c" * 64
-
-    def describe(self):
-        return {
-            "versions": {key: "hermetic-1" for key in ("python", "dpone", "clickhouse", "mssql", "bcp")},
-            "target_layout_sha256": self.layout,
-            "resource_profile": {"cpu_count": 1},
-        }
-
-    def open(self, dataset, *, case, clock):
-        session = FakeSession(dataset, case, clock)
-        self.sessions.append(session)
-        return session
 
 
 @pytest.fixture
