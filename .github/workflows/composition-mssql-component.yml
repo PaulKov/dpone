@@ -1,4 +1,4 @@
-# Real SQL ledger and gate components; this does not certify a route or full parent.
+# Real SQL ledger, gate and trust components; no route or full-parent certification.
 name: Composition SQL Server component
 
 on:
@@ -6,9 +6,13 @@ on:
     paths:
       - ".github/workflows/composition-mssql-component.yml"
       - "src/dpone/adapters/composition_mssql_*.py"
+      - "src/dpone/adapters/nonproduction_mssql_*.py"
       - "src/dpone/contracts/composition_*.py"
+      - "src/dpone/contracts/nonproduction_*.py"
+      - "src/dpone/ports/nonproduction_authentication.py"
       - "tests/integration/composition/**"
       - "tests/test_composition_mssql_synthetic_runner.py"
+      - "tests/test_nonproduction_mssql_trust_live_support.py"
       - "tools/composition_mssql_synthetic.py"
       - "pyproject.toml"
       - "uv.lock"
@@ -25,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [store, gate]
+        profile: [store, gate, trust]
     steps:
       - name: Checkout exact candidate head
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

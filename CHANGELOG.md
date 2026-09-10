@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add an isolated nine-case SQL trust profile to the disposable component runner.
+  Require exact source and case inventories, append-only revision observations
+  and owned-container cleanup. Storage fixtures do not establish signed grant
+  authority or full worker qualification.
+
 - Report exact sanitized SQL target catalog refusal reasons before writer
   issuance, preserving all existing policy predicates. Keep catalog policy in
   a separate adapter responsibility from login credentials and enrollment.

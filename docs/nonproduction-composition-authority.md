@@ -114,7 +114,7 @@ provisioners from altering/truncating tables, disabling triggers, impersonating
 privileged principals, using bulk-copy paths that omit trigger execution, or
 otherwise bypassing append-only enforcement. Catalog
 hashes and RLS rejection detect drift; they do not prove effective permissions.
-Actual installation, concurrent appends and no-bypass permissions still require
+Actual installation, concurrent appends and no-bypass permissions require
 isolated SQL qualification. A constructed revision is never an executor permit.
 
 ## Scoped activation request

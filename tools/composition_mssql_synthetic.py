@@ -7,8 +7,8 @@ Prerequisites: clean checkout, Docker Linux/amd64 daemon, Microsoft ODBC Driver
 PATH is a new directory outside the checkout. No existing service is accepted.
 Only JUnit and a sanitized component summary are retained; no driver errors,
 commands, DSNs, container environment, credentials or broad logs are published.
-Profiles qualify the control ledger or issued-principal gate and recovery.
-Neither profile certifies downstream execution or a source-to-sink route.
+Profiles qualify the control ledger, issued-principal gate/recovery or append-only
+nonproduction trust storage. None certifies downstream execution or a route.
 """
 
 from __future__ import annotations
@@ -66,6 +66,18 @@ GATE_CASES = {
         "test_real_commit_unknown_requires_explicit_reconciliation",
     ),
 }
+TRUST_TEST_CLASS = "tests.integration.composition.test_nonproduction_mssql_trust_live"
+TRUST_TESTS = (
+    "test_external_trust_ddl_and_original_byte_readback",
+    "test_append_only_revision_rejects_update_delete_and_replay",
+    "test_trust_revision_change_blocks_same_ledger_compare",
+    "test_concurrent_appends_admit_one_next_revision",
+    "test_invalid_original_hash_or_epoch_cannot_append",
+    "test_read_rejects_changed_trigger_or_schema",
+    "test_insufficient_transaction_lock_never_returns_trust",
+    "test_lost_read_ack_returns_no_trusted_revision",
+    "test_provisioner_can_append_without_schema_bypass",
+)
 
 
 class RunFailure(RuntimeError):
@@ -78,6 +90,8 @@ def expected_cases(profile):
         return tuple(f"{TEST_CLASS}::{name}" for name in EXPECTED_TESTS)
     if profile == "gate":
         return tuple(f"{module}::{name}" for module, names in GATE_CASES.items() for name in names)
+    if profile == "trust":
+        return tuple(f"{TRUST_TEST_CLASS}::{name}" for name in TRUST_TESTS)
     raise RunFailure("unknown_component_profile")
 
 
@@ -172,6 +186,11 @@ def provision_database(env):
 def execute_component(output, env, profile="store"):
     """One bounded child pytest process, with sanitized JUnit failure reports."""
     test_files = tuple(dict.fromkeys(node.split("::")[0].replace(".", "/") + ".py" for node in expected_cases(profile)))
+    plugin = (
+        "tests.integration.composition.nonproduction_mssql_trust_live_support"
+        if profile == "trust"
+        else f"tests.integration.composition.mssql_{profile}_live_support"
+    )
     child_env = env | {
         "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
         "PYTHONDONTWRITEBYTECODE": "1",
@@ -191,7 +210,7 @@ def execute_component(output, env, profile="store"):
             "-p",
             "no:cacheprovider",
             "-p",
-            f"tests.integration.composition.mssql_{profile}_live_support",
+            plugin,
             "--tb=no",
             "--show-capture=no",
             "-o",
@@ -228,9 +247,11 @@ def run(output, profile="store"):
         "status": "FAIL",
         "profile": profile,
         "component_scope": {
-            "sql_server": "real_dbapi_control_ledger"
-            if profile == "store"
-            else "real_issued_principal_gate_and_recovery",
+            "sql_server": {
+                "store": "real_dbapi_control_ledger",
+                "gate": "real_issued_principal_gate_and_recovery",
+                "trust": "real_append_only_nonproduction_trust",
+            }[profile],
             "clickhouse": "synthetic_enrollment_metadata_only",
             "route_certification": "UNVERIFIED",
             "native_v2_and_logon_guarantees": "UNVERIFIED",
@@ -274,8 +295,11 @@ def run(output, profile="store"):
             "DPONE_COMPOSITION_SQL_DATABASE": "dpone_composition_" + token,
         }
         env.pop("DPONE_RUN_COMPOSITION_MSSQL_GATE_LIVE", None)
+        env.pop("DPONE_RUN_COMPOSITION_MSSQL_TRUST_LIVE", None)
         if profile == "gate":
             env["DPONE_RUN_COMPOSITION_MSSQL_GATE_LIVE"] = "1"
+        elif profile == "trust":
+            env["DPONE_RUN_COMPOSITION_MSSQL_TRUST_LIVE"] = "1"
         owned_name = "dpone-composition-" + token
         report["owned_container_name"] = owned_name
         report["stage"] = "container_start"
@@ -347,7 +371,7 @@ def run(output, profile="store"):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--profile", choices=("store", "gate"), default="store")
+    parser.add_argument("--profile", choices=("store", "gate", "trust"), default="store")
     args = parser.parse_args(argv)
     return run(args.output_dir, args.profile)
 

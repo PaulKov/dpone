@@ -144,12 +144,13 @@ and `junit.xml`, recording exact source, image, driver and server identity. All
 expected cases must execute without skips. A cleanup failure changes the result
 to FAIL. No raw driver diagnostics or credentials belong in these artifacts.
 
-The workflow runs two independent profiles, each in its own fresh container:
+The workflow runs three independent profiles, each in its own fresh container:
 
 | Profile | Required cases | Evidence scope |
 |---|---|---|
 | `store` (default) | 7 | Real ledger DDL, whole-parent transactions, conflicts, lost acknowledgements and retirement |
 | `gate` | 16 | Real issued credentials, target permissions and continuity, monotonic LOGON closure, races, in-flight transactions and explicit unknown recovery |
+| `trust` | 9 | Real append-only nonproduction trust, original bytes, revision races, schema integrity, lock/acknowledgement failures and bounded provisioner permissions |
 
 The gate profile uses the actual closed-gate and quiescence producers. Its
 test-only outcome producer binds observed SQL and independent reconciliation;
@@ -157,7 +158,12 @@ it does not qualify the future native/transfer worker outcome producer. The
 runner rejects a missing, skipped, duplicate or foreign case, including results
 from the other profile. JUnit retains bounded numeric SQL error identifiers and
 fixed domain reasons for failure diagnosis; raw driver messages stay suppressed.
-Default non-live collection skips both profiles without opening a connection.
+The trust profile uses inert public policy documents as storage fixtures. It
+does not verify actual grant signatures, consume grants or authorize workers.
+Its provisioner case verifies database permissions through an impersonated
+database user; it does not qualify a separately authenticated network login.
+Select it with `--profile trust` in the same disposable command.
+Default non-live collection skips all profiles without opening a connection.
 
 This component's ClickHouse rows are synthetic ledger metadata. Route
 qualification and complete worker execution remain separate observations;
