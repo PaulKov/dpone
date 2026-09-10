@@ -47,3 +47,11 @@ The reviewer correctly retains the layer gate failure as a merge blocker:
 runtime-to-contracts 217 exceeds 214. The DDA-04 constructors require those actual
 imports; DDA-06/root are coordinating an independently authorized dependency
 refactor. No baseline or budget changes were made here.
+
+## Independent verification of the evidence correction
+
+The second reviewer re-reviewed commit
+`d8b09de644ab3bf72f9eee7b51cc8b8e38ca8a3c`, reran all four producer regression
+cases (PASS), and independently recomputed the source/producer fingerprints
+matching both observations in producer.json. P2 is resolved; no further blocking
+finding in the correction. No production code changed after 9795f01.
