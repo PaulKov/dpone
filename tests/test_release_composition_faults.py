@@ -17,7 +17,7 @@ from dpone.runtime.deployment_cache_common import DeploymentCacheError
 from dpone.runtime.deployment_cache_workspace_activation import DeploymentCacheWorkspaceActivation
 from dpone.runtime.immutable_local_tree import ImmutableLocalTreeDurabilityError, materialize_immutable_local_tree
 from dpone.services.dbt_release_integrity import DbtReleaseIntegrityService
-from dpone.services.release_composition import ReleaseCompositionService
+from dpone.services.release_composition import ReleaseCompositionService, VerifiedCompositionReleaseCapture
 from dpone.version import installed_version
 from tests.test_release_composition_delivery import composition_request as composition_request
 
@@ -28,6 +28,12 @@ def service_with_writer(writer):
         ordinary=build_ordinary_release_inventory_reader(),
         integrity=DbtReleaseIntegrityService(),
         publisher=writer,
+        capture=VerifiedCompositionReleaseCapture(
+            native=build_dbt_release_source_reader(),
+            ordinary=build_ordinary_release_inventory_reader(),
+            integrity=DbtReleaseIntegrityService(),
+            read_file=read_confined_file,
+        ),
         read_file=read_confined_file,
         producer_version=installed_version(),
         durability_error=ImmutableLocalTreeDurabilityError,

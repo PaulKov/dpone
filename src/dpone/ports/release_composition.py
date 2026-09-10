@@ -2,15 +2,16 @@
 
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 
+from dpone.contracts.dbt_source_inventory_binding import DbtReleaseSources
 from dpone.ports.dbt_release_files import VerifiedWorkspaceReleaseCapture
 
 
 class CompositionNativeSourceReader(VerifiedWorkspaceReleaseCapture, Protocol):
     """Return complete native source observations after confined verification."""
 
-    def read(self, compiled_root: Path, *, expected_release_id: str) -> Any: ...
+    def read(self, compiled_root: Path, *, expected_release_id: str) -> DbtReleaseSources: ...
 
 
 class CompositionIntegrity(Protocol):

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.airflow_deployment import is_sha256_digest
 from dpone.contracts.airflow_release_artifacts import ReleaseArtifactLocatorError, release_artifact_path
-from dpone.contracts.release_composition_subject import COMPOSITION_SUBJECT, composition_subject_sha256
+from dpone.manifest.release_composition_files import composition_auxiliary_artifacts
 from dpone.runtime.airflow_artifact_attestation_inventory import attestation_publication_spec
 from dpone.runtime.airflow_artifact_delivery_models import (
     AirflowArtifactDeliveryError,
@@ -93,7 +93,10 @@ def build_publish_inventory(
         root=request.cache_root,
     )
     release_files = [release_set_file]
-    for relative, declared_sha in declared_release_artifacts(release):
+    for relative, declared_sha in (
+        *declared_release_artifacts(release),
+        *composition_auxiliary_artifacts(release_dir, release),
+    ):
         item = _local_artifact_file(
             key=PurePosixPath("releases", request.release_dir_name, relative.as_posix()),
             path=release_dir / relative.as_posix(),
@@ -106,21 +109,6 @@ def build_publish_inventory(
                 details={"logical_path": relative.as_posix()},
             )
         release_files.append(item)
-
-    if release.get("schema") == "dpone.release-set.v3":
-        subject = _local_artifact_file(
-            key=PurePosixPath("releases", request.release_dir_name, COMPOSITION_SUBJECT),
-            path=release_dir / COMPOSITION_SUBJECT,
-            root=request.cache_root,
-        )
-        from dpone.manifest.confined_files import read_confined_file
-
-        descriptor_payload = read_confined_file(release_dir, "release-set.json", max_bytes=8 * 1024 * 1024)
-        if subject.sha256 != composition_subject_sha256(release, descriptor_payload):
-            raise AirflowArtifactDeliveryError(
-                "DPONE_COMPOSITION_INVALID", "composition subject differs from bound release bytes"
-            )
-        release_files.append(subject)
 
     deployment_names = deployment_file_names(
         projection.deployment,

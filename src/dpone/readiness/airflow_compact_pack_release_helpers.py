@@ -129,3 +129,16 @@ __all__ = [
     "rewrite_strict_init_fetch_dag_spec",
     "rewrite_strict_init_fetch_pack",
 ]
+
+
+def require_legacy_pack_authority(pack: Mapping[str, Any]) -> None:
+    """Keep native workspace authority out of descriptor-less compact releases."""
+    from dpone.contracts.legacy_release_dbt_authority import require_legacy_dbt_authority
+
+    try:
+        require_legacy_dbt_authority(pack)
+    except ValueError as exc:
+        raise CompactPackReleaseError(
+            "DPONE_COMPACT_PACK_RELEASE_NATIVE_AUTHORITY_REQUIRED",
+            "native dbt inputs require a complete workspace descriptor; rebuild with workspace compile",
+        ) from exc

@@ -7,20 +7,22 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Literal
 
-from dpone.contracts.airflow_deployment import release_id
-from dpone.contracts.dbt_contract_validation import artifact_json_bytes, sha256_bytes
+from dpone.contracts.dbt_relation_writes import require_distinct_logical_writes
 from dpone.contracts.release_composition import (
-    COMPOSITION_PRODUCER,
-    COMPOSITION_SCHEMA,
+    COMPOSITION_PROFILE,
+    NATIVE_SIDECARS,
     ReleaseCompositionReport,
     ReleaseCompositionRequest,
 )
+from dpone.contracts.release_composition_policy import assemble_composition_files, composition_native_release
 from dpone.contracts.strict_json import strict_json_object
 from dpone.gitops.release_set_validation import validate_release_set
-from dpone.gitops.schema_release_set_promotion import COMPACT_PROMOTION_PROFILE, COMPACT_PROMOTION_SCHEMA
-from dpone.manifest.release_composition_capture import VerifiedCompositionReleaseCapture
-from dpone.manifest.release_composition_files import NATIVE_SIDECARS, require_composition_root, write_private_files
-from dpone.ports.dbt_release_files import ConfinedReleaseFileReader
+from dpone.manifest.release_composition_files import (
+    require_composition_root,
+    verify_composition_transport_files,
+    write_private_files,
+)
+from dpone.ports.dbt_release_files import ConfinedReleaseFileReader, VerifiedWorkspaceReleaseCapture
 from dpone.ports.release_composition import CompositionIntegrity, CompositionNativeSourceReader, CompositionPublisher
 from dpone.ports.release_composition_ordinary import OrdinaryReleaseInventoryReaderPort
 
@@ -35,6 +37,7 @@ class ReleaseCompositionService:
         ordinary: OrdinaryReleaseInventoryReaderPort,
         integrity: CompositionIntegrity,
         publisher: CompositionPublisher,
+        capture: VerifiedWorkspaceReleaseCapture,
         read_file: ConfinedReleaseFileReader,
         producer_version: str,
         durability_error: type[Exception],
@@ -42,9 +45,7 @@ class ReleaseCompositionService:
         self._native, self._ordinary = native, ordinary
         self._integrity, self._publish, self._read = integrity, publisher, read_file
         self._version, self._durability_error = producer_version, durability_error
-        self._capture = VerifiedCompositionReleaseCapture(
-            native=native, ordinary=ordinary, integrity=integrity, read_file=read_file
-        )
+        self._capture = capture
 
     def inventory(self, root: Path, *, xcom_sidecar_image: str) -> Mapping[str, Any]:
         """Produce a verified source-only digest without publication or source writes."""
@@ -137,8 +138,8 @@ class ReleaseCompositionService:
             raise ValueError("composition roots must be disjoint")
         payload = self._read(native_root, "release-set.json", max_bytes=8 * 1024 * 1024)
         native = strict_json_object(payload)
-        promotion = {"schema": COMPACT_PROMOTION_SCHEMA, "profile": COMPACT_PROMOTION_PROFILE}
-        if request.profile != COMPACT_PROMOTION_PROFILE or native.get("promotion") != promotion:
+        promotion = {"schema": "dpone.compact-pack-release-promotion.v1", "profile": COMPOSITION_PROFILE}
+        if request.profile != COMPOSITION_PROFILE or native.get("promotion") != promotion:
             raise ValueError("native input must already use the supported compact transport")
         if validate_release_set(native).failure is not None:
             raise ValueError("native input violates its public schema")
@@ -148,47 +149,10 @@ class ReleaseCompositionService:
         ordinary = self._ordinary.capture(ordinary_root, xcom_sidecar_image=request.xcom_sidecar_image)
         if ordinary.inventory_sha256 != request.expected_inventory_sha256:
             raise ValueError("ordinary source inventory differs from expected identity")
-        files = {path: body for path, body in captured.items() if path not in NATIVE_SIDECARS}
-        files.update({target: captured[source] for source, target in NATIVE_SIDECARS.items()})
-        for path, body in {**ordinary.dag_files, **ordinary.pack_files}.items():
-            if path in files:
-                raise ValueError("composition artifact path collision")
-            files[path] = body
-        files.update({f"_composition/standalone/{path}": body for path, body in ordinary.files.items()})
-        artifacts = {section: [dict(row) for row in rows] for section, rows in native["artifacts"].items()}
-        for section, values in (("dag_specs", ordinary.dag_files), ("workload_packs", ordinary.pack_files)):
-            for path, body in sorted(values.items()):
-                parsed = strict_json_object(body)
-                key = parsed["dag_id"] if section == "dag_specs" else parsed["workload"]["workload_id"]
-                row = _descriptor(key, path, body)
-                if section == "workload_packs":
-                    row["pack_fingerprint"] = parsed["pack_fingerprint"]
-                artifacts[section].append(row)
-        artifacts["composition_sources"] = [
-            _descriptor(path, path, body) for path, body in sorted(files.items()) if path.startswith("_composition/")
-        ]
-        release: dict[str, Any] = {
-            "schema": COMPOSITION_SCHEMA,
-            "release_id": "",
-            "producer": {"name": COMPOSITION_PRODUCER, "version": self._version},
-            "promotion": promotion,
-            "artifacts": artifacts,
-            "constituents": [
-                {"id": "native", "kind": "dbt_workspace", "release": native},
-                {
-                    "id": "standalone",
-                    "kind": "workload_inventory",
-                    "inventory": ordinary.inventory_dict(),
-                    "inventory_sha256": ordinary.inventory_sha256,
-                },
-            ],
-        }
-        for rows in artifacts.values():
-            rows.sort(key=lambda row: row["id"])
-        release["release_id"] = release_id(release)
+        files = assemble_composition_files(native, captured, ordinary, producer_version=self._version)
+        release = strict_json_object(files["release-set.json"])
         if validate_release_set(release).failure is not None:
             raise ValueError("composed release violates its public schema")
-        files["release-set.json"] = artifact_json_bytes(release)
         self._integrity.require_capture_budget(len(body) for body in files.values())
         with TemporaryDirectory(prefix="dpone-composition-stage-") as temporary:
             stage = Path(temporary)
@@ -215,5 +179,77 @@ class ReleaseCompositionService:
         )
 
 
-def _descriptor(key: str, path: str, body: bytes) -> dict[str, Any]:
-    return {"id": key, "path": path, "sha256": sha256_bytes(body), "bytes": len(body)}
+class VerifiedCompositionReleaseCapture:
+    """Recapture every source and verify deterministic transport before admission.
+
+    This is a build-plane capability. Downstream cache checks establish transport
+    integrity, not a replacement for this complete source admission algorithm.
+    """
+
+    def __init__(
+        self,
+        *,
+        native: CompositionNativeSourceReader,
+        ordinary: OrdinaryReleaseInventoryReaderPort,
+        integrity: CompositionIntegrity,
+        read_file: ConfinedReleaseFileReader,
+    ) -> None:
+        self._native = native
+        self._ordinary = ordinary
+        self._integrity = integrity
+        self._read = read_file
+
+    def capture_verified_files(
+        self, root: Path, *, release_payload: bytes, expected_release_id: str
+    ) -> Mapping[str, bytes]:
+        release = strict_json_object(release_payload)
+        if release.get("release_id") != expected_release_id or len(release_payload) > 8 * 1024 * 1024:
+            raise ValueError("composition release identity or metadata budget differs")
+        files = verify_composition_transport_files(root, release, read_file=self._read)
+        if self._read(root, "release-set.json", max_bytes=len(release_payload)) != release_payload:
+            raise ValueError("composition release descriptor changed during capture")
+        files["release-set.json"] = release_payload
+        files["release-subjects.sha256"] = self._read(root, "release-subjects.sha256", max_bytes=8 * 1024 * 1024)
+        self._integrity.require_capture_budget(len(body) for body in files.values())
+        with TemporaryDirectory(prefix="dpone-composition-recheck-") as temporary:
+            frozen = Path(temporary) / "parent"
+            frozen.mkdir()
+            write_private_files(frozen, files)
+            self._integrity.verify(frozen)
+            self._verify_sources(Path(temporary), release, files)
+        return files
+
+    def _verify_sources(self, stage: Path, release: Mapping[str, Any], files: Mapping[str, bytes]) -> None:
+        native = composition_native_release(release)
+        native_files = {row["path"]: files[row["path"]] for rows in native["artifacts"].values() for row in rows}
+        native_files.update({original: files[source] for original, source in NATIVE_SIDECARS.items()})
+        native_root = stage / "native"
+        native_root.mkdir()
+        write_private_files(native_root, native_files)
+        self._native.capture_verified_files(
+            native_root, release_payload=native_files["release-set.json"], expected_release_id=native["release_id"]
+        )
+        source = self._native.read(native_root, expected_release_id=native["release_id"])
+        ordinary_root = stage / "ordinary"
+        ordinary_root.mkdir()
+        prefix = "_composition/standalone/"
+        write_private_files(
+            ordinary_root, {path.removeprefix(prefix): body for path, body in files.items() if path.startswith(prefix)}
+        )
+        sidecars = {
+            strict_json_object(files[row["path"]]).get("xcom", {}).get("sidecar_image")
+            for row in release["artifacts"]["workload_packs"]
+        }
+        if len(sidecars) != 1 or not isinstance(next(iter(sidecars)), str):
+            raise ValueError("composition transport sidecar must match every workload")
+        ordinary = self._ordinary.capture(ordinary_root, xcom_sidecar_image=next(iter(sidecars)))
+        constituent = next(item for item in release["constituents"] if item["id"] == "standalone")
+        if (
+            ordinary.inventory_dict() != constituent["inventory"]
+            or ordinary.inventory_sha256 != constituent["inventory_sha256"]
+        ):
+            raise ValueError("composition ordinary source inventory differs")
+        for path, body in {**ordinary.dag_files, **ordinary.pack_files}.items():
+            if files.get(path) != body:
+                raise ValueError("composition ordinary transport differs from verified source")
+        require_distinct_logical_writes((*source.relation_writes, *ordinary.relation_writes))

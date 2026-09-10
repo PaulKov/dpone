@@ -50,7 +50,7 @@ def release_composition_contract(native_schema: dict[str, Any]):
     return documented_contract(
         name="release-set-v3",
         kind=COMPOSITION_SCHEMA,
-        title="dpone verified release composition",
+        title="dpone GitOps verified release composition",
         required=("schema", "release_id", "producer", "promotion", "artifacts", "constituents"),
         properties={
             "schema": {"const": COMPOSITION_SCHEMA},
@@ -103,7 +103,7 @@ def release_composition_manifest_contract():
     return documented_contract(
         name="release-composition",
         kind=COMPOSITION_PRODUCER,
-        title="dpone release composition manifest",
+        title="dpone GitOps release composition manifest",
         required=tuple(fields),
         properties=fields,
         additional_properties=False,

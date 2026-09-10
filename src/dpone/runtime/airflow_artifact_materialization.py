@@ -11,8 +11,7 @@ from typing import Any
 
 from dpone.contracts.airflow_deployment import release_id as compute_release_id
 from dpone.contracts.airflow_deployment_projection import deployment_projection_violation
-from dpone.contracts.release_composition_subject import COMPOSITION_SUBJECT, composition_subject_sha256
-from dpone.manifest.confined_files import read_confined_file
+from dpone.manifest.release_composition_files import composition_auxiliary_artifacts
 from dpone.ports.airflow_deployment_attestation import (
     AirflowDeploymentAttestationVerifier,
 )
@@ -181,17 +180,11 @@ class AirflowArtifactMaterializer:
         index: Mapping[str, Any],
     ) -> None:
         request = state.request
-        for relative, sha256 in declared_release_artifacts(release):
+        root = state.staging_root / "releases" / request.release_dir_name
+        for relative, sha256 in (*declared_release_artifacts(release), *composition_auxiliary_artifacts(root, release)):
             state.fetch(
                 PurePosixPath("releases", request.release_dir_name, relative.as_posix()),
                 expected_sha256=sha256,
-            )
-        if release.get("schema") == "dpone.release-set.v3":
-            root = state.staging_root / "releases" / request.release_dir_name
-            descriptor_payload = read_confined_file(root, "release-set.json", max_bytes=8 * 1024 * 1024)
-            state.fetch(
-                PurePosixPath("releases", request.release_dir_name, COMPOSITION_SUBJECT),
-                expected_sha256=composition_subject_sha256(release, descriptor_payload),
             )
         semantic_files = dict(semantic_refresh_deployment_files(deployment, index))
         for name in deployment_file_names(deployment, index):
@@ -342,7 +335,7 @@ def _install_staged_projection(
     staged_release = staging / "releases" / request.release_dir_name
     release_names = ["release-set.json", *(relative.as_posix() for relative, _ in declared_release_artifacts(release))]
     if release.get("schema") == "dpone.release-set.v3":
-        release_names.append(COMPOSITION_SUBJECT)
+        release_names.extend(path.as_posix() for path, _ in composition_auxiliary_artifacts(staged_release, release))
     staged_deployment = staging / "deployments" / request.environment / request.deployment_dir_name
     deployment_names = deployment_file_names(deployment, index)
     release_state = "not_installed"

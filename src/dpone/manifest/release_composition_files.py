@@ -9,17 +9,12 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from dpone.contracts.dbt_contract_validation import sha256_bytes
-from dpone.contracts.release_composition import MAX_COMPOSITION_TOTAL_BYTES
+from dpone.contracts.release_composition import MAX_COMPOSITION_TOTAL_BYTES, NATIVE_SIDECARS
 from dpone.contracts.release_composition_subject import composition_subject_bytes
 from dpone.contracts.strict_json import strict_json_object
 from dpone.manifest.confined_files import read_confined_file
 from dpone.ports.dbt_release_files import ConfinedReleaseFileReader
 
-NATIVE_SIDECARS = {
-    "release-set.json": "_composition/native/release-set.json",
-    "_dbt/dbt-source-snapshot.json": "_composition/native/dbt-source-snapshot.json",
-    "release-subjects.sha256": "_composition/native/release-subjects.sha256",
-}
 SUBJECT = "release-subjects.sha256"
 
 
@@ -126,3 +121,19 @@ def require_composition_root(root: Path) -> None:
             continue
         if stat.S_ISLNK(metadata.st_mode):
             raise ValueError("composition roots cannot traverse symbolic links")
+
+
+def composition_auxiliary_artifacts(root: Path, release: Mapping[str, Any]) -> tuple[tuple[PurePosixPath, str], ...]:
+    """Return transport pins for derived artifacts outside the parent inventory.
+
+    The descriptor is reread through confinement and bound to the validated view.
+    Native releases have no composition auxiliary transport requirements.
+    """
+    from dpone.contracts.release_composition_subject import composition_subject_sha256
+
+    if release.get("schema") != "dpone.release-set.v3":
+        return ()
+    payload = read_confined_file(root, "release-set.json", max_bytes=8 * 1024 * 1024)
+    if strict_json_object(payload) != release:
+        raise ValueError("composition descriptor changed after metadata validation")
+    return ((PurePosixPath(SUBJECT), composition_subject_sha256(release, payload)),)

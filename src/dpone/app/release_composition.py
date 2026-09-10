@@ -19,16 +19,22 @@ from dpone.runtime.runtime_payload_archive import (
     verify_runtime_payload_tree,
 )
 from dpone.services.dbt_release_integrity import DbtReleaseIntegrityService
-from dpone.services.release_composition import ReleaseCompositionService
+from dpone.services.release_composition import ReleaseCompositionService, VerifiedCompositionReleaseCapture
 from dpone.version import installed_version
 
 
 def build_release_composition_service() -> ReleaseCompositionService:
     """Construct the same mandatory verifiers for public CLI and Python callers."""
+    native = build_dbt_release_source_reader()
+    ordinary = build_ordinary_release_inventory_reader()
+    integrity = DbtReleaseIntegrityService()
     return ReleaseCompositionService(
-        native=build_dbt_release_source_reader(),
-        ordinary=build_ordinary_release_inventory_reader(),
-        integrity=DbtReleaseIntegrityService(),
+        native=native,
+        ordinary=ordinary,
+        integrity=integrity,
+        capture=VerifiedCompositionReleaseCapture(
+            native=native, ordinary=ordinary, integrity=integrity, read_file=read_confined_file
+        ),
         publisher=_publish_composition,
         read_file=read_confined_file,
         producer_version=installed_version(),

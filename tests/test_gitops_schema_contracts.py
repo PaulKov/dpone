@@ -405,6 +405,8 @@ def test_gitops_schema_contract_catalog_is_public_and_documented() -> None:
         "workloads",
         "release-set",
         "release-set-v2",
+        "release-set-v3",
+        "release-composition",
         "deployment-set",
         "deployment-set-v2",
         "deployment-set-v3",

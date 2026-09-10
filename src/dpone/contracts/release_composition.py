@@ -73,3 +73,10 @@ class ReleaseCompositionReport:
             "inventory_sha256": self.inventory_sha256,
             "blockers": list(self.blockers),
         }
+
+
+NATIVE_SIDECARS = {
+    "release-set.json": "_composition/native/release-set.json",
+    "_dbt/dbt-source-snapshot.json": "_composition/native/dbt-source-snapshot.json",
+    "release-subjects.sha256": "_composition/native/release-subjects.sha256",
+}

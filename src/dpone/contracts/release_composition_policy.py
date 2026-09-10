@@ -15,6 +15,7 @@ from typing import Any
 
 from dpone.contracts.airflow_deployment import canonical_fingerprint, is_canonical_sha256_digest, release_id
 from dpone.contracts.airflow_release_artifacts import release_artifact_path
+from dpone.contracts.dbt_contract_validation import artifact_json_bytes, sha256_bytes
 from dpone.contracts.dbt_release import dbt_release_authority_violation, dbt_release_runtime_wire_contract
 from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V2
 from dpone.contracts.dbt_runtime_release_binding import DbtReleaseArtifactIndex
@@ -27,7 +28,10 @@ from dpone.contracts.release_composition import (
     MAX_COMPOSITION_FILES,
     MAX_COMPOSITION_METADATA_BYTES,
     MAX_COMPOSITION_TOTAL_BYTES,
+    NATIVE_SIDECARS,
 )
+from dpone.contracts.release_composition_ordinary import OrdinaryReleaseCapture
+from dpone.contracts.strict_json import strict_json_object
 
 _BASE_FIELDS = {"id", "path", "sha256", "bytes"}
 _SECTIONS = {"dag_specs", "workload_packs", "canonical_schemas", "runtime_payloads", "composition_sources"}
@@ -217,3 +221,53 @@ def _exact(value: object, fields: set[str]) -> Mapping[str, Any]:
     if not isinstance(value, Mapping) or set(value) != fields:
         raise ValueError("composition object fields are invalid")
     return value
+
+
+def assemble_composition_files(
+    native: Mapping[str, Any], captured: Mapping[str, bytes], ordinary: OrdinaryReleaseCapture, *, producer_version: str
+) -> dict[str, bytes]:
+    """Bind the exact constituent union without rewriting native executable bytes."""
+    files = {path: body for path, body in captured.items() if path not in NATIVE_SIDECARS}
+    files.update({target: captured[source] for source, target in NATIVE_SIDECARS.items()})
+    for path, body in {**ordinary.dag_files, **ordinary.pack_files}.items():
+        if path in files:
+            raise ValueError("composition artifact path collision")
+        files[path] = body
+    files.update({f"_composition/standalone/{path}": body for path, body in ordinary.files.items()})
+    artifacts = {section: [dict(row) for row in rows] for section, rows in native["artifacts"].items()}
+    for section, values in (("dag_specs", ordinary.dag_files), ("workload_packs", ordinary.pack_files)):
+        for path, body in sorted(values.items()):
+            parsed = strict_json_object(body)
+            key = parsed["dag_id"] if section == "dag_specs" else parsed["workload"]["workload_id"]
+            row = _artifact_descriptor(key, path, body)
+            if section == "workload_packs":
+                row["pack_fingerprint"] = parsed["pack_fingerprint"]
+            artifacts[section].append(row)
+    artifacts["composition_sources"] = [
+        _artifact_descriptor(path, path, body) for path, body in sorted(files.items()) if path.startswith("_composition/")
+    ]
+    release: dict[str, Any] = {
+        "schema": COMPOSITION_SCHEMA,
+        "release_id": "",
+        "producer": {"name": COMPOSITION_PRODUCER, "version": producer_version},
+        "promotion": dict(_PROMOTION),
+        "artifacts": artifacts,
+        "constituents": [
+            {"id": "native", "kind": "dbt_workspace", "release": native},
+            {
+                "id": "standalone",
+                "kind": "workload_inventory",
+                "inventory": ordinary.inventory_dict(),
+                "inventory_sha256": ordinary.inventory_sha256,
+            },
+        ],
+    }
+    for rows in artifacts.values():
+        rows.sort(key=lambda row: row["id"])
+    release["release_id"] = release_id(release)
+    files["release-set.json"] = artifact_json_bytes(release)
+    return files
+
+
+def _artifact_descriptor(key: str, path: str, body: bytes) -> dict[str, Any]:
+    return {"id": key, "path": path, "sha256": sha256_bytes(body), "bytes": len(body)}

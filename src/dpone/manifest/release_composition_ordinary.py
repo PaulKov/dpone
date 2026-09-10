@@ -15,13 +15,13 @@ from dpone_airflow_pack.dag_spec_validation import validate_dag_spec_payload
 from dpone_airflow_pack.pack_identity import parse_pack_json, verify_pack_fingerprint
 from dpone_airflow_pack.strict_json import loads_strict_json_object
 
-from dpone.contracts.configuration_errors import ETLConfigurationError
 from dpone.contracts.dbt_contract_validation import DbtPublishingError
 from dpone.contracts.dbt_relation_writes import require_distinct_logical_writes
 from dpone.contracts.release_composition_ordinary import (
     OrdinaryReleaseCapture,
     OrdinaryReleaseInventoryError,
 )
+from dpone.manifest.errors import ManifestConfigurationError
 from dpone.manifest.release_composition_ordinary_closure import OrdinaryPackClosureVerifier
 from dpone.ports.dbt_release_files import ConfinedReleaseFileReader
 from dpone.readiness.airflow_compact_pack_release_helpers import rewrite_strict_init_fetch_dag_spec
@@ -65,7 +65,7 @@ class OrdinaryReleaseInventoryReader:
             KeyError,
             RecursionError,
             DbtPublishingError,
-            ETLConfigurationError,
+            ManifestConfigurationError,
         ) as exc:
             raise OrdinaryReleaseInventoryError(
                 "ordinary sources are invalid or unsupported; regenerate a complete root of plain transfer packs"

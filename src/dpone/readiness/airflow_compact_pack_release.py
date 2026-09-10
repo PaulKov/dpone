@@ -19,13 +19,13 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from dpone.contracts.legacy_release_dbt_authority import require_legacy_dbt_authority
 from dpone.gitops.schema_release_set_promotion import (
     COMPACT_PROMOTION_PROFILE,
     COMPACT_PROMOTION_SCHEMA,
 )
 from dpone.readiness.airflow_compact_pack_release_helpers import (
     closed_connection_projection,
+    require_legacy_pack_authority,
     rewrite_strict_init_fetch_dag_spec,
     rewrite_strict_init_fetch_pack,
 )
@@ -168,13 +168,7 @@ def _materialize(
                     f"missing compact pack for workload {workload_id!r}",
                 )
             original_pack = _load_json_object(pack_path)
-            try:
-                require_legacy_dbt_authority(original_pack)
-            except ValueError as exc:
-                raise CompactPackReleaseError(
-                    "DPONE_COMPACT_PACK_RELEASE_NATIVE_AUTHORITY_REQUIRED",
-                    "native dbt inputs require a complete workspace descriptor; rebuild with workspace compile",
-                ) from exc
+            require_legacy_pack_authority(original_pack)
             pack = rewrite_strict_init_fetch_pack(
                 original_pack,
                 xcom_sidecar_image=xcom_sidecar_image,
@@ -292,7 +286,13 @@ def _materialize_workspace(
     from dpone.app.dbt_promotion_composition import build_dbt_compact_workspace_release_builder
     from dpone.readiness.airflow_release_schema_validation import validate_release_set_schema
 
-    if _load_json_object(root / "release-set.json").get("schema") == "dpone.release-set.v3":
+    try:
+        descriptor = _load_json_object(root / "release-set.json")
+    except CompactPackReleaseError as exc:
+        raise CompactPackReleaseError(
+            "DPONE_COMPACT_PACK_RELEASE_WORKSPACE_INVALID", "workspace descriptor is invalid"
+        ) from exc
+    if descriptor.get("schema") == "dpone.release-set.v3":
         from dpone.readiness.airflow_composed_release_materializer import materialize_composed_release
 
         return materialize_composed_release(root, cache, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
