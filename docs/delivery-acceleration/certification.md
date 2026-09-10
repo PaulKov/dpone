@@ -237,11 +237,25 @@ the harness process's monotonic clock domain. `snapshot()` independently reads
 business/outside rows, canonical metadata hashes and exact operation-receipt
 hashes. Missing metadata/receipt authority produces UNVERIFIED, not PASS.
 
+Source-query/publication counters are scoped to the invocation, start at zero,
+and exclude fixture preparation and target-observation queries. Each successful
+fresh delivery requires exactly one source query and one atomic publication.
+Correct final rows cannot compensate for a repeated extraction or publication.
+
 Fault names are `before_commit`, `after_eof`, `lost_ack` and `unknown_commit`.
 Snapshots record actual `fault_events`, the count of exact `receipt_probes`, and
 `pipeline_complete` after evidence/checkpoint success. Every injected fault must
 be newly observed; lost ACK requires a receipt probe even when runtime recovery
 returns normally. Known rollback alone cannot establish recovery success.
+Rollback and the post-EOF boundary must preserve business rows, outside-window
+rows and metadata before recovery, with no publication or completed pipeline.
+For an unknown commit, the initial target must be exactly its prior state or the
+complete replacement, consistent with zero or one publication. Recovery must
+leave that state and the incomplete pipeline unchanged while outcome authority
+remains unavailable. An unavailable receipt is allowed only in this negative
+replay-blocking fixture; metadata still needs independent authority. For known
+commit recovery, the initial target and receipt must already be correct and
+remain unchanged; completing pending evidence/checkpoint work is allowed.
 `recover(source_allowed=False)` must install a source opener that raises if used,
 not merely accept the flag. Recovery fixtures assert no duplicate publication;
 receipt-first recovery asserts no extra stage reads after known commit. For

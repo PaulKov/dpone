@@ -1,5 +1,9 @@
 # DDA-05 review record
 
+> This record describes reviews through `38f6603`. The subsequent independent
+> review requested changes; [follow-up evidence](review-followup/report.md)
+> supersedes the component approval below.
+
 Planning dependency: `f3682940f8864563cde0e6b6ecee60f746b49020`, imported by ordinary
 fast-forward merge after fetching `origin/master`. Production base:
 `d5ad9aaecc900c24df421b160ed36b4cfc726e45`. Audit implementation paths after the
