@@ -7,9 +7,63 @@ from typing import Any
 
 from dpone_airflow_pack.kubernetes_resources import KubernetesResourceError, validate_kubernetes_resources
 
+from dpone.manifest.errors import ManifestConfigurationError
+
 _POD_OVERRIDE_FIELDS = frozenset(
     {"pod_template_dict", "pod_template_file", "full_pod_spec", "container_resources", "resources"}
 )
+
+
+class AirflowResourcePlacementError(KubernetesResourceError, ManifestConfigurationError):
+    """A workload resource declaration appears in a process-scoped location.
+
+    Both resource and manifest boundaries must recognize this failure so direct
+    batch loading and authoring compilation expose the same diagnostic code.
+    """
+
+
+def reject_process_airflow_resources(payload: Mapping[str, Any]) -> None:
+    """Reject resource declarations outside the manifest root before projection.
+
+    Inspect only authoring containers, never arbitrary connector options or
+    application data. Call again after folder/recipe expansion and at the batch
+    compiler boundary: classic manifests can bypass the authoring compiler.
+    """
+
+    processes = payload.get("processes")
+    if isinstance(processes, list | tuple):
+        for index, process in enumerate(processes):
+            _reject_process_resources(process, field=f"processes[{index}]")
+    _reject_process_resources(payload.get("defaults"), field="defaults")
+    schemas = payload.get("schemas")
+    if not isinstance(schemas, Mapping):
+        return
+    for name, schema in schemas.items():
+        if not isinstance(schema, Mapping):
+            continue
+        field = f"schemas.{name}"
+        _reject_process_resources(schema, field=field)
+        _reject_process_resources(schema.get("defaults"), field=f"{field}.defaults")
+        tables = schema.get("tables")
+        if not isinstance(tables, list | tuple):
+            continue
+        for index, table in enumerate(tables):
+            if isinstance(table, Mapping):
+                table_field = f"{field}.tables[{index}]"
+                _reject_process_resources(table, field=table_field)
+                _reject_process_resources(table.get("overrides"), field=f"{table_field}.overrides")
+
+
+def _reject_process_resources(value: object, *, field: str) -> None:
+    if not isinstance(value, Mapping):
+        return
+    gitops = value.get("gitops")
+    airflow = gitops.get("airflow") if isinstance(gitops, Mapping) else None
+    if isinstance(airflow, Mapping) and "resources" in airflow:
+        raise AirflowResourcePlacementError(
+            f"{field}.gitops.airflow.resources is unsupported; move this declaration to "
+            "gitops.airflow.resources at the manifest root. Resources apply to the whole workload."
+        )
 
 
 def workload_airflow_resources(
@@ -37,6 +91,7 @@ def workload_airflow_resources(
 def manifest_airflow_resources(payload: Mapping[str, Any]) -> dict[str, dict[str, str]] | None:
     """Resolve the documented manifest-local declaration before compilation."""
 
+    reject_process_airflow_resources(payload)
     gitops = payload.get("gitops")
     if gitops is None:
         return None

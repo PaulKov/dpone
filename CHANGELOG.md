@@ -6,6 +6,10 @@
   storage; preserve requests/limits through strict delivery and bind resource
   changes to authoring selection and artifact identity. Reject resource-capable
   Pod overrides with migration guidance instead of discarding them.
+- Reject Airflow resource declarations inside flow/folder/recipe processes and
+  classic batch defaults/schema/table scopes. Check, direct batch loading and
+  reconcile report the misplaced field and root-level replacement before any
+  delivery artifacts are written.
 - Fix separate Airflow hooks requiring `/airflow/xcom` despite disabled XCom.
   Keep hook diagnostics on the writable run volume, preserve child failures,
   and report safe startup stage, exception type and errno without raw argv.

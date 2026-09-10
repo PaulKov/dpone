@@ -81,6 +81,16 @@ volume or security-context overrides.
 Malformed/null quantities, unsupported resource names and request greater than
 limit fail with `DPONE_AIRFLOW_RESOURCES_INVALID` and the field path. For example,
 `gitops.airflow.resources.requests.cpu` identifies an invalid CPU request.
+The declaration belongs at the manifest root. A declaration inside
+`processes[]`, a folder fragment's process, a recipe component's process, batch
+`defaults`, a schema block/defaults, or a table/its `overrides` also fails with
+`DPONE_AIRFLOW_RESOURCES_INVALID`, even when root resources are present. For
+example, `processes[0].gitops.airflow.resources` identifies the misplaced block.
+Move it to root `gitops.airflow.resources`, then rerun check and preview.
+Folder and recipe diagnostics use the expanded process index. Catalog
+`reconcile` preserves this field-path diagnostic and writes no pack or DAG
+artifacts when validation fails. Per-process resource overrides are unsupported.
+
 Move `pod_template_dict`, `pod_template_file`, `full_pod_spec`,
 `container_resources` or direct `resources` from `operator_overrides` into the
 documented workload field. Strict release rewriting rejects those overrides

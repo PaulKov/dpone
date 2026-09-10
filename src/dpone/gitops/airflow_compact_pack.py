@@ -184,7 +184,7 @@ class AirflowCompactPackBuilder:
                 repo_root=repo_path,
             )
         except (RuntimeManifestMaterializationError, WorkloadDependencyError) as exc:
-            raise AirflowCompactPackBuildError(str(exc)) from exc
+            raise AirflowCompactPackBuildError(str(exc), code=getattr(exc, "code", None)) from exc
         runner_contract = resolve_airflow_runner_contract(
             dict_mapping(effective.get("airflow")),
             repo_root=repo_path,

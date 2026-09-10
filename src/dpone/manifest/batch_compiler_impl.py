@@ -7,6 +7,7 @@ from typing import Any
 
 from dpone.config import ENV_CODE
 from dpone.governance.quality import QualityGatePolicy
+from dpone.manifest.airflow_resources import reject_process_airflow_resources
 from dpone.manifest.batch_dependencies import _normalize_depends_on, _validate_unique_names
 from dpone.manifest.batch_merge import deep_merge
 from dpone.manifest.batch_models import _RESERVED_VARS, CompiledProcess
@@ -31,6 +32,7 @@ class BatchManifestCompiler:
                 f"Неверный kind для batch manifest: '{kind}'. Ожидалось 'dpone.batch.v1' ({manifest_path})"
             )
 
+        reject_process_airflow_resources(raw)
         root_vars = self._merge_vars({}, raw.get("vars") or {}, manifest_path=manifest_path)
         root_naming = self._merge_dict_templates(raw.get("naming") or {})
         root_defaults = self._ensure_dict(raw.get("defaults") or {}, "defaults", manifest_path)

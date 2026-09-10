@@ -69,6 +69,15 @@ Missing resources produces the existing Pod defaults. Kubernetes admission may
 apply namespace defaults. Unsupported resource-bearing Pod/operator overrides
 fail with a field path and guidance to use workload `airflow.resources`.
 
+Manifest-local resources belong only at root `gitops.airflow.resources`.
+Process declarations, including folder/recipe expansion and classic batch
+defaults/schema/table scopes, fail with `DPONE_AIRFLOW_RESOURCES_INVALID` and a
+path plus recovery guidance. This applies even if root resources also exist.
+Canonical manifest policy validates placement after authoring expansion and
+before batch compilation, which also protects direct classic loader callers.
+Traversal follows authoring containers and leaves connector/application data
+alone. Reconcile preserves the safe diagnostic before writing artifacts.
+
 The ordinary release-composition verifier added in 0.75.0 admits this validated
 resource-only manifest metadata during source reconstruction. Other `gitops`
 fields, hooks and custom runner authority remain outside its supported scope.
@@ -199,8 +208,10 @@ task evidence before handing off write access.
 The implementation is available in [PR #22](https://github.com/PaulKov/dpone/pull/22).
 It includes ordinary release-composition resource preservation, canonical
 manifest/runtime policy ownership and the readiness compatibility facade.
-Independent review found no remaining actionable issues after the integration
-corrections. Focused runtime/resource/composition coverage passed 231 tests;
+The initial integration review found no remaining actionable issues. A later
+independent review exposed ignored process-scoped resource declarations; the
+placement guard and regression matrix address that finding, with another fresh
+review required for the correction. Focused runtime/resource/composition coverage passed 231 tests;
 the composition, schema and identity integration group passed 163 tests.
 
 Ruff, formatting, mypy, import rules, layer/module budgets, generated references,
@@ -214,6 +225,8 @@ Exact revisions, full-suite results and logs are recorded in the PR and
 run exposed stale local native-acceleration distribution metadata after the
 0.76.0 update; reinstalling that editable package from current source resolved
 all 23 tests in its contract module without code or test changes.
+Placement-fix red/green logs and subsequent validation/review evidence are under
+`test_artifacts/airflow-hooks-resources/process-placement-fix/`.
 
 These are implementation and offline compatibility results. They do not certify
 live scheduling, writable Kubernetes volumes, disk capacity or a published
