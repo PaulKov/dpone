@@ -25,6 +25,71 @@ def lost_ack():
     raise AcknowledgementLost("injected_loss_after_real_commit")
 
 
+def _record_lock_snapshot(case, locker, locker_spid):
+    """Observe only this fixture session's control-table locks before waiting.
+
+    Catalog IDs and transaction state explain missing locks; they neither relax
+    the exact key-lock assertion nor prove authentication rejection.
+    """
+    table = case.table("login_gates")
+    context = execute(locker, "SELECT @@SPID,DB_ID(),@@TRANCOUNT,XACT_STATE();")
+    transactions = case.sql(
+        "SELECT TOP (17) t.transaction_id,a.transaction_type,a.transaction_state,t.is_user_transaction "
+        "FROM sys.dm_tran_session_transactions t JOIN sys.dm_tran_active_transactions a "
+        "ON a.transaction_id=t.transaction_id WHERE t.session_id=? ORDER BY t.transaction_id;",
+        locker_spid,
+    )
+    table_identity = case.sql("SELECT DB_ID(),OBJECT_ID(?);", table)
+    indexes = case.sql(
+        "SELECT TOP (17) p.hobt_id,p.index_id,p.partition_number,i.type,i.is_unique,i.is_primary_key "
+        "FROM sys.partitions p JOIN sys.indexes i ON i.object_id=p.object_id AND i.index_id=p.index_id "
+        "WHERE p.object_id=OBJECT_ID(?) ORDER BY p.index_id,p.partition_number;",
+        table,
+    )
+    locks = case.sql(
+        "SELECT TOP (65) l.resource_type,l.request_mode,l.request_status,l.resource_database_id,"
+        "l.resource_associated_entity_id,p.index_id,l.request_owner_type,l.request_owner_id,l.request_session_id "
+        "FROM sys.dm_tran_locks l LEFT JOIN sys.partitions p ON p.hobt_id=l.resource_associated_entity_id "
+        "WHERE l.request_session_id=? AND l.resource_database_id=DB_ID() AND "
+        "((l.resource_type IN ('KEY','RID','PAGE','HOBT') AND p.object_id=OBJECT_ID(?)) OR "
+        "(l.resource_type='OBJECT' AND l.resource_associated_entity_id=OBJECT_ID(?))) "
+        "ORDER BY l.resource_type,l.resource_associated_entity_id,l.request_mode,l.request_owner_id;",
+        locker_spid,
+        table,
+        table,
+    )
+    case.record(
+        "row_lock_snapshot",
+        {
+            "locker_spid": locker_spid,
+            "driver_autocommit": locker.autocommit,
+            "locker_spid_dbid_trancount_xactstate": context,
+            "transaction_id_type_state_user": transactions,
+            "control_database_and_table_ids": table_identity,
+            "index_hobt_id_partition_type_unique_primary": indexes,
+            "lock_type_mode_status_dbid_entity_index_owner_kind_owner_id_spid": locks,
+        },
+    )
+
+
+def _exclusive_gate_key_lock(case, locker_spid):
+    """Require this session's granted exclusive key lock on the control table.
+
+    SQL Server RangeX-X holds both an exclusive range and exclusive resource;
+    it conflicts with the LOGON reader's shared and serializable shared locks.
+    """
+    return (
+        case.sql(
+            "SELECT COUNT(*) FROM sys.dm_tran_locks WHERE request_session_id=? AND resource_database_id=DB_ID() "
+            "AND resource_type='KEY' AND request_mode IN ('X','RangeX-X') AND request_status='GRANT' "
+            "AND resource_associated_entity_id IN (SELECT hobt_id FROM sys.partitions WHERE object_id=OBJECT_ID(?));",
+            locker_spid,
+            case.table("login_gates"),
+        )[0][0]
+        > 0
+    )
+
+
 def test_lost_admission_ack_never_authorizes_replay(gate_case):
     case = gate_case
     factory, opened = commit_factory(case.environment, 1, lost_ack)
@@ -96,18 +161,8 @@ def test_connection_attempts_racing_close_cannot_reconnect(gate_case):
             case.attempt.attempt_sha256,
         )
         try:
-            wait_until(
-                lambda: (
-                    case.sql(
-                        "SELECT COUNT(*) FROM sys.dm_tran_locks WHERE request_session_id=? AND resource_type='KEY' "
-                        "AND request_mode='X' AND request_status='GRANT' AND resource_associated_entity_id IN "
-                        "(SELECT hobt_id FROM sys.partitions WHERE object_id=OBJECT_ID(?));",
-                        locker_spid,
-                        case.table("login_gates"),
-                    )[0][0]
-                    > 0
-                )
-            )
+            _record_lock_snapshot(case, locker, locker_spid)
+            wait_until(lambda: _exclusive_gate_key_lock(case, locker_spid))
             assert case.sql("SELECT is_disabled FROM sys.server_principals WHERE sid=?;", credentials.login_sid) == (
                 (False,),
             )

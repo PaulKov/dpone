@@ -56,7 +56,9 @@ def require_denied(operation):
     """Require a permission/authentication refusal, never arbitrary SQL failure."""
     with pytest.raises(SqlFailure) as caught:
         operation()
-    assert caught.value.code in {229, 262, 297, 916, 2760, 15151, 15247, 15406, 18456, 17892}, caught.value.code
+    # Microsoft error 18470 is the independently observed disabled-account refusal.
+    if caught.value.code not in {229, 262, 297, 916, 2760, 15151, 15247, 15406, 18456, 18470, 17892}:
+        raise caught.value  # Keep its safe SQLSTATE/code available to the report hook.
     return caught.value.code
 
 
@@ -345,6 +347,13 @@ def pytest_runtest_makereport(item, call):
             reason = error.reason
         report.longrepr = "SQL gate component failed: " + reason
         properties = [("dpone.gate.failure", reason)]
+        if isinstance(error, SqlFailure):
+            state = error.sqlstate
+            state = state if type(state) is str and re.fullmatch(r"[A-Z0-9]{5}", state) else None
+            codes = [error.code] if type(error.code) is int and abs(error.code) <= 2147483647 else []
+            properties.append(
+                ("dpone.gate.failure_sql", observation_document({"sqlstate": state, "native_codes": codes}))
+            )
         locations = failure_locations(error)
         if locations:
             properties.append(("dpone.gate.failure_locations", observation_document({"frames": locations})))
