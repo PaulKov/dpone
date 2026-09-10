@@ -344,5 +344,41 @@ def pytest_runtest_makereport(item, call):
         elif isinstance(error, CompositionAdmissionError) and re.fullmatch(r"[a-z0-9_]+", error.reason):
             reason = error.reason
         report.longrepr = "SQL gate component failed: " + reason
-        report.user_properties.append(("dpone.gate.failure", reason))
+        properties = [("dpone.gate.failure", reason)]
+        locations = failure_locations(error)
+        if locations:
+            properties.append(("dpone.gate.failure_locations", observation_document({"frames": locations})))
+        # JUnit finalizes with teardown's copy of the item properties.
+        item.user_properties.extend(properties)
+        report.user_properties.extend(properties)
     report.sections = []
+
+
+def failure_locations(error):
+    """Retain at most eight owned module/line pairs from 64 traceback frames.
+
+    Inspect only code filenames and numeric line numbers. Never inspect source,
+    locals, exception arguments/messages, chained exceptions or foreign paths.
+    """
+    directory = os.path.dirname(os.path.abspath(__file__))
+    allowed = {
+        os.path.join(directory, name): name
+        for name in (
+            "test_composition_mssql_gate_live.py",
+            "test_composition_mssql_gate_recovery_live.py",
+            "mssql_gate_live_support.py",
+            "mssql_gate_live_provisioning.py",
+            "mssql_gate_live_outcomes.py",
+        )
+    }
+    traceback = error.__traceback__ if error is not None else None
+    locations = []
+    for _ in range(64):
+        if traceback is None:
+            break
+        module = allowed.get(os.path.abspath(traceback.tb_frame.f_code.co_filename))
+        if module is not None and type(traceback.tb_lineno) is int and 1 <= traceback.tb_lineno <= 100000:
+            locations.append({"module": module, "line": traceback.tb_lineno})
+            locations = locations[-8:]
+        traceback = traceback.tb_next
+    return locations

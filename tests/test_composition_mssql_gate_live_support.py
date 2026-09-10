@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import FunctionType, SimpleNamespace
 from xml.etree import ElementTree
 
 import pytest
@@ -296,14 +296,64 @@ def test_reconciliation_derives_status_and_digest_from_reopened_rows(monkeypatch
 def test_failure_report_retains_only_numeric_code_and_discards_capture():
     report = SimpleNamespace(failed=True, longrepr="PWD=never-print", user_properties=[], sections=["driver output"])
     call = SimpleNamespace(excinfo=SimpleNamespace(value=SqlFailure(229)))
-    item = SimpleNamespace(nodeid="tests/integration/composition/test_composition_mssql_gate_live.py::test_case")
+    item = SimpleNamespace(
+        nodeid="tests/integration/composition/test_composition_mssql_gate_live.py::test_case", user_properties=[]
+    )
     hook = support.pytest_runtest_makereport(item, call)
     next(hook)
     with pytest.raises(StopIteration):
         hook.send(SimpleNamespace(get_result=lambda: report))
     assert report.longrepr == "SQL gate component failed: sql_error_229"
     assert report.user_properties == [("dpone.gate.failure", "sql_error_229")]
+    assert item.user_properties == report.user_properties
     assert report.sections == []
+
+
+@pytest.mark.parametrize("owned", [True, False])
+def test_failure_locations_include_only_exact_owned_module_and_line(owned):
+    def fail():
+        raise AssertionError("PWD=never-print; private source and locals")
+
+    module = Path(support.__file__).with_name("test_composition_mssql_gate_live.py")
+    filename = module if owned else Path("/private/unrelated") / module.name
+    operation = FunctionType(fail.__code__.replace(co_filename=str(filename)), {})
+    with pytest.raises(AssertionError) as caught:
+        operation()
+    locations = support.failure_locations(caught.value)
+    expected = [{"module": module.name, "line": fail.__code__.co_firstlineno + 1}] if owned else []
+    assert locations == expected
+    assert "never-print" not in json.dumps(locations) and "private" not in json.dumps(locations)
+
+
+def test_failure_locations_are_bounded_and_survive_teardown_property_copy():
+    def recurse(depth, operation):
+        if depth:
+            operation(depth - 1, operation)
+        raise AssertionError("secret assertion payload")
+
+    filename = str(Path(support.__file__).with_name("test_composition_mssql_gate_recovery_live.py"))
+    operation = FunctionType(recurse.__code__.replace(co_filename=filename), {})
+    with pytest.raises(AssertionError) as caught:
+        operation(80, operation)
+    item = SimpleNamespace(
+        nodeid="tests/integration/composition/test_composition_mssql_gate_recovery_live.py::test_case",
+        user_properties=[],
+    )
+    report = SimpleNamespace(failed=True, longrepr="secret", user_properties=[], sections=["secret"])
+    hook = support.pytest_runtest_makereport(item, SimpleNamespace(excinfo=SimpleNamespace(value=caught.value)))
+    next(hook)
+    with pytest.raises(StopIteration):
+        hook.send(SimpleNamespace(get_result=lambda: report))
+    # pytest snapshots item properties again for teardown, which finalizes JUnit.
+    teardown_properties = list(item.user_properties)
+    assert teardown_properties == report.user_properties
+    locations = json.loads(dict(teardown_properties)["dpone.gate.failure_locations"])["frames"]
+    assert len(locations) == 8
+    assert all(
+        row["module"] == "test_composition_mssql_gate_recovery_live.py" and type(row["line"]) is int
+        for row in locations
+    )
+    assert "secret" not in json.dumps(teardown_properties) and report.sections == []
 
 
 def test_unrelated_test_failure_keeps_original_diagnostics_and_properties():
