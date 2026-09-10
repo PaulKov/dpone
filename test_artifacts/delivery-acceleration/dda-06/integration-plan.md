@@ -12,7 +12,7 @@ UNVERIFIED remain explicit.
   `codex/dda-06-linear-integration`.
 - Original contract: `../agent-task-contracts/dda-06-integration.yml`.
   The full effective successor is
-  `../planning-amendments/dda-06-generated-metrics-scope.yml`; the original
+  `../planning-amendments/dda-06-quality-summary-scope.yml`; the original
   planning contracts and feature specifications remain unchanged.
 - `origin/master` was fetched before branch preparation and contained the baseline.
 - The clean detached worktree was placed on the integration branch and imported
@@ -31,6 +31,8 @@ UNVERIFIED remain explicit.
   implementation status here and in the integration completion report.
 - The effective contract's `integrator_owned_paths` assigns `CHANGELOG.md`,
   `mkdocs.yml` and a producer-only refresh of `docs/quality-metrics.md` to DDA-06.
+  The final successor permits only three exact manual-summary replacements
+  supported by the failing integrated gates; all other prose remains unchanged.
   It also records the narrowly scoped annotation/staging supplement and preserves
   the exclusion of unowned PostgreSQL source-authority changes.
 

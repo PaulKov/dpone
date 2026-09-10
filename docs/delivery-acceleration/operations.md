@@ -83,8 +83,8 @@ lifecycle identities when resuming an interrupted invocation after upgrade.
 
 ## Connect optional observations
 
-Use one collector for the application-owned runtime and stage composition. These
-factories accept the same required capabilities listed in the
+Use one collector for the application-owned runtime and stage composition within
+one delivery invocation. These factories accept the same required capabilities listed in the
 [native runtime guide](../mssql-native-transport.md#compose-the-runtime):
 
 ```python
@@ -106,6 +106,9 @@ def make_runtime(**runtime_capabilities):
 The application's existing `bindings` callback uses `make_stage_context` with its
 fresh lease. After `runtime.run(...)`, including on failure, read
 `observer.snapshot()` and persist it separately from the recovery journal.
+Snapshots accumulate accepted spans and do not reset the collector. Create a
+fresh collector for each independent invocation so its report does not include
+spans or capacity usage from a previous run.
 
 For a custom observer, explicitly share one session across both factories:
 
@@ -117,8 +120,9 @@ def make_shared_session(custom_observer):
     return NativeDeliverySession(custom_observer)
 ```
 
-Create that session once, pass it as `observer=session` to both runtime and stage
-composition, and read `session.snapshot()` even if the custom observer throws.
+Create that session once per invocation, pass it as `observer=session` to both
+runtime and stage composition, and read `session.snapshot()` even if the custom
+observer throws.
 Separately constructed sessions keep separate diagnostic histories;
 `runtime.observations.snapshot()` alone does not include another session's staging
 failures. The bounded collector example above already shares its failure channel.

@@ -19,6 +19,7 @@ IMPORTED_PREFIXES = (
     "e10d48e",
     "642874b",
     "c1a88ad",
+    "0b526c5",
     "3dea445",
     "3f37418",
     "ad9d96b",
@@ -94,7 +95,7 @@ def reviewed_import(commit: str, original: str) -> bool:
 
 
 def main() -> None:
-    contract_path = Path("test_artifacts/delivery-acceleration/planning-amendments/dda-06-generated-metrics-scope.yml")
+    contract_path = Path("test_artifacts/delivery-acceleration/planning-amendments/dda-06-quality-summary-scope.yml")
     raw = contract_path.read_bytes()
     contract = yaml.safe_load(raw)
     shared = contract["integrator_owned_paths"]
