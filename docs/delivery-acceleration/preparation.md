@@ -121,9 +121,9 @@ Preserve this surrounding sequence:
    those columns once through `get_records_iterator`, and call
    `digest_prepared_rows` with `business_contract=context.wire_contract`,
    `max_row_bytes=context.max_row_bytes` and `expected_rows=stage.row_count`.
-6. Compare `business_digest` to `native_multiset_digest(stage.row_count,
-   sum(receipt.consumed_part_evidence["native_typed_sum"]) % (1 << 256))`, using
-   the existing integer conversion and aggregation code. On mismatch retain
+6. Compute `expected_sum = sum(int(receipt.consumed_part_evidence["native_typed_sum"]) for receipt in receipts) % (1 << 256)`.
+   Compare `business_digest` to `native_multiset_digest(stage.row_count, expected_sum)`.
+   On mismatch retain
    `mssql_native.prepared_digest_mismatch`. Persist `full_digest` in the existing
    prepared resource and recovery snapshot `digest` field. Keep capacity,
    object-id and journal ordering checks.
@@ -162,8 +162,13 @@ uv run pytest tests/test_mssql_native_integrity_readbacks.py tests/test_mssql_na
 The tests use legacy digest/UPDATE parity, frozen digest/SQL examples, a poisoned
 second iteration and exact encoder counts. Local SQLite execution verifies only
 the portable business-only UNION ALL subset; it does not certify SQL Server
-metadata evaluation. Component evidence belongs under
-`test_artifacts/delivery-acceleration/dda-02/`.
+metadata evaluation. The pytest command prints test results and exits with status
+0 on success; it does not save evidence in the task directory. To record the same
+check, run `uv run python test_artifacts/delivery-acceleration/dda-02/run_checks.py focused`.
+This evidence producer writes `focused.log` and `focused-results.json` under
+`test_artifacts/delivery-acceleration/dda-02/`, including the actual exit code,
+source hashes and checkout identity. It replaces that group's previous local
+results; commit evidence before rerunning when it must be retained.
 
 Live SQL Server/ClickHouse/BCP correctness is **SKIP** without an explicitly
 approved disposable environment. End-to-end scan reduction remains **UNVERIFIED**
