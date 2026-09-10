@@ -6,7 +6,9 @@ MR: <https://github.com/PaulKov/dpone/pull/31>.
 
 **Independent review follow-up:** a new reviewer found two P2 regressions in
 `648237b6`: ignored legacy-loader dependencies and incorrect partition row
-metrics. Fixes and their current validation status are tracked in
+metrics. Both were fixed in `48c123d`, independently reviewed with **APPROVE**,
+and validated with 65 focused tests and a new 40-case PostgreSQL campaign.
+The findings and validation status are tracked in
 [independent-review.md](independent-review.md). They change production bytes;
 the original live/CI receipts below remain evidence for their recorded commits.
 
