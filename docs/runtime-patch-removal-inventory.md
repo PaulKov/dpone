@@ -10,7 +10,7 @@ the [bounded MSSQL design](feature-design-clickhouse-mssql-bounded-native-v1.md)
 for the associated transport work. Production examples and evidence must remain
 synthetic and must not contain deployment-specific identifiers or credentials.
 
-The credential, logging and Airflow replacements are implemented for review in
+The credential, logging and Airflow replacements and source gate are implemented for review in
 [PR #12](https://github.com/PaulKov/dpone/pull/12). This records proposed removal
 on that branch, not absence on released v0.74.36. The native transport remains a
 separate researched contract awaiting maintainer approval.
@@ -72,12 +72,20 @@ Run after building all maintained Python distributions:
 uv run python tools/agent_policy/package_archive_gate.py dist/*.whl dist/*.tar.gz
 ```
 
-A separate source gate remains to be implemented alongside runtime removal. It
-must detect class/module/function replacement in import-executed statements,
-simple aliases and directly called initialization helpers; reject unresolved
-dynamic installation with an explicit finding; and cover all production package
-roots. Document analysis limits instead of claiming a general proof about Python.
-Instance data injection, subclass definitions and own-module re-exports must pass.
+PR #12 adds `tools/agent_policy/import_mutation_gate.py` to the Python validation
+plan and ordinary tests. It parses all production package roots without importing
+source and detects import-executed attribute replacement, simple/tuple aliases,
+direct initialization helpers and constructors, classmethod argument provenance,
+eager annotations, registry overlays and recognized dynamic installation.
+Nonregular inputs, including FIFOs, fail before reading. Instance data injection,
+subclass definitions and own-module re-exports pass. On the integrated review
+branch, the scan passed for 3,722 source files with no findings; the gate has 56
+synthetic regression cases.
+
+This finite syntax policy cannot prove absence of arbitrary dynamic Python
+behavior. Unknown calls, cross-file effects, complex indirect returns, argument
+unpacking, reflection, metaclasses and descriptors still require manual review.
+See the proposed source-policy documentation in PR #12 for output and exit codes.
 
 ## Review and release boundaries
 
