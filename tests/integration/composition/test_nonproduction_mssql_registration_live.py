@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 from tests.integration.composition import nonproduction_mssql_registration_live_support as support
-from tests.integration.composition.mssql_gate_live_provisioning import execute
+from tests.integration.composition.mssql_gate_live_provisioning import SqlFailure, execute
 from tests.integration.composition.nonproduction_mssql_trust_live_support import (
     acquire_shared_transaction,
     require_sql_rejection,
@@ -26,6 +26,31 @@ from dpone.contracts.nonproduction_scope import NonproductionAuthorityError
 
 pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql]
 registration_case = support.registration_case
+
+CASE_NAMES = (
+    (
+        "external_registration_ddl_and_catalog",
+        "complete_binary_originals_survive_independent_readback",
+        "append_only_and_invalid_direct_dml",
+        "execution_replay_rebind_and_documentary_candidates",
+        "qualification_consumes_once_without_run_rebind",
+        "complete_campaign_membership_obeys_current_ceilings",
+        "paged_history_audits_later_originals",
+        "historical_reads_survive_current_trust_changes",
+        "actual_ledger_identity_revision_and_clock_preconditions",
+    ),
+    (
+        "concurrent_qualification_has_one_durable_consumption",
+        "concurrent_execution_preserves_membership_ceiling",
+        "partial_write_failure_rolls_back_complete_registration",
+        "lost_commit_ack_reconciles_exact_durable_originals",
+        "failed_commit_and_unavailable_readback_return_no_ack",
+        "membership_corruption_and_overflow_fail_closed",
+        "installed_catalog_drift_blocks_registration",
+        "restricted_login_cannot_bypass_registration_storage",
+        "session_options_reject_new_writes_without_mutation",
+    ),
+)
 
 
 def expanded(grant, count):
@@ -55,6 +80,35 @@ def originals_for(grant, policy, **changes):
     values = support.inputs(grant, policy) | changes
     return NonproductionRegistrationOriginals(
         values["grant_bytes"], values["signature_bundle"], values["signature_subject_bytes"], values["request_bytes"]
+    )
+
+
+def observe_denial(case, index, label, operation, codes):
+    """Record each attempted operation before enforcing its unchanged denial codes."""
+    payload = {"operation_index": index, "operation": label}
+    try:
+        operation()
+        payload["unexpected_success"] = True
+    except SqlFailure as error:
+        if error.code is None:
+            payload["unclassified_sql_error"] = True
+        else:
+            payload["sql_error"] = error.code
+    finally:
+        case.record("denial_" + str(index), payload)
+    assert payload.get("sql_error") in codes, "unexpected_sql_rejection"
+    return payload["sql_error"]
+
+
+def storage_denials(case):
+    """Fixed restricted-principal operations; no caller SQL or chosen objects."""
+    return (
+        ("update", f"UPDATE {case.table('grants')} SET schema_version=2;"),
+        ("delete", f"DELETE FROM {case.table('memberships')};"),
+        ("alter", f"ALTER TABLE {case.table('grants')} ADD forbidden int;"),
+        ("truncate", f"TRUNCATE TABLE {case.table('memberships')};"),
+        ("disable_trigger", f"DISABLE TRIGGER {case.trigger('grants')} ON {case.table('grants')};"),
+        ("impersonate", "EXECUTE AS LOGIN=N'sa';"),
     )
 
 

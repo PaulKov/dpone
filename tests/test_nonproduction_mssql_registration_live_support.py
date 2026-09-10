@@ -25,31 +25,6 @@ from tests.integration.composition.test_nonproduction_mssql_registration_live im
 from tests.nonproduction_authority_helpers import NOW, execution, limits
 from tests.nonproduction_signature_helpers import github_policy, trust
 
-CASES = (
-    (
-        "external_registration_ddl_and_catalog",
-        "complete_binary_originals_survive_independent_readback",
-        "append_only_and_invalid_direct_dml",
-        "execution_replay_rebind_and_documentary_candidates",
-        "qualification_consumes_once_without_run_rebind",
-        "complete_campaign_membership_obeys_current_ceilings",
-        "paged_history_audits_later_originals",
-        "historical_reads_survive_current_trust_changes",
-        "actual_ledger_identity_revision_and_clock_preconditions",
-    ),
-    (
-        "concurrent_qualification_has_one_durable_consumption",
-        "concurrent_execution_preserves_membership_ceiling",
-        "partial_write_failure_rolls_back_complete_registration",
-        "lost_commit_ack_reconciles_exact_durable_originals",
-        "failed_commit_and_unavailable_readback_return_no_ack",
-        "membership_corruption_and_overflow_fail_closed",
-        "installed_catalog_drift_blocks_registration",
-        "restricted_login_cannot_bypass_registration_storage",
-        "session_options_reject_new_writes_without_mutation",
-    ),
-)
-
 
 def environment():
     token = "a" * 24
@@ -197,10 +172,21 @@ def test_bulk_fixture_rejects_any_foreign_pin(field):
         support.require_bulk_fixture(values)
 
 
-@pytest.mark.parametrize("code", [102, 4861, 4860])
-def test_syntax_or_missing_bulk_file_cannot_count_as_permission_denial(code):
-    with pytest.raises(AssertionError):
-        recovery.require_sql_rejection(lambda: (_ for _ in ()).throw(SqlFailure(code)), {229, 4834})
+@pytest.mark.parametrize("code", [229, 102, 4861, 4860, 4902, None])
+@pytest.mark.parametrize("index,label", enumerate(support.DENIAL_OPERATIONS, 1))
+def test_denial_diagnostics_precede_exact_assertion_for_every_operation(code, index, label):
+    plan = live.storage_denials(SimpleNamespace(table=str, trigger=str))
+    assert tuple(label for label, _ in plan) == support.DENIAL_OPERATIONS
+    case = object.__new__(support.RegistrationCase)
+    case.record_property = Mock()
+    operation = Mock(side_effect=None if code is None else SqlFailure(code))
+    with nullcontext() if code == 229 else pytest.raises(AssertionError):
+        live.observe_denial(case, index, label, operation, {229, 4834})
+    name, raw = case.record_property.call_args.args
+    assert name == f"dpone.registration.denial_{index}"
+    expected = {"unexpected_success": True} if code is None else {"sql_error": code}
+    assert json.loads(raw) == {"operation_index": index, "operation": label} | expected
+    operation.assert_called_once_with()
 
 
 @pytest.mark.parametrize("mode,completed", [("before_commit", 0), ("after_commit", 1)])
@@ -282,6 +268,10 @@ def test_owned_bulk_probe_is_cleaned_up_after_actual_setup_refusal(monkeypatch):
         {"xact_state": 2},
         {"lock_mode": "private-canary"},
         {"bulk_path": "PASS"},
+        {"operation_index": 7},
+        {"operation": "private-canary"},
+        {"operation": []},
+        {"unexpected_success": 1},
     ],
 )
 def test_evidence_rejects_raw_or_invented_authority(payload):
@@ -326,10 +316,18 @@ def test_unrelated_reports_and_duplicate_or_malformed_properties():
     value.user_properties = [([], "private-canary"), ("dpone.registration.state", '{"rows":"private-canary"}')] + [
         ("dpone.registration.state", '{"rows":1}')
     ] * 100
+    denials = [
+        (
+            f"dpone.registration.denial_{index}",
+            support.observation_document({"operation_index": index, "operation": label, "sql_error": 229}),
+        )
+        for index, label in enumerate(support.DENIAL_OPERATIONS, 1)
+    ]
+    value.user_properties += denials
     support.sanitize_report(
         SimpleNamespace(nodeid=support.LIVE_MODULES[1] + "::case"), SimpleNamespace(excinfo=None), value
     )
-    assert value.user_properties == [("dpone.registration.state", '{"rows":1}')]
+    assert value.user_properties == [("dpone.registration.state", '{"rows":1}'), *denials]
 
 
 def test_fault_restoration_runs_and_cleanup_errors_remain_failures(monkeypatch):
@@ -390,7 +388,7 @@ def test_exact_eighteen_cases_opt_out_without_opening_sql(tmp_path):
     assert len(cases) == 18
     assert {case.attrib["classname"] + "::" + case.attrib["name"] for case in cases} == {
         module[:-3].replace("/", ".") + "::test_" + name
-        for module, names in zip(support.LIVE_MODULES, CASES, strict=True)
+        for module, names in zip(support.LIVE_MODULES, live.CASE_NAMES, strict=True)
         for name in names
     }
     assert all(case.find("skipped") is not None for case in cases)

@@ -46,7 +46,9 @@ OPTIONS = (
     "SET CONCAT_NULL_YIELDS_NULL ON; SET QUOTED_IDENTIFIER ON; SET NUMERIC_ROUNDABORT OFF;"
 )
 BULK_PATH = "/tmp/dpone-composition-registration-bulk.txt"
+DENIAL_OPERATIONS = ("update", "delete", "alter", "truncate", "disable_trigger", "impersonate")
 _OBSERVATIONS = {"state", "bytes", "catalog", "transaction", "race", "fault", "permissions", "history", "cleanup"}
+_OBSERVATIONS.update("denial_" + str(index) for index in range(1, 7))
 _COUNTS = {
     "rows",
     "members",
@@ -178,6 +180,11 @@ class RegistrationCase:
     def store(self, *, provider=None):
         return MssqlNonproductionRegistrationStore(provider or self.trust.provider(), clock=self.clock)
 
+    def registration_method(self, grant):
+        """Use the same phase selection for successful and refused fixture calls."""
+        store = self.store()
+        return store.register_execution_in if grant.phase == "execution" else store.consume_qualification_in
+
     def grant(self, **changes):
         return execution(self.policy, grant_id=str(uuid4()), **changes)
 
@@ -200,11 +207,7 @@ class RegistrationCase:
         """Commit once via existing owner; caller separately reconciles success."""
         values = inputs(grant, self.policy) | changes
         with self.transaction(factory) as ledger:
-            method = (
-                self.store().register_execution_in
-                if grant.phase == "execution"
-                else self.store().consume_qualification_in
-            )
+            method = self.registration_method(grant)
             result = method(ledger, **values, expected_revision=expected or self.expected)
         return result
 
@@ -220,11 +223,7 @@ class RegistrationCase:
         observed = None
         with pytest.raises(CompositionAdmissionError, match="control_operation_unknown"):
             with self.transaction() as ledger:
-                method = (
-                    self.store().register_execution_in
-                    if grant.phase == "execution"
-                    else self.store().consume_qualification_in
-                )
+                method = self.registration_method(grant)
                 try:
                     method(ledger, **(inputs(grant, self.policy) | changes), expected_revision=self.expected)
                 except NonproductionAuthorityError as error:
@@ -317,7 +316,14 @@ def observation_document(payload):
             value is None or type(value) is int and value in {0, 1}
         ):
             continue
-        if key in {"login_matches", "user_matches"} and type(value) is bool:
+        if (
+            key in {"login_matches", "user_matches", "unexpected_success", "unclassified_sql_error"}
+            and type(value) is bool
+        ):
+            continue
+        if key == "operation_index" and type(value) is int and 1 <= value <= 6:
+            continue
+        if key == "operation" and type(value) is str and value in DENIAL_OPERATIONS:
             continue
         if (
             key in _COUNTS
@@ -343,12 +349,9 @@ def sanitize_report(item, call, report):
     stash = getattr(item, "stash", None)
     diagnostics = stash.get(_FAILURES, []) if stash is not None else []
     safe, seen = [], set()
+    allowed = {"dpone.registration." + suffix for suffix in _OBSERVATIONS}
     for name, value in report.user_properties:
-        if (
-            type(name) is not str
-            or name in seen
-            or name not in {"dpone.registration." + suffix for suffix in _OBSERVATIONS}
-        ):
+        if type(name) is not str or name in seen or name not in allowed:
             continue
         try:
             if type(value) is str and len(value) <= 2048:
