@@ -442,7 +442,7 @@ Local command output is retained under
 `native-full-suite-final.log`, `native-module-size-final.log`,
 `native-architecture-overshoot-final.log`, `native-mypy-changed-final.log`,
 `native-archive-gate-final.log` and `native-wheel-smoke-final.log`.
-The [review PR](https://github.com/PaulKov/dpone/pull/11) carries current integration
+The [review PR](https://github.com/PaulKov/dpone/pull/13) carries current integration
 checks and owner attestations. This evidence does not authorize tagging or publication.
 
 ### Integration with 0.75.0
@@ -460,3 +460,12 @@ Public signatures, validation order, errors and identity hashes are preserved.
 The focused compatibility suite passed 278 tests. Architectural budgets and
 baselines remain unchanged. Current combined-commit validation is recorded in
 the PR; previous implementation evidence above is retained with its exact scope.
+
+Combined implementation commit: `088959fb6f2abf095de691049d37c0b3813c4280`.
+The subsequent update regenerates tracked-file metrics and records evidence only.
+The complete non-live suite passed: **20,794 passed, 570 skipped**, 438.11 seconds
+(`-n 2 --dist loadfile`). Ruff, formatting, configured and focused mypy, import,
+layer, exact-commit module-size and 41 architecture fitness tests passed.
+Documentation checks, strict MkDocs, all four 0.75.0 package builds, eight archive
+inspections, twine and isolated-wheel native composition imports passed.
+Native live certification remains SKIP for the reason recorded above.
