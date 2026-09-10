@@ -10,18 +10,20 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.dbt_relation_writes import DbtRelationWrite, transfer_relation_write
 from dpone.contracts.release_composition_ordinary import OrdinaryReleaseInventoryError
-from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
 from dpone.gitops.workload_catalog_models import GitOpsConfigProvenance, GitOpsWorkloadDefinition
-from dpone.gitops.workload_dependencies import WorkloadDependencyResolver
 from dpone.manifest.bounded_yaml import load_bounded_yaml
 from dpone.manifest.confined_files import read_confined_file
-from dpone.manifest.loader import SingleYamlManifestLoader
 from dpone.manifest.runtime_materialization import materialize_runtime_manifest
-from dpone.ports.release_composition_ordinary import OrdinaryArchiveUnpacker
+
+if TYPE_CHECKING:
+    from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
+    from dpone.gitops.workload_dependencies import WorkloadDependencyResolver
+    from dpone.manifest.loader import SingleYamlManifestLoader
+    from dpone.ports.release_composition_ordinary import OrdinaryArchiveUnpacker
 
 
 class OrdinaryPackClosureVerifier:

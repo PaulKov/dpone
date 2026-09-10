@@ -198,3 +198,33 @@ separate worktrees and validated path-scoped contracts; review agents are read
 only. No publication before exact reviewed-head gates and ordinary controller
 policy. Mark IMPLEMENTED only after linked evidence demonstrates all supported
 behavior. This specification records approved intended behavior, not completion.
+
+## Approved review corrections
+
+The maintainer authorized correction of the independent review findings. The
+inventory reader must apply the existing provider OCI validator and preserve its
+ordinary API error, CLI rejection, original source bytes and source-only digest.
+
+The internal dependency correction preserves the public release and execution
+contracts. Extract five pure policies into canonical contracts: composition
+transport byte binding, semantic-refresh template proof binding, generic release
+authority after schema admission, native producer installation admission, and
+release artifact metadata. Existing adapters retain schema orchestration, provider
+fingerprints/topology parsing, confined I/O, error translation and publication.
+Keep the existing order of rejected conditions and public imports/class identity.
+Each policy owns its actual validation algorithm, not aliases to unrelated helpers.
+
+Dependencies used only by postponed annotations may be guarded by `TYPE_CHECKING`.
+Keep runtime bases, constructors, type checks, dataclass field types and advertised
+re-exports available. Explicit dependency injection and raw string annotations
+remain unchanged. Incidental `typing.get_type_hints` calls may require explicit
+type namespaces; automatic runtime annotation resolution is not an injection
+mechanism for these adapters. Verify reduced module loading in fresh interpreters.
+
+Independent transport, proof and artifact-metadata writers use separate worktrees
+and path-scoped task contracts. The integrator owns generic/native admission,
+remaining annotation imports, shared docs and final validation. Acceptance includes
+first-error characterization, v1 legacy checksum spelling, native v2 authority,
+v3 byte closure, actual registry/cache/provider preparation and unchanged activation
+refusal. Compare the canonical graph from the real final files against unchanged
+budgets; a simulated graph does not establish acceptance or release readiness.

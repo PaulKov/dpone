@@ -7,16 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from dpone.contracts.airflow_deployment import (
-    is_canonical_sha256_digest,
-    is_sha256_digest,
-)
-from dpone.contracts.airflow_deployment import (
-    release_id as compute_release_id,
-)
-from dpone.contracts.airflow_release_artifacts import (
-    ReleaseArtifactLocatorError,
-    release_artifact_path,
+from dpone.contracts.release_artifact_metadata import (
+    ArtifactChecksumPolicy,
+    ReleaseArtifactMetadataError,
+    parse_release_artifact_pin,
+    require_release_metadata_identity,
 )
 from dpone.manifest.confined_files import read_confined_file
 from dpone.readiness.airflow_deployment_artifacts_io import (
@@ -82,36 +77,10 @@ def require_release_identity(
 ) -> None:
     """Verify that the release schema, claim, and content identity agree."""
 
-    if release.get("schema") not in {
-        "dpone.release-set.v1",
-        "dpone.release-set.v2",
-        "dpone.release-set.v3",
-    }:
-        raise AirflowDeploymentProjectionError(
-            "DPONE_RELEASE_SCHEMA_INVALID",
-            "release-set schema is invalid",
-            path=path.as_posix(),
-        )
-    claimed_release_id = release.get("release_id")
-    if not is_canonical_sha256_digest(claimed_release_id):
-        raise AirflowDeploymentProjectionError(
-            "DPONE_RELEASE_ID_INVALID",
-            "release-set identity must be a canonical sha256 digest",
-            path=path.as_posix(),
-        )
-    computed_release_id = compute_release_id(release)
-    if claimed_release_id != computed_release_id:
-        raise AirflowDeploymentProjectionError(
-            "DPONE_RELEASE_FINGERPRINT_MISMATCH",
-            "release-set content does not match its claimed identity",
-            path=path.as_posix(),
-        )
-    if requested_release_id != computed_release_id:
-        raise AirflowDeploymentProjectionError(
-            "DPONE_RELEASE_ID_MISMATCH",
-            "requested release identity does not match release-set content",
-            path=path.as_posix(),
-        )
+    try:
+        require_release_metadata_identity(release, requested_release_id=requested_release_id)
+    except ReleaseArtifactMetadataError as exc:
+        raise AirflowDeploymentProjectionError(exc.code, str(exc), path=path.as_posix()) from exc
 
 
 def _validated_release_artifacts(
@@ -168,23 +137,20 @@ def _index_release_artifact(
     reader: Any,
 ) -> dict[str, Any]:
     try:
-        artifact_path = release_artifact_path(raw_item)
-    except ReleaseArtifactLocatorError as exc:
-        raise AirflowDeploymentProjectionError(
-            "DPONE_RELEASE_ARTIFACT_PATH_INVALID",
-            "release artifact path is invalid",
-        ) from exc
-    expected_sha256 = str(raw_item.get("sha256") or "")
-    digest_is_valid = (
-        is_canonical_sha256_digest(expected_sha256)
-        if rules.require_canonical_checksums
-        else is_sha256_digest(expected_sha256)
-    )
-    if not digest_is_valid:
-        raise AirflowDeploymentProjectionError(
-            "DPONE_DEPLOYMENT_DIGEST_INVALID",
-            "sha256 does not satisfy the selected projection wire contract",
+        pin = parse_release_artifact_pin(
+            raw_item,
+            checksum_policy=ArtifactChecksumPolicy.CANONICAL_TEXT
+            if rules.require_canonical_checksums
+            else ArtifactChecksumPolicy.LEGACY_TEXT,
         )
+    except ReleaseArtifactMetadataError as exc:
+        message = (
+            "release artifact path is invalid"
+            if exc.code == "DPONE_RELEASE_ARTIFACT_PATH_INVALID"
+            else "sha256 does not satisfy the selected projection wire contract"
+        )
+        raise AirflowDeploymentProjectionError(exc.code, message) from exc
+    artifact_path, expected_sha256 = pin.path, pin.sha256
     relative_path = f"releases/{digest_dir(release_id)}/{artifact_path.as_posix()}"
     local_path = cache_root / relative_path
     content = capture_confined_source(

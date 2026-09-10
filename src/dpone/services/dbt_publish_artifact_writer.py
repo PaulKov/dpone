@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 from dpone.contracts.dbt_contract_validation import DbtPublishingError, artifact_json_bytes
 from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V1
 from dpone.readiness.dbt_airflow_execution_pack import DbtAirflowExecutionPackBuilder
-from dpone.readiness.dbt_airflow_pack_adapter import AirflowPackBuilderPort
 from dpone.readiness.dbt_publish_atomic_publisher import (
     DbtArtifactOutputConflict,
     DbtArtifactPublicationError,
@@ -27,6 +26,9 @@ from dpone.services.dbt_release_assets import (
 )
 from dpone.services.dbt_release_set_assembly import build_release_set
 from dpone.version import installed_version
+
+if TYPE_CHECKING:
+    from dpone.readiness.dbt_airflow_pack_adapter import AirflowPackBuilderPort
 
 if TYPE_CHECKING:
     from dpone.contracts.dbt_publish_models import DbtCompileReport, DbtPublishIssue

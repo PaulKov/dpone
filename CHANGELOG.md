@@ -11,6 +11,9 @@
   Activation fails closed until every constituent has physical admission.
 - Reject descriptor-less legacy materialization of workspace wire-v2 payloads;
   regenerate through the complete workspace producer and compact materializer.
+- Validate inventory sidecar images with the same OCI contract used by the
+  Airflow provider; malformed repository names and invalid registry ports return
+  a structured rejection instead of a successful inventory report.
 
 ## 0.74.36 - 2026-09-09
 

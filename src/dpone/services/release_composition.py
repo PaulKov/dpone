@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from dpone.contracts.dbt_relation_writes import require_distinct_logical_writes
 from dpone.contracts.release_composition import (
@@ -22,9 +22,15 @@ from dpone.manifest.release_composition_files import (
     verify_composition_transport_files,
     write_private_files,
 )
-from dpone.ports.dbt_release_files import ConfinedReleaseFileReader, VerifiedWorkspaceReleaseCapture
-from dpone.ports.release_composition import CompositionIntegrity, CompositionNativeSourceReader, CompositionPublisher
-from dpone.ports.release_composition_ordinary import OrdinaryReleaseInventoryReaderPort
+
+if TYPE_CHECKING:
+    from dpone.ports.dbt_release_files import ConfinedReleaseFileReader, VerifiedWorkspaceReleaseCapture
+    from dpone.ports.release_composition import (
+        CompositionIntegrity,
+        CompositionNativeSourceReader,
+        CompositionPublisher,
+    )
+    from dpone.ports.release_composition_ordinary import OrdinaryReleaseInventoryReaderPort
 
 
 class ReleaseCompositionService:

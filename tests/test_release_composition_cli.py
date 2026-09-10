@@ -9,7 +9,9 @@ import pytest
 import yaml
 
 from dpone.app.release_composition import build_release_composition_service
+from dpone.contracts.release_composition_ordinary import OrdinaryReleaseInventoryError
 from tests.test_release_composition_delivery import composition_request as composition_request
+from tests.test_release_composition_ordinary import ordinary_root
 
 
 def invoke(*args):
@@ -19,6 +21,33 @@ def invoke(*args):
         text=True,
         check=False,
     )
+
+
+@pytest.mark.parametrize(
+    "sidecar",
+    [
+        "@sha256:" + "a" * 64,
+        "bad name@sha256:" + "a" * 64,
+        "sidecar:latest",
+        "registry.example:65536/team/xcom@sha256:" + "a" * 64,
+    ],
+)
+def test_inventory_rejects_invalid_sidecar_in_cli_and_api_without_source_writes(tmp_path, sidecar):
+    root = ordinary_root(tmp_path)
+    before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    with pytest.raises(OrdinaryReleaseInventoryError) as error:
+        build_release_composition_service().inventory(root, xcom_sidecar_image=sidecar)
+    assert error.value.code == "DPONE_RELEASE_COMPOSITION_ORDINARY_INVALID"
+    assert sidecar not in str(error.value)
+
+    result = invoke("release-inventory", "--pack-root", str(root), "--xcom-sidecar-image", sidecar)
+    assert result.returncode == 2
+    report = json.loads(result.stdout)
+    assert report["schema"] == "dpone.workload-inventory-report.v1"
+    assert report["passed"] is False and report["inventory_sha256"] is None
+    assert report["blockers"][0].startswith("DPONE_COMPOSITION_INVENTORY_INVALID:")
+    assert result.stderr == "" and sidecar not in result.stdout
+    assert {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
 
 
 def test_cli_inventory_and_compose_match_public_api(composition_request):

@@ -9,11 +9,13 @@ import re
 import stat
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone_airflow_pack.dag_spec_validation import validate_dag_spec_payload
+from dpone_airflow_pack.init_fetch_contract import InitFetchProviderError
 from dpone_airflow_pack.pack_identity import parse_pack_json, verify_pack_fingerprint
 from dpone_airflow_pack.strict_json import loads_strict_json_object
+from dpone_airflow_pack.xcom_sidecar import require_strict_xcom_sidecar_image
 
 from dpone.contracts.dbt_contract_validation import DbtPublishingError
 from dpone.contracts.dbt_relation_writes import require_distinct_logical_writes
@@ -22,10 +24,12 @@ from dpone.contracts.release_composition_ordinary import (
     OrdinaryReleaseInventoryError,
 )
 from dpone.manifest.errors import ManifestConfigurationError
-from dpone.manifest.release_composition_ordinary_closure import OrdinaryPackClosureVerifier
-from dpone.ports.dbt_release_files import ConfinedReleaseFileReader
 from dpone.readiness.airflow_compact_pack_release_helpers import rewrite_strict_init_fetch_dag_spec
 from dpone.readiness.dbt_airflow_execution_pack import strict_transfer_pack
+
+if TYPE_CHECKING:
+    from dpone.manifest.release_composition_ordinary_closure import OrdinaryPackClosureVerifier
+    from dpone.ports.dbt_release_files import ConfinedReleaseFileReader
 
 _MAX_SOURCE_FILES = 10_000
 _MAX_SOURCE_FILE_BYTES = 8 * 1024 * 1024
@@ -55,7 +59,8 @@ class OrdinaryReleaseInventoryReader:
     def capture(self, root: Path, *, xcom_sidecar_image: str) -> OrdinaryReleaseCapture:
         """Return detached source evidence or a sanitized fail-closed error."""
         try:
-            return self._capture(Path(root).absolute(), xcom_sidecar_image=xcom_sidecar_image)
+            exact_image = require_strict_xcom_sidecar_image({"xcom": {"sidecar_image": xcom_sidecar_image}})
+            return self._capture(Path(root).absolute(), xcom_sidecar_image=exact_image)
         except OrdinaryReleaseInventoryError:
             raise
         except (
@@ -64,6 +69,7 @@ class OrdinaryReleaseInventoryReader:
             TypeError,
             KeyError,
             RecursionError,
+            InitFetchProviderError,
             DbtPublishingError,
             ManifestConfigurationError,
         ) as exc:

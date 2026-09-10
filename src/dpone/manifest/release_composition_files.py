@@ -6,28 +6,27 @@ import os
 import stat
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dpone.contracts.dbt_contract_validation import sha256_bytes
-from dpone.contracts.release_composition import MAX_COMPOSITION_TOTAL_BYTES, NATIVE_SIDECARS
-from dpone.contracts.release_composition_subject import composition_subject_bytes
-from dpone.contracts.strict_json import strict_json_object
+from dpone.contracts.release_composition_transport import (
+    CompositionTransportPlan,
+    composition_auxiliary_subject_digest,
+    project_composition_descriptors,
+    verify_composition_descriptor,
+    verify_composition_subject,
+    verify_embedded_native_descriptor,
+)
 from dpone.manifest.confined_files import read_confined_file
-from dpone.ports.dbt_release_files import ConfinedReleaseFileReader
+
+if TYPE_CHECKING:
+    from dpone.ports.dbt_release_files import ConfinedReleaseFileReader
 
 SUBJECT = "release-subjects.sha256"
 
 
 def composition_file_descriptors(release: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     """Project the already validated complete parent file inventory."""
-    result = {}
-    for rows in release["artifacts"].values():
-        for row in rows:
-            path = row["path"]
-            if path in result:
-                raise ValueError("composition contains duplicate artifact paths")
-            result[path] = row
-    return result
+    return project_composition_descriptors(release)
 
 
 def verify_composition_transport_files(
@@ -38,31 +37,19 @@ def verify_composition_transport_files(
     Generic registry/cache consumers use this boundary. The composition producer
     additionally runs complete source verifiers on detached constituent views.
     """
-    from dpone.contracts.release_composition_policy import validate_composition_metadata
-
-    validate_composition_metadata(release)
-    descriptors = composition_file_descriptors(release)
-    require_exact_composition_tree(root, set(descriptors) | {"release-set.json"})
+    plan = CompositionTransportPlan.from_release(release)
+    require_exact_composition_tree(root, {row.path for row in plan.descriptors} | {"release-set.json"})
     descriptor_payload = read_file(root, "release-set.json", max_bytes=8 * 1024 * 1024)
-    if strict_json_object(descriptor_payload) != release:
-        raise ValueError("composition descriptor changed after metadata validation")
+    verify_composition_descriptor(release, descriptor_payload)
     subject = read_file(root, SUBJECT, max_bytes=8 * 1024 * 1024)
-    if (
-        sum(row["bytes"] for row in descriptors.values()) + len(descriptor_payload) + len(subject)
-        > MAX_COMPOSITION_TOTAL_BYTES
-    ):
-        raise ValueError("composition aggregate bytes including metadata exceed the bound")
+    plan.require_complete_byte_budget(len(descriptor_payload), len(subject))
     files = {}
-    for path, row in descriptors.items():
-        payload = read_file(root, path, max_bytes=row["bytes"])
-        if len(payload) != row["bytes"] or sha256_bytes(payload) != row["sha256"]:
-            raise ValueError("composition artifact differs from its exact descriptor")
-        files[path] = payload
-    native = next(item["release"] for item in release["constituents"] if item["id"] == "native")
-    if strict_json_object(files[NATIVE_SIDECARS["release-set.json"]]) != native:
-        raise ValueError("composition native source descriptor differs from embedded authority")
-    if subject != composition_subject_bytes(release, descriptor_payload):
-        raise ValueError("composition checksum subject differs from the parent-bound inventory")
+    for row in plan.descriptors:
+        payload = read_file(root, row.path, max_bytes=row.size)
+        row.verify_bytes(payload)
+        files[row.path] = payload
+    verify_embedded_native_descriptor(release, files)
+    verify_composition_subject(release, descriptor_payload, subject)
     return files
 
 
@@ -129,11 +116,7 @@ def composition_auxiliary_artifacts(root: Path, release: Mapping[str, Any]) -> t
     The descriptor is reread through confinement and bound to the validated view.
     Native releases have no composition auxiliary transport requirements.
     """
-    from dpone.contracts.release_composition_subject import composition_subject_sha256
-
     if release.get("schema") != "dpone.release-set.v3":
         return ()
     payload = read_confined_file(root, "release-set.json", max_bytes=8 * 1024 * 1024)
-    if strict_json_object(payload) != release:
-        raise ValueError("composition descriptor changed after metadata validation")
-    return ((PurePosixPath(SUBJECT), composition_subject_sha256(release, payload)),)
+    return ((PurePosixPath(SUBJECT), composition_auxiliary_subject_digest(release, payload)),)

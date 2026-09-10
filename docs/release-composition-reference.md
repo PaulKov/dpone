@@ -41,6 +41,11 @@ are reported on stderr and exit `2`.
 success. On rejection it returns `passed: false`, a null digest, and `blockers`.
 Its exit codes are `0` for verified inventory and `2` for rejection. It validates
 the proposed sidecar and transport capability without publishing a release.
+The sidecar must pass the Airflow provider's OCI image validator: a digest alone,
+an image name containing spaces, or an out-of-range registry port is rejected.
+Use a complete reference such as `registry.example/team/xcom@sha256:` followed
+by its 64 lowercase hexadecimal digest characters. Rejection leaves source
+files unchanged; correct the image reference and repeat the command.
 
 `release-compose` returns `passed`, `status`, `release_id`, `output_dir`,
 `source_release_id`, `inventory_sha256`, and `blockers`. A missing or empty

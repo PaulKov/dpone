@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
-from dpone.gitops.airflow_asset_uri import ResolvedMssqlAssetRegistry
 from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
-from dpone.gitops.airflow_compact_pack_outlets import OutletBinding
 from dpone.gitops.workload_catalog_models import GitOpsWorkloadDefinition
+
+if TYPE_CHECKING:
+    from dpone.gitops.airflow_asset_uri import ResolvedMssqlAssetRegistry
+    from dpone.gitops.airflow_compact_pack_outlets import OutletBinding
 
 
 class AirflowPackReportPort(Protocol):

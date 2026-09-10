@@ -7,14 +7,11 @@ import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.airflow_deployment import release_id as compute_release_id
 from dpone.contracts.airflow_deployment_projection import deployment_projection_violation
 from dpone.manifest.release_composition_files import composition_auxiliary_artifacts
-from dpone.ports.airflow_deployment_attestation import (
-    AirflowDeploymentAttestationVerifier,
-)
 from dpone.runtime.airflow_artifact_delivery_models import (
     AirflowArtifactDeliveryError,
     MaterializeReport,
@@ -48,6 +45,11 @@ from dpone.runtime.deployment_cache_common import DeploymentCacheError
 from dpone.runtime.deployment_cache_models import ValidatedDeploymentProjection
 from dpone.runtime.deployment_cache_projection_validator import DeploymentCacheProjectionValidator
 from dpone.runtime.immutable_local_tree import ImmutableLocalTreeError, materialize_immutable_local_tree_at
+
+if TYPE_CHECKING:
+    from dpone.ports.airflow_deployment_attestation import (
+        AirflowDeploymentAttestationVerifier,
+    )
 
 
 class AirflowArtifactMaterializer:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone_airflow_pack.pack_identity import PACK_IDENTITY_SCHEMA, compute_pack_fingerprint
 from dpone_airflow_pack.semantic_refresh_projection import (
@@ -13,13 +13,6 @@ from dpone_airflow_pack.semantic_refresh_projection import (
 )
 
 from dpone.contracts.dbt_publishing import DbtExecutionPack
-from dpone.contracts.dbt_semantic_refresh_activation import (
-    SemanticRefreshActivationAuthorityReceipt,
-)
-from dpone.contracts.dbt_semantic_refresh_plan_contracts import SemanticRefreshPlanBundle
-from dpone.contracts.dbt_semantic_refresh_run_contracts import (
-    SemanticRefreshRunExecutionBundle,
-)
 from dpone.readiness.dbt_semantic_refresh_airflow_validation import (
     SemanticRefreshTemplateProofAuthority,
 )
@@ -38,6 +31,15 @@ from dpone.readiness.dbt_semantic_refresh_airflow_validation import (
 from dpone.readiness.dbt_semantic_refresh_airflow_validation import (
     validate_pre_release_template as _validate_pre_release_template,
 )
+
+if TYPE_CHECKING:
+    from dpone.contracts.dbt_semantic_refresh_activation import (
+        SemanticRefreshActivationAuthorityReceipt,
+    )
+    from dpone.contracts.dbt_semantic_refresh_plan_contracts import SemanticRefreshPlanBundle
+    from dpone.contracts.dbt_semantic_refresh_run_contracts import (
+        SemanticRefreshRunExecutionBundle,
+    )
 
 
 @dataclass(frozen=True, slots=True)

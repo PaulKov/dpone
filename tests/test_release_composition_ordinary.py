@@ -147,6 +147,17 @@ def test_source_inventory_does_not_depend_on_transport(tmp_path: Path) -> None:
     assert first.pack_files != second.pack_files
 
 
+@pytest.mark.parametrize("repository", ["registry.example/team/xcom", "registry.example:65535/team/xcom"])
+def test_valid_sidecar_preserves_inventory_identity_and_exact_transport(tmp_path: Path, repository: str) -> None:
+    root = ordinary_root(tmp_path)
+    original = _capture(root)
+    image = repository + "@sha256:" + "c" * 64
+    result = _capture(root, image)
+    assert result.inventory_sha256 == original.inventory_sha256
+    assert result.files == original.files
+    assert json.loads(result.pack_files["packs/orders.airflow-pack.json"])["xcom"]["sidecar_image"] == image
+
+
 def test_semantically_empty_projection_is_supported(tmp_path: Path) -> None:
     root = ordinary_root(tmp_path)
     _mutate_pack(root, lambda pack: pack.update(connection_projection={}))
