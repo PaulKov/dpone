@@ -14,6 +14,10 @@ activation/current/recovery, parent attempt fencing and actual synthetic
 execution. This specification records that explicit implementation authorization, reaffirmed by the maintainer's approval on 2026-09-10. The earlier 0.75.0
 publication approval does not authorize another publication.
 
+The separately approved [nonproduction authority amendment](nonproduction-composition-authority.md)
+adds an explicit scoped native family for actual synthetic execution. Existing
+production/native-v2 authority remains unchanged.
+
 The design preserves the exact native constituent, source verification and
 v3 parent identity. Native-only admission is never authority for the parent.
 Unknown capabilities or missing physical/session authority reject the complete
@@ -36,7 +40,7 @@ is not sufficient for downstream readiness; the complete required matrix is:
 
 | Workload | Initial execution cell |
 |---|---|
-| Native dbt | Existing verified SQL Server execution-pack.v2 under a protected per-attempt SQL connection gate |
+| Native dbt | Verified SQL Server execution-pack.v2 payload under production native-v2 authority or the explicitly scoped nonproduction family; protected per-attempt SQL connection gate |
 | Ordinary transfer | PostgreSQL table extraction to MSSQL, full_refresh, generic target transaction, external target_atomic state |
 | Native-generated transfer (required downstream) | MSSQL to ClickHouse full_refresh; protected physical ownership, Atomic snapshot publication and parent attempt fencing |
 | MSSQL to MSSQL transfer | Deferred capability unless separately proven; not a substitute for the required ClickHouse cell |

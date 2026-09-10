@@ -1,0 +1,38 @@
+schema_version: 1
+task_id: DPONE-COMPOSITION-BACKENDS
+title: Protected composition backends and worker integration
+goal: Implement protected SQLServer and ClickHouse adapters and connect real workers to complete-parent authority without weakening native certification.
+specification: docs/feature-specs/composition-activation-execution.md
+base_commit: 2c45622407203533e960b984438dc8ee022ee3ba
+integrator: root
+acceptance_criteria:
+  - Persist the entire cross-connector occurrence and attempt closure through protected SQL transactions.
+  - Issue writer authority once and require protected close, quiescence and outcome records before release.
+  - Reject stale parent, epoch, repeated attempt and unknown publication outcomes.
+  - Retain native v2 behavior and all existing production certification checks.
+  - Report synthetic execution and production readiness separately with exact evidence.
+public_contract_impact:
+  level: compatible
+  surfaces: [python, runtime, state, evidence, documentation]
+  migration_required: false
+owned_paths: [src/dpone, tests, docs, tools, examples, packages]
+integrator_owned_paths: [CHANGELOG.md, mkdocs.yml, .github/workflows]
+read_only_paths: [pyproject.toml, uv.lock]
+forbidden_paths: [.git, pyproject.toml, uv.lock, CHANGELOG.md, mkdocs.yml, .github/workflows]
+shared_file_owner: root
+dependencies: [DPONE-COMPOSITION-ACTIVATION]
+required_checks:
+  focused: [protected SQL adapter and worker failure boundary tests]
+  broad: [ruff, mypy, import rules, layer metrics, module size, non-live pytest, docs]
+  live: [isolated synthetic SQLServer PostgreSQL ClickHouse execution and reconciliation]
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - An authority change exceeds the separately approved nonproduction-composition-authority amendment.
+  - Another writer owns the same semantic contract.
+  - A live check would access corporate or private systems.

@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+- Report exact sanitized SQL target catalog refusal reasons before writer
+  issuance, preserving all existing policy predicates. Keep catalog policy in
+  a separate adapter responsibility from login credentials and enrollment.
+  Accept the pinned controller's exact `dbo` membership in fixed `db_owner`,
+  while continuing to reject other elevated role members.
+
+- Correct SQL Server gate permission probes to use the server securable's NULL
+  class, so valid controller and gate-reader privileges can be observed. Restore
+  the controller before returning probe rows, including when the driver consumes
+  only the first result set.
+
+- Add an isolated SQL Server gate qualification profile covering actual issued
+  credentials, reconnect closure, transaction drain and unknown-outcome recovery.
+  Its exact 16-case evidence is separate from the seven-case control-ledger
+  profile and does not certify native or transfer worker execution.
+
+- Add concrete SQL Server persistence for complete composition occurrences and
+  cross-connector guards, with independent commit readback and exact protected
+  attempt/proof closure before retirement or successor admission. Add one-time
+  login issuance, monotonic reconnect gates and explicit unknown-outcome
+  reconciliation using protected producer evidence. Keep original admission bytes
+  and producer-bound outcome states; running and unknown attempts retain ownership.
+  External enrollment, live writer-gate qualification and full downstream execution
+  remain required before public activation can be enabled. Add a disposable Linux
+  SQL component runner with exact source and sanitized evidence.
+
 - Add complete composition source, physical-domain, occurrence and attempt
   contracts, plus a separate injectable parent activation coordinator. Preserve
   native-v2 authority and reject partial or stale parent readbacks. Protected
