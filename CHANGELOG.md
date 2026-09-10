@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add an injectable ClickHouse Atomic whole-snapshot publisher with exact durable
+  intent identities, one-time EXCHANGE claims and explicit UUID reconciliation.
+  Preserve empty and vanished-row snapshots, retain the previous target and
+  reject uncertain or repeated dispatch. Concrete protected adapters and live
+  worker qualification remain required before composition execution is enabled.
+
 - Correct SQL Server gate permission probes to use the server securable's NULL
   class, so valid controller and gate-reader privileges can be observed. Restore
   the controller before returning probe rows, including when the driver consumes
