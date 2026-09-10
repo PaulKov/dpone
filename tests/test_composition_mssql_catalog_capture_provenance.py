@@ -18,8 +18,9 @@ def observed_cursor(rows):
 
 
 @pytest.mark.parametrize("version", ["16.0.4265.3", None])
-def test_capture_preserves_actual_nondefault_database_session_and_unknown_version(version):
-    cursor = observed_cursor([("owned", 130, 32, version, 59)])
+@pytest.mark.parametrize("collation", ["Latin1_General_100_BIN2", "SQL_Latin1_General_CP1_CI_AS"])
+def test_capture_preserves_actual_nondefault_database_session_and_unknown_version(version, collation):
+    cursor = observed_cursor([("owned", 130, 32, version, 59, collation)])
     assert support.catalog_context(cursor, "owned") == {
         "database": "owned",
         "compatibility_level": 130,
@@ -27,14 +28,19 @@ def test_capture_preserves_actual_nondefault_database_session_and_unknown_versio
         "product_version": version,
         "product_version_status": "UNVERIFIED" if version is None else "OBSERVED",
         "session_id": 59,
+        "database_collation": collation,
     }
     sql = cursor.execute.call_args.args[0]
     assert "DB_NAME()" in sql and "d.compatibility_level" in sql and "@@OPTIONS" in sql and "@@SPID" in sql
     assert "SERVERPROPERTY('ProductVersion')" in sql and "d.database_id=DB_ID()" in sql
+    assert "d.collation_name" in sql
     assert cursor.nextset.call_count == 1
 
 
-@pytest.mark.parametrize("rows", [[], [("owned",)], [("owned", 130, 32, None, 59)] * 2])
+@pytest.mark.parametrize(
+    "rows",
+    [[], [("owned",)], [("owned", 130, 32, None, 59)], [("owned", 130, 32, None, 59, "Latin1_General_100_BIN2")] * 2],
+)
 def test_absent_or_ambiguous_capture_is_refused(rows):
     with pytest.raises(RuntimeError, match="^synthetic_catalog_context$"):
         support.catalog_context(observed_cursor(rows), "owned")
@@ -55,17 +61,23 @@ def test_absent_or_ambiguous_capture_is_refused(rows):
         (3, "1" * 129),
         (4, 0),
         (4, True),
+        (5, None),
+        (5, ""),
+        (5, True),
+        (5, "private-driver\n"),
+        (5, "A" * 129),
+        (5, "Latin1_General_100_BIN2\n"),
     ],
 )
 def test_untrusted_observation_cannot_be_defaulted_into_provenance(index, value):
-    row = ["owned", 130, 32, "16.0.4265.3", 59]
+    row = ["owned", 130, 32, "16.0.4265.3", 59, "Latin1_General_100_BIN2"]
     row[index] = value
     with pytest.raises(RuntimeError, match="^synthetic_catalog_context$"):
         support.catalog_context(observed_cursor([row]), "owned")
 
 
 def test_delayed_provenance_query_failure_cannot_return_partial_observation():
-    cursor = observed_cursor([("owned", 130, 32, None, 59)])
+    cursor = observed_cursor([("owned", 130, 32, None, 59, "Latin1_General_100_BIN2")])
     cursor.nextset.side_effect = RuntimeError("delayed failure")
     with pytest.raises(RuntimeError, match="^delayed failure$"):
         support.catalog_context(cursor, "owned")

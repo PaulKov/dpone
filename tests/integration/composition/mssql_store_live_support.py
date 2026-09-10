@@ -78,16 +78,16 @@ def execute(connection, statement, *parameters):
 
 
 def catalog_context(cursor, database):
-    """Observe only bounded same-session facts; unknown version stays unverified."""
+    """Retain actual database collation and session facts; never infer defaults."""
     cursor.execute(
         "SELECT DB_NAME(),d.compatibility_level,@@OPTIONS,"
-        "CONVERT(varchar(128),SERVERPROPERTY('ProductVersion')),@@SPID "
+        "CONVERT(varchar(128),SERVERPROPERTY('ProductVersion')),@@SPID,d.collation_name "
         "FROM sys.databases AS d WHERE d.database_id=DB_ID();"
     )
     rows = drain_results(cursor)
-    if len(rows) != 1 or len(rows[0]) != 5:
+    if len(rows) != 1 or len(rows[0]) != 6:
         raise RuntimeError("synthetic_catalog_context")
-    name, compatibility, options, version, session = rows[0]
+    name, compatibility, options, version, session, collation = rows[0]
     if (
         name != database
         or type(name) is not str
@@ -98,6 +98,8 @@ def catalog_context(cursor, database):
         or not 0 <= options <= 2147483647
         or type(session) is not int
         or not 1 <= session <= 32767
+        or type(collation) is not str
+        or re.fullmatch(r"[A-Za-z0-9_]{1,128}", collation) is None
         or (
             version is not None
             and (
@@ -115,6 +117,7 @@ def catalog_context(cursor, database):
         "product_version": version,
         "product_version_status": "UNVERIFIED" if version is None else "OBSERVED",
         "session_id": session,
+        "database_collation": collation,
     }
 
 

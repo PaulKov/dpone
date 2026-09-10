@@ -35,6 +35,7 @@ CONTEXT = {
     "product_version": "16.0.4265.3",
     "product_version_status": "OBSERVED",
     "session_id": 51,
+    "database_collation": "SQL_Latin1_General_CP1_CI_AS",
 }
 
 
