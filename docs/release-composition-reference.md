@@ -150,7 +150,7 @@ all bootstrap commands, process plans, pod projections, and compatibility
 commands. Caller-supplied hashes or producer labels alone are insufficient.
 
 The initial supported manifest has top-level `name`, `source`, `sink`, and
-optionally `description`. `name` matches the workload ID. Source and sink types
+optionally `description` and the bounded MSSQL `state` policy below. `name` matches the workload ID. Source and sink types
 must explicitly be `postgres`, `mssql`, `mysql`, or `clickhouse`; the sink declares
 `connection_ref` and table `schema`/`name`, with optional database. Referenced SQL
 files are included through the normal dependency resolver. Standard manifest
@@ -158,6 +158,19 @@ parsing still applies. This capability does not cover batch/flow/folder/recipe
 manifests, hooks, transforms, extra runtime sections, custom runner assets, live
 gate commands, or dbt payload IDs/execution. Unsupported input fails closed and
 must use its existing separate delivery path.
+
+An optional `state` requires `type: mssql`, explicit `connection_ref`,
+`atomicity: target_atomic`, and `provisioning: external`, with an MSSQL sink.
+Only optional `table: {database, schema, name}` coordinates are admitted in this
+initial subset. Build these state-bearing MSSQL packs with the existing
+`AirflowCompactPackBuilder.build(..., outlet_binding="logical")` option. The
+closure verifier reproduces that same logical outlet projection before deployment
+bindings exist; physical outlet/target authority is not inferred from the alias.
+Sources without `state` retain their existing physical-outlet reconstruction.
+Unknown fields/backends and implicit policies fail source
+admission. The runtime still verifies actual target/state co-location and
+externally provisioned control objects. See the narrower
+[composition execution contract](composition-activation-contract.md).
 
 The only admitted input connection projections are `{}` and
 `{"query_overrides": {}}`. Both mean no connection authority. Existing strict

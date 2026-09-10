@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Add complete composition source, physical-domain, occurrence and attempt
+  contracts, plus a separate injectable parent activation coordinator. Preserve
+  native-v2 authority and reject partial or stale parent readbacks. Protected
+  backend/worker integration remains pending; default public activation stays
+  unavailable and this base change does not certify downstream execution.
+- Admit explicit bounded external target-atomic MSSQL state in ordinary transfer
+  sources with deterministic logical-outlet reconstruction while preserving
+  existing SQL-file delivery.
+
 - Keep native MSSQL preparation/publication locks on an independent session so
   successful lost-COMMIT-acknowledgement reconciliation can complete evidence
   and checkpoints without a spurious lock-release failure.

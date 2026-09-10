@@ -70,7 +70,9 @@ workloads, the verified strict transfer bootstrap remains the execution entrypoi
 Do not write custom init-fetch plans, reorder trios, or weaken readers to accept
 missing source artifacts.
 
-**Composition activation is unavailable.** Activation fails with
+**Default public composition activation is unavailable.** The
+[base coordinator contract](composition-activation-contract.md) adds a separate
+parent integration boundary; protected backend and worker integration are pending. Activation fails with
 `DPONE_COMPOSITION_ADMISSION_UNAVAILABLE` until physical-target admission covers
 all constituents. Supplying a native-only workspace activation coordinator does
 not grant this authority. Preserve the existing active deployment. Local

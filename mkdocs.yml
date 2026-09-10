@@ -159,6 +159,7 @@ nav:
           - Compose independent releases: release-composition.md
           - Composition contracts: release-composition-reference.md
           - Composition operations: release-composition-operations.md
+          - Composition activation contract: composition-activation-contract.md
           - Workspace promotion: dbt-workspace-promotion.md
       - Runtime observability: observability.md
       - Data Product SLO and incidents: data-product-slo.md
@@ -613,6 +614,7 @@ nav:
       - ADR 0056: adr/0056-public-snapshot-governance-recovery.md
       - ADR 0057: adr/0057-bounded-window-atomic-publication.md
       - ADR 0058: adr/0058-verified-release-composition.md
+      - ADR 0059: adr/0059-composition-parent-activation.md
 
 extra:
   generator: false
