@@ -6,8 +6,9 @@ maintainers and platform engineers. Start with the
 [native transport guide](../mssql-native-transport.md) and the
 [approved acceleration design](../feature-design-data-delivery-acceleration-v1.md).
 
-The DDA-02 contribution supplies two internal helpers. Runtime wiring belongs
-to DDA-06; adding these modules alone does not change delivery behavior. No new
+The DDA-02 contribution supplies two internal helpers used by DDA-06's integrated
+preparation path. The standalone component branch contains the helpers and
+their contracts; runtime wiring and integrated evidence belong to DDA-06. No new
 manifest option, CLI flag, dependency, wire format or recovery migration is
 introduced. Existing native SWITCH rejection remains in force.
 
@@ -18,13 +19,20 @@ contiguous verified raw receipts and invocation-owned prepared table. The caller
 must hold the preparation scope, current lease and capacity authority. The
 helpers neither acquire these authorities nor execute SQL or write evidence.
 
-After integration, preparation populates business values and authoritative
+The integrated preparation path populates business values and authoritative
 metadata in one INSERT and reads the full prepared table once to calculate both
-existing digests. The fresh successful route should have **four raw typed
+existing digests. Its hermetic coordinator tests establish **four raw typed
 readbacks plus two prepared typed readbacks**, including the independent prepared
-verification before publication. It should have **zero preparation metadata
-UPDATEs**. Count/key/catalog queries remain necessary and are not typed digest
+verification before publication and **zero preparation metadata UPDATEs**.
+Count/key/catalog queries remain necessary and are not typed digest
 scans. These are structural acceptance criteria, not observed latency results.
+
+See the [integrated overview](https://github.com/PaulKov/dpone/blob/49160c3982705b8576c50c0d06e740ae13991e08/docs/delivery-acceleration/index.md),
+[coordinator contract tests](https://github.com/PaulKov/dpone/blob/49160c3982705b8576c50c0d06e740ae13991e08/tests/test_mssql_native_delivery_integration.py)
+and [57-case scoped run](https://github.com/PaulKov/dpone/blob/49160c3982705b8576c50c0d06e740ae13991e08/test_artifacts/delivery-acceleration/dda-06/observation-wiring-reviewed.log)
+at DDA-06 checkpoint `49160c3982705b8576c50c0d06e740ae13991e08`.
+These preliminary hermetic results establish the scoped structure; they do not
+replace final frozen integration gates or live SQL/performance certification.
 
 ## Helper contracts
 
@@ -67,9 +75,9 @@ transaction remains mandatory. Target types, nullability and collations are
 unchanged; keep existing staging DDL, including physical staging nullability.
 An empty load still has a verified zero-row raw stage and uses the same SQL.
 
-## DDA-06 integration recipe
+## Integration contract and original handoff recipe
 
-The following call-site recipe belongs in the existing preparer. It is a
+The following records the call-site contract delivered to DDA-06. It is a
 developer excerpt using that method's already validated local values, not a
 standalone user entry point:
 
@@ -132,10 +140,10 @@ Preserve this surrounding sequence:
    publication, the finalizer target-clock UPDATE, atomic target mutation and
    receipt, durable evidence before checkpoint advancement and owned cleanup.
 
-Update DDA-06's staged-prepare SQL fixture to evaluate the derived INSERT. The
-baseline fixture only recognizes the old flat INSERT and fabricates metadata on
-UPDATE; leaving it unchanged would not prove the new projection. Integration
-tests must also cover key failures, metadata tampering, count/evidence ordering,
+DDA-06's integrated staged-prepare SQL fixture evaluates the derived INSERT. The
+original baseline fixture recognized only the old flat INSERT and fabricated
+metadata on UPDATE; that fixture alone cannot prove the new projection. Maintain
+integration coverage for key failures, metadata tampering, count/evidence ordering,
 completed-stage recovery and direct BCP compatibility. DDA-06 owns navigation,
 shared normalizer/coordinator tests and the changelog.
 
@@ -171,8 +179,10 @@ source hashes and checkout identity. It replaces that group's previous local
 results; commit evidence before rerunning when it must be retained.
 
 Live SQL Server/ClickHouse/BCP correctness is **SKIP** without an explicitly
-approved disposable environment. End-to-end scan reduction remains **UNVERIFIED**
-until DDA-06 wiring is tested. Performance remains **UNVERIFIED** until DDA-05
+approved disposable environment. DDA-06's integrated hermetic checks cover the
+scan-count reduction, empty/duplicate rows, boundary tampering and the retained
+finalizer clock UPDATE; the standalone DDA-02 suite proves helper contracts only.
+Performance remains **UNVERIFIED** until DDA-05
 collects eligible baseline/candidate measurements. No production-readiness or
 speed claim follows from hermetic parity. Continue with the
 [task execution plan](../data-delivery-acceleration-tasks.md) for integration and
