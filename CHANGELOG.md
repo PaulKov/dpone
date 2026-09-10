@@ -9,7 +9,8 @@
 - Reject Airflow resource declarations inside flow/folder/recipe processes and
   classic batch defaults/schema/table scopes. Check, direct batch loading and
   reconcile report the misplaced field and root-level replacement before any
-  delivery artifacts are written.
+  delivery artifacts are written. Reject opaque metadata containers before
+  templates or merges can conceal a declaration; retain ordinary process templates.
 - Fix separate Airflow hooks requiring `/airflow/xcom` despite disabled XCom.
   Keep hook diagnostics on the writable run volume, preserve child failures,
   and report safe startup stage, exception type and errno without raw argv.

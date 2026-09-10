@@ -183,7 +183,7 @@ def test_recipe_expansion_cannot_hide_process_resources(tmp_path: Path) -> None:
     assert "processes[0].gitops.airflow.resources" in errors[0]["message"]
 
 
-@pytest.mark.parametrize("scope", ["defaults", "schemas.src.defaults", "schemas.src.tables[0].overrides"])
+@pytest.mark.parametrize("scope", _CLASSIC_SCOPES)
 @pytest.mark.parametrize("template_field", ["gitops", "airflow"])
 @pytest.mark.parametrize("route", ["authoring", "loader", "reconcile"])
 def test_rendered_resources_cannot_bypass_placement_validation(
@@ -199,7 +199,9 @@ def test_rendered_resources_cannot_bypass_placement_validation(
     schema = source["schemas"]["src"]
     target = {
         "defaults": source["defaults"],
+        "schemas.src": schema,
         "schemas.src.defaults": schema["defaults"],
+        "schemas.src.tables[0]": schema["tables"][0],
         "schemas.src.tables[0].overrides": schema["tables"][0]["overrides"],
     }[scope]
     owner = target if template_field == "gitops" else target["gitops"]
@@ -230,5 +232,63 @@ def test_rendered_resources_cannot_bypass_placement_validation(
         assert not (tmp_path / PACK_ROOT).exists()
         assert not (tmp_path / ".dpone-cache").exists()
     assert code == _RESOURCE_CODE
-    assert "compiled_processes[0].gitops.airflow.resources" in message
+    assert f"{scope}.gitops" in message
     assert "manifest root" in message
+
+
+@pytest.mark.parametrize("mode", ["classic-overridden", "flow-ignored"])
+def test_template_declaration_cannot_disappear_before_compilation(tmp_path: Path, mode: str) -> None:
+    source, _ = _source(tmp_path, "defaults" if mode == "classic-overridden" else "flow", placement_root=True)
+    source["defaults"] = {"gitops": "{{ {'airflow': {'resources': {'requests': {'cpu': '1'}}}} }}"}
+    if mode == "classic-overridden":
+        source["schemas"]["src"]["tables"][0]["overrides"]["gitops"] = {}
+
+    compilation, errors = compile_pipeline_source(
+        source, tmp_path / "pipeline.yaml", root=tmp_path, compiler=default_authoring_compiler()
+    )
+
+    assert compilation is None
+    assert len(errors) == 1
+    assert errors[0]["code"] == _RESOURCE_CODE
+    assert "defaults.gitops" in errors[0]["message"]
+
+
+def test_regular_typed_connector_templates_remain_supported(tmp_path: Path) -> None:
+    source, _ = _source(tmp_path, "defaults", placement_root=True)
+    data = {"gitops": {"airflow": {"resources": "application-data"}}}
+    source["vars"] = {"application_data": data}
+    process = source["schemas"]["src"]["tables"][0]["overrides"]
+    process["source"]["options"]["application_data"] = "{{ application_data }}"
+
+    compilation, errors = compile_pipeline_source(
+        source, tmp_path / "pipeline.yaml", root=tmp_path, compiler=default_authoring_compiler()
+    )
+
+    assert errors == []
+    assert compilation is not None
+    assert compilation.processes[0]["source"]["options"]["application_data"] == data
+
+
+@pytest.mark.parametrize("field", ["defaults", "schemas", "schemas.src", "schemas.src.tables", "schemas.src.tables[0]"])
+def test_opaque_authoring_templates_cannot_hide_resource_declarations(tmp_path: Path, field: str) -> None:
+    source, _ = _source(tmp_path, "flow", placement_root=True)
+    expression = "{{ {'gitops': {'airflow': {'resources': {'requests': {'cpu': '1'}}}}} }}"
+    containers = {
+        "defaults": {"defaults": expression},
+        "schemas": {"schemas": "{{ {'src': process_defaults} }}"},
+        "schemas.src": {"schemas": {"src": expression}},
+        "schemas.src.tables": {"schemas": {"src": {"tables": "{{ [process_defaults] }}"}}},
+        "schemas.src.tables[0]": {"schemas": {"src": {"tables": [expression]}}},
+    }
+    source.update(containers[field])
+
+    compilation, errors = compile_pipeline_source(
+        source, tmp_path / "pipeline.yaml", root=tmp_path, compiler=default_authoring_compiler()
+    )
+
+    assert compilation is None
+    if field == "defaults":
+        assert errors[0]["code"] == _RESOURCE_CODE
+        assert field in errors[0]["message"]
+    else:
+        assert errors[0]["code"] == "DPONE_AUTHORING_SOURCE_AMBIGUOUS"

@@ -75,8 +75,13 @@ defaults/schema/table scopes, fail with `DPONE_AIRFLOW_RESOURCES_INVALID` and a
 path plus recovery guidance. This applies even if root resources also exist.
 Canonical manifest policy validates placement after authoring expansion and
 before batch compilation, which also protects direct classic loader callers.
-The final rendered process is checked too, because typed Jinja expressions can
-produce mappings absent from the raw source. Traversal follows authoring
+Process-scoped GitOps/Airflow containers must be literal objects, matching the
+manifest schema: dynamic/scalar containers fail before merge or normalization
+can erase a declaration, including declarations overridden later. The guard
+also requires literal authoring containers, preventing opaque whole-object
+templates in discarded defaults/schema/table scopes. The final
+rendered process is checked too. Ordinary typed process templates remain
+supported. Traversal follows authoring
 containers and leaves connector/application data alone. Reconcile preserves
 the safe diagnostic before writing artifacts.
 
@@ -210,26 +215,20 @@ task evidence before handing off write access.
 The implementation is available in [PR #22](https://github.com/PaulKov/dpone/pull/22).
 It includes ordinary release-composition resource preservation, canonical
 manifest/runtime policy ownership and the readiness compatibility facade.
-The initial integration review found no remaining actionable issues. A later
-independent review exposed ignored process-scoped resource declarations; the
-placement guard and regression matrix address that finding, with another fresh
-review required for the correction. That review additionally reproduced a
-typed-template bypass, addressed by validating the final rendered process.
-Focused runtime/resource/composition coverage passed 231 tests;
-the composition, schema and identity integration group passed 163 tests.
+Independent review identified resource declarations lost in process projection,
+typed rendering and merges. The correction validates literal authoring
+containers before projection/merge and final process configurations after
+rendering. Its focused group passes 281 tests, including 75 placement, recovery,
+template and connector-data cases; review also exercises independent inputs.
 
-Ruff, formatting, mypy, import rules, layer/module budgets, generated references,
-strict documentation rendering and all four distribution builds passed.
-Installed-wheel checks reproduced a failing hook from a read-only workload with
-an unusable XCom destination and preserved its child exit code. The cross-layer
-ratio is 0.2999345835, within the unchanged 0.300 limit.
-
-Exact revisions, full-suite results and logs are recorded in the PR and
-`test_artifacts/airflow-hooks-resources/completion.md`. The first integrated full
-run exposed stale local native-acceleration distribution metadata after the
-0.76.0 update; reinstalling that editable package from current source resolved
-all 23 tests in its contract module without code or test changes.
-Placement-fix red/green logs and subsequent validation/review evidence are under
+The earlier integrated implementation passed 20,896 offline tests with 570
+skipped at `7efaa12c3d40fe2087248cde384b9bc79f3f8097`, plus static, architecture,
+documentation and distribution checks. Installed-wheel validation preserved a
+failing hook's exit code from a read-only workload with an unusable XCom path.
+That historical evidence is recorded in
+`test_artifacts/airflow-hooks-resources/completion.md`.
+The PR records the assessed revision and current validation/review outcome.
+Placement-fix red/green logs, broad validation and fresh-review evidence are under
 `test_artifacts/airflow-hooks-resources/process-placement-fix/`.
 
 These are implementation and offline compatibility results. They do not certify

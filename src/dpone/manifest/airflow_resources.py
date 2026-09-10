@@ -31,41 +31,64 @@ def reject_process_airflow_resources(payload: Mapping[str, Any]) -> None:
     """
 
     processes = payload.get("processes")
+    _reject_dynamic_container(processes, field="processes")
     if isinstance(processes, list | tuple):
         for index, process in enumerate(processes):
             reject_process_resource_declaration(process, field=f"processes[{index}]")
     reject_process_resource_declaration(payload.get("defaults"), field="defaults")
     schemas = payload.get("schemas")
+    _reject_dynamic_container(schemas, field="schemas")
     if not isinstance(schemas, Mapping):
         return
     for name, schema in schemas.items():
-        if not isinstance(schema, Mapping):
-            continue
         field = f"schemas.{name}"
         reject_process_resource_declaration(schema, field=field)
+        if not isinstance(schema, Mapping):
+            continue
         reject_process_resource_declaration(schema.get("defaults"), field=f"{field}.defaults")
         tables = schema.get("tables")
+        _reject_dynamic_container(tables, field=f"{field}.tables")
         if not isinstance(tables, list | tuple):
             continue
         for index, table in enumerate(tables):
+            table_field = f"{field}.tables[{index}]"
+            reject_process_resource_declaration(table, field=table_field)
             if isinstance(table, Mapping):
-                table_field = f"{field}.tables[{index}]"
-                reject_process_resource_declaration(table, field=table_field)
                 reject_process_resource_declaration(table.get("overrides"), field=f"{table_field}.overrides")
 
 
 def reject_process_resource_declaration(value: object, *, field: str) -> None:
-    """Validate one raw or rendered process; templates may produce typed maps."""
+    """Validate resource authority before a merge can discard the declaration.
 
+    Process-scoped GitOps/Airflow containers must be literal objects, as in the
+    manifest schema. Dynamic containers could hide resources until rendering,
+    or disappear altogether in merge/normalization. Other process templates and
+    connector data are outside this policy. Rendered configs are checked too.
+    """
+
+    _reject_dynamic_container(value, field=field)
     if not isinstance(value, Mapping):
         return
     gitops = value.get("gitops")
+    if gitops is not None and not isinstance(gitops, Mapping):
+        raise _placement_error(f"{field}.gitops", "must be a literal object, not a dynamic or scalar container")
     airflow = gitops.get("airflow") if isinstance(gitops, Mapping) else None
+    if airflow is not None and not isinstance(airflow, Mapping):
+        raise _placement_error(f"{field}.gitops.airflow", "must be a literal object, not a dynamic or scalar container")
     if isinstance(airflow, Mapping) and "resources" in airflow:
-        raise AirflowResourcePlacementError(
-            f"{field}.gitops.airflow.resources is unsupported; move this declaration to "
-            "gitops.airflow.resources at the manifest root. Resources apply to the whole workload."
-        )
+        raise _placement_error(f"{field}.gitops.airflow.resources", "is unsupported")
+
+
+def _placement_error(field: str, reason: str) -> AirflowResourcePlacementError:
+    return AirflowResourcePlacementError(
+        f"{field} {reason}; configure resources in gitops.airflow.resources at the manifest root. "
+        "Resources apply to the whole workload."
+    )
+
+
+def _reject_dynamic_container(value: object, *, field: str) -> None:
+    if isinstance(value, str) and ("{{" in value or "{%" in value):
+        raise _placement_error(field, "must use literal authoring containers so resource placement can be validated")
 
 
 def workload_airflow_resources(
