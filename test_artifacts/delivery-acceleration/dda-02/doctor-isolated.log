@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_ test_import_probe_replays_effective_env_derived_runtime_state[PYTHONTRACEMALLOC-5-import tracemalloc\nassert tracemalloc.is_tracing()\nassert tracemalloc.get_traceback_limit() == 5\nassert 'tracemalloc' not in sys._xoptions\n] _
+tests/test_doctor_import_integration.py:457: in test_import_probe_replays_effective_env_derived_runtime_state
+    completed = subprocess.run(
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:550: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:1209: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:2141: in _communicate
+    self.wait(timeout=self._remaining_time(endtime))
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:1264: in wait
+    return self._wait(timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:2045: in _wait
+    raise TimeoutExpired(self.args, timeout)
+E   subprocess.TimeoutExpired: Command '('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3657/doctor-clean-python0/venv/bin/python', '-c', "import os, sys; sys.path.insert(0, sys.argv[1]); from dpone.readiness.python_import_health import probe_python_import; os._exit(0 if probe_python_import('_dpone_env_derived_runtime_state').passed else 1)", '/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3657/test_import_probe_replays_effe0')' timed out after 19.999852792010643 seconds
+=========================== short test summary info ============================
+FAILED tests/test_doctor_import_integration.py::test_import_probe_replays_effective_env_derived_runtime_state[PYTHONTRACEMALLOC-5-import tracemalloc\nassert tracemalloc.is_tracing()\nassert tracemalloc.get_traceback_limit() == 5\nassert 'tracemalloc' not in sys._xoptions\n]

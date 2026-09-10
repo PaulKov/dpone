@@ -1,0 +1,125 @@
+{
+  "head": "f3682940f8864563cde0e6b6ecee60f746b49020",
+  "planning_dependency": "f3682940f8864563cde0e6b6ecee60f746b49020",
+  "git_status_before": "A  docs/delivery-acceleration/preparation.md\nA  src/dpone/runtime/sinks/mssql_native_prepared_digests.py\nA  src/dpone/runtime/sinks/mssql_native_prepared_insert.py\nA  tests/test_mssql_native_integrity_readbacks.py\nA  tests/test_mssql_native_metadata_insert.py\nA  tests/test_mssql_native_metadata_insert_parity.py\n?? test_artifacts/delivery-acceleration/dda-02/",
+  "source_sha256": {
+    "src/dpone/runtime/sinks/mssql_native_prepared_digests.py": "00828037204874b5dec5db7859c70e7a4c73e805a9ae5480b785756d261f004f",
+    "src/dpone/runtime/sinks/mssql_native_prepared_insert.py": "c7e23ded0f07361373f30ff69fdeaa8ac8b3f9765c3fae0417038787bab36a2a",
+    "docs/delivery-acceleration/preparation.md": "ee91137b90f23237ab7a7a7eb2aa57cba2d59a766c4c13c11b97c8b509ee39b0",
+    "tests/test_mssql_native_integrity_readbacks.py": "c2f3a96b350e638a10b9cd24998256031711fcd8700e22bbba07c98d052e20c6",
+    "tests/test_mssql_native_metadata_insert.py": "5111bf41598ac449ed5918ef8ef152475d4214541950c8e45adfa9e8f69576f4",
+    "tests/test_mssql_native_metadata_insert_parity.py": "7c28c0da6f0233706dc7148b16f528dff8693ff47fbd140f336cb5bfe0cc2056"
+  },
+  "checks": [
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "tools/agent_policy/task_contract.py",
+        "test_artifacts/delivery-acceleration/agent-task-contracts/dda-02-preparation.yml"
+      ],
+      "status": "PASS",
+      "exit_code": 0,
+      "seconds": 0.24,
+      "log": "contract.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "tools/agent_policy/select_checks.py",
+        "--base-ref",
+        "origin/master"
+      ],
+      "status": "PASS",
+      "exit_code": 0,
+      "seconds": 0.332,
+      "log": "plan.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "ruff",
+        "check",
+        "."
+      ],
+      "status": "PASS",
+      "exit_code": 0,
+      "seconds": 0.84,
+      "log": "ruff.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "ruff",
+        "format",
+        "--check",
+        "."
+      ],
+      "status": "PASS",
+      "exit_code": 0,
+      "seconds": 0.823,
+      "log": "format.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "mypy",
+        "--config-file",
+        "mypy.ini"
+      ],
+      "status": "PASS",
+      "exit_code": 0,
+      "seconds": 193.108,
+      "log": "mypy.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "mypy",
+        "--config-file",
+        "mypy.ini",
+        "src/dpone/runtime/sinks/mssql_native_prepared_digests.py",
+        "src/dpone/runtime/sinks/mssql_native_prepared_insert.py"
+      ],
+      "status": "PASS",
+      "exit_code": 0,
+      "seconds": 4.283,
+      "log": "helper-mypy.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "dpone",
+        "docs",
+        "check-import-rules"
+      ],
+      "status": "PASS",
+      "exit_code": 0,
+      "seconds": 27.349,
+      "log": "imports.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "dpone",
+        "docs",
+        "check-layer-metrics",
+        "--baseline",
+        "docs/layer_metrics_baseline.json"
+      ],
+      "status": "PASS",
+      "exit_code": 0,
+      "seconds": 16.962,
+      "log": "layers.log"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+import os, sys, time, faulthandler
+faulthandler.dump_traceback_later(10, repeat=True)
+start = time.monotonic()
+cpu_start = time.process_time()
+print('OUTER_START', flush=True)
+sys.path.insert(0, sys.argv[1])
+from dpone.readiness.python_import_health import probe_python_import
+imported = time.monotonic()
+print('HEALTH_IMPORT_SECONDS', imported - start, 'CPU_SECONDS', time.process_time() - cpu_start, flush=True)
+result = probe_python_import('_dpone_env_derived_runtime_state')
+print('DUAL_PROBE_SECONDS', time.monotonic() - imported, flush=True)
+print('RESULT', repr(result), flush=True)
+os._exit(0 if result.passed else 1)

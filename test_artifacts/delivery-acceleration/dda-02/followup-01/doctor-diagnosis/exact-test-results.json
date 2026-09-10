@@ -1,0 +1,22 @@
+{
+  "head": "61bcebc0c96b4db535bd4494de6f30cb15d11d18",
+  "command": [
+    "uv",
+    "run",
+    "--locked",
+    "--no-sync",
+    "--offline",
+    "--no-python-downloads",
+    "pytest",
+    "tests/test_doctor_import_integration.py::test_import_probe_replays_effective_env_derived_runtime_state[PYTHONTRACEMALLOC-5-import tracemalloc\\nassert tracemalloc.is_tracing()\\nassert tracemalloc.get_traceback_limit() == 5\\nassert 'tracemalloc' not in sys._xoptions\\n]",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--tb=short",
+    "--durations=5"
+  ],
+  "status": "FAIL",
+  "returncode": 1,
+  "seconds": 27.411636709002778,
+  "log": "/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dda02-doctor-diagnosis-m7tiqg_r/exact-test.log"
+}

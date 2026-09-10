@@ -1,0 +1,291 @@
+{
+  "command": [
+    "gh",
+    "api",
+    "repos/PaulKov/dpone/actions/jobs/102969374174"
+  ],
+  "observation": {
+    "id": 102969374174,
+    "name": "Quality preflight",
+    "head_sha": "61bcebc0c96b4db535bd4494de6f30cb15d11d18",
+    "status": "completed",
+    "conclusion": "failure",
+    "started_at": "2026-09-10T17:09:11Z",
+    "completed_at": "2026-09-10T17:11:46Z",
+    "html_url": "https://github.com/PaulKov/dpone/actions/runs/34505214418/job/102969374174",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-09-10T17:09:12Z",
+        "completed_at": "2026-09-10T17:09:14Z"
+      },
+      {
+        "name": "Checkout",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-09-10T17:09:14Z",
+        "completed_at": "2026-09-10T17:09:16Z"
+      },
+      {
+        "name": "Install uv",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-09-10T17:09:16Z",
+        "completed_at": "2026-09-10T17:09:20Z"
+      },
+      {
+        "name": "Set up Python",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-09-10T17:09:20Z",
+        "completed_at": "2026-09-10T17:09:20Z"
+      },
+      {
+        "name": "Validate changed workflows with pinned actionlint",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-09-10T17:09:20Z",
+        "completed_at": "2026-09-10T17:09:20Z"
+      },
+      {
+        "name": "Install dependencies",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-09-10T17:09:20Z",
+        "completed_at": "2026-09-10T17:09:26Z"
+      },
+      {
+        "name": "Ruff lint",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-09-10T17:09:26Z",
+        "completed_at": "2026-09-10T17:09:26Z"
+      },
+      {
+        "name": "Ruff format check",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-09-10T17:09:26Z",
+        "completed_at": "2026-09-10T17:09:27Z"
+      },
+      {
+        "name": "Mypy",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-09-10T17:09:27Z",
+        "completed_at": "2026-09-10T17:10:00Z"
+      },
+      {
+        "name": "Import rules",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-09-10T17:10:00Z",
+        "completed_at": "2026-09-10T17:10:12Z"
+      },
+      {
+        "name": "Layer metrics",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-09-10T17:10:12Z",
+        "completed_at": "2026-09-10T17:10:21Z"
+      },
+      {
+        "name": "Architecture fitness",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-09-10T17:10:21Z",
+        "completed_at": "2026-09-10T17:10:36Z"
+      },
+      {
+        "name": "Upload architecture fitness evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-09-10T17:10:36Z",
+        "completed_at": "2026-09-10T17:10:37Z"
+      },
+      {
+        "name": "Module size",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14,
+        "started_at": "2026-09-10T17:10:37Z",
+        "completed_at": "2026-09-10T17:10:40Z"
+      },
+      {
+        "name": "Airflow provider module size",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-09-10T17:10:40Z",
+        "completed_at": "2026-09-10T17:10:42Z"
+      },
+      {
+        "name": "Formal Airflow provider module size",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16,
+        "started_at": "2026-09-10T17:10:42Z",
+        "completed_at": "2026-09-10T17:10:44Z"
+      },
+      {
+        "name": "Agent policy module size",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17,
+        "started_at": "2026-09-10T17:10:44Z",
+        "completed_at": "2026-09-10T17:10:46Z"
+      },
+      {
+        "name": "Agent policy test module size",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 18,
+        "started_at": "2026-09-10T17:10:46Z",
+        "completed_at": "2026-09-10T17:10:49Z"
+      },
+      {
+        "name": "Validate agent control plane",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 19,
+        "started_at": "2026-09-10T17:10:49Z",
+        "completed_at": "2026-09-10T17:10:51Z"
+      },
+      {
+        "name": "Workflow security policy",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20,
+        "started_at": "2026-09-10T17:10:51Z",
+        "completed_at": "2026-09-10T17:10:54Z"
+      },
+      {
+        "name": "Build documentation strictly",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21,
+        "started_at": "2026-09-10T17:10:54Z",
+        "completed_at": "2026-09-10T17:11:21Z"
+      },
+      {
+        "name": "Generated references",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22,
+        "started_at": "2026-09-10T17:11:21Z",
+        "completed_at": "2026-09-10T17:11:23Z"
+      },
+      {
+        "name": "Governed REST delivery design contract",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 23,
+        "started_at": "2026-09-10T17:11:23Z",
+        "completed_at": "2026-09-10T17:11:25Z"
+      },
+      {
+        "name": "Frozen Airflow public contract",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 24,
+        "started_at": "2026-09-10T17:11:25Z",
+        "completed_at": "2026-09-10T17:11:30Z"
+      },
+      {
+        "name": "Upload Airflow public contract evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 25,
+        "started_at": "2026-09-10T17:11:30Z",
+        "completed_at": "2026-09-10T17:11:31Z"
+      },
+      {
+        "name": "Generated developer metrics",
+        "status": "completed",
+        "conclusion": "failure",
+        "number": 26,
+        "started_at": "2026-09-10T17:11:31Z",
+        "completed_at": "2026-09-10T17:11:43Z"
+      },
+      {
+        "name": "Build packages",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 27,
+        "started_at": "2026-09-10T17:11:43Z",
+        "completed_at": "2026-09-10T17:11:43Z"
+      },
+      {
+        "name": "Smoke REST design contract from clean base wheel",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 28,
+        "started_at": "2026-09-10T17:11:43Z",
+        "completed_at": "2026-09-10T17:11:43Z"
+      },
+      {
+        "name": "Collect exact non-live test population",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 29,
+        "started_at": "2026-09-10T17:11:43Z",
+        "completed_at": "2026-09-10T17:11:43Z"
+      },
+      {
+        "name": "Upload exact test population",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 30,
+        "started_at": "2026-09-10T17:11:43Z",
+        "completed_at": "2026-09-10T17:11:43Z"
+      },
+      {
+        "name": "Post Set up Python",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 58,
+        "started_at": "2026-09-10T17:11:43Z",
+        "completed_at": "2026-09-10T17:11:43Z"
+      },
+      {
+        "name": "Post Install uv",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 59,
+        "started_at": "2026-09-10T17:11:43Z",
+        "completed_at": "2026-09-10T17:11:43Z"
+      },
+      {
+        "name": "Post Checkout",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 60,
+        "started_at": "2026-09-10T17:11:43Z",
+        "completed_at": "2026-09-10T17:11:43Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 61,
+        "started_at": "2026-09-10T17:11:43Z",
+        "completed_at": "2026-09-10T17:11:43Z"
+      }
+    ]
+  }
+}

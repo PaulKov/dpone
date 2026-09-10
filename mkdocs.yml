@@ -484,6 +484,8 @@ nav:
       - Feature design - MCP connector onboarding gate: feature-design-mcp-connector-onboarding-gate.md
       - Feature design - Bounded streaming windows and acceptance: feature-design-bounded-streaming-window-v1.md
       - Feature design - Bounded native MSSQL transport: feature-design-clickhouse-mssql-bounded-native-v1.md
+      - Feature design - Data-delivery acceleration: feature-design-data-delivery-acceleration-v1.md
+      - Data-delivery acceleration tasks: data-delivery-acceleration-tasks.md
       - Runtime patch removal inventory: runtime-patch-removal-inventory.md
       - Impact-aware acceptance: impact-aware-acceptance.md
       - Feature design - Data Product Trust Center: feature-design-data-product-trust-center-evidence-lake.md

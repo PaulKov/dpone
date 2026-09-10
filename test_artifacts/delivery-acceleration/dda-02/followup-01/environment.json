@@ -1,0 +1,21 @@
+{
+  "python": "3.12.11 (main, Sep 18 2025, 19:41:45) [Clang 20.1.4 ]",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "versions": {
+    "pytest": "9.0.3",
+    "pytest-xdist": "3.8.0",
+    "pyarrow": "23.0.1",
+    "psycopg": "3.3.4",
+    "google-cloud-bigquery": "3.42.2",
+    "dbt-core": "1.12.3",
+    "dpone-native-accel": "0.76.0",
+    "boto3": "1.43.23"
+  },
+  "temp_root": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T",
+  "temp_root_uid": 502,
+  "temp_root_gid": 20,
+  "temp_root_mode": "0o700",
+  "effective_uid": 502,
+  "effective_gid": 20,
+  "pytest_auto_workers": 2
+}

@@ -49,6 +49,11 @@ Text decoding is strict; arbitrary binary values require binary target
 types. VARCHAR/CHAR are currently rejected by the importer, including when a collation
 is configured.
 
+Planned internal optimizations and their unchanged compatibility boundary are
+specified in the [data-delivery acceleration design](feature-design-data-delivery-acceleration-v1.md).
+Contributors can follow the [implementation task plan](data-delivery-acceleration-tasks.md).
+Those plans do not establish measured acceleration or enable native partition SWITCH.
+
 ## Compose the runtime
 
 `NativeMssqlRuntime` accepts these required application capabilities:
