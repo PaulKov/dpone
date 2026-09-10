@@ -1,0 +1,5 @@
+Subject: 9aa2a0ef9600644f1789b9de1b84b9ab9ba1d033
+Command: ['uv', 'run', '--locked', '--no-sync', 'dpone', 'docs', 'check-generated-references']
+INFO: Generated references are up-to-date
+✅ Generated references OK: 3/3 in sync.
+Exit: 0; elapsed_seconds: 1.04

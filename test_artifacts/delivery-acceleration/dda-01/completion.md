@@ -1,5 +1,8 @@
 # DDA-01 completion and validation evidence
 
+Historical checkpoint through `006e0a1`. Later independent-review fixes and
+current source/checks are recorded in [review-v2.md](review-v2.md).
+
 Date: 2026-09-10. PR: https://github.com/PaulKov/dpone/pull/28 (draft).
 Production code: `7fcdabd43ed8656f1de52415fa66d8b7db6befd4`.
 Reviewed documentation: `3e578759fc531f4a7701d977241f327b28883417`.
@@ -42,7 +45,8 @@ explicitly use `--all-extras`. All paths below are relative to this report.
 | `dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json` | FAIL | runtime-to-contracts flow 216 exceeds tolerance 214 (baseline 209) | [layers-final.log](layers-final.log) |
 | `dpone docs check-architecture-fitness` | FAIL (budget) | CLI exit 0 with warning; average clustering 0.18170059431282887 exceeds hard target 0.180 | [architecture-fitness.log](architecture-fitness.log) |
 | Planning-source architecture comparison | PASS (observation only) | Baseline clustering 0.1813233335910147; DDA-01 increases existing debt | [baseline](architecture-fitness-planning-baseline.log), [source diff](planning-baseline-source-diff.log) |
-| `dpone docs check-docs` / `check-generated-references` | PASS | Documentation and generated references valid | [docs-final.log](docs-final.log), [generated.log](generated.log) |
+| `dpone docs check-docs` | FAIL | Missing DDA-06-owned index.md link; corrected from an earlier erroneous PASS label | [docs-final.log](docs-final.log) |
+| `dpone docs check-generated-references` | PASS | Generated references valid | [generated.log](generated.log) |
 | `mkdocs build --strict` | PASS | Build completed in 65.38 s during final documentation review; two later wording-only precision edits were covered by the final 102-case replay | [mkdocs-final.log](mkdocs-final.log) |
 | `PYTEST_XDIST_AUTO_NUM_WORKERS=2 uv run pytest -m 'not integration_live' -n auto --dist loadfile` | FAIL | 20,544 passed, 815 skipped, 27 failed, 2 collection errors; 1,772.42 s | [pytest-broad.log](pytest-broad.log) |
 | `uv sync --locked --all-extras` | PASS | Installed missing optional test dependencies; no lock/dependency-file changes | [dependency-sync.log](dependency-sync.log) |
