@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -16,11 +15,9 @@ from .resources import ProcessTreeRss
 
 def configuration(limits: dict[str, Any]) -> dict[str, Any]:
     """Reuse canonical limit validation; missing or surplus fields are errors."""
-    from dpone.contracts.mssql_native_chunks import NativeChunkLimits
+    from dpone.contracts.native_delivery_observations import normalize_delivery_limits
 
-    if set(limits) != set(NativeChunkLimits.__dataclass_fields__):
-        raise ValueError("exact_limits_required")
-    resolved = asdict(NativeChunkLimits(**limits))
+    resolved = normalize_delivery_limits(limits)
     return {"limits": resolved, "sha256": digest(resolved)}
 
 

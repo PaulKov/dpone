@@ -144,19 +144,38 @@ def test_metrics_reject_nonfinite_boolean_negative_values(value):
 
 
 @pytest.mark.parametrize(
-    "mutate",
+    ("mutate", "error"),
     [
-        lambda d: d.pop("parallelism"),
-        lambda d: d.update(password="secret"),
-        lambda d: d.update(max_row_bytes=2**30),
-        lambda d: d.update(parallelism=True),
+        (lambda d: d.pop("parallelism"), "exact_limits_required"),
+        (lambda d: d.update(unexpected=1), "exact_limits_required"),
+        (lambda d: d.update(max_row_bytes=2**30), "mssql_native.max_row_bytes_exceeds_chunk"),
+        (lambda d: d.update(parallelism=True), "mssql_native.invalid_limit:parallelism"),
+        (lambda d: d.update(max_pending=0), "mssql_native.invalid_limit:max_pending"),
+        (lambda d: d.update(max_rows=1000001), "mssql_native.invalid_limit:max_rows"),
     ],
 )
-def test_configuration_uses_exact_canonical_limits(mutate):
+def test_configuration_uses_exact_canonical_limits(mutate, error):
     limits = dict(LIMITS)
     mutate(limits)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as caught:
         configuration(limits)
+    assert type(caught.value) is ValueError
+    assert str(caught.value) == error
+
+
+def test_shared_limits_normalization_preserves_configuration_bytes_and_detaches_input():
+    from dpone.contracts.native_delivery_observations import normalize_delivery_limits
+
+    limits = dict(reversed(list(LIMITS.items())))
+    resolved = normalize_delivery_limits(limits)
+    assert resolved == LIMITS
+    assert resolved is not limits
+    assert configuration(limits) == {
+        "limits": resolved,
+        "sha256": "4ceac4f9c46a4280916ce9df6d7038e55a1ea0f0b0540edb1a116c62b61c4054",
+    }
+    limits["parallelism"] = 64
+    assert resolved["parallelism"] == 1
 
 
 @pytest.mark.parametrize("approved_env", [False, True])

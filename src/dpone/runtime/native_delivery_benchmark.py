@@ -13,8 +13,13 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from dpone.contracts.mssql_native_chunks import NativeChunkLimits
-from dpone.contracts.native_delivery_observations import CAMPAIGN_SCHEMA, CHECKS_BY_SCOPE, RECEIPT_SCHEMA, RUN_SCHEMA
+from dpone.contracts.native_delivery_observations import (
+    CAMPAIGN_SCHEMA,
+    CHECKS_BY_SCOPE,
+    RECEIPT_SCHEMA,
+    RUN_SCHEMA,
+    normalize_delivery_limits,
+)
 from dpone.runtime.native_delivery_benchmark_artifacts import (
     BenchmarkArtifacts,
     BenchmarkInputError,
@@ -141,10 +146,8 @@ def _run(store: BenchmarkArtifacts, path: Path) -> tuple[dict[str, Any], dict[st
     if any(type(run["workload"][key]) is not int for key in ("seed", "rows", "columns")):
         raise BenchmarkInputError("invalid_workload_integer")
     limits = run["configuration"]["limits"]
-    if set(limits) != set(NativeChunkLimits.__dataclass_fields__):
-        raise BenchmarkInputError("invalid_limits")
     try:
-        NativeChunkLimits(**limits)
+        normalize_delivery_limits(limits)
     except (TypeError, ValueError):
         raise BenchmarkInputError("invalid_limits") from None
     statuses = [run["status"]]

@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass
 from types import MappingProxyType
 from typing import Any
 
+from dpone.contracts.mssql_native_chunks import NativeChunkLimits
+
 PHASES = frozenset(
     "source_read source_adapt frame_build ipc_submit encode bcp raw_verify prepare_insert metadata_project prepared_verify quality publish evidence checkpoint".split()
 )
@@ -185,6 +187,20 @@ CHECKS_BY_SCOPE = {
     ),
     "failure_recovery": frozenset("empty_input rollback receipt_first_recovery source_free_resume".split()),
 }
+
+
+def normalize_delivery_limits(limits: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate an exact v1 limit record and return canonical, detached values.
+
+    Producers preserve ``exact_limits_required`` for a missing or surplus field
+    and the canonical model's value errors. Consumers may translate these errors
+    at their input boundary. No defaults are filled into a retained report.
+    """
+    if set(limits) != set(NativeChunkLimits.__dataclass_fields__):
+        raise ValueError("exact_limits_required")
+    return asdict(NativeChunkLimits(**limits))
+
+
 RUN_SCHEMA = _record(
     schema_version={"const": 1, "type": "integer"},
     kind={"const": "native-delivery-run"},

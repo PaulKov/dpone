@@ -198,6 +198,27 @@ def test_schema_identity_and_drift_rejected(tmp_path, change):
         compare(baseline, candidate)
 
 
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda limits: limits.pop("parallelism"),
+        lambda limits: limits.update(unexpected=1),
+        lambda limits: limits.update(parallelism=True),
+        lambda limits: limits.update(max_pending=0),
+        lambda limits: limits.update(max_row_bytes=2**30),
+    ],
+)
+def test_invalid_limit_fields_and_values_keep_consumer_error(tmp_path, change):
+    from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+
+    baseline, candidate = run_fixture(tmp_path / "b"), run_fixture(tmp_path / "c")
+    mutate(candidate, lambda run: change(run["configuration"]["limits"]))
+    with pytest.raises(BenchmarkInputError) as caught:
+        compare(baseline, candidate)
+    assert type(caught.value) is BenchmarkInputError
+    assert str(caught.value) == "invalid_limits"
+
+
 def test_tampered_receipt_bytes_rejected_even_when_supplied_pass(tmp_path):
     from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
 
