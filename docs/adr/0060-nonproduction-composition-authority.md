@@ -28,6 +28,8 @@ Physical guard identity remains independent of authority family, purpose and
 campaign. Expired or revoked grants prevent new issuance; they do not release
 unknown attempts or undo committed target data. All actual mutation paths still
 require protected writer gates, quiescence and outcome reconciliation.
+The common protected owner/operation implementation and explicit qualification
+handoff are specified in [ADR 0061](0061-shared-composition-physical-ownership.md).
 
 ## Consequences
 

@@ -161,6 +161,7 @@ nav:
           - Composition operations: release-composition-operations.md
           - Composition activation contract: composition-activation-contract.md
           - Nonproduction authority contracts: nonproduction-composition-authority.md
+          - Shared ownership design: composition-shared-ownership.md
           - Workspace promotion: dbt-workspace-promotion.md
       - Runtime observability: observability.md
       - Data Product SLO and incidents: data-product-slo.md
@@ -616,6 +617,8 @@ nav:
       - ADR 0057: adr/0057-bounded-window-atomic-publication.md
       - ADR 0058: adr/0058-verified-release-composition.md
       - ADR 0059: adr/0059-composition-parent-activation.md
+      - ADR 0060: adr/0060-nonproduction-composition-authority.md
+      - ADR 0061: adr/0061-shared-composition-physical-ownership.md
 
 extra:
   generator: false

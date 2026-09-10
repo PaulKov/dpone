@@ -1,0 +1,121 @@
+schema_version: 1
+task_id: DPONE-NONPRODUCTION-REGISTRATION
+title: Persist exact grant registration and complete campaign membership
+goal: Add protected same-ledger immutable grant registration without executor authority
+specification: docs/feature-specs/nonproduction-composition-authority.md
+base_commit: 0fae1b1dd76bd924a8b6b72ea118c45fe0090fc0
+integrator: root
+acceptance_criteria:
+- Implement only immutable exact-byte grant registration and full execution campaign membership;
+  no credential, new attempt, export, executor, mutable counter or root factory.
+- Use separately externally installed grants/memberships tables under existing control schema, same
+  global transaction lock, pinned service/environment and strict schema/trigger/byte audit. Runtime
+  never creates or repairs schema.
+- Unique original consumption key and logical grant UUID/phase bind exact original grant bytes/hash,
+  public signature bundle/hash, verified signature-subject bytes/hash, registration trust revision
+  and UTC instant. Qualification run cannot rebind to another grant. No raw exceptions, passwords
+  or connection data in records.
+- Execution registration requires explicit NP request/grant matching and atomically inserts every
+  distinct signed workload ID into environment/campaign/execution pool. Validate full union against
+  policy/grant and every current workload lower max_workloads. Replacements retain memberships; grant/policy/deployment/activation
+  never reset pool key.
+- Current valid newly signed higher ceiling may admit more memberships while retaining all previous
+  charges; smaller current ceilings block new registration. Identical historical registration is
+  documentary reread, no fresh admission or signature claim; changed original bytes, bundle, subject
+  or original request under same key rejects.
+- Qualification once-consumption binds exact run/fixture/qualification plan subjects, then rejects
+  repeat consumption even if original bytes match. Read method is separate. It does not charge or
+  authorize qualification work-items until genuine plan model exists.
+- Use MssqlNonproductionTrustProvider.require_revision_in with expected_revision meaning the latest
+  storage-consistency fence on every operation, never the registration historical revision. For documentary
+  history, independently reopen and audit the stored original trust revision and registration instant;
+  current grant eligibility, expiry or revocation does not erase historical readability. New registration/consumption
+  additionally requires current policy/time/epoch eligibility. Same-ledger methods never connect,
+  commit or rollback. Incoming DTOs cannot substitute for original byte integrity; audit actual transaction/exclusive
+  lock and full stored originals.
+- External immutable append-only producer must prevent update/delete/rebind through its trigger and
+  unique constraints; document permissions/bulk-copy/ALTER/TRUNCATE bypass constraints. Preserve
+  complete membership on independent readback, not just registration row.
+- No production/native-v2 decoder, hash, schema, attempt algorithm or existing API changes; public
+  scoped factories remain closed. Original signature verification remains coordinator obligation,
+  never claim a storage fixture or signature subject is cryptographic proof.
+- Red-green exact canonical/schema/hash/identity, all-fields tamper, replay, same campaign different
+  grants, complete membership ceiling, qualification run reuse, missing membership, wrong service/trust
+  revision/clock/policy, SQL malformed/unknown failure and no implicit commit tests. Keep errors
+  fixed and modules within canonical budgets.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python
+  - runtime
+  - state
+  - evidence
+  - documentation
+  migration_required: false
+owned_paths:
+- src/dpone/contracts/nonproduction_registration.py
+- src/dpone/adapters/nonproduction_mssql_registration_schema.py
+- src/dpone/adapters/nonproduction_mssql_registration.py
+- tests/test_nonproduction_registration.py
+- tests/test_nonproduction_mssql_registration_schema.py
+- tests/test_nonproduction_mssql_registration.py
+integrator_owned_paths: []
+read_only_paths:
+- docs
+- src/dpone/contracts/nonproduction_scope.py
+- src/dpone/contracts/nonproduction_authority.py
+- src/dpone/contracts/nonproduction_grants.py
+- src/dpone/contracts/nonproduction_activation.py
+- src/dpone/contracts/composition_control.py
+- src/dpone/adapters/nonproduction_mssql_trust.py
+- src/dpone/adapters/nonproduction_mssql_schema.py
+- src/dpone/adapters/composition_mssql_attempts.py
+- src/dpone/adapters/composition_mssql_schema.py
+- src/dpone/adapters/composition_mssql_store_queries.py
+- src/dpone/ports/nonproduction_authentication.py
+- tests/nonproduction_authority_helpers.py
+- tests/nonproduction_signature_helpers.py
+- pyproject.toml
+- uv.lock
+forbidden_paths:
+- .git
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+shared_file_owner: root
+dependencies:
+- DPONE-NONPRODUCTION-SQL-TRUST
+required_checks:
+  focused:
+  - red-green registration/schema/SQL repository contracts and existing trust/grant/request compatibility
+  broad:
+  - ruff and format owned files
+  - mypy owned files
+  - import rules
+  - layer metrics
+  - canonical module size
+  live:
+  - 'UNVERIFIED: root later isolated Linux SQL uniqueness/appendonly/concurrency/rollback/readback/permission
+    cases; never execute local ARM64 SQL'
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- An authority change exceeds the separately approved nonproduction-composition-authority amendment.
+- Another writer owns the same semantic contract.
+- A live check would access corporate or private systems.

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add immutable nonproduction grant registration and complete execution campaign
+  membership under the existing protected transaction. Preserve original bytes
+  and historical trust, reject qualification replay, and retain membership across
+  replacement grants. Registration does not authorize workers or reserve exports.
+- Reject missing or uncommittable SQL trust transactions before protected reads,
+  without calling transaction-owned lock inspection outside its valid context.
+
 - Add an isolated nine-case SQL trust profile to the disposable component runner.
   Require exact source and case inventories, append-only revision observations
   and owned-container cleanup. Storage fixtures do not establish signed grant

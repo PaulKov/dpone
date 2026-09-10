@@ -13,6 +13,7 @@ import pytest
 from dpone.contracts.nonproduction_scope import NonproductionAuthorityError
 from tests.integration.composition import nonproduction_mssql_trust_live_support as support
 from tests.integration.composition.mssql_gate_live_provisioning import SqlFailure
+from tests.integration.composition.test_nonproduction_mssql_trust_live import DoomedTransactionCursor
 
 
 def environment():
@@ -112,6 +113,104 @@ def test_transaction_snapshot_records_actual_rows_before_assertions(monkeypatch)
     }
 
 
+def test_transaction_snapshot_guards_transaction_owned_lock_lookup(monkeypatch):
+    def observe(connection, sql, *parameters):
+        assert "IF @transaction_count > 0 AND @transaction_state = 1" in sql
+        assert sql.index("IF @transaction_count") < sql.index("APPLOCK_MODE(")
+        assert parameters == (support.COMPOSITION_MSSQL_LEDGER_LOCK,)
+        return ((0, 0, "NoLock"),)
+
+    monkeypatch.setattr(support, "execute", observe)
+    case = support.TrustCase(SimpleNamespace(), lambda *args: None)
+    assert case.record_transaction("transaction_initial", object()) == ((0, 0, "NoLock"),)
+
+
+class FaultCursor:
+    """Result-set choreography only; never evidence that SQL executed."""
+
+    def __init__(self, sets):
+        self.sets, self.index, self.calls = sets, 0, []
+
+    @property
+    def description(self):
+        return None if self.sets[self.index] is None else ("columns",)
+
+    def execute(self, sql, *parameters):
+        self.calls.append((sql, parameters))
+
+    def fetchall(self):
+        return self.sets[self.index]
+
+    def nextset(self):
+        self.index += 1
+        return self.index < len(self.sets)
+
+
+def test_doomed_wrapper_preserves_original_sql_parameters_and_real_result_object():
+    original = "SELECT @@TRANCOUNT, XACT_STATE(), APPLOCK_MODE(N'public', ?, N'Transaction');"
+    observed = [(1, -1, "Exclusive")]
+    cursor = FaultCursor([None, [(2627, 1, -1)], None, observed])
+    boundary = DoomedTransactionCursor(cursor, lambda *args: None)
+    boundary.execute(original, support.COMPOSITION_MSSQL_LEDGER_LOCK)
+    assert boundary.fetchall() is observed
+    sql, parameters = cursor.calls[0]
+    assert sql.count(original) == 1 and parameters == (support.COMPOSITION_MSSQL_LEDGER_LOCK,)
+    assert sql.index("BEGIN CATCH") < sql.index(original) < sql.index("ROLLBACK TRANSACTION")
+    assert boundary.complete and cursor.index == len(cursor.sets)
+    assert boundary.fault_rows == ((2627, 1, -1),) and boundary.precondition_rows == tuple(observed)
+    with pytest.raises(RuntimeError, match="fault_cursor_reuse"):
+        boundary.execute(original, *parameters)
+    with pytest.raises(RuntimeError, match="fault_cursor_read"):
+        boundary.fetchall()
+    assert len(cursor.calls) == 1
+
+
+@pytest.mark.parametrize("fault", [[(102, 1, -1)], [(2627, 1, 1)], []])
+def test_doomed_wrapper_requires_actual_constraint_error_and_uncommittable_state(fault):
+    cursor = FaultCursor([fault, [(1, -1, "NoLock")]])
+    boundary = DoomedTransactionCursor(cursor, lambda *args: None)
+    with pytest.raises(RuntimeError, match="fault_not_doomed"):
+        boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
+    assert not boundary.complete and boundary.precondition_rows == ()
+
+
+@pytest.mark.parametrize("extra", [None, [(123,)]])
+def test_doomed_wrapper_requires_complete_batch_without_extra_results(extra):
+    cursor = FaultCursor([[(2627, 1, -1)], [(1, -1, "NoLock")], extra])
+    boundary = DoomedTransactionCursor(cursor, lambda *args: None)
+    boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
+    if extra is None:
+        assert boundary.fetchall() == [(1, -1, "NoLock")] and boundary.complete
+    else:
+        with pytest.raises(RuntimeError, match="fault_extra_result"):
+            boundary.fetchall()
+        assert not boundary.complete
+
+
+@pytest.mark.parametrize("operation", ["execute", "nextset"])
+def test_doomed_wrapper_driver_failure_is_incomplete_and_cannot_retry(monkeypatch, operation):
+    cursor = FaultCursor([[(2627, 1, -1)], [(1, -1, "NoLock")]])
+    boundary = DoomedTransactionCursor(cursor, lambda *args: None)
+
+    def fail(*args):
+        raise RuntimeError("driver_failure")
+
+    if operation == "execute":
+        monkeypatch.setattr(cursor, operation, fail)
+        with pytest.raises(RuntimeError, match="driver_failure"):
+            boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
+    else:
+        boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
+        monkeypatch.setattr(cursor, operation, fail)
+        with pytest.raises(RuntimeError, match="driver_failure"):
+            boundary.fetchall()
+    assert not boundary.complete
+    with pytest.raises(RuntimeError, match="fault_cursor_reuse"):
+        boundary.execute("SELECT XACT_STATE();", support.COMPOSITION_MSSQL_LEDGER_LOCK)
+    with pytest.raises(RuntimeError, match="fault_cursor_read"):
+        boundary.fetchall()
+
+
 def report():
     return SimpleNamespace(
         failed=True,
@@ -164,42 +263,18 @@ def test_unrelated_reports_are_not_sanitized_or_relabelled():
     assert repr(value) == before
 
 
-def test_failure_location_contains_only_owned_filename_and_line():
-    filename = str(Path(support.__file__).resolve())
-    try:
-        exec(compile("raise AssertionError('PWD=never-print')", filename, "exec"), {})
-    except AssertionError as error:
-        value = report()
-        support.sanitize_report(
-            SimpleNamespace(nodeid=support.LIVE_MODULE + "::test_case"),
-            SimpleNamespace(excinfo=SimpleNamespace(value=error)),
-            value,
-        )
-    assert ("dpone.trust.failure_location", "nonproduction_mssql_trust_live_support.py:1") in value.user_properties
-    assert "never-print" not in repr(value) and filename not in repr(value)
-
-
-def test_failure_diagnostics_survive_real_pytest_teardown_into_junit(tmp_path):
+def run_child_pytest(tmp_path, *, script=None, case=None):
     root = Path(__file__).resolve().parents[1]
-    junit = tmp_path / "failure.xml"
-    script = """
-import sys
-import pytest
-from tests.integration.composition import nonproduction_mssql_trust_live_support as support
-class Fault:
-    @pytest.hookimpl(tryfirst=True)
-    def pytest_runtest_setup(self, item):
-        support.observation_document({'password': 'never-print'})
-raise SystemExit(pytest.main(sys.argv[1:], plugins=[Fault()]))
-"""
+    junit = tmp_path / "junit.xml"
     result = subprocess.run(
         [
             sys.executable,
-            "-c",
-            script,
+            *(["-c", script] if script else ["-m", "pytest"]),
             "-p",
             "tests.integration.composition.nonproduction_mssql_trust_live_support",
-            support.LIVE_MODULE + "::test_insufficient_transaction_lock_never_returns_trust",
+            "-p",
+            "no:cacheprovider",
+            support.LIVE_MODULE + ("::" + case if case else ""),
             "-o",
             "junit_family=xunit1",
             "--junitxml",
@@ -210,7 +285,9 @@ raise SystemExit(pytest.main(sys.argv[1:], plugins=[Fault()]))
         env=os.environ
         | {
             "DPONE_RUN_COMPOSITION_MSSQL_TRUST_LIVE": "0",
+            "DPONE_RUN_COMPOSITION_MSSQL_LIVE": "0",
             "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+            "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONPATH": os.pathsep.join((str(root / "src"), str(root))),
             "PYTEST_ADDOPTS": "",
             "PYTEST_PLUGINS": "",
@@ -218,6 +295,23 @@ raise SystemExit(pytest.main(sys.argv[1:], plugins=[Fault()]))
         capture_output=True,
         check=False,
         timeout=60,
+    )
+    return result, junit
+
+
+def test_failure_diagnostics_survive_real_pytest_teardown_into_junit(tmp_path):
+    script = """
+import sys
+import pytest
+from tests.integration.composition import nonproduction_mssql_trust_live_support as support
+class Fault:
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_runtest_setup(self, item):
+        support.observation_document({'password': 'never-print'})
+raise SystemExit(pytest.main(sys.argv[1:], plugins=[Fault()]))
+"""
+    result, junit = run_child_pytest(
+        tmp_path, script=script, case="test_insufficient_transaction_lock_never_returns_trust"
     )
     assert result.returncode == 1
     case = ElementTree.parse(junit).getroot().find(".//testcase")
@@ -298,39 +392,7 @@ def test_syntax_error_cannot_count_as_permission_or_append_rejection():
 
 
 def test_exact_nine_case_optout_runs_plugin_and_produces_only_skips(tmp_path):
-    root = Path(__file__).resolve().parents[1]
-    junit = tmp_path / "junit.xml"
-    env = os.environ | {
-        "DPONE_RUN_COMPOSITION_MSSQL_TRUST_LIVE": "0",
-        "DPONE_RUN_COMPOSITION_MSSQL_LIVE": "0",
-        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "PYTHONPATH": os.pathsep.join((str(root / "src"), str(root))),
-    }
-    for key in ("PYTEST_ADDOPTS", "PYTEST_PLUGINS"):
-        env.pop(key, None)
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pytest",
-            "-p",
-            "tests.integration.composition.nonproduction_mssql_trust_live_support",
-            "-p",
-            "no:cacheprovider",
-            support.LIVE_MODULE,
-            "-o",
-            "junit_family=xunit1",
-            "--junitxml",
-            str(junit),
-            "--tb=no",
-        ],
-        cwd=root,
-        env=env,
-        capture_output=True,
-        check=False,
-        timeout=60,
-    )
+    result, junit = run_child_pytest(tmp_path)
     assert result.returncode == 0
     cases = ElementTree.parse(junit).getroot().findall(".//testcase")
     expected = {

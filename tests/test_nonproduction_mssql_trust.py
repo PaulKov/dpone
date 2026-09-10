@@ -183,8 +183,11 @@ def test_same_ledger_requires_existing_lock_service_and_enrollment(section, valu
     connection = Connection()
     connection.answers = reads()
     connection.answers[section] = value
-    with pytest.raises(NonproductionAuthorityError):
+    with pytest.raises(NonproductionAuthorityError) as caught:
         provider(lambda: connection).read_revision_in(CompositionMssqlLedger(connection, SCHEMA))
+    if section == 0:
+        assert caught.value.reason == "trust_ledger_lock"
+        assert len(connection.commands) == 1
     assert not connection.events
 
 

@@ -204,15 +204,91 @@ def test_read_rejects_changed_trigger_or_schema(trust_case):
     case.record("drift", {"rows": len(case.rows()), "denied": len(faults), "restored": restored})
 
 
+class DoomedTransactionCursor:
+    """Run the untouched first provider query inside a real constraint CATCH.
+
+    SQL Server rolls back doomed transactions at batch end. This one-shot fault
+    therefore observes the provider's real result before explicit rollback in
+    the same batch. Only the separate fault result is consumed here; provider
+    rows are returned unchanged, and completion requires draining the batch.
+    See learn.microsoft.com/en-us/sql/t-sql/functions/xact-state-transact-sql.
+    """
+
+    def __init__(self, cursor, record):
+        self.cursor, self.record = cursor, record
+        self.executed = self.complete = self._ready = False
+        self.fault_rows: tuple[tuple[object, ...], ...] = ()
+        self.precondition_rows: tuple[tuple[object, ...], ...] = ()
+
+    def __getattr__(self, name):
+        return getattr(self.cursor, name)
+
+    def execute(self, sql, *parameters):
+        if self.executed:
+            raise RuntimeError("fault_cursor_reuse")
+        if parameters != (COMPOSITION_MSSQL_LEDGER_LOCK,):
+            raise RuntimeError("fault_cursor_subject")
+        self.executed = True
+        prefix = (
+            "DECLARE @fault_options int = @@OPTIONS; SET NOCOUNT ON; SET XACT_ABORT ON; "
+            "CREATE TABLE #dpone_trust_fault (id int NOT NULL PRIMARY KEY); "
+            "INSERT INTO #dpone_trust_fault VALUES (1); "
+            "BEGIN TRY INSERT INTO #dpone_trust_fault VALUES (1); END TRY BEGIN CATCH "
+            "SELECT ERROR_NUMBER(),@@TRANCOUNT,XACT_STATE(); "
+        )
+        suffix = (
+            " IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION; END CATCH; "
+            "IF (@fault_options & 16384) = 0 SET XACT_ABORT OFF; "
+            "IF (@fault_options & 512) = 0 SET NOCOUNT OFF;"
+        )
+        # The SQL comes directly from the provider; parameters stay DBAPI-bound.
+        self.cursor.execute(prefix + sql + suffix, *parameters)
+        self._require_result()
+        self.fault_rows = tuple(tuple(row) for row in self.cursor.fetchall())
+        payload: dict[str, object] = {"result_rows": len(self.fault_rows)}
+        if len(self.fault_rows) == 1 and len(self.fault_rows[0]) == 3:
+            payload.update(zip(("sql_error", "transaction_count", "xact_state"), self.fault_rows[0], strict=True))
+        self.record("transaction_fault", payload)
+        if self.fault_rows != ((2627, 1, -1),):
+            raise RuntimeError("fault_not_doomed")
+        if not self.cursor.nextset():
+            raise RuntimeError("fault_missing_result")
+        self._require_result()
+        self._ready = True
+        return self
+
+    def _require_result(self):
+        while self.cursor.description is None:
+            if not self.cursor.nextset():
+                raise RuntimeError("fault_missing_result")
+
+    def fetchall(self):
+        if not self._ready:
+            raise RuntimeError("fault_cursor_read")
+        self._ready = False
+        rows = self.cursor.fetchall()
+        self.precondition_rows = tuple(tuple(row) for row in rows)
+        payload = {"result_rows": len(rows)}
+        if len(rows) == 1 and len(rows[0]) == 3:
+            payload.update(zip(("transaction_count", "xact_state", "lock_mode"), rows[0], strict=True))
+        self.record("transaction_doomed", payload)
+        while self.cursor.nextset():
+            if self.cursor.description is not None:
+                raise RuntimeError("fault_extra_result")
+        self.complete = True
+        return rows
+
+
 def test_insufficient_transaction_lock_never_returns_trust(trust_case):
     case = trust_case
     case.append(1)
     refusals = 0
     with closing(case.database.connect()) as connection, closing(connection.cursor()) as cursor:
         ledger = CompositionMssqlLedger(cursor, case.schema)
-        case.record_transaction("transaction_initial", connection)
-        with pytest.raises(NonproductionAuthorityError, match="trust_ledger_lock"):
+        assert case.record_transaction("transaction_initial", connection) == ((0, 0, "NoLock"),)
+        with pytest.raises(NonproductionAuthorityError) as refused:
             case.provider().read_revision_in(ledger)
+        assert refused.value.reason == "trust_ledger_lock"
         refusals += 1
         for mode in ("Shared", "Exclusive"):
             try:
@@ -223,28 +299,26 @@ def test_insufficient_transaction_lock_never_returns_trust(trust_case):
                     COMPOSITION_MSSQL_LEDGER_LOCK,
                     mode,
                 )
-                acquisition = {"result_rows": len(locked)}
-                if len(locked) == 1 and len(locked[0]) == 1:
-                    acquisition["lock_result"] = locked[0][0]
-                case.record("transaction_" + mode.lower() + "_acquire", acquisition)
-                case.record_transaction("transaction_" + mode.lower(), connection)
+                observed = case.record_transaction("transaction_" + mode.lower(), connection)
+                assert observed == ((1, 1, mode),)
                 assert len(locked) == 1 and locked[0][0] >= 0
                 if mode == "Exclusive":
-                    # A real server constraint failure dooms this transaction.
-                    state = execute(
-                        connection,
-                        "SET XACT_ABORT ON; CREATE TABLE #trust_fault (id int PRIMARY KEY);"
-                        "INSERT INTO #trust_fault VALUES (1); BEGIN TRY INSERT INTO #trust_fault VALUES (1); "
-                        "END TRY BEGIN CATCH SELECT XACT_STATE(); END CATCH;",
-                    )
-                    fault = {"result_rows": len(state)}
-                    if len(state) == 1 and len(state[0]) == 1:
-                        fault["xact_state"] = state[0][0]
-                    case.record("transaction_fault", fault)
-                    case.record_transaction("transaction_after_fault", connection)
-                    assert state == ((-1,),)
-                with pytest.raises(NonproductionAuthorityError, match="trust_ledger_lock"):
-                    case.provider().read_revision_in(ledger)
+                    options = execute(connection, "SELECT @@OPTIONS;")
+                    boundary = DoomedTransactionCursor(cursor, case.record)
+                    doomed = CompositionMssqlLedger(boundary, case.schema)
+                    with pytest.raises(NonproductionAuthorityError) as refused:
+                        case.provider().read_revision_in(doomed)
+                    assert refused.value.reason == "trust_ledger_lock"
+                    assert boundary.complete and boundary.fault_rows == ((2627, 1, -1),)
+                    assert boundary.precondition_rows == ((1, -1, "NoLock"),)
+                    assert execute(connection, "SELECT @@OPTIONS;") == options
+                    assert execute(connection, "SELECT OBJECT_ID(N'tempdb..#dpone_trust_fault');") == ((None,),)
+                    observed = case.record_transaction("transaction_after_fault", connection)
+                    assert observed == ((0, 0, "NoLock"),)
+                else:
+                    with pytest.raises(NonproductionAuthorityError) as refused:
+                        case.provider().read_revision_in(ledger)
+                    assert refused.value.reason == "trust_ledger_lock"
                 refusals += 1
             finally:
                 execute(connection, "IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;")

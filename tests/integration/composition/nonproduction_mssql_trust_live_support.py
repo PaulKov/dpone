@@ -40,11 +40,10 @@ _OBSERVATIONS = {
     "drift",
     "transaction",
     "transaction_initial",
-    "transaction_shared_acquire",
     "transaction_shared",
-    "transaction_exclusive_acquire",
     "transaction_exclusive",
     "transaction_fault",
+    "transaction_doomed",
     "transaction_after_fault",
     "transaction_final",
     "ack",
@@ -250,10 +249,14 @@ class TrustCase:
         self.record_property("dpone.trust." + name, observation_document(payload))
 
     def record_transaction(self, name, connection):
-        """Observe the real connection before a refusal; never infer batch state."""
+        """Observe real state; NoLock is a sentinel when lock lookup is unsafe."""
         rows = execute(
             connection,
-            "SELECT @@TRANCOUNT,XACT_STATE(),APPLOCK_MODE(N'public', ?, N'Transaction');",
+            "DECLARE @transaction_count int = @@TRANCOUNT, "
+            "@transaction_state smallint = XACT_STATE(), @lock_mode nvarchar(32) = N'NoLock'; "
+            "IF @transaction_count > 0 AND @transaction_state = 1 "
+            "SET @lock_mode = APPLOCK_MODE(N'public', ?, N'Transaction'); "
+            "SELECT @transaction_count, @transaction_state, @lock_mode;",
             COMPOSITION_MSSQL_LEDGER_LOCK,
         )
         payload = {"result_rows": len(rows)}

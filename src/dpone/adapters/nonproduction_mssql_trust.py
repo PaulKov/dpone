@@ -156,8 +156,14 @@ class MssqlNonproductionTrustProvider:
     def _require_ledger(self, ledger: CompositionMssqlLedger) -> None:
         if type(ledger) is not CompositionMssqlLedger or ledger.schema != self._schema:
             raise NonproductionAuthorityError("trust_ledger")
+        # Transaction-owned APPLOCK_MODE itself fails without a transaction.
+        # Observe invalid states without invoking it or reading protected rows.
         ledger.cursor.execute(
-            "SELECT @@TRANCOUNT, XACT_STATE(), APPLOCK_MODE(N'public', ?, N'Transaction');",
+            "DECLARE @transaction_count int = @@TRANCOUNT, "
+            "@transaction_state smallint = XACT_STATE(), @lock_mode nvarchar(32) = N'NoLock'; "
+            "IF @transaction_count > 0 AND @transaction_state = 1 "
+            "SET @lock_mode = APPLOCK_MODE(N'public', ?, N'Transaction'); "
+            "SELECT @transaction_count, @transaction_state, @lock_mode;",
             COMPOSITION_MSSQL_LEDGER_LOCK,
         )
         records = tuple(tuple(value) for value in ledger.cursor.fetchall())

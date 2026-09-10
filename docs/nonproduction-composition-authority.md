@@ -28,6 +28,7 @@ authority and reject the new family.
 | `dpone.adapters.nonproduction_github_signature.GitHubNonproductionGrantSignatureVerifier` | Bind external signer expectations and pass exact original bytes to the injected `GitHubArtifactAttestationVerifier` |
 | `dpone.contracts.nonproduction_activation.NonproductionCompositionActivationRequest` | Encode the distinct full activation request with its mandatory execution-grant digest |
 | `dpone.adapters.nonproduction_mssql_trust.MssqlNonproductionTrustProvider` | Reopen independently provisioned SQL trust revisions and compare them inside an existing admission transaction |
+| `dpone.adapters.nonproduction_mssql_registration.MssqlNonproductionRegistrationStore` | Persist immutable grant originals and complete execution campaign membership in that transaction |
 
 Documents reject unknown and duplicate members, noncanonical JSON, non-finite
 numbers, ambiguous types and unsupported discriminators. New authority document
@@ -106,8 +107,12 @@ existing committable transaction holding the exact Exclusive transaction-owned
 composition lock. They neither connect nor commit. Protected admission can
 privately bracket signature verification with equal revisions, then recheck the
 same revision/bytes and clock inside its atomic grant/budget/attempt transaction.
-The current component provides the read/compare capability; that complete
-consumption transaction remains pending.
+An absent or uncommittable transaction rejects with `trust_ledger_lock` before
+reading authority rows. The precondition only inspects the transaction-owned
+application lock when a committable transaction exists, because SQL Server can
+otherwise reject the lock-inspection function itself.
+The registration component below uses this read/compare capability; the complete
+private authentication/admission coordinator remains pending.
 
 The platform must separately establish complete catalog visibility and prevent
 provisioners from altering/truncating tables, disabling triggers, impersonating
@@ -116,6 +121,66 @@ otherwise bypassing append-only enforcement. Catalog
 hashes and RLS rejection detect drift; they do not prove effective permissions.
 Actual installation, concurrent appends and no-bypass permissions require
 isolated SQL qualification. A constructed revision is never an executor permit.
+
+## Immutable grant registration
+
+After installing trust storage, the independent platform administrator installs
+`render_nonproduction_mssql_registration_schema(control_schema="dpone_control")`
+from `dpone.adapters.nonproduction_mssql_registration_schema`. The renderer adds
+append-only grant and membership tables. Installation does not enroll signers,
+verify signatures or grant worker permissions. Apply the same no-bypass permission
+requirements as for trust storage; runtime does not install or repair these tables.
+
+Construct `MssqlNonproductionRegistrationStore(trust_provider, clock=...)` with
+the independently configured SQL trust provider and UTC-aware clock. Its methods
+operate on the caller's existing protected ledger and never connect, commit or
+roll back:
+
+- `register_execution_in(...)` receives original request and grant bytes, the
+  original signature bundle, verified signature-subject bytes and the expected
+  current trust revision. It binds the exact request/grant and charges every
+  distinct workload in the complete grant to its environment/campaign/execution
+  membership pool. Different grants or activations cannot reset that pool.
+- `consume_qualification_in(...)` receives the same originals without an execution
+  request. It consumes the exact qualification run once. Repetition and binding
+  the same run to another grant reject. It grants no seeding, reading, workload,
+  attempt or export authority.
+- `read_in(ledger, consumption_subject_sha256, expected_revision=...)` reopens
+  immutable history. The expected revision is the current storage consistency
+  fence; stored originals are separately audited against their original trust
+  revision and registration time. Later expiry or revocation does not erase history.
+
+The trusted coordinator must verify original signatures before these calls,
+retain the transaction and exact lock through all admission writes, roll back the
+whole transaction on failure, then commit once and independently read back.
+An in-transaction return is documentary data, not an acknowledged durable result
+or an execution permit. Signature bundles have a separate 8 MiB bound; individual
+documents retain their 1 MiB bound and are stored as original binary bytes.
+
+An identical execution registration reopens history without another membership
+charge. Changed originals under the same grant/phase key reject. Distinct execution
+candidate grants can name the same activation; registration does not select or
+replace the protected occurrence's single exact request. Complete membership must
+fit the current policy/grant ceiling and every current workload's lower ceiling.
+A higher newly signed ceiling can admit additional members while retaining all
+earlier charges; a smaller ceiling can block new admission.
+
+Before new inserts, the external connection owner must set `ANSI_NULLS`,
+`ANSI_PADDING`, `ANSI_WARNINGS`, `ARITHABORT`, `CONCAT_NULL_YIELDS_NULL` and
+`QUOTED_IDENTIFIER` ON, and `NUMERIC_ROUNDABORT` OFF. SQL Server requires these
+options for the qualification-only filtered unique index. The renderer sets them
+for installation; repository methods check the caller's options and reject
+`registration_session` without changing them. Historical reads do not need this
+additional DML precondition.
+
+Complete pool audit reads grant history one original record at a time in stable
+key order, including each original signature bundle and historical trust revision.
+It retains at most 64 distinct membership identities; an extra membership row
+rejects. Memory is bounded, but total audit work grows with registration history
+while holding the global lock. SQL concurrency, rollback, permission enforcement
+and audit duration for this registration component remain **UNVERIFIED** until
+the corresponding isolated SQL scenarios pass. Cumulative attempt and source
+budgets remain separate implementation work.
 
 ## Scoped activation request
 
@@ -136,7 +201,7 @@ field or legacy-family fallback.
 `require_execution_grant(grant)` compares the exact grant digest, parent release,
 deployment, activation and complete workload/constituent/pack membership. This
 is a pure comparison; it does not verify signatures, native ancestry, physical
-scope, time or consumption. Concrete scoped persistence and worker factories
+scope, time or consumption. Concrete scoped activation persistence and worker factories
 remain unavailable.
 
 ## Required runtime verification
