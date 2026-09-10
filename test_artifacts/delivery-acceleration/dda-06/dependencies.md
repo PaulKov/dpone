@@ -72,3 +72,42 @@ cross-layer-ratio failure remains documented. DDA-02's replay retained one
 pre-existing doctor PYTHONTRACEMALLOC subprocess timeout, including an isolated
 reproduction; its owned helper tests remain PASS. No unowned timeout or baseline
 was modified by DDA-06.
+
+All component guide follow-ups are now integrated and independently re-reviewed:
+DDA-03 `4851bd3` (local `81a0203`) describes the final original-task byte check and
+417-case integrated receipt; DDA-05 `5761738` (local `cec722c`) leaves factory and
+visibility authority with the approved application. DDA-01 final artifact commit
+`006e0a1`, DDA-02 `61bcebc` and DDA-05 `38f6603` were imported with provenance.
+DDA-03's final evidence `76ee6da` was imported as `4dff1ce`. Fresh additional
+DDA-01/DDA-05 owner reviews requested by the user found defects; their fixes
+must be integrated before the final validation freeze.
+
+DDA-03 and DDA-05 full runs with installed extras each retained two failures in
+unchanged Airflow cache permission tests. Their independently controlled probes
+identified a macOS temporary-root group mismatch. DDA-06 created a unique root
+under the platform user temp directory; its real chmod probe confirms effective
+GID 20 and retained mode 02777. The final full suite uses that root, preserving
+all shared permission tests and production checks.
+
+The next independent owner review cycle produced these reviewed follow-ups:
+
+- Planning `642874b` (local `0a23d9b`) records the approved isolated DDA-05
+  recovery regression module and its focused command. The full effective
+  supplement remains in DDA-06's supplemental-contracts directory.
+- DDA-04 `e0fbad8` (local `1243bf3`) documents the fixture-owner grant of
+  `SELECT ON OBJECT::sys.sql_expression_dependencies`. No production or public
+  admission behavior changed. Independent follow-up review reported no findings.
+- DDA-01 `9aa2a0e` and `9b69be0` (local `d7bd090`, `6b2d78e`) preserve logical
+  envelope aliases when exporting relative proof bundles, reconstruct and
+  validate diagnostic sidecars, and keep the immutable snapshot field contract
+  below the module warning budget. Each revision received independent review;
+  the owner reports 91 focused cases PASS. Its standalone documentation link
+  check remains FAIL because the DDA-06 overview is absent in that checkout.
+  Earlier owner completion prose incorrectly grouped that retained failed log
+  with PASS checks; combined documentation validation remains mandatory.
+- DDA-01 artifact-only `f7ae00c` (local `9547b42`) retains the independently
+  audited correction, exact source checks and original failed logs. The
+  production checkpoint remains `9b69be0`.
+- Planning `c1a88ad` (local `550510f`) authorizes a bounded sole-integrator
+  metrics handoff for the frozen DDA-02 component source `61bcebc`. Its generated
+  component dashboard is not imported into this combined branch.

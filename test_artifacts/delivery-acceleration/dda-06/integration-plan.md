@@ -1,6 +1,8 @@
 # DDA-06 integration and validation plan
 
-Status: implementation integrated and independently reviewed; final integrated gates in progress. Architecture HOLD and live performance UNVERIFIED remain explicit.
+Status: shared implementation reviewed; additional owner review fixes are being
+integrated before the final checks. Architecture HOLD and live performance
+UNVERIFIED remain explicit.
 
 ## Identity and ownership
 
@@ -8,7 +10,10 @@ Status: implementation integrated and independently reviewed; final integrated g
 - Immutable approved planning dependency: `f3682940f8864563cde0e6b6ecee60f746b49020`.
 - PR branch: `codex/dda-06-integration`; current local working branch:
   `codex/dda-06-linear-integration`.
-- Contract: `../agent-task-contracts/dda-06-integration.yml`.
+- Original contract: `../agent-task-contracts/dda-06-integration.yml`.
+  The full effective successor is
+  `../planning-amendments/dda-06-generated-metrics-scope.yml`; the original
+  planning contracts and feature specifications remain unchanged.
 - `origin/master` was fetched before branch preparation and contained the baseline.
 - The clean detached worktree was placed on the integration branch and imported
   the planning dependency with ordinary `git merge --no-edit` (fast-forward).
@@ -24,8 +29,10 @@ Status: implementation integrated and independently reviewed; final integrated g
   Audit imported dependency paths separately from DDA-06's own diff.
 - Planning specification and task-plan documents remain immutable. Record current
   implementation status here and in the integration completion report.
-- The contract's `integrator_owned_paths` explicitly assigns `CHANGELOG.md` and
-  `mkdocs.yml` to DDA-06; it does not grant other shared paths.
+- The effective contract's `integrator_owned_paths` assigns `CHANGELOG.md`,
+  `mkdocs.yml` and a producer-only refresh of `docs/quality-metrics.md` to DDA-06.
+  It also records the narrowly scoped annotation/staging supplement and preserves
+  the exclusion of unowned PostgreSQL source-authority changes.
 
 ## Compatible changes
 
@@ -62,6 +69,20 @@ Run focused checks before the full non-live suite. Set
 import/layer/module-size gates and documentation gates against the exact integrated
 source commit. Record commands, exit codes and retained logs through their actual
 execution; never edit a generated result into a PASS.
+
+The final change-aware selector also requests Airflow/CLI/runtime pytest subsets.
+The full non-live suite includes those ordinary tests, so its result supplies
+their final coverage without rerunning overlapping selections. Run the separate
+Airflow public-contract checker and requested Airflow package builds. Generated
+metrics freshness, documentation, architecture, and live certification retain
+independent statuses; a current dashboard does not clear a graph failure.
+
+Before the dashboard refresh, track every intended Python input, including
+evidence producers and the new DDA-05 recovery regression module. Record the
+input file set and source identity, run the canonical producer, verify that only
+the authorized document changed and its surrounding prose remains identical,
+then confirm a second generation is byte-identical and `--check` passes. Freeze
+the resulting source/docs commit during all exact-source final checks.
 
 ## Review and integration
 

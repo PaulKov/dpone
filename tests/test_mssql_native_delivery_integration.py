@@ -283,3 +283,65 @@ def test_real_produced_benchmark_rejects_tampering(tmp_path, tamper):
     with pytest.raises(BenchmarkInputError):
         compare(*paths, output=tmp_path / "comparison.json")
     assert not (tmp_path / "comparison.json").exists()
+
+
+@pytest.mark.parametrize("counter", ["queries", "publications"])
+def test_failed_produced_trial_remains_failed_in_offline_comparison(tmp_path, counter):
+    from tools.native_delivery_live_support.hermetic import HermeticRouteFactory, produce_fixture
+
+    from dpone.runtime.native_delivery_benchmark import compare
+
+    class RepeatedTrialFactory(HermeticRouteFactory):
+        def open(self, dataset, *, case, clock):
+            session = super().open(dataset, case=case, clock=clock)
+            run = session.run
+
+            def repeat_operation():
+                run()
+                if case.startswith("trial-"):
+                    setattr(session, counter, getattr(session, counter) + 1)
+
+            session.run = repeat_operation
+            return session
+
+    paths = [tmp_path / name for name in ("baseline", "candidate")]
+    for path in paths:
+        path.mkdir()
+    produce_fixture(paths[0])
+    candidate = produce_fixture(paths[1], RepeatedTrialFactory())
+    assert candidate["status"] == "FAIL"
+    assert candidate["fidelity_receipt"]["status"] == "PASS"
+    assert candidate["recovery_receipt"]["status"] == "PASS"
+    assert [sample["id"] for sample in candidate["samples"]] == [f"trial-{index:03}" for index in range(4)]
+    assert [sample["is_warmup"] for sample in candidate["samples"]] == [True, False, False, False]
+    assert all(sample["status"] == "FAIL" for sample in candidate["samples"])
+    report = compare(paths[0] / "run.json", paths[1] / "run.json")
+    assert report["status"] == "FAIL"
+    assert report["workloads"][0]["ratio"] is None
+
+
+def test_real_producer_symlink_envelope_keeps_exported_proof_bundle(tmp_path):
+    import shutil
+
+    from tools.native_delivery_live_support.hermetic import produce_fixture
+
+    from dpone.runtime.native_delivery_benchmark import compare
+
+    original = tmp_path / "original"
+    original.mkdir()
+    produce_fixture(original)
+    alias = tmp_path / "alias"
+    shutil.copytree(original, alias)
+    (alias / "run.json").unlink()
+    (alias / "run.json").symlink_to(original / "run.json")
+    destination = tmp_path / "export"
+    destination.mkdir()
+    report = compare(alias / "run.json", alias / "run.json", output=destination / "comparison.json")
+    retained = destination / report["baseline"]["path"]
+    assert retained.resolve().is_relative_to(destination.resolve())
+    shutil.rmtree(original)
+    shutil.rmtree(alias)
+    # The exported envelope must retain a usable root for every proof reference.
+    replay = compare(retained, retained)
+    assert replay["status"] == "UNVERIFIED"
+    assert replay["workloads"][0]["ratio"] is None
