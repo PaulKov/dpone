@@ -111,3 +111,8 @@ The next independent owner review cycle produced these reviewed follow-ups:
 - Planning `c1a88ad` (local `550510f`) authorizes a bounded sole-integrator
   metrics handoff for the frozen DDA-02 component source `61bcebc`. Its generated
   component dashboard is not imported into this combined branch.
+- DDA-04 artifact-only `aadf384` (local `a58b1d9`) records the locked-extras
+  13-file replay: 684 PASS / 2 architecture FAIL / zero collection errors. All
+  26 historical non-architecture failures and two collection errors cleared;
+  107 focused component/producer cases passed. The original full FAIL remains
+  retained, and this replay is not a new full-suite PASS.
