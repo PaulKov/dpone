@@ -31,7 +31,7 @@ def baseline_python(tmp_path_factory):
         ["git", "-C", str(checkout), "checkout", "--detach", BASELINE_COMMIT], check=True, capture_output=True
     )
     environment = directory / "venv"
-    venv.EnvBuilder(with_pip=False).create(environment)
+    venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(environment)
     python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     site = subprocess.check_output(
         [str(python), "-I", "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"], text=True
