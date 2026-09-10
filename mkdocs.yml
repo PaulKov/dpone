@@ -171,9 +171,11 @@ nav:
       - MSSQL native transport: mssql-native-transport.md
       - Delivery acceleration:
           - Overview and first success: delivery-acceleration/index.md
+          - Observations and comparison: delivery-acceleration/observations.md
           - Prepared metadata and integrity: delivery-acceleration/preparation.md
           - Sized frame handoff: delivery-acceleration/frames.md
           - Isolated partition SWITCH: delivery-acceleration/partition-switch.md
+          - Certification experiments: delivery-acceleration/certification.md
           - Operations and recovery: delivery-acceleration/operations.md
       - Object storage staging: object-storage-staging.md
       - Supply-chain evidence: supply-chain.md

@@ -67,6 +67,10 @@ def _encode(*args: Any, observed: bool = False) -> tuple[Any, dict[str, Any], di
     return value, legacy, session.snapshot() if observed else None
 
 
+def _encode_observed(*args: Any) -> tuple[Any, dict[str, Any], dict[str, Any] | None]:
+    return _encode(*args, observed=True)
+
+
 @dataclass
 class _Work:
     ordinal: int
@@ -285,7 +289,7 @@ class BoundedNativeChunks:
                         ):
                             raise WindowContractError("mssql_native.IPC_task_limit_exceeded")
                         with recorder.phase("ipc_submit", ordinal=ordinal, rows=len(frame), encoded_bytes=size):
-                            future = encoders.submit(_encode, *args, observed=self.observations.enabled)
+                            future = encoders.submit(_encode_observed if self.observations.enabled else _encode, *args)
                         pending[future] = _Work(ordinal, size)
                         ordinal += 1
                     if not pending:

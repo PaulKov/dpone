@@ -27,8 +27,8 @@ uv run pytest tests/test_mssql_native_runtime.py tests/test_mssql_native_staged_
 
 The first command exits successfully and reports `status: composition_required`,
 `live_preflight: not_run` and `certification_status: unverified`. It renders the
-intended route and its requirements without running a delivery. The tests verify preparation and lifecycle ordering without
-opening SQL Server or ClickHouse. Passing them establishes only the tested
+intended route and its requirements without running a delivery. The tests verify
+preparation and lifecycle ordering without opening SQL Server or ClickHouse. Passing them establishes only the tested
 hermetic behavior. To execute a route, the platform owner must supply the
 [Python composition capabilities](../mssql-native-transport.md#compose-the-runtime),
 including a `native_runtime_factory`, exclusion scopes, state and evidence
@@ -70,3 +70,16 @@ certification. Hermetic component tests cannot authorize activation.
 Use the [operations guide](operations.md) for measurement interpretation, failure
 diagnosis and recovery. The [implementation task plan](../data-delivery-acceleration-tasks.md)
 describes the immutable scope and ownership of this work.
+
+
+## Choose the next step
+
+- Read [frame sizing](frames.md) and [preparation integrity](preparation.md) for
+  algorithms, bounds and preserved verification boundaries.
+- Add [phase observations](observations.md) using the composition instructions in
+  the [operations guide](operations.md#connect-optional-observations).
+- Generate retained experiment inputs with the
+  [certification harness](certification.md#start-without-services), then follow
+  the [comparison workflow](operations.md#create-and-compare-retained-reports).
+- Review [isolated partition SWITCH](partition-switch.md) and
+  [ADR 0062](../adr/0062-isolated-mssql-switch-activation.md) for activation limits.

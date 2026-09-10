@@ -27,3 +27,30 @@ Checkpoint acceptance permits integration work. It does not promote a pending
 owner gate into PASS. Final owner evidence and any subsequent fixes must be
 reconciled before claiming integrated readiness. Live SQL is SKIP and performance
 UNVERIFIED for every checkpoint without approved environment evidence.
+
+Additional reviewed imports, all through ordinary `cherry-pick -x`:
+
+| Task | Owner checkpoints | Integrated commits | Scoped evidence |
+|---|---|---|---|
+| DDA-01 / PR 28 | `b8ae950`, `94bbd3c`, `7912df9`, `957c239`, `7fcdabd` | `1887352`, `db0077f`, `4ed4004`, `fe789e6`, `8a237fe` | Independent reviews approved; latest 70 focused PASS. Strict numeric identity and actual producer provenance fixes included. Owner full suite pending; failures observed, not promoted to PASS. |
+| DDA-05 / PR 30 | `d406dbf`, `5cc2296`, `518cc16`, `f09af01` | `62558a6`, `bd3bc67`, `5bd0b67`, `b77266a` | Independent review approved latest immutable typed snapshot fix; 70 focused PASS. Owner full suite at earlier 518cc16 pending. |
+| Annotation/staging supplement | `4edfb91fb160acb3e1a7505d0e1393e4bf8daeff` | `9be1a4c` | Planning owner approved six annotation edges, conditional sink annotation reserve and cohesive staging checks extraction. |
+
+DDA-02's initial full run completed with 20,537 PASS / 815 SKIP / 28 FAIL /
+2 collection errors. Its owner reports missing declared optional dependencies and
+is replaying failures after installing them; benchmark/probe failures remain
+under investigation. This is an owner checkpoint FAIL, not a dpone integration
+PASS. DDA-06 installed its own locked all-extras environment before final checks.
+
+After six annotation edges were removed and observation wiring was added,
+`after-six-annotations-layers.log` records the actual working-tree check: runtime
+flow 216 > 214 (FAIL). This triggers the explicitly authorized reserve in
+`sinks/mssql.py`: `MssqlCatalogColumn` still appears only in a postponed method
+return annotation and is moved under TYPE_CHECKING. No sink behavior changes.
+A final clean-commit check must establish the remaining result; the forecast is
+215, still above the unchanged limit. No unowned PostgreSQL cleanup is authorized.
+
+The native encoder opt-in selects a separate worker entrypoint with the original
+argument tuple. The default submitted-task serialization and admission boundary
+are preserved; no diagnostic flag enlarges that tuple. Legacy journal records
+remain unchanged. The new sidecar is bounded separately.

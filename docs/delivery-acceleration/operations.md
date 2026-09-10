@@ -80,3 +80,109 @@ counters alone cannot fill that gap.
 Existing manifests, Mapping/tuple consumers, wire files and recovery journals
 require no migration. Preserve the same physical target, invocation and source
 lifecycle identities when resuming an interrupted invocation after upgrade.
+
+## Connect optional observations
+
+Use one collector for the application-owned runtime and stage composition. These
+factories accept the same required capabilities listed in the
+[native runtime guide](../mssql-native-transport.md#compose-the-runtime):
+
+```python
+from dpone.runtime.mssql_native_runtime import NativeMssqlRuntime
+from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
+from dpone.runtime.sinks.mssql_native_composition import compose_native_stage_context
+
+observer = BoundedNativeDeliveryObserver(max_observations=4096)
+
+
+def make_stage_context(**stage_capabilities):
+    return compose_native_stage_context(observer=observer, **stage_capabilities)
+
+
+def make_runtime(**runtime_capabilities):
+    return NativeMssqlRuntime(observer=observer, **runtime_capabilities)
+```
+
+The application's existing `bindings` callback uses `make_stage_context` with its
+fresh lease. After `runtime.run(...)`, including on failure, read
+`observer.snapshot()` and persist it separately from the recovery journal.
+
+For a custom observer, explicitly share one session across both factories:
+
+```python
+from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession
+
+
+def make_shared_session(custom_observer):
+    return NativeDeliverySession(custom_observer)
+```
+
+Create that session once, pass it as `observer=session` to both runtime and stage
+composition, and read `session.snapshot()` even if the custom observer throws.
+Separately constructed sessions keep separate diagnostic histories;
+`runtime.observations.snapshot()` alone does not include another session's staging
+failures. The bounded collector example above already shares its failure channel.
+Neither a failed observation nor collector overflow changes business admission,
+verification or error propagation. Overflow makes aggregate claims unavailable.
+Omitting the observer preserves the original source adapter without extra
+per-row clocks; it creates no diagnostic file automatically.
+
+`frame_build` includes source reads, adaptation, sizing and frame assembly. Its
+`source_read_work_seconds` sums actual raw iterator `next()` spans; it excludes
+suspension while encoding/import runs. A frame builder may read ahead one row, so
+this is work performed during that call, not a latency attribution to exactly the
+rows it emits. Exclusive adaptation is unavailable with reason
+`inclusive_source_boundary`. No observation is emitted for each source row.
+
+`metadata_project` with reason `insert_projection_build` measures SQL construction;
+`prepare_insert` measures execution of that statement, including its canonical
+metadata expressions. `prepared_verify` includes the digest comparison. Runtime
+`publish` with reason `service_finalize` includes prepublication checks and
+transaction handling. Evidence/checkpoint spans include their journal markers.
+The source context still remains open through publication. Cooperative native
+cancellation or lease loss preserves its existing `WindowContractError` and is
+recorded as failed work; it is not relabeled as explicit user cancellation.
+
+Each process has its own declared clock domain. Child encode records cross IPC
+as bounded serialized values; no observer or client crosses that boundary. Runtime
+composition has no independent visibility probe, so its observation sidecar
+leaves delivery/pipeline duration unavailable. The experiment harness measures
+those boundaries through its explicit source/visibility/checkpoint protocol.
+
+## Create and compare retained reports
+
+First follow [Start without services](certification.md#start-without-services) to
+create a limits file. The following complete offline continuation produces two
+honest absence reports. Both output directories must already exist, and every
+output path must be new:
+
+```bash
+mkdir -p /tmp/dpone-dda5/baseline /tmp/dpone-dda5/candidate
+for subject in baseline candidate; do
+  env -u DPONE_RUN_INTEGRATION -u DPONE_RUN_INTEGRATION_LIVE \
+    -u DPONE_DDA_DISPOSABLE_APPROVED \
+    uv run python tools/native_delivery_live_benchmark.py run \
+    --profile unicode --rows 10000 --seed 7 --trials 3 \
+    --limits /tmp/dpone-dda5/limits.json \
+    --output "/tmp/dpone-dda5/$subject/run.json"
+done
+uv run python tools/native_delivery_benchmark.py compare \
+  --baseline /tmp/dpone-dda5/baseline/run.json \
+  --candidate /tmp/dpone-dda5/candidate/run.json \
+  --output /tmp/dpone-dda5/comparison.json
+```
+
+These directory names label comparison sides; they do not claim execution of the
+historical baseline. The producers retain actual subject/producer identities,
+profile/sample receipts and hashes. Keep each report together with its referenced
+artifacts. Without approved execution the comparator reports `UNVERIFIED`, ratio
+`null`, and the missing-evidence reason. No source service or BCP runs here.
+
+The comparator writes UTF-8 JSON atomically. It refuses existing output unless
+`--overwrite` is explicitly supplied, and never overwrites retained inputs. Its
+stdout contains the output path and status; stderr contains actionable sanitized
+diagnostics. Exit **0** means a report was written, including UNVERIFIED; **1**
+means a failed comparison gate; **2** means invalid arguments, identity, schema,
+retained bytes or file access. Inspect the JSON status before making any claim.
+For a real comparison, use the approved baseline/candidate experiment procedure
+in the [certification guide](certification.md), retaining all attempted trials.

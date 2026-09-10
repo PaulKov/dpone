@@ -166,3 +166,22 @@ def test_observer_failure_cannot_change_business_outcome(tmp_path, quality_fails
         assert value.run(config(), owner="invocation").status == "success"
         assert "state" in events
     assert value.observations.snapshot()["status"] == "UNVERIFIED"
+
+
+def test_runtime_observations_identify_the_executing_thread(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import get_ident
+
+    from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
+
+    observer = BoundedNativeDeliveryObserver()
+    value, _, _ = runtime(tmp_path, observer=observer)
+
+    def execute():
+        value.run(config(), owner="invocation")
+        return get_ident()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        worker = pool.submit(execute).result()
+    assert worker != get_ident()
+    assert {item["worker_id"] for item in observer.snapshot()["observations"]} == {f"runtime:{worker}"}

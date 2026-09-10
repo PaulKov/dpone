@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Changed
+
+- Reduce bounded native MSSQL preparation to one metadata-bearing INSERT and one
+  dual-digest iterator; preserve all four raw checks and the independent prepared
+  prepublication check. Reuse frame sizes without removing native-file validation.
+- Add optional bounded phase observations and offline benchmark comparison with
+  explicit missing-evidence results. Existing manifests, bytes, journals and
+  recovery remain compatible. SQL Server partition SWITCH is an isolated,
+  unregistered component; public native SWITCH remains rejected before I/O.
+  See [delivery acceleration](docs/delivery-acceleration/index.md). Live fidelity
+  and measured performance remain unverified.
+
 ## 0.76.0 - 2026-09-10
 
 ### Added

@@ -60,7 +60,6 @@ class NativeMssqlRuntime:
         self.quality, self.evidence, self.advance_state = quality, evidence, advance_state
         self.lease_ttl = lease_ttl
         self.observations = delivery_session(observer)
-        self._recorder = self.observations.recorder("runtime")
 
     def run(self, load_config: Any, *, owner: str) -> ProcessResult:
         """Resume target receipts before any source factory; never replay unknown commit."""
@@ -96,13 +95,13 @@ class NativeMssqlRuntime:
             if state is None:
                 raise WindowContractError("mssql_native.publication_receipt_missing")
             if state["phase"] == "published":
-                with self._recorder.phase("evidence"):
+                with self.observations.recorder("runtime").phase("evidence"):
                     self.evidence(load_config, result, context, lease)
                     self._check(lease, lost)
                     journal.publication.evidence_complete()
                 state = journal.publication.state()
             if state["phase"] == "evidence-complete":
-                with self._recorder.phase("checkpoint"):
+                with self.observations.recorder("runtime").phase("checkpoint"):
                     self.advance_state(load_config, result, lease)
                     self._check(lease, lost)
                     journal.publication.succeeded()
@@ -144,7 +143,7 @@ class NativeMssqlRuntime:
     ) -> LoadResult:
         self._check(lease, lost)
         try:
-            with self._recorder.phase("quality"):
+            with self.observations.recorder("runtime").phase("quality"):
                 self.quality(config, handle, lease)
             self._check(lease, lost)
         except BaseException as error:
@@ -154,7 +153,7 @@ class NativeMssqlRuntime:
                 error.add_note(f"native prepublication cleanup failed: {type(cleanup).__name__}")
             raise
         # Finalizer owns unknown-outcome classification; never abort after intent.
-        with self._recorder.phase("publish", reason="service_finalize"):
+        with self.observations.recorder("runtime").phase("publish", reason="service_finalize"):
             return service.finalize(config, handle)
 
     def _check(self, lease: WindowLease, lost: Event) -> None:

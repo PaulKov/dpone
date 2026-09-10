@@ -227,3 +227,59 @@ def test_observed_delivery_reports_actual_boundaries_and_preserves_journal(tmp_p
     assert all(item["metrics"]["source_adapt_work_seconds"]["value"] is None for item in frames)
     assert all("schema_version" not in item for item in context.journal_factory().completed().observations)
     assert closed == [True]
+
+
+@pytest.mark.parametrize("kind", ["absent", "hermetic"])
+def test_real_benchmark_producer_consumer_never_certifies_unapproved_runs(tmp_path, kind):
+    from tools.native_delivery_live_support.artifacts import ArtifactStore
+    from tools.native_delivery_live_support.execution import git_identity, loaded_subject
+    from tools.native_delivery_live_support.hermetic import LIMITS, produce_fixture
+    from tools.native_delivery_live_support.profiles import Dataset
+    from tools.native_delivery_live_support.runner import absent_run, configuration, route_record
+
+    from dpone.runtime.native_delivery_benchmark import compare
+
+    paths = [tmp_path / name / "run.json" for name in ("baseline", "candidate")]
+    for path in paths:
+        path.parent.mkdir()
+        if kind == "hermetic":
+            produce_fixture(path.parent)
+        else:
+            absent_run(
+                ArtifactStore(path),
+                Dataset("unicode", 16),
+                configuration(LIMITS),
+                route_record("partition_replace", "bounded_native"),
+                git_identity(loaded_subject()),
+                "disposable_environment_not_approved",
+            )
+    report = compare(*paths, output=tmp_path / "comparison.json")
+    assert report["status"] == "UNVERIFIED"
+    assert report["workloads"][0]["ratio"] is None
+
+
+@pytest.mark.parametrize("tamper", ["retained_bytes", "schema", "binding"])
+def test_real_produced_benchmark_rejects_tampering(tmp_path, tamper):
+    import json
+
+    from tools.native_delivery_live_support.hermetic import produce_fixture
+
+    from dpone.runtime.native_delivery_benchmark import BenchmarkInputError, compare
+
+    paths = [tmp_path / name / "run.json" for name in ("baseline", "candidate")]
+    for path in paths:
+        path.parent.mkdir()
+        produce_fixture(path.parent)
+    payload = json.loads(paths[1].read_text())
+    if tamper == "retained_bytes":
+        ref = payload["fidelity_receipt"]
+        (paths[1].parent / ref["path"]).write_text("{}")
+    else:
+        if tamper == "schema":
+            payload["schema_version"] = 99
+        else:
+            payload["configuration"]["sha256"] = "f" * 64
+        paths[1].write_text(json.dumps(payload))
+    with pytest.raises(BenchmarkInputError):
+        compare(*paths, output=tmp_path / "comparison.json")
+    assert not (tmp_path / "comparison.json").exists()

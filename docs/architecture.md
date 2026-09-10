@@ -2,6 +2,13 @@
 
 This document describes the **target OOP / clean architecture** structure for dpone and the current migration status.
 
+The opt-in native ClickHouse-to-MSSQL path uses sized frames, bounded native
+encoding/import, a metadata-bearing preparation INSERT and dual digests, followed
+by quality, independent prepublication verification, the existing transactional
+finalizer, evidence and checkpoint. [Delivery acceleration](delivery-acceleration/index.md)
+describes those boundaries and its diagnostic sidecar. The sidecar has no journal,
+publication or recovery authority; the isolated SWITCH component is unregistered.
+
 ## Current architecture snapshot
 
 dpone is now organized as a production batch ELT runtime with explicit contracts for connectors, sources, sinks, artifacts, state, schema evolution, reconciliation, quality gates and operational UX.

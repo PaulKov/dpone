@@ -49,10 +49,13 @@ Text decoding is strict; arbitrary binary values require binary target
 types. VARCHAR/CHAR are currently rejected by the importer, including when a collation
 is configured.
 
-Planned internal optimizations and their unchanged compatibility boundary are
-specified in the [data-delivery acceleration design](feature-design-data-delivery-acceleration-v1.md).
-Contributors can follow the [implementation task plan](data-delivery-acceleration-tasks.md).
-Those plans do not establish measured acceleration or enable native partition SWITCH.
+Bounded delivery reuses frame sizes, projects canonical metadata in the prepared
+INSERT and computes business/full digests in one iterator. All four raw checks,
+the independent prepared prepublication check and the finalizer target-clock
+UPDATE remain. Follow [delivery acceleration](delivery-acceleration/index.md) for
+structural evidence, optional observations and measurement instructions. These
+changes establish no measured acceleration and do not enable native partition
+SWITCH. Existing callers need no manifest or recovery migration.
 
 ## Compose the runtime
 

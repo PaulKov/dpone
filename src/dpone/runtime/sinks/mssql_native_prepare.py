@@ -217,13 +217,13 @@ class MssqlNativeStagePreparer:
                     max_row_bytes=context.max_row_bytes,
                     expected_rows=stage.row_count,
                 )
-            from dpone.runtime.mssql_native_chunks_files import native_multiset_digest
+                from dpone.runtime.mssql_native_chunks_files import native_multiset_digest
 
-            expected_sum = sum(int(receipt.consumed_part_evidence["native_typed_sum"]) for receipt in receipts) % (
-                1 << 256
-            )
-            if digests.business_digest != native_multiset_digest(stage.row_count, expected_sum):
-                raise ValueError("mssql_native.prepared_digest_mismatch")
+                expected_sum = sum(int(receipt.consumed_part_evidence["native_typed_sum"]) for receipt in receipts) % (
+                    1 << 256
+                )
+                if digests.business_digest != native_multiset_digest(stage.row_count, expected_sum):
+                    raise ValueError("mssql_native.prepared_digest_mismatch")
             digest = digests.full_digest
             context.capacity_check(0)
             object_id = strategy.connector.get_records("SELECT OBJECT_ID(?)", (strategy._staging_name(stage),))[0][0]

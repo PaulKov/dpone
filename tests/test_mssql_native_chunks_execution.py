@@ -355,3 +355,58 @@ def test_allocation_overshoot_is_durable_without_stage_complete(tmp_path, worker
     assert len(failed) == workers
     assert failed[0]["allocated_before"] == 0
     assert failed[0]["allocated_after"] == 20000
+
+
+def test_source_work_excludes_adapter_and_downstream_suspension(monkeypatch):
+    from dpone.runtime.mssql_native_chunks_observations import ObservedNativeRows
+
+    clock, closed = [0], []
+    monkeypatch.setattr("dpone.runtime.mssql_native_chunks_observations.time.monotonic_ns", lambda: clock[0])
+
+    def source():
+        try:
+            for value in (1, 2):
+                clock[0] += 3
+                yield (value,)
+        finally:
+            closed.append(True)
+
+    def adapt(rows):
+        try:
+            for row in rows:
+                clock[0] += 7
+                yield row
+        finally:
+            rows.close()
+
+    rows = ObservedNativeRows(source(), adapt)
+    assert next(rows) == (1,)
+    clock[0] += 100
+    assert rows.metrics()["source_read_work_seconds"].value == 3 / 1e9
+    assert next(rows) == (2,)
+    assert rows.metrics()["source_read_work_seconds"].value == 3 / 1e9
+    rows.close()
+    assert closed == [True]
+
+
+def test_disabled_source_observation_never_reads_clock(monkeypatch):
+    from dpone.runtime.mssql_native_chunks_observations import delivery_session
+
+    def unavailable_clock():
+        raise AssertionError("disabled diagnostics read a clock")
+
+    monkeypatch.setattr("dpone.runtime.mssql_native_chunks_observations.time.monotonic_ns", unavailable_clock)
+    session = delivery_session(None)
+    assert list(session.source_rows(iter([(1,)]), lambda rows: rows)) == [(1,)]
+    assert session.snapshot()["status"] == "UNVERIFIED"
+
+
+def test_failed_worker_encoding_returns_diagnostics_without_masking_error(tmp_path):
+    from dpone.runtime.mssql_native_chunks import _encode
+
+    wire = build_mssql_bcp_native_contract(schema=[("value", "int")], query="synthetic")
+    result, legacy, sidecar = _encode(wire, [("invalid",)], tmp_path / "bad.native", 0, 64, 64, observed=True)
+    assert isinstance(result, ValueError)
+    assert sidecar["observations"][0]["outcome"] == "failed"
+    assert sidecar["observations"][0]["phase"] == "encode"
+    assert set(legacy) == {"phase", "start", "end", "worker"}
