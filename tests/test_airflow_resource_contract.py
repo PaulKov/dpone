@@ -17,8 +17,17 @@ from jsonschema import validate
 from dpone.contracts.airflow_deployment import canonical_fingerprint
 from dpone.manifest.authoring import AuthoringCompilationError, AuthoringCompiler
 from dpone.readiness.airflow_authoring_validation import authoring_check_view
-from tests.test_airflow_authoring_v1 import _classic, _flow
+from tests.test_airflow_authoring_v1 import _classic, _flow, _process
 from tests.test_airflow_workload_resources import RESOURCES
+
+
+def _legacy_config(_path: Path) -> dict:
+    payload = _process()
+    for side in ("source", "sink"):
+        endpoint = payload[side]
+        endpoint["connection_id"] = endpoint.pop("connection_ref")
+        endpoint["connection_type"] = "airflow"
+    return payload
 
 
 @pytest.mark.parametrize(
@@ -121,6 +130,7 @@ def test_resource_only_change_updates_semantic_selection_and_check_view(tmp_path
     [
         ("etl-flow-manifest.schema.json", _flow),
         ("etl-batch-manifest.schema.json", _classic),
+        ("etl-config.schema.json", _legacy_config),
     ],
 )
 def test_public_schemas_share_resource_shape(filename: str, factory) -> None:
