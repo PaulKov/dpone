@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from dataclasses import replace
 from typing import Any
 
 from .artifacts import ArtifactStore, canonical_json, digest
@@ -62,7 +63,12 @@ def _hash_check(name: str, expected: str | None, observed: str | None) -> dict[s
 
 
 def snapshot_checks(
-    dataset: Dataset, before_outside: Iterable[Mapping[str, object]], after: Snapshot, strategy: str
+    dataset: Dataset,
+    before_outside: Iterable[Mapping[str, object]],
+    after: Snapshot,
+    strategy: str,
+    *,
+    require_pipeline_complete: bool = True,
 ) -> list[dict[str, Any]]:
     expected = exact_multiset(dataset.generate())
     observed = exact_multiset(after.rows)
@@ -82,8 +88,19 @@ def snapshot_checks(
             _hash_check("commit_receipt_binding", after.receipt_expected, after.receipt_observed),
         ]
     )
-    if not after.commit_known or not after.pipeline_complete:
-        checks[3] = check("commit_receipt_binding", True, False, reason="publication_or_pipeline_unconfirmed")
+    expected_state = {"source_queries": 1, "publications": 1, "commit_known": True}
+    observed_state = {key: getattr(after, key) for key in expected_state}
+    if require_pipeline_complete:
+        expected_state["pipeline_complete"] = True
+        observed_state["pipeline_complete"] = after.pipeline_complete
+    if canonical_json(expected_state) != canonical_json(observed_state):
+        checks[3] = check(
+            "commit_receipt_binding",
+            expected_state,
+            observed_state,
+            method="live_observation",
+            reason="invocation_or_pipeline_unconfirmed",
+        )
     if strategy == "partition_replace":
         prior, current = exact_multiset(before_outside), exact_multiset(after.outside_rows)
         checks.append(
@@ -157,6 +174,18 @@ def receipt(
     )
 
 
+def _capture(snapshot: Snapshot) -> Snapshot:
+    """Materialize driver iterators once before checking the same boundary twice."""
+    return replace(snapshot, rows=capture_rows(snapshot.rows), outside_rows=capture_rows(snapshot.outside_rows))
+
+
+def _bindings_unchanged(before: Snapshot, after: Snapshot) -> bool:
+    return all(
+        getattr(before, name) == getattr(after, name)
+        for name in ("metadata_expected", "metadata_observed", "receipt_expected", "receipt_observed")
+    )
+
+
 def failure_recovery(
     factory: RouteFactory, dataset: Dataset, strategy: str, store: ArtifactStore | None = None
 ) -> list[dict[str, Any]]:
@@ -173,7 +202,7 @@ def failure_recovery(
         try:
             if store is not None:
                 record_owner(store, session, case)
-            before = session.snapshot()
+            before = _capture(session.snapshot())
             before_rows = exact_multiset(before.rows)
             before_outside = capture_rows(before.outside_rows)
             fault = {
@@ -189,66 +218,112 @@ def failure_recovery(
                 session.run()
             except Exception:
                 failed = True  # Never persist exception text from connectors.
-            initial = session.snapshot()
+            initial = _capture(session.snapshot())
             initial_rows = exact_multiset(initial.rows)
             initial_outside = capture_rows(initial.outside_rows)
+            checks: list[dict[str, Any]] = []
             if case in {"source_free_resume", "receipt_first_recovery", "unknown_commit"}:
                 recover_failed = False
                 try:
                     session.recover(source_allowed=False)
                 except Exception:
                     recover_failed = True
-                after = session.snapshot()
+                after = _capture(session.snapshot())
                 if case == "unknown_commit":
+                    old_state = initial_rows == before_rows and initial.publications == 0
+                    new_state = initial_rows == exact_multiset(fixture.generate()) and initial.publications == 1
+                    checks.append(
+                        _hash_check(
+                            "metadata_parity",
+                            before.metadata_observed if old_state else initial.metadata_expected,
+                            initial.metadata_observed,
+                        )
+                    )
+                    # This negative fixture must permit deliberately unavailable
+                    # receipt authority, while rejecting a present wrong receipt.
+                    if initial.receipt_observed is not None:
+                        checks.append(
+                            _hash_check("commit_receipt_binding", initial.receipt_expected, initial.receipt_observed)
+                        )
                     ok = (
                         failed
                         and recover_failed
+                        and (old_state or new_state)
                         and not initial.commit_known
                         and not after.commit_known
+                        and not initial.pipeline_complete
+                        and not after.pipeline_complete
                         and initial.publications == after.publications
                         and initial.source_queries == after.source_queries
                         and initial_rows == exact_multiset(after.rows)
                         and exact_multiset(initial_outside) == exact_multiset(after.outside_rows)
                         and (
-                            strategy != "partition_replace"
+                            (new_state and strategy != "partition_replace")
                             or exact_multiset(initial_outside) == exact_multiset(before_outside)
                         )
                         and initial.stage_reads == after.stage_reads
+                        and _bindings_unchanged(initial, after)
                     )
                 else:
                     checks = snapshot_checks(fixture, before_outside, after, strategy)
-                    ok = (
-                        not recover_failed
-                        and aggregate(c["status"] for c in checks) == "PASS"
-                        and initial.source_queries == after.source_queries
-                    )
+                    ok = not recover_failed and initial.source_queries == after.source_queries
                     if case == "source_free_resume":
-                        ok &= failed and initial_rows == before_rows and after.publications == before.publications + 1
+                        checks.append(
+                            _hash_check("metadata_parity", before.metadata_observed, initial.metadata_observed)
+                        )
+                        ok &= (
+                            failed
+                            and initial.commit_known
+                            and not initial.pipeline_complete
+                            and initial_rows == before_rows
+                            and exact_multiset(initial_outside) == exact_multiset(before_outside)
+                            and initial.receipt_observed == before.receipt_observed
+                            and initial.publications == 0
+                            and after.publications == 1
+                        )
                     else:
+                        checks.extend(
+                            snapshot_checks(fixture, before_outside, initial, strategy, require_pipeline_complete=False)
+                        )
                         ok &= (
                             initial.commit_known
-                            and initial.publications == after.publications == before.publications + 1
+                            and initial.publications == after.publications == 1
+                            and initial_rows == exact_multiset(after.rows)
+                            and exact_multiset(initial_outside) == exact_multiset(after.outside_rows)
                             and initial.stage_reads == after.stage_reads
+                            and _bindings_unchanged(initial, after)
                         )
             elif case == "rollback":
                 after = initial
+                checks.append(_hash_check("metadata_parity", before.metadata_observed, initial.metadata_observed))
                 ok = (
                     failed
                     and initial.commit_known
+                    and not initial.pipeline_complete
                     and initial_rows == before_rows
                     and exact_multiset(initial_outside) == exact_multiset(before_outside)
+                    and initial.receipt_observed == before.receipt_observed
                     and initial.publications == before.publications
                 )
             else:
                 after = initial
                 checks = snapshot_checks(fixture, before_outside, initial, strategy)
-                ok = not failed and aggregate(c["status"] for c in checks) == "PASS"
+                ok = not failed
             known = after.commit_known
+            ok &= before.source_queries == before.publications == 0 and not before.pipeline_complete
+            ok &= initial.source_queries == 1
             if fault is not None:
                 ok &= fault not in before.fault_events and fault in initial.fault_events
             if case == "receipt_first_recovery":
                 ok &= initial.receipt_probes > before.receipt_probes
-            outcomes[case] = check(case, True, bool(ok))
+            status = aggregate(["PASS" if ok else "FAIL", *(item["status"] for item in checks)])
+            outcomes[case] = check(
+                case,
+                True,
+                bool(ok),
+                status=status,
+                reason="authoritative_binding_unavailable" if status == "UNVERIFIED" else None,
+            )
         except Exception:
             outcomes[case] = check(case, True, False, reason="recovery_fixture_failed")
         finally:
@@ -260,9 +335,12 @@ def failure_recovery(
             finally:
                 session.close()
     known_check, unknown_check = outcomes["receipt_first_recovery"], outcomes["unknown_commit"]
+    recovery_status = aggregate([known_check["status"], unknown_check["status"]])
     outcomes["receipt_first_recovery"] = check(
         "receipt_first_recovery",
         {"known_commit": True, "unknown_blocks_replay": True},
         {"known_commit": known_check["status"] == "PASS", "unknown_blocks_replay": unknown_check["status"] == "PASS"},
+        status=recovery_status,
+        reason="authoritative_binding_unavailable" if recovery_status == "UNVERIFIED" else None,
     )
     return [outcomes[name] for name in RECOVERY_CHECKS]

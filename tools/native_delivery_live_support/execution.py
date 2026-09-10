@@ -101,6 +101,11 @@ class Snapshot:
     authored window (including its upper boundary). Metadata hashes must include
     canonical expected/observed framework columns. Receipt hashes bind the exact
     operation/window/owner/content identity, not merely receipt existence.
+    Source-query and publication counters belong to this invocation and start
+    at zero; fixture preparation and target observation queries are excluded.
+    A successful fresh delivery performs one source query and one atomic target
+    publication. commit_known also covers a confirmed no-publication rollback;
+    pipeline_complete may advance only after successful evidence/checkpoint work.
     """
 
     rows: Iterable[Mapping[str, object]]

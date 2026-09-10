@@ -1,5 +1,11 @@
 # DDA-05 completion and evidence
 
+> Historical completion at `38f6603`. A subsequent user-requested independent
+> review withdrew this approval and identified recovery/counter assertion gaps.
+> See [the corrective review record](review-followup/report.md) for the successor
+> implementation, validation and review status. Logs below retain their original
+> identities and results; they do not certify the corrective commit.
+
 ## Result and scope
 
 DDA-05 adds an opt-in real-row delivery certification harness: deterministic

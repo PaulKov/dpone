@@ -153,7 +153,10 @@ def _trial(
             raise ValueError("trial_identity_drift")
         session = adapter.factory.open(dataset, case=sample_id, clock=clock)
         record_owner(store, session, sample_id)
-        before_outside = capture_rows(session.snapshot().outside_rows)
+        before = session.snapshot()
+        before_outside = capture_rows(before.outside_rows)
+        if before.source_queries or before.publications or before.pipeline_complete:
+            raise ValueError("invocation_not_fresh")
         with ProcessTreeRss() as rss:
             session.run()
             visibility, pipeline = clock.finish()
