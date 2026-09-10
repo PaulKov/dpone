@@ -400,7 +400,7 @@ def prepare_fixture() -> None:
     import psycopg
 
     with psycopg.connect(os.environ["AIRFLOW_CONN_WAREHOUSE"]) as connection:
-        connection.execute("CREATE SCHEMA preserve_src; CREATE SCHEMA preserve_dst")
+        connection.execute("CREATE SCHEMA preserve_src; CREATE SCHEMA preserve_dst; CREATE SCHEMA staging")
         connection.execute("CREATE TABLE preserve_src.orders(id integer PRIMARY KEY, label text NOT NULL)")
         connection.execute(
             "CREATE TABLE preserve_dst.orders(id integer PRIMARY KEY, label text NOT NULL DEFAULT 'default' CHECK(label <> 'invalid'))"
@@ -467,7 +467,11 @@ def execute_case(case_id: str, dag, index: dict, expected: list, baseline: dict)
     require(snapshot["rows"] == expected and snapshot["metadata"]["view"] == expected, "rows_or_view_mismatch")
     for name in ("oid", "constraints", "columns", "indexes"):
         require(snapshot["metadata"][name] == baseline["metadata"][name], "catalog_changed_" + name)
-    require(any(x["key"] == "return_value" and x["task_id"] in kinds for x in xcoms), "persisted_runtime_xcom_missing")
+    summaries = [x["value"] for x in xcoms if x["key"] == "return_value" and x["task_id"] in kinds]
+    require(len(summaries) == 1, "persisted_runtime_xcom_missing")
+    require(summaries[0]["status"] == ("failed" if rejected else "passed"), "runtime_xcom_outcome_mismatch")
+    if rejected:
+        require("CheckViolation" in json.dumps(summaries[0]), "expected_check_constraint_failure_missing")
     observed.update(
         status="PASS", rows=snapshot["rows"], scope="actual strict DAG and independent database observations"
     )

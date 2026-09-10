@@ -304,11 +304,12 @@ Create the explicit task contract before any delegated writer is used.
 | Test certifier | No parallel production writes; independent evidence review | Credentials and manufactured evidence forbidden |
 | Docs/UX reviewer | No writes during review; novice recovery and defaults review | Shared docs/schema mutation reserved to integrator |
 
-Current checks: **PASS** read-only code/contract/evidence review by explorer,
+Design-time checks: **PASS** read-only code/contract/evidence review by explorer,
 architect, test certifier and docs/UX reviewer; **FAIL** retained original live
 constraint-loss case; **SKIP** new unit/live/broad suites (planning only).
-No production files, live data, runtime images or remote PR state changed for
-this design. Public behavior remains unfixed until implementation is validated.
+No production files, live data, runtime images or remote PR state changed during
+that planning phase. These planning statuses are superseded by the implementation
+and validation results in [README.md](README.md).
 
 Design ready for review. No merge/release readiness is asserted. Maintainer approval is recorded below.
 
@@ -357,3 +358,12 @@ IS NOT DISTINCT FROM; native NULL input falls back or rejects required mode.
 Standalone file compatibility restores historical best-effort file cleanup.
 SQL errors from target diagnostic samples propagate as primary failures because
 swallowing them leaves PostgreSQL's transaction aborted. None adds a new option.
+
+### Implementation disposition
+
+Implemented in `1ff83879fc7640d358cad15402672eafddcabf41`, with 40 frozen-source
+direct PostgreSQL cases and five strict Kubernetes/Airflow DAG cases passing.
+Independent code/architecture and bounded proof reviews approved this source.
+Documentation/proof follow-ups preserve its production and test bytes.
+The [campaign report](README.md) records broader checks, baseline failures,
+remaining CI status and the limits of this evidence. No publication is authorized.

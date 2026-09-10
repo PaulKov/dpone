@@ -1,6 +1,7 @@
 *.log
 live-direct-*/
 red-null-partition/
+ci-shards/
 kubernetes/image/
 kubernetes/registry-images.json
 kubernetes/cluster/

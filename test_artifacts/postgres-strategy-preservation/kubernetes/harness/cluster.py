@@ -356,5 +356,29 @@ def collect() -> None:
         time.sleep(0.4)
 
 
+def verify_installed() -> None:
+    """Capture the running controller's source verification and embedded claims."""
+    credentials()
+    pod = json.loads(kube("get", "pod", "dpone-controller", "-n", NAMESPACE, "-o", "json").stdout)
+    uid = pod["metadata"]["uid"]
+    result = kube("exec", "dpone-controller", "-n", NAMESPACE, "--", "python", "/opt/dpone-live/verify_installed.py")
+    save(
+        f"controller/{uid}/installed-source-verification.json",
+        {
+            "controller_uid": uid,
+            "exit_code": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        },
+    )
+    provenance = kube(
+        "exec", "dpone-controller", "-n", NAMESPACE, "--", "cat", "/opt/dpone-live/source-provenance.json"
+    )
+    save_original(f"controller/{uid}/source-provenance.json", provenance.stdout.encode())
+    print("Captured installed source verification for " + uid, flush=True)
+
+
 if __name__ == "__main__":
-    {"bootstrap": bootstrap, "controller": launch_controller, "collect": collect}[sys.argv[1]]()
+    {"bootstrap": bootstrap, "controller": launch_controller, "collect": collect, "verify-installed": verify_installed}[
+        sys.argv[1]
+    ]()

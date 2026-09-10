@@ -27,5 +27,25 @@ as intermediate evidence only. Neither substitutes for the required final frozen
 commit run. Its producer now fingerprints source and tests before/after execution
 and fails certification if either changes.
 
-Repeat reviewer disposition and final exact-source checks will be added after
-source/test freeze. No merge or release readiness is asserted here.
+## Repeat disposition on frozen source
+
+APPROVE code and architecture at `1ff83879fc7640d358cad15402672eafddcabf41`.
+The independent reviewer checked all 27 review-manifest files with zero
+mismatches and found no remaining code blockers. Reviewer-executed tests: SKIP.
+Broad and exact-image gates remain separate from this code-review approval.
+
+## Final bounded evidence review
+
+APPROVE the synthetic proof at the same frozen production source. The reviewer
+required exact Pod UID and boolean checks, a bijection between direct receipts
+and passed tests, deployment and outcome-gate identity joins, structured CHECK
+errors after the target-truncated event, exported-file checksums, and the
+controller's admitted image and embedded source provenance. All were corrected.
+
+The independent reviewer then checked controller
+`1826409a-ecdc-488c-9f58-6e1c38542224`, its admitted image and observed digest,
+the installed-file verification, embedded provenance, and manifest digest.
+They agree on source `1ff83879fc7640d358cad15402672eafddcabf41`.
+All five strict DAG cases pass the strengthened verifier. Reviewer-executed
+heavy tests: SKIP. This approval does not certify other routes, merge readiness,
+or publication authority.
