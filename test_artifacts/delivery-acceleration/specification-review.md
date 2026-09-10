@@ -9,10 +9,12 @@ No production code, package versions, release history or provider settings chang
 | Six concrete task contracts, canonical validator | PASS | Zero errors |
 | Pairwise code/docs/evidence ownership | PASS | No writable path overlaps |
 | Dependency DAG | PASS | DDA-01..05 independent; DDA-06 depends on all five |
-| Docs check | PASS | 817 Markdown files, 3,266 local links |
+| Docs check | PASS | 817 Markdown files, 3,260 local links after immutable GitHub contract links |
 | Generated references | PASS | 3/3 in sync |
 | Docs language and task-contract validator tests | PASS | 44 tests |
 | Strict MkDocs build | PASS | Rendered to a disposable local site directory |
+| Rendered task navigation | PASS | Both pages render; all six contract links target retained GitHub commit blobs |
+| Implementation dispatch | PASS | All six separate worktree tasks confirmed active/inProgress through task snapshots |
 | Independent architecture/test/docs analysis | PASS | Scope reconciled before dispatch |
 | Fresh-context review and correction re-review | PASS | No remaining actionable findings |
 | Live SQL / performance | SKIP | No environment execution requested for specification work |

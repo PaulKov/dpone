@@ -91,7 +91,7 @@ Purpose: Implement opt-in bounded phase observations and a truthful versioned be
 - Interface: NativeDeliveryObservation; NativeDeliveryObserver.record(observation); native_delivery_benchmark.py compare.
 - Handoff: Model/port, bounded collector, comparison producer, focused tests, observations guide and exact-commit report.
 - Depends on: the frozen specification/interfaces only; no unfinished implementation branch.
-- Contract: [DDA-01 ownership and acceptance](../test_artifacts/delivery-acceleration/agent-task-contracts/dda-01-observations.yml).
+- Contract: [DDA-01 ownership and acceptance](https://github.com/PaulKov/dpone/blob/f3682940f8864563cde0e6b6ecee60f746b49020/test_artifacts/delivery-acceleration/agent-task-contracts/dda-01-observations.yml).
 - Focused checks: `uv run pytest tests/test_mssql_native_delivery_observations.py tests/test_mssql_native_delivery_benchmark.py -q`.
 
 Definition of Done:
@@ -112,7 +112,7 @@ Purpose: Implement prepared-stage helpers that remove one full typed scan and th
 - Interface: digest_prepared_rows(...) -> PreparedDigests; build_prepared_insert(...) -> SQL string.
 - Handoff: Two cohesive helpers, golden/parity/one-shot tests, preparation guide and exact call-site integration recipe.
 - Depends on: the frozen specification/interfaces only; no unfinished implementation branch.
-- Contract: [DDA-02 ownership and acceptance](../test_artifacts/delivery-acceleration/agent-task-contracts/dda-02-preparation.yml).
+- Contract: [DDA-02 ownership and acceptance](https://github.com/PaulKov/dpone/blob/f3682940f8864563cde0e6b6ecee60f746b49020/test_artifacts/delivery-acceleration/agent-task-contracts/dda-02-preparation.yml).
 - Focused checks: `uv run pytest tests/test_mssql_native_integrity_readbacks.py tests/test_mssql_native_metadata_insert.py tests/test_mssql_native_metadata_insert_parity.py tests/test_mssql_native_staged_verification.py tests/test_mssql_native_lineage_authority.py -q`.
 
 Definition of Done:
@@ -133,7 +133,7 @@ Purpose: Eliminate the scheduler's redundant full sizing pass while preserving f
 - Interface: SizedNativeFrame; sized_native_frames; existing native_frames remains a tuple adapter.
 - Handoff: Sized iterator/compatibility adapter, boundary/golden tests, framing guide and scheduler wiring recipe.
 - Depends on: the frozen specification/interfaces only; no unfinished implementation branch.
-- Contract: [DDA-03 ownership and acceptance](../test_artifacts/delivery-acceleration/agent-task-contracts/dda-03-frames.yml).
+- Contract: [DDA-03 ownership and acceptance](https://github.com/PaulKov/dpone/blob/f3682940f8864563cde0e6b6ecee60f746b49020/test_artifacts/delivery-acceleration/agent-task-contracts/dda-03-frames.yml).
 - Focused checks: `uv run pytest tests/test_mssql_native_chunks_files.py tests/test_mssql_native_sized_frames.py tests/test_mssql_native_encoder.py tests/test_mssql_native_staged_values.py -q`.
 
 Definition of Done:
@@ -153,7 +153,7 @@ Purpose: Build an unregistered, fail-closed SWITCH planner/catalog adapter/trans
 - Interface: plan_native_switch(snapshot, interval=..., owner_binding=...); execute_native_switch(plan, transaction=...).
 - Handoff: Feature-local models/port/planner/catalog/executor, negative/recovery tests, component guide and ADR decision note.
 - Depends on: the frozen specification/interfaces only; no unfinished implementation branch.
-- Contract: [DDA-04 ownership and acceptance](../test_artifacts/delivery-acceleration/agent-task-contracts/dda-04-switch.yml).
+- Contract: [DDA-04 ownership and acceptance](https://github.com/PaulKov/dpone/blob/f3682940f8864563cde0e6b6ecee60f746b49020/test_artifacts/delivery-acceleration/agent-task-contracts/dda-04-switch.yml).
 - Focused checks: `uv run pytest tests/test_mssql_native_partition_switch.py tests/test_mssql_native_partition_switch_recovery.py tests/test_mssql_native_partition_switch_catalog.py tests/test_runtime_partition_replace_native_contracts.py -q`.
 
 Definition of Done:
@@ -174,7 +174,7 @@ Purpose: Implement an explicitly opted-in real-row native delivery/SWITCH-compon
 - Interface: Versioned baseline/candidate run envelope consumed by DDA-01; real route factory injected by DDA-06.
 - Handoff: Live test/benchmark producer and parser tests, certification guide; live execution status separate from implementation readiness.
 - Depends on: the frozen specification/interfaces only; no unfinished implementation branch.
-- Contract: [DDA-05 ownership and acceptance](../test_artifacts/delivery-acceleration/agent-task-contracts/dda-05-certification.yml).
+- Contract: [DDA-05 ownership and acceptance](https://github.com/PaulKov/dpone/blob/f3682940f8864563cde0e6b6ecee60f746b49020/test_artifacts/delivery-acceleration/agent-task-contracts/dda-05-certification.yml).
 - Focused checks: `uv run pytest tests/test_native_delivery_live_benchmark.py -q`.
 
 Definition of Done:
@@ -195,7 +195,7 @@ Purpose: Integrate reviewed task handoffs, own shared runtime wiring/docs, and e
 - Interface: Sole shared-file owner; consumes DDA-01..05 fixed interfaces and preserves existing production boundaries.
 - Handoff: Integration PR, independent review, exact-head evidence, operations docs and honest live/performance status.
 - Depends on: reviewed DDA-01 through DDA-05 handoffs.
-- Contract: [DDA-06 ownership and acceptance](../test_artifacts/delivery-acceleration/agent-task-contracts/dda-06-integration.yml).
+- Contract: [DDA-06 ownership and acceptance](https://github.com/PaulKov/dpone/blob/f3682940f8864563cde0e6b6ecee60f746b49020/test_artifacts/delivery-acceleration/agent-task-contracts/dda-06-integration.yml).
 - Focused checks: `uv run pytest tests/test_mssql_native_delivery_integration.py tests/test_mssql_native_chunks_execution.py tests/test_mssql_native_staged_prepare.py tests/test_mssql_native_staged_finalizer.py tests/test_mssql_native_staged_recovery.py tests/test_mssql_native_staged_verification.py tests/test_mssql_native_staged_import.py tests/test_mssql_native_runtime.py tests/test_runtime_partition_replace_native_contracts.py -q`.
 
 Definition of Done:
@@ -230,17 +230,19 @@ Do not invent a numeric speed result from the structural improvements.
 
 ## Dispatch registry
 
-The maintainer requested six separate implementation tasks. Their concrete Codex
-task identities are recorded here after creation; creation is not completion.
+All six implementation tasks were created in separate project worktrees.
+Their active/in-progress state was confirmed through task status snapshots.
+The integrator received every dependency task ID. Dispatch is not implementation
+completion; each task retains its own DoD and review/validation gates.
 
 | Task | Codex task ID | Dispatch state |
 |---|---|---|
-| DDA-01 | Pending creation | Authorized |
-| DDA-02 | Pending creation | Authorized |
-| DDA-03 | Pending creation | Authorized |
-| DDA-04 | Pending creation | Authorized |
-| DDA-05 | Pending creation | Authorized |
-| DDA-06 | Pending creation | Authorized |
+| DDA-01 | `01a08c14-43e0-74a2-9148-c64e6c56e0bd` | Started in separate worktree |
+| DDA-02 | `01a08c14-43c5-7003-b1bc-052c67ebcd08` | Started in separate worktree |
+| DDA-03 | `01a08c14-4406-7dc3-ae1f-19517bf558af` | Started in separate worktree |
+| DDA-04 | `01a08c14-43a1-7632-885b-2fd2de8e0e00` | Started in separate worktree |
+| DDA-05 | `01a08c14-435a-7040-b7f3-f4607df82376` | Started in separate worktree |
+| DDA-06 | `01a08c14-a8b1-75d0-b651-f99603bb70e7` | Started in separate worktree |
 
 Next: use the assigned contract and the
 [agent development workflow](agent-development.md); consult the
