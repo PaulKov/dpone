@@ -15,7 +15,7 @@ import time
 from uuid import uuid4
 
 import pytest
-from tests.integration.composition.mssql_gate_live_provisioning import ProvisionedGate, SqlFailure
+from tests.integration.composition.mssql_gate_live_provisioning import ControlDiagnostics, ProvisionedGate, SqlFailure
 from tests.integration.composition.mssql_store_live_support import OwnedDatabase, digest
 
 from dpone.adapters.composition_mssql_attempts import MssqlCompositionAttemptStore
@@ -106,8 +106,9 @@ def commit_factory(environment, selected, callback):
 
 
 class GateCase:
-    def __init__(self, environment, record_property):
+    def __init__(self, environment, record_property, *, diagnostics=None):
         self.environment, self.record_property = environment, record_property
+        self.diagnostics = diagnostics or ControlDiagnostics()
         self.target, self.pins = environment.new_target()
         self.connections = []
         self.credentials = None
@@ -132,7 +133,9 @@ class GateCase:
             environment.managed_schema,
         )
         self.store = MssqlCompositionActivationStore(
-            environment.connect, expected_service_id=environment.service_id, control_schema=environment.schema
+            self.diagnostics.factory(environment.connect, scope="activation"),
+            expected_service_id=environment.service_id,
+            control_schema=environment.schema,
         )
         self.store.prepare(self.request)
         self.active = self.store.activate(self.request)
@@ -219,14 +222,14 @@ class GateCase:
 
     def attempt_store(self, factory=None):
         return MssqlCompositionAttemptStore(
-            factory or self.environment.connect,
+            self.diagnostics.factory(factory or self.environment.connect, scope="attempt"),
             expected_service_id=self.environment.service_id,
             control_schema=self.environment.schema,
         )
 
     def login_gate(self, factory=None):
         return MssqlCompositionLoginGate(
-            factory or self.environment.connect,
+            self.diagnostics.factory(factory or self.environment.connect, scope="gate"),
             expected_service_id=self.environment.service_id,
             control_database=self.environment.database.database,
             control_schema=self.environment.schema,
@@ -311,11 +314,16 @@ def gate_environment():
 @pytest.fixture
 def gate_case(gate_environment, record_property):
     record_property("dpone.gate.installed_policy", observation_document(gate_environment.observe_policy()))
-    case = GateCase(gate_environment, record_property)
+    diagnostics, case = ControlDiagnostics(), None
     try:
+        case = GateCase(gate_environment, record_property, diagnostics=diagnostics)
         yield case
     finally:
-        case.cleanup()
+        try:
+            if case is not None:
+                case.cleanup()
+        finally:
+            record_property("dpone.gate.control_failures", observation_document(diagnostics.snapshot()))
 
 
 @pytest.hookimpl(hookwrapper=True)

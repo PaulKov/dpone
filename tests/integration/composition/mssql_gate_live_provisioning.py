@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import secrets
 from contextlib import closing
+from threading import Lock
 from uuid import uuid4
 
 from dpone.adapters.composition_mssql_gate_schema import (
@@ -25,16 +26,124 @@ from dpone.adapters.composition_mssql_schema import render_composition_mssql_sch
 
 
 class SqlFailure(RuntimeError):
-    """Only a numeric SQL Server error is retained; messages may carry secrets."""
+    """Keep only SQLSTATE and a numeric error; driver messages may carry secrets."""
 
-    def __init__(self, code=None):
+    def __init__(self, code=None, *, sqlstate=None):
         self.code = code
+        self.sqlstate = sqlstate
         super().__init__(f"synthetic_sql_failure:{code if code is not None else 'unclassified'}")
 
 
 def failure(error):
+    if isinstance(error, SqlFailure):
+        return error
+    arguments = getattr(error, "args", ())
+    state = arguments[0] if arguments and type(arguments[0]) is str else None
+    state = state if state and re.fullmatch(r"[A-Z0-9]{5}", state) else None
     codes = re.findall(r"\((\d{2,6})\)", " ".join(str(value) for value in getattr(error, "args", ())))
-    return SqlFailure(int(codes[-1]) if codes else None)
+    return SqlFailure(int(codes[-1]) if codes else None, sqlstate=state)
+
+
+class ControlDiagnostics:
+    """Memory-only bounded SQL codes captured before runtime sanitization.
+
+    Wrappers never retry, change SQL or consume rows. They rethrow the identical
+    exception; only fixed operation labels, ordinals and parsed codes survive.
+    """
+
+    def __init__(self):
+        self.events, self.omitted, self.connections = [], 0, 0
+        self._lock = Lock()
+
+    def factory(self, factory, *, scope):
+        if scope not in {"activation", "attempt", "gate"}:
+            raise ValueError("diagnostic_scope")
+
+        def connect():
+            with self._lock:
+                self.connections = min(self.connections + 1, 65535)
+                ordinal = self.connections
+            raw = self.call(factory, scope, ordinal, 0, "connect")
+            return _ObservedConnection(raw, self, scope, ordinal)
+
+        return connect
+
+    def call(self, operation, scope, connection, execution, stage):
+        try:
+            return operation()
+        except Exception as error:
+            with self._lock:
+                if len(self.events) < 16:
+                    arguments = getattr(error, "args", ())
+                    state = arguments[0] if arguments and type(arguments[0]) is str else None
+                    state = state if state and re.fullmatch(r"[A-Z0-9]{5}", state) else None
+                    message = " ".join(value[:8192] for value in arguments[:4] if type(value) is str)
+                    codes = [int(value) for value in re.findall(r"\((-?\d{1,10})\)", message)[:8]]
+                    if isinstance(error, SqlFailure):
+                        candidate = error.sqlstate
+                        state = (
+                            candidate if type(candidate) is str and re.fullmatch(r"[A-Z0-9]{5}", candidate) else None
+                        )
+                        codes = [error.code] if type(error.code) is int else []
+                    self.events.append(
+                        {
+                            "scope": scope,
+                            "connection_ordinal": connection,
+                            "execute_ordinal": execution,
+                            "operation": stage,
+                            "sqlstate": state,
+                            "native_codes": codes,
+                        }
+                    )
+                else:
+                    self.omitted = min(self.omitted + 1, 65535)
+            raise
+
+    def snapshot(self):
+        with self._lock:
+            return {"events": list(self.events), "omitted_events": self.omitted, "connection_count": self.connections}
+
+
+class _ObservedConnection:
+    def __init__(self, raw, diagnostics, scope, ordinal):
+        self.raw, self.diagnostics, self.scope, self.ordinal = raw, diagnostics, scope, ordinal
+        self.execution = 0
+
+    def observe(self, stage, operation):
+        return self.diagnostics.call(operation, self.scope, self.ordinal, self.execution, stage)
+
+    @property
+    def autocommit(self):
+        return self.raw.autocommit
+
+    @autocommit.setter
+    def autocommit(self, value):
+        self.observe("autocommit", lambda: setattr(self.raw, "autocommit", value))
+
+    def cursor(self, *args, **kwargs):
+        return _ObservedCursor(self.observe("cursor", lambda: self.raw.cursor(*args, **kwargs)), self)
+
+    def __getattr__(self, name):
+        value = getattr(self.raw, name)
+        if name in {"commit", "rollback", "close"}:
+            return lambda *args, **kwargs: self.observe(name, lambda: value(*args, **kwargs))
+        return value
+
+
+class _ObservedCursor:
+    def __init__(self, raw, connection):
+        self.raw, self.connection = raw, connection
+
+    def execute(self, *args, **kwargs):
+        self.connection.execution = min(self.connection.execution + 1, 65535)
+        result = self.connection.observe("execute", lambda: self.raw.execute(*args, **kwargs))
+        return self if result is self.raw else result
+
+    def __getattr__(self, name):
+        value = getattr(self.raw, name)
+        if name in {"fetchone", "fetchall", "fetchmany", "nextset", "close"}:
+            return lambda *args, **kwargs: self.connection.observe(name, lambda: value(*args, **kwargs))
+        return value
 
 
 def execute(connection, statement, *parameters):

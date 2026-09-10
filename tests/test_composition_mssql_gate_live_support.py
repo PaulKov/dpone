@@ -16,11 +16,102 @@ from tests.integration.composition import mssql_gate_live_provisioning as provis
 from tests.integration.composition import mssql_gate_live_support as support
 from tests.integration.composition.mssql_gate_live_outcomes import OutcomeProducer
 from tests.integration.composition.mssql_gate_live_provisioning import (
+    ControlDiagnostics,
     ProvisionedGate,
     SqlFailure,
     execute,
     gate_batches,
 )
+
+
+@pytest.mark.parametrize("stage", ["execute", "fetchone", "fetchall", "nextset", "commit"])
+def test_control_boundary_records_only_codes_and_rethrows_identical_error(stage):
+    fault = RuntimeError("42000", "PWD=never-print; SELECT private_text; failure (229) (SQLExecDirectW)")
+
+    def operation(*_):
+        raise fault
+
+    raw_cursor: SimpleNamespace = SimpleNamespace(
+        execute=lambda *_: raw_cursor, fetchone=lambda: (1,), fetchall=lambda: [(1,)]
+    )
+    raw_cursor.nextset = lambda: None
+    raw_connection = SimpleNamespace(cursor=lambda: raw_cursor, commit=lambda: None, autocommit=True)
+    setattr(raw_connection if stage == "commit" else raw_cursor, stage, operation)
+    diagnostics = ControlDiagnostics()
+    connection = diagnostics.factory(lambda: raw_connection, scope="gate")()
+    connection.autocommit = False
+    assert raw_connection.autocommit is False
+    cursor = connection.cursor()
+    with pytest.raises(RuntimeError) as caught:
+        cursor.execute("private SQL", "never-print")
+        getattr(connection if stage == "commit" else cursor, stage)()
+    assert caught.value is fault
+    event = diagnostics.snapshot()["events"][0]
+    assert event == {
+        "scope": "gate",
+        "connection_ordinal": 1,
+        "execute_ordinal": 1,
+        "operation": stage,
+        "sqlstate": "42000",
+        "native_codes": [229],
+    }
+    document = json.dumps(diagnostics.snapshot())
+    assert "never-print" not in document and "private" not in document and "SQLExecDirectW" not in document
+
+
+def test_control_boundary_keeps_results_and_committed_ack_loss_behavior():
+    row, rows, commits = (b"actual", None), [(b"actual", None)], []
+    raw_cursor: SimpleNamespace = SimpleNamespace(
+        execute=lambda *_: raw_cursor, fetchone=lambda: row, fetchall=lambda: rows, nextset=lambda: None
+    )
+    raw_connection = SimpleNamespace(
+        cursor=lambda: raw_cursor, commit=lambda: commits.append("committed"), autocommit=True
+    )
+    fault = RuntimeError("injected acknowledgement loss")
+
+    def lost_ack():
+        raise fault
+
+    diagnostics = ControlDiagnostics()
+    connection = diagnostics.factory(lambda: support.CommitBoundary(raw_connection, lost_ack), scope="gate")()
+    cursor = connection.cursor()
+    assert cursor.execute("SELECT observed") is cursor
+    assert cursor.fetchone() is row and cursor.fetchall() is rows and cursor.nextset() is None
+    with pytest.raises(RuntimeError) as caught:
+        connection.commit()
+    assert caught.value is fault and commits == ["committed"]
+    assert diagnostics.snapshot()["events"][0]["sqlstate"] is None
+    assert diagnostics.snapshot()["events"][0]["native_codes"] == []
+
+
+def test_control_diagnostics_are_bounded_and_connect_failures_are_not_replayed():
+    calls = []
+
+    def connect():
+        calls.append(1)
+        raise RuntimeError("08001", "private endpoint failure (53)")
+
+    diagnostics = ControlDiagnostics()
+    factory = diagnostics.factory(connect, scope="attempt")
+    for _ in range(40):
+        with pytest.raises(RuntimeError):
+            factory()
+    snapshot = diagnostics.snapshot()
+    assert len(calls) == 40 and len(snapshot["events"]) == 16 and snapshot["omitted_events"] == 24
+    assert snapshot["events"][0]["operation"] == "connect"
+    assert "private" not in json.dumps(snapshot)
+
+
+def test_already_sanitized_connect_failure_preserves_safe_driver_codes():
+    fault = provisioning.failure(RuntimeError("08001", "PWD=never-print (53) (SQLDriverConnect)"))
+    diagnostics = ControlDiagnostics()
+    factory = diagnostics.factory(lambda: (_ for _ in ()).throw(fault), scope="gate")
+    with pytest.raises(SqlFailure) as caught:
+        factory()
+    assert caught.value is fault and provisioning.failure(fault) is fault
+    event = diagnostics.snapshot()["events"][0]
+    assert event["sqlstate"] == "08001" and event["native_codes"] == [53]
+    assert "never-print" not in json.dumps(diagnostics.snapshot())
 
 
 def test_gate_optout_precedes_any_provisioning(monkeypatch):
@@ -141,6 +232,7 @@ def test_sql_failure_keeps_only_safe_code_not_driver_credentials():
     with pytest.raises(SqlFailure) as caught:
         execute(connection, "SELECT 1")
     assert caught.value.code == 229
+    assert caught.value.sqlstate == "42000"
     assert "never-print" not in str(caught.value)
     assert "private" not in str(caught.value)
 
