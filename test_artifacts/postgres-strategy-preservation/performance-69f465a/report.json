@@ -1,0 +1,1408 @@
+{
+  "status": "PASS",
+  "started_at": "2026-09-10T21:02:27.073048+00:00",
+  "source": {
+    "git_head": "69f465a3a3b20e7ba34e5c97eceb13f182953c2d",
+    "execution_inputs_sha256": "9c788a52cfe6adb1c8ee12c2803b2ef4ad140c6f341834a8f14cb082e2cf75c7"
+  },
+  "producer_sha256": {
+    "partition_benchmark.py": "99650ccfc7fc4e09e0b66c11d6ab8e24cd58e08494fc91f16c0792047d0b2e43",
+    "partition_benchmark_support.py": "342784f86809f88444a151476ab9873de3038bf5ce80a7a8ea6f4edea103d204"
+  },
+  "environment": {
+    "container_id": "ddc774b2a416d8954b794dffddd0507c2ca8952159553491ad01489332303971",
+    "image_id": "sha256:44c4ee9810eff91f7eab4d822642e01115b1a9eccce4bcbdde7604752d68eac6",
+    "image_ref": "postgres:16-alpine",
+    "container_memory_limit": 0,
+    "container_nano_cpus": 0,
+    "docker_resources": {
+      "cpus": 10,
+      "memory_bytes": 8321515520,
+      "architecture": "aarch64"
+    },
+    "python": "3.12.11",
+    "psycopg": "3.3.4"
+  },
+  "cases": [
+    {
+      "status": "PASS",
+      "rows": 100000,
+      "attempt": 1,
+      "elapsed_seconds": 0.528683042,
+      "rows_per_second": 189149.2483316686,
+      "lock_seconds": 0.330073291,
+      "old_count_seconds": 0.003215209,
+      "old_count_share_of_lock": 0.009740894182195432,
+      "observer_probe_seconds": 0.000880834,
+      "reader_elapsed_seconds": 0.335649,
+      "reader_blocked_by_sink": true,
+      "reader": {
+        "started_ns": 832148992057541,
+        "observed_rows": 101000,
+        "finished_ns": 832149327706541
+      },
+      "load_result": {
+        "inserted_rows": 100000,
+        "updated_rows": 0,
+        "total_rows": 101000,
+        "state": null,
+        "staging_rows": 100000,
+        "soft_deleted_rows": null,
+        "reactivated_rows": null,
+        "unchanged_rows": null,
+        "hard_deleted_rows": 100000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 100000,
+        "deleted_lookback_rows": null,
+        "reconciliation_metrics": null,
+        "partition_validation_results": null,
+        "quality_gate_receipt": null,
+        "cleanup_disposition": null
+      },
+      "public_result": {
+        "extracted_rows": 100000,
+        "loaded_rows": 100000,
+        "inserted_rows": 100000,
+        "updated_rows": 0,
+        "total_rows": 101000,
+        "final_rows": 101000,
+        "staging_rows": 100000,
+        "soft_deleted_rows": 0,
+        "reactivated_rows": 0,
+        "unchanged_rows": 0,
+        "hard_deleted_rows": 100000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 100000,
+        "deleted_lookback_rows": 0,
+        "status": "success",
+        "validation_info": null,
+        "reconciliation_metrics": null
+      },
+      "verification": {
+        "groups": [
+          [
+            "2026-01-01",
+            100000,
+            1,
+            100000,
+            "5000050000",
+            true
+          ],
+          [
+            "2026-02-01",
+            1000,
+            1,
+            1000,
+            "500500",
+            true
+          ]
+        ],
+        "parent_oid_preserved": true,
+        "no_staging_leaks": true
+      },
+      "operations": [
+        {
+          "sql": "CREATE TABLE \"bench_pg_1dcd18eef5f94383\".\"stg_259cf821725644eda6ecb91ecc900225_target\" (\"id\" bigint, \"name\" text, \"event_day\" date)",
+          "elapsed_ns": 2616333,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_1dcd18eef5f94383\".\"stg_259cf821725644eda6ecb91ecc900225_target\" (\"id\", \"name\", \"event_day\") SELECT id,name,event_day FROM bench_pg_1dcd18eef5f94383.source",
+          "elapsed_ns": 179316834,
+          "rowcount": 100000
+        },
+        {
+          "sql": "LOCK TABLE \"bench_pg_1dcd18eef5f94383\".\"target\" IN ACCESS EXCLUSIVE MODE",
+          "elapsed_ns": 476084,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM bench_pg_1dcd18eef5f94383.current_rows",
+          "elapsed_ns": 3215209,
+          "old_child_count": true,
+          "count": 100000
+        },
+        {
+          "sql": "CREATE TABLE \"bench_pg_1dcd18eef5f94383\".\"dpone_part_8f8ac8109ecb4a01bffc056851067984\" (LIKE bench_pg_1dcd18eef5f94383.current_rows INCLUDING ALL)",
+          "elapsed_ns": 5036666,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_1dcd18eef5f94383\".\"dpone_part_8f8ac8109ecb4a01bffc056851067984\" (\"id\", \"name\", \"event_day\")\n            SELECT \"id\", \"name\", \"event_day\"\n            FROM \"bench_pg_1dcd18eef5f94383\".\"stg_259cf821725644eda6ecb91ecc900225_target\"\n            WHERE \"event_day\"::text = %s",
+          "elapsed_ns": 282755500,
+          "rowcount": 100000
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_1dcd18eef5f94383\".\"target\" DETACH PARTITION bench_pg_1dcd18eef5f94383.current_rows",
+          "elapsed_ns": 918167,
+          "rowcount": -1
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_1dcd18eef5f94383\".\"target\" ATTACH PARTITION \"bench_pg_1dcd18eef5f94383\".\"dpone_part_8f8ac8109ecb4a01bffc056851067984\" FOR VALUES IN ('2026-01-01')",
+          "elapsed_ns": 4064208,
+          "rowcount": -1
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS bench_pg_1dcd18eef5f94383.current_rows",
+          "elapsed_ns": 1100209,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM \"bench_pg_1dcd18eef5f94383\".\"target\"",
+          "elapsed_ns": 5611292,
+          "old_child_count": false,
+          "count": 101000
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS \"bench_pg_1dcd18eef5f94383\".\"stg_259cf821725644eda6ecb91ecc900225_target\"",
+          "elapsed_ns": 720750,
+          "rowcount": -1
+        }
+      ],
+      "parent_oid": 24683,
+      "partition_total_bytes": 20643840,
+      "partition_heap_bytes": 17432576,
+      "schema": "bench_pg_1dcd18eef5f94383"
+    },
+    {
+      "status": "PASS",
+      "rows": 100000,
+      "attempt": 2,
+      "elapsed_seconds": 0.433392666,
+      "rows_per_second": 230737.6378168799,
+      "lock_seconds": 0.296558916,
+      "old_count_seconds": 0.004385208,
+      "old_count_share_of_lock": 0.014786970694214434,
+      "observer_probe_seconds": 0.000472375,
+      "reader_elapsed_seconds": 0.303703958,
+      "reader_blocked_by_sink": true,
+      "reader": {
+        "started_ns": 832149516962208,
+        "observed_rows": 101000,
+        "finished_ns": 832149820666166
+      },
+      "load_result": {
+        "inserted_rows": 100000,
+        "updated_rows": 0,
+        "total_rows": 101000,
+        "state": null,
+        "staging_rows": 100000,
+        "soft_deleted_rows": null,
+        "reactivated_rows": null,
+        "unchanged_rows": null,
+        "hard_deleted_rows": 100000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 100000,
+        "deleted_lookback_rows": null,
+        "reconciliation_metrics": null,
+        "partition_validation_results": null,
+        "quality_gate_receipt": null,
+        "cleanup_disposition": null
+      },
+      "public_result": {
+        "extracted_rows": 100000,
+        "loaded_rows": 100000,
+        "inserted_rows": 100000,
+        "updated_rows": 0,
+        "total_rows": 101000,
+        "final_rows": 101000,
+        "staging_rows": 100000,
+        "soft_deleted_rows": 0,
+        "reactivated_rows": 0,
+        "unchanged_rows": 0,
+        "hard_deleted_rows": 100000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 100000,
+        "deleted_lookback_rows": 0,
+        "status": "success",
+        "validation_info": null,
+        "reconciliation_metrics": null
+      },
+      "verification": {
+        "groups": [
+          [
+            "2026-01-01",
+            100000,
+            1,
+            100000,
+            "5000050000",
+            true
+          ],
+          [
+            "2026-02-01",
+            1000,
+            1,
+            1000,
+            "500500",
+            true
+          ]
+        ],
+        "parent_oid_preserved": true,
+        "no_staging_leaks": true
+      },
+      "operations": [
+        {
+          "sql": "CREATE TABLE \"bench_pg_1dcd18eef5f94383\".\"stg_2694dd90d23b4d2cb0be3fd0bd19da99_target\" (\"id\" bigint, \"name\" text, \"event_day\" date)",
+          "elapsed_ns": 2381750,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_1dcd18eef5f94383\".\"stg_2694dd90d23b4d2cb0be3fd0bd19da99_target\" (\"id\", \"name\", \"event_day\") SELECT id,name,event_day FROM bench_pg_1dcd18eef5f94383.source",
+          "elapsed_ns": 120963208,
+          "rowcount": 100000
+        },
+        {
+          "sql": "LOCK TABLE \"bench_pg_1dcd18eef5f94383\".\"target\" IN ACCESS EXCLUSIVE MODE",
+          "elapsed_ns": 486500,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM bench_pg_1dcd18eef5f94383.dpone_part_8f8ac8109ecb4a01bffc056851067984",
+          "elapsed_ns": 4385208,
+          "old_child_count": true,
+          "count": 100000
+        },
+        {
+          "sql": "CREATE TABLE \"bench_pg_1dcd18eef5f94383\".\"dpone_part_9b338c66dcbf4d7daa860c99a3b18ed1\" (LIKE bench_pg_1dcd18eef5f94383.dpone_part_8f8ac8109ecb4a01bffc056851067984 INCLUDING ALL)",
+          "elapsed_ns": 3963625,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_1dcd18eef5f94383\".\"dpone_part_9b338c66dcbf4d7daa860c99a3b18ed1\" (\"id\", \"name\", \"event_day\")\n            SELECT \"id\", \"name\", \"event_day\"\n            FROM \"bench_pg_1dcd18eef5f94383\".\"stg_2694dd90d23b4d2cb0be3fd0bd19da99_target\"\n            WHERE \"event_day\"::text = %s",
+          "elapsed_ns": 236869708,
+          "rowcount": 100000
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_1dcd18eef5f94383\".\"target\" DETACH PARTITION bench_pg_1dcd18eef5f94383.dpone_part_8f8ac8109ecb4a01bffc056851067984",
+          "elapsed_ns": 1376500,
+          "rowcount": -1
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_1dcd18eef5f94383\".\"target\" ATTACH PARTITION \"bench_pg_1dcd18eef5f94383\".\"dpone_part_9b338c66dcbf4d7daa860c99a3b18ed1\" FOR VALUES IN ('2026-01-01')",
+          "elapsed_ns": 4769166,
+          "rowcount": -1
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS bench_pg_1dcd18eef5f94383.dpone_part_8f8ac8109ecb4a01bffc056851067984",
+          "elapsed_ns": 1458375,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM \"bench_pg_1dcd18eef5f94383\".\"target\"",
+          "elapsed_ns": 5898250,
+          "old_child_count": false,
+          "count": 101000
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS \"bench_pg_1dcd18eef5f94383\".\"stg_2694dd90d23b4d2cb0be3fd0bd19da99_target\"",
+          "elapsed_ns": 880250,
+          "rowcount": -1
+        }
+      ],
+      "parent_oid": 24683,
+      "partition_total_bytes": 20643840,
+      "partition_heap_bytes": 17432576,
+      "schema": "bench_pg_1dcd18eef5f94383"
+    },
+    {
+      "status": "PASS",
+      "rows": 100000,
+      "attempt": 3,
+      "elapsed_seconds": 0.371116,
+      "rows_per_second": 269457.52810442017,
+      "lock_seconds": 0.2585485,
+      "old_count_seconds": 0.004668791,
+      "old_count_share_of_lock": 0.018057699039058437,
+      "observer_probe_seconds": 0.000445708,
+      "reader_elapsed_seconds": 0.262800333,
+      "reader_blocked_by_sink": true,
+      "reader": {
+        "started_ns": 832149984663750,
+        "observed_rows": 101000,
+        "finished_ns": 832150247464083
+      },
+      "load_result": {
+        "inserted_rows": 100000,
+        "updated_rows": 0,
+        "total_rows": 101000,
+        "state": null,
+        "staging_rows": 100000,
+        "soft_deleted_rows": null,
+        "reactivated_rows": null,
+        "unchanged_rows": null,
+        "hard_deleted_rows": 100000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 100000,
+        "deleted_lookback_rows": null,
+        "reconciliation_metrics": null,
+        "partition_validation_results": null,
+        "quality_gate_receipt": null,
+        "cleanup_disposition": null
+      },
+      "public_result": {
+        "extracted_rows": 100000,
+        "loaded_rows": 100000,
+        "inserted_rows": 100000,
+        "updated_rows": 0,
+        "total_rows": 101000,
+        "final_rows": 101000,
+        "staging_rows": 100000,
+        "soft_deleted_rows": 0,
+        "reactivated_rows": 0,
+        "unchanged_rows": 0,
+        "hard_deleted_rows": 100000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 100000,
+        "deleted_lookback_rows": 0,
+        "status": "success",
+        "validation_info": null,
+        "reconciliation_metrics": null
+      },
+      "verification": {
+        "groups": [
+          [
+            "2026-01-01",
+            100000,
+            1,
+            100000,
+            "5000050000",
+            true
+          ],
+          [
+            "2026-02-01",
+            1000,
+            1,
+            1000,
+            "500500",
+            true
+          ]
+        ],
+        "parent_oid_preserved": true,
+        "no_staging_leaks": true
+      },
+      "operations": [
+        {
+          "sql": "CREATE TABLE \"bench_pg_1dcd18eef5f94383\".\"stg_9fa74c6ee6214967bdfa32fba91b2ceb_target\" (\"id\" bigint, \"name\" text, \"event_day\" date)",
+          "elapsed_ns": 3060042,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_1dcd18eef5f94383\".\"stg_9fa74c6ee6214967bdfa32fba91b2ceb_target\" (\"id\", \"name\", \"event_day\") SELECT id,name,event_day FROM bench_pg_1dcd18eef5f94383.source",
+          "elapsed_ns": 96133750,
+          "rowcount": 100000
+        },
+        {
+          "sql": "LOCK TABLE \"bench_pg_1dcd18eef5f94383\".\"target\" IN ACCESS EXCLUSIVE MODE",
+          "elapsed_ns": 553417,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM bench_pg_1dcd18eef5f94383.dpone_part_9b338c66dcbf4d7daa860c99a3b18ed1",
+          "elapsed_ns": 4668791,
+          "old_child_count": true,
+          "count": 100000
+        },
+        {
+          "sql": "CREATE TABLE \"bench_pg_1dcd18eef5f94383\".\"dpone_part_39891874b95d405dbba9f8591584e613\" (LIKE bench_pg_1dcd18eef5f94383.dpone_part_9b338c66dcbf4d7daa860c99a3b18ed1 INCLUDING ALL)",
+          "elapsed_ns": 3382542,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_1dcd18eef5f94383\".\"dpone_part_39891874b95d405dbba9f8591584e613\" (\"id\", \"name\", \"event_day\")\n            SELECT \"id\", \"name\", \"event_day\"\n            FROM \"bench_pg_1dcd18eef5f94383\".\"stg_9fa74c6ee6214967bdfa32fba91b2ceb_target\"\n            WHERE \"event_day\"::text = %s",
+          "elapsed_ns": 210584792,
+          "rowcount": 100000
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_1dcd18eef5f94383\".\"target\" DETACH PARTITION bench_pg_1dcd18eef5f94383.dpone_part_9b338c66dcbf4d7daa860c99a3b18ed1",
+          "elapsed_ns": 780917,
+          "rowcount": -1
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_1dcd18eef5f94383\".\"target\" ATTACH PARTITION \"bench_pg_1dcd18eef5f94383\".\"dpone_part_39891874b95d405dbba9f8591584e613\" FOR VALUES IN ('2026-01-01')",
+          "elapsed_ns": 4149666,
+          "rowcount": -1
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS bench_pg_1dcd18eef5f94383.dpone_part_9b338c66dcbf4d7daa860c99a3b18ed1",
+          "elapsed_ns": 1096375,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM \"bench_pg_1dcd18eef5f94383\".\"target\"",
+          "elapsed_ns": 6363667,
+          "old_child_count": false,
+          "count": 101000
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS \"bench_pg_1dcd18eef5f94383\".\"stg_9fa74c6ee6214967bdfa32fba91b2ceb_target\"",
+          "elapsed_ns": 745500,
+          "rowcount": -1
+        }
+      ],
+      "parent_oid": 24683,
+      "partition_total_bytes": 20643840,
+      "partition_heap_bytes": 17432576,
+      "schema": "bench_pg_1dcd18eef5f94383"
+    },
+    {
+      "status": "PASS",
+      "rows": 1000000,
+      "attempt": 1,
+      "elapsed_seconds": 3.01075375,
+      "rows_per_second": 332142.74000323005,
+      "lock_seconds": 1.906164417,
+      "old_count_seconds": 0.028591958,
+      "old_count_share_of_lock": 0.01499973336245527,
+      "observer_probe_seconds": 0.000554792,
+      "reader_elapsed_seconds": 1.917256167,
+      "reader_blocked_by_sink": true,
+      "reader": {
+        "started_ns": 832155763805416,
+        "observed_rows": 1001000,
+        "finished_ns": 832157681061583
+      },
+      "load_result": {
+        "inserted_rows": 1000000,
+        "updated_rows": 0,
+        "total_rows": 1001000,
+        "state": null,
+        "staging_rows": 1000000,
+        "soft_deleted_rows": null,
+        "reactivated_rows": null,
+        "unchanged_rows": null,
+        "hard_deleted_rows": 1000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 1000000,
+        "deleted_lookback_rows": null,
+        "reconciliation_metrics": null,
+        "partition_validation_results": null,
+        "quality_gate_receipt": null,
+        "cleanup_disposition": null
+      },
+      "public_result": {
+        "extracted_rows": 1000000,
+        "loaded_rows": 1000000,
+        "inserted_rows": 1000000,
+        "updated_rows": 0,
+        "total_rows": 1001000,
+        "final_rows": 1001000,
+        "staging_rows": 1000000,
+        "soft_deleted_rows": 0,
+        "reactivated_rows": 0,
+        "unchanged_rows": 0,
+        "hard_deleted_rows": 1000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 1000000,
+        "deleted_lookback_rows": 0,
+        "status": "success",
+        "validation_info": null,
+        "reconciliation_metrics": null
+      },
+      "verification": {
+        "groups": [
+          [
+            "2026-01-01",
+            1000000,
+            1,
+            1000000,
+            "500000500000",
+            true
+          ],
+          [
+            "2026-02-01",
+            1000,
+            1,
+            1000,
+            "500500",
+            true
+          ]
+        ],
+        "parent_oid_preserved": true,
+        "no_staging_leaks": true
+      },
+      "operations": [
+        {
+          "sql": "CREATE TABLE \"bench_pg_f36c4f7385984643\".\"stg_62ba1ba2ebef4424a555c2e66e06d945_target\" (\"id\" bigint, \"name\" text, \"event_day\" date)",
+          "elapsed_ns": 4297000,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_f36c4f7385984643\".\"stg_62ba1ba2ebef4424a555c2e66e06d945_target\" (\"id\", \"name\", \"event_day\") SELECT id,name,event_day FROM bench_pg_f36c4f7385984643.source",
+          "elapsed_ns": 1025953667,
+          "rowcount": 1000000
+        },
+        {
+          "sql": "LOCK TABLE \"bench_pg_f36c4f7385984643\".\"target\" IN ACCESS EXCLUSIVE MODE",
+          "elapsed_ns": 1237542,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM bench_pg_f36c4f7385984643.current_rows",
+          "elapsed_ns": 28591958,
+          "old_child_count": true,
+          "count": 1000000
+        },
+        {
+          "sql": "CREATE TABLE \"bench_pg_f36c4f7385984643\".\"dpone_part_9ea2bcc5d7ed46ec9253a02c9f50bea2\" (LIKE bench_pg_f36c4f7385984643.current_rows INCLUDING ALL)",
+          "elapsed_ns": 6841750,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_f36c4f7385984643\".\"dpone_part_9ea2bcc5d7ed46ec9253a02c9f50bea2\" (\"id\", \"name\", \"event_day\")\n            SELECT \"id\", \"name\", \"event_day\"\n            FROM \"bench_pg_f36c4f7385984643\".\"stg_62ba1ba2ebef4424a555c2e66e06d945_target\"\n            WHERE \"event_day\"::text = %s",
+          "elapsed_ns": 1667743292,
+          "rowcount": 1000000
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_f36c4f7385984643\".\"target\" DETACH PARTITION bench_pg_f36c4f7385984643.current_rows",
+          "elapsed_ns": 1580875,
+          "rowcount": -1
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_f36c4f7385984643\".\"target\" ATTACH PARTITION \"bench_pg_f36c4f7385984643\".\"dpone_part_9ea2bcc5d7ed46ec9253a02c9f50bea2\" FOR VALUES IN ('2026-01-01')",
+          "elapsed_ns": 37138750,
+          "rowcount": -1
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS bench_pg_f36c4f7385984643.current_rows",
+          "elapsed_ns": 1555084,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM \"bench_pg_f36c4f7385984643\".\"target\"",
+          "elapsed_ns": 20083625,
+          "old_child_count": false,
+          "count": 1001000
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS \"bench_pg_f36c4f7385984643\".\"stg_62ba1ba2ebef4424a555c2e66e06d945_target\"",
+          "elapsed_ns": 2881583,
+          "rowcount": -1
+        }
+      ],
+      "parent_oid": 24754,
+      "partition_total_bytes": 205938688,
+      "partition_heap_bytes": 174301184,
+      "schema": "bench_pg_f36c4f7385984643"
+    },
+    {
+      "status": "PASS",
+      "rows": 1000000,
+      "attempt": 2,
+      "elapsed_seconds": 2.0764945,
+      "rows_per_second": 481580.8565830538,
+      "lock_seconds": 1.535907,
+      "old_count_seconds": 0.02253,
+      "old_count_share_of_lock": 0.014668856903445326,
+      "observer_probe_seconds": 0.000556083,
+      "reader_elapsed_seconds": 1.547968125,
+      "reader_blocked_by_sink": true,
+      "reader": {
+        "started_ns": 832158482530958,
+        "observed_rows": 1001000,
+        "finished_ns": 832160030499083
+      },
+      "load_result": {
+        "inserted_rows": 1000000,
+        "updated_rows": 0,
+        "total_rows": 1001000,
+        "state": null,
+        "staging_rows": 1000000,
+        "soft_deleted_rows": null,
+        "reactivated_rows": null,
+        "unchanged_rows": null,
+        "hard_deleted_rows": 1000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 1000000,
+        "deleted_lookback_rows": null,
+        "reconciliation_metrics": null,
+        "partition_validation_results": null,
+        "quality_gate_receipt": null,
+        "cleanup_disposition": null
+      },
+      "public_result": {
+        "extracted_rows": 1000000,
+        "loaded_rows": 1000000,
+        "inserted_rows": 1000000,
+        "updated_rows": 0,
+        "total_rows": 1001000,
+        "final_rows": 1001000,
+        "staging_rows": 1000000,
+        "soft_deleted_rows": 0,
+        "reactivated_rows": 0,
+        "unchanged_rows": 0,
+        "hard_deleted_rows": 1000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 1000000,
+        "deleted_lookback_rows": 0,
+        "status": "success",
+        "validation_info": null,
+        "reconciliation_metrics": null
+      },
+      "verification": {
+        "groups": [
+          [
+            "2026-01-01",
+            1000000,
+            1,
+            1000000,
+            "500000500000",
+            true
+          ],
+          [
+            "2026-02-01",
+            1000,
+            1,
+            1000,
+            "500500",
+            true
+          ]
+        ],
+        "parent_oid_preserved": true,
+        "no_staging_leaks": true
+      },
+      "operations": [
+        {
+          "sql": "CREATE TABLE \"bench_pg_f36c4f7385984643\".\"stg_f70dd09df1884600b8ceb178a22d642a_target\" (\"id\" bigint, \"name\" text, \"event_day\" date)",
+          "elapsed_ns": 3365417,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_f36c4f7385984643\".\"stg_f70dd09df1884600b8ceb178a22d642a_target\" (\"id\", \"name\", \"event_day\") SELECT id,name,event_day FROM bench_pg_f36c4f7385984643.source",
+          "elapsed_ns": 479447334,
+          "rowcount": 1000000
+        },
+        {
+          "sql": "LOCK TABLE \"bench_pg_f36c4f7385984643\".\"target\" IN ACCESS EXCLUSIVE MODE",
+          "elapsed_ns": 750250,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM bench_pg_f36c4f7385984643.dpone_part_9ea2bcc5d7ed46ec9253a02c9f50bea2",
+          "elapsed_ns": 22530000,
+          "old_child_count": true,
+          "count": 1000000
+        },
+        {
+          "sql": "CREATE TABLE \"bench_pg_f36c4f7385984643\".\"dpone_part_849ae34690144b0f8c3005b841f2fb96\" (LIKE bench_pg_f36c4f7385984643.dpone_part_9ea2bcc5d7ed46ec9253a02c9f50bea2 INCLUDING ALL)",
+          "elapsed_ns": 2954000,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_f36c4f7385984643\".\"dpone_part_849ae34690144b0f8c3005b841f2fb96\" (\"id\", \"name\", \"event_day\")\n            SELECT \"id\", \"name\", \"event_day\"\n            FROM \"bench_pg_f36c4f7385984643\".\"stg_f70dd09df1884600b8ceb178a22d642a_target\"\n            WHERE \"event_day\"::text = %s",
+          "elapsed_ns": 1325754875,
+          "rowcount": 1000000
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_f36c4f7385984643\".\"target\" DETACH PARTITION bench_pg_f36c4f7385984643.dpone_part_9ea2bcc5d7ed46ec9253a02c9f50bea2",
+          "elapsed_ns": 3305250,
+          "rowcount": -1
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_f36c4f7385984643\".\"target\" ATTACH PARTITION \"bench_pg_f36c4f7385984643\".\"dpone_part_849ae34690144b0f8c3005b841f2fb96\" FOR VALUES IN ('2026-01-01')",
+          "elapsed_ns": 41170625,
+          "rowcount": -1
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS bench_pg_f36c4f7385984643.dpone_part_9ea2bcc5d7ed46ec9253a02c9f50bea2",
+          "elapsed_ns": 1279250,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM \"bench_pg_f36c4f7385984643\".\"target\"",
+          "elapsed_ns": 19992791,
+          "old_child_count": false,
+          "count": 1001000
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS \"bench_pg_f36c4f7385984643\".\"stg_f70dd09df1884600b8ceb178a22d642a_target\"",
+          "elapsed_ns": 722833,
+          "rowcount": -1
+        }
+      ],
+      "parent_oid": 24754,
+      "partition_total_bytes": 205938688,
+      "partition_heap_bytes": 174301184,
+      "schema": "bench_pg_f36c4f7385984643"
+    },
+    {
+      "status": "PASS",
+      "rows": 1000000,
+      "attempt": 3,
+      "elapsed_seconds": 1.95714625,
+      "rows_per_second": 510948.01934193727,
+      "lock_seconds": 1.406602792,
+      "old_count_seconds": 0.022540792,
+      "old_count_share_of_lock": 0.016024987386773222,
+      "observer_probe_seconds": 0.000781959,
+      "reader_elapsed_seconds": 1.412897958,
+      "reader_blocked_by_sink": true,
+      "reader": {
+        "started_ns": 832160841087458,
+        "observed_rows": 1001000,
+        "finished_ns": 832162253985416
+      },
+      "load_result": {
+        "inserted_rows": 1000000,
+        "updated_rows": 0,
+        "total_rows": 1001000,
+        "state": null,
+        "staging_rows": 1000000,
+        "soft_deleted_rows": null,
+        "reactivated_rows": null,
+        "unchanged_rows": null,
+        "hard_deleted_rows": 1000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 1000000,
+        "deleted_lookback_rows": null,
+        "reconciliation_metrics": null,
+        "partition_validation_results": null,
+        "quality_gate_receipt": null,
+        "cleanup_disposition": null
+      },
+      "public_result": {
+        "extracted_rows": 1000000,
+        "loaded_rows": 1000000,
+        "inserted_rows": 1000000,
+        "updated_rows": 0,
+        "total_rows": 1001000,
+        "final_rows": 1001000,
+        "staging_rows": 1000000,
+        "soft_deleted_rows": 0,
+        "reactivated_rows": 0,
+        "unchanged_rows": 0,
+        "hard_deleted_rows": 1000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 1000000,
+        "deleted_lookback_rows": 0,
+        "status": "success",
+        "validation_info": null,
+        "reconciliation_metrics": null
+      },
+      "verification": {
+        "groups": [
+          [
+            "2026-01-01",
+            1000000,
+            1,
+            1000000,
+            "500000500000",
+            true
+          ],
+          [
+            "2026-02-01",
+            1000,
+            1,
+            1000,
+            "500500",
+            true
+          ]
+        ],
+        "parent_oid_preserved": true,
+        "no_staging_leaks": true
+      },
+      "operations": [
+        {
+          "sql": "CREATE TABLE \"bench_pg_f36c4f7385984643\".\"stg_52627e024ee449bcac872dbb51243664_target\" (\"id\" bigint, \"name\" text, \"event_day\" date)",
+          "elapsed_ns": 4484208,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_f36c4f7385984643\".\"stg_52627e024ee449bcac872dbb51243664_target\" (\"id\", \"name\", \"event_day\") SELECT id,name,event_day FROM bench_pg_f36c4f7385984643.source",
+          "elapsed_ns": 500449958,
+          "rowcount": 1000000
+        },
+        {
+          "sql": "LOCK TABLE \"bench_pg_f36c4f7385984643\".\"target\" IN ACCESS EXCLUSIVE MODE",
+          "elapsed_ns": 870333,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM bench_pg_f36c4f7385984643.dpone_part_849ae34690144b0f8c3005b841f2fb96",
+          "elapsed_ns": 22540792,
+          "old_child_count": true,
+          "count": 1000000
+        },
+        {
+          "sql": "CREATE TABLE \"bench_pg_f36c4f7385984643\".\"dpone_part_5637046aacc84867836626068c931858\" (LIKE bench_pg_f36c4f7385984643.dpone_part_849ae34690144b0f8c3005b841f2fb96 INCLUDING ALL)",
+          "elapsed_ns": 6119959,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_f36c4f7385984643\".\"dpone_part_5637046aacc84867836626068c931858\" (\"id\", \"name\", \"event_day\")\n            SELECT \"id\", \"name\", \"event_day\"\n            FROM \"bench_pg_f36c4f7385984643\".\"stg_52627e024ee449bcac872dbb51243664_target\"\n            WHERE \"event_day\"::text = %s",
+          "elapsed_ns": 1199736417,
+          "rowcount": 1000000
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_f36c4f7385984643\".\"target\" DETACH PARTITION bench_pg_f36c4f7385984643.dpone_part_849ae34690144b0f8c3005b841f2fb96",
+          "elapsed_ns": 1208292,
+          "rowcount": -1
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_f36c4f7385984643\".\"target\" ATTACH PARTITION \"bench_pg_f36c4f7385984643\".\"dpone_part_5637046aacc84867836626068c931858\" FOR VALUES IN ('2026-01-01')",
+          "elapsed_ns": 35104000,
+          "rowcount": -1
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS bench_pg_f36c4f7385984643.dpone_part_849ae34690144b0f8c3005b841f2fb96",
+          "elapsed_ns": 1349042,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM \"bench_pg_f36c4f7385984643\".\"target\"",
+          "elapsed_ns": 19574417,
+          "old_child_count": false,
+          "count": 1001000
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS \"bench_pg_f36c4f7385984643\".\"stg_52627e024ee449bcac872dbb51243664_target\"",
+          "elapsed_ns": 688250,
+          "rowcount": -1
+        }
+      ],
+      "parent_oid": 24754,
+      "partition_total_bytes": 205938688,
+      "partition_heap_bytes": 174301184,
+      "schema": "bench_pg_f36c4f7385984643"
+    },
+    {
+      "status": "PASS",
+      "rows": 5000000,
+      "attempt": 1,
+      "elapsed_seconds": 13.414359167,
+      "rows_per_second": 372734.91321898194,
+      "lock_seconds": 7.414154958,
+      "old_count_seconds": 0.113526083,
+      "old_count_share_of_lock": 0.01531207314159295,
+      "observer_probe_seconds": 0.000631333,
+      "reader_elapsed_seconds": 7.607244,
+      "reader_blocked_by_sink": true,
+      "reader": {
+        "started_ns": 832182026729041,
+        "observed_rows": 5001000,
+        "finished_ns": 832189633973041
+      },
+      "load_result": {
+        "inserted_rows": 5000000,
+        "updated_rows": 0,
+        "total_rows": 5001000,
+        "state": null,
+        "staging_rows": 5000000,
+        "soft_deleted_rows": null,
+        "reactivated_rows": null,
+        "unchanged_rows": null,
+        "hard_deleted_rows": 5000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 5000000,
+        "deleted_lookback_rows": null,
+        "reconciliation_metrics": null,
+        "partition_validation_results": null,
+        "quality_gate_receipt": null,
+        "cleanup_disposition": null
+      },
+      "public_result": {
+        "extracted_rows": 5000000,
+        "loaded_rows": 5000000,
+        "inserted_rows": 5000000,
+        "updated_rows": 0,
+        "total_rows": 5001000,
+        "final_rows": 5001000,
+        "staging_rows": 5000000,
+        "soft_deleted_rows": 0,
+        "reactivated_rows": 0,
+        "unchanged_rows": 0,
+        "hard_deleted_rows": 5000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 5000000,
+        "deleted_lookback_rows": 0,
+        "status": "success",
+        "validation_info": null,
+        "reconciliation_metrics": null
+      },
+      "verification": {
+        "groups": [
+          [
+            "2026-01-01",
+            5000000,
+            1,
+            5000000,
+            "12500002500000",
+            true
+          ],
+          [
+            "2026-02-01",
+            1000,
+            1,
+            1000,
+            "500500",
+            true
+          ]
+        ],
+        "parent_oid_preserved": true,
+        "no_staging_leaks": true
+      },
+      "operations": [
+        {
+          "sql": "CREATE TABLE \"bench_pg_108b1830275a45d0\".\"stg_4e4dc56662664195a06d216232d760bc_target\" (\"id\" bigint, \"name\" text, \"event_day\" date)",
+          "elapsed_ns": 132967084,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_108b1830275a45d0\".\"stg_4e4dc56662664195a06d216232d760bc_target\" (\"id\", \"name\", \"event_day\") SELECT id,name,event_day FROM bench_pg_108b1830275a45d0.source",
+          "elapsed_ns": 5627591166,
+          "rowcount": 5000000
+        },
+        {
+          "sql": "LOCK TABLE \"bench_pg_108b1830275a45d0\".\"target\" IN ACCESS EXCLUSIVE MODE",
+          "elapsed_ns": 851417,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM bench_pg_108b1830275a45d0.current_rows",
+          "elapsed_ns": 113526083,
+          "old_child_count": true,
+          "count": 5000000
+        },
+        {
+          "sql": "CREATE TABLE \"bench_pg_108b1830275a45d0\".\"dpone_part_74f3b5517c17494eb3e07b03c9e96d8d\" (LIKE bench_pg_108b1830275a45d0.current_rows INCLUDING ALL)",
+          "elapsed_ns": 3597125,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_108b1830275a45d0\".\"dpone_part_74f3b5517c17494eb3e07b03c9e96d8d\" (\"id\", \"name\", \"event_day\")\n            SELECT \"id\", \"name\", \"event_day\"\n            FROM \"bench_pg_108b1830275a45d0\".\"stg_4e4dc56662664195a06d216232d760bc_target\"\n            WHERE \"event_day\"::text = %s",
+          "elapsed_ns": 6277752250,
+          "rowcount": 5000000
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_108b1830275a45d0\".\"target\" DETACH PARTITION bench_pg_108b1830275a45d0.current_rows",
+          "elapsed_ns": 1590250,
+          "rowcount": -1
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_108b1830275a45d0\".\"target\" ATTACH PARTITION \"bench_pg_108b1830275a45d0\".\"dpone_part_74f3b5517c17494eb3e07b03c9e96d8d\" FOR VALUES IN ('2026-01-01')",
+          "elapsed_ns": 261876375,
+          "rowcount": -1
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS bench_pg_108b1830275a45d0.current_rows",
+          "elapsed_ns": 2078833,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM \"bench_pg_108b1830275a45d0\".\"target\"",
+          "elapsed_ns": 113066584,
+          "old_child_count": false,
+          "count": 5001000
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS \"bench_pg_108b1830275a45d0\".\"stg_4e4dc56662664195a06d216232d760bc_target\"",
+          "elapsed_ns": 1072667,
+          "rowcount": -1
+        }
+      ],
+      "parent_oid": 24825,
+      "partition_total_bytes": 1029455872,
+      "partition_heap_bytes": 871489536,
+      "schema": "bench_pg_108b1830275a45d0"
+    },
+    {
+      "status": "PASS",
+      "rows": 5000000,
+      "attempt": 2,
+      "elapsed_seconds": 11.578031959,
+      "rows_per_second": 431852.3232364486,
+      "lock_seconds": 7.458581459,
+      "old_count_seconds": 0.115341667,
+      "old_count_share_of_lock": 0.015464290044164013,
+      "observer_probe_seconds": 0.000745209,
+      "reader_elapsed_seconds": 7.64712575,
+      "reader_blocked_by_sink": true,
+      "reader": {
+        "started_ns": 832195669511791,
+        "observed_rows": 5001000,
+        "finished_ns": 832203316637541
+      },
+      "load_result": {
+        "inserted_rows": 5000000,
+        "updated_rows": 0,
+        "total_rows": 5001000,
+        "state": null,
+        "staging_rows": 5000000,
+        "soft_deleted_rows": null,
+        "reactivated_rows": null,
+        "unchanged_rows": null,
+        "hard_deleted_rows": 5000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 5000000,
+        "deleted_lookback_rows": null,
+        "reconciliation_metrics": null,
+        "partition_validation_results": null,
+        "quality_gate_receipt": null,
+        "cleanup_disposition": null
+      },
+      "public_result": {
+        "extracted_rows": 5000000,
+        "loaded_rows": 5000000,
+        "inserted_rows": 5000000,
+        "updated_rows": 0,
+        "total_rows": 5001000,
+        "final_rows": 5001000,
+        "staging_rows": 5000000,
+        "soft_deleted_rows": 0,
+        "reactivated_rows": 0,
+        "unchanged_rows": 0,
+        "hard_deleted_rows": 5000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 5000000,
+        "deleted_lookback_rows": 0,
+        "status": "success",
+        "validation_info": null,
+        "reconciliation_metrics": null
+      },
+      "verification": {
+        "groups": [
+          [
+            "2026-01-01",
+            5000000,
+            1,
+            5000000,
+            "12500002500000",
+            true
+          ],
+          [
+            "2026-02-01",
+            1000,
+            1,
+            1000,
+            "500500",
+            true
+          ]
+        ],
+        "parent_oid_preserved": true,
+        "no_staging_leaks": true
+      },
+      "operations": [
+        {
+          "sql": "CREATE TABLE \"bench_pg_108b1830275a45d0\".\"stg_b59df2bfb88a4b9b9de1caf3e22c908c_target\" (\"id\" bigint, \"name\" text, \"event_day\" date)",
+          "elapsed_ns": 3576750,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_108b1830275a45d0\".\"stg_b59df2bfb88a4b9b9de1caf3e22c908c_target\" (\"id\", \"name\", \"event_day\") SELECT id,name,event_day FROM bench_pg_108b1830275a45d0.source",
+          "elapsed_ns": 3415022375,
+          "rowcount": 5000000
+        },
+        {
+          "sql": "LOCK TABLE \"bench_pg_108b1830275a45d0\".\"target\" IN ACCESS EXCLUSIVE MODE",
+          "elapsed_ns": 1551083,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM bench_pg_108b1830275a45d0.dpone_part_74f3b5517c17494eb3e07b03c9e96d8d",
+          "elapsed_ns": 115341667,
+          "old_child_count": true,
+          "count": 5000000
+        },
+        {
+          "sql": "CREATE TABLE \"bench_pg_108b1830275a45d0\".\"dpone_part_a01023ed80524fcb84cc70dda6441e48\" (LIKE bench_pg_108b1830275a45d0.dpone_part_74f3b5517c17494eb3e07b03c9e96d8d INCLUDING ALL)",
+          "elapsed_ns": 4132209,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_108b1830275a45d0\".\"dpone_part_a01023ed80524fcb84cc70dda6441e48\" (\"id\", \"name\", \"event_day\")\n            SELECT \"id\", \"name\", \"event_day\"\n            FROM \"bench_pg_108b1830275a45d0\".\"stg_b59df2bfb88a4b9b9de1caf3e22c908c_target\"\n            WHERE \"event_day\"::text = %s",
+          "elapsed_ns": 6029268666,
+          "rowcount": 5000000
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_108b1830275a45d0\".\"target\" DETACH PARTITION bench_pg_108b1830275a45d0.dpone_part_74f3b5517c17494eb3e07b03c9e96d8d",
+          "elapsed_ns": 1252291,
+          "rowcount": -1
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_108b1830275a45d0\".\"target\" ATTACH PARTITION \"bench_pg_108b1830275a45d0\".\"dpone_part_a01023ed80524fcb84cc70dda6441e48\" FOR VALUES IN ('2026-01-01')",
+          "elapsed_ns": 227024000,
+          "rowcount": -1
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS bench_pg_108b1830275a45d0.dpone_part_74f3b5517c17494eb3e07b03c9e96d8d",
+          "elapsed_ns": 1294084,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM \"bench_pg_108b1830275a45d0\".\"target\"",
+          "elapsed_ns": 107923125,
+          "old_child_count": false,
+          "count": 5001000
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS \"bench_pg_108b1830275a45d0\".\"stg_b59df2bfb88a4b9b9de1caf3e22c908c_target\"",
+          "elapsed_ns": 1027042,
+          "rowcount": -1
+        }
+      ],
+      "parent_oid": 24825,
+      "partition_total_bytes": 1029455872,
+      "partition_heap_bytes": 871489536,
+      "schema": "bench_pg_108b1830275a45d0"
+    },
+    {
+      "status": "PASS",
+      "rows": 5000000,
+      "attempt": 3,
+      "elapsed_seconds": 10.234277958,
+      "rows_per_second": 488554.25077560707,
+      "lock_seconds": 6.943950209,
+      "old_count_seconds": 0.145007792,
+      "old_count_share_of_lock": 0.020882608261225222,
+      "observer_probe_seconds": 0.000558417,
+      "reader_elapsed_seconds": 7.118504292,
+      "reader_blocked_by_sink": true,
+      "reader": {
+        "started_ns": 832208525136416,
+        "observed_rows": 5001000,
+        "finished_ns": 832215643640708
+      },
+      "load_result": {
+        "inserted_rows": 5000000,
+        "updated_rows": 0,
+        "total_rows": 5001000,
+        "state": null,
+        "staging_rows": 5000000,
+        "soft_deleted_rows": null,
+        "reactivated_rows": null,
+        "unchanged_rows": null,
+        "hard_deleted_rows": 5000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 5000000,
+        "deleted_lookback_rows": null,
+        "reconciliation_metrics": null,
+        "partition_validation_results": null,
+        "quality_gate_receipt": null,
+        "cleanup_disposition": null
+      },
+      "public_result": {
+        "extracted_rows": 5000000,
+        "loaded_rows": 5000000,
+        "inserted_rows": 5000000,
+        "updated_rows": 0,
+        "total_rows": 5001000,
+        "final_rows": 5001000,
+        "staging_rows": 5000000,
+        "soft_deleted_rows": 0,
+        "reactivated_rows": 0,
+        "unchanged_rows": 0,
+        "hard_deleted_rows": 5000000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 5000000,
+        "deleted_lookback_rows": 0,
+        "status": "success",
+        "validation_info": null,
+        "reconciliation_metrics": null
+      },
+      "verification": {
+        "groups": [
+          [
+            "2026-01-01",
+            5000000,
+            1,
+            5000000,
+            "12500002500000",
+            true
+          ],
+          [
+            "2026-02-01",
+            1000,
+            1,
+            1000,
+            "500500",
+            true
+          ]
+        ],
+        "parent_oid_preserved": true,
+        "no_staging_leaks": true
+      },
+      "operations": [
+        {
+          "sql": "CREATE TABLE \"bench_pg_108b1830275a45d0\".\"stg_b9a5f05969ca492099740b5adaa8413f_target\" (\"id\" bigint, \"name\" text, \"event_day\" date)",
+          "elapsed_ns": 34380291,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_108b1830275a45d0\".\"stg_b9a5f05969ca492099740b5adaa8413f_target\" (\"id\", \"name\", \"event_day\") SELECT id,name,event_day FROM bench_pg_108b1830275a45d0.source",
+          "elapsed_ns": 2975565208,
+          "rowcount": 5000000
+        },
+        {
+          "sql": "LOCK TABLE \"bench_pg_108b1830275a45d0\".\"target\" IN ACCESS EXCLUSIVE MODE",
+          "elapsed_ns": 955708,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM bench_pg_108b1830275a45d0.dpone_part_a01023ed80524fcb84cc70dda6441e48",
+          "elapsed_ns": 145007792,
+          "old_child_count": true,
+          "count": 5000000
+        },
+        {
+          "sql": "CREATE TABLE \"bench_pg_108b1830275a45d0\".\"dpone_part_292fc7f5db2e4c6eaab25ec7afc4ef91\" (LIKE bench_pg_108b1830275a45d0.dpone_part_a01023ed80524fcb84cc70dda6441e48 INCLUDING ALL)",
+          "elapsed_ns": 6134500,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_108b1830275a45d0\".\"dpone_part_292fc7f5db2e4c6eaab25ec7afc4ef91\" (\"id\", \"name\", \"event_day\")\n            SELECT \"id\", \"name\", \"event_day\"\n            FROM \"bench_pg_108b1830275a45d0\".\"stg_b9a5f05969ca492099740b5adaa8413f_target\"\n            WHERE \"event_day\"::text = %s",
+          "elapsed_ns": 5802196250,
+          "rowcount": 5000000
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_108b1830275a45d0\".\"target\" DETACH PARTITION bench_pg_108b1830275a45d0.dpone_part_a01023ed80524fcb84cc70dda6441e48",
+          "elapsed_ns": 1134709,
+          "rowcount": -1
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_108b1830275a45d0\".\"target\" ATTACH PARTITION \"bench_pg_108b1830275a45d0\".\"dpone_part_292fc7f5db2e4c6eaab25ec7afc4ef91\" FOR VALUES IN ('2026-01-01')",
+          "elapsed_ns": 241058042,
+          "rowcount": -1
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS bench_pg_108b1830275a45d0.dpone_part_a01023ed80524fcb84cc70dda6441e48",
+          "elapsed_ns": 1500708,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM \"bench_pg_108b1830275a45d0\".\"target\"",
+          "elapsed_ns": 109699875,
+          "old_child_count": false,
+          "count": 5001000
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS \"bench_pg_108b1830275a45d0\".\"stg_b9a5f05969ca492099740b5adaa8413f_target\"",
+          "elapsed_ns": 879709,
+          "rowcount": -1
+        }
+      ],
+      "parent_oid": 24825,
+      "partition_total_bytes": 1029455872,
+      "partition_heap_bytes": 871489536,
+      "schema": "bench_pg_108b1830275a45d0"
+    }
+  ],
+  "method": "Server-generated synthetic 128-byte payload, PK/CHECK, native required, one replaced child plus 1000 untouched rows; first change then same-input replays; no cache flushing; verification excluded from load timings.",
+  "limits": "Local Docker measurements only; no production SLA or cold-cache claim; 3-point summaries are not p95 estimates. Lock timing includes a measured observer probe before commit.",
+  "postgres_settings": {
+    "fsync": "on",
+    "full_page_writes": "on",
+    "maintenance_work_mem": "65536",
+    "max_parallel_workers_per_gather": "2",
+    "server_version": "16.15",
+    "shared_buffers": "16384",
+    "synchronous_commit": "on",
+    "work_mem": "4096"
+  },
+  "summary": [
+    {
+      "rows": 100000,
+      "elapsed_seconds": {
+        "min": 0.371116,
+        "median": 0.433392666,
+        "max": 0.528683042
+      },
+      "lock_seconds": {
+        "min": 0.2585485,
+        "median": 0.296558916,
+        "max": 0.330073291
+      },
+      "old_count_seconds": {
+        "min": 0.003215209,
+        "median": 0.004385208,
+        "max": 0.004668791
+      },
+      "rows_per_second": {
+        "min": 189149.2483316686,
+        "median": 230737.6378168799,
+        "max": 269457.52810442017
+      }
+    },
+    {
+      "rows": 1000000,
+      "elapsed_seconds": {
+        "min": 1.95714625,
+        "median": 2.0764945,
+        "max": 3.01075375
+      },
+      "lock_seconds": {
+        "min": 1.406602792,
+        "median": 1.535907,
+        "max": 1.906164417
+      },
+      "old_count_seconds": {
+        "min": 0.02253,
+        "median": 0.022540792,
+        "max": 0.028591958
+      },
+      "rows_per_second": {
+        "min": 332142.74000323005,
+        "median": 481580.8565830538,
+        "max": 510948.01934193727
+      }
+    },
+    {
+      "rows": 5000000,
+      "elapsed_seconds": {
+        "min": 10.234277958,
+        "median": 11.578031959,
+        "max": 13.414359167
+      },
+      "lock_seconds": {
+        "min": 6.943950209,
+        "median": 7.414154958,
+        "max": 7.458581459
+      },
+      "old_count_seconds": {
+        "min": 0.113526083,
+        "median": 0.115341667,
+        "max": 0.145007792
+      },
+      "rows_per_second": {
+        "min": 372734.91321898194,
+        "median": 431852.3232364486,
+        "max": 488554.25077560707
+      }
+    }
+  ],
+  "finished_at": "2026-09-10T21:03:37.212995+00:00"
+}

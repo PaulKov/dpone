@@ -1,0 +1,210 @@
+{
+  "status": "PASS",
+  "started_at": "2026-09-10T20:48:28.717953+00:00",
+  "source": {
+    "git_head": "1266b38c76c20497f3860c9d1a981539c0abe392",
+    "execution_inputs_sha256": "4f094c2623a40b694d1fea781d6acfc15e88a6dbb3256f250687b897507462b7"
+  },
+  "producer_sha256": {
+    "partition_benchmark.py": "99650ccfc7fc4e09e0b66c11d6ab8e24cd58e08494fc91f16c0792047d0b2e43",
+    "partition_benchmark_support.py": "342784f86809f88444a151476ab9873de3038bf5ce80a7a8ea6f4edea103d204"
+  },
+  "environment": {
+    "container_id": "ddc774b2a416d8954b794dffddd0507c2ca8952159553491ad01489332303971",
+    "image_id": "sha256:44c4ee9810eff91f7eab4d822642e01115b1a9eccce4bcbdde7604752d68eac6",
+    "image_ref": "postgres:16-alpine",
+    "container_memory_limit": 0,
+    "container_nano_cpus": 0,
+    "docker_resources": {
+      "cpus": 10,
+      "memory_bytes": 8321515520,
+      "architecture": "aarch64"
+    },
+    "python": "3.12.11",
+    "psycopg": "3.3.4"
+  },
+  "cases": [
+    {
+      "status": "PASS",
+      "rows": 100000,
+      "attempt": 1,
+      "elapsed_seconds": 0.607143,
+      "rows_per_second": 164705.84359862504,
+      "lock_seconds": 0.379166125,
+      "old_count_seconds": 0.003035542,
+      "old_count_share_of_lock": 0.008005836491854329,
+      "observer_probe_seconds": 0.000979209,
+      "reader_elapsed_seconds": 0.386528792,
+      "reader_blocked_by_sink": true,
+      "reader": {
+        "started_ns": 831311197665041,
+        "observed_rows": 101000,
+        "finished_ns": 831311584193833
+      },
+      "load_result": {
+        "inserted_rows": 100000,
+        "updated_rows": 0,
+        "total_rows": 101000,
+        "state": null,
+        "staging_rows": 100000,
+        "soft_deleted_rows": null,
+        "reactivated_rows": null,
+        "unchanged_rows": null,
+        "hard_deleted_rows": 100000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 100000,
+        "deleted_lookback_rows": null,
+        "reconciliation_metrics": null,
+        "partition_validation_results": null,
+        "quality_gate_receipt": null,
+        "cleanup_disposition": null
+      },
+      "public_result": {
+        "extracted_rows": 100000,
+        "loaded_rows": 100000,
+        "inserted_rows": 100000,
+        "updated_rows": 0,
+        "total_rows": 101000,
+        "final_rows": 101000,
+        "staging_rows": 100000,
+        "soft_deleted_rows": 0,
+        "reactivated_rows": 0,
+        "unchanged_rows": 0,
+        "hard_deleted_rows": 100000,
+        "active_rows": null,
+        "commit_receipt_id": null,
+        "commit_outcome": null,
+        "replaced_rows": 100000,
+        "deleted_lookback_rows": 0,
+        "status": "success",
+        "validation_info": null,
+        "reconciliation_metrics": null
+      },
+      "verification": {
+        "groups": [
+          [
+            "2026-01-01",
+            100000,
+            1,
+            100000,
+            "5000050000",
+            true
+          ],
+          [
+            "2026-02-01",
+            1000,
+            1,
+            1000,
+            "500500",
+            true
+          ]
+        ],
+        "parent_oid_preserved": true,
+        "no_staging_leaks": true
+      },
+      "operations": [
+        {
+          "sql": "CREATE TABLE \"bench_pg_5b964c307def4fe8\".\"stg_a3d1453ae3b2406cae14f659444ca91e_target\" (\"id\" bigint, \"name\" text, \"event_day\" date)",
+          "elapsed_ns": 2869875,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_5b964c307def4fe8\".\"stg_a3d1453ae3b2406cae14f659444ca91e_target\" (\"id\", \"name\", \"event_day\") SELECT id,name,event_day FROM bench_pg_5b964c307def4fe8.source",
+          "elapsed_ns": 206255625,
+          "rowcount": 100000
+        },
+        {
+          "sql": "LOCK TABLE \"bench_pg_5b964c307def4fe8\".\"target\" IN ACCESS EXCLUSIVE MODE",
+          "elapsed_ns": 412625,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM bench_pg_5b964c307def4fe8.current_rows",
+          "elapsed_ns": 3035542,
+          "old_child_count": true,
+          "count": 100000
+        },
+        {
+          "sql": "CREATE TABLE \"bench_pg_5b964c307def4fe8\".\"dpone_part_1dbbefaedb464fd2bae18519fa42b8d3\" (LIKE bench_pg_5b964c307def4fe8.current_rows INCLUDING ALL)",
+          "elapsed_ns": 3238916,
+          "rowcount": -1
+        },
+        {
+          "sql": "INSERT INTO \"bench_pg_5b964c307def4fe8\".\"dpone_part_1dbbefaedb464fd2bae18519fa42b8d3\" (\"id\", \"name\", \"event_day\")\n            SELECT \"id\", \"name\", \"event_day\"\n            FROM \"bench_pg_5b964c307def4fe8\".\"stg_a3d1453ae3b2406cae14f659444ca91e_target\"\n            WHERE \"event_day\"::text = %s",
+          "elapsed_ns": 285426375,
+          "rowcount": 100000
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_5b964c307def4fe8\".\"target\" DETACH PARTITION bench_pg_5b964c307def4fe8.current_rows",
+          "elapsed_ns": 976583,
+          "rowcount": -1
+        },
+        {
+          "sql": "ALTER TABLE \"bench_pg_5b964c307def4fe8\".\"target\" ATTACH PARTITION \"bench_pg_5b964c307def4fe8\".\"dpone_part_1dbbefaedb464fd2bae18519fa42b8d3\" FOR VALUES IN ('2026-01-01')",
+          "elapsed_ns": 3824291,
+          "rowcount": -1
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS bench_pg_5b964c307def4fe8.current_rows",
+          "elapsed_ns": 1031167,
+          "rowcount": -1
+        },
+        {
+          "sql": "SELECT COUNT(*) FROM \"bench_pg_5b964c307def4fe8\".\"target\"",
+          "elapsed_ns": 8711625,
+          "old_child_count": false,
+          "count": 101000
+        },
+        {
+          "sql": "DROP TABLE IF EXISTS \"bench_pg_5b964c307def4fe8\".\"stg_a3d1453ae3b2406cae14f659444ca91e_target\"",
+          "elapsed_ns": 818625,
+          "rowcount": -1
+        }
+      ],
+      "parent_oid": 21475,
+      "partition_total_bytes": 20643840,
+      "partition_heap_bytes": 17432576,
+      "schema": "bench_pg_5b964c307def4fe8"
+    }
+  ],
+  "method": "Server-generated synthetic 128-byte payload, PK/CHECK, native required, one replaced child plus 1000 untouched rows; first change then same-input replays; no cache flushing; verification excluded from load timings.",
+  "limits": "Local Docker measurements only; no production SLA or cold-cache claim; 3-point summaries are not p95 estimates. Lock timing includes a measured observer probe before commit.",
+  "postgres_settings": {
+    "fsync": "on",
+    "full_page_writes": "on",
+    "maintenance_work_mem": "65536",
+    "max_parallel_workers_per_gather": "2",
+    "server_version": "16.15",
+    "shared_buffers": "16384",
+    "synchronous_commit": "on",
+    "work_mem": "4096"
+  },
+  "summary": [
+    {
+      "rows": 100000,
+      "elapsed_seconds": {
+        "min": 0.607143,
+        "median": 0.607143,
+        "max": 0.607143
+      },
+      "lock_seconds": {
+        "min": 0.379166125,
+        "median": 0.379166125,
+        "max": 0.379166125
+      },
+      "old_count_seconds": {
+        "min": 0.003035542,
+        "median": 0.003035542,
+        "max": 0.003035542
+      },
+      "rows_per_second": {
+        "min": 164705.84359862504,
+        "median": 164705.84359862504,
+        "max": 164705.84359862504
+      }
+    }
+  ],
+  "finished_at": "2026-09-10T20:48:30.879194+00:00"
+}

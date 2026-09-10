@@ -1221,3 +1221,33 @@ all readers before using v3. Composition activation is unavailable until physica
 admission covers every constituent; see the
 [contracts](release-composition-reference.md) and
 [migration and recovery guide](release-composition-operations.md).
+
+## PostgreSQL strategy-preserving refresh correction
+
+PostgreSQL internal queries now honor the selected strategy. Omitted overwrite
+mode and `truncate_insert` preserve an existing target, matching file/memory
+loads. Manifest fields, Python call signatures and result fields are unchanged.
+Legacy direct internal-query/file loader calls delegate to the configured sink
+strategy, including the historically named exchange helpers; only configured
+`overwrite_type: exchange` selects replacement. Their injected target-table
+manager and sample callback remain authoritative: delegation does not replace
+them with default target policy or sample logging. A failing callback aborts the
+sink transaction before commit. Prefer `PostgresSink.load`.
+
+For PostgreSQL `partition_replace`, `replaced_rows` counts inserted replacement
+rows and `hard_deleted_rows` counts removed old rows, for both native and
+predicate replacement. Replacing three old rows with two new rows reports
+`loaded_rows=2`, `replaced_rows=2`, and `hard_deleted_rows=3`; replay reports
+`hard_deleted_rows=2`. Counts represent rows rather than physical partitions.
+
+For PostgreSQL `snapshot_diff`, missing keys removed by `hard_delete` are
+reported as `hard_deleted_rows`. They do not become `replaced_rows` or increase
+`loaded_rows`. Existing inserted/updated accounting is preserved: a replay with
+two matching keys reports zero inserted rows and two updated rows; an empty
+snapshot can delete old rows while reporting zero loaded rows.
+
+Invalid rows, missing TRUNCATE privileges and incoming foreign keys can now
+correctly fail loads that previously bypassed the target contract. Upgrading
+prevents this replacement defect; it cannot reconstruct constraints lost by an
+earlier runtime. Restore them from approved DDL using the
+[PostgreSQL recovery runbook](source-sink/postgres-to-postgres.md#recover-a-previously-replaced-target).

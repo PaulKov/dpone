@@ -45,9 +45,12 @@ class PostgresSink(AbstractSink):
         self._strategy_map = composition.strategy_map
 
     def load(self, load_config: LoadConfig, payload: LoadPayload) -> LoadResult:
-        """Загружает данные в PostgreSQL.
-        - Reconciliation выполняется в ETLProcessor ДО этого метода
-        - Здесь только загрузка данных через стратегии
+        """Apply the selected strategy and return only after commit acknowledgement.
+
+        This is the transaction entry point for full refresh, including exchange.
+        PostgreSQL rollback restores transactional DDL; no compensating target DDL
+        is needed. The existing append micro-batch mode owns its inner commits.
+        A failed commit/rollback acknowledgement never proves a database outcome.
         """
         strategy = self._resolve_strategy(load_config)
         self.connector.begin()
@@ -55,8 +58,13 @@ class PostgresSink(AbstractSink):
             result = strategy.load(load_config, payload)
             self.connector.commit_transaction()
             return result
-        except Exception:
-            self.connector.rollback()
+        except BaseException as primary_error:
+            try:
+                self.connector.rollback()
+            except BaseException as rollback_error:
+                add_note = getattr(primary_error, "add_note", None)
+                if callable(add_note):
+                    add_note(f"PostgreSQL rollback failed: {type(rollback_error).__name__}; outcome unverified")
             raise
 
     def get_target_schema(self, load_config: LoadConfig) -> list[tuple[str, str]]:

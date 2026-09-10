@@ -1,0 +1,312 @@
+{
+  "source_commit": "30e922117c58c0e837f09a3ae7f30c217361267f",
+  "production_and_tests_identical_to": "1ff83879fc7640d358cad15402672eafddcabf41",
+  "observed_at_utc": "2026-09-10T20:18:38.735804+00:00",
+  "checks": [
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103032467484",
+      "name": "governance-attestation",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103031346777",
+      "name": "Quality timing evidence",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103031346761",
+      "name": "governance-source",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103030387442",
+      "name": "Quality checks (3.12)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103030387454",
+      "name": "Quality checks (3.11)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433620/job/103023369872",
+      "name": "Airflow 3.3.0 / py3.12",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433446/job/103029463208",
+      "name": "PR Gate shadow",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433620/job/103023369910",
+      "name": "Airflow 3.3.0 / py3.11",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144603",
+      "name": "Quality tests (3.11, shard 3)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433620/job/103023369947",
+      "name": "Airflow 3.2.0 / py3.12",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144648",
+      "name": "Quality tests (3.11, shard 5)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144673",
+      "name": "Quality tests (3.12, shard 0)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144626",
+      "name": "Quality tests (3.12, shard 3)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144608",
+      "name": "Quality tests (3.12, shard 5)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433620/job/103023369914",
+      "name": "Airflow 3.2.0 / py3.11",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144583",
+      "name": "Quality tests (3.12, shard 2)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144481",
+      "name": "Quality tests (3.11, shard 2)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144502",
+      "name": "Quality tests (3.11, shard 4)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144624",
+      "name": "Quality tests (3.12, shard 4)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144620",
+      "name": "Quality tests (3.12, shard 6)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433620/job/103023369905",
+      "name": "Airflow 2.11.0 / py3.12",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144435",
+      "name": "Quality tests (3.11, shard 7)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433446/job/103023594428",
+      "name": "PR Gate shadow Python 3.11",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144477",
+      "name": "Quality tests (3.11, shard 1)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433446/job/103023594478",
+      "name": "PR Gate shadow Python 3.12",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144505",
+      "name": "Quality tests (3.12, shard 7)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433620/job/103023369879",
+      "name": "Airflow 2.11.0 / py3.11",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144550",
+      "name": "Quality tests (3.12, shard 1)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144434",
+      "name": "Quality tests (3.11, shard 6)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433620/job/103023369702",
+      "name": "Runtime wheel smoke / py3.12",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103024144456",
+      "name": "Quality tests (3.11, shard 0)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433446/job/103023594456",
+      "name": "PR Gate shadow contracts",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433446/job/103023594376",
+      "name": "PR Gate shadow packaging",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433446/job/103023594381",
+      "name": "PR Gate shadow PostgreSQL XMin",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433446/job/103023594396",
+      "name": "PR Gate shadow static",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103023626556",
+      "name": "Acceptance checks",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/runs/103023618542",
+      "name": "CodeQL",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433446/job/103023596699",
+      "name": "PR Gate shadow Airflow ${{ matrix.airflow_version }} / py${{ matrix.python_version }}",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433446/job/103023596856",
+      "name": "PR Gate shadow runtime wheel smoke",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433446/job/103023596081",
+      "name": "PR Gate shadow docs",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433446/job/103023415050",
+      "name": "PR Gate shadow plan",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433620/job/103023370018",
+      "name": "Airflow 2.10.5 / py3.12",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433620/job/103023369669",
+      "name": "Runtime wheel smoke / py3.11",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433620/job/103023369862",
+      "name": "Airflow 2.10.5 / py3.11",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433672/job/103023303622",
+      "name": "Deploy GitHub Pages documentation",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433672/job/103023301722",
+      "name": "Verify current master Pages subject",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433620/job/103023211184",
+      "name": "Build Airflow distribution artifacts",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103023160858",
+      "name": "Scheduling acceptance contracts",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103023160893",
+      "name": "Synthetic PostgreSQL ClickHouse window smoke",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103022964494",
+      "name": "Quality preflight",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103022964315",
+      "name": "Exact-commit acceptance plan",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522445193/job/103023003830",
+      "name": "Agent PR receipt",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522445193/job/103023005456",
+      "name": "Agent PR merge closure",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433672/job/103022963672",
+      "name": "Build GitHub Pages documentation",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103022964145",
+      "name": "PostgreSQL XMin integration",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433688/job/103022963032",
+      "name": "Analyze Python",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103022964310",
+      "name": "Doctor import Windows (3.12)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433663/job/103022964312",
+      "name": "Doctor import Windows (3.11)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433480/job/103022961899",
+      "name": "Backfill route x strategy matrix",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433826/job/103022962920",
+      "name": "TruffleHog verified secrets",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/PaulKov/dpone/actions/runs/34522433533/job/103022962042",
+      "name": "Dependency Review",
+      "state": "SUCCESS"
+    }
+  ]
+}

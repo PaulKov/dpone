@@ -2570,7 +2570,7 @@
                   "type": "string",
                   "title": "🔄 Режим перезаписи",
                   "description": "Для full_refresh: способ перезаписи данных",
-                  "markdownDescription": "**Только для `mode: full_refresh`**\n\n- `truncate_insert` (default) — TRUNCATE + INSERT: быстрый стандартный режим\n- `exchange` — Exchange Pattern (атомарная замена через RENAME): создается временная таблица `{table}__tmp`, текущая таблица переименовывается в `{table}__backup`, затем `{table}__tmp` переименовывается в `{table}`, backup удаляется\n\n**Преимущества Exchange Pattern:**\n- Zero downtime (атомарный swap через RENAME)\n- Safe rollback (backup сохраняется до успешного CREATE)\n- Не ломает dependencies",
+                  "markdownDescription": "**Only for `mode: full_refresh`**\n\n- `truncate_insert` (default): replace rows with TRUNCATE + INSERT. PostgreSQL preserves the existing target object and constraints, regardless of artifact transport.\n- `exchange`: explicitly replace the target object. PostgreSQL performs staging rename and backup removal in the sink-owned transaction. Constraints, grants and other target metadata are not preserved automatically; dependencies can reject replacement.\n\nPostgreSQL rollback reverses transactional DDL. Neither mode guarantees zero downtime; locks can block readers. An absent target follows the sink creation policy, not automatic source-constraint replication. Other sinks retain their documented overwrite behavior.",
                   "enum": [
                     "truncate_insert",
                     "exchange"

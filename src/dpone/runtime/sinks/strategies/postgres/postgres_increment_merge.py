@@ -250,13 +250,14 @@ class PostgresPartitionReplaceStrategy(PostgresIncrementMergeStrategy):
                     "partition values, and the runtime can resolve existing partition bounds."
                 )
 
-            replaced = self._delete_matching_partition_values(load_config, staging, partition.column)
+            deleted = self._delete_matching_partition_values(load_config, staging, partition.column)
             inserted = self._insert_from_staging(load_config, staging, payload.schema)
             return LoadResult(
                 inserted_rows=inserted,
                 updated_rows=0,
                 total_rows=self._count_target(load_config),
-                replaced_rows=replaced,
+                replaced_rows=inserted,
+                hard_deleted_rows=deleted,
             )
 
         return self._consume_with_staging(load_config, payload, handler)
@@ -268,7 +269,7 @@ class PostgresPartitionReplaceStrategy(PostgresIncrementMergeStrategy):
             DELETE FROM {}.{} AS t
             WHERE EXISTS (
                 SELECT 1 FROM {}.{} AS s
-                WHERE s.{}::text = t.{}::text
+                WHERE s.{}::text IS NOT DISTINCT FROM t.{}::text
             )
             """
         ).format(

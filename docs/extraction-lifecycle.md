@@ -40,9 +40,10 @@ PostgreSQL boundaries are strategy-specific:
   session. Automatic MIN/MAX/count bounds are resolved inside that same
   snapshot;
 - `InternalQueryArtifact` has no source file or cursor. Its extraction window
-  starts and completes at the target session's `INSERT ... SELECT` execution
-  boundary; it does not claim a snapshot unless that session supplies a native
-  snapshot authority.
+  starts and completes at the target session's `INSERT INTO staging ... SELECT`
+  execution boundary. The selected sink strategy runs afterward; extraction
+  completion does not mean target commit. The artifact does not claim a snapshot
+  unless that session supplies a native snapshot authority.
 
 `ExtractResult.extraction_receipt` always reads the authority's latest frozen
 value, so wrappers and schema rebinds do not copy stale timing data.

@@ -104,6 +104,21 @@ Algorithm:
 5. Replace the final target using the sink-native safe path.
 6. Advance state only after finalization succeeds.
 
+For PostgreSQL, omitted `overwrite_type` and explicit `truncate_insert` stage
+rows, then TRUNCATE and INSERT inside the sink-owned transaction, preserving an
+existing target object and its constraints. Only explicit `exchange` replaces
+the object; dependencies can reject that operation. Both modes can block readers.
+A successful extraction is separate from an acknowledged target commit. See the
+[PostgreSQL strategy contract](postgres.md#load-strategy-behavior) and
+[recovery runbook](source-sink/postgres-to-postgres.md#runbook).
+
+The PostgreSQL artifact transport also preserves the selected `replace`,
+`partition_replace` and backfill inner strategy; unrelated target rows remain.
+This correction adds no source/artifact combinations: ordinary append/merge
+use file extraction, while snapshot-diff/SCD2 internal-query metadata enrichment
+retains its existing rejection. Missing-target creation does not clone source
+constraints.
+
 For MSSQL, an existing business object is preserved: the fast path bulk-loads
 a disposable heap, performs typed/lineage projection set-wise, then uses
 `TRUNCATE` plus `INSERT ... WITH (TABLOCK) SELECT` inside the governed target

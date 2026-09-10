@@ -178,10 +178,86 @@ See [Route live wide certification](../testing/route-live-wide-certification.md)
 1. Start with `dpone doctor --profile local` and fix missing extras or native clients.
 2. Run `dpone plan examples/source-sink/postgres-to-postgres.yaml --format md` and review source boundary, staging path, schema evolution, state, and quality gates.
 3. Run a small bounded window first.
-4. Inspect the run artifact under `.dpone/runs/postgres_to_postgres`.
+4. Save and inspect one report per attempt as shown below; check exit status, `passed` and `result.errors`.
 5. For incremental jobs, verify state before enabling a schedule.
 6. For delete-aware jobs, run reconciliation in report-only mode before enabling physical deletes.
 7. Promote the manifest through GitOps after the plan and artifact are reviewed.
+
+### Observe and retry a constrained refresh
+
+For `full_refresh`, omit `overwrite_type` or set `truncate_insert`; see the
+[PostgreSQL guide](../postgres.md#refresh-an-existing-table-without-replacing-its-structure)
+for prerequisites and the explicit exchange boundary. The same-database internal
+query optimization changes transport, not the selected write strategy.
+
+`dpone run --format json` writes its report to stdout. Retain each attempt:
+
+```bash
+attempt_dir=$(mktemp -d .dpone-pg-attempt.XXXXXX)
+dpone run examples/source-sink/postgres-to-postgres.yaml --format json \
+  > "$attempt_dir/run.json" 2> "$attempt_dir/run.log"
+run_status=$?
+printf 'Exit status: %s; reports: %s\n' "$run_status" "$attempt_dir"
+```
+
+Adapt the checked example to `full_refresh` before using it for this regression.
+Progress events, including `PG_EXCHANGE_COMPLETE`, precede commit and are not
+success receipts. See [run output](../run.md) for the JSON contract. Default full
+refresh is stateless; no checkpoint advancement is claimed.
+
+Use a separate database connection before and after two changed-source refreshes
+and one unchanged replay. Save exact expected/actual business rows and run these
+queries with your target relation substituted for `landing.orders`:
+
+```sql
+SELECT 'landing.orders'::regclass::oid AS logical_oid;
+SELECT conname, contype, pg_get_constraintdef(oid)
+FROM pg_constraint WHERE conrelid = 'landing.orders'::regclass ORDER BY conname;
+SELECT a.attname, a.attnotnull, pg_get_expr(d.adbin, d.adrelid) AS default_expression
+FROM pg_attribute a
+LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+WHERE a.attrelid = 'landing.orders'::regclass AND a.attnum > 0 AND NOT a.attisdropped
+ORDER BY a.attnum;
+SELECT indexname, indexdef FROM pg_indexes
+WHERE schemaname = 'landing' AND tablename = 'orders' ORDER BY indexname;
+```
+
+Check existing views, grants and triggers too. Logical OID remains stable under
+default refresh; physical `relfilenode` can change during TRUNCATE.
+
+| Failure | Operator action |
+| --- | --- |
+| PK/NOT NULL/CHECK violation after TRUNCATE | Confirm rollback and previous rows using the independent connection; correct source data and retry with a fresh attempt. Do not remove constraints to pass. |
+| Source query failure | Fix SQL or permissions; materialization fails before target truncation. |
+| Incoming FK or missing TRUNCATE privilege | Review target design/permissions with its owner; dpone does not use CASCADE or silently choose exchange. |
+| Exchange rejected by a dependent object | Confirm original table/view restoration by rollback and use an approved loading design. |
+| Lock timeout or cancellation | Confirm the prior state, resolve contention and retry; concurrent refreshes do not guarantee snapshot-freshness ordering. |
+| Lost commit or rollback acknowledgement | Database outcome is unverified. Inspect independently before retry; a client error does not prove rollback. |
+
+An empty source is a valid empty refresh unless a separately configured quality
+gate rejects it. The earlier `legacy_post_finalize` warning still applies:
+a quality failure after commit cannot roll back that committed load.
+
+### Recover a previously replaced target
+
+An affected older internal-query refresh could succeed while losing constraints,
+then fail schema validation on its next run. An upgrade cannot infer lost DDL.
+
+1. Pause affected writers and retain current rows plus catalog evidence.
+2. Obtain approved target DDL from migrations or a schema backup.
+3. Check NULLs, duplicate keys and other violations; resolve them under the data
+   owner's rules without automatic deduplication or guessed keys.
+4. Restore missing constraints, indexes, grants and dependent objects from that
+   authority. This is a separate controlled repair.
+5. Use the corrected runtime and verify two refreshes and replay with both rows
+   and catalog metadata. Returning to the affected runtime does not repair data.
+
+Maintainers can reproduce the bounded internal-query regression separately from
+wide file-route tests with
+`tests/integration/postgres/test_postgres_strategy_preservation_live.py` using an
+approved local PostgreSQL environment and `DPONE_RUN_INTEGRATION=1`. This checks
+real sink transactions, constraints, failures and scoped replacement; it does
+not certify every PostgreSQL source/strategy combination.
 
 ## Cross-links
 

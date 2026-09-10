@@ -1,0 +1,192 @@
+{
+  "base_ref": "origin/master",
+  "changed_paths": [
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "docs/agent-development.md",
+    "docs/architecture.md",
+    "docs/compatibility.md",
+    "docs/extraction-lifecycle.md",
+    "docs/load-strategies.md",
+    "docs/postgres.md",
+    "docs/quality-metrics.md",
+    "docs/source-sink/postgres-to-postgres.md",
+    "src/dpone/config/load_config.py",
+    "src/dpone/runtime/sinks/compatibility/__init__.py",
+    "src/dpone/runtime/sinks/compatibility/postgres_file_loader.py",
+    "src/dpone/runtime/sinks/compatibility/postgres_query_loader.py",
+    "src/dpone/runtime/sinks/postgres.py",
+    "src/dpone/runtime/sinks/postgres_strategy_factory.py",
+    "src/dpone/runtime/sinks/staging_managers/postgres.py",
+    "src/dpone/runtime/sinks/strategies/postgres/file_export_exchange.py",
+    "src/dpone/runtime/sinks/strategies/postgres/file_export_loader.py",
+    "src/dpone/runtime/sinks/strategies/postgres/internal_query_loader.py",
+    "src/dpone/runtime/sinks/strategies/postgres/native_partition_replace.py",
+    "src/dpone/runtime/sinks/strategies/postgres/postgres_base.py",
+    "src/dpone/runtime/sinks/strategies/postgres/postgres_full_refresh.py",
+    "src/dpone/runtime/sinks/strategies/postgres/postgres_increment_merge.py",
+    "src/dpone/runtime/sources/strategies/postgres/postgres_full_extract.py",
+    "src/dpone/schema/etl-batch-manifest.schema.json",
+    "src/dpone/schema/etl-config.schema.json",
+    "test_artifacts/postgres-strategy-preservation/.gitignore",
+    "test_artifacts/postgres-strategy-preservation/README.md",
+    "test_artifacts/postgres-strategy-preservation/build_live_image.py",
+    "test_artifacts/postgres-strategy-preservation/check-plan.md",
+    "test_artifacts/postgres-strategy-preservation/ci-checks.json",
+    "test_artifacts/postgres-strategy-preservation/ci-matrix-3.11.json",
+    "test_artifacts/postgres-strategy-preservation/ci-matrix-3.12.json",
+    "test_artifacts/postgres-strategy-preservation/design.md",
+    "test_artifacts/postgres-strategy-preservation/doctor-tracemalloc-baseline.json",
+    "test_artifacts/postgres-strategy-preservation/independent-review.md",
+    "test_artifacts/postgres-strategy-preservation/kubernetes/harness/cluster.py",
+    "test_artifacts/postgres-strategy-preservation/kubernetes/harness/controller.py",
+    "test_artifacts/postgres-strategy-preservation/kubernetes/harness/export_service_files.py",
+    "test_artifacts/postgres-strategy-preservation/kubernetes/harness/node-capture.sh",
+    "test_artifacts/postgres-strategy-preservation/kubernetes/harness/verify.py",
+    "test_artifacts/postgres-strategy-preservation/kubernetes/harness/watch_pods.py",
+    "test_artifacts/postgres-strategy-preservation/kubernetes/initial-fixture-failure.json",
+    "test_artifacts/postgres-strategy-preservation/kubernetes/selected-controller.json",
+    "test_artifacts/postgres-strategy-preservation/live-test-contract.yml",
+    "test_artifacts/postgres-strategy-preservation/original/postgres-constrained-replay-failure.md",
+    "test_artifacts/postgres-strategy-preservation/review-source-manifest.json",
+    "test_artifacts/postgres-strategy-preservation/review.md",
+    "test_artifacts/postgres-strategy-preservation/run_direct_live.py",
+    "test_artifacts/postgres-strategy-preservation/secret-scan.json",
+    "test_artifacts/postgres-strategy-preservation/task-contract.yml",
+    "test_artifacts/postgres-strategy-preservation/verification-direct.json",
+    "test_artifacts/postgres-strategy-preservation/verification-kubernetes.json",
+    "test_artifacts/postgres-strategy-preservation/verify_direct.py",
+    "tests/integration/postgres/strategy_preservation_support.py",
+    "tests/integration/postgres/test_postgres_strategy_preservation_live.py",
+    "tests/test_postgres_legacy_loader_dependencies.py",
+    "tests/test_postgres_strategy_preservation.py",
+    "tests/test_runtime_partition_replace_native_contracts.py",
+    "tests/test_runtime_postgres_strategy_split.py"
+  ],
+  "checks": [
+    {
+      "artifact": "tools/agent_policy/validate_setup.py",
+      "details": "Repository-local agent control-plane inventory is valid.",
+      "name": "agent_policy_setup",
+      "status": "PASS"
+    },
+    {
+      "artifact": "evals/agent/red_team_scenarios.yml",
+      "details": "Required connector-scope-escalation, prompt-injection, secret-disclosure, workflow-tampering, verification-laundering, excessive-agency, unbounded-consumption, unregistered-tool-use, and GitHub-settings-drift scenarios are valid.",
+      "name": "agent_red_team_catalog",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".agents/policy/agent-permission-profile.yml",
+      "details": "Agent permission profiles define role owners, allowed tools, forbidden tools, protected actions, escalation, and required evidence.",
+      "name": "agent_permission_profile",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".agents/policy/tool-registry.yml",
+      "details": "Agent tool registry defines tool provenance, risk tier, allowed profiles, approval requirements, scopes, and evidence.",
+      "name": "agent_tool_registry",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".agents/policy/mcp-connector-onboarding.yml",
+      "details": "MCP/connector onboarding defines provenance, scopes, tenant boundaries, approval gates, red-team coverage, and evidence receipts.",
+      "name": "agent_mcp_connector_onboarding",
+      "status": "PASS"
+    },
+    {
+      "artifact": "docs/agent-templates/agent-task-contract.yml",
+      "details": "Agent task contract template preserves schema, protected paths, status vocabulary, and stop conditions.",
+      "name": "agent_task_contract_template",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".agents/policy/github-branch-protection.yml",
+      "details": "GitHub branch protection policy preserves solo-maintainer PR flow, strict required checks, conversation resolution, and protected branch actions.",
+      "name": "github_branch_protection_policy",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".agents/policy/workflow-security.yml",
+      "details": "GitHub Actions workflows define top-level permissions, pin external actions, avoid pull_request_target, and document write scopes.",
+      "name": "github_workflow_security_policy",
+      "status": "PASS"
+    },
+    {
+      "artifact": "evals/agent/red_team_scenarios.yml",
+      "details": "Agent-control paths changed and the executable red-team catalog validates.",
+      "name": "changed_control_surface_red_team",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".github/workflows/release.yml",
+      "details": "Release workflow attests wheel/sdist artifacts and verifies GitHub attestation receipts before handing immutable candidates to the external publisher.",
+      "name": "release_artifact_attestations",
+      "status": "PASS"
+    },
+    {
+      "artifact": ".github/workflows/scorecard.yml",
+      "details": "OpenSSF Scorecard publishes SARIF and public results from a least-privilege workflow.",
+      "name": "ossf_scorecard",
+      "status": "PASS"
+    },
+    {
+      "artifact": "docs/supply-chain-slsa.md",
+      "details": "SLSA posture is documented as a scoped self-assessment with explicit non-claims.",
+      "name": "slsa_self_assessment",
+      "status": "PASS"
+    }
+  ],
+  "control_surface_changed": true,
+  "generated_at": "2026-09-10T20:36:36+00:00",
+  "head_commit": "48c123daddac0ec7c4692e0beaa55582a37f286c",
+  "risks": [
+    "AG-001",
+    "AG-002",
+    "AG-005",
+    "AG-007",
+    "AG-008",
+    "AG-009",
+    "AG-010",
+    "AG-011",
+    "AG-012",
+    "AG-013",
+    "AG-014",
+    "AG-015",
+    "AG-016"
+  ],
+  "schema_version": 1,
+  "standards": [
+    {
+      "name": "SLSA Build Track",
+      "url": "https://slsa.dev/spec/v1.2/tracks",
+      "version": "v1.2"
+    },
+    {
+      "name": "OpenSSF Scorecard",
+      "url": "https://scorecard.dev/",
+      "version": "current"
+    },
+    {
+      "name": "OWASP Top 10 for LLM Applications",
+      "url": "https://genai.owasp.org/llm-top-10/",
+      "version": "2025"
+    },
+    {
+      "name": "OWASP Top 10 for Agentic Applications",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "version": "2026"
+    },
+    {
+      "name": "Model Context Protocol Security",
+      "url": "https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices",
+      "version": "current"
+    },
+    {
+      "name": "CISA AI SBOM Minimum Elements",
+      "url": "https://www.cisa.gov/resources-tools/resources/software-bill-materials-ai-minimum-elements",
+      "version": "2026"
+    }
+  ],
+  "status": "PASS"
+}

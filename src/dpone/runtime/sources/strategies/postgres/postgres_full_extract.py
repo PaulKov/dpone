@@ -38,11 +38,10 @@ class PostgresFullExtractStrategy(PostgresBaseStrategy):
     - FULL_REFRESH: извлечь ВСЕ данные и заменить target таблицу
     - REPLACE: извлечь ЧАСТЬ данных (по custom_predicate) и заменить эту часть в target
 
-    Exchange Pattern (runtime-issued same-database capability):
-    - capability granted → InternalQueryArtifact → атомарная замена через RENAME
-      (в 5-10x быстрее, работает внутри PostgreSQL без Python overhead)
-    - capability absent/denied → FileExportArtifact → Binary COPY export/import
-      (5-10x быстрее чем StreamingRowsArtifact, минимальный Python overhead)
+    Transport (runtime-issued same-database capability):
+    - capability granted → InternalQueryArtifact → server-side staging INSERT
+    - capability absent/denied → FileExportArtifact → COPY export/import
+    The sink applies the selected load strategy after materialization.
     """
 
     def __init__(
@@ -163,7 +162,7 @@ class PostgresFullExtractStrategy(PostgresBaseStrategy):
         if self._internal_query_authorized(load_config):
             if query_params:
                 raise RuntimeError("postgres_portable_scope.internal_query_parameters_unsupported")
-            # FAST PATH: прямой CREATE TABLE AS SELECT (Exchange pattern)
+            # Server-side staging transport; the sink retains strategy ownership.
             from dpone.runtime.internal_query_artifact import InternalQueryArtifact
 
             artifact = InternalQueryArtifact(
@@ -175,7 +174,7 @@ class PostgresFullExtractStrategy(PostgresBaseStrategy):
                 {
                     "Source": f"{load_config.source_schema}.{load_config.source_table}",
                     "Target": f"{load_config.target_schema}.{load_config.target_table}",
-                    "Mode": "Exchange Pattern (атомарная замена через RENAME)",
+                    "Mode": "Internal query to staging; configured sink strategy",
                 },
             )
         else:
