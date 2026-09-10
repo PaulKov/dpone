@@ -6,10 +6,12 @@ Audience: DDA implementation owners and reviewers. Date: 2026-09-10.
 
 ## DDA-06 annotation-only dependency scope
 
-The full supplemental contract is `dda-06-native-annotation-scope.yml` in this
-directory. It replaces the effective DDA-06 contract for path/acceptance checks;
-the original planning commit f368294 remains immutable. Other task contracts
-remain in force, including independently recorded narrow supplements.
+The original full supplemental contract is `dda-06-native-annotation-scope.yml`
+in this directory. Its successor, `dda-06-generated-metrics-scope.yml`, is the
+current effective DDA-06 contract and retains every annotation/staging limit and
+exclusion below. The original planning commit f368294 remains immutable. Other
+task contracts remain in force, including independently recorded narrow
+supplements.
 
 A read-only architecture review checked real symbol use, exports, imports from
 5,801 Python files and applicable runtime reflection. It identified six
@@ -92,3 +94,41 @@ supplement. The baseline and budget files remain unchanged.
 Implementation tests and the integrated architecture/module-size gates remain
 UNVERIFIED for this supplement until DDA-06 executes and records them. The
 dependency-removal count is a scope estimate, not a prediction of a passing gate.
+
+## Excluded PostgreSQL reserve
+
+A further function-annotation candidate, ResolvedBindingConnection in
+`src/dpone/runtime/sources/postgres_source_authority.py`, is excluded from this
+supplement. Read-only inspection found active edits in six PostgreSQL worktrees
+and an explicit existing ownership contract for that file. Technical compatibility
+of an import cleanup does not transfer ownership to DDA-06.
+
+The file remains outside DDA-06's authorized paths. Preserve the PostgreSQL
+owner's changes and do not import that separate prototype as part of this scope
+adjustment. If actual integrated dependency or clustering metrics still exceed
+their limits, report FAIL and keep integration on HOLD with the measured result.
+
+## Generated quality dashboard
+
+The full `dda-06-generated-metrics-scope.yml` contract grants only DDA-06 the
+additional shared path `docs/quality-metrics.md`. Hosted CI requires the generated
+dashboard to match the integrated tracked Python tree. The existing producer,
+`uv run dpone docs update-dev-metrics`, writes only that Markdown file and
+preserves content outside its generated markers; its implementation was checked
+against integration commit 81a02033d4972a4a8a15795b87ef6efb1a15c267.
+
+Run the producer in the integration checkout after staging or committing every
+intended Python input, then run its `--check` mode and confirm byte-identical
+regeneration. Review the generated diff, source identity and final documentation
+checks. Retain all parallel changes and stop on a new ownership conflict.
+
+This update synchronizes displayed measurements. It permits no manual metric
+edits, generator changes, new output paths, baseline/budget changes, workflow
+changes or threshold overrides. An up-to-date dashboard can still describe
+failing architecture metrics; those FAIL results and integration HOLD remain.
+
+Planning validation: all six effective contracts and their combined ownership
+check PASS, including the exact one-path extension. The 44 documentation/policy
+tests PASS. Independent static review approved this supplement without findings.
+Generation and final integrated documentation/architecture checks remain DDA-06's
+execution responsibility; no passing generation result is claimed here.
