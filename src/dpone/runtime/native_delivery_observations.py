@@ -14,10 +14,17 @@ import time
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, TypedDict
 
 from dpone.contracts.native_delivery_observations import NativeDeliveryObservation, ObservationMetric, diagnostic_token
 from dpone.ports.native_delivery_observer import NativeDeliveryObserver
+
+
+class _RecorderIdentity(TypedDict):
+    clock_domain: str
+    process_id: int
+    worker_id: str
+
 
 _DIAGNOSTICS = frozenset(
     {
@@ -32,7 +39,7 @@ _DIAGNOSTICS = frozenset(
 )
 
 
-def _identity_valid(identity: dict[str, Any]) -> bool:
+def _identity_valid(identity: Mapping[str, Any]) -> bool:
     try:
         diagnostic_token(identity["clock_domain"])
         diagnostic_token(identity["worker_id"])
@@ -185,7 +192,7 @@ class BoundedNativeDeliveryObserver:
 
 
 def _overlap(spans: list[NativeDeliveryObservation]) -> int:
-    events = []
+    events: list[tuple[int, int, tuple[int, str]]] = []
     for span in spans:
         if span.end_monotonic_ns > span.start_monotonic_ns:
             worker = (span.process_id, span.worker_id)
@@ -219,10 +226,10 @@ class NativeDeliveryRecorder:
         diagnostics: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self._observer, self._clock = observer, clock
-        self._identity = dict(clock_domain=clock_domain, process_id=process_id, worker_id=worker_id)
+        self._identity = _RecorderIdentity(clock_domain=clock_domain, process_id=process_id, worker_id=worker_id)
         self._diagnostics: set[str] = set()
         if not _identity_valid(self._identity):
-            self._identity = dict(clock_domain="unavailable", process_id=0, worker_id="unavailable")
+            self._identity = _RecorderIdentity(clock_domain="unavailable", process_id=0, worker_id="unavailable")
             self._diagnostics.add("invalid_identity")
         self._durations: dict[str, dict[str, Any]] = {}
         self._invalid_durations: set[str] = set()
