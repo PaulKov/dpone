@@ -1,6 +1,7 @@
 # Feature design: bounded native ClickHouse to MSSQL transport
 
-- Status: RESEARCHED
+- Status: APPROVED
+- Maintainer approval: explicit `APPROVED` in the implementation task, 2026-09-10
 - Owner: dpone maintainers
 - Target release: unassigned
 - Last verified: 2026-09-10
@@ -384,4 +385,4 @@ the final implementation before integration. No merge or release is authorized.
 - [x] Compatibility, public options, evidence and migration impact identified.
 - [x] Primary-source alternatives and reproducible validation plan recorded.
 - [x] Single integrator and independent read-only reviews assigned.
-- [ ] Maintainer marks this concrete extension APPROVED before production edits.
+- [x] Maintainer marks this concrete extension APPROVED before production edits.
