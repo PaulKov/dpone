@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from dpone.adapters.dbt_workspace_mssql_activation_connection import WorkspaceActivationCursor, row
+from dpone.adapters.dbapi_lifecycle import row
 from dpone.contracts.dbt_workspace_control import (
     DbtWorkspaceActivationError,
     DbtWorkspaceActivationReceipt,
@@ -13,6 +13,7 @@ from dpone.contracts.dbt_workspace_control import (
     DbtWorkspaceGuardEpoch,
     canonical_fingerprint,
 )
+from dpone.ports.sql_connection import SqlControlCursor as WorkspaceActivationCursor
 
 Table = Callable[[str], str]
 ActivationRow = Callable[[WorkspaceActivationCursor, str], tuple[Any, ...] | None]

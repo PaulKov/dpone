@@ -13,6 +13,123 @@ for artifact delivery, and [the approved specification](feature-specs/compositio
 for the full execution scope. A successful source read, plan, fake-adapter test,
 cache install or launcher prepare does not certify SQL execution.
 
+## Concrete SQL Server persistence
+
+`dpone.adapters.composition_mssql_store.MssqlCompositionActivationStore`
+implements the occurrence store with real DB-API SQL statements. It accepts an
+injected factory for independent connections, an externally pinned
+`expected_service_id`, and an optional `control_schema`. It retains the complete
+MSSQL and ClickHouse resource closure in one protected SQL control database.
+ClickHouse rows in that ledger do not themselves prove ClickHouse permissions or
+writer exclusion.
+
+The platform installs the SQL from
+`dpone.adapters.composition_mssql_schema.render_composition_mssql_schema()`
+explicitly, then provisions and protects the authority and domain records.
+Reapplying the initial DDL fails rather than adopting existing tables. Runtime
+operations never create, repair or enroll their own authority. A matching schema
+version, eight table names and service UUID are structural prerequisites; the
+protected backend must separately verify database continuity, role permissions,
+exclusive enrollment and the installed writer gates before using this store.
+
+The store uses one short transaction-owned application lock in the control
+database to serialize ledger changes. This lock is not a writer-session fence.
+Requests retain canonical UTF-8 bytes and their original catalog observations.
+Each mutation closes its transaction connection and independently rereads the
+exact request, state, complete guard partition and epochs. A lost commit
+acknowledgement permits only exact reconciliation; it never triggers a blind
+mutation replay. An unavailable or changed readback requires operator recovery.
+
+Before retirement, the store reads all durable attempts, their complete epoch
+partitions and the immutable issued-principal journal. Resolved attempts require
+the exact protected `CLOSED_GATES`, `QUIESCENCE` and `OUTCOME` proof triplet. Each
+proof binds attempt, parent request, guard-epoch subject, backend service and
+issued principal identities. `OUTCOME` also binds its terminal state; a caller
+cannot promote a protected failed outcome to success. Unknown or running attempts
+retain ownership. A proof document's shape or caller-supplied digest grants no
+authority: trusted backend producers must create the actual observations and
+protected records.
+
+An unowned domain is not sufficient for successor admission. The store uses the
+historical activation partitions to find previous owners, then reopens their
+complete attempt/proof closure. Missing attempt partitions, missing proof bytes
+and terminal-state tampering reject reservation before any epoch is advanced.
+
+Offline adapter tests use explicit DB-API doubles. The separate synthetic SQL
+component runner exercises real control transactions; neither is the full
+current/provider/native/generated/ordinary execution campaign. Public activation
+remains unavailable until the complete protected backend and worker path is
+installed and verified.
+
+## SQL Server attempt and connection gates
+
+`MssqlCompositionAttemptStore` in `dpone.adapters.composition_mssql_attempts`
+accepts the same connection factory, pinned service UUID and control schema.
+`admit_once(attempt)` persists all selected epochs before credential issuance.
+`read_exact(attempt)` audits durable state and does not authorize another executor.
+Admission checks the complete protected proof triplet of relevant previous
+terminal attempts; three nonempty receipt digests are insufficient.
+
+`finalize(attempt, state=..., outcome_evidence_sha256=...)` selects a protected
+OUTCOME proof for a RUNNING attempt. The argument names the proof digest; its
+inner `evidence_sha256` names the actual producer's outcome evidence. Completion
+requires matching closed-gate and quiescence proofs for every issued principal,
+including other backends. A SQL gate cannot supply business-outcome evidence.
+The explicit `reconcile_unknown(...)` operation accepts a newly protected success
+or failure proof only for an audited COMMIT_UNKNOWN attempt. It issues no
+credentials and cannot change an already successful or failed attempt.
+
+`MssqlCompositionLoginGate` in `dpone.adapters.composition_mssql_login_gate`
+additionally requires the exact `control_database`. `issue_once(attempt)` first
+commits a unique login SID/name to the protected journal, then creates its bounded
+target users and verifies READY on another connection. Only that invocation
+receives the memory-only password. A replay cannot reset, enable or recreate the
+principal. Driver tracing must be disabled on these injected connections.
+
+`close(attempt)` irreversibly closes the reconnect gate and verifies the exact
+disabled SID before persisting closure evidence. `prove_quiescence(attempt)`
+requires server-visible absence of that original SID's sessions and transactions.
+Missing or uncertain principal state remains blocking. Process exit, gate table
+presence and login disablement alone are insufficient quiescence evidence.
+
+The platform separately installs
+`render_composition_mssql_login_gate(control_database=...)` from
+`dpone.adapters.composition_mssql_gate_schema`. Execute its `GO` batches preserving
+the trigger definition bytes. Provision the disabled gate reader, its minimum
+catalog/DMV grants and the protected control-table read permission as documented
+by the renderer. Enroll newly isolated target databases with their actual
+database identity, managed schemas and exact bounded writer role. Runtime checks
+the installed trigger definitions and permissions; it does not provision them.
+For this initial cell the trusted controller must own each dedicated target
+database, the bounded role must be owned by `dbo`, and managed objects must use
+inherited or `dbo` ownership. Read-only principals may not acquire writer authority
+through object or role ownership.
+LOGON synchronization and DMV visibility still require real tests on the pinned
+SQL Server version before worker activation is enabled.
+
+## Disposable SQL component check
+
+The `Composition SQL Server component` GitHub workflow uses a clean candidate
+checkout, Linux x86-64, Docker and Microsoft ODBC Driver 18. Its equivalent command
+on an explicitly approved disposable runner is:
+
+```bash
+uv sync --locked --extra mssql
+uv run python tools/composition_mssql_synthetic.py \
+  --output-dir "$RUNNER_TEMP/composition-mssql-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+```
+
+The output must be a new directory outside the checkout. The runner creates its
+own pinned SQL Server container, random loopback port and synthetic database;
+it does not accept an existing service. It retains only sanitized `summary.json`
+and `junit.xml`, recording exact source, image, driver and server identity. All
+expected cases must execute without skips. A cleanup failure changes the result
+to FAIL. No raw driver diagnostics or credentials belong in these artifacts.
+
+This component's ClickHouse rows are synthetic ledger metadata. Route
+qualification, LOGON concurrency and complete worker execution remain separate
+observations; a component PASS must not be reported as their certification.
+
 ## Required downstream matrix
 
 | Workload | Required route | Base contract | Actual parent execution |
@@ -179,8 +296,10 @@ Current acceptance gaps are explicit:
   DMV quiescence and actual dbt/ordinary worker credential injection.
 - ClickHouse physical enrollment, per-attempt writer closure, staged snapshot
   publication with atomic EXCHANGE and durable recovery intent.
-- Genuine qualifying full_refresh route evidence for the unchanged native-v2
-  compiler; existing local nonproduction receipts cannot be relabeled.
+- Genuine route qualification and the separately approved
+  [nonproduction authority family](feature-specs/nonproduction-composition-authority.md)
+  for the synthetic campaign. Existing production/native-v2 requirements retain
+  their meaning; local synthetic receipts cannot be relabeled as production.
 - The public authority-aware app factory/CLI and complete current/provider/SQL
   reconciliation run. Local ARM64 Docker is not the vendor-supported SQL Server
   container cell; use an isolated Linux x86-64 runner for that proof.

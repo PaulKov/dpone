@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Add concrete SQL Server persistence for complete composition occurrences and
+  cross-connector guards, with independent commit readback and exact protected
+  attempt/proof closure before retirement or successor admission. Add one-time
+  login issuance, monotonic reconnect gates and explicit unknown-outcome
+  reconciliation using protected producer evidence. Keep original admission bytes
+  and producer-bound outcome states; running and unknown attempts retain ownership.
+  External enrollment, live writer-gate qualification and full downstream execution
+  remain required before public activation can be enabled. Add a disposable Linux
+  SQL component runner with exact source and sanitized evidence.
+
 - Add complete composition source, physical-domain, occurrence and attempt
   contracts, plus a separate injectable parent activation coordinator. Preserve
   native-v2 authority and reject partial or stale parent readbacks. Protected

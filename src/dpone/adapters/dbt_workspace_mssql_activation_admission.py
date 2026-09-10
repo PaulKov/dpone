@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from dpone.adapters.dbt_workspace_mssql_activation_connection import close, rollback, row
+from dpone.adapters.dbapi_lifecycle import close, rollback, row
 from dpone.adapters.dbt_workspace_mssql_retirement import (
     activation_record as activation_row,
 )
@@ -32,10 +32,8 @@ from dpone.contracts.dbt_workspace_control import (
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 if TYPE_CHECKING:
-    from dpone.adapters.dbt_workspace_mssql_activation_connection import (
-        WorkspaceActivationConnection,
-        WorkspaceActivationCursor,
-    )
+    from dpone.ports.sql_connection import SqlControlConnection as WorkspaceActivationConnection
+    from dpone.ports.sql_connection import SqlControlCursor as WorkspaceActivationCursor
 
 
 class MssqlDbtWorkspaceActivationAdmission:

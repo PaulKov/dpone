@@ -95,6 +95,32 @@ class CompositionAttemptReceipt:
                 require_digest(value)
 
 
+def require_composition_attempt_scope(
+    occurrence: CompositionActivationOccurrence,
+    attempt: CompositionAttemptIdentity,
+) -> frozenset[str]:
+    """Audit exact parent/workload/epoch scope without granting new admission."""
+    occurrence.__post_init__()
+    attempt.__post_init__()
+    if attempt.activation_request_sha256 != occurrence.request.request_sha256:
+        raise CompositionAdmissionError("attempt_parent")
+    workloads = {row.workload_id: row for row in occurrence.request.workloads}
+    workload = workloads.get(attempt.workload_id)
+    if workload is None or (workload.constituent_id, workload.pack_sha256) != (
+        attempt.constituent_id,
+        attempt.pack_sha256,
+    ):
+        raise CompositionAdmissionError("attempt_workload")
+    subjects = set(workload.write_subjects)
+    guards = frozenset(
+        row.guard_id for row in occurrence.request.resources if subjects.intersection(row.write_subjects)
+    )
+    expected = tuple(pair for pair in occurrence.receipt.guard_epochs if pair[0] in guards)
+    if attempt.guard_epochs != expected:
+        raise CompositionAdmissionError("attempt_guard_epochs")
+    return guards
+
+
 def require_composition_attempt_admission(
     occurrence: CompositionActivationOccurrence,
     attempt: CompositionAttemptIdentity,
@@ -107,21 +133,7 @@ def require_composition_attempt_admission(
     occurrences holding any requested guard. No caller-provided subset is proof.
     """
     occurrence.require_state("ACTIVE")
-    attempt.__post_init__()
-    if attempt.activation_request_sha256 != occurrence.request.request_sha256:
-        raise CompositionAdmissionError("attempt_parent")
-    workloads = {row.workload_id: row for row in occurrence.request.workloads}
-    workload = workloads.get(attempt.workload_id)
-    if workload is None or (workload.constituent_id, workload.pack_sha256) != (
-        attempt.constituent_id,
-        attempt.pack_sha256,
-    ):
-        raise CompositionAdmissionError("attempt_workload")
-    subjects = set(workload.write_subjects)
-    guards = {row.guard_id for row in occurrence.request.resources if subjects.intersection(row.write_subjects)}
-    expected = tuple(pair for pair in occurrence.receipt.guard_epochs if pair[0] in guards)
-    if attempt.guard_epochs != expected:
-        raise CompositionAdmissionError("attempt_guard_epochs")
+    guards = require_composition_attempt_scope(occurrence, attempt)
     for receipt in existing:
         receipt.__post_init__()
         if receipt.attempt.attempt_sha256 == attempt.attempt_sha256:

@@ -30,9 +30,16 @@ domain conflict regardless of constituent boundaries.
 
 ## Consequences
 
-This first implementation provides the base contracts/coordinator and preserves
-fail-closed public activation. It does not install protected SQL Server/ClickHouse
-adapters or fence actual worker sessions. The required downstream includes
+The base contracts/coordinator preserve fail-closed public activation. The
+dependent concrete SQL Server store persists the entire cross-connector ledger
+under one short control transaction lock, with independent exact readback after
+commit. Canonical UTF-8 documents retain original admission observations. Final
+retirement checks protected issuance, complete proof scope and producer-bound
+outcome state. Neither the control lock nor table/schema presence proves writer
+permissions, exclusive enrollment or session quiescence.
+
+The store does not enable public activation or fence actual worker sessions by
+itself. The required downstream includes
 native-generated MSSQL-to-ClickHouse full_refresh and ordinary
 PostgreSQL-to-MSSQL full_refresh; an MSSQL-only pass is insufficient.
 
