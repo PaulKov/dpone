@@ -1,0 +1,110 @@
+bringing up nodes...
+bringing up nodes...
+
+......................F.....                                             [100%]
+=================================== FAILURES ===================================
+_ test_import_probe_replays_effective_env_derived_runtime_state[PYTHONTRACEMALLOC-5-import tracemalloc\nassert tracemalloc.is_tracing()\nassert tracemalloc.get_traceback_limit() == 5\nassert 'tracemalloc' not in sys._xoptions\n] _
+[gw1] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/c38d/dpone-public/.venv/bin/python
+
+name = 'PYTHONTRACEMALLOC', value = '5'
+assertion = "import tracemalloc\nassert tracemalloc.is_tracing()\nassert tracemalloc.get_traceback_limit() == 5\nassert 'tracemalloc' not in sys._xoptions\n"
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3650/popen-gw1/test_import_probe_replays_effe0')
+clean_doctor_probe_python = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3650/popen-gw1/doctor-clean-python0/venv/bin/python')
+
+    @pytest.mark.parametrize(
+        ("name", "value", "assertion"),
+        (
+            (
+                "PYTHONFAULTHANDLER",
+                "1",
+                "import faulthandler\nassert faulthandler.is_enabled()\nassert 'faulthandler' not in sys._xoptions\n",
+            ),
+            (
+                "PYTHONTRACEMALLOC",
+                "5",
+                "import tracemalloc\n"
+                "assert tracemalloc.is_tracing()\n"
+                "assert tracemalloc.get_traceback_limit() == 5\n"
+                "assert 'tracemalloc' not in sys._xoptions\n",
+            ),
+        ),
+    )
+    def test_import_probe_replays_effective_env_derived_runtime_state(
+        name: str,
+        value: str,
+        assertion: str,
+        tmp_path: Path,
+        clean_doctor_probe_python: Path,
+    ) -> None:
+        module_name = "_dpone_env_derived_runtime_state"
+        (tmp_path / f"{module_name}.py").write_text(
+            "import os, sys\n" + f"assert os.environ[{name!r}] == {value!r}\n" + assertion,
+            encoding="utf-8",
+        )
+        script = (
+            "import os, sys; "
+            "sys.path.insert(0, sys.argv[1]); "
+            "from dpone.readiness.python_import_health import probe_python_import; "
+            f"os._exit(0 if probe_python_import({module_name!r}).passed else 1)"
+        )
+        environment = dict(os.environ)
+        environment[name] = value
+    
+>       completed = subprocess.run(
+            (str(clean_doctor_probe_python), "-c", script, str(tmp_path)),
+            check=False,
+            env=_outer_probe_environment(environment),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=20,
+        )
+
+tests/test_doctor_import_integration.py:457: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:550: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:1209: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:2141: in _communicate
+    self.wait(timeout=self._remaining_time(endtime))
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:1264: in wait
+    return self._wait(timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: -9 args: ('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q...>
+timeout = 19.99994629190769
+
+    def _wait(self, timeout):
+        """Internal implementation of wait() on POSIX."""
+        if self.returncode is not None:
+            return self.returncode
+    
+        if timeout is not None:
+            endtime = _time() + timeout
+            # Enter a busy loop if we have a timeout.  This busy loop was
+            # cribbed from Lib/threading.py in Thread.wait() at r71065.
+            delay = 0.0005 # 500 us -> initial delay of 1 ms
+            while True:
+                if self._waitpid_lock.acquire(False):
+                    try:
+                        if self.returncode is not None:
+                            break  # Another thread waited.
+                        (pid, sts) = self._try_wait(os.WNOHANG)
+                        assert pid == self.pid or pid == 0
+                        if pid == self.pid:
+                            self._handle_exitstatus(sts)
+                            break
+                    finally:
+                        self._waitpid_lock.release()
+                remaining = self._remaining_time(endtime)
+                if remaining <= 0:
+>                   raise TimeoutExpired(self.args, timeout)
+E                   subprocess.TimeoutExpired: Command '('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3650/popen-gw1/doctor-clean-python0/venv/bin/python', '-c', "import os, sys; sys.path.insert(0, sys.argv[1]); from dpone.readiness.python_import_health import probe_python_import; os._exit(0 if probe_python_import('_dpone_env_derived_runtime_state').passed else 1)", '/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3650/popen-gw1/test_import_probe_replays_effe0')' timed out after 19.99994629190769 seconds
+
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:2045: TimeoutExpired
+=========================== short test summary info ============================
+FAILED tests/test_doctor_import_integration.py::test_import_probe_replays_effective_env_derived_runtime_state[PYTHONTRACEMALLOC-5-import tracemalloc\nassert tracemalloc.is_tracing()\nassert tracemalloc.get_traceback_limit() == 5\nassert 'tracemalloc' not in sys._xoptions\n]
+1 failed, 27 passed, 25 skipped in 76.49s (0:01:16)

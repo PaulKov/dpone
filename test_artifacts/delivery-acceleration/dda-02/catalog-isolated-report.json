@@ -1,0 +1,49 @@
+{
+  "airflow_parse": {
+    "command": "uv run pytest tests/test_airflow_provider_parse_slo.py -q",
+    "fixture": "100 DAG / 500 workloads",
+    "status": "SEPARATE_GATE"
+  },
+  "build": {
+    "first_bundle_id": "sha256:fe0690db68402f7e6e8b511a4818a490cbbde275c8860c8092decefa21401cf4",
+    "first_ms": 199.342,
+    "idempotent_rebuild_status": "no_op",
+    "independent_builds_equal": true,
+    "second_bundle_id": "sha256:fe0690db68402f7e6e8b511a4818a490cbbde275c8860c8092decefa21401cf4",
+    "second_ms": 78.928
+  },
+  "fixture": {
+    "catalog_entries": 4,
+    "payload_files": 5,
+    "recipe_entries": 3,
+    "shared_components": 1
+  },
+  "live_sigstore": "UNVERIFIED: requires an approved CI identity and trusted root",
+  "mutation_detection": {
+    "detected": 2,
+    "false_success_count": 0,
+    "passed": true,
+    "substitutions": 2
+  },
+  "passed": true,
+  "runner": {
+    "platform": "macOS-26.3.2-arm64-arm-64bit",
+    "processor": "arm64",
+    "python": "3.12.11"
+  },
+  "schema": "dpone.signed-catalog-extension-benchmark.v1",
+  "side_effects": {
+    "network_calls": 0,
+    "passed": true,
+    "subprocess_calls": 0
+  },
+  "verification": {
+    "budget_p95_ms": 2000.0,
+    "cosign_startup_excluded": true,
+    "max_ms": 140.383,
+    "p50_ms": 87.575,
+    "p95_ms": 140.383,
+    "passed": true,
+    "repetitions": 2
+  }
+}
