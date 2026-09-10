@@ -148,8 +148,9 @@ configured worker count as measured overlap.
 
 Chunk phases and publication phases are nested journal records. `stage_complete`
 is one CAS after EOF, contiguous verification and completion metadata. A verified
-individual chunk does not authorize publication. Two transient import retries
-reuse immutable bytes after previous-writer settlement. Cancellation, exhausted
+individual chunk does not authorize publication. Up to two import retries reuse immutable bytes after previous-writer settlement
+when the importer classifies a failure as `WindowTransientError`. Unclassified
+vendor errors stop the run. Cancellation, exhausted
 retries and lease loss cannot manufacture EOF or a target success receipt.
 
 For a first deployment, run synthetic NULL, duplicate, Unicode, binary, decimal,

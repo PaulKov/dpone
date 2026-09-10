@@ -1,12 +1,12 @@
 # Feature design: bounded native ClickHouse to MSSQL transport
 
-- Status: APPROVED
+- Status: IMPLEMENTED
 - Maintainer approval: explicit `APPROVED` in the implementation task, 2026-09-10
 - Owner: dpone maintainers
 - Target release: unassigned
 - Last verified: 2026-09-10
 
-This specification is for framework maintainers and connector authors. It proposes
+This specification is for framework maintainers and connector authors. It defines
 an opt-in replacement for the complete character spool on bounded ClickHouse to
 MSSQL loads. Implementation and deployment prerequisites are tracked in the
 [native transport guide](mssql-native-transport.md); live certification remains
@@ -411,3 +411,37 @@ The observed SQL allocation stop threshold counts reserved pages of native stagi
 tables; volume and transaction-log headroom are separate admission observations.
 Mandatory deployment callbacks must use real fencing, capacity and persistence
 services. Synthetic no-op authorities are not a deployment configuration.
+
+
+## Implementation evidence (2026-09-10)
+
+Frozen implementation commit: `a915444105f4ed6fb71d0e35e796a9233a43751b`.
+The subsequent status/evidence update changes documentation only.
+
+- **PASS:** complete non-live Python 3.12.11 suite: 20,595 passed, 570 skipped,
+  549.67 seconds. Used `-n 2 --dist loadfile` to avoid host oversubscription;
+  the selected test suite is unchanged. Skipped cases are not passes.
+- **PASS:** Ruff, formatting, configured mypy and explicit mypy over 43 changed
+  modules; import, layer, class-responsibility and exact-commit module-size gates.
+  Existing architectural budgets and debt baselines were not relaxed.
+- **PASS:** focused native source, encoder, real spawned execution, existing
+  transaction-finalizer, capacity, journal/recovery and compatibility tests.
+  Reviews reproduced and corrected temporal precision, Unicode sizing,
+  lineage overhead, ownership, exact-capacity and failure-observation issues.
+- **PASS:** documentation language/link checks, strict MkDocs and generated
+  references; four package builds, twine and all eight archive inspections;
+  fresh isolated-wheel native imports.
+- **IN PROGRESS:** [CI for the frozen implementation](https://github.com/PaulKov/dpone/actions/runs/34467423669).
+  Quality preflight, acceptance and Windows import checks completed successfully;
+  the remaining test matrix was queued when this record was written.
+- **SKIP / UNVERIFIED:** live ClickHouse/MSSQL interoperability, deployed DDL/writer
+  authorities and performance trials. No approved native live environment was
+  supplied. Implementation status is not route certification or release approval.
+
+Local command output is retained under
+`test_artifacts/bounded-mssql-typed-transport/`, including
+`native-full-suite-final.log`, `native-module-size-final.log`,
+`native-architecture-overshoot-final.log`, `native-mypy-changed-final.log`,
+`native-archive-gate-final.log` and `native-wheel-smoke-final.log`.
+The [review PR](https://github.com/PaulKov/dpone/pull/11) remains a draft; no merge,
+tag or publication is authorized by this evidence.
