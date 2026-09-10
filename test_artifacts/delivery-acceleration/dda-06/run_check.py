@@ -51,6 +51,20 @@ def identity() -> dict[str, str]:
         "tree": git("rev-parse", "HEAD^{tree}"),
         "source_sha256": digest.hexdigest(),
         "producer_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "working_tree_dirty": git(
+            "status",
+            "--porcelain",
+            "--",
+            "src",
+            "tests",
+            "docs",
+            "tools",
+            "pyproject.toml",
+            "uv.lock",
+            "mypy.ini",
+            "mkdocs.yml",
+            "CHANGELOG.md",
+        ),
     }
 
 
@@ -86,14 +100,14 @@ def run(name: str, command: list[str]) -> int:
             check=False,
         )
     after = identity()
-    unchanged = before == after
+    unchanged = before == after and not before["working_tree_dirty"]
     record.update(
         source_after=after,
         source_unchanged=unchanged,
         exit_code=process.returncode,
         duration_seconds=round(time.monotonic() - started, 3),
         status=("PASS" if process.returncode == 0 else "FAIL") if unchanged else "UNVERIFIED",
-        reason=None if unchanged else "Source or producer identity changed during execution",
+        reason=None if unchanged else "Source was dirty or source/producer identity changed during execution",
         log_sha256=hashlib.sha256(log.read_bytes()).hexdigest(),
     )
     temporary = report.with_suffix(".tmp")
