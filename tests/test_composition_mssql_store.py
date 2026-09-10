@@ -9,13 +9,25 @@ from dpone.adapters.composition_mssql_schema import render_composition_mssql_sch
 from dpone.adapters.composition_mssql_store import MssqlCompositionActivationStore
 from dpone.contracts.composition_activation import CompositionAdmissionError
 from dpone.contracts.composition_persistence import encode_activation_request
-from tests.composition_mssql_store_helpers import SERVICE_ID, Database, journal_attempt
+from tests.composition_mssql_store_fault_model import mutation_statements
+from tests.composition_mssql_store_fault_model import offline_gate as offline_gate
+from tests.composition_mssql_store_helpers import (
+    SERVICE_ID,
+    Database,
+    damage_authority,
+    damage_terminal_record,
+    journal_attempt,
+    owner_key,
+)
 from tests.test_composition_activation_contract import digest
+from tests.test_composition_mssql_catalog import verified_reference as verified_reference
+
+pytestmark = pytest.mark.usefixtures("verified_reference", "offline_gate")
 
 
 def test_external_schema_is_separate_from_native_v2():
     sql = render_composition_mssql_schema()
-    assert "CREATE TABLE [dpone_control].[composition_activations]" in sql
+    assert "CREATE TABLE [dpone_control].[composition_owners]" in sql
     assert "varbinary(max)" in sql.lower()
     assert "dbt_workspace" not in sql
     assert "semantic_refresh" not in sql
@@ -52,11 +64,11 @@ def retiring():
 def test_terminal_row_cannot_promote_a_protected_failed_outcome_to_success():
     database, adapter = retiring()
     attempt = journal_attempt(database, state="FAILED")
-    record = database.data["attempts"][attempt.attempt_sha256]
-    database.data["attempts"][attempt.attempt_sha256] = (*record[:4], "SUCCEEDED", *record[5:])
+    record = database.data["operations"][attempt.attempt_sha256]
+    database.data["operations"][attempt.attempt_sha256] = (*record[:6], "SUCCEEDED", *record[7:])
     with pytest.raises(CompositionAdmissionError, match="terminal_outcome_state"):
         adapter.finalize_retirement(database.request)
-    assert all(value[4] == database.request.activation_id for value in database.data["domains"].values())
+    assert all(value[4] == owner_key(database.request) for value in database.data["domains"].values())
 
 
 def test_mixed_engine_complete_request_and_partition_are_durable():
@@ -65,15 +77,22 @@ def test_mixed_engine_complete_request_and_partition_are_durable():
     assert result.request == database.request
     assert len(result.request.workloads) == 3
     assert {item.connector for item in result.request.resources} == {"mssql", "clickhouse"}
-    record = database.data["activations"][database.request.activation_id]
-    assert record == (database.request.request_sha256, encode_activation_request(database.request), "PREPARED")
-    assert "данные".encode() in record[1]
+    record = database.data["owners"][owner_key(database.request)]
+    assert record == (
+        owner_key(database.request),
+        "execution",
+        database.request.activation_id,
+        database.request.request_sha256,
+        encode_activation_request(database.request),
+        "PREPARED",
+    )
+    assert "данные".encode() in record[4]
     assert (
         tuple((guard, value[3]) for guard, value in sorted(database.data["domains"].items()))
         == result.receipt.guard_epochs
     )
-    assert len(database.data["activation_domains"]) == 2
-    assert all(value[4] == database.request.activation_id for value in database.data["domains"].values())
+    assert len(database.data["owner_domains"]) == 2
+    assert all(value[4] == owner_key(database.request) for value in database.data["domains"].values())
 
 
 def test_every_mutation_uses_independent_readback_after_commit():
@@ -90,6 +109,8 @@ def test_every_mutation_uses_independent_readback_after_commit():
         writer, reader = database.connections[before:]
         assert writer is not reader and writer.closed and reader.closed
         assert writer.commits == 1 and reader.commits == 0 and reader.rollbacks == 1
+        assert len(writer.transaction_ids) == len(reader.transaction_ids) == 1
+        assert writer.transaction_ids != reader.transaction_ids
 
 
 def test_prepare_replay_preserves_exact_bytes_and_epochs():
@@ -124,21 +145,24 @@ def test_changed_complete_request_is_rejected_without_mutation(field):
 @pytest.mark.parametrize("damage", ["document", "partition", "resource", "epoch", "owner", "physical"])
 def test_damaged_durable_state_cannot_acknowledge_activation(damage):
     database, adapter = prepared()
-    activation = database.request.activation_id
+    activation = owner_key(database.request)
     guard = database.request.resources[0].guard_id
     if damage == "document":
-        digest_value, document, state = database.data["activations"][activation]
-        database.data["activations"][activation] = (digest_value, document + b" ", state)
+        record = database.data["owners"][activation]
+        database.data["owners"][activation] = (*record[:4], record[4] + b" ", record[5])
     elif damage == "partition":
-        del database.data["activation_domains"][activation, guard]
+        database.data["owner_domains"] = [
+            row for row in database.data["owner_domains"] if row[:2] != (activation, guard)
+        ]
     elif damage == "resource":
-        document, epoch = database.data["activation_domains"][activation, guard]
-        database.data["activation_domains"][activation, guard] = (document + b" ", epoch)
+        index = next(i for i, row in enumerate(database.data["owner_domains"]) if row[:2] == (activation, guard))
+        row = database.data["owner_domains"][index]
+        database.data["owner_domains"][index] = (*row[:2], row[2] + b" ", row[3])
     else:
         row = list(database.data["domains"][guard])
         row[{"epoch": 3, "owner": 4, "physical": 2}[damage]] = {
             "epoch": 2,
-            "owner": "10000000-0000-4000-8000-000000000099",
+            "owner": digest("foreign owner"),
             "physical": digest("reincarnated"),
         }[damage]
         database.data["domains"][guard] = tuple(row)
@@ -151,24 +175,12 @@ def test_damaged_durable_state_cannot_acknowledge_activation(damage):
 @pytest.mark.parametrize("damage", ["missing_domain", "foreign_owner", "authority", "schema", "version"])
 def test_admission_rejects_unprovisioned_or_conflicting_authority_before_dml(damage):
     database = Database()
-    guard = database.request.resources[0].guard_id
-    if damage == "missing_domain":
-        guard = next(row.guard_id for row in database.request.resources if row.connector == "clickhouse")
-        del database.data["domains"][guard]
-    elif damage == "foreign_owner":
-        row = database.data["domains"][guard]
-        database.data["domains"][guard] = (*row[:3], 9, "10000000-0000-4000-8000-000000000099")
-    elif damage == "authority":
-        database.data["authority"] = [(1, 1, "10000000-0000-4000-8000-000000000099")]
-    elif damage == "schema":
-        database.data["tables"] = 7
-    else:
-        database.data["authority"] = [(1, 2, SERVICE_ID)]
+    damage_authority(database, damage)
     before = deepcopy(database.data)
     with pytest.raises(CompositionAdmissionError):
         store(database).prepare(database.request)
     assert database.data == before
-    assert not any(sql.startswith(("UPDATE ", "INSERT ")) for sql, _ in database.statements)
+    assert mutation_statements(database) == []
 
 
 def test_commit_ack_loss_reconciles_exact_independent_state_without_replay():
@@ -176,8 +188,7 @@ def test_commit_ack_loss_reconciles_exact_independent_state_without_replay():
     database.fail_commit = True
     assert store(database).prepare(database.request).receipt.state == "PREPARED"
     assert (
-        sum(sql.startswith("INSERT INTO [dpone_control].[composition_activations]") for sql, _ in database.statements)
-        == 1
+        sum(sql.startswith("INSERT INTO [dpone_control].[composition_owners]") for sql, _ in database.statements) == 1
     )
     assert len(database.connections) == 2
 
@@ -203,7 +214,7 @@ def test_successful_commit_with_unavailable_readback_retains_all_ownership():
     with pytest.raises(CompositionAdmissionError, match="commit_unknown") as caught:
         store(database).prepare(database.request)
     assert "synthetic-secret" not in str(caught.value)
-    assert all(row[4] == database.request.activation_id for row in database.data["domains"].values())
+    assert all(row[4] == owner_key(database.request) for row in database.data["domains"].values())
 
 
 def test_changed_epoch_after_commit_cannot_report_success():
@@ -230,12 +241,12 @@ def test_retirement_retains_historical_epochs_and_allows_explicit_successor():
     new = adapter.prepare(successor)
     assert all(epoch == 2 for _, epoch in new.receipt.guard_epochs)
     assert adapter.read(old.request.activation_id) == old
-    assert all(row[4] == successor.activation_id for row in database.data["domains"].values())
+    assert all(row[4] == owner_key(successor) for row in database.data["domains"].values())
 
 
 def test_driver_failure_rolls_back_complete_union_and_is_sanitized():
     database = Database()
-    database.fail_sql = "INSERT INTO [dpone_control].[composition_activation_domains]"
+    database.fail_sql = "INSERT INTO [dpone_control].[composition_owner_domains]"
     before = deepcopy(database.data)
     with pytest.raises(CompositionAdmissionError, match="durable_mutation") as caught:
         store(database).prepare(database.request)
@@ -249,16 +260,17 @@ def test_busy_global_ledger_lock_blocks_before_dml():
     database.lock_result = -1
     with pytest.raises(CompositionAdmissionError, match="ledger_lock"):
         store(database).prepare(database.request)
-    assert not database.data["activations"]
+    assert not database.data["owners"]
 
 
 @pytest.mark.parametrize("state", ["SUCCEEDED", "FAILED"])
 def test_retirement_requires_and_accepts_exact_protected_terminal_triplets(state):
     database, adapter = retiring()
-    journal_attempt(database, state=state)
+    attempt = journal_attempt(database, state=state)
     journal_attempt(database, workload_id="c_generated_данные", extra_principal=True)
     result = adapter.finalize_retirement(database.request)
     assert result.receipt.state == "RETIRED"
+    assert database.gate_observations and all(row[0] == attempt for row in database.gate_observations)
     assert all(row[4] is None for row in database.data["domains"].values())
 
 
@@ -289,39 +301,18 @@ def test_unresolved_attempt_blocks_retirement_even_with_complete_proofs(state):
 def test_terminal_hashes_cannot_substitute_for_complete_protected_proofs(damage):
     database, adapter = retiring()
     attempt = journal_attempt(database)
-    key = attempt.attempt_sha256
-    proof_key = next(iter(database.data["proofs"]))
-    if damage == "missing_proof":
-        del database.data["proofs"][proof_key]
-    elif damage in {"proof_bytes", "proof_epoch"}:
-        parent, epoch, document = database.data["proofs"][proof_key]
-        database.data["proofs"][proof_key] = (
-            parent,
-            digest("wrong") if damage == "proof_epoch" else epoch,
-            document + b" " if damage == "proof_bytes" else document,
-        )
-    elif damage == "missing_issuer":
-        del database.data["issued_authorities"][key]
-    elif damage == "foreign_issuer":
-        connector, service_id, principal = database.data["issued_authorities"][key][0]
-        database.data["issued_authorities"][key] = ((connector, service_id, principal[:-1] + "b"),)
-    elif damage == "partition":
-        database.data["attempt_domains"][key] = ()
-    else:
-        record = list(database.data["attempts"][key])
-        record[{"epoch": 2, "parent": 1, "terminal_hash": 5}[damage]] = digest("wrong")
-        database.data["attempts"][key] = tuple(record)
+    damage_terminal_record(database, attempt, damage)
     before = deepcopy(database.data)
     reason = {
         "missing_proof": "terminal_proof_identity",
         "proof_bytes": "proof_persistence_readback",
         "missing_issuer": "terminal_issued_authorities",
         "foreign_issuer": "terminal_proof_authorities",
-        "partition": "terminal_attempt_partition",
-        "epoch": "terminal_attempt_identity",
-        "parent": "terminal_attempt_identity",
+        "partition": "attempt_partition",
+        "epoch": "attempt_partition",
+        "parent": "attempt_parent_identity",
         "terminal_hash": "terminal_proof_identity",
-        "proof_epoch": "terminal_proof_identity",
+        "proof_epoch": "proof_attempt",
     }[damage]
     with pytest.raises(CompositionAdmissionError, match=reason):
         adapter.finalize_retirement(database.request)
@@ -345,18 +336,18 @@ def test_retirement_readback_rechecks_durable_terminal_proofs():
 def test_missing_occurrence_read_never_reserves_or_provisions():
     database = Database()
     assert store(database).read(database.request.activation_id) is None
-    assert not any(sql.startswith(("CREATE ", "ALTER ", "INSERT ", "UPDATE ")) for sql, _ in database.statements)
+    assert mutation_statements(database) == []
     assert database.connections[0].commits == 0
 
 
 def test_attempt_without_domain_rows_still_blocks_retirement():
     database, adapter = retiring()
     attempt = journal_attempt(database, state="RUNNING")
-    database.data["attempt_domains"].clear()
-    with pytest.raises(CompositionAdmissionError, match="unresolved_attempt"):
+    database.data["operation_domains"].clear()
+    with pytest.raises(CompositionAdmissionError, match="attempt_partition"):
         adapter.finalize_retirement(database.request)
-    assert database.data["attempts"][attempt.attempt_sha256][4] == "RUNNING"
-    assert all(row[4] == database.request.activation_id for row in database.data["domains"].values())
+    assert database.data["operations"][attempt.attempt_sha256][6] == "RUNNING"
+    assert all(row[4] == owner_key(database.request) for row in database.data["domains"].values())
 
 
 def test_foreign_unresolved_attempt_prevents_reacquiring_an_available_domain():
@@ -378,14 +369,14 @@ def test_successor_rejects_damaged_foreign_history_before_reservation(damage):
     database, adapter = retiring()
     attempt = journal_attempt(database, state="FAILED")
     adapter.finalize_retirement(database.request)
-    record = database.data["attempts"][attempt.attempt_sha256]
+    record = database.data["operations"][attempt.attempt_sha256]
     if damage == "missing_partition":
-        database.data["attempt_domains"].clear()
-        database.data["attempts"][attempt.attempt_sha256] = (*record[:4], "COMMIT_UNKNOWN", *record[5:])
+        database.data["operation_domains"].clear()
+        database.data["operations"][attempt.attempt_sha256] = (*record[:6], "COMMIT_UNKNOWN", *record[7:])
     elif damage == "missing_proof":
         database.data["proofs"].clear()
     else:
-        database.data["attempts"][attempt.attempt_sha256] = (*record[:4], "SUCCEEDED", *record[5:])
+        database.data["operations"][attempt.attempt_sha256] = (*record[:6], "SUCCEEDED", *record[7:])
     successor = replace(
         database.request,
         context=replace(database.request.context, activation_id="10000000-0000-4000-8000-000000000002"),

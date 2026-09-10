@@ -32,13 +32,20 @@ The platform installs the SQL from
 `dpone.adapters.composition_mssql_schema.render_composition_mssql_schema()`
 explicitly, then provisions and protects the authority and domain records.
 Reapplying the initial DDL fails rather than adopting existing tables. Runtime
-operations never create, repair or enroll their own authority. A matching schema
-version, eight table names and service UUID are structural prerequisites; the
-protected backend must separately verify database continuity, role permissions,
-exclusive enrollment and the installed writer gates before using this store.
+operations never create, repair or enroll their own authority. Each transaction
+requires schema version 2, the externally pinned service UUID and the complete
+eight-table catalog: original columns, keys, constraints, triggers and metadata
+visibility. Legacy writable table names reject admission. See the
+[shared SQL storage reference](composition-shared-sql-storage.md) for generated
+CHECK provenance and initial installation. The protected backend must separately
+verify database continuity, role permissions, exclusive enrollment and installed
+writer gates. Schema-v2 live qualification remains pending.
 
 The store uses one short transaction-owned application lock in the control
-database to serialize ledger changes. This lock is not a writer-session fence.
+database to serialize ledger changes. It also observes the actual SQL transaction
+identity at read, callback and commit boundaries; closing and reopening a
+transaction with the same lock does not preserve the original observation.
+This lock is not a writer-session fence.
 Requests retain canonical UTF-8 bytes and their original catalog observations.
 Each mutation closes its transaction connection and independently rereads the
 exact request, state, complete guard partition and epochs. A lost commit
@@ -55,10 +62,12 @@ retain ownership. A proof document's shape or caller-supplied digest grants no
 authority: trusted backend producers must create the actual observations and
 protected records.
 
-An unowned domain is not sufficient for successor admission. The store uses the
-historical activation partitions to find previous owners, then reopens their
-complete attempt/proof closure. Missing attempt partitions, missing proof bytes
-and terminal-state tampering reject reservation before any epoch is advanced.
+An unowned domain is not sufficient for successor admission. The store scans every
+owner and operation original independently of partition rows and current domain
+pointers. It validates complete original partitions before comparing guard
+intersection and reopening the relevant prior terminal-proof closure. Missing
+partitions, missing proof bytes and terminal-state tampering reject reservation
+before any epoch is advanced.
 
 Offline adapter tests use explicit DB-API doubles. The separate synthetic SQL
 component runner exercises real control transactions; neither is the full

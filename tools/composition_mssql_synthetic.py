@@ -192,6 +192,21 @@ def execute_component(output, env, profile="store"):
     return validate_results(output / "junit.xml", profile)
 
 
+def observe_source_after(report):
+    """Retain failed-capture provenance without replacing its original failure."""
+    try:
+        after_sha, after_clean = source_identity()
+        report.update(source_commit_after=after_sha, source_clean_after=after_clean)
+        matches = (report["source_commit"], True) == (after_sha, after_clean)
+        report["source_verification"] = "PASS" if matches else "FAIL"
+        if not matches and report["status"] == "PASS":
+            report.update(status="FAIL", reason="source_changed_during_execution")
+    except BaseException:
+        report["source_verification"] = "UNVERIFIED"
+        if report["status"] == "PASS":
+            report.update(status="FAIL", reason="source_readback_unavailable")
+
+
 def run(output, profile="store"):
     """Own the full lifecycle; cleanup failure overrides any otherwise green run."""
     cases = expected_cases(profile)
@@ -323,18 +338,18 @@ def run(output, profile="store"):
         report.update(provision_database(env))
         report["stage"] = "component_tests"
         report.update(execute_component(output, env, profile))
-        report["stage"] = "source_readback"
-        after_sha, after_clean = source_identity()
-        report.update(source_commit_after=after_sha, source_clean_after=after_clean)
-        if (sha, True) != (after_sha, after_clean):
-            raise RunFailure("source_changed_during_execution")
         report["status"] = "PASS"
-        report["stage"] = "complete"
     except RunFailure as error:
         report["reason"] = str(error)
     except BaseException:
         report["reason"] = "component_runner_failed"
     finally:
+        if report.get("source_clean_before") is True:
+            if report["status"] == "PASS":
+                report["stage"] = "source_readback"
+            observe_source_after(report)
+            if report["status"] == "PASS":
+                report["stage"] = "complete"
         if owned_name:
             try:
                 checked(["docker", "rm", "-f", owned_name], timeout=60)

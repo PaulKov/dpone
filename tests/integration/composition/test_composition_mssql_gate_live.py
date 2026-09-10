@@ -13,6 +13,7 @@ from threading import Event
 import pytest
 from tests.integration.composition.mssql_gate_live_provisioning import SqlFailure, execute
 from tests.integration.composition.mssql_gate_live_support import commit_factory, require_denied
+from tests.integration.composition.mssql_store_live_support import owner_key
 
 from dpone.adapters.composition_mssql_attempts import composition_control_transaction
 from dpone.adapters.composition_mssql_gate_schema import (
@@ -128,7 +129,7 @@ def test_gate_transitions_are_monotonic_and_reconnect_is_denied(gate_case):
     assert case.gate_row()[2:] == ("CLOSED", closed.evidence_sha256)
     with pytest.raises(SqlFailure) as caught:
         case.sql(
-            f"UPDATE {case.table('login_gates')} SET gate_state='READY' WHERE attempt_sha256=?;",
+            f"UPDATE {case.table('login_gates')} SET gate_state='READY' WHERE operation_key=?;",
             case.attempt.attempt_sha256,
         )
     assert caught.value.code == 51000
@@ -154,7 +155,7 @@ def test_stale_and_replayed_attempts_never_issue_credentials(gate_case):
         case.gate.issue_once(case.attempt)
     case.no_issuance()
     assert case.sql(
-        f"SELECT COUNT(*) FROM {case.table('attempts')} WHERE activation_id=?;", case.request.activation_id
+        f"SELECT COUNT(*) FROM {case.table('operations')} WHERE owner_key=?;", owner_key(case.request.activation_id)
     ) == ((1,),)
 
 
@@ -242,7 +243,7 @@ def test_concurrent_issuance_returns_credentials_once(gate_case):
         case.credentials = future.result(timeout=20)
     assert case.gate_row()[0] == case.credentials.login_sid
     assert case.sql(
-        f"SELECT COUNT(*) FROM {case.table('issued_authorities')} WHERE attempt_sha256=?;", case.attempt.attempt_sha256
+        f"SELECT COUNT(*) FROM {case.table('issued_authorities')} WHERE operation_key=?;", case.attempt.attempt_sha256
     ) == ((1,),)
     with closing(case.worker()) as worker:
         assert execute(worker, "SELECT SUSER_SID();") == ((case.credentials.login_sid,),)
@@ -268,7 +269,7 @@ def test_missing_or_recreated_sid_cannot_prove_closed(gate_case):
         with pytest.raises(CompositionAdmissionError):
             case.gate.close(case.attempt)
         assert case.sql(
-            f"SELECT COUNT(*) FROM {case.table('proofs')} WHERE attempt_sha256=?;", case.attempt.attempt_sha256
+            f"SELECT COUNT(*) FROM {case.table('proofs')} WHERE operation_key=?;", case.attempt.attempt_sha256
         ) == ((0,),)
     finally:
         case.environment.recover(

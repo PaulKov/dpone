@@ -3,9 +3,13 @@
 from collections import deque
 from dataclasses import replace
 
+import pytest
+
+from dpone.adapters.composition_mssql_schema import COMPOSITION_MSSQL_SCHEMA_VERSION
 from dpone.contracts.airflow_deployment import canonical_fingerprint
 from dpone.contracts.composition_activation import CompositionActivationOccurrence, CompositionActivationReceipt
 from dpone.contracts.composition_attempt import CompositionAttemptIdentity
+from tests.composition_mssql_catalog_helpers import catalog_observation, install_offline_catalog_references
 from tests.test_composition_activation_contract import digest, request
 
 SERVICE = "10000000-0000-4000-8000-000000000002"
@@ -61,7 +65,14 @@ class Cursor:
             assert "OUTPUT inserted.gate_state INTO @transition" in sql, (
                 "SQL334: OUTPUT requires INTO with AFTER trigger"
             )
-        if self.steps:
+        projected = catalog_observation(sql, parameters)
+        if sql.startswith("DECLARE @count"):
+            self.rows = [(1, 1, "Exclusive", 7)]
+        elif sql.startswith("SELECT TOP (2) singleton,schema_version,"):
+            self.rows = [(1, COMPOSITION_MSSQL_SCHEMA_VERSION, SERVICE)]
+        elif projected is not None:
+            self.rows = projected
+        elif self.steps:
             contains, result = self.steps.popleft()
             assert contains in sql, (contains, sql)
             if isinstance(result, Exception):
@@ -107,8 +118,6 @@ def begin_steps():
     return [
         ("SET XACT_ABORT", []),
         ("sp_getapplock", [(0,)]),
-        ("SELECT singleton", [(1, 1, SERVICE)]),
-        ("SELECT COUNT(*) FROM sys.tables", [(8,)]),
     ]
 
 
@@ -167,3 +176,36 @@ def partition_steps(value=None):
         ("SELECT request_sha256 FROM", [(value.activation_request_sha256,)]),
         ("SELECT guard_id, fencing_epoch", list(value.guard_epochs)),
     ]
+
+
+@pytest.fixture(autouse=True)
+def offline_catalog(monkeypatch):
+    install_offline_catalog_references(monkeypatch)
+
+
+@pytest.fixture
+def issuing(monkeypatch):
+    from dpone.adapters import composition_mssql_login_gate as gate_module
+    from dpone.adapters.composition_mssql_issuance import MssqlEnrollment, MssqlIssuedCredentials
+    from dpone.adapters.composition_mssql_login_gate import MssqlCompositionLoginGate
+    from dpone.contracts.composition_attempt import CompositionAttemptReceipt
+
+    value = attempt()
+    # This gate-boundary fixture supplies an independently observed existing
+    # operation. Kernel/history and actual SQL are separate validation layers.
+    monkeypatch.setattr(gate_module, "read_attempt", lambda *_: CompositionAttemptReceipt(value, "RUNNING"))
+    credentials = MssqlIssuedCredentials("dpone_v3_" + value.attempt_sha256[7:], b"a" * 16, "test-password-secret")
+    enrollment = MssqlEnrollment(
+        value.guard_epochs[0][0],
+        "SyntheticTarget",
+        8,
+        "10000000-0000-4000-8000-000000000009",
+        "2026-09-10T00:00:00",
+        "bounded_writer",
+        ("dbo",),
+    )
+    monkeypatch.setattr(gate_module, "new_credentials", lambda _: credentials)
+    monkeypatch.setattr(gate_module, "require_gate_policy", lambda *_: None)
+    monkeypatch.setattr(gate_module, "require_enrollments", lambda *_: (enrollment,))
+    monkeypatch.setattr(MssqlCompositionLoginGate, "_require_running", staticmethod(lambda *_: None))
+    return value, credentials, enrollment

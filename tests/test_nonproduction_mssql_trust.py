@@ -5,11 +5,13 @@ from dataclasses import replace
 
 import pytest
 
+from dpone.adapters.composition_mssql_schema import COMPOSITION_MSSQL_SCHEMA_VERSION
 from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.adapters.nonproduction_mssql_trust import MssqlNonproductionTrustProvider, NonproductionTrustRevision
 from dpone.contracts.nonproduction_scope import NonproductionAuthorityError
 from dpone.contracts.strict_json import canonical_json_bytes
 from dpone.runtime.nonproduction_authentication import NonproductionGrantAuthenticator
+from tests.composition_mssql_catalog_helpers import catalog_observation, install_offline_catalog_references
 from tests.nonproduction_authority_helpers import NOW, identifier, qualification
 from tests.nonproduction_signature_helpers import SignatureDouble, github_policy, qualification_inputs, sha256, trust
 from tests.test_nonproduction_mssql_schema import SCHEMA, catalog
@@ -33,12 +35,22 @@ def record(snapshot=None, revision=1):
 
 
 def reads(values=None):
-    return [[(1, 1, "Exclusive")], [(1, 1, SERVICE)], *catalog(), [record() if values is None else values]]
+    return [*catalog(), [record() if values is None else values]]
+
+
+@pytest.fixture(autouse=True)
+def offline_catalog(monkeypatch):
+    install_offline_catalog_references(monkeypatch)
 
 
 class Connection:
     def __init__(self, values=None):
-        self.answers = [[(0,)], [(1, 1, SERVICE)], [(8,)], *reads(values)]
+        self.answers = reads(values)
+        self.lock = (1, 1, "Exclusive")
+        self.transaction_id = 7
+        self.authority = [(1, COMPOSITION_MSSQL_SCHEMA_VERSION, SERVICE)]
+        self.lock_result = 0
+        self.rows = None
         self.commands = []
         self.events = []
         self.autocommit = True
@@ -53,15 +65,24 @@ class Connection:
         assert not sql.startswith(("INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "EXEC(N'"))
         if self.fail == "execute":
             raise RuntimeError("secret SQL connection")
+        self.rows = catalog_observation(sql, parameters)
+        if "APPLOCK_MODE" in sql:
+            self.rows = [(*self.lock, self.transaction_id)] if "CURRENT_TRANSACTION_ID" in sql else [self.lock]
+        elif "composition_authority] WITH" in sql:
+            self.rows = self.authority
+        elif "sp_getapplock" in sql:
+            self.rows = [(self.lock_result,)]
         return self
 
     def fetchone(self):
-        values = self.answers.pop(0)
+        values = self.fetchall()
         assert len(values) <= 1
         return values[0] if values else None
 
     def fetchall(self):
-        return self.answers.pop(0)
+        values = self.answers.pop(0) if self.rows is None else self.rows
+        self.rows = None
+        return values
 
     def commit(self):
         self.events.append("commit")
@@ -98,7 +119,7 @@ def test_each_read_uses_fresh_protected_transaction_and_preserves_snapshot_api()
     for connection in connections:
         assert not connection.answers and connection.autocommit is False
         assert connection.events == ["cursor", "commit", "close", "close"]
-        sql, params = connection.commands[-1]
+        sql, params = next(item for item in connection.commands if "ORDER BY revision DESC" in item[0])
         assert "TOP (1)" in sql and "ORDER BY revision DESC" in sql and "HOLDLOCK" in sql
         assert params == (ENVIRONMENT,)
 
@@ -171,21 +192,24 @@ def test_wrong_row_shape_rejects(values):
 @pytest.mark.parametrize(
     "section,value",
     [
-        (0, []),
-        (0, [(0, 0, "NoLock")]),
-        (0, [(1, -1, "Exclusive")]),
-        (0, [(1, 1, "Shared")]),
-        (1, [(1, 1, identifier(90))]),
-        (9, []),
+        ("lock", ()),
+        ("lock", (0, 0, "NoLock")),
+        ("lock", (1, -1, "Exclusive")),
+        ("lock", (1, 1, "Shared")),
+        ("authority", [(1, COMPOSITION_MSSQL_SCHEMA_VERSION, identifier(90))]),
+        ("enrollment", []),
     ],
 )
 def test_same_ledger_requires_existing_lock_service_and_enrollment(section, value):
     connection = Connection()
     connection.answers = reads()
-    connection.answers[section] = value
+    if section == "enrollment":
+        connection.answers[-1] = value
+    else:
+        setattr(connection, section, value)
     with pytest.raises(NonproductionAuthorityError) as caught:
         provider(lambda: connection).read_revision_in(CompositionMssqlLedger(connection, SCHEMA))
-    if section == 0:
+    if section == "lock":
         assert caught.value.reason == "trust_ledger_lock"
         assert len(connection.commands) == 1
     assert not connection.events
@@ -278,7 +302,7 @@ def test_external_identity_pins_reject_before_connecting(field, value):
 
 def test_rollback_failure_preserves_the_sanitized_primary_failure():
     connection = Connection()
-    connection.answers[0] = [(-1,)]
+    connection.lock_result = -1
     connection.fail = "rollback"
     with pytest.raises(NonproductionAuthorityError) as caught:
         provider(lambda: connection).read()

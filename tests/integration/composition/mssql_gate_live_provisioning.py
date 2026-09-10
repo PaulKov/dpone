@@ -14,6 +14,15 @@ from contextlib import closing
 from threading import Lock
 from uuid import uuid4
 
+from tests.integration.composition.mssql_store_live_support import (
+    SqlFailure,
+    catalog_context,
+    drain_results,
+    execute,
+    failure,
+)
+from tools.composition_mssql_check_catalog import capture_gate_check_catalog
+
 from dpone.adapters.composition_mssql_gate_schema import (
     GATE_READER,
     GATE_TRIGGER,
@@ -22,26 +31,7 @@ from dpone.adapters.composition_mssql_gate_schema import (
     monotonic_trigger_sql,
     render_composition_mssql_login_gate,
 )
-from dpone.adapters.composition_mssql_schema import render_composition_mssql_schema
-
-
-class SqlFailure(RuntimeError):
-    """Keep only SQLSTATE and a numeric error; driver messages may carry secrets."""
-
-    def __init__(self, code=None, *, sqlstate=None):
-        self.code = code
-        self.sqlstate = sqlstate
-        super().__init__(f"synthetic_sql_failure:{code if code is not None else 'unclassified'}")
-
-
-def failure(error):
-    if isinstance(error, SqlFailure):
-        return error
-    arguments = getattr(error, "args", ())
-    state = arguments[0] if arguments and type(arguments[0]) is str else None
-    state = state if state and re.fullmatch(r"[A-Z0-9]{5}", state) else None
-    codes = re.findall(r"\((\d{2,6})\)", " ".join(str(value) for value in getattr(error, "args", ())))
-    return SqlFailure(int(codes[-1]) if codes else None, sqlstate=state)
+from dpone.adapters.composition_mssql_schema import COMPOSITION_MSSQL_SCHEMA_VERSION, render_composition_mssql_schema
 
 
 class ControlDiagnostics:
@@ -146,23 +136,6 @@ class _ObservedCursor:
         return value
 
 
-def execute(connection, statement, *parameters):
-    """Drain every batch result so later trigger/grant/REVERT statements finish."""
-    try:
-        with closing(connection.cursor()) as cursor:
-            cursor.execute(statement, *parameters)
-            rows: list[tuple[object, ...]] = []
-            while True:
-                if cursor.description:
-                    rows.extend(tuple(value) for value in cursor.fetchall())
-                if not cursor.nextset():
-                    return tuple(rows)
-    except SqlFailure:
-        raise
-    except Exception as error:
-        raise failure(error) from None
-
-
 def gate_batches(database, schema):
     """Split only this renderer's explicit GO separators, preserving SQL bodies."""
     return tuple(
@@ -188,6 +161,7 @@ class ProvisionedGate:
         self.lifeline = None
         self.controller_name = None
         self.controller_sid = None
+        self._catalog = None
 
     def table(self, name):
         return f"[{self.schema}].[composition_{name}]"
@@ -237,7 +211,11 @@ class ProvisionedGate:
             "SELECT ORIGINAL_LOGIN(), SUSER_SID(ORIGINAL_LOGIN());"
         )[0]
         self.recover(render_composition_mssql_schema(self.schema))
-        self.recover(f"INSERT INTO {self.table('authority')} VALUES (1, 1, ?);", self.service_id)
+        self.recover(
+            f"INSERT INTO {self.table('authority')} VALUES (1, ?, ?);",
+            COMPOSITION_MSSQL_SCHEMA_VERSION,
+            self.service_id,
+        )
         self.recover(
             "DECLARE @password nvarchar(128)=?; DECLARE @sql nvarchar(max)="
             f"N'CREATE LOGIN [{GATE_READER}] WITH PASSWORD='+QUOTENAME(@password, '''')+"
@@ -250,8 +228,14 @@ class ProvisionedGate:
         for permission in ("VIEW SERVER STATE", "VIEW ANY DEFINITION", "VIEW SERVER PERFORMANCE STATE"):
             self.sql(f"GRANT {permission} TO [{GATE_READER}];", database="master")
         batches = gate_batches(self.database.database, self.schema)
-        for batch in batches[:-1]:
-            self.recover(batch)
+        with closing(self.lifeline.cursor()) as cursor:
+            for batch in batches[:-1]:
+                cursor.execute(batch)
+                drain_results(cursor)
+            self._catalog = (
+                capture_gate_check_catalog(cursor, self.schema),
+                catalog_context(cursor, self.database.database),
+            )
         self.recover(
             f"GRANT CONNECT TO [{GATE_READER}]; GRANT SELECT ON OBJECT::{self.table('login_gates')} TO [{GATE_READER}];"
         )
@@ -260,6 +244,15 @@ class ProvisionedGate:
             "attempt_sha256 varchar(71) NOT NULL, evidence_document varbinary(max) NOT NULL);"
         )
         self.sql(batches[-1], database="master")
+
+    def check_catalog(self):
+        """Return originals captured on the exact gate DDL cursor/session."""
+        assert self._catalog is not None
+        return self._catalog[0]
+
+    def check_catalog_context(self):
+        assert self._catalog is not None
+        return self._catalog[1]
 
     def new_target(self):
         """Create and observe fresh physical identity before any enrollment row."""

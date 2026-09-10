@@ -111,6 +111,10 @@ An absent or uncommittable transaction rejects with `trust_ledger_lock` before
 reading authority rows. The precondition only inspects the transaction-owned
 application lock when a committable transaction exists, because SQL Server can
 otherwise reject the lock-inspection function itself.
+Each read also retains the actual SQL transaction ID across catalog and original
+row observations. A new transaction holding the same lock cannot validate an
+earlier read. The enclosing control authority requires schema version 2; the
+optional trust and registration documents retain version 1.
 The registration component below uses this read/compare capability; the complete
 private authentication/admission coordinator remains pending.
 
@@ -148,7 +152,14 @@ roll back:
 - `read_in(ledger, consumption_subject_sha256, expected_revision=...)` reopens
   immutable history. The expected revision is the current storage consistency
   fence; stored originals are separately audited against their original trust
-  revision and registration time. Later expiry or revocation does not erase history.
+revision and registration time. Later expiry or revocation does not erase history.
+
+One private invocation boundary retains the actual transaction across both clock
+calls, all history pages, each append and successful returns, including an empty
+read or an identical execution registration. Before each append and return, it
+reopens the latest complete trust revision. A newer revision with identical
+policy bytes still rejects. Changed authority, lock or transaction returns no
+receipt; a failure after an append requires the caller to roll back all its writes.
 
 The trusted coordinator must verify original signatures before these calls,
 retain the transaction and exact lock through all admission writes, roll back the

@@ -232,7 +232,9 @@ def test_execution_replay_rebind_and_documentary_candidates(registration_case):
     second = case.register(other)
     assert case.read(grant) == first and case.read(other) == second
     assert (len(case.snapshot()[0]), len(case.snapshot()[1])) == (2, 3)
-    assert case.sql(f"SELECT COUNT(*) FROM [{case.schema}].[composition_activations];") == ((0,),)
+    assert case.sql(
+        f"SELECT COUNT(*) FROM [{case.schema}].[composition_owners]; SELECT COUNT(*) FROM [{case.schema}].[composition_operations];"
+    ) == ((0,), (0,))
     case.record("state", {"rows": 2, "members": 3, "denied": 2})
 
 

@@ -10,15 +10,15 @@ successful return inside a transaction is not an acknowledged durable result.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
+from dpone.adapters.nonproduction_mssql_registration_boundary import _RegistrationBoundary
 from dpone.adapters.nonproduction_mssql_registration_schema import (
     REGISTRATION_COLUMNS,
     registration_projection_sql,
     require_nonproduction_registration_insert_options,
-    require_nonproduction_registration_schema,
 )
 from dpone.adapters.nonproduction_mssql_trust import MssqlNonproductionTrustProvider, NonproductionTrustRevision
 from dpone.contracts.nonproduction_authority import utc_timestamp
@@ -89,9 +89,9 @@ class MssqlNonproductionRegistrationStore:
         cannot erase historical evidence. Caller controls the transaction lifetime.
         """
         try:
-            current, now = self._begin(ledger, expected_revision)
-            digest(consumption_subject_sha256)
-            return self._read(ledger, consumption_subject_sha256, current, now)
+            with _RegistrationBoundary(self._trust, ledger, expected_revision, self._clock) as boundary:
+                digest(consumption_subject_sha256)
+                return self._read(boundary, consumption_subject_sha256, boundary.started_at)
         except NonproductionAuthorityError:
             raise
         except Exception:
@@ -141,22 +141,6 @@ class MssqlNonproductionRegistrationStore:
             ledger, grant_bytes, signature_bundle, signature_subject_bytes, None, expected_revision, "qualification"
         )
 
-    def _begin(
-        self, ledger: CompositionMssqlLedger, expected: NonproductionTrustRevision
-    ) -> tuple[NonproductionTrustRevision, datetime]:
-        current = self._trust.require_revision_in(ledger, expected)
-        require_nonproduction_registration_schema(ledger.cursor, ledger.schema)
-        return current, self._now()
-
-    def _now(self) -> datetime:
-        try:
-            now = self._clock()
-            if type(now) is not datetime or now.tzinfo is None or now.utcoffset() is None:
-                raise ValueError
-            return now.astimezone(timezone.utc)  # noqa: UP017
-        except Exception:
-            raise NonproductionAuthorityError("registration_clock") from None
-
     def _register(
         self,
         ledger: CompositionMssqlLedger,
@@ -168,96 +152,97 @@ class MssqlNonproductionRegistrationStore:
         phase: str,
     ) -> NonproductionGrantRegistration:
         try:
-            current, now = self._begin(ledger, expected)
-            originals = NonproductionRegistrationOriginals(grant_bytes, bundle, subject, request)
-            grant = originals.grant
-            if grant.phase != phase or grant.scope.environment_id != current.environment_id:
-                raise NonproductionAuthorityError("registration_phase_environment")
-            prior = self._read(ledger, grant.consumption_subject_sha256, current, now)
-            if prior is not None:
-                if prior.originals != originals:
-                    raise NonproductionAuthorityError("registration_rebind")
-                if phase == "qualification":
-                    raise NonproductionAuthorityError("qualification_consumed")
-                return prior
-            policy = originals.require_policy(
-                current.snapshot.policy_bytes,
-                current.snapshot.policy_sha256,
-                current.snapshot.current_revocation_epoch,
-                now,
-            )
-            members = self._pool(ledger, grant.scope.campaign_id, phase, current, now)
-            if type(grant) is NonproductionExecutionGrant:
-                require_execution_memberships(grant, policy, tuple(sorted(members)))
-            record = NonproductionGrantRegistration(originals, current.revision, now.strftime("%Y-%m-%dT%H:%M:%SZ"))
-            subject_id = _values(record)[5]
-            if phase == "qualification" and self._rows(ledger, "phase = ? AND phase_subject_id = ?", phase, subject_id):
-                raise NonproductionAuthorityError("registration_subject_reuse")
-            finished = self._now()
-            if finished < now:
-                raise NonproductionAuthorityError("registration_clock")
-            originals.require_policy(
-                current.snapshot.policy_bytes,
-                current.snapshot.policy_sha256,
-                current.snapshot.current_revocation_epoch,
-                finished,
-            )
-            require_nonproduction_registration_insert_options(ledger.cursor)
-            ledger.cursor.execute(
-                f"INSERT INTO {ledger.table('nonproduction_grants')} "
-                f"({', '.join(REGISTRATION_COLUMNS)}) VALUES ({', '.join('?' for _ in REGISTRATION_COLUMNS)});",
-                *_values(record),
-            )
-            if type(grant) is NonproductionExecutionGrant:
-                for workload in grant.workloads:
-                    if workload.workload_id not in members:
-                        document = workload_document(workload.workload_id)
-                        ledger.cursor.execute(
-                            f"INSERT INTO {ledger.table('nonproduction_memberships')} "
-                            "(environment_id, campaign_id, phase, workload_sha256, workload_document, "
-                            "first_grant_sha256) VALUES (?, ?, ?, ?, ?, ?);",
-                            current.environment_id,
-                            grant.scope.campaign_id,
-                            phase,
-                            original_sha256(document),
-                            document,
-                            grant.consumption_subject_sha256,
-                        )
-            readback = self._read(ledger, grant.consumption_subject_sha256, current, finished)
-            if readback != record:
-                raise NonproductionAuthorityError("registration_readback")
-            return record
+            with _RegistrationBoundary(self._trust, ledger, expected, self._clock) as boundary:
+                current, now = boundary.current, boundary.started_at
+                originals = NonproductionRegistrationOriginals(grant_bytes, bundle, subject, request)
+                grant = originals.grant
+                if grant.phase != phase or grant.scope.environment_id != current.environment_id:
+                    raise NonproductionAuthorityError("registration_phase_environment")
+                prior = self._read(boundary, grant.consumption_subject_sha256, now)
+                if prior is not None:
+                    if prior.originals != originals:
+                        raise NonproductionAuthorityError("registration_rebind")
+                    if phase == "qualification":
+                        raise NonproductionAuthorityError("qualification_consumed")
+                    return prior
+                policy = originals.require_policy(
+                    current.snapshot.policy_bytes,
+                    current.snapshot.policy_sha256,
+                    current.snapshot.current_revocation_epoch,
+                    now,
+                )
+                members = self._pool(boundary, grant.scope.campaign_id, phase, now)
+                if type(grant) is NonproductionExecutionGrant:
+                    require_execution_memberships(grant, policy, tuple(sorted(members)))
+                record = NonproductionGrantRegistration(originals, current.revision, now.strftime("%Y-%m-%dT%H:%M:%SZ"))
+                subject_id = _values(record)[5]
+                if phase == "qualification" and self._rows(
+                    boundary, "phase = ? AND phase_subject_id = ?", phase, subject_id
+                ):
+                    raise NonproductionAuthorityError("registration_subject_reuse")
+                finished = boundary.now()
+                if finished < now:
+                    raise NonproductionAuthorityError("registration_clock")
+                originals.require_policy(
+                    current.snapshot.policy_bytes,
+                    current.snapshot.policy_sha256,
+                    current.snapshot.current_revocation_epoch,
+                    finished,
+                )
+                require_nonproduction_registration_insert_options(ledger.cursor)
+                boundary.write(
+                    f"INSERT INTO {ledger.table('nonproduction_grants')} "
+                    f"({', '.join(REGISTRATION_COLUMNS)}) VALUES ({', '.join('?' for _ in REGISTRATION_COLUMNS)});",
+                    *_values(record),
+                )
+                if type(grant) is NonproductionExecutionGrant:
+                    for workload in grant.workloads:
+                        if workload.workload_id not in members:
+                            document = workload_document(workload.workload_id)
+                            boundary.write(
+                                f"INSERT INTO {ledger.table('nonproduction_memberships')} "
+                                "(environment_id, campaign_id, phase, workload_sha256, workload_document, "
+                                "first_grant_sha256) VALUES (?, ?, ?, ?, ?, ?);",
+                                current.environment_id,
+                                grant.scope.campaign_id,
+                                phase,
+                                original_sha256(document),
+                                document,
+                                grant.consumption_subject_sha256,
+                            )
+                readback = self._read(boundary, grant.consumption_subject_sha256, finished)
+                if readback != record:
+                    raise NonproductionAuthorityError("registration_readback")
+                return record
         except NonproductionAuthorityError:
             raise
         except Exception:
             raise NonproductionAuthorityError("registration_unavailable") from None
 
     @staticmethod
-    def _rows(ledger: CompositionMssqlLedger, where: str, *parameters: object) -> tuple[tuple[Any, ...], ...]:
-        ledger.cursor.execute(
-            f"SELECT TOP (2) {registration_projection_sql()} FROM {ledger.table('nonproduction_grants')} WITH (HOLDLOCK) "
+    def _rows(boundary: _RegistrationBoundary, where: str, *parameters: object) -> tuple[tuple[Any, ...], ...]:
+        return boundary.rows(
+            f"SELECT TOP (2) {registration_projection_sql()} FROM {boundary.ledger.table('nonproduction_grants')} WITH (HOLDLOCK) "
             f"WHERE {where} ORDER BY consumption_subject_sha256;",
             *parameters,
         )
-        return tuple(tuple(value) for value in ledger.cursor.fetchall())
 
-    def _read(
-        self, ledger: CompositionMssqlLedger, key: str, current: NonproductionTrustRevision, now: datetime
-    ) -> NonproductionGrantRegistration | None:
-        rows = self._rows(ledger, "consumption_subject_sha256 = ?", key)
+    def _read(self, boundary: _RegistrationBoundary, key: str, now: datetime) -> NonproductionGrantRegistration | None:
+        rows = self._rows(boundary, "consumption_subject_sha256 = ?", key)
         if not rows:
             return None
         if len(rows) != 1:
             raise NonproductionAuthorityError("registration_row")
-        record = self._decode(ledger, rows[0], current, now)
+        record = self._decode(boundary, rows[0], now)
         if record.originals.grant.consumption_subject_sha256 != key:
             raise NonproductionAuthorityError("registration_identity")
-        self._pool(ledger, record.originals.grant.scope.campaign_id, record.originals.grant.phase, current, now)
+        self._pool(boundary, record.originals.grant.scope.campaign_id, record.originals.grant.phase, now)
         return record
 
     def _decode(
-        self, ledger: CompositionMssqlLedger, row: tuple[Any, ...], current: NonproductionTrustRevision, now: datetime
+        self, boundary: _RegistrationBoundary, row: tuple[Any, ...], now: datetime
     ) -> NonproductionGrantRegistration:
+        current = boundary.current
         if len(row) != len(REGISTRATION_COLUMNS) or type(row[6]) is not int or row[6] != 1:
             raise NonproductionAuthorityError("registration_row")
         originals = NonproductionRegistrationOriginals(row[7], row[9], row[11], row[13])
@@ -267,7 +252,7 @@ class MssqlNonproductionRegistrationStore:
         instant = utc_timestamp(record.registered_at)
         if instant > now or record.trust_revision > current.revision:
             raise NonproductionAuthorityError("registration_history")
-        historical = self._historical(ledger, current, record.trust_revision)
+        historical = self._historical(boundary, record.trust_revision)
         originals.require_policy(
             historical.snapshot.policy_bytes,
             historical.snapshot.policy_sha256,
@@ -277,21 +262,19 @@ class MssqlNonproductionRegistrationStore:
         return record
 
     @staticmethod
-    def _historical(
-        ledger: CompositionMssqlLedger, current: NonproductionTrustRevision, revision: int
-    ) -> NonproductionTrustRevision:
+    def _historical(boundary: _RegistrationBoundary, revision: int) -> NonproductionTrustRevision:
+        current = boundary.current
         if revision == current.revision:
             return current
-        ledger.cursor.execute(
+        rows = boundary.rows(
             "SELECT LOWER(CONVERT(char(36), environment_id)), revision, schema_version, "
             "CASE WHEN DATALENGTH(policy_document) BETWEEN 1 AND 1048576 THEN policy_document END, "
             "policy_sha256, CASE WHEN DATALENGTH(verifier_policy_document) BETWEEN 1 AND 1048576 "
             "THEN verifier_policy_document END, verifier_policy_sha256, current_revocation_epoch "
-            f"FROM {ledger.table('nonproduction_trust')} WITH (HOLDLOCK) WHERE environment_id = ? AND revision = ?;",
+            f"FROM {boundary.ledger.table('nonproduction_trust')} WITH (HOLDLOCK) WHERE environment_id = ? AND revision = ?;",
             current.environment_id,
             revision,
         )
-        rows = tuple(tuple(row) for row in ledger.cursor.fetchall())
         if (
             len(rows) != 1
             or len(rows[0]) != 8
@@ -306,18 +289,18 @@ class MssqlNonproductionRegistrationStore:
 
     def _pool_records(
         self,
-        ledger: CompositionMssqlLedger,
+        boundary: _RegistrationBoundary,
         campaign: str,
         phase: str,
-        current: NonproductionTrustRevision,
         now: datetime,
     ) -> Iterator[NonproductionGrantRegistration]:
         """One full original at a time; nested trust reads cannot invalidate a page."""
+        current = boundary.current
         previous: str | None = None
         while True:
             after = "" if previous is None else " AND consumption_subject_sha256 > ?"
-            ledger.cursor.execute(
-                f"SELECT TOP (1) consumption_subject_sha256 FROM {ledger.table('nonproduction_grants')} WITH (HOLDLOCK) "
+            page = boundary.rows(
+                f"SELECT TOP (1) consumption_subject_sha256 FROM {boundary.ledger.table('nonproduction_grants')} WITH (HOLDLOCK) "
                 f"WHERE environment_id = ? AND campaign_id = ? AND phase = ?{after} "
                 "ORDER BY consumption_subject_sha256;",
                 current.environment_id,
@@ -325,16 +308,15 @@ class MssqlNonproductionRegistrationStore:
                 phase,
                 *((previous,) if previous is not None else ()),
             )
-            page = ledger.cursor.fetchone()
-            if page is None:
+            if not page:
                 return
-            if len(page) != 1 or digest(page[0]) <= (previous or ""):
+            if len(page) != 1 or len(page[0]) != 1 or digest(page[0][0]) <= (previous or ""):
                 raise NonproductionAuthorityError("registration_pool_order")
-            previous = page[0]
-            rows = self._rows(ledger, "consumption_subject_sha256 = ?", previous)
+            previous = page[0][0]
+            rows = self._rows(boundary, "consumption_subject_sha256 = ?", previous)
             if len(rows) != 1:
                 raise NonproductionAuthorityError("registration_row")
-            record = self._decode(ledger, rows[0], current, now)
+            record = self._decode(boundary, rows[0], now)
             grant = record.originals.grant
             if (grant.scope.campaign_id, grant.phase, grant.consumption_subject_sha256) != (campaign, phase, previous):
                 raise NonproductionAuthorityError("registration_pool")
@@ -342,28 +324,27 @@ class MssqlNonproductionRegistrationStore:
 
     def _pool(
         self,
-        ledger: CompositionMssqlLedger,
+        boundary: _RegistrationBoundary,
         campaign: str,
         phase: str,
-        current: NonproductionTrustRevision,
         now: datetime,
     ) -> frozenset[str]:
         """Bound memory, not lock duration: all immutable history is still audited."""
-        ledger.cursor.execute(
+        current = boundary.current
+        rows = boundary.rows(
             "SELECT TOP (65) LOWER(CONVERT(char(36), environment_id)), LOWER(CONVERT(char(36), campaign_id)), phase, "
             "workload_sha256, CASE WHEN DATALENGTH(workload_document) BETWEEN 1 AND 1048576 THEN workload_document END, "
-            f"first_grant_sha256 FROM {ledger.table('nonproduction_memberships')} WITH (HOLDLOCK) "
+            f"first_grant_sha256 FROM {boundary.ledger.table('nonproduction_memberships')} WITH (HOLDLOCK) "
             "WHERE environment_id = ? AND campaign_id = ? AND phase = ? ORDER BY workload_sha256;",
             current.environment_id,
             campaign,
             phase,
         )
-        rows = tuple(tuple(row) for row in ledger.cursor.fetchall())
         if len(rows) > 64:
             raise NonproductionAuthorityError("registration_membership_overflow")
         for row in rows:
             if len(row) != 6 or tuple(row[:3]) != (current.environment_id, campaign, phase):
                 raise NonproductionAuthorityError("registration_membership")
         return require_membership_history(
-            tuple((row[3], row[4], row[5]) for row in rows), self._pool_records(ledger, campaign, phase, current, now)
+            tuple((row[3], row[4], row[5]) for row in rows), self._pool_records(boundary, campaign, phase, now)
         )

@@ -2,8 +2,9 @@
 
 This is the implementation design for the already approved
 [nonproduction composition campaign](feature-specs/nonproduction-composition-authority.md).
-The shared schema-v2 core and qualification lifecycle described here are
-**not yet implemented or live-qualified**. [ADR 0061](adr/0061-shared-composition-physical-ownership.md)
+The shared schema-v2 journal and existing execution adapters are implemented;
+**schema-v2 live qualification and the qualification lifecycle remain pending**.
+[ADR 0061](adr/0061-shared-composition-physical-ownership.md)
 records the architecture decision. The closed owner, physical-claim and
 qualification-operation records are implemented as structural contracts only.
 Existing public scoped factories remain closed.

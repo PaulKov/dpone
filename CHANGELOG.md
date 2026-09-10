@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Move internal composition execution storage to one schema-v2 ownership and
+  operation journal. Audit complete original scope, transaction continuity,
+  table metadata and retained gate proofs; preserve existing execution bytes,
+  hashes and replay identities. Historical retired reads permit a correctly
+  admitted successor while fresh issuance still requires ACTIVE/RUNNING.
+  Initial installation requires a new isolated ledger; no automatic adoption
+  or migration is provided. Generated SQL CHECK references and schema-v2 live
+  qualification remain pending, and public execution factories stay closed.
+- Keep nonproduction trust reads and registrations in one observed SQL
+  transaction. Recheck the original trust revision around clock callbacks,
+  writes and successful returns without changing historical grant validity.
+  Preserve source readback observations even when a synthetic component run
+  fails; unavailable or changed source cannot produce passing certification.
+
 - Add strict internal qualification owner, complete physical-claim and operation
   records, including replay identity for the actual invocation. Preserve existing
   physical guard and execution document hashes. These structural values do not

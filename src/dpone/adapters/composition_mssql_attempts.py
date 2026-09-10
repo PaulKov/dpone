@@ -10,11 +10,16 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Any
 from uuid import UUID
 
+from dpone.adapters.composition_mssql_existing_operation import require_existing_execution_in
+from dpone.adapters.composition_mssql_operations import require_execution_attempt_in
 from dpone.adapters.composition_mssql_schema import require_control_schema
 from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
+from dpone.adapters.composition_mssql_terminal import (
+    require_execution_terminal_in,
+    select_terminal_hashes_in,
+)
 from dpone.adapters.dbapi_lifecycle import (
     close,
     rollback,
@@ -25,13 +30,9 @@ from dpone.contracts.composition_control import (
     CompositionAdmissionError,
     CompositionAttemptIdentity,
     CompositionAttemptReceipt,
-    composition_attempt_epoch_subject,
-    decode_attempt_identity,
-    decode_attempt_proof,
     encode_attempt_identity,
-    require_composition_attempt_admission,
-    require_composition_attempt_scope,
 )
+from dpone.contracts.composition_ownership import CompositionOwnerReference
 from dpone.ports.sql_connection import SqlControlConnection
 
 ConnectionFactory = Callable[[], SqlControlConnection]
@@ -51,8 +52,9 @@ def composition_control_transaction(
         connection.autocommit = False
         cursor = connection.cursor()
         ledger = CompositionMssqlLedger(cursor, schema)
-        ledger.begin(service_id)
+        transaction = ledger.begin(service_id)
         yield ledger
+        ledger.require_transaction(transaction)
         connection.commit()
     except CompositionAdmissionError:
         rollback(connection)
@@ -68,126 +70,62 @@ def composition_control_transaction(
 def read_attempt_occurrence(
     ledger: CompositionMssqlLedger, attempt: CompositionAttemptIdentity
 ) -> CompositionActivationOccurrence:
-    """Resolve the parent only from protected canonical request identity."""
-    ledger.cursor.execute(
-        f"SELECT LOWER(CONVERT(char(36), activation_id)) FROM {ledger.table('activations')} WITH (HOLDLOCK) "
-        "WHERE request_sha256 = ?;",
-        attempt.activation_request_sha256,
+    """Inspect an already reserved operation; this cannot admit a fresh attempt."""
+    occurrence, _ = require_existing_execution_in(
+        ledger, attempt, expected_service_id=ledger.expected_service_id, terminal_validator=ledger.terminal_validator
     )
-    records = tuple(ledger.cursor.fetchall())
-    if len(records) != 1:
-        raise CompositionAdmissionError("attempt_parent")
-    occurrence = ledger.read(records[0][0])
-    if occurrence is None:
-        raise CompositionAdmissionError("attempt_parent")
-    require_composition_attempt_scope(occurrence, attempt)
     return occurrence
 
 
-def _receipt(ledger: CompositionMssqlLedger, record: tuple[Any, ...]) -> CompositionAttemptReceipt:
-    digest, parent, epochs, document, state, closed, quiescent, outcome, activation_id = record
-    attempt = decode_attempt_identity(document, digest)
-    if (parent, epochs) != (attempt.activation_request_sha256, composition_attempt_epoch_subject(attempt)):
-        raise CompositionAdmissionError("attempt_identity")
-    ledger.cursor.execute(
-        f"SELECT request_sha256 FROM {ledger.table('activations')} WITH (HOLDLOCK) WHERE activation_id=?;",
-        activation_id,
-    )
-    if row(ledger.cursor) != (parent,):
-        raise CompositionAdmissionError("attempt_parent_identity")
-    ledger.cursor.execute(
-        f"SELECT guard_id, fencing_epoch FROM {ledger.table('attempt_domains')} WITH (HOLDLOCK) "
-        "WHERE attempt_sha256 = ? ORDER BY guard_id;",
-        attempt.attempt_sha256,
-    )
-    if tuple(tuple(value) for value in ledger.cursor.fetchall()) != attempt.guard_epochs:
-        raise CompositionAdmissionError("attempt_partition")
-    return CompositionAttemptReceipt(attempt, state, closed, quiescent, outcome)
-
-
 def read_attempt(ledger: CompositionMssqlLedger, attempt: CompositionAttemptIdentity) -> CompositionAttemptReceipt:
-    """Read exact attempt bytes and every reserved guard; no new admission."""
-    ledger.cursor.execute(
-        "SELECT attempt_sha256, activation_request_sha256, guard_epochs_sha256, attempt_document, state, "
-        "closed_gates_sha256, quiescence_sha256, outcome_evidence_sha256, LOWER(CONVERT(char(36), activation_id)) "
-        f"FROM {ledger.table('attempts')} "
-        "WITH (HOLDLOCK) WHERE attempt_sha256 = ?;",
-        attempt.attempt_sha256,
+    """Preserve exact existing receipt readback, including complete shared history."""
+    _, receipt = require_existing_execution_in(
+        ledger, attempt, expected_service_id=ledger.expected_service_id, terminal_validator=ledger.terminal_validator
     )
-    record = row(ledger.cursor)
-    if record is None:
-        raise CompositionAdmissionError("attempt_missing")
-    receipt = _receipt(ledger, record)
-    if receipt.attempt != attempt:
-        raise CompositionAdmissionError("attempt_identity")
     return receipt
 
 
 def require_terminal_attempt(
-    ledger: CompositionMssqlLedger,
-    occurrence: CompositionActivationOccurrence,
-    receipt: CompositionAttemptReceipt,
+    ledger: CompositionMssqlLedger, occurrence: CompositionActivationOccurrence, receipt: CompositionAttemptReceipt
 ) -> None:
-    """A terminal label cannot free a writer scope without its protected proofs."""
-    guards = require_composition_attempt_scope(occurrence, receipt.attempt)
-    closed, quiescent, outcome = receipt.closed_gates_sha256, receipt.quiescence_sha256, receipt.outcome_evidence_sha256
-    if closed is None or quiescent is None or outcome is None:
-        raise CompositionAdmissionError("terminal_evidence")
-    services = {
-        (resource.connector, resource.service_id)
-        for resource in occurrence.request.resources
-        if resource.guard_id in guards
-    }
-    ledger.require_proofs(receipt.attempt, services, (closed, quiescent, outcome), expected_outcome_state=receipt.state)
+    """Keep the old helper while binding its configured control identity explicitly."""
+    require_execution_terminal_in(ledger, occurrence, receipt, expected_service_id=ledger.expected_service_id)
 
 
 def reserve_composition_attempt(ledger: CompositionMssqlLedger, attempt: CompositionAttemptIdentity) -> None:
-    """Insert RUNNING and every guard inside the caller's protected transaction.
+    """Reserve a fresh operation and complete partition in the caller transaction.
 
-    The caller must hold the existing ledger lock and commit all related budget
-    reservations atomically. This function commits nothing and grants no
-    executor; only a fresh acknowledged operation plus independent exact
-    readback may admit execution. Replays follow the existing rejection policy.
+    Neither the insert nor its exact same-transaction readback is a durable ACK.
+    The owning boundary commits once and independently reconciles the result.
     """
-    attempt.__post_init__()
-    occurrence = read_attempt_occurrence(ledger, attempt)
-    ledger.cursor.execute(
-        "SELECT attempt_sha256, activation_request_sha256, guard_epochs_sha256, attempt_document, state, "
-        "closed_gates_sha256, quiescence_sha256, outcome_evidence_sha256, LOWER(CONVERT(char(36), activation_id)) "
-        f"FROM {ledger.table('attempts')} "
-        "WITH (UPDLOCK, HOLDLOCK) ORDER BY attempt_sha256;",
+    occurrence = require_execution_attempt_in(
+        ledger, attempt, expected_service_id=ledger.expected_service_id, terminal_validator=ledger.terminal_validator
     )
-    records = tuple(tuple(value) for value in ledger.cursor.fetchall())
-    existing = tuple(_receipt(ledger, record) for record in records)
-    require_composition_attempt_admission(occurrence, attempt, existing)
-    requested_guards = {guard for guard, _ in attempt.guard_epochs}
-    for receipt in existing:
-        if receipt.state in {"SUCCEEDED", "FAILED"} and requested_guards.intersection(
-            guard for guard, _ in receipt.attempt.guard_epochs
-        ):
-            prior = (
-                occurrence
-                if receipt.attempt.activation_request_sha256 == attempt.activation_request_sha256
-                else read_attempt_occurrence(ledger, receipt.attempt)
-            )
-            require_terminal_attempt(ledger, prior, receipt)
+    owner = CompositionOwnerReference("execution", occurrence.request.activation_id)
     ledger.cursor.execute(
-        f"INSERT INTO {ledger.table('attempts')} (attempt_sha256, activation_id, activation_request_sha256, "
-        "guard_epochs_sha256, attempt_document, state) VALUES (?, ?, ?, ?, ?, 'RUNNING');",
+        f"INSERT INTO {ledger.table('operations')} "
+        "(operation_key, operation_family, owner_key, owner_subject_sha256, replay_key, operation_document, state) "
+        "VALUES (?, 'execution', ?, ?, ?, ?, 'RUNNING');",
         attempt.attempt_sha256,
-        occurrence.request.activation_id,
+        owner.owner_key,
         attempt.activation_request_sha256,
-        composition_attempt_epoch_subject(attempt),
+        attempt.attempt_sha256,
         encode_attempt_identity(attempt),
     )
     for guard, epoch in attempt.guard_epochs:
         ledger.cursor.execute(
-            f"INSERT INTO {ledger.table('attempt_domains')} (attempt_sha256, guard_id, fencing_epoch) "
-            "VALUES (?, ?, ?);",
+            f"INSERT INTO {ledger.table('operation_domains')} (operation_key, owner_key, guard_id, fencing_epoch) "
+            "VALUES (?, ?, ?, ?);",
             attempt.attempt_sha256,
+            owner.owner_key,
             guard,
             epoch,
         )
+    observed, receipt = require_existing_execution_in(
+        ledger, attempt, expected_service_id=ledger.expected_service_id, terminal_validator=ledger.terminal_validator
+    )
+    if observed != occurrence or receipt != CompositionAttemptReceipt(attempt, "RUNNING"):
+        raise CompositionAdmissionError("attempt_admission_readback")
 
 
 class MssqlCompositionAttemptStore:
@@ -216,8 +154,9 @@ class MssqlCompositionAttemptStore:
         """Fresh durable audit; RUNNING readback does not authorize replay."""
         attempt.__post_init__()
         with composition_control_transaction(self._factory, self._schema, self._service_id) as ledger:
-            occurrence = read_attempt_occurrence(ledger, attempt)
-            receipt = read_attempt(ledger, attempt)
+            occurrence, receipt = require_existing_execution_in(
+                ledger, attempt, expected_service_id=self._service_id, terminal_validator=ledger.terminal_validator
+            )
             if receipt.state in {"SUCCEEDED", "FAILED"}:
                 require_terminal_attempt(ledger, occurrence, receipt)
             return receipt
@@ -258,8 +197,9 @@ class MssqlCompositionAttemptStore:
         self, attempt: CompositionAttemptIdentity, *, state: str, outcome: str, previous_state: str
     ) -> CompositionAttemptReceipt:
         with composition_control_transaction(self._factory, self._schema, self._service_id) as ledger:
-            occurrence = read_attempt_occurrence(ledger, attempt)
-            current = read_attempt(ledger, attempt)
+            occurrence, current = require_existing_execution_in(
+                ledger, attempt, expected_service_id=self._service_id, terminal_validator=ledger.terminal_validator
+            )
             if previous_state == "COMMIT_UNKNOWN":
                 if current.state != "COMMIT_UNKNOWN":
                     raise CompositionAdmissionError("attempt_unknown_required")
@@ -278,8 +218,10 @@ class MssqlCompositionAttemptStore:
                     raise CompositionAdmissionError("attempt_terminal_replay")
             else:
                 ledger.cursor.execute(
-                    f"UPDATE {ledger.table('attempts')} SET state = ?, closed_gates_sha256 = ?, quiescence_sha256 = ?, "
-                    "outcome_evidence_sha256 = ? OUTPUT inserted.state WHERE attempt_sha256 = ? AND state = ?;",
+                    "DECLARE @changed TABLE (state varchar(16)); "
+                    f"UPDATE {ledger.table('operations')} SET state = ?, closed_gates_sha256 = ?, quiescence_sha256 = ?, "
+                    "outcome_evidence_sha256 = ? OUTPUT inserted.state INTO @changed "
+                    "WHERE operation_key = ? AND operation_family = 'execution' AND state = ?; SELECT state FROM @changed;",
                     state,
                     *hashes,
                     attempt.attempt_sha256,
@@ -296,30 +238,4 @@ class MssqlCompositionAttemptStore:
     def _terminal_hashes(
         ledger: CompositionMssqlLedger, attempt: CompositionAttemptIdentity, outcome: str
     ) -> tuple[str, str, str]:
-        from dpone.contracts.composition_control import CompositionProofAuthority
-
-        ledger.cursor.execute(
-            "SELECT connector, LOWER(CONVERT(char(36), service_id)), principal_id "
-            f"FROM {ledger.table('issued_authorities')} WITH (HOLDLOCK) WHERE attempt_sha256 = ?;",
-            attempt.attempt_sha256,
-        )
-        issued = tuple(sorted(CompositionProofAuthority(*value) for value in ledger.cursor.fetchall()))
-        selected = []
-        for kind in ("CLOSED_GATES", "QUIESCENCE", "OUTCOME"):
-            ledger.cursor.execute(
-                f"SELECT proof_sha256, proof_document FROM {ledger.table('proofs')} WITH (HOLDLOCK) "
-                "WHERE attempt_sha256 = ? AND kind = ?;",
-                attempt.attempt_sha256,
-                kind,
-            )
-            matches = []
-            for digest, document in ledger.cursor.fetchall():
-                proof = decode_attempt_proof(document, digest).require_attempt(attempt)
-                if proof.kind != kind:
-                    raise CompositionAdmissionError("attempt_proof_kind")
-                if proof.authorities == issued and (kind != "OUTCOME" or digest == outcome):
-                    matches.append(digest)
-            if len(matches) != 1:
-                raise CompositionAdmissionError("attempt_terminal_proof")
-            selected.append(matches[0])
-        return selected[0], selected[1], selected[2]
+        return select_terminal_hashes_in(ledger, attempt, outcome, expected_service_id=ledger.expected_service_id)

@@ -9,10 +9,10 @@ observation bytes in SQL plus safe JUnit properties before container destruction
 from __future__ import annotations
 
 import json
-from contextlib import closing
 
-from tests.integration.composition.mssql_gate_live_provisioning import execute
+from tests.integration.composition.mssql_store_live_support import drain_results
 
+from dpone.adapters.composition_mssql_attempts import composition_control_transaction
 from dpone.contracts.airflow_deployment import canonical_fingerprint
 from dpone.contracts.composition_control import (
     CompositionAdmissionError,
@@ -73,7 +73,7 @@ class OutcomeProducer:
         assert current.state in {"RUNNING", "COMMIT_UNKNOWN"}
         records = case.sql(
             f"SELECT connector,LOWER(CONVERT(char(36),service_id)),principal_id FROM {case.table('issued_authorities')} "
-            "WHERE attempt_sha256=? ORDER BY connector,service_id,principal_id;",
+            "WHERE operation_key=? ORDER BY connector,service_id,principal_id;",
             attempt.attempt_sha256,
         )
         authorities = tuple(CompositionProofAuthority(*row) for row in records)
@@ -88,7 +88,7 @@ class OutcomeProducer:
         kinds = {
             item[0]
             for item in case.sql(
-                f"SELECT kind FROM {case.table('proofs')} WHERE attempt_sha256=?;", attempt.attempt_sha256
+                f"SELECT kind FROM {case.table('proofs')} WHERE operation_key=?;", attempt.attempt_sha256
             )
         }
         if not {"CLOSED_GATES", "QUIESCENCE"}.issubset(kinds):
@@ -113,29 +113,26 @@ class OutcomeProducer:
             state,
         )
         document = json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode()
-        with closing(case.environment.connect()) as connection:
-            connection.autocommit = False
-            try:
-                execute(
-                    connection,
+        try:
+            with composition_control_transaction(
+                case.environment.connect, case.environment.schema, case.environment.service_id
+            ) as ledger:
+                ledger.cursor.execute(
                     f"INSERT INTO [{case.environment.schema}].[synthetic_outcomes] VALUES (?,?,?);",
                     proof.evidence_sha256,
                     attempt.attempt_sha256,
                     document,
                 )
-                execute(
-                    connection,
-                    f"INSERT INTO {case.table('proofs')} (attempt_sha256,kind,proof_sha256,activation_request_sha256,guard_epochs_sha256,proof_document) VALUES (?,'OUTCOME',?,?,?,?);",
+                drain_results(ledger.cursor)
+                ledger.cursor.execute(
+                    f"INSERT INTO {case.table('proofs')} (operation_key,operation_family,kind,proof_sha256,proof_document) VALUES (?,'execution','OUTCOME',?,?);",
                     attempt.attempt_sha256,
                     proof.proof_sha256,
-                    proof.activation_request_sha256,
-                    proof.guard_epochs_sha256,
                     encode_attempt_proof(proof),
                 )
-                connection.commit()
-            except Exception:
-                connection.rollback()
-                raise RuntimeError("synthetic_outcome_persistence_failed") from None
+                drain_results(ledger.cursor)
+        except Exception:
+            raise RuntimeError("synthetic_outcome_persistence_failed") from None
         assert case.sql(
             f"SELECT evidence_document FROM [{case.environment.schema}].[synthetic_outcomes] WHERE evidence_sha256=?;",
             proof.evidence_sha256,

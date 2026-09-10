@@ -67,8 +67,10 @@ class MssqlCompositionActivationStore:
             connection.autocommit = False
             cursor = connection.cursor()
             ledger = CompositionMssqlLedger(cursor, self._schema)
-            ledger.begin(self._service_id)
-            return ledger.read(activation_id)
+            transaction = ledger.begin(self._service_id)
+            occurrence = ledger.read(activation_id)
+            ledger.require_transaction(transaction)
+            return occurrence
         except CompositionAdmissionError:
             raise
         except Exception:
@@ -105,7 +107,7 @@ class MssqlCompositionActivationStore:
             connection.autocommit = False
             cursor = connection.cursor()
             ledger = CompositionMssqlLedger(cursor, self._schema)
-            ledger.begin(self._service_id)
+            transaction = ledger.begin(self._service_id)
             current = ledger.read(request.activation_id)
             self._apply(ledger, request, current, state)
             expected = ledger.read(request.activation_id)
@@ -114,6 +116,7 @@ class MssqlCompositionActivationStore:
             expected.require_state(state)
             if current is not None and expected.receipt.guard_epochs != current.receipt.guard_epochs:
                 raise CompositionAdmissionError("guard_readback")
+            ledger.require_transaction(transaction)
             commit_started = True
             connection.commit()
         except CompositionAdmissionError:
@@ -155,7 +158,6 @@ class MssqlCompositionActivationStore:
         if current.receipt.state != before:
             raise CompositionAdmissionError("occurrence_state")
         if state == "RETIRED":
-            ledger.require_unblocked(request)
             ledger.require_terminal(current)
             ledger.release(current)
         ledger.transition(current, state)

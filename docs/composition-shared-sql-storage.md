@@ -3,10 +3,12 @@
 This developer reference implements the already approved
 [shared physical ownership design](composition-shared-ownership.md) and
 [ADR 0061](adr/0061-shared-composition-physical-ownership.md).
-The coordinated SQL schema-v2 migration is **not yet implemented or live-qualified**.
-Existing scoped execution factories remain closed. The independently reviewed
-first slice preserves execution documents and introduces qualification records
-only for complete exclusion checks.
+The first SQL schema-v2 implementation covers the shared journal, execution
+store, login gates and historical proof checks. **Schema-v2 live qualification
+remains unverified.** Existing scoped execution factories remain closed.
+Qualification records participate in complete exclusion checks; qualification
+issuance, source sealing and atomic ownership transfer still require their
+protected implementations and campaign evidence.
 
 Existing execution fingerprints normalize some strings, including backslashes.
 Do not replace them with SQL HASHBYTES over the original document. Each original
@@ -55,6 +57,58 @@ The stored document partition is bounded before fetching/decoding, and full
 original-byte equality includes length. SQL CHECK/FK constraints supplement
 typed readback; they cannot authenticate a grant, a physical enrollment or a
 business outcome.
+
+## Catalog reference and controlled installation
+
+The connection-owning boundary inspects complete table metadata on every
+transaction. Its protected principal needs database and schema `VIEW DEFINITION`.
+An effective metadata `DENY` on any current user-token principal rejects the
+audit; table visibility alone cannot establish visibility of incoming foreign
+keys or row-security policies in other schemas. Platform provisioning must also
+exclude concurrent DDL, alternate writers and permission or trigger bypass.
+Runtime catalog reads do not grant or repair those privileges.
+
+The initial DDL sets `ANSI_NULLS` and `QUOTED_IDENTIFIER` explicitly. Fixed named
+constraints and exact invariant trigger definitions bind the physical layout;
+immutable originals also compare their byte lengths. The triggers observe the
+already-held global transaction lock. They do not acquire it on a writer's behalf.
+Only initial authority/domain enrollment has the documented bootstrap exception.
+Runtime mutations use `OUTPUT INTO` because the tables have AFTER triggers.
+
+SQL Server's stored CHECK expressions must be captured from the reviewed DDL in
+a newly owned synthetic database. `tools/composition_mssql_check_catalog.py`
+provides separate core and gate capture/render functions. They preserve original
+expression text and reject an incomplete inventory, unexpected flags or a
+different DDL digest. The checked-in reference modules are generated outputs;
+never reconstruct their strings manually or adopt a runtime database as a
+reference.
+
+While these references are empty, the corresponding catalog audit rejects with
+`control_schema_reference` or `login_gate_schema_reference`. The first controlled
+capture run is therefore expected to fail admission. Retain its original JUnit
+capture properties and failed result. Verify source, producer, server image and
+version, database compatibility level, session SET observations and artifact
+identity before feeding those originals to the generator. Commit the generated
+references, then rerun all four exact SQL profiles from that commit. A successful
+capture or an older schema-v1 pass is not a schema-v2 qualification result.
+
+Use the [disposable component runner](composition-activation-contract.md#disposable-sql-component-check)
+with profiles `store` and `gate` for the captures, retaining each original
+`summary.json` and `junit.xml`. The core expressions are the JSON value of JUnit
+property `dpone.composition.check_catalog`; its companion is
+`dpone.composition.check_catalog_context`. The gate properties are
+`dpone.gate.check_catalog` and `dpone.gate.check_catalog_context`. Missing or
+unverified context blocks acceptance of a reference. Match these observations to
+the source and image identities in that run's summary and original archive.
+
+After verifying provenance, pass the decoded core JSON to
+`tools.composition_mssql_check_catalog.render_reference` and the gate JSON to
+`render_gate_reference`. Write their returned text unchanged to
+`src/dpone/adapters/composition_mssql_check_definitions.py` and
+`src/dpone/adapters/composition_mssql_gate_check_definitions.py`, respectively.
+Keep the original captures alongside the generated-source hash manifest. The
+next committed-source run must execute all `store`, `gate`, `trust` and
+`registration` cases with no skips and successful cleanup.
 
 ## Optional MSSQL gate deployment and proof family
 
@@ -127,6 +181,17 @@ or caller assertion is authority. Helpers never begin/acquire a transaction or
 lock, open a connection, commit or roll back. The root boundary performs the
 mandatory exact catalog audit; every kernel entry rechecks actual transaction
 and authority. No untrusted DDL/trigger-bypass permission is introduced.
+
+Nonproduction trust keeps its existing payload version 1 while its enclosing
+control authority requires version 2. A trust read compares the actual transaction
+before and after the optional catalog and original revision read. Registration
+retains that transaction across its entire invocation, including injected clocks,
+streamed history pages, each append and all successful return paths. Before each
+append and successful exit, it also reopens the latest complete trust revision;
+equal policy bytes at a newer revision still reject. Historical grants retain
+their original revision/time validation. An externally managed caller must roll
+back on failure, including any partial appends, then follow the original commit
+and independent readback protocol. These checks create no worker authority.
 
 The execution proof dependency is a root-injected narrow callback:
 
@@ -391,12 +456,25 @@ Missing original evidence or a changed barrier still rejects.
 existing operation/replay key. One root-owned existing-operation guard serves
 journal/create/READY/readback/close/recovery. It first reopens the exact original
 operation, owner and partitions, then performs the complete mixed-family audit
-while excluding only that independently observed identical operation. An
-untrusted skip digest or boolean admission/recovery mode is not accepted.
+while excluding only that independently observed identical operation for a
+nonretired parent. An independently reopened RETIRED parent instead permits
+structurally valid PREPARED/ACTIVE/RETIRING execution successors and their current
+operations. Every operation under an overlapping RETIRED execution owner still
+requires complete original terminal closure; nonterminal operations under any
+RETIRED execution owner and overlapping qualification remain blockers. An untrusted skip
+digest or caller-supplied admission/recovery mode is not accepted.
 It returns the observed existing occurrence and receipt; each existing entrypoint
 retains its explicit state requirements. Issuance needs ACTIVE/RUNNING; close and
 recovery require no fresh admission, renewed grant or replacement credentials.
 History and terminal reads remain distinct from new issuance.
+
+`require_retired_execution_in(context, occurrence, *, expected_service_id,
+terminal_validator)` serves historical activation readback. It independently
+reopens the exact RETIRED owner and complete global original history, validates
+all operations of overlapping retired owners and rechecks the same transaction
+and original owner after proof callbacks. A legitimate execution successor does
+not turn historical readback into fresh acquisition. Retirement mutation still
+uses the separate shared exclusion check before releasing any physical guard.
 
 Malformed or missing original partitions reject globally. Well-formed unsupported
 qualification history blocks overlapping resources while unrelated physical

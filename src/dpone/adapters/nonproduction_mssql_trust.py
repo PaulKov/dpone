@@ -11,16 +11,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from dpone.adapters.composition_mssql_attempts import ConnectionFactory, composition_control_transaction
-from dpone.adapters.composition_mssql_schema import (
-    COMPOSITION_MSSQL_LEDGER_LOCK,
-    COMPOSITION_MSSQL_SCHEMA_VERSION,
-    require_control_schema,
-)
+from dpone.adapters.composition_mssql_schema import require_control_schema
 from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
+from dpone.adapters.composition_mssql_transaction import require_shared_transaction_in
 from dpone.adapters.nonproduction_mssql_schema import (
     NONPRODUCTION_MSSQL_SCHEMA_VERSION,
     require_nonproduction_mssql_schema,
 )
+from dpone.contracts.composition_activation import CompositionAdmissionError
 from dpone.contracts.nonproduction_authority import NonproductionAuthorityPolicy
 from dpone.contracts.nonproduction_scope import MAX_DOCUMENT_BYTES, NonproductionAuthorityError, uuid_text
 from dpone.ports.nonproduction_authentication import NonproductionTrustSnapshot
@@ -109,8 +107,9 @@ class MssqlNonproductionTrustProvider:
         merely constructing a ledger object cannot establish the precondition.
         """
         try:
-            self._require_ledger(ledger)
+            transaction_id = self._require_ledger(ledger)
             require_nonproduction_mssql_schema(ledger.cursor, self._schema)
+            self._require_ledger(ledger, transaction_id)
             ledger.cursor.execute(
                 "SELECT TOP (1) LOWER(CONVERT(char(36), environment_id)), revision, schema_version, "
                 f"CASE WHEN DATALENGTH(policy_document) BETWEEN 1 AND {MAX_DOCUMENT_BYTES} "
@@ -130,7 +129,9 @@ class MssqlNonproductionTrustProvider:
             if environment != self._environment_id:
                 raise NonproductionAuthorityError("trust_environment")
             snapshot = NonproductionTrustSnapshot(policy, policy_hash, verifier, verifier_hash, epoch)
-            return NonproductionTrustRevision(self._service_id, environment, revision, snapshot)
+            observed = NonproductionTrustRevision(self._service_id, environment, revision, snapshot)
+            self._require_ledger(ledger, transaction_id)
+            return observed
         except NonproductionAuthorityError:
             raise
         except Exception:
@@ -153,35 +154,17 @@ class MssqlNonproductionTrustProvider:
             raise NonproductionAuthorityError("trust_revision_changed")
         return observed
 
-    def _require_ledger(self, ledger: CompositionMssqlLedger) -> None:
+    def _require_ledger(self, ledger: CompositionMssqlLedger, transaction_id: int | None = None) -> int:
+        """Observe actual authority and keep one SQL transaction through each read."""
         if type(ledger) is not CompositionMssqlLedger or ledger.schema != self._schema:
             raise NonproductionAuthorityError("trust_ledger")
-        # Transaction-owned APPLOCK_MODE itself fails without a transaction.
-        # Observe invalid states without invoking it or reading protected rows.
-        ledger.cursor.execute(
-            "DECLARE @transaction_count int = @@TRANCOUNT, "
-            "@transaction_state smallint = XACT_STATE(), @lock_mode nvarchar(32) = N'NoLock'; "
-            "IF @transaction_count > 0 AND @transaction_state = 1 "
-            "SET @lock_mode = APPLOCK_MODE(N'public', ?, N'Transaction'); "
-            "SELECT @transaction_count, @transaction_state, @lock_mode;",
-            COMPOSITION_MSSQL_LEDGER_LOCK,
-        )
-        records = tuple(tuple(value) for value in ledger.cursor.fetchall())
-        if (
-            len(records) != 1
-            or len(records[0]) != 3
-            or type(records[0][0]) is not int
-            or records[0][0] < 1
-            or type(records[0][1]) is not int
-            or records[0][1] != 1
-            or records[0][2] != "Exclusive"
-        ):
-            raise NonproductionAuthorityError("trust_ledger_lock")
-        ledger.cursor.execute(
-            "SELECT singleton, schema_version, LOWER(CONVERT(char(36), service_id)) "
-            f"FROM {ledger.table('authority')} WITH (HOLDLOCK);"
-        )
-        if tuple(tuple(value) for value in ledger.cursor.fetchall()) != (
-            (1, COMPOSITION_MSSQL_SCHEMA_VERSION, self._service_id),
-        ):
-            raise NonproductionAuthorityError("trust_control_authority")
+        try:
+            return require_shared_transaction_in(
+                ledger, expected_service_id=self._service_id, transaction_id=transaction_id
+            )
+        except CompositionAdmissionError as exc:
+            if exc.reason == "control_authority":
+                raise NonproductionAuthorityError("trust_control_authority") from None
+            if exc.reason in {"shared_transaction", "shared_transaction_identity"}:
+                raise NonproductionAuthorityError("trust_ledger_lock") from None
+            raise NonproductionAuthorityError("trust_read_unavailable") from None

@@ -5,9 +5,9 @@ violation is distinct from an unavailable or uncertain driver operation.
 """
 
 from dpone.adapters.composition_mssql_schema import require_control_schema
-from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.adapters.dbapi_lifecycle import row
 from dpone.contracts.composition_control import CompositionAdmissionError
+from dpone.ports.composition_sql import CompositionSqlContext
 
 _POLICY_REASONS = (
     "role_owner",
@@ -26,7 +26,7 @@ _POLICY_REASONS = (
 
 
 def require_database_policy(
-    ledger: CompositionMssqlLedger, *, database: str, writer_role: str, schemas: tuple[str, ...], guard_id: str
+    ledger: CompositionSqlContext, *, database: str, writer_role: str, schemas: tuple[str, ...], guard_id: str
 ) -> None:
     """Reject ambient writers and require the bounded role's exact permission set.
 

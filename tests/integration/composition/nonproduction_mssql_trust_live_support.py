@@ -22,7 +22,11 @@ from tests.integration.composition.mssql_gate_live_provisioning import SqlFailur
 from tests.integration.composition.mssql_store_live_support import OwnedDatabase
 from tests.nonproduction_signature_helpers import github_policy, trust
 
-from dpone.adapters.composition_mssql_schema import COMPOSITION_MSSQL_LEDGER_LOCK, render_composition_mssql_schema
+from dpone.adapters.composition_mssql_schema import (
+    COMPOSITION_MSSQL_LEDGER_LOCK,
+    COMPOSITION_MSSQL_SCHEMA_VERSION,
+    render_composition_mssql_schema,
+)
 from dpone.adapters.nonproduction_mssql_schema import (
     render_nonproduction_mssql_schema,
     require_nonproduction_mssql_schema,
@@ -193,7 +197,11 @@ class TrustCase:
         """Explicit external provisioning, never runtime repair or enrollment."""
         self.admin = self.database.connect()
         self.sql(render_composition_mssql_schema(self.schema))
-        self.sql(f"INSERT INTO [{self.schema}].[composition_authority] VALUES (1, 1, ?);", self.service_id)
+        self.sql(
+            f"INSERT INTO [{self.schema}].[composition_authority] VALUES (1, ?, ?);",
+            COMPOSITION_MSSQL_SCHEMA_VERSION,
+            self.service_id,
+        )
         self.sql(render_nonproduction_mssql_schema(self.schema))
         self.require_schema()
 
