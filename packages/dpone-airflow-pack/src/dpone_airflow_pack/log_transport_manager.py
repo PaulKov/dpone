@@ -32,6 +32,14 @@ class LiveLogTransportBoundary:
             "live_log_exception_types", default=()
         )
 
+    def __reduce__(self) -> tuple[type[LiveLogTransportBoundary], tuple[()]]:
+        """Copy task graphs with a fresh inactive scope, never a live context.
+
+        Pickle/deepcopy memoization preserves shared references between the
+        copied operator and its managers while isolating them from the original.
+        """
+        return type(self), ()
+
     @contextmanager
     def classify(self, exception_types: tuple[type[BaseException], ...]) -> Iterator[None]:
         """Activate classification only for this completion attempt and context."""

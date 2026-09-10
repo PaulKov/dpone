@@ -25,6 +25,7 @@ BASE_PYTHON_CHECKS = (
     "uv run ruff check .",
     "uv run ruff format --check .",
     "uv run mypy --config-file mypy.ini",
+    "uv run python tools/agent_policy/import_mutation_gate.py",
     "uv run dpone docs check-import-rules",
     "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json",
     (
