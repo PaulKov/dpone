@@ -207,3 +207,14 @@ runtime dataclass dependencies, algorithms, checks and all quality budgets.
 Graph predictions remain unverified until the implemented source is tested.
 The final current-summary update must follow actual gates; prior FAIL evidence
 is retained without relabelling.
+
+## Independent review correction phase
+
+The maintainer requested fixes for both P2 findings at f164f2b.
+The current successor is `dda-06-review-fixes.yml`, with the compatible
+impact and validation plan in `dda-06-review-fixes.md`. DDA-06 remains the
+sole writer. This phase transfers only the listed baseline regression, live
+entrypoint/support and certification guide paths from completed DDA-05.
+It also preserves the exact pinned 0.77.0 and PostgreSQL upstream commits
+through reviewed linear imports; no foreign editing authority is granted.
+Historical specifications, contracts and evidence retain their original meaning.
