@@ -123,14 +123,15 @@ class VerifiedPackLauncher:
             except Exception as exc:
                 raise _launcher_error("dbt project bundle worktree verification failed") from exc
         argv, environment = _selected_command(pack, plan)
-        if plan.execution.kind == "runtime":
-            environment = {
-                **environment,
-                RUNTIME_CONNECTION_CONTEXT_ENV: _runtime_connection_context_path(
-                    plan,
-                    artifact_root=self._artifact_root,
-                ).as_posix(),
-            }
+        # Separate hooks hydrate the same canonical connections as the runtime.
+        # Both receive only the context whose artifacts were verified above.
+        environment = {
+            **environment,
+            RUNTIME_CONNECTION_CONTEXT_ENV: _runtime_connection_context_path(
+                plan,
+                artifact_root=self._artifact_root,
+            ).as_posix(),
+        }
         _validate_worktree_command(
             argv,
             root=self._worktree_root,

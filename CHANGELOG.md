@@ -14,6 +14,9 @@
 - Fix separate Airflow hooks requiring `/airflow/xcom` despite disabled XCom.
   Keep hook diagnostics on the writable run volume, preserve child failures,
   and report safe startup stage, exception type and errno without raw argv.
+- Pass the verified runtime connection context to separate Airflow hooks so
+  canonical `connection_ref` SQL hooks can resolve their pinned credentials.
+  Retain artifact verification and hook child-exit/XCom behavior.
 
 ## 0.76.0 - 2026-09-10
 

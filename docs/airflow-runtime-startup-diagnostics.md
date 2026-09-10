@@ -2,7 +2,7 @@
 
 This runbook helps operators diagnose strict runtime and separate-hook startup
 without exposing container credentials. Start from the task's base-container
-log; retain the failed Pod until its run-volume diagnostics have been collected.
+log and collect run-volume diagnostics while the containers are still running.
 See [strict delivery](airflow-cache-sync-strict-v2.md) for init-fetch failures.
 
 ## Service files and publication
@@ -25,6 +25,13 @@ Runtime, including dbt, enables KPO XCom and publishes the summary to
 Separate pre-hooks disable publication and perform no required access to
 `/airflow/xcom`. `VerifiedPackCommand.publish_xcom` defaults to true for existing
 Python callers; the verified launcher sets it from the execution kind.
+
+SQL hooks with canonical `connection_ref` use the same pinned binding set,
+connection registry and credential-runtime context as the main workload. The
+verified launcher supplies that context automatically. If a separate hook reports
+`DPONE_RUNTIME_CONNECTION_CONTEXT_REQUIRED` after successful init-fetch, check
+that the pinned runtime image includes the hook context-handoff fix, then rebuild
+and activate the deployment with the matching packages.
 
 Ordinary runtime retains the XCom outcome-gate exit policy. dbt and hooks retain
 the real child exit code; failed hooks block downstream `all_success` runtime
@@ -58,7 +65,9 @@ declarations and actual disk availability are separate checks; see
 Retry uses a new task Pod in normal strict delivery. Direct Python callers that
 reuse a run directory must not run two commands concurrently in it; the wrapper
 invalidates previous attempt summaries before execution. Run-volume files are
-ephemeral and must be collected before deleting the Pod.
+ephemeral: kubelet can remove them after all containers stop, even when the Pod
+object is retained. Configure platform collection during execution; retaining a
+completed Pod alone does not guarantee that its service files remain available.
 
 `dpone airflow runtime-pack-exec` is the provider's internal entry point. Running
 it without the injected verified plan fails with exit `2` and

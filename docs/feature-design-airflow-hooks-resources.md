@@ -38,9 +38,9 @@ versions and the runtime image before building new delivery artifacts.
 Runtime service files, separate pre-hooks, bounded workload resources, safe
 startup diagnostics, contract tests and self-service documentation are in scope.
 Data-transfer algorithms, PVC provisioning, cluster configuration, arbitrary Pod
-overrides and per-hook resource overrides are non-goals. No live environment or
-credentials have been approved; Kubernetes certification remains UNVERIFIED
-until an approved live test is recorded.
+overrides and per-hook resource overrides are non-goals. The maintainer approved
+local Docker/minikube live testing on 2026-09-10. Kubernetes acceptance remains
+UNVERIFIED until the complete live matrix and independent review are recorded.
 
 ## Public contract
 
@@ -104,6 +104,12 @@ to `/airflow/xcom/return.json`; hooks require no XCom path operations and retain
 a local summary. Existing workload/artifact mounts stay read-only. The existing
 run emptyDir is writable without root; KPO provides its XCom emptyDir when
 publication is enabled. No security-context override is added.
+
+Separate hooks receive the same verified runtime connection context as ordinary
+runtime commands. The launcher derives its path from the pinned binding set,
+connection registry and credential-runtime artifacts after checking their bytes.
+Canonical `connection_ref` hydration uses the existing context loader; hooks do
+not acquire another credential authority or bypass integrity checks.
 
 Existing resource-free packs keep their wire shape. Existing direct wrapper
 callers retain publication by default. Unsupported resource configuration that

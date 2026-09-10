@@ -1126,7 +1126,11 @@ def test_launcher_preserves_valid_strict_v2_pre_hook_command(tmp_path: Path) -> 
         "--hook-id",
         "refresh_orders",
     )
-    assert command.env == {}
+    assert command.env == {
+        RUNTIME_CONNECTION_CONTEXT_ENV: (
+            tmp_path / "artifacts" / "payload" / _key(bundle.plan.binding_set.artifact_ref).parent
+        ).as_posix(),
+    }
     assert command.exit_code_policy == "child"
     assert command.publish_xcom is False
 
