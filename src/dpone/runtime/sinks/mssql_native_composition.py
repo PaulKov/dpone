@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -38,8 +39,11 @@ def compose_native_stage_context(
 
     ``importer_connection`` returns a context manager closing its dedicated
     connector. ``target_connector`` is the sink/finalizer's dedicated session in
-    ``database``. The caller provides durable invocation and schema authorities,
-    plus a row source invoked only after target-only recovery found no journal.
+    ``database``. Its ``open_session`` port supplies a separately owned preparation
+    lock session, which survives closure of the finalizer's connection during
+    commit acknowledgement recovery. The caller provides durable invocation and
+    schema authorities, plus a row source invoked only after target-only recovery
+    found no journal.
     """
     encoder = MssqlNativeEncoder(wire_contract, max_row_bytes=limits.max_row_bytes)
 
@@ -85,6 +89,27 @@ def compose_native_stage_context(
         if rows[0][0] + extra_tables > limits.max_staging_tables:
             raise ValueError("mssql_native.staging_table_limit_exceeded")
 
+    @contextmanager
+    def preparation_scope() -> Iterator[None]:
+        store.assert_lease(lease)
+        connector = target_connector.open_session(application_name="dpone-native-preparation")
+        if connector is target_connector:
+            raise ValueError("mssql_native.preparation_session_reused")
+        try:
+            current = connector.get_records("SELECT DB_NAME()")
+            if not current or current[0][0] != database:
+                raise ValueError("mssql_native.preparation_database_mismatch")
+            with native_stage_writer_scope(connector, store, lease, "prepare:" + plan.run_id):
+                yield
+        finally:
+            primary = sys.exc_info()[1]
+            try:
+                connector.close()
+            except BaseException as error:
+                if primary is None:
+                    raise
+                primary.add_note(f"native preparation session cleanup failed: {type(error).__name__}")
+
     return NativeStageContext(
         plan=plan,
         wire_contract=wire_contract,
@@ -95,7 +120,7 @@ def compose_native_stage_context(
         cleanup_receipts=cleanup,
         capacity_check=capacity,
         journal_factory=journal_factory,
-        preparation_scope=lambda: native_stage_writer_scope(target_connector, store, lease, "prepare:" + plan.run_id),
+        preparation_scope=preparation_scope,
         interval=interval,
         max_row_bytes=limits.max_row_bytes,
         cancelled=cancelled,
