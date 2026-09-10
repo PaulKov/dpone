@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep native MSSQL preparation/publication locks on an independent session so
+  successful lost-COMMIT-acknowledgement reconciliation can complete evidence
+  and checkpoints without a spurious lock-release failure.
+
 - Add opt-in Python composition for bounded native ClickHouse to MSSQL transport,
   independent verified staging, exact authored interval publication and fenced
   source-free recovery. Live interoperability/performance remain unverified;

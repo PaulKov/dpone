@@ -1,12 +1,17 @@
 """The native lifecycle invokes the existing transaction and lost-ACK authority."""
 
+from threading import Event
 from types import SimpleNamespace
 
 import pytest
 
 from dpone.config.load_strategy import LoadStrategy
 from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
+from dpone.manifest.mssql_native_policy import native_limits
+from dpone.runtime.connectors.mssql_bulk import BcpOptions
+from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome
+from dpone.runtime.sinks.mssql_native_composition import compose_native_stage_context
 from dpone.runtime.sinks.mssql_native_staged_load import MssqlNativeStagedLoadService, NativePreparedStage
 from dpone.runtime.sinks.strategies.mssql.mssql_transaction_finalizer import MssqlGenericCommitOutcomeUnknown
 from tests.test_mssql_generic_transaction_governance import (
@@ -18,16 +23,80 @@ from tests.test_mssql_generic_transaction_governance import (
     _source_lifecycle_receipt,
     _staging,
 )
+from tests.test_mssql_native_policy import config as native_config
+
+
+class _LockSession:
+    def __init__(self):
+        self.held = False
+        self.closed = False
+        self.released = False
+
+    def get_records(self, sql, params=None):
+        assert not self.closed
+        if sql == "SELECT DB_NAME()":
+            return [("DWH",)]
+        if "sp_getapplock" in sql:
+            self.held = True
+            return [(0,)]
+        assert "sp_releaseapplock" in sql
+        result = 0 if self.held else -999
+        self.held = False
+        self.released = result == 0
+        return [(result,)]
+
+    def close(self):
+        self.held = False
+        self.closed = True
+
+
+class _PublicationConnector(_FinalizerConnector):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.target_lock = _LockSession()
+        self.lock_sessions = []
+
+    def open_session(self, *, application_name):
+        session = _LockSession()
+        self.lock_sessions.append(session)
+        return session
+
+    def get_records(self, sql, params=None, *, as_dict=False):
+        if "sp_getapplock" in sql or "sp_releaseapplock" in sql:
+            return self.target_lock.get_records(sql, params)
+        return super().get_records(sql, params, as_dict=as_dict)
+
+    def close(self):
+        # Closing the publication connection discards its session-owned locks.
+        self.target_lock = _LockSession()
+        super().close()
 
 
 @pytest.mark.parametrize("lost_ack,probe", [(False, False), (True, True), (True, False)])
-def test_native_service_uses_transaction_receipt_and_fresh_probe(lost_ack, probe):
-    connector = _FinalizerConnector(commit_error=OSError("lost acknowledgement") if lost_ack else None)
+def test_native_service_uses_transaction_receipt_and_fresh_probe(lost_ack, probe, tmp_path):
+    connector = _PublicationConnector(commit_error=OSError("lost acknowledgement") if lost_ack else None)
     state = _FinalizerState(probe_after_commit=probe)
     events = []
     stage = _staging(2)
     prepared = NativePreparedStage(
         stage, MssqlTransactionAdmission(operation=_operation()), _source_lifecycle_receipt(), None, None
+    )
+    context = compose_native_stage_context(
+        store=SimpleNamespace(assert_lease=lambda lease: None),
+        plan=SimpleNamespace(run_id="synthetic"),
+        lease=SimpleNamespace(target_id="target"),
+        wire_contract=build_mssql_bcp_native_contract(schema=[("value", "int")], query="SELECT synthetic"),
+        limits=native_limits(native_config()),
+        work_dir=tmp_path,
+        target_connector=connector,
+        importer_connection=lambda: pytest.fail("publication must not open importers"),
+        bcp_options_factory=BcpOptions,
+        database="DWH",
+        schema="dbo",
+        row_source=lambda: pytest.fail("publication must not reopen the source"),
+        journal_factory=lambda: None,
+        cancelled=Event(),
+        required_target_headroom_bytes=1024,
     )
 
     class Preparer:
@@ -36,6 +105,9 @@ def test_native_service_uses_transaction_receipt_and_fresh_probe(lost_ack, probe
 
         def reverify(self, prepared):
             events.append("verified")
+
+        def publication_scope(self, prepared):
+            return context.preparation_scope()
 
         def cleanup(self, prepared):
             events.append("cleanup")
@@ -71,3 +143,6 @@ def test_native_service_uses_transaction_receipt_and_fresh_probe(lost_ack, probe
     assert state.receipt_inserts == 1
     assert state.fresh_probes == int(lost_ack)
     assert connector.calls.count("TRUNCATE TABLE [db].[dbo].[target]") == 1
+    assert len(connector.lock_sessions) == 1
+    assert connector.lock_sessions[0].released
+    assert connector.lock_sessions[0].closed

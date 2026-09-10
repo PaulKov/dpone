@@ -87,7 +87,10 @@ target databases are not admitted by this helper. The context owns:
   `MssqlNativeEncoder.encode_row`, and `store.assert_lease`.
 - `native_stage_writer_scope` on that same connector, keyed by the stable attempt
   identity. Old writers must settle before retry or removal. The preparation
-  scope uses the sink/finalizer session and covers verification through commit.
+  scope covers verification through commit and owns an independent same-database
+  session created by `target_connector.open_session()`. The context releases its
+  lock and closes that session on every exit. Reusing the target connector or
+  opening a different database fails before preparation begins.
 - Real receipt verification and cleanup callbacks using importer `inspect` and
   `settle`; cleanup checks the table's persisted owner binding.
 - Capacity checks before extraction, preparation and publication. Use
@@ -103,7 +106,11 @@ The factory must select the runtime for the actual route. The executable
 [composition-order tests](../tests/test_mssql_native_runtime.py) demonstrate
 callback ordering and recovery, and the
 [real-finalizer tests](../tests/test_mssql_native_staged_finalizer.py) exercise
-commit, lost acknowledgement and unknown outcomes with synthetic SQL fixtures.
+the concrete preparation scope with commit, lost acknowledgement and unknown
+outcomes using synthetic SQL fixtures. When COMMIT acknowledgement is lost,
+the finalizer can close its own connection and confirm the exact receipt while
+the preparation lock remains held. A confirmed commit continues to evidence and
+checkpoint completion; an unknown outcome retains its existing recovery path.
 These fixtures are not deployment authorities.
 
 ## Resource limits and observations
