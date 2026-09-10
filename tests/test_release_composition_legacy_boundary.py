@@ -40,7 +40,7 @@ def test_native_execution_pack_in_legacy_root_rejects_before_publication(tmp_pat
 def test_descriptor_bounds_and_recursion_reject_before_source_dispatch(tmp_path, oversized):
     root = tmp_path / "source"
     root.mkdir()
-    depth = sys.getrecursionlimit() + 100
+    depth = max(10_000, sys.getrecursionlimit() + 100)
     payload = b'{"schema":"dpone.release-set.v3","nested":' + b"[" * depth + b"0" + b"]" * depth + b"}"
     if oversized:
         payload += b" " * (8 * 1024 * 1024 + 1 - len(payload))
