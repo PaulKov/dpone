@@ -1,0 +1,20 @@
+{
+  "python": "3.12.11 (main, Sep 18 2025, 19:41:45) [Clang 20.1.4 ]",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "lock_sha256": "cef0cbbfa8cca8b450b67cb084c6454572176a0a846fe3084251a29801438b94",
+  "packages": {
+    "dpone": "0.76.0",
+    "dpone-native-accel": "0.76.0",
+    "psycopg": "3.3.4",
+    "psycopg-binary": "3.3.4",
+    "pyarrow": "23.0.1",
+    "dbt-core": "1.12.3",
+    "dbt-sqlserver": "1.11.1",
+    "google-cloud-bigquery": "3.42.2",
+    "google-cloud-storage": "3.12.1",
+    "vault-kv-client": "0.1.0",
+    "pytest": "9.0.3",
+    "pytest-xdist": "3.8.0"
+  }
+}
