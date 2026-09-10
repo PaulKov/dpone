@@ -80,6 +80,37 @@ observation, metadata/parity and real spawned-worker integration. The reviewer
 inspected those suites without claiming to rerun them. No user journey or
 migration change is required; the developer guides describe the boundaries.
 
+## Coordinator independent architecture review
+
+The coordinator independently **APPROVED** `1281b83..5d8f77a`, with no findings.
+The review checked exact limits, lazy digest supplier validation before I/O,
+catalog authority and ordering, and the three annotation-only imports. It found
+no dependency laundering or changes to budgets or PostgreSQL ownership.
+Test execution in this architecture review was **SKIP**; it does not claim the
+other reviewers' test runs as its own.
+
+## Coordinator independent evidence and oracle review
+
+The coordinator's separate evidence reviewer **APPROVED** the bounded
+`1281b83..5d8f77a` scope, with independent probes against stable
+`2f44960964be27f708873223c98c9dfdac17a9c9` and no P1/P2 findings.
+It verified both old-source provenance hashes and all 28 byte/envelope/digest
+chains, reproducing the 14 typed cases through the frozen old preparer.
+Seven producer-limit cases retained exact errors, digest and detached inputs;
+consumer invalid-limit classification stayed intact. Ten negative second
+transaction observations retained errors and zero SWITCH mutations. All four
+reflection and canonical pickle checks passed. JUnit counts were consistent,
+and historical failed receipts/full analysis were unchanged. The reviewer made
+no source, environment or artifact edits. This is an oracle and compatibility
+approval; full-suite and hosted-CI acceptance remains separate.
+
+The coordinator also independently inspected the actual unchanged-source
+`2f44960` preflight receipts: architecture and layer gates **PASS**, with the
+preferred clustering target still advisory debt. It confirmed that current
+master `d5ad9aa` is an ancestor and dependency configuration, canonical budgets,
+layer baseline, workflows and the separately owned PostgreSQL authority module
+are unchanged from that base.
+
 ## Remaining acceptance work
 
 Actual canonical graph, focused/broad checks, final documentation/metrics,

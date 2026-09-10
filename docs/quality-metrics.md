@@ -4,17 +4,17 @@ This page is the single source of truth for dpone code-quality metrics. It conta
 
 ## Current quality summary
 
-🔴 **RED - integrated architecture gates fail; merge readiness remains on hold.**
+🟡 **YELLOW - required architecture gates pass; advisory coupling debt remains.**
 
-The current integrated dependency and architecture gates report regressions.
-Generated dashboard labels do not establish acceptance or replace the complete
-exact-candidate CI suite. Regeneration updates observations, not thresholds;
-actual gate receipts determine readiness.
+The current integrated dependency and architecture gates pass their unchanged
+hard limits. Advisory coupling debt remains visible. Generated dashboard labels
+do not replace the complete exact-candidate test and CI suite; actual gate
+receipts determine readiness.
 
 Generic reconciliation/API/type facades are protected by import rules, broad
 facades are lazy/delegating, module-size hard violations are closed and legacy
 warning debt in the canonical `src/dpone` package is held by exact
-non-regression caps. Architecture coupling requires further improvement.
+non-regression caps. Architecture coupling remains above the preferred advisory target.
 Release governance is split
 into focused catalog sections, so current architecture fitness has no class
 responsibility advisories. `ETLProcessor` is now below the preferred fan-out
