@@ -201,12 +201,6 @@ def test_postgres_consume_with_staging_materializes_file_export_artifact() -> No
         row_count=2,
     )
     strategy = Strat(connector=SimpleNamespace(), logger=StubLogger(), staging_manager=staging_manager)
-    strategy.file_export_loader.load = (  # type: ignore[method-assign]
-        lambda *_args, **_kwargs: (
-            calls.__setitem__("file_export", calls["file_export"] + 1)
-            or LoadResult(inserted_rows=0, updated_rows=0, total_rows=0)
-        )
-    )
 
     with TemporaryDirectory() as tmp_dir:
         csv_path = Path(tmp_dir) / "orders.csv"

@@ -123,8 +123,13 @@ separate fact from inference. Do not make an unqualified claim that dpone is
 6. Update documentation, examples, schemas, generated references, and
    `CHANGELOG.md` when public behavior changes.
 7. Run focused checks first, then the required broader gate.
-8. Have a fresh-context reviewer inspect correctness, compatibility, data-loss
-   risk, tests, docs, and evidence before integration.
+8. After every feature implementation, require an independent, fresh-context
+   subagent that did not implement the feature to review the final diff before
+   completion or merge. Review correctness, compatibility, data-loss risk,
+   tests, docs, and evidence. Record the reviewed commit, findings, and verdict;
+   resolve blocking findings, validate fixes, and obtain a follow-up review of
+   changed scope. Author self-review does not satisfy this requirement. If a
+   reviewer is unavailable, report the review as `UNVERIFIED`.
 
 ## Architecture and quality
 
@@ -216,4 +221,6 @@ Every agent completion must state:
 4. evidence/artifact paths;
 5. documentation and CJM impact;
 6. remaining risk, uncertainty, and follow-up work;
-7. whether the result is ready for review, merge, or release.
+7. whether the result is ready for review, merge, or release;
+8. for feature implementations, the independent subagent review verdict,
+   reviewed commit, evidence path, and disposition of findings.

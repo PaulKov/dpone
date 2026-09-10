@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "source_commit": "69f465a3a3b20e7ba34e5c97eceb13f182953c2d",
+  "execution_inputs_sha256": "9c788a52cfe6adb1c8ee12c2803b2ef4ad140c6f341834a8f14cb082e2cf75c7",
+  "report_path": "test_artifacts/postgres-strategy-preservation/performance-69f465a/report.json",
+  "report_sha256": "ddbc52da83ccc237a98c978d75cd69f259011d9ade8ec580adbb3b2372960321",
+  "case_count": 9,
+  "rows_per_case": [
+    100000,
+    1000000,
+    5000000
+  ],
+  "attempts_per_size": 3,
+  "checks": [
+    "source_and_producers",
+    "complete_case_matrix",
+    "raw_count_timings",
+    "native_operation_order",
+    "row_metrics_and_payloads",
+    "concurrent_reader",
+    "summary_recalculation"
+  ],
+  "limits": "Verifies the recorded local experiment; does not establish a production SLA or cold-cache performance."
+}

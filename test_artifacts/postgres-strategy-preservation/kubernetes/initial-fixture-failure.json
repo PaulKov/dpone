@@ -1,0 +1,6 @@
+{
+  "status": "FAIL",
+  "reason": "Fixture omitted the configured staging schema; all runtime operations failed before target mutation. The coarse initial rejected-case PASS does not establish CHECK rejection.",
+  "correction": "Prepare staging before all five cases, assert CheckViolation for the rejected case, reset only own synthetic tables and rerun.",
+  "source_commit": "1ff83879fc7640d358cad15402672eafddcabf41"
+}

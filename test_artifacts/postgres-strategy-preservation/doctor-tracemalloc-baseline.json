@@ -1,0 +1,17 @@
+{
+  "baseline": "d5ad9aaecc900c24df421b160ed36b4cfc726e45",
+  "checkout": "/private/tmp/dpone-pg-baseline-ir3itocx",
+  "command": [
+    "/Users/paulkov007/.codex/worktrees/ec30/dpone-public/.venv/bin/python",
+    "-m",
+    "pytest",
+    "-n",
+    "0",
+    "tests/test_doctor_import_integration.py",
+    "-k",
+    "replays_effective_env_derived_runtime_state and PYTHONTRACEMALLOC",
+    "-q"
+  ],
+  "exit_code": 1,
+  "duration_seconds": 30.597154750023037
+}

@@ -1023,8 +1023,12 @@ Feature slices:
 - ✅ PostgreSQL sink runtime split into focused collaborators:
   - `dpone.runtime.sinks.strategies.postgres.postgres_base` is now an orchestration-only facade
   - `target_table_manager` owns target table creation + technical columns
-  - `file_export_loader` owns COPY/exchange/truncate flows for `FileExportArtifact`
-  - `internal_query_loader` owns CTAS/exchange workflow for `InternalQueryArtifact`
+  - `PostgresSink.load` owns the full-refresh transaction: artifact materialization →
+    selected strategy → owned staging cleanup → commit acknowledgement
+  - `InternalQueryArtifact.materialize` uses server-side INSERT into staging;
+    transport never selects exchange or bypasses a strategy
+  - `file_export_loader` and `internal_query_loader` retain direct-call compatibility
+    through the sink entry point; see [PostgreSQL strategy behavior](postgres.md#load-strategy-behavior)
   - `staging_sql_helper` owns staging->target SQL helpers, typed select and column-type cache
 - ✅ Staging managers split into focused collaborators:
   - `dpone.runtime.sinks.staging` is now a thin facade

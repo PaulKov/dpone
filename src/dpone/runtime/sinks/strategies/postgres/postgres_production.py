@@ -37,7 +37,7 @@ class PostgresSnapshotDiffStrategy(PostgresIncrementMergeStrategy):
                 inserted_rows=max(0, inserted - updated),
                 updated_rows=updated,
                 total_rows=self._count_target(load_config),
-                replaced_rows=deleted_missing if delete_policy == "hard_delete" else 0,
+                hard_deleted_rows=deleted_missing if delete_policy == "hard_delete" else 0,
                 soft_deleted_rows=deleted_missing if delete_policy == "soft_delete" else 0,
             )
 
