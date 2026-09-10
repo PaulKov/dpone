@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "name": "remediation-final-ownership",
+  "command": [
+    "uv",
+    "run",
+    "python",
+    "test_artifacts/delivery-acceleration/dda-06/audit_ownership.py"
+  ],
+  "source_before": {
+    "commit": "c7d86e1449afde30f401127b6eda941ef43a116a",
+    "tree": "b7b9c92571e6ebe8d25cc922f65eadba02a44d82",
+    "source_sha256": "3d0de1ccc48431eaa327922eac47941faa73e47db7845354429c239c645b15c7",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "remediation-final-ownership.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "c7d86e1449afde30f401127b6eda941ef43a116a",
+    "tree": "b7b9c92571e6ebe8d25cc922f65eadba02a44d82",
+    "source_sha256": "3d0de1ccc48431eaa327922eac47941faa73e47db7845354429c239c645b15c7",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 6.252,
+  "log_sha256": "78bbb4b567b27f1f491201a64ac9a0fc373bf1e89d6a6061bc52b2cb55bd072e"
+}

@@ -62,7 +62,9 @@ def setup(tmp_path, target, **overrides):
         max_total_encoded_bytes=10000,
         stage_allocated_bytes_stop_threshold=10000,
         max_rows=1,
-        max_bytes=1024,
+        # Positive flows need room for the serialized contract and temporary path.
+        # Exact byte-limit rejection is exercised separately with explicit caps.
+        max_bytes=4096,
         max_row_bytes=256,
         parallelism=2,
         **overrides,
@@ -77,7 +79,11 @@ def setup(tmp_path, target, **overrides):
     return executor, replace(plan, wire_fingerprint=contract.type_layout_hash), lease, contract
 
 
-def test_spawned_encoding_and_imports_overlap_and_recover_without_source(tmp_path):
+@pytest.mark.parametrize("long_work_path", [False, True], ids=["default-path", "long-path"])
+def test_spawned_encoding_and_imports_overlap_and_recover_without_source(tmp_path, long_work_path):
+    if long_work_path:
+        tmp_path = tmp_path / ("long-worker-parent-" + "x" * 120)
+        tmp_path.mkdir()
     target = Target(Barrier(2, timeout=20))
     executor, plan, lease, contract = setup(tmp_path, target)
     result = executor.stage(plan, iter([(7,), (7,)]), contract, lease)
@@ -91,6 +97,31 @@ def test_spawned_encoding_and_imports_overlap_and_recover_without_source(tmp_pat
     import os
 
     assert all(o["worker"] != os.getpid() for o in result.observations if o["phase"] == "encode")
+
+
+def test_insufficient_ipc_capacity_closes_unpulled_source_without_completion(tmp_path):
+    class UnpulledSource:
+        closed = False
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            raise AssertionError("metadata admission must reject before pulling rows")
+
+        def close(self):
+            self.closed = True
+
+    target = Target()
+    executor, plan, lease, contract = setup(tmp_path, target)
+    executor.limits = replace(executor.limits, max_bytes=64, max_row_bytes=64)
+    source = UnpulledSource()
+    with pytest.raises(WindowContractError, match="mssql_native.IPC_metadata_limit_exceeded"):
+        executor.stage(plan, source, contract, lease)
+    assert source.closed
+    assert target.files == []
+    assert target.receipts == {}
+    assert NativeChunkJournal(executor.store, lease, plan).completed() is None
 
 
 def test_import_retries_only_retained_identical_bytes(tmp_path):

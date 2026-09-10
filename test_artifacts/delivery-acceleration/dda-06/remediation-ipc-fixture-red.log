@@ -1,0 +1,58 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_ test_spawned_encoding_and_imports_overlap_and_recover_without_source[long-path] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3730/test_spawned_enco...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+long_work_path = True
+
+    @pytest.mark.parametrize("long_work_path", [False, True], ids=["default-path", "long-path"])
+    def test_spawned_encoding_and_imports_overlap_and_recover_without_source(tmp_path, long_work_path):
+        if long_work_path:
+            tmp_path = tmp_path / ("long-worker-parent-" + "x" * 120)
+            tmp_path.mkdir()
+        target = Target(Barrier(2, timeout=20))
+        executor, plan, lease, contract = setup(tmp_path, target)
+>       result = executor.stage(plan, iter([(7,), (7,)]), contract, lease)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_chunks_execution.py:87: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/dpone/runtime/mssql_native_chunks.py:155: in stage
+    return self._stage(journal, rows, contract, cancel, completion_metadata)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <dpone.runtime.mssql_native_chunks.BoundedNativeChunks object at 0x10c433c20>
+journal = <dpone.adapters.mssql_native_chunks_journal.NativeChunkJournal object at 0x10cc0a1e0>
+rows = <list_iterator object at 0x10bf3b100>
+contract = SourceNativeWireContract(schema_version='dpone.native_transfer.native_wire.v1', source_system='mssql', source_format='...41a55170b14582c079b7424bbd2f50169', bcp_version=None, warnings=('native_wire_query_is_not_sink_escaped',), blockers=())
+cancelled = <threading.Event at 0x10cc0a150: unset>, completion_metadata = None
+
+    def _stage(
+        self,
+        journal: NativeChunkJournal,
+        rows: Iterator[NativeRow],
+        contract: SourceNativeWireContract,
+        cancelled: Event,
+        completion_metadata: Callable[[], dict[str, Any]] | None,
+    ) -> NativeStageComplete:
+        limits, plan, lease = self.limits, journal.plan, journal.lease
+        self.work_dir.mkdir(parents=True, exist_ok=True)
+        directory = self.work_dir / journal.key.rsplit("/", 1)[-1]
+        directory.mkdir(mode=0o700, exist_ok=False)
+        envelope = (
+            contract,
+            (),
+            directory / f"{limits.max_staging_tables}.native",
+            limits.max_staging_tables,
+            limits.max_row_bytes,
+            limits.max_bytes,
+        )
+        ipc_overhead = len(pickle.dumps(envelope, protocol=5)) + 128
+        if ipc_overhead + 64 > limits.max_bytes:
+>           raise WindowContractError("mssql_native.IPC_metadata_limit_exceeded")
+E           dpone.contracts.bounded_window.WindowContractError: mssql_native.IPC_metadata_limit_exceeded
+
+src/dpone/runtime/mssql_native_chunks.py:251: WindowContractError
+=========================== short test summary info ============================
+FAILED tests/test_mssql_native_chunks_execution.py::test_spawned_encoding_and_imports_overlap_and_recover_without_source[long-path]

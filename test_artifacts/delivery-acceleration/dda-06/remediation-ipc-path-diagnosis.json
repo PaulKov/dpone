@@ -1,0 +1,30 @@
+{
+  "source_commit": "c7d86e1449afde30f401127b6eda941ef43a116a",
+  "status": "PASS",
+  "cause": "Longer platform temporary path exceeds existing exact serialized IPC budget; scheduler, framed producer and failing test module unchanged since1281b83.",
+  "measurements": [
+    {
+      "case": "failed_long",
+      "tmp_path": "/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dpone-dda06-remediation-full-x7lfbvsj/pytest/popen-gw1/test_spawned_encoding_and_impo0",
+      "ipc_overhead": 929,
+      "row_pickle_with_allowance": 32,
+      "required_bytes": 1025,
+      "max_bytes": 1024,
+      "admitted": false
+    },
+    {
+      "case": "replay_short",
+      "tmp_path": "/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/d6-criviwqt/p/popen-gw1/test_spawned_encoding_and_impo0",
+      "ipc_overhead": 898,
+      "row_pickle_with_allowance": 32,
+      "required_bytes": 994,
+      "max_bytes": 1024,
+      "admitted": true
+    }
+  ],
+  "replay_parent": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/d6-criviwqt",
+  "replay_basetemp": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/d6-criviwqt/p",
+  "effective_gid": 20,
+  "probe_gid": 20,
+  "probe_mode": "0o2777"
+}

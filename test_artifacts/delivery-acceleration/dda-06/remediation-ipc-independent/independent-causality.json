@@ -1,0 +1,18 @@
+[
+  {
+    "case": "failed_long",
+    "overhead": 929,
+    "row_with_allowance": 32,
+    "required_bytes": 1025,
+    "cap_1024_admitted": false,
+    "cap_4096_admitted": true
+  },
+  {
+    "case": "replay_short",
+    "overhead": 898,
+    "row_with_allowance": 32,
+    "required_bytes": 994,
+    "cap_1024_admitted": true,
+    "cap_4096_admitted": true
+  }
+]
