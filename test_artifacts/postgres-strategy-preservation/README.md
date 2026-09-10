@@ -1,8 +1,12 @@
 # PostgreSQL strategy preservation evidence
 
-Production source: `1ff83879fc7640d358cad15402672eafddcabf41`.
-Baseline: `d5ad9aaecc900c24df421b160ed36b4cfc726e45`.
-MR: <https://github.com/PaulKov/dpone/pull/31>.
+Latest production source: `bef37a7752db43dcae42298da7bd62509a186535`.
+Current baseline: `e15ad32b850708207c2f8f1b6faf597ef0f5b0b1`.
+Current MR: <https://github.com/PaulKov/dpone/pull/32>, replacing #31 after
+integration with current master. See [performance-review.md](performance-review.md)
+for final-source measurements and review. The historical campaigns below used
+source `1ff83879fc7640d358cad15402672eafddcabf41` and baseline
+`d5ad9aaecc900c24df421b160ed36b4cfc726e45`.
 
 **Independent review follow-up:** a new reviewer found two P2 regressions in
 `648237b6`: ignored legacy-loader dependencies and incorrect partition row
@@ -39,7 +43,7 @@ Independent code and proof reviews are recorded in [review.md](review.md).
 The later independent review and finding disposition are recorded separately in
 [independent-review.md](independent-review.md).
 
-## Validation
+## Historical validation before the review corrections
 
 | Check | Status | Evidence and limits |
 | --- | --- | --- |

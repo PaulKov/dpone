@@ -222,6 +222,34 @@ proportional to the affected child; `max_partitions_per_run` limits partition
 count, not row count or lock duration. Measure representative row widths,
 indexes and concurrent traffic before choosing an operational window.
 
+### Local large-partition measurements
+
+The Docker campaign on source `bef37a7752db43dcae42298da7bd62509a186535`
+exercised the real native replacement path with a primary key, CHECK constraint,
+128-byte text payload and 1,000 untouched rows in another partition. Each size
+ran three times: changed input followed by two replays. The table reports
+medians with observed ranges, in seconds.
+
+| Rows replaced | Load | Exclusive lock | Old-child COUNT |
+| --- | --- | --- | --- |
+| 100,000 | 0.272 (0.233–0.293) | 0.186 (0.165–0.215) | 0.003 (0.003–0.007) |
+| 1,000,000 | 1.937 (1.723–2.369) | 1.425 (1.250–1.551) | 0.020 (0.019–0.021) |
+| 5,000,000 | 12.059 (11.680–15.395) | 8.139 (7.985–9.435) | 0.143 (0.112–0.166) |
+
+The environment used PostgreSQL 16.15 with durability enabled and an ARM64
+Docker VM with 10 CPUs and 7.75 GiB RAM. The 5m-row child occupied about 1.03 GB
+including indexes. All nine cases passed row, payload, metric, parent identity,
+untouched-partition and staging-cleanup checks. A concurrent reader was observed
+waiting on the loader's lock.
+
+These are local observations, not a production latency guarantee. An earlier
+series with the same PostgreSQL implementation took 55.391–71.458 seconds at
+5m rows, with locks lasting 37.995–47.591 seconds. Cache state and host contention
+were uncontrolled; the difference does not establish a code speedup. The COUNT
+timing measures that call, not the overall slowdown against a version without it.
+For reproduction, raw attempts, source hashes and independent review, see the
+[campaign report](https://github.com/PaulKov/dpone/blob/codex/postgres-preservation-reviewed/test_artifacts/postgres-strategy-preservation/performance-review.md).
+
 ## Cross-links
 
 - [Load strategies](load-strategies.md)
