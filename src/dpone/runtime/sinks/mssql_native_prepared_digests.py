@@ -1,8 +1,8 @@
-"""Both existing prepared-stage integrity digests from one typed readback."""
+"""Typed prepared integrity for shared and independent verification readbacks."""
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
@@ -20,6 +20,33 @@ class PreparedDigests:
     business_digest: str
     full_digest: str
     rows: int
+
+
+def digest_prepared_projection(
+    read_rows: Callable[[], Iterator[Mapping[str, Any]]],
+    *,
+    contract: SourceNativeWireContract,
+    business_contract: SourceNativeWireContract,
+    max_row_bytes: int,
+    expected_rows: int,
+) -> str:
+    """Verify one typed projection with one encoding per row and no retention.
+
+    Validate allowance and encoder before requesting rows: an injected connector
+    may perform I/O when creating its iterator. The caller supplies a fresh SQL
+    readback for each invocation, preserving the independent prepublication
+    boundary. Iterator and encoding failures propagate without retry.
+    """
+    allowance = verification_allowance(contract, business_contract)
+    encoder = MssqlNativeEncoder(contract, max_row_bytes=max_row_bytes + allowance.overhead_bytes)
+    count, total = 0, 0
+    for row in read_rows():
+        allowance.require_null_metadata(row)
+        count += 1
+        total = (total + int.from_bytes(sha256(encoder.encode_row(row)).digest(), "big")) % (1 << 256)
+    if count != expected_rows:
+        raise ValueError("mssql_native.prepared_count_mismatch")
+    return native_multiset_digest(count, total)
 
 
 def digest_prepared_rows(

@@ -370,21 +370,18 @@ class MssqlNativeStagePreparer:
 
     @staticmethod
     def _stage_digest(strategy: Any, stage: Any, context: NativeStageContext, *, all_columns: bool = False) -> str:
-        from hashlib import sha256
-
-        from dpone.runtime.mssql_native_chunks_files import native_multiset_digest
-        from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
-        from dpone.runtime.sinks.mssql_native_verification import verification_allowance
+        from dpone.runtime.sinks.mssql_native_prepared_digests import digest_prepared_projection
 
         contract = MssqlNativeStagePreparer._full_contract(stage) if all_columns else context.wire_contract
-        allowance = verification_allowance(contract, context.wire_contract)
-        encoder = MssqlNativeEncoder(contract, max_row_bytes=context.max_row_bytes + allowance.overhead_bytes)
-        columns = ", ".join(strategy.connector.quote_identifier(column.name) for column in contract.columns)
-        count, total = 0, 0
-        for row in strategy.connector.get_records_iterator(f"SELECT {columns} FROM {strategy._staging_name(stage)}"):
-            allowance.require_null_metadata(row)
-            count += 1
-            total = (total + int.from_bytes(sha256(encoder.encode_row(row)).digest(), "big")) % (1 << 256)
-        if count != stage.row_count:
-            raise ValueError("mssql_native.prepared_count_mismatch")
-        return native_multiset_digest(count, total)
+
+        def read_rows() -> Any:
+            columns = ", ".join(strategy.connector.quote_identifier(column.name) for column in contract.columns)
+            return strategy.connector.get_records_iterator(f"SELECT {columns} FROM {strategy._staging_name(stage)}")
+
+        return digest_prepared_projection(
+            read_rows,
+            contract=contract,
+            business_contract=context.wire_contract,
+            max_row_bytes=context.max_row_bytes,
+            expected_rows=stage.row_count,
+        )
