@@ -9,13 +9,13 @@ from typing import Any
 
 import yaml
 
-from dpone.contracts.airflow_resources import KubernetesResourceError, workload_airflow_resources
 from dpone.gitops.workload_catalog_models import (
     GitOpsConfigProvenance,
     GitOpsWorkloadCatalogReport,
     GitOpsWorkloadDefinition,
     issue,
 )
+from dpone.manifest.airflow_resources import KubernetesResourceError, workload_airflow_resources
 
 
 @dataclass(frozen=True, slots=True)

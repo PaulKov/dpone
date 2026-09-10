@@ -12,10 +12,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
 
-from dpone.contracts.airflow_resources import KubernetesResourceError, manifest_airflow_resources
 from dpone.contracts.dbt_relation_writes import DbtRelationWrite, transfer_relation_write
 from dpone.contracts.release_composition_ordinary import OrdinaryReleaseInventoryError
 from dpone.gitops.workload_catalog_models import GitOpsConfigProvenance, GitOpsWorkloadDefinition
+from dpone.manifest.airflow_resources import KubernetesResourceError, manifest_airflow_resources
 from dpone.manifest.bounded_yaml import load_bounded_yaml
 from dpone.manifest.confined_files import read_confined_file
 from dpone.manifest.runtime_materialization import materialize_runtime_manifest

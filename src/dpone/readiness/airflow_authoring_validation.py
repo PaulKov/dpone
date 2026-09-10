@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from dpone.contracts.airflow_resources import manifest_airflow_resources
+from dpone.manifest.airflow_resources import manifest_airflow_resources
 from dpone.manifest.authoring import (
     AuthoringCompilation,
     AuthoringCompilationError,

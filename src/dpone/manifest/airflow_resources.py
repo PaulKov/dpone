@@ -1,4 +1,4 @@
-"""Authoring policy for the provider-owned bounded Kubernetes resource wire."""
+"""Manifest and effective-config policy for the bounded provider resource wire."""
 
 from __future__ import annotations
 

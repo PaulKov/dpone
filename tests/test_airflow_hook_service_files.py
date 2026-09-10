@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from dpone.readiness import airflow_runtime_pack_exec as pack_exec
+from dpone.runtime import verified_pack_execution as pack_exec
 from dpone.runtime.verified_pack_diagnostics import VerifiedPackServiceError
 from dpone.runtime.verified_pack_launcher import VerifiedPackCommand
 from dpone.runtime.verified_pack_service_files import VerifiedPackServiceFiles

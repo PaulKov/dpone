@@ -11,9 +11,9 @@ if TYPE_CHECKING:
 from pathlib import Path
 from typing import Any
 
-from dpone.contracts.airflow_resources import manifest_airflow_resources
 from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
 from dpone.gitops.workload_catalog_models import GitOpsConfigProvenance, GitOpsWorkloadDefinition
+from dpone.manifest.airflow_resources import manifest_airflow_resources
 from dpone.manifest.confined_files import project_relative_path, sha256_confined_file
 from dpone.readiness.airflow_authoring_dependency_integrity import (
     AuthoringDependencyIntegrityError,

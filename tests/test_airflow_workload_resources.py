@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from dpone.contracts.airflow_resources import workload_airflow_resources
 from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
 from dpone.gitops.workload_catalog import WorkloadCatalogResolver
+from dpone.manifest.airflow_resources import workload_airflow_resources
 from dpone.readiness.airflow_compact_pack_release_helpers import rewrite_strict_init_fetch_dag_spec
 from dpone.readiness.airflow_compact_pack_release_models import CompactPackReleaseError
 from dpone.readiness.airflow_local_workload_pack import build_local_airflow_workload_pack

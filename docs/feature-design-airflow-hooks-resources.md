@@ -120,7 +120,9 @@ validation. Timeouts/cancellation retain the existing operator behavior.
 The existing provider wire contract remains the distribution-independent
 authority for Kubernetes resource syntax; core authoring composes that bounded
 contract without importing Kubernetes or Airflow SDKs. Canonical runtime helpers
-own new service-file and safe OS-diagnostic policy. Existing compiler and command
+own execution, service-file and safe OS-diagnostic policy. Resource authoring
+policy lives under `dpone.manifest`; the legacy readiness executor re-exports
+the canonical implementation without adding policy. Existing compiler and command
 facades call these helpers. One integrator owns schemas, navigation, changelog
 and cross-layer integration. New modules must satisfy the existing quality
 budgets; no new framework or plugin registry is needed.

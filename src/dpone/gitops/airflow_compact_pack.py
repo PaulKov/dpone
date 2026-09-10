@@ -27,7 +27,6 @@ from dpone_airflow_pack.provider_execution_contract import (
     kubernetes_pod_name,
 )
 
-from dpone.contracts.airflow_resources import workload_airflow_resources
 from dpone.gitops.airflow_asset_uri import ResolvedMssqlAssetRegistry
 from dpone.gitops.airflow_compact_errors import AirflowCompactPackBuildError, project_compact_connections
 from dpone.gitops.airflow_compact_pack_bootstrap import (
@@ -58,6 +57,7 @@ from dpone.gitops.airflow_compact_runtime import compact_kpo_kwargs, compact_pro
 from dpone.gitops.airflow_runner_contract import resolve_airflow_runner_contract
 from dpone.gitops.workload_catalog_models import GitOpsWorkloadCatalogIssue
 from dpone.gitops.workload_dependencies import WorkloadDependencyError
+from dpone.manifest.airflow_resources import workload_airflow_resources
 from dpone.manifest.runtime_materialization import RuntimeManifestMaterializationError, materialize_runtime_manifest
 
 COMPACT_PACK_SOURCE = "dpone gitops airflow pack"

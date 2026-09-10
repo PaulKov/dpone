@@ -9,7 +9,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from dpone.contracts.airflow_deployment import canonical_fingerprint
-from dpone.contracts.airflow_resources import KubernetesResourceError, manifest_airflow_resources
+from dpone.manifest.airflow_resources import KubernetesResourceError, manifest_airflow_resources
 from dpone.manifest.authoring_folder import (
     AuthoringSourceDependency,
     BoundedYamlFolderFragmentLoader,

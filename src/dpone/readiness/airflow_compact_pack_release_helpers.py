@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from dpone.contracts.airflow_resources import KubernetesResourceError, reject_resource_overrides
+from dpone.manifest.airflow_resources import KubernetesResourceError, reject_resource_overrides
 from dpone.readiness.airflow_compact_pack_release_models import CompactPackReleaseError
 
 _AWS_ENV_TEMPLATES = {
