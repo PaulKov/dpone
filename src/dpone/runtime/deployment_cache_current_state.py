@@ -5,12 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dpone.contracts.airflow_deployment import current_pointer_violation
 from dpone.runtime.deployment_cache_common import (
     DeploymentCacheError,
     read_regular_json_object,
     resolve_relative_current_symlink,
 )
+from dpone.runtime.deployment_cache_recovery_policy import assess_current_identity
 
 if TYPE_CHECKING:
     from dpone.runtime.deployment_cache_projection_validator import DeploymentCacheProjectionValidator
@@ -54,25 +54,13 @@ class DeploymentCacheCurrentState:
             )
         except (DeploymentCacheError, UnicodeError, OSError) as exc:
             raise _recovery_required(current_path) from exc
-        pointer_id = str(pointer.get("deployment_id") or "")
-        current_id = str(current.get("deployment_id") or "")
-        pointer_environment = str(pointer.get("environment") or "")
-        current_environment = str(current.get("environment") or "")
-        pointer_release_id = str(pointer.get("release_id") or "")
-        current_release_id = str(current.get("release_ref") or "")
-        pointer_violation = current_pointer_violation(pointer, expected_environment=expected_environment)
-        if (
-            pointer_violation is not None
-            or not pointer_environment
-            or pointer_environment != current_environment
-            or expected_environment is not None
-            and pointer_environment != expected_environment
-            or not pointer_id
-            or physical_id is None
-            or physical_id != current_id
-            or pointer_id != current_id
-            or pointer_release_id != current_release_id
-        ):
+        current_id = assess_current_identity(
+            pointer,
+            current,
+            physical_deployment_id=physical_id,
+            expected_environment=expected_environment,
+        )
+        if current_id is None:
             raise _recovery_required(current_path)
         return current_id
 
