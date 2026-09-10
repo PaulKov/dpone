@@ -186,13 +186,20 @@ it. Absolute references, traversal and symlink escape are rejected. Evidence
 references inside receipts also resolve relative to the run envelope. The
 comparison keeps envelope references relative to its own directory and original
 relative sample references; resolve sample references against their envelope
-directory. If inputs are outside the output directory, the producer retains an
+directory. Accepted envelope symlinks retain that logical directory on export;
+hashes still bind the resolved file bytes. If inputs are outside the output directory, the producer retains an
 immutable content-addressed evidence bundle beside the report. Existing matching
 bundles are verified and reused; conflicts fail closed. For `compare()` without
 an output path, envelope references are relative to the common input ancestor.
 Its `sha256` hashes canonical sorted compact UTF-8 JSON **excluding that sha256
 field**. Hashes detect accidental changes; self-authored JSON is not an independent
 proof that a database ran.
+
+When a sample supplies an observations sidecar, comparison reconstructs bounded
+observations, recorder diagnostics and aggregates through the collector contracts.
+Unknown nested versions, malformed records or inconsistent derived fields are
+input errors (exit 2). A valid sidecar with observer failures or capacity overflow
+keeps the comparison UNVERIFIED and prevents an eligible performance ratio.
 
 Sample correctness requires typed content, duplicate multiplicity, metadata
 parity and commit-receipt binding. Partition replacement also requires unchanged

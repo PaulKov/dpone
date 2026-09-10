@@ -119,6 +119,45 @@ class BoundedNativeDeliveryObserver:
             diagnostics=self.record_diagnostics,
         )
 
+    @classmethod
+    def from_snapshot(cls, payload: dict[str, Any]) -> BoundedNativeDeliveryObserver:
+        """Rebuild bounded typed records; consumers verify derived snapshot fields.
+
+        Aggregates and status are recomputed, never taken as acceptance authority
+        from serialized labels. Irrecoverable loss flags remain explicit.
+        """
+        if (
+            set(payload)
+            != {
+                "schema_version",
+                "kind",
+                "status",
+                "limitations",
+                "recorders",
+                "capacity",
+                "observations",
+                "aggregates",
+            }
+            or type(payload["schema_version"]) is not int
+            or payload["schema_version"] != 1
+        ):
+            raise ValueError("observation.invalid_snapshot")
+        collector = cls(max_observations=payload["capacity"])
+        if any(
+            not isinstance(payload[field], list) or len(payload[field]) > collector._capacity
+            for field in ("observations", "recorders")
+        ) or not isinstance(payload["limitations"], list):
+            raise ValueError("observation.invalid_snapshot")
+        for item in payload["observations"]:
+            collector.record(NativeDeliveryObservation.from_dict(item))
+        for report in payload["recorders"]:
+            if not _valid_report(report):
+                raise ValueError("observation.invalid_recorder_report")
+            collector.record_diagnostics(report)
+        collector._overflow = "capacity_exceeded" in payload["limitations"]
+        collector._invalid_report = "invalid_or_failed_recorder" in payload["limitations"]
+        return collector
+
     def record_diagnostics(self, report: dict[str, Any]) -> None:
         """Merge the latest worker snapshot, including worker-process failures.
 
