@@ -151,6 +151,12 @@ demo source, parses, builds and tests the demo twice (including its incremental
 path), then uploads the manifest, macro diff and SHA-256 receipt. It never uses
 production credentials.
 
+The observer phase imports both the core and its declared lightweight
+`dpone-airflow-pack` dependency from the same candidate checkout. Its source
+path includes `src`, `packages/dpone-airflow-pack/src` and the repository's test
+tools. Origin assertions reject an observer or resource contract resolved from
+an unrelated installed package; no published candidate version is required.
+
 Before that first merge, dispatch the existing `Connector certification`
 workflow on the candidate ref with only `run_dbt_toolchain_candidate=true`.
 That trusted dispatcher invokes the same reusable workflow; all of its other

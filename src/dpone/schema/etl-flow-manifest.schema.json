@@ -31,6 +31,70 @@
     }
   ],
   "properties": {
+    "gitops": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "airflow": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "resources": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": false,
+              "properties": {
+                "limits": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "properties": {
+                    "cpu": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$"
+                    },
+                    "ephemeral-storage": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$"
+                    },
+                    "memory": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$"
+                    }
+                  }
+                },
+                "requests": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "properties": {
+                    "cpu": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$"
+                    },
+                    "ephemeral-storage": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$"
+                    },
+                    "memory": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$"
+                    }
+                  }
+                }
+              },
+              "description": "Base-container resources for runtime and separate hooks. Quote quantities; requests must not exceed limits. CPU precision is 1m; magnitude is at most 2^63-1 and precision at most 1n. Missing sections retain Kubernetes admission defaults."
+            }
+          }
+        }
+      }
+    },
     "kind": {"const": "dpone.flow.v1"},
     "authoring": {"$ref": "#/definitions/authoring"},
     "metadata": {"$ref": "#/definitions/metadata"},

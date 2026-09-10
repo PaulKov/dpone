@@ -391,6 +391,7 @@ def test_runtime_init_fetch_end_to_end_publishes_ready_and_prepares_shell_free_c
         ).as_posix(),
     }
     assert command.working_directory == worktree_root.absolute()
+    assert command.publish_xcom is True
     assert (worktree_root / "runtime" / "manifest.json").read_text(encoding="utf-8") == "kind: dpone.batch.v1\n"
     assert factory.configurations == [
         RuntimeRegistryConfiguration(
@@ -443,6 +444,7 @@ def test_runtime_init_fetch_extracts_and_reverifies_pinned_dbt_project_bundle(
         "json",
     )
     assert command.exit_code_policy == "child"
+    assert command.publish_xcom is True
     assert (worktree_root / "dbt-project" / "dbt_project.yml").read_text(encoding="utf-8") == "name: analytics\n"
     assert (worktree_root / "dbt-project" / "models" / "orders.sql").read_text(encoding="utf-8") == "select 1\n"
 
@@ -1124,8 +1126,13 @@ def test_launcher_preserves_valid_strict_v2_pre_hook_command(tmp_path: Path) -> 
         "--hook-id",
         "refresh_orders",
     )
-    assert command.env == {}
+    assert command.env == {
+        RUNTIME_CONNECTION_CONTEXT_ENV: (
+            tmp_path / "artifacts" / "payload" / _key(bundle.plan.binding_set.artifact_ref).parent
+        ).as_posix(),
+    }
     assert command.exit_code_policy == "child"
+    assert command.publish_xcom is False
 
 
 def test_launcher_v2_uses_unique_structured_generated_pre_hook_command(
@@ -1855,6 +1862,45 @@ def test_runtime_pack_exec_failure_never_starts_workload_or_changes_directory(
 
     assert code == 4
     assert "DPONE_RUNTIME_FETCH_READY_INVALID" in caplog.text
+
+
+@pytest.mark.parametrize("error_number", [2, 13, 28])
+def test_runtime_pack_exec_cli_reports_safe_preparation_os_diagnostic(
+    error_number: int,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class UnavailableService:
+        def prepare_pack_exec(self) -> object:
+            raise OSError(error_number, "private-message", "/private-workload-path")
+
+    monkeypatch.setattr(airflow_runtime_delivery_cmd, "AirflowRuntimeInitFetchService", UnavailableService)
+    code = airflow_runtime_delivery_cmd.cmd_airflow_runtime_pack_exec(
+        argparse.Namespace(), ctx=object(), logger=logging.getLogger("test.runtime-pack-exec.os-error")
+    )
+
+    assert code == 5
+    assert "DPONE_RUNTIME_PACK_EXEC_FAILED" in caplog.text
+    assert "stage=prepare_verified_command" in caplog.text
+    assert "service_path=verified_inputs" in caplog.text
+    assert f"exception_type={type(OSError(error_number, 'unused')).__name__}" in caplog.text
+    assert f"errno={error_number}" in caplog.text
+    assert "private-message" not in caplog.text
+    assert "private-workload-path" not in caplog.text
+    assert capsys.readouterr().out == ""
+
+
+def test_runtime_pack_exec_help_describes_hook_and_runtime_service_files() -> None:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
+    command = airflow_runtime_delivery_cmd.register_runtime_pack_exec_parser(subparsers)
+
+    help_text = command.format_help()
+
+    assert "/var/lib/dpone/run" in help_text
+    assert "/airflow/xcom/return.json" in help_text
+    assert "separate hooks use no XCom path" in help_text
 
 
 def test_runtime_pack_exec_writes_non_empty_xcom_return_json(

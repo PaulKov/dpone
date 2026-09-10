@@ -641,6 +641,23 @@
                             },
                             "maxProperties": 64,
                             "minProperties": 1,
+                            "properties": {
+                              "cpu": {
+                                "maxLength": 64,
+                                "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$",
+                                "type": "string"
+                              },
+                              "ephemeral-storage": {
+                                "maxLength": 64,
+                                "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$",
+                                "type": "string"
+                              },
+                              "memory": {
+                                "maxLength": 64,
+                                "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$",
+                                "type": "string"
+                              }
+                            },
                             "propertyNames": {
                               "maxLength": 253,
                               "minLength": 1,
@@ -658,6 +675,23 @@
                             },
                             "maxProperties": 64,
                             "minProperties": 1,
+                            "properties": {
+                              "cpu": {
+                                "maxLength": 64,
+                                "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$",
+                                "type": "string"
+                              },
+                              "ephemeral-storage": {
+                                "maxLength": 64,
+                                "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$",
+                                "type": "string"
+                              },
+                              "memory": {
+                                "maxLength": 64,
+                                "pattern": "^\\+?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$",
+                                "type": "string"
+                              }
+                            },
                             "propertyNames": {
                               "maxLength": 253,
                               "minLength": 1,

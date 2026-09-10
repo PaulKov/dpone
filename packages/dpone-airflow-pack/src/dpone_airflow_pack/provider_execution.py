@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from dpone_airflow_pack.init_fetch_contract import InitFetchProviderError
+from dpone_airflow_pack.kubernetes_resources import KubernetesResourceError, validate_kubernetes_resources
 from dpone_airflow_pack.provider_execution_contract import (
     BASE_CONTAINER_FIELDS,
     IMAGE_PULL_SECRET_FIELDS,
@@ -16,14 +17,12 @@ from dpone_airflow_pack.provider_execution_contract import (
     MAX_EXECUTION_TIMEOUT_SECONDS,
     MAX_IMAGE_PULL_SECRETS,
     MAX_NODE_SELECTOR_ENTRIES,
-    MAX_RESOURCE_ENTRIES,
     MAX_TOLERATIONS,
     POD_FIELDS,
     POD_SPEC_FIELDS,
     PROJECTION_FIELDS,
     PROJECTION_REQUIRED_FIELDS,
     PROVIDER_EXECUTION_SCHEMA,
-    RESOURCE_FIELDS,
     RUNTIME_POD_CONTRACT_KEY,
     RUNTIME_POD_CONTRACT_VALUE,
     RUNTIME_POD_MANAGED_BY_KEY,
@@ -227,38 +226,16 @@ def _validate_base_container(value: object) -> None:
     if container["name"] != "base":
         raise _collision("provider_execution container name must be base")
     resources = container.get("resources")
-    if resources is not None:
+    if "resources" in container:
         _validate_resources(resources)
 
 
 def _validate_resources(value: object) -> None:
     field = "provider_execution.pod_spec.spec.containers[0].resources"
-    resources = _mapping(value, field=field)
-    _require_exact_fields(
-        resources,
-        allowed=RESOURCE_FIELDS,
-        required=frozenset(),
-    )
-    if not resources:
-        raise _invalid(f"{field} must contain requests or limits")
-    for section_name, raw_section in resources.items():
-        section_field = f"{field}.{section_name}"
-        section = _mapping(raw_section, field=section_field)
-        if not section:
-            raise _invalid(f"{section_field} must not be empty")
-        if len(section) > MAX_RESOURCE_ENTRIES:
-            raise _invalid(f"{section_field} exceeds the {MAX_RESOURCE_ENTRIES}-item limit")
-        for resource_name, quantity in section.items():
-            _bounded_string(
-                resource_name,
-                field=f"{section_field} resource name",
-                max_length=253,
-            )
-            _bounded_string(
-                quantity,
-                field=f"{section_field}.{resource_name}",
-                max_length=64,
-            )
+    try:
+        validate_kubernetes_resources(value, field=field, allow_extended=True)
+    except KubernetesResourceError as exc:
+        raise _invalid(str(exc)) from exc
 
 
 def _require_exact_fields(

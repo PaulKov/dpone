@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+## 0.77.0 - 2026-09-10
+
+- Add validated workload `airflow.resources` for CPU, memory and ephemeral
+  storage; preserve requests/limits through strict delivery and bind resource
+  changes to authoring selection and artifact identity. Reject resource-capable
+  Pod overrides with migration guidance instead of discarding them.
+- Reject Airflow resource declarations inside flow/folder/recipe processes and
+  classic batch defaults/schema/table scopes. Check, direct batch loading and
+  reconcile report the misplaced field and root-level replacement before any
+  delivery artifacts are written. Reject opaque metadata containers before
+  templates or merges can conceal a declaration; retain ordinary process templates.
+- Fix separate Airflow hooks requiring `/airflow/xcom` despite disabled XCom.
+  Keep hook diagnostics on the writable run volume, preserve child failures,
+  and report safe startup stage, exception type and errno without raw argv.
+- Pass the verified runtime connection context to separate Airflow hooks so
+  canonical `connection_ref` SQL hooks can resolve their pinned credentials.
+  Retain artifact verification and hook child-exit/XCom behavior.
+
+### Known limitation
+
+- The existing PostgreSQL same-database internal-query full-refresh path can
+  replace a pre-existing target and lose PK/NOT NULL constraints. This release
+  does not correct that load-strategy defect; it remains a separate tracked fix.
+  Hooks/resources live acceptance does not certify constraint preservation.
+
 ## 0.76.0 - 2026-09-10
 
 ### Added

@@ -171,8 +171,9 @@ skipped, an ambiguous commit is reconciled, and only non-committed chunks rerun.
 All other routes retain the zero-retry contract.
 
 Strict release materialization preserves only the validated scheduler-owned
-`operator_overrides.pool` and `operator_overrides.retries` fields. It removes
-legacy `in_cluster` and every executable, image, namespace, secret, and pod
+`operator_overrides.pool` and `operator_overrides.retries` fields. Resource-capable
+Pod overrides fail with field-specific migration guidance to
+[workload resources](airflow-workload-resources.md). It removes other legacy `in_cluster` and every executable, image, namespace, secret, and pod
 security override before fingerprinting the immutable DAG spec. The promoted
 compiler, `dpone-airflow-pack`, and `apache-airflow-providers-dpone` must be a
 coordinated set with both reader packages at `0.74.20` or newer. After cache
@@ -194,8 +195,9 @@ The base container does not mount or reread
 decision is committed by `runtime-fetch-ready.json`. Runtime workloads run the
 verified argv without `shell=True`, `/bin/sh -c`, scheduler-copied command, or
 inline bootstrap fallback; stdout/stderr are captured under
-`/var/lib/dpone/run`, and `runtime-pack-exec` always writes a JSON object to
-`/airflow/xcom/return.json`. Normal runtime commands exit `0` so the KPO xcom
+`/var/lib/dpone/run`, including a local `runtime-summary.json`. Runtime commands
+publish a JSON object to `/airflow/xcom/return.json`; separate hooks disable
+XCom and require no access to that path. Normal runtime commands exit `0` so the KPO xcom
 sidecar can publish the outcome summary; pre-hook and dbt commands propagate
 the real child exit code after writing evidence.
 
@@ -209,7 +211,7 @@ Interpret runtime command exits with the stable code in the container log:
 | `2` | `DPONE_INIT_FETCH_PLAN_INVALID`, `DPONE_INIT_FETCH_PLAN_TOO_LARGE`, `DPONE_INIT_FETCH_PLAN_HASH_MISMATCH`, or `DPONE_INIT_FETCH_PLAN_NON_CANONICAL`. | Rebuild the v2 index/KPO with compatible producer and provider bytes. Do not retry the same malformed pod. |
 | `3` | `DPONE_ARTIFACT_REGISTRY_UNAVAILABLE`. | Repair registry/IAM availability, then retry the same pinned task. Each retry gets a fresh `emptyDir`. |
 | `4` | Configuration/trust mismatch, missing or corrupt artifact, required attestation, invalid ready state, or other integrity/contract failure. | Stop execution. Restore exact immutable bytes or publish and promote a new deployment; do not bypass verification. |
-| `5` | `DPONE_RUNTIME_PACK_EXEC_FAILED` or verified child process could not start. | Verify the digest-pinned runtime image contains the expected dpone entry point and runtime payload; rebuild the image/deployment if necessary. |
+| `5` | `DPONE_RUNTIME_PACK_EXEC_FAILED` or verified child process could not start. | Use stage, exception type, errno and service-path role to distinguish permissions, missing executable/path, full disk and publication failures; follow [startup diagnostics](airflow-runtime-startup-diagnostics.md). |
 | Child exit | Verified workload command started and returned non-zero. | Use normal dpone run/evidence/state recovery for that exact attempt; the launcher preserves the child exit code. |
 
 Useful stable runtime codes include

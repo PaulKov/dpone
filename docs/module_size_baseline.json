@@ -113,8 +113,8 @@
     "src/dpone/gitops/airflow_compact_pack.py": {
       "accepted_adr": null,
       "baseline_commit": "f8c6a4a5e75d167829c05f65d5d3033acb193878",
-      "max_lines": 377,
-      "max_sloc": 356,
+      "max_lines": 371,
+      "max_sloc": 352,
       "owner": "architecture",
       "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
       "target_date": "2026-12-31",
@@ -183,8 +183,8 @@
     "src/dpone/manifest/authoring.py": {
       "accepted_adr": null,
       "baseline_commit": "f8c6a4a5e75d167829c05f65d5d3033acb193878",
-      "max_lines": 419,
-      "max_sloc": 385,
+      "max_lines": 402,
+      "max_sloc": 372,
       "owner": "architecture",
       "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
       "target_date": "2026-12-31",

@@ -10,7 +10,10 @@ from dpone.readiness.airflow_runtime_init_fetch import (
     AirflowRuntimeDeliveryError,
     AirflowRuntimeInitFetchService,
 )
-from dpone.readiness.airflow_runtime_pack_exec import execute_verified_pack_command
+from dpone.readiness.airflow_runtime_pack_exec import (
+    execute_verified_pack_command,
+    report_pack_os_error,
+)
 
 
 def register_runtime_init_fetch_parser(
@@ -37,8 +40,9 @@ def register_runtime_pack_exec_parser(
         description=(
             "Internal KPO base-container command. Revalidates the pinned init-fetch "
             "plan and runtime-fetch-ready.json, then runs the structured command "
-            "selected from the verified workload pack and writes "
-            "/airflow/xcom/return.json for the KPO xcom sidecar."
+            "selected from the verified workload pack. Captures output and summary "
+            "under /var/lib/dpone/run; runtime publishes /airflow/xcom/return.json "
+            "for the KPO xcom sidecar, while separate hooks use no XCom path."
         ),
     )
 
@@ -72,8 +76,8 @@ def cmd_airflow_runtime_pack_exec(
     except AirflowRuntimeDeliveryError as exc:
         logger.error("%s: %s", exc.code, exc)
         return _exit_code(exc)
-    except OSError:
-        logger.error("DPONE_RUNTIME_PACK_EXEC_FAILED: verified workload process could not start")
+    except OSError as exc:
+        report_pack_os_error(exc, logger=logger)
         return 5
 
 

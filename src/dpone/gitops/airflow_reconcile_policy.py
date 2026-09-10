@@ -11,12 +11,13 @@ from dpone.gitops.paths import GitOpsPathValidationError, confined_repo_file_pat
 from dpone.gitops.workload_catalog_models import GitOpsWorkloadCatalogIssue, issue
 
 RECONCILE_SOURCE = "dpone gitops airflow reconcile"
-_PUBLIC_CONNECTION_PROJECTION_CODES = frozenset(
+_PUBLIC_CONFIGURATION_CODES = frozenset(
     {
         "DPONE_AIRFLOW_CONNECTION_PROJECTION_ENTRY_INVALID",
         "DPONE_AIRFLOW_CONNECTION_PROJECTION_OVERRIDE_CONFLICT",
         "DPONE_AIRFLOW_CONNECTION_PROJECTION_REF_AMBIGUOUS",
         "DPONE_AIRFLOW_CONNECTION_PROJECTION_REF_MISSING",
+        "DPONE_AIRFLOW_RESOURCES_INVALID",
     }
 )
 
@@ -87,7 +88,7 @@ def build_failure_issue(
     exc: Exception,
 ) -> GitOpsWorkloadCatalogIssue:
     code = str(getattr(exc, "code", "") or "")
-    if code in _PUBLIC_CONNECTION_PROJECTION_CODES:
+    if code in _PUBLIC_CONFIGURATION_CODES:
         return issue(
             code=code,
             message=str(exc),
