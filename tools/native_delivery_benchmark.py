@@ -5,12 +5,13 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 from dpone.runtime.native_delivery_benchmark import BenchmarkInputError, compare
 
 
 class _Parser(argparse.ArgumentParser):
-    def error(self, message: str) -> None:
+    def error(self, message: str) -> NoReturn:
         self.print_usage(sys.stderr)
         self.exit(2, "native_delivery_benchmark: invalid_arguments; see compare --help\n")
 

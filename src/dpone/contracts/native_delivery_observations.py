@@ -22,7 +22,7 @@ def diagnostic_token(value: str) -> None:
 
 def _finite_number(value: float | int | None) -> bool:
     try:
-        return type(value) in (float, int) and math.isfinite(value)
+        return value is not None and type(value) in (float, int) and math.isfinite(value)
     except OverflowError:
         return False
 
@@ -82,14 +82,14 @@ class NativeDeliveryObservation:
             raise ValueError("observation.invalid_schema_or_phase")
         for token in (self.clock_domain, self.worker_id):
             diagnostic_token(token)
-        for token in (self.reason, self.attempt_id):
-            if token is not None:
-                diagnostic_token(token)
+        for optional_token in (self.reason, self.attempt_id):
+            if optional_token is not None:
+                diagnostic_token(optional_token)
         for value in (self.process_id, self.start_monotonic_ns, self.end_monotonic_ns):
             if type(value) is not int or not 0 <= value <= 2**63 - 1:
                 raise ValueError("observation.invalid_counter")
-        for value in (self.ordinal, self.rows, self.encoded_bytes):
-            if value is not None and (type(value) is not int or not 0 <= value <= 2**63 - 1):
+        for optional_value in (self.ordinal, self.rows, self.encoded_bytes):
+            if optional_value is not None and (type(optional_value) is not int or not 0 <= optional_value <= 2**63 - 1):
                 raise ValueError("observation.invalid_counter")
         if self.end_monotonic_ns < self.start_monotonic_ns or self.outcome not in {"completed", "failed", "cancelled"}:
             raise ValueError("observation.invalid_span")
