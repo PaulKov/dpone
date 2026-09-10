@@ -4,8 +4,11 @@ Status: fixture contract handoff; no services or credentials used by DDA-04.
 
 1. Use an explicitly approved disposable SQL Server 2022 (major 16) instance,
    EngineEdition 2 or 3. Record exact server, driver and tool versions. The
-   connection needs database VIEW DEFINITION, server VIEW ANY DEFINITION, table reads, ALTER/SWITCH rights,
-   plus the existing finalizer's receipt/fence rights. Never log credentials.
+   connection needs database `VIEW DEFINITION`, server `VIEW ANY DEFINITION`,
+   `SELECT ON OBJECT::sys.sql_expression_dependencies` in the target database,
+   table reads, ALTER/SWITCH rights, plus the existing finalizer's receipt/fence
+   rights. The fixture owner provisions these permissions; `db_owner` membership
+   is not required by the component. Never log credentials.
 2. Provision a fixture database and identical three partitioned rowstore tables
    with a shared RANGE RIGHT function/scheme and two finite boundaries. Minimal
    physical shape: a heap with a non-null date key and an int business column,
