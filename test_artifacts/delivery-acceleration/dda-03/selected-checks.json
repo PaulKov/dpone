@@ -1,0 +1,33 @@
+{
+  "command": "uv run python tools/agent_policy/select_checks.py --base-ref origin/master",
+  "environment_override": {
+    "PYTEST_XDIST_AUTO_NUM_WORKERS": "2",
+    "PYTEST_DEBUG_TEMPROOT": "/tmp/dpone-dda03-selected-checks"
+  },
+  "status": "PASS",
+  "exit_code": 0,
+  "elapsed_seconds": 0.38,
+  "log": "selected-checks.log",
+  "before": {
+    "head": "ad5c117f89c7df33f2bdc2e1aa42d671ca8e0f1b",
+    "implementation_dirty": false,
+    "implementation_sha256": {
+      "src/dpone/runtime/mssql_native_sized_frames.py": "2d1716812cff9732be8b9bf4c89465e740c554a404f61e03708bbdeed1092852",
+      "src/dpone/runtime/mssql_native_chunks_files.py": "466e8286ab7e3fcb716075a7d5a45b479f1c6dc52877ce141192fc4cd6ca47b5",
+      "tests/test_mssql_native_sized_frames.py": "086ee9c984b65912501ba5fdf2c4761c0b521a09d2f4ac84f4ad186c083dd85f",
+      "tests/test_mssql_native_chunks_files.py": "589ba061e7a37b3b0cb0d16844952fa8f38379c104ccbceb2955f989c938e035",
+      "docs/delivery-acceleration/frames.md": "9f40aa9aa9c93960d0c284a9059ba9479b7bb03fec94ef5a5366631104419fe8"
+    }
+  },
+  "after": {
+    "head": "ad5c117f89c7df33f2bdc2e1aa42d671ca8e0f1b",
+    "implementation_dirty": false,
+    "implementation_sha256": {
+      "src/dpone/runtime/mssql_native_sized_frames.py": "2d1716812cff9732be8b9bf4c89465e740c554a404f61e03708bbdeed1092852",
+      "src/dpone/runtime/mssql_native_chunks_files.py": "466e8286ab7e3fcb716075a7d5a45b479f1c6dc52877ce141192fc4cd6ca47b5",
+      "tests/test_mssql_native_sized_frames.py": "086ee9c984b65912501ba5fdf2c4761c0b521a09d2f4ac84f4ad186c083dd85f",
+      "tests/test_mssql_native_chunks_files.py": "589ba061e7a37b3b0cb0d16844952fa8f38379c104ccbceb2955f989c938e035",
+      "docs/delivery-acceleration/frames.md": "9f40aa9aa9c93960d0c284a9059ba9479b7bb03fec94ef5a5366631104419fe8"
+    }
+  }
+}
