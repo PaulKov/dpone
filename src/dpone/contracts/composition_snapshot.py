@@ -22,6 +22,7 @@ _INTENT_SCHEMA = "dpone.composition-clickhouse-snapshot-intent.v1"
 _RECORD_SCHEMA = "dpone.composition-clickhouse-snapshot-record.v1"
 _MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
 _TERMINAL = frozenset({"PUBLISHED", "NOT_PUBLISHED"})
+_MIN_REVISION = {"PREPARED": 1, "EXCHANGE_INTENT": 2, "NOT_PUBLISHED": 2, "PUBLISHED": 3, "COMMIT_UNKNOWN": 3}
 
 
 def _require(condition: bool, reason: str) -> None:
@@ -320,17 +321,11 @@ class SnapshotPublicationRecord:
     def __post_init__(self) -> None:
         _require(type(self.intent) is SnapshotPublicationIntent, "record_intent")
         self.intent.__post_init__()
-        _require(
-            type(self.state) is str and self.state in {"PREPARED", "EXCHANGE_INTENT", "COMMIT_UNKNOWN", *_TERMINAL},
-            "state",
-        )
+        _require(type(self.state) is str and self.state in _MIN_REVISION, "state")
         _integer(self.revision, minimum=1 if self.state == "PREPARED" else 2)
-        _require(
-            (self.state != "PREPARED" or self.revision == 1)
-            and (self.state != "EXCHANGE_INTENT" or self.revision == 2)
-            and (self.state not in {"PUBLISHED", "COMMIT_UNKNOWN"} or self.revision >= 3),
-            "revision",
-        )
+        minimum = _MIN_REVISION[self.state]
+        exact = self.state in {"PREPARED", "EXCHANGE_INTENT"}
+        _require(self.revision == minimum if exact else self.revision >= minimum, "revision")
         if self.closure is not None:
             _require(type(self.closure) is SnapshotPublisherClosure, "closure_shape")
             self.closure.__post_init__()
