@@ -158,3 +158,15 @@ No live execution, public SWITCH activation, shared fixture edits, threshold
 changes, publication authority or revision of receipt semantics is authorized.
 Component tests and the actual final integrated gates still require execution;
 the scope confirmation does not claim a passing implementation or lift HOLD.
+
+## DDA-02 component dashboard operation
+
+The bounded operation in `dda-02-component-metrics-operation.md` allows the
+existing DDA-06 shared-file owner to generate a reviewed dashboard dependency for
+DDA-02's frozen component source in a separate integrator checkout. DDA-02 may
+import that docs-only dependency; it receives no shared-file writing authority.
+The combined integration dashboard is generated separately from the combined
+tracked Python tree. Source changes invalidate a previously generated candidate.
+
+The previously failing doctor scenarios passed on unchanged source during the
+follow-up. No readiness source scope or speculative lazy-import fix is granted.
