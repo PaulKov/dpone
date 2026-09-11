@@ -18,7 +18,7 @@ from contextlib import AbstractContextManager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Event, Thread, get_ident
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from dpone.adapters.mssql_native_chunks_journal import NativeChunkJournal
 from dpone.contracts.bounded_window import WindowContractError, WindowLease, WindowOutcomeUnknown, WindowTransientError
@@ -36,11 +36,15 @@ from dpone.runtime.mssql_native_chunks_files import (
     NativeRow,
     discard_native_files,
     encode_native_frame,
-    native_frames,
     verify_native_file,
 )
-from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session, frame_observation
+from dpone.runtime.mssql_native_sized_frames import sized_native_frames
+from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
 from dpone.runtime.native_wire_models import SourceNativeWireContract
+
+if TYPE_CHECKING:
+    from dpone.ports.native_delivery_observer import NativeDeliveryObserver
 
 ImporterFactory = Callable[[], AbstractContextManager[NativeChunkImporter]]
 
@@ -49,10 +53,22 @@ class NativeReextractRequired(WindowContractError):
     """Partial staging is settled; restart the complete query with a new invocation."""
 
 
-def _encode(*args: Any) -> tuple[EncodedNativeFile, dict[str, Any]]:
+def _encode(*args: Any, observed: bool = False) -> tuple[Any, dict[str, Any], dict[str, Any] | None]:
     start = time.monotonic()
-    file = encode_native_frame(*args)
-    return file, dict(phase="encode", start=start, end=time.monotonic(), worker=os.getpid())
+    session = delivery_session(BoundedNativeDeliveryObserver(max_observations=2) if observed else None)
+    try:
+        with session.recorder("encoder").phase("encode", ordinal=args[3], rows=len(args[1]), encoded_bytes=args[5]):
+            value: EncodedNativeFile | Exception = encode_native_frame(*args)
+    except Exception as error:
+        if not observed:
+            raise
+        value = error
+    legacy = dict(phase="encode", start=start, end=time.monotonic(), worker=os.getpid())
+    return value, legacy, session.snapshot() if observed else None
+
+
+def _encode_observed(*args: Any) -> tuple[Any, dict[str, Any], dict[str, Any] | None]:
+    return _encode(*args, observed=True)
 
 
 @dataclass
@@ -79,11 +95,13 @@ class BoundedNativeChunks:
         work_dir: Path,
         limits: NativeChunkLimits,
         lease_ttl: float = 60.0,
+        observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
     ) -> None:
         if lease_ttl <= 0:
             raise ValueError("mssql_native.invalid_lease_ttl")
         self.store, self.importer_factory, self.work_dir = store, importer_factory, work_dir
         self.limits, self.lease_ttl = limits, lease_ttl
+        self.observations = delivery_session(observer)
 
     def _check(self, lease: WindowLease, cancelled: Event) -> None:
         if cancelled.is_set():
@@ -165,8 +183,11 @@ class BoundedNativeChunks:
             if result is not None:
                 for receipt in result.receipts:
                     self.store.assert_lease(lease)
-                    if importer.inspect(plan, receipt, lease) != receipt:
-                        raise WindowContractError("mssql_native.recovered_stage_changed")
+                    with self.observations.recorder().phase(
+                        "raw_verify", reason="recovery", ordinal=receipt.ordinal, attempt_id=receipt.attempt_id
+                    ):
+                        if importer.inspect(plan, receipt, lease) != receipt:
+                            raise WindowContractError("mssql_native.recovered_stage_changed")
                 self._capacity(importer)
                 return result
             for attempt_id in journal.attempts():
@@ -180,7 +201,7 @@ class BoundedNativeChunks:
 
     def _import(
         self, plan: NativeChunkPlan, file: EncodedNativeFile, attempt: str, lease: WindowLease, cancelled: Event
-    ) -> tuple[NativeChunkReceipt | Exception, dict[str, Any]]:
+    ) -> tuple[NativeChunkReceipt | Exception, dict[str, Any], None]:
         start = time.monotonic()
         observation: dict[str, Any] = dict(phase="import_verify", start=start, worker=get_ident(), attempt=attempt)
         try:
@@ -190,13 +211,20 @@ class BoundedNativeChunks:
                 self.store.assert_lease(lease)
                 self._capacity(importer, observation, "allocated_before")
                 receipt = importer.import_file(plan, file, attempt, lease)
-                observed = importer.inspect(plan, receipt, lease)
-                if observed != receipt:
-                    raise WindowContractError("mssql_native.import_verification_changed")
+                with self.observations.recorder("importer").phase(
+                    "raw_verify", reason="immediate_inspection", ordinal=file.ordinal, attempt_id=attempt
+                ):
+                    observed = importer.inspect(plan, receipt, lease)
+                    if observed != receipt:
+                        raise WindowContractError("mssql_native.import_verification_changed")
                 self._capacity(importer, observation, "allocated_after")
-            return receipt, dict(observation, end=time.monotonic(), outcome="verified")
+            return receipt, dict(observation, end=time.monotonic(), outcome="verified"), None
         except Exception as error:
-            return error, dict(observation, end=time.monotonic(), outcome="failed", error_type=type(error).__name__)
+            return (
+                error,
+                dict(observation, end=time.monotonic(), outcome="failed", error_type=type(error).__name__),
+                None,
+            )
 
     def _stage(
         self,
@@ -221,10 +249,10 @@ class BoundedNativeChunks:
         ipc_overhead = len(pickle.dumps(envelope, protocol=5)) + 128
         if ipc_overhead + 64 > limits.max_bytes:
             raise WindowContractError("mssql_native.IPC_metadata_limit_exceeded")
-        frames = native_frames(
+        frames = sized_native_frames(
             rows, contract, limits, check=lambda: self._check(lease, cancelled), ipc_overhead=ipc_overhead
         )
-        encoder = MssqlNativeEncoder(contract, max_row_bytes=limits.max_row_bytes)
+        recorder = self.observations.recorder()
         pending: dict[Future[Any], _Work] = {}
         observations: list[dict[str, Any]] = []
         total, ordinal, eof = 0, 0, False
@@ -238,16 +266,17 @@ class BoundedNativeChunks:
                 while not eof or pending:
                     while not eof and len(pending) < limits.parallelism + limits.max_pending:
                         self._check(lease, cancelled)
-                        frame = next(frames, None)
-                        if frame is None:
+                        with frame_observation(recorder, rows, ordinal):
+                            sized_frame = next(frames, None)
+                        if sized_frame is None:
                             eof = True
                             break
+                        frame, size = sized_frame.rows, sized_frame.encoded_bytes
                         # Reserve one additional stage for UNION ALL preparation.
                         if ordinal + 2 > limits.max_staging_tables:
                             raise WindowContractError("mssql_native.staging_object_limit_exceeded")
                         if len(pickle.dumps(frame, protocol=5)) > limits.max_bytes:
                             raise WindowContractError("mssql_native.IPC_frame_limit_exceeded")
-                        size = sum(encoder.encoded_row_size(row) for row in frame)
                         if total + size > limits.max_total_encoded_bytes:
                             raise WindowContractError("mssql_native.total_encoded_bytes_exceeded")
                         with self.importer_factory() as importer:
@@ -256,7 +285,8 @@ class BoundedNativeChunks:
                         args = (contract, frame, directory / f"{ordinal}.native", ordinal, limits.max_row_bytes, size)
                         if len(pickle.dumps(args, protocol=5)) + 128 > limits.max_bytes:
                             raise WindowContractError("mssql_native.IPC_task_limit_exceeded")
-                        future = encoders.submit(_encode, *args)
+                        with recorder.phase("ipc_submit", ordinal=ordinal, rows=len(frame), encoded_bytes=size):
+                            future = encoders.submit(_encode_observed if self.observations.enabled else _encode, *args)
                         pending[future] = _Work(ordinal, size)
                         ordinal += 1
                     if not pending:
@@ -266,7 +296,8 @@ class BoundedNativeChunks:
                     for future in done:
                         work = pending.pop(future)
                         try:
-                            value, observation = future.result()
+                            value, observation, sidecar = future.result()
+                            self.observations.accept_worker(sidecar)
                             observations.append(observation)
                             journal.record_observations(tuple(observations))
                             if isinstance(value, Exception):
@@ -319,7 +350,8 @@ class BoundedNativeChunks:
                 for future in pending:
                     if not future.cancelled():
                         try:
-                            _value, observation = future.result()
+                            _value, observation, sidecar = future.result()
+                            self.observations.accept_worker(sidecar)
                             observations.append(observation)
                         except BaseException as cleanup:
                             self._cleanup_error(primary, cleanup)

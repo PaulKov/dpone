@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "name": "final-authority-regressions",
+  "command": [
+    "uv",
+    "run",
+    "pytest",
+    "tests/test_mssql_schema_preplan.py",
+    "tests/test_mssql_generic_transaction_governance.py",
+    "tests/test_mssql_operation_lease.py",
+    "tests/test_mssql_operation_lease_controller.py",
+    "tests/test_mssql_database_authority.py",
+    "tests/test_mssql_database_authority_retry.py",
+    "tests/test_mssql_schema_evolution_projection.py",
+    "tests/test_mssql_strategy_metadata_projection.py",
+    "-q",
+    "--junitxml=test_artifacts/delivery-acceleration/dda-06/final-authority-regressions-junit.xml"
+  ],
+  "source_before": {
+    "commit": "be7655ac2e36cd1e9601217c6b0a1fbd10e2eb3f",
+    "tree": "210b8ed74cd3f5302597ae88dec705255f27c507",
+    "source_sha256": "1b812c16044b8a9cb45cc634cb1177307d784016a985ff9e32c82c14c6507913",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "final-authority-regressions.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "be7655ac2e36cd1e9601217c6b0a1fbd10e2eb3f",
+    "tree": "210b8ed74cd3f5302597ae88dec705255f27c507",
+    "source_sha256": "1b812c16044b8a9cb45cc634cb1177307d784016a985ff9e32c82c14c6507913",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 10.456,
+  "log_sha256": "550b41caa02a238c7305eabb75646346956f2f3872f75979a6466521f957cbd5"
+}

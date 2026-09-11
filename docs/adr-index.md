@@ -70,3 +70,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0060: Explicit authority for isolated synthetic composition execution (Accepted)](adr/0060-nonproduction-composition-authority.md)
 
 - [ADR 0061: Qualification and execution share one physical ownership journal (Accepted)](adr/0061-shared-composition-physical-ownership.md)
+
+- [ADR 0062: SQL Server SWITCH has an explicit activation boundary (Accepted for isolated component)](adr/0062-isolated-mssql-switch-activation.md)

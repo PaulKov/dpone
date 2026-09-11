@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "source_commit": "61bcebc0c96b4db535bd4494de6f30cb15d11d18",
+  "source_tree": "7873b58ca80faa8386232e49e50ea255b11fc102",
+  "checkout": "/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dpone-dda02-metrics-_3vit3hu/checkout",
+  "recorder_sha256": "3de8fa8a07d22711b78208f278e6cde82b4d75d997433397d710885973e703c3",
+  "status": "PASS",
+  "commands": [
+    {
+      "name": "before",
+      "argv": [
+        "uv",
+        "run",
+        "dpone",
+        "docs",
+        "update-dev-metrics",
+        "--check"
+      ],
+      "exit_code": 2,
+      "duration_seconds": 24.118
+    },
+    {
+      "name": "generate",
+      "argv": [
+        "uv",
+        "run",
+        "dpone",
+        "docs",
+        "update-dev-metrics"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 14.025
+    },
+    {
+      "name": "after",
+      "argv": [
+        "uv",
+        "run",
+        "dpone",
+        "docs",
+        "update-dev-metrics",
+        "--check"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 13.342
+    },
+    {
+      "name": "repeat",
+      "argv": [
+        "uv",
+        "run",
+        "dpone",
+        "docs",
+        "update-dev-metrics"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 13.749
+    }
+  ],
+  "input_inventory_sha256": "7cd4344763f0f2ce713075efd650a4aa48f4aeeb1aaefd7fd14b9266fdd26a37",
+  "python_files": 5808,
+  "changed_tracked_paths": [
+    "docs/quality-metrics.md"
+  ],
+  "surrounding_prose_unchanged": true,
+  "byte_identical_repeat": true,
+  "document_sha256": "64af8270add0193990edaad8e7e05f30ed247192b2ccb868e786b8999e99bb9e",
+  "unexpected_untracked_paths": []
+}

@@ -1,0 +1,35 @@
+{
+  "base_commit": "d5ad9aaecc900c24df421b160ed36b4cfc726e45",
+  "system": "Darwin",
+  "effective_gid": 20,
+  "requested_mode": "0o2777",
+  "default_tmp_group": {
+    "gid": 0,
+    "mode": "0o777"
+  },
+  "effective_group": {
+    "gid": 20,
+    "mode": "0o2777"
+  },
+  "files": [
+    {
+      "path": "tests/test_airflow_cache_shared_directory_mode.py",
+      "base_sha256": "7117c9a833ada55047f311f582641ab73aad5680ee0e7af61181e822054cd816",
+      "current_sha256": "7117c9a833ada55047f311f582641ab73aad5680ee0e7af61181e822054cd816",
+      "unchanged": true
+    },
+    {
+      "path": "packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_permissions.py",
+      "base_sha256": "b600fe13fc17200e30c29e60dc8899ff9873f5451982a100d4d5f7522afb48c4",
+      "current_sha256": "b600fe13fc17200e30c29e60dc8899ff9873f5451982a100d4d5f7522afb48c4",
+      "unchanged": true
+    },
+    {
+      "path": "packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_layout.py",
+      "base_sha256": "ba5700e2ad8e748f569574e72d32a6ec344a439b3a669340c62ae2306e5fc8ae",
+      "current_sha256": "ba5700e2ad8e748f569574e72d32a6ec344a439b3a669340c62ae2306e5fc8ae",
+      "unchanged": true
+    }
+  ],
+  "controlled_basetemp": "/tmp/dpone-dda05-group-probe-ff3orq5z/pytest"
+}

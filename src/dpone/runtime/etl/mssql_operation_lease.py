@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from threading import Event, Thread
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
+if TYPE_CHECKING:
+    from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
+
 
 LEASE_OPTION = "__dpone_mssql_transaction_lease"
 _UTC = timezone.utc  # noqa: UP017 - mypy target may be older than datetime.UTC.

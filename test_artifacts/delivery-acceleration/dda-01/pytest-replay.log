@@ -1,0 +1,41 @@
+Replay after uv sync --locked --all-extras; live profiles remain disabled.
+uv run --all-extras pytest -m not integration_live -n 2 --dist loadfile tests/integration/postgres/test_postgres_snapshot_retry_live.py tests/test_architecture_fitness_gate.py tests/test_dbt_inline_publishing.py tests/test_native_acceleration_contracts.py tests/test_native_bcp_type_matrix.py tests/test_object_storage_fast_path_access.py tests/test_postgres_snapshot_retry.py tests/test_route_capability_runtime_factory.py tests/test_runtime_gcs_support.py tests/test_runtime_load_audit_state_contracts.py tests/test_runtime_state_and_reconciliation_contracts.py tests/test_semantic_refresh_clickhouse_http.py tests/test_tools_mssql_stress_config.py
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 10%]
+........................................................................ [ 20%]
+........................................................................ [ 31%]
+........................................................................ [ 41%]
+........................................................................ [ 52%]
+........................................................................ [ 62%]
+........................................................................ [ 73%]
+........................................................................ [ 83%]
+........................................................................ [ 94%]
+...F..................................                                   [100%]
+=================================== FAILURES ===================================
+_ test_architecture_fitness_current_repo_stays_inside_pre_release_cross_layer_budget _
+[gw0] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/4d98/dpone-public/.venv/bin/python
+
+    def test_architecture_fitness_current_repo_stays_inside_pre_release_cross_layer_budget() -> None:
+        max_clustering = _resolve_max_avg_clustering(repo_root=Path.cwd(), explicit_value=None)
+        report = analyze_architecture_fitness(
+            Path("src/dpone"),
+            repo_root=Path.cwd(),
+            thresholds=ArchitectureFitnessThresholds(
+                target_avg_clustering=0.18,
+                max_avg_clustering=max_clustering,
+                max_cross_layer_ratio=0.300,
+            ),
+            top_n=20,
+        )
+    
+        assert report.avg_clustering <= max_clustering
+>       assert report.cross_layer_ratio <= 0.300
+E       AssertionError: assert 0.30024001745581497 <= 0.3
+E        +  where 0.30024001745581497 = ArchitectureFitnessReport(package='src/dpone', avg_clustering=0.18170059431282887, cross_layer_ratio=0.300240017455814...lClusteringDiagnostic(module='dpone.adapters.hermetic_test_memory', degree=2, coefficient=1.0, inbound=1, outbound=1))).cross_layer_ratio
+
+tests/test_architecture_fitness_gate.py:149: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_architecture_fitness_gate.py::test_architecture_fitness_current_repo_stays_inside_pre_release_cross_layer_budget
+1 failed, 685 passed in 137.19s (0:02:17)

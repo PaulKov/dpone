@@ -1,0 +1,59 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 10%]
+........................................................................ [ 20%]
+........................................................................ [ 31%]
+........................................................................ [ 41%]
+........................................................................ [ 52%]
+........................................................................ [ 62%]
+........................................................................ [ 73%]
+........................................................................ [ 83%]
+........................................................................ [ 94%]
+..FF..................................                                   [100%]
+=================================== FAILURES ===================================
+_ test_architecture_fitness_current_repo_stays_inside_green_clustering_target __
+[gw1] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/c3dc/dpone-public/.venv/bin/python
+
+    def test_architecture_fitness_current_repo_stays_inside_green_clustering_target() -> None:
+        max_clustering = _resolve_max_avg_clustering(repo_root=Path.cwd(), explicit_value=None)
+        report = analyze_architecture_fitness(
+            Path("src/dpone"),
+            repo_root=Path.cwd(),
+            thresholds=ArchitectureFitnessThresholds(
+                target_avg_clustering=0.18,
+                max_avg_clustering=max_clustering,
+            ),
+            top_n=20,
+        )
+    
+>       assert report.avg_clustering <= max_clustering
+E       AssertionError: assert 0.1823846551601551 <= 0.182
+E        +  where 0.1823846551601551 = ArchitectureFitnessReport(package='src/dpone', avg_clustering=0.1823846551601551, cross_layer_ratio=0.2999781992587748...steringDiagnostic(module='dpone.runtime.sinks.mssql_native_switch', degree=3, coefficient=1.0, inbound=0, outbound=3))).avg_clustering
+
+tests/test_architecture_fitness_gate.py:132: AssertionError
+_ test_architecture_fitness_current_repo_stays_inside_pre_release_cross_layer_budget _
+[gw1] darwin -- Python 3.12.11 /Users/paulkov007/.codex/worktrees/c3dc/dpone-public/.venv/bin/python
+
+    def test_architecture_fitness_current_repo_stays_inside_pre_release_cross_layer_budget() -> None:
+        max_clustering = _resolve_max_avg_clustering(repo_root=Path.cwd(), explicit_value=None)
+        report = analyze_architecture_fitness(
+            Path("src/dpone"),
+            repo_root=Path.cwd(),
+            thresholds=ArchitectureFitnessThresholds(
+                target_avg_clustering=0.18,
+                max_avg_clustering=max_clustering,
+                max_cross_layer_ratio=0.300,
+            ),
+            top_n=20,
+        )
+    
+>       assert report.avg_clustering <= max_clustering
+E       AssertionError: assert 0.1823846551601551 <= 0.182
+E        +  where 0.1823846551601551 = ArchitectureFitnessReport(package='src/dpone', avg_clustering=0.1823846551601551, cross_layer_ratio=0.2999781992587748...steringDiagnostic(module='dpone.runtime.sinks.mssql_native_switch', degree=3, coefficient=1.0, inbound=0, outbound=3))).avg_clustering
+
+tests/test_architecture_fitness_gate.py:148: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_architecture_fitness_gate.py::test_architecture_fitness_current_repo_stays_inside_green_clustering_target
+FAILED tests/test_architecture_fitness_gate.py::test_architecture_fitness_current_repo_stays_inside_pre_release_cross_layer_budget
+2 failed, 684 passed in 229.25s (0:03:49)

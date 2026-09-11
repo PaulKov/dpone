@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "specification_commit": "f3682940f8864563cde0e6b6ecee60f746b49020",
+  "specification_pr": "https://github.com/PaulKov/dpone/pull/24",
+  "baseline_commit": "d5ad9aaecc900c24df421b160ed36b4cfc726e45",
+  "status": "DISPATCHED",
+  "verification": "All six actual thread IDs confirmed active/inProgress through wait_threads; list_threads lagged during creation.",
+  "tasks": [
+    {
+      "task_id": "DDA-01",
+      "thread_id": "01a08c14-43e0-74a2-9148-c64e6c56e0bd",
+      "host_id": "local",
+      "requested_title": "DDA-01: Метрики доставки и benchmark",
+      "creation_request_id": "client-new-thread:bd4d8799-75b5-4d3b-958f-725920575e4b",
+      "contract": "test_artifacts/delivery-acceleration/agent-task-contracts/dda-01-observations.yml"
+    },
+    {
+      "task_id": "DDA-02",
+      "thread_id": "01a08c14-43c5-7003-b1bc-052c67ebcd08",
+      "host_id": "local",
+      "requested_title": "DDA-02: Проверки staging и metadata INSERT",
+      "creation_request_id": "client-new-thread:22b971a8-1fc5-4b62-8be2-50b79d3a29e5",
+      "contract": "test_artifacts/delivery-acceleration/agent-task-contracts/dda-02-preparation.yml"
+    },
+    {
+      "task_id": "DDA-03",
+      "thread_id": "01a08c14-4406-7dc3-ae1f-19517bf558af",
+      "host_id": "local",
+      "requested_title": "DDA-03: Повторное использование размеров пакетов",
+      "creation_request_id": "client-new-thread:18a4a292-eadd-48c7-9cf8-fa44305e8ae7",
+      "contract": "test_artifacts/delivery-acceleration/agent-task-contracts/dda-03-frames.yml"
+    },
+    {
+      "task_id": "DDA-04",
+      "thread_id": "01a08c14-43a1-7632-885b-2fd2de8e0e00",
+      "host_id": "local",
+      "requested_title": "DDA-04: Изолированный компонент SQL Server SWITCH",
+      "creation_request_id": "client-new-thread:083858dd-8b9e-42d4-bced-c01643987200",
+      "contract": "test_artifacts/delivery-acceleration/agent-task-contracts/dda-04-switch.yml"
+    },
+    {
+      "task_id": "DDA-05",
+      "thread_id": "01a08c14-435a-7040-b7f3-f4607df82376",
+      "host_id": "local",
+      "requested_title": "DDA-05: Проверки реальных данных и performance harness",
+      "creation_request_id": "client-new-thread:dfc34e68-90fc-4398-a4b0-26922eeafbdb",
+      "contract": "test_artifacts/delivery-acceleration/agent-task-contracts/dda-05-certification.yml"
+    },
+    {
+      "task_id": "DDA-06",
+      "thread_id": "01a08c14-a8b1-75d0-b651-f99603bb70e7",
+      "host_id": "local",
+      "requested_title": "DDA-06: Интеграция ускорения доставки",
+      "creation_request_id": "client-new-thread:7c217a84-6906-488b-8d48-5bcd97e7110c",
+      "contract": "test_artifacts/delivery-acceleration/agent-task-contracts/dda-06-integration.yml"
+    }
+  ]
+}

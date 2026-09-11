@@ -1,0 +1,292 @@
+schema_version: 1
+task_id: DDA-06
+title: Integrate delivery acceleration and certify compatibility
+goal: Finish the integrated delivery change by removing duplicated validation and unnecessary real coupling, preserving
+  all public contracts and unchanged quality gates.
+specification: docs/feature-design-data-delivery-acceleration-v1.md
+base_commit: 1281b83e2900cacf5dcf9201e3909464d5f7b659
+integrator: DDA-06 delivery acceleration integrator
+acceptance_criteria:
+- Wait for reviewed DDA-01..05 commits/PRs and integrate them on a dedicated branch containing current master; never
+  overwrite another worktree or force-push shared history.
+- Wire phase observations, dual-digest/INSERT helpers and sized frames through existing composition and coordinators.
+  Defaults, wire/journal/recovery formats, source lifetime and resource bounds remain unchanged.
+- Integrated structural tests show four raw/two prepared typed readbacks, no preparation metadata UPDATE and no
+  repeated scheduler sizing. Preserve finalizer target-clock UPDATE and all key/count/evidence/quality/ownership/fencing
+  checks.
+- Keep direct BCP metadata behavior and every old Mapping/tuple/manifest API. Exercise real spawned workers, mutable
+  buffers, tampering at every boundary, cancellation, replay and lost/unknown commit with hermetic fixtures.
+- Keep public native SWITCH rejection before I/O; DDA-04 is an isolated component only. Add the next unused ADR
+  number for its exact architecture/activation boundary without colliding with parallel work.
+- Reconcile DDA-01 and DDA-05 report producer/consumer with executable contract tests. Missing approved live environment
+  is SKIP/UNVERIFIED; do not infer real speed from structural counters.
+- Write overview/runbook, first-success examples, limitations and migration notes; update current native/architecture/nav/changelog
+  through owned paths, preserving 0.75.0/0.76.0 history.
+- Run exact-head focused, full non-live, architecture/type/format and docs gates; request fresh-context independent
+  subagent review, fix findings and rerun independent review after fixes.
+- Publish a reviewable integration PR with linked per-task evidence and explicit code-ready versus live-performance
+  statuses. Do not merge/release/tag/upload or change providers in this task.
+- 'Supplemental annotation-only scope: move only MssqlTransactionAdmission in fresh-target preplan, operation lease
+  and target mutation plan; MssqlPhysicalDesignContract in filegroup authority; MssqlDatabaseAuthorityPin and ResolvedBindingConnection
+  in database-authority support behind TYPE_CHECKING. All are postponed function/constructor annotations, not dataclass
+  fields or runtime uses.'
+- The extra src/dpone/runtime/sinks/mssql.py path is a reserve restricted to its annotation-only MssqlCatalogColumn
+  import; use it only if the actual integrated dependency gate still requires the additional legitimate import cleanup.
+  No sink behavior or registry changes.
+- 'Follow ADR0058: preserve raw annotations, supported reexports and canonical-namespace get_type_hints resolution.
+  Keep runtime constructors/type checks/exceptions/decorators/bases and dataclass field types imported. In particular
+  keep ProcessResult construction, NativeTransferExecutionPolicy.native_chunks and explicit soft-delete reexports.'
+- Retain baseline/budget/gate implementations and all real DDA01/DDA04 runtime model/schema/error dependencies.
+  No facade laundering, copied policy/errors, graph exclusions, threshold overrides or unrelated refactors.
+- Before these edits, verify each listed symbol still has only the reviewed annotation use on the integrated head.
+  If another contributor changed a symbol to runtime use, leave it and report the remaining gate issue.
+- Record the exact before/after canonical layer and architecture-fitness results plus all required quality budgets.
+  Six statically removable edges are a scope estimate, not a promised PASS; clustering and other gates still require
+  actual execution.
+- Run the additional existing lease/schema/database-authority/native-recovery suites, mypy and independent review;
+  add no tests that merely duplicate the import layout.
+- The additional mssql_native_staging_checks.py path is restricted to a cohesive collaborator for the existing required-key,
+  SQL-equivalence and COUNT_BIG checks. Move these algorithms intact and reuse them in decoded/direct/bounded normalization;
+  metadata/evidence orchestration stays in mssql_native_staging.py.
+- The staging-check collaborator must preserve validation ordering, public errors/signatures, query parameterization
+  and row-count semantics. No new skip flag, ownership bypass, copied policy or budget relaxation is allowed.
+- Retain the existing ADR0058 text and dataclass field runtime imports, including EncodedNativeFile in the private
+  _Work dataclass; a cast removal is not permission to hide that runtime annotation dependency.
+- 'Generated metrics supplement: DDA-06 alone may refresh docs/quality-metrics.md through the existing uv run dpone
+  docs update-dev-metrics producer in its integration checkout. This is the only additional path; retain all prior
+  scope and exclusions.'
+- Stage or commit every intended Python input, including tools and evidence scripts, before generation because the
+  producer uses git ls-files. Record the integrated source commit and tracked input set; preserve prose outside
+  the generated markers except for the explicit integration-summary correction below, and retain unrelated upstream
+  edits.
+- Do not hand-edit generated values or alter the producer, metrics definitions, quality budgets, baselines, gate
+  code, workflow, dependency files or command thresholds. Generated freshness PASS does not imply architecture PASS;
+  retain every actual FAIL/HOLD independently.
+- After generation, run uv run dpone docs update-dev-metrics --check, verify a second generation is byte-identical,
+  and audit that the generator changed only docs/quality-metrics.md. Run documentation checks, language contracts
+  and strict MkDocs on the final integrated tree, then request fresh independent review before handoff.
+- If the generator writes an additional path, the generated output hides a measured failure, or a parallel contributor
+  owns the same unintegrated change, stop the affected mutation and report the conflict; do not overwrite or expand
+  this supplement.
+- 'Manual-summary exception on the same integration docs/quality-metrics.md path: after exact-candidate layer and
+  architecture receipts both confirm FAIL, replace only the obsolete current-quality headline, its immediately following
+  explanation paragraph and the narrow-architecture-margin sentence with the exact text in planning-amendments/dda-06-quality-summary-correction.md.
+  Retain every other paragraph and every generated byte.'
+- This correction describes actual integrated gate evidence and does not introduce numerical metric copies, change
+  any gate result, or claim pytest success without a corresponding receipt. Record source identity and the exact
+  before/after manual diff. If results or source differ from the stated precondition, reconcile the text with reviewed
+  evidence before editing.
+- The exception applies only to the integrated dashboard. DDA-02 component dashboard generation remains strictly
+  producer-only under its reviewed operation; no manual prose authority is transferred to any component owner.
+- For the summary-only commit, verify byte-identical generated marker contents before/after, rerun update-dev-metrics
+  --check and final documentation/language/strict-MkDocs checks, and obtain independent review of the exact correction.
+  No producer, baseline, budget, threshold, workflow, source, public contract or additional path changes are authorized.
+- Architecture remediation scope is approved by the maintainer continuation. Follow planning-amendments/dda-06-architecture-remediation.md
+  exactly; the listed completed DDA-01/02/04/05 paths transfer to DDA-06 only for this compatible correction, with
+  no concurrent writers.
+- Normalize exact NativeChunkLimits beside RUN_SCHEMA and reuse that contract policy in both existing producer and
+  consumer. Preserve field sets, canonical constructors, normalized bytes/digests and original error classifications.
+- Delegate the existing single-projection prepared digest to its cohesive existing digest module, preserving one
+  encode per row, the independent prepublication SQL readback and existing errors. Establish independent typed golden
+  expectations before replacing the old loop; do not create a circular parity oracle.
+- Add only a query/row-shape transaction_state reader to NativeSwitchCatalog. Preserve TRANSACTION_SQL at its existing
+  import location and keep every authority/lock/replan/prepared-verification/mutation decision and its order in
+  the executor.
+- Only the NativeDeliveryObserver parameter import in runtime observations and schema/lineage parameter imports
+  in prepared INSERT may move to TYPE_CHECKING under existing ADR0058. Preserve raw annotations and canonical-namespace
+  resolution. No runtime/dataclass/reexport import hiding or optional SourceWire cleanup.
+- 'Actual unchanged gates must pass: YAML clustering maximum 0.182, repository cross-layer ratio 0.300, canonical
+  flow allowance and all size/import/type budgets. The 0.180 clustering target remains an advisory improvement target;
+  do not change any threshold or substitute simulated metrics for executed evidence.'
+- 'Completion-phase summary authority supersedes the previous FAIL-only summary correction: after actual gates pass,
+  update only current quality-summary headline, explanation and coupling sentence for the new candidate. Keep generated
+  bytes producer-owned, remaining advisory debt visible and historical FAIL evidence intact. Component snapshots
+  remain producer-only.'
+- Use new remediation-* evidence from the existing producer, obtain independent subagent review after every correction,
+  fix and re-review findings, freeze the final source/docs tree, and execute one complete non-live suite only after
+  focused/static gates pass. Preserve all old final-* records without relabelling.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - Python composition
+  - diagnostic artifacts
+  - documentation
+  - recovery compatibility
+  migration_required: false
+owned_paths:
+- src/dpone/runtime/mssql_native_chunks.py
+- src/dpone/runtime/mssql_native_chunks_observations.py
+- src/dpone/runtime/mssql_native_runtime.py
+- src/dpone/runtime/sinks/mssql_native_prepare.py
+- src/dpone/runtime/sinks/mssql_native_composition.py
+- src/dpone/runtime/sinks/mssql_native_import.py
+- src/dpone/runtime/sinks/mssql_native_staged_load.py
+- src/dpone/runtime/sinks/strategies/mssql/mssql_native_staging.py
+- src/dpone/runtime/sinks/strategies/mssql/mssql_transaction_finalizer.py
+- tests/test_mssql_native_chunks_execution.py
+- tests/test_mssql_native_staged_prepare.py
+- tests/test_mssql_native_staged_finalizer.py
+- tests/test_mssql_native_staged_recovery.py
+- tests/test_mssql_native_staged_verification.py
+- tests/test_mssql_native_staged_import.py
+- tests/test_mssql_native_runtime.py
+- tests/test_mssql_native_composition.py
+- tests/test_mssql_native_delivery_integration.py
+- docs/delivery-acceleration/index.md
+- docs/delivery-acceleration/operations.md
+- docs/mssql-native-transport.md
+- docs/feature-design-clickhouse-mssql-bounded-native-v1.md
+- docs/feature-design-data-delivery-acceleration-v1.md
+- docs/data-delivery-acceleration-tasks.md
+- docs/architecture.md
+- docs/adr
+- docs/adr-index.md
+- test_artifacts/delivery-acceleration/dda-06
+- test_artifacts/delivery-acceleration/measurement
+- src/dpone/runtime/etl/mssql_fresh_target_preplan.py
+- src/dpone/runtime/etl/mssql_operation_lease.py
+- src/dpone/runtime/sinks/mssql_filegroup_authority.py
+- src/dpone/runtime/sinks/mssql_target_mutation_plan.py
+- src/dpone/runtime/state/mssql_database_authority_support.py
+- src/dpone/runtime/sinks/mssql.py
+- src/dpone/runtime/sinks/strategies/mssql/mssql_native_staging_checks.py
+- src/dpone/contracts/native_delivery_observations.py
+- src/dpone/runtime/native_delivery_benchmark.py
+- src/dpone/runtime/native_delivery_observations.py
+- tools/native_delivery_live_support/runner.py
+- src/dpone/runtime/sinks/mssql_native_prepared_digests.py
+- src/dpone/runtime/sinks/mssql_native_prepared_insert.py
+- src/dpone/runtime/sinks/mssql_native_switch/catalog.py
+- src/dpone/runtime/sinks/mssql_native_switch/executor.py
+- tests/test_mssql_native_integrity_readbacks.py
+- tests/test_mssql_native_delivery_benchmark.py
+- tests/test_native_delivery_live_benchmark.py
+- tests/test_mssql_native_delivery_observations.py
+- tests/test_mssql_native_metadata_insert.py
+- tests/test_mssql_native_metadata_insert_parity.py
+- tests/test_mssql_native_partition_switch_catalog.py
+- tests/test_mssql_native_partition_switch_recovery.py
+- tests/test_native_delivery_architecture_compatibility.py
+- docs/delivery-acceleration/preparation.md
+- docs/delivery-acceleration/observations.md
+- docs/delivery-acceleration/partition-switch.md
+integrator_owned_paths:
+- CHANGELOG.md
+- mkdocs.yml
+- docs/quality-metrics.md
+read_only_paths:
+- AGENTS.md
+- docs/AGENTS.md
+- docs/feature-design-standard.md
+- docs/engineering-standards.md
+- docs/import-rules.md
+- docs/agent-development.md
+- docs/testing/index.md
+- docs/documentation-standard.md
+- docs/benchmarks/quality_budgets.yml
+- tests/test_runtime_partition_replace_native_contracts.py
+- tests/test_mssql_schema_preplan.py
+- tests/test_mssql_generic_transaction_governance.py
+- tests/test_mssql_operation_lease.py
+- tests/test_mssql_operation_lease_controller.py
+- tests/test_mssql_database_authority.py
+- tests/test_mssql_database_authority_retry.py
+- tests/test_mssql_schema_evolution_projection.py
+- tests/test_mssql_strategy_metadata_projection.py
+- src/dpone/contracts/mssql_native_chunks.py
+- src/dpone/runtime/sinks/mssql_native_switch/__init__.py
+- src/dpone/runtime/sinks/mssql_native_switch/planner.py
+- src/dpone/runtime/sinks/mssql_native_switch/catalog_parse.py
+- src/dpone/runtime/sinks/mssql_native_switch/catalog_sql.py
+- tests/test_architecture_fitness_gate.py
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- src/dpone/schema
+- src/dpone/config/mssql_strategy_contract_policies.py
+- src/dpone/manifest/mssql_native_policy.py
+- tests/conftest.py
+- tests/integration/conftest.py
+- src/dpone/ports/native_delivery_observer.py
+- tools/native_delivery_benchmark.py
+- src/dpone/runtime/mssql_native_sized_frames.py
+- src/dpone/runtime/mssql_native_chunks_files.py
+- tests/test_mssql_native_chunks_files.py
+- tests/test_mssql_native_sized_frames.py
+- docs/delivery-acceleration/frames.md
+- src/dpone/contracts/native_mssql_switch.py
+- src/dpone/ports/native_mssql_switch.py
+- tests/test_mssql_native_partition_switch.py
+- tools/native_delivery_live_benchmark.py
+- tests/integration/mssql/test_clickhouse_mssql_bounded_native_delivery_integration.py
+- tests/integration/mssql/test_clickhouse_mssql_partition_switch_integration.py
+- tests/integration/mssql/clickhouse_mssql_delivery_support.py
+- docs/delivery-acceleration/certification.md
+- test_artifacts/delivery-acceleration/dda-01
+- test_artifacts/delivery-acceleration/dda-02
+- test_artifacts/delivery-acceleration/dda-03
+- test_artifacts/delivery-acceleration/dda-04
+- test_artifacts/delivery-acceleration/dda-05
+- docs/quality-metrics.md
+shared_file_owner: DDA-06 delivery acceleration integrator
+dependencies:
+- DDA-01
+- DDA-02
+- DDA-03
+- DDA-04
+- DDA-05
+required_checks:
+  focused:
+  - uv run pytest tests/test_mssql_native_delivery_integration.py tests/test_mssql_native_chunks_execution.py tests/test_mssql_native_staged_prepare.py
+    tests/test_mssql_native_staged_finalizer.py tests/test_mssql_native_staged_recovery.py tests/test_mssql_native_staged_verification.py
+    tests/test_mssql_native_staged_import.py tests/test_mssql_native_runtime.py tests/test_runtime_partition_replace_native_contracts.py
+    -q
+  - uv run pytest tests/test_mssql_schema_preplan.py tests/test_mssql_generic_transaction_governance.py tests/test_mssql_operation_lease.py
+    tests/test_mssql_operation_lease_controller.py tests/test_mssql_database_authority.py tests/test_mssql_database_authority_retry.py
+    tests/test_mssql_schema_evolution_projection.py tests/test_mssql_strategy_metadata_projection.py -q
+  - uv run dpone docs update-dev-metrics --check
+  - uv run pytest tests/test_native_delivery_architecture_compatibility.py tests/test_mssql_native_integrity_readbacks.py
+    tests/test_mssql_native_delivery_benchmark.py tests/test_native_delivery_live_benchmark.py tests/test_mssql_native_delivery_observations.py
+    tests/test_mssql_native_metadata_insert.py tests/test_mssql_native_metadata_insert_parity.py tests/test_mssql_native_partition_switch_catalog.py
+    tests/test_mssql_native_partition_switch_recovery.py -q
+  - uv run pytest tests/test_architecture_fitness_gate.py -q
+  - uv run dpone docs check-architecture-fitness --format json
+  broad:
+  - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
+  - uv run ruff check .
+  - uv run ruff format --check .
+  - uv run mypy --config-file mypy.ini
+  - uv run dpone docs check-import-rules
+  - uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json
+  - Run dpone docs check-module-size with the exact merge-base/head recipe from AGENTS.md; do not weaken budgets.
+  - PYTEST_XDIST_AUTO_NUM_WORKERS=2 uv run pytest -m 'not integration_live' -n auto --dist loadfile
+  - uv run dpone docs check-docs
+  - uv run dpone docs check-generated-references
+  - uv run pytest tests/test_docs_language_contracts.py -q
+  - uv run mkdocs build --strict
+  live:
+  - SKIP unless the maintainer explicitly approves the disposable environment; implement applicable live tests without
+    running services by default.
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
+- Do not broaden scope, activate native SWITCH, alter source snapshot semantics, rewrite history or publish a release.
+- A supplemental annotation import is now needed at runtime, in dataclass reflection, or as a supported reexport.

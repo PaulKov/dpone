@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "name": "review-fixes-focused-green",
+  "command": [
+    "uv",
+    "run",
+    "pytest",
+    "tests/test_native_delivery_baseline_compatibility.py",
+    "tests/test_native_delivery_live_entrypoints.py",
+    "tests/test_native_delivery_live_benchmark.py",
+    "tests/test_native_delivery_live_recovery_boundaries.py",
+    "tests/test_mssql_native_delivery_benchmark.py",
+    "-q",
+    "--junitxml=test_artifacts/delivery-acceleration/dda-06/review-fixes-focused-green-junit.xml"
+  ],
+  "source_before": {
+    "commit": "f5705f83249d79f5db944b4b7fa75ae95f428609",
+    "tree": "c43e910495e6aa3d07e15c4274f1fa5d478aee5f",
+    "source_sha256": "0c290e1fbb3090d6e3c8a8bbbc9f20392d4eeacd3b895afbf4f93020e124d85f",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "review-fixes-focused-green.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "f5705f83249d79f5db944b4b7fa75ae95f428609",
+    "tree": "c43e910495e6aa3d07e15c4274f1fa5d478aee5f",
+    "source_sha256": "0c290e1fbb3090d6e3c8a8bbbc9f20392d4eeacd3b895afbf4f93020e124d85f",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 126.27,
+  "log_sha256": "3dc0a67e957ff2e06601ee1e4e3ca9c30c61bf6534256d93b1ea5b381ec5f318"
+}

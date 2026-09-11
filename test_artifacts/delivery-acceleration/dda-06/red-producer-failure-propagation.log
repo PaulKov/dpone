@@ -1,0 +1,77 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+___ test_failed_produced_trial_remains_failed_in_offline_comparison[queries] ___
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3670/test_failed_produced_trial_rem0')
+counter = 'queries'
+
+    @pytest.mark.parametrize("counter", ["queries", "publications"])
+    def test_failed_produced_trial_remains_failed_in_offline_comparison(tmp_path, counter):
+        from tools.native_delivery_live_support.hermetic import HermeticRouteFactory, produce_fixture
+    
+        from dpone.runtime.native_delivery_benchmark import compare
+    
+        class RepeatedTrialFactory(HermeticRouteFactory):
+            def open(self, dataset, *, case, clock):
+                session = super().open(dataset, case=case, clock=clock)
+                run = session.run
+    
+                def repeat_operation():
+                    run()
+                    if case.startswith("trial-"):
+                        setattr(session, counter, getattr(session, counter) + 1)
+    
+                session.run = repeat_operation
+                return session
+    
+        paths = [tmp_path / name for name in ("baseline", "candidate")]
+        for path in paths:
+            path.mkdir()
+        produce_fixture(paths[0])
+        candidate = produce_fixture(paths[1], RepeatedTrialFactory())
+>       assert candidate["status"] == "FAIL"
+E       AssertionError: assert 'UNVERIFIED' == 'FAIL'
+E         
+E         - FAIL
+E         + UNVERIFIED
+
+tests/test_mssql_native_delivery_integration.py:312: AssertionError
+_ test_failed_produced_trial_remains_failed_in_offline_comparison[publications] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3670/test_failed_produced_trial_rem1')
+counter = 'publications'
+
+    @pytest.mark.parametrize("counter", ["queries", "publications"])
+    def test_failed_produced_trial_remains_failed_in_offline_comparison(tmp_path, counter):
+        from tools.native_delivery_live_support.hermetic import HermeticRouteFactory, produce_fixture
+    
+        from dpone.runtime.native_delivery_benchmark import compare
+    
+        class RepeatedTrialFactory(HermeticRouteFactory):
+            def open(self, dataset, *, case, clock):
+                session = super().open(dataset, case=case, clock=clock)
+                run = session.run
+    
+                def repeat_operation():
+                    run()
+                    if case.startswith("trial-"):
+                        setattr(session, counter, getattr(session, counter) + 1)
+    
+                session.run = repeat_operation
+                return session
+    
+        paths = [tmp_path / name for name in ("baseline", "candidate")]
+        for path in paths:
+            path.mkdir()
+        produce_fixture(paths[0])
+        candidate = produce_fixture(paths[1], RepeatedTrialFactory())
+>       assert candidate["status"] == "FAIL"
+E       AssertionError: assert 'UNVERIFIED' == 'FAIL'
+E         
+E         - FAIL
+E         + UNVERIFIED
+
+tests/test_mssql_native_delivery_integration.py:312: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mssql_native_delivery_integration.py::test_failed_produced_trial_remains_failed_in_offline_comparison[queries]
+FAILED tests/test_mssql_native_delivery_integration.py::test_failed_produced_trial_remains_failed_in_offline_comparison[publications]

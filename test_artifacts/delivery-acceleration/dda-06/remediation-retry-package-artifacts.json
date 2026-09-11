@@ -1,0 +1,21 @@
+{
+  "source_commit": "7c25ce910ff4e3a929b46aa01237840ae92ef512",
+  "built_files": [
+    {
+      "path": "dist/dpone_airflow_pack-0.76.0.tar.gz",
+      "sha256": "792e184ac84e59f14f51b027badf0ace434df1c9b580c4e634ffa7bd40b2efa0"
+    },
+    {
+      "path": "dist/dpone_airflow_pack-0.76.0-py3-none-any.whl",
+      "sha256": "5019822f6dc25d8a03f64127a92531bf5f5c826962d93bf2df516c74b619968d"
+    },
+    {
+      "path": "dist/apache_airflow_providers_dpone-0.76.0.tar.gz",
+      "sha256": "150d28dc47401a5bac723f870ba9b059bf010899f9f5add648b00e405ae382da"
+    },
+    {
+      "path": "dist/apache_airflow_providers_dpone-0.76.0-py3-none-any.whl",
+      "sha256": "419cf20ce6c11694d1d260b4e95481e04075813c00a126935aeea934cd264fbc"
+    }
+  ]
+}

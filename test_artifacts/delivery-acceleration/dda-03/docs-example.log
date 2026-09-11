@@ -1,0 +1,2 @@
+PASS: documentation example executed and matched expected output
+[(((1,), (2,)), 8), (((3,),), 4)]

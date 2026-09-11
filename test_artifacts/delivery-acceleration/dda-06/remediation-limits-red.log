@@ -1,0 +1,11 @@
+......F.....                                                             [100%]
+=================================== FAILURES ===================================
+_ test_shared_limits_normalization_preserves_configuration_bytes_and_detaches_input _
+
+    def test_shared_limits_normalization_preserves_configuration_bytes_and_detaches_input():
+>       from dpone.contracts.native_delivery_observations import normalize_delivery_limits
+E       ImportError: cannot import name 'normalize_delivery_limits' from 'dpone.contracts.native_delivery_observations' (/Users/paulkov007/.codex/worktrees/b364/dpone-public/src/dpone/contracts/native_delivery_observations.py)
+
+tests/test_native_delivery_live_benchmark.py:167: ImportError
+=========================== short test summary info ============================
+FAILED tests/test_native_delivery_live_benchmark.py::test_shared_limits_normalization_preserves_configuration_bytes_and_detaches_input

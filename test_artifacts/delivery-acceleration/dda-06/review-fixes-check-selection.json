@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "name": "review-fixes-check-selection",
+  "command": [
+    "uv",
+    "run",
+    "python",
+    "tools/agent_policy/select_checks.py",
+    "--base-ref",
+    "origin/master"
+  ],
+  "source_before": {
+    "commit": "b5b9f0eb34148febc858efcd5ca513180706a84c",
+    "tree": "31abad483b9db82783be8903b8f59ed3ad72c437",
+    "source_sha256": "92449b29ba6905b82b708f7010a589ea9b50e1a8949c8cf0fa85b12aafbb820d",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "review-fixes-check-selection.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "b5b9f0eb34148febc858efcd5ca513180706a84c",
+    "tree": "31abad483b9db82783be8903b8f59ed3ad72c437",
+    "source_sha256": "92449b29ba6905b82b708f7010a589ea9b50e1a8949c8cf0fa85b12aafbb820d",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 2.347,
+  "log_sha256": "ff7a0aa7002fd1da4a197d6edca89adc498279e2ec8f4abcd889559db8e27eb2"
+}

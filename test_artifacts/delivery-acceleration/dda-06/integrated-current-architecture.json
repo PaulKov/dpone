@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "name": "integrated-current-architecture",
+  "command": [
+    "uv",
+    "run",
+    "dpone",
+    "docs",
+    "check-architecture-fitness"
+  ],
+  "source_before": {
+    "commit": "b82e2098a642aff588f6a9c6b33d72292e25023a",
+    "tree": "912e21e658865d2b840dcabb80d0125f93ca47ad",
+    "source_sha256": "74f714c977c1d674e9025d4d769788adcbd2a18c41c4f20fe9241f33774d649b",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "FAIL",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "integrated-current-architecture.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "b82e2098a642aff588f6a9c6b33d72292e25023a",
+    "tree": "912e21e658865d2b840dcabb80d0125f93ca47ad",
+    "source_sha256": "74f714c977c1d674e9025d4d769788adcbd2a18c41c4f20fe9241f33774d649b",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 1,
+  "duration_seconds": 12.165,
+  "log_sha256": "bba912023c5761eacb9274225997fe62adc14892489b0d75336f4cfca12fcb23"
+}

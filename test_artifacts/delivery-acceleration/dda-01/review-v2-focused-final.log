@@ -1,0 +1,117 @@
+........................................................................ [ 79%]
+...................                                                      [100%]
+==================================== PASSES ====================================
+_________ test_cli_status_streams_help_and_no_output_on_invalid_input __________
+----------------------------- Captured stdout call -----------------------------
+usage: pytest compare [-h] --baseline BASELINE --candidate CANDIDATE --output
+                      OUTPUT [--overwrite]
+
+options:
+  -h, --help            show this help message and exit
+  --baseline BASELINE
+  --candidate CANDIDATE
+  --output OUTPUT
+  --overwrite           Atomically replace an existing report
+___________ test_documented_python_and_cli_examples_execute_or_parse ___________
+----------------------------- Captured stdout call -----------------------------
+usage: pytest compare [-h] --baseline BASELINE --candidate CANDIDATE --output
+                      OUTPUT [--overwrite]
+
+options:
+  -h, --help            show this help message and exit
+  --baseline BASELINE
+  --candidate CANDIDATE
+  --output OUTPUT
+  --overwrite           Atomically replace an existing report
+=========================== short test summary info ============================
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_hermetic_samples_produce_unverified_report_with_raw_references
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_live_shape_gate_boundaries_are_hermetic_contract_tests[8.5-PASS]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_live_shape_gate_boundaries_are_hermetic_contract_tests[8.6-FAIL]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_live_shape_gate_boundaries_are_hermetic_contract_tests[10.6-FAIL]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_schema_identity_and_drift_rejected[<lambda>0]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_schema_identity_and_drift_rejected[<lambda>1]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_schema_identity_and_drift_rejected[<lambda>2]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_schema_identity_and_drift_rejected[<lambda>3]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_schema_identity_and_drift_rejected[<lambda>4]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_schema_identity_and_drift_rejected[<lambda>5]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_schema_identity_and_drift_rejected[<lambda>6]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_schema_identity_and_drift_rejected[<lambda>7]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_schema_identity_and_drift_rejected[<lambda>8]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_tampered_receipt_bytes_rejected_even_when_supplied_pass
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_ineligible_trials_never_produce_a_ratio[<lambda>-UNVERIFIED0]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_ineligible_trials_never_produce_a_ratio[<lambda>-UNVERIFIED1]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_ineligible_trials_never_produce_a_ratio[<lambda>-UNVERIFIED2]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_ineligible_trials_never_produce_a_ratio[<lambda>-UNVERIFIED3]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_failed_fidelity_blocks_success_despite_fast_samples
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_receipt_identity_checked_after_valid_hash[<lambda>0]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_receipt_identity_checked_after_valid_hash[<lambda>1]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_receipt_identity_checked_after_valid_hash[<lambda>2]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_receipt_identity_checked_after_valid_hash[<lambda>3]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_reference_escape_is_rejected[traversal]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_reference_escape_is_rejected[absolute]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_reference_escape_is_rejected[symlink]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_campaign_requires_all_predeclared_cases_and_every_ratio_limit
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_atomic_output_hash_overwrite_and_alias_protection
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_atomic_write_failure_preserves_previous_report_and_cleans_temp
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_atomic_no_clobber_concurrent_publication
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_cli_status_streams_help_and_no_output_on_invalid_input
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_documented_python_and_cli_examples_execute_or_parse
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_output_outside_input_tree_retains_relative_verified_evidence
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_bundled_internal_symlink_reference_keeps_retained_bytes
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[False-memory]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[False-same_tree]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[False-bundle]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[True-memory]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[True-same_tree]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[True-bundle]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_exported_campaign_alias_preserves_relative_runs[memory]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_exported_campaign_alias_preserves_relative_runs[same_tree]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_exported_campaign_alias_preserves_relative_runs[bundle]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_sidecar_reconstructs_real_collector_diagnostic_status[None-PASS]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_sidecar_reconstructs_real_collector_diagnostic_status[clock-UNVERIFIED]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_sidecar_reconstructs_real_collector_diagnostic_status[overflow-UNVERIFIED]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>0]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>1]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>2]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>3]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>4]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>5]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>6]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>7]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>8]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_evidence_assertions_preserve_json_scalar_types
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_cli_argument_errors_do_not_echo_sensitive_unrecognized_values
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_raw_schema_version_boolean_is_not_integer_identity
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_identity_records_do_not_coerce_integer_or_resource_types[<lambda>0]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_identity_records_do_not_coerce_integer_or_resource_types[<lambda>1]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_identity_records_do_not_coerce_integer_or_resource_types[<lambda>2]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_observation_sidecar_version_requires_integer[True]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_observation_sidecar_version_requires_integer[1.0]
+PASSED tests/test_mssql_native_delivery_benchmark.py::test_envelope_provenance_and_version_accept_frozen_descriptive_strings
+PASSED tests/test_mssql_native_delivery_observations.py::test_immutable_observation_and_explicit_unavailable_metric
+PASSED tests/test_mssql_native_delivery_observations.py::test_injected_nested_clock_and_separate_delivery_pipeline_spans
+PASSED tests/test_mssql_native_delivery_observations.py::test_overlap_counts_distinct_workers_and_never_combines_clock_domains
+PASSED tests/test_mssql_native_delivery_observations.py::test_overflow_bounds_all_retention_and_invalidates_overlap
+PASSED tests/test_mssql_native_delivery_observations.py::test_failures_cancellations_and_retries_are_separate_work
+PASSED tests/test_mssql_native_delivery_observations.py::test_observer_failure_and_missing_clock_do_not_mask_original_exception
+PASSED tests/test_mssql_native_delivery_observations.py::test_disabled_observer_does_not_read_clock_or_change_results
+PASSED tests/test_mssql_native_delivery_observations.py::test_invalid_observation_is_rejected[changes0]
+PASSED tests/test_mssql_native_delivery_observations.py::test_invalid_observation_is_rejected[changes1]
+PASSED tests/test_mssql_native_delivery_observations.py::test_invalid_observation_is_rejected[changes2]
+PASSED tests/test_mssql_native_delivery_observations.py::test_invalid_observation_is_rejected[changes3]
+PASSED tests/test_mssql_native_delivery_observations.py::test_invalid_observation_is_rejected[changes4]
+PASSED tests/test_mssql_native_delivery_observations.py::test_invalid_observation_is_rejected[changes5]
+PASSED tests/test_mssql_native_delivery_observations.py::test_invalid_observation_is_rejected[changes6]
+PASSED tests/test_mssql_native_delivery_observations.py::test_invalid_observation_is_rejected[changes7]
+PASSED tests/test_mssql_native_delivery_observations.py::test_invalid_observation_is_rejected[changes8]
+PASSED tests/test_mssql_native_delivery_observations.py::test_metric_availability_is_explicit[0-unavailable-missing]
+PASSED tests/test_mssql_native_delivery_observations.py::test_metric_availability_is_explicit[None-unavailable-None]
+PASSED tests/test_mssql_native_delivery_observations.py::test_metric_availability_is_explicit[nan-measured-None]
+PASSED tests/test_mssql_native_delivery_observations.py::test_metric_availability_is_explicit[inf-measured-None]
+PASSED tests/test_mssql_native_delivery_observations.py::test_metric_availability_is_explicit[True-measured-None]
+PASSED tests/test_mssql_native_delivery_observations.py::test_metric_availability_is_explicit[3-measured-missing]
+PASSED tests/test_mssql_native_delivery_observations.py::test_worker_serialization_roundtrip_and_recorder_failure_merge
+PASSED tests/test_mssql_native_delivery_observations.py::test_invalid_recorder_identity_never_emits_values_or_changes_business_result
+PASSED tests/test_mssql_native_delivery_observations.py::test_nested_repeated_duration_stays_unavailable
+PASSED tests/test_mssql_native_delivery_observations.py::test_malformed_duration_report_and_unbounded_clock_are_isolated
+PASSED tests/test_mssql_native_delivery_observations.py::test_oversized_worker_metric_cannot_escape_failure_channel
