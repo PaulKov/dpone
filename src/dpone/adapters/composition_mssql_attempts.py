@@ -141,6 +141,55 @@ def require_terminal_attempt(
     ledger.require_proofs(receipt.attempt, services, (closed, quiescent, outcome), expected_outcome_state=receipt.state)
 
 
+def reserve_composition_attempt(ledger: CompositionMssqlLedger, attempt: CompositionAttemptIdentity) -> None:
+    """Insert RUNNING and every guard inside the caller's protected transaction.
+
+    The caller must hold the existing ledger lock and commit all related budget
+    reservations atomically. This function commits nothing and grants no
+    executor; only a fresh acknowledged operation plus independent exact
+    readback may admit execution. Replays follow the existing rejection policy.
+    """
+    attempt.__post_init__()
+    occurrence = read_attempt_occurrence(ledger, attempt)
+    ledger.cursor.execute(
+        "SELECT attempt_sha256, activation_request_sha256, guard_epochs_sha256, attempt_document, state, "
+        "closed_gates_sha256, quiescence_sha256, outcome_evidence_sha256, LOWER(CONVERT(char(36), activation_id)) "
+        f"FROM {ledger.table('attempts')} "
+        "WITH (UPDLOCK, HOLDLOCK) ORDER BY attempt_sha256;",
+    )
+    records = tuple(tuple(value) for value in ledger.cursor.fetchall())
+    existing = tuple(_receipt(ledger, record) for record in records)
+    require_composition_attempt_admission(occurrence, attempt, existing)
+    requested_guards = {guard for guard, _ in attempt.guard_epochs}
+    for receipt in existing:
+        if receipt.state in {"SUCCEEDED", "FAILED"} and requested_guards.intersection(
+            guard for guard, _ in receipt.attempt.guard_epochs
+        ):
+            prior = (
+                occurrence
+                if receipt.attempt.activation_request_sha256 == attempt.activation_request_sha256
+                else read_attempt_occurrence(ledger, receipt.attempt)
+            )
+            require_terminal_attempt(ledger, prior, receipt)
+    ledger.cursor.execute(
+        f"INSERT INTO {ledger.table('attempts')} (attempt_sha256, activation_id, activation_request_sha256, "
+        "guard_epochs_sha256, attempt_document, state) VALUES (?, ?, ?, ?, ?, 'RUNNING');",
+        attempt.attempt_sha256,
+        occurrence.request.activation_id,
+        attempt.activation_request_sha256,
+        composition_attempt_epoch_subject(attempt),
+        encode_attempt_identity(attempt),
+    )
+    for guard, epoch in attempt.guard_epochs:
+        ledger.cursor.execute(
+            f"INSERT INTO {ledger.table('attempt_domains')} (attempt_sha256, guard_id, fencing_epoch) "
+            "VALUES (?, ?, ?);",
+            attempt.attempt_sha256,
+            guard,
+            epoch,
+        )
+
+
 class MssqlCompositionAttemptStore:
     """Persist one RUNNING reservation and audit trusted terminal proof triplets."""
 
@@ -157,44 +206,7 @@ class MssqlCompositionAttemptStore:
         """Reserve all selected guards atomically before any credential issuance."""
         attempt.__post_init__()
         with composition_control_transaction(self._factory, self._schema, self._service_id) as ledger:
-            occurrence = read_attempt_occurrence(ledger, attempt)
-            ledger.cursor.execute(
-                "SELECT attempt_sha256, activation_request_sha256, guard_epochs_sha256, attempt_document, state, "
-                "closed_gates_sha256, quiescence_sha256, outcome_evidence_sha256, LOWER(CONVERT(char(36), activation_id)) "
-                f"FROM {ledger.table('attempts')} "
-                "WITH (UPDLOCK, HOLDLOCK) ORDER BY attempt_sha256;",
-            )
-            records = tuple(tuple(value) for value in ledger.cursor.fetchall())
-            existing = tuple(_receipt(ledger, record) for record in records)
-            require_composition_attempt_admission(occurrence, attempt, existing)
-            requested_guards = {guard for guard, _ in attempt.guard_epochs}
-            for receipt in existing:
-                if receipt.state in {"SUCCEEDED", "FAILED"} and requested_guards.intersection(
-                    guard for guard, _ in receipt.attempt.guard_epochs
-                ):
-                    prior = (
-                        occurrence
-                        if receipt.attempt.activation_request_sha256 == attempt.activation_request_sha256
-                        else read_attempt_occurrence(ledger, receipt.attempt)
-                    )
-                    require_terminal_attempt(ledger, prior, receipt)
-            ledger.cursor.execute(
-                f"INSERT INTO {ledger.table('attempts')} (attempt_sha256, activation_id, activation_request_sha256, "
-                "guard_epochs_sha256, attempt_document, state) VALUES (?, ?, ?, ?, ?, 'RUNNING');",
-                attempt.attempt_sha256,
-                occurrence.request.activation_id,
-                attempt.activation_request_sha256,
-                composition_attempt_epoch_subject(attempt),
-                encode_attempt_identity(attempt),
-            )
-            for guard, epoch in attempt.guard_epochs:
-                ledger.cursor.execute(
-                    f"INSERT INTO {ledger.table('attempt_domains')} (attempt_sha256, guard_id, fencing_epoch) "
-                    "VALUES (?, ?, ?);",
-                    attempt.attempt_sha256,
-                    guard,
-                    epoch,
-                )
+            reserve_composition_attempt(ledger, attempt)
         receipt = self.read_exact(attempt)
         if receipt.state != "RUNNING":
             raise CompositionAdmissionError("attempt_admission_readback")
