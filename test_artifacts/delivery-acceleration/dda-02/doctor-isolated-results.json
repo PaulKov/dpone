@@ -1,0 +1,17 @@
+{
+  "command": [
+    "uv",
+    "run",
+    "pytest",
+    "tests/test_doctor_import_integration.py::test_import_probe_replays_effective_env_derived_runtime_state[PYTHONTRACEMALLOC-5-import tracemalloc\\nassert tracemalloc.is_tracing()\\nassert tracemalloc.get_traceback_limit() == 5\\nassert 'tracemalloc' not in sys._xoptions\\n]",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--tb=short"
+  ],
+  "head": "3f37418f898bcd60f475ede8fbd89ca5ad24c7a4",
+  "seconds": 26.55,
+  "status": "FAIL",
+  "exit_code": 1,
+  "log": "doctor-isolated.log"
+}

@@ -1,0 +1,809 @@
+FFFFFFFF                                                                 [100%]
+=================================== FAILURES ===================================
+________________________ test_order_and_complete_result ________________________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_order_and_complete_result0')
+
+    def test_order_and_complete_result(tmp_path):
+>       value, events, journal = runtime(tmp_path)
+                                 ^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_runtime.py:100: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_order_and_complete_result0')
+
+    def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
+        events = []
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            phase = "published"
+    
+            def state(self):
+                return {"phase": self.phase}
+    
+            def evidence_complete(self):
+                self.phase = "evidence-complete"
+                events.append("evidence-marker")
+    
+            def succeeded(self):
+                self.phase = "succeeded"
+                events.append("state-marker")
+    
+        journal = Journal()
+        handle = StagedLoadHandle(None, (), 2)
+        result = LoadResult(inserted_rows=2, updated_rows=0, total_rows=2, staging_rows=2, commit_receipt_id="synthetic")
+    
+        class Service:
+            def resume(self, *args):
+                events.append("resume")
+                return result if recovered else None
+    
+            def stage(self, *args):
+                events.append("stage")
+                return handle
+    
+            def finalize(self, *args):
+                events.append("publish")
+                return result
+    
+            def cleanup(self, *args):
+                events.append("cleanup")
+    
+            def cleanup_recovered(self, *args):
+                events.append("cleanup-recovered")
+    
+            def abort(self, *args):
+                events.append("abort")
+    
+        service = Service()
+    
+        def bindings(cfg, owner, lease, cancelled):
+            context = SimpleNamespace(
+                plan=SimpleNamespace(target_id="target"), lease=lease, journal_factory=lambda: journal, cancelled=cancelled
+            )
+            return NativeRuntimeBindings(service, context, None)
+    
+        @contextmanager
+        def source(*args):
+            events.append("source")
+            yield object()
+    
+        def quality(*args):
+            events.append("quality")
+            if quality_fails:
+                raise ValueError("quality")
+    
+        def evidence(*args):
+            events.append("evidence")
+            if evidence_fails:
+                raise ValueError("evidence")
+    
+>       value = NativeMssqlRuntime(
+            observer=observer,
+            store=SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1),
+            target_id="target",
+            bindings=bindings,
+            source=source,
+            preflight=lambda _: events.append("preflight"),
+            quality=quality,
+            evidence=evidence,
+            advance_state=lambda *args: events.append("state"),
+        )
+E       TypeError: NativeMssqlRuntime.__init__() got an unexpected keyword argument 'observer'
+
+tests/test_mssql_native_runtime.py:85: TypeError
+__________ test_published_recovery_never_opens_source_or_runs_quality __________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_published_recovery_never_0')
+
+    def test_published_recovery_never_opens_source_or_runs_quality(tmp_path):
+>       value, events, _ = runtime(tmp_path, recovered=True)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_runtime.py:118: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_published_recovery_never_0')
+
+    def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
+        events = []
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            phase = "published"
+    
+            def state(self):
+                return {"phase": self.phase}
+    
+            def evidence_complete(self):
+                self.phase = "evidence-complete"
+                events.append("evidence-marker")
+    
+            def succeeded(self):
+                self.phase = "succeeded"
+                events.append("state-marker")
+    
+        journal = Journal()
+        handle = StagedLoadHandle(None, (), 2)
+        result = LoadResult(inserted_rows=2, updated_rows=0, total_rows=2, staging_rows=2, commit_receipt_id="synthetic")
+    
+        class Service:
+            def resume(self, *args):
+                events.append("resume")
+                return result if recovered else None
+    
+            def stage(self, *args):
+                events.append("stage")
+                return handle
+    
+            def finalize(self, *args):
+                events.append("publish")
+                return result
+    
+            def cleanup(self, *args):
+                events.append("cleanup")
+    
+            def cleanup_recovered(self, *args):
+                events.append("cleanup-recovered")
+    
+            def abort(self, *args):
+                events.append("abort")
+    
+        service = Service()
+    
+        def bindings(cfg, owner, lease, cancelled):
+            context = SimpleNamespace(
+                plan=SimpleNamespace(target_id="target"), lease=lease, journal_factory=lambda: journal, cancelled=cancelled
+            )
+            return NativeRuntimeBindings(service, context, None)
+    
+        @contextmanager
+        def source(*args):
+            events.append("source")
+            yield object()
+    
+        def quality(*args):
+            events.append("quality")
+            if quality_fails:
+                raise ValueError("quality")
+    
+        def evidence(*args):
+            events.append("evidence")
+            if evidence_fails:
+                raise ValueError("evidence")
+    
+>       value = NativeMssqlRuntime(
+            observer=observer,
+            store=SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1),
+            target_id="target",
+            bindings=bindings,
+            source=source,
+            preflight=lambda _: events.append("preflight"),
+            quality=quality,
+            evidence=evidence,
+            advance_state=lambda *args: events.append("state"),
+        )
+E       TypeError: NativeMssqlRuntime.__init__() got an unexpected keyword argument 'observer'
+
+tests/test_mssql_native_runtime.py:85: TypeError
+_________ test_evidence_failure_does_not_advance_or_abort_publication __________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_evidence_failure_does_not0')
+
+    def test_evidence_failure_does_not_advance_or_abort_publication(tmp_path):
+>       value, events, journal = runtime(tmp_path, evidence_fails=True)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_runtime.py:125: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_evidence_failure_does_not0')
+
+    def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
+        events = []
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            phase = "published"
+    
+            def state(self):
+                return {"phase": self.phase}
+    
+            def evidence_complete(self):
+                self.phase = "evidence-complete"
+                events.append("evidence-marker")
+    
+            def succeeded(self):
+                self.phase = "succeeded"
+                events.append("state-marker")
+    
+        journal = Journal()
+        handle = StagedLoadHandle(None, (), 2)
+        result = LoadResult(inserted_rows=2, updated_rows=0, total_rows=2, staging_rows=2, commit_receipt_id="synthetic")
+    
+        class Service:
+            def resume(self, *args):
+                events.append("resume")
+                return result if recovered else None
+    
+            def stage(self, *args):
+                events.append("stage")
+                return handle
+    
+            def finalize(self, *args):
+                events.append("publish")
+                return result
+    
+            def cleanup(self, *args):
+                events.append("cleanup")
+    
+            def cleanup_recovered(self, *args):
+                events.append("cleanup-recovered")
+    
+            def abort(self, *args):
+                events.append("abort")
+    
+        service = Service()
+    
+        def bindings(cfg, owner, lease, cancelled):
+            context = SimpleNamespace(
+                plan=SimpleNamespace(target_id="target"), lease=lease, journal_factory=lambda: journal, cancelled=cancelled
+            )
+            return NativeRuntimeBindings(service, context, None)
+    
+        @contextmanager
+        def source(*args):
+            events.append("source")
+            yield object()
+    
+        def quality(*args):
+            events.append("quality")
+            if quality_fails:
+                raise ValueError("quality")
+    
+        def evidence(*args):
+            events.append("evidence")
+            if evidence_fails:
+                raise ValueError("evidence")
+    
+>       value = NativeMssqlRuntime(
+            observer=observer,
+            store=SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1),
+            target_id="target",
+            bindings=bindings,
+            source=source,
+            preflight=lambda _: events.append("preflight"),
+            quality=quality,
+            evidence=evidence,
+            advance_state=lambda *args: events.append("state"),
+        )
+E       TypeError: NativeMssqlRuntime.__init__() got an unexpected keyword argument 'observer'
+
+tests/test_mssql_native_runtime.py:85: TypeError
+______________ test_quality_failure_aborts_before_target_mutation ______________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_quality_failure_aborts_be0')
+
+    def test_quality_failure_aborts_before_target_mutation(tmp_path):
+>       value, events, _ = runtime(tmp_path, quality_fails=True)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_runtime.py:133: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_quality_failure_aborts_be0')
+
+    def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
+        events = []
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            phase = "published"
+    
+            def state(self):
+                return {"phase": self.phase}
+    
+            def evidence_complete(self):
+                self.phase = "evidence-complete"
+                events.append("evidence-marker")
+    
+            def succeeded(self):
+                self.phase = "succeeded"
+                events.append("state-marker")
+    
+        journal = Journal()
+        handle = StagedLoadHandle(None, (), 2)
+        result = LoadResult(inserted_rows=2, updated_rows=0, total_rows=2, staging_rows=2, commit_receipt_id="synthetic")
+    
+        class Service:
+            def resume(self, *args):
+                events.append("resume")
+                return result if recovered else None
+    
+            def stage(self, *args):
+                events.append("stage")
+                return handle
+    
+            def finalize(self, *args):
+                events.append("publish")
+                return result
+    
+            def cleanup(self, *args):
+                events.append("cleanup")
+    
+            def cleanup_recovered(self, *args):
+                events.append("cleanup-recovered")
+    
+            def abort(self, *args):
+                events.append("abort")
+    
+        service = Service()
+    
+        def bindings(cfg, owner, lease, cancelled):
+            context = SimpleNamespace(
+                plan=SimpleNamespace(target_id="target"), lease=lease, journal_factory=lambda: journal, cancelled=cancelled
+            )
+            return NativeRuntimeBindings(service, context, None)
+    
+        @contextmanager
+        def source(*args):
+            events.append("source")
+            yield object()
+    
+        def quality(*args):
+            events.append("quality")
+            if quality_fails:
+                raise ValueError("quality")
+    
+        def evidence(*args):
+            events.append("evidence")
+            if evidence_fails:
+                raise ValueError("evidence")
+    
+>       value = NativeMssqlRuntime(
+            observer=observer,
+            store=SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1),
+            target_id="target",
+            bindings=bindings,
+            source=source,
+            preflight=lambda _: events.append("preflight"),
+            quality=quality,
+            evidence=evidence,
+            advance_state=lambda *args: events.append("state"),
+        )
+E       TypeError: NativeMssqlRuntime.__init__() got an unexpected keyword argument 'observer'
+
+tests/test_mssql_native_runtime.py:85: TypeError
+_______ test_optional_observer_records_actual_runtime_boundaries[False] ________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_optional_observer_records0')
+recovered = False
+
+    @pytest.mark.parametrize("recovered", [False, True])
+    def test_optional_observer_records_actual_runtime_boundaries(tmp_path, recovered):
+        from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
+    
+        observer = BoundedNativeDeliveryObserver()
+>       value, events, _ = runtime(tmp_path, recovered=recovered, observer=observer)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_runtime.py:144: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_optional_observer_records0')
+
+    def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
+        events = []
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            phase = "published"
+    
+            def state(self):
+                return {"phase": self.phase}
+    
+            def evidence_complete(self):
+                self.phase = "evidence-complete"
+                events.append("evidence-marker")
+    
+            def succeeded(self):
+                self.phase = "succeeded"
+                events.append("state-marker")
+    
+        journal = Journal()
+        handle = StagedLoadHandle(None, (), 2)
+        result = LoadResult(inserted_rows=2, updated_rows=0, total_rows=2, staging_rows=2, commit_receipt_id="synthetic")
+    
+        class Service:
+            def resume(self, *args):
+                events.append("resume")
+                return result if recovered else None
+    
+            def stage(self, *args):
+                events.append("stage")
+                return handle
+    
+            def finalize(self, *args):
+                events.append("publish")
+                return result
+    
+            def cleanup(self, *args):
+                events.append("cleanup")
+    
+            def cleanup_recovered(self, *args):
+                events.append("cleanup-recovered")
+    
+            def abort(self, *args):
+                events.append("abort")
+    
+        service = Service()
+    
+        def bindings(cfg, owner, lease, cancelled):
+            context = SimpleNamespace(
+                plan=SimpleNamespace(target_id="target"), lease=lease, journal_factory=lambda: journal, cancelled=cancelled
+            )
+            return NativeRuntimeBindings(service, context, None)
+    
+        @contextmanager
+        def source(*args):
+            events.append("source")
+            yield object()
+    
+        def quality(*args):
+            events.append("quality")
+            if quality_fails:
+                raise ValueError("quality")
+    
+        def evidence(*args):
+            events.append("evidence")
+            if evidence_fails:
+                raise ValueError("evidence")
+    
+>       value = NativeMssqlRuntime(
+            observer=observer,
+            store=SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1),
+            target_id="target",
+            bindings=bindings,
+            source=source,
+            preflight=lambda _: events.append("preflight"),
+            quality=quality,
+            evidence=evidence,
+            advance_state=lambda *args: events.append("state"),
+        )
+E       TypeError: NativeMssqlRuntime.__init__() got an unexpected keyword argument 'observer'
+
+tests/test_mssql_native_runtime.py:85: TypeError
+________ test_optional_observer_records_actual_runtime_boundaries[True] ________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_optional_observer_records1')
+recovered = True
+
+    @pytest.mark.parametrize("recovered", [False, True])
+    def test_optional_observer_records_actual_runtime_boundaries(tmp_path, recovered):
+        from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
+    
+        observer = BoundedNativeDeliveryObserver()
+>       value, events, _ = runtime(tmp_path, recovered=recovered, observer=observer)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_runtime.py:144: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_optional_observer_records1')
+
+    def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
+        events = []
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            phase = "published"
+    
+            def state(self):
+                return {"phase": self.phase}
+    
+            def evidence_complete(self):
+                self.phase = "evidence-complete"
+                events.append("evidence-marker")
+    
+            def succeeded(self):
+                self.phase = "succeeded"
+                events.append("state-marker")
+    
+        journal = Journal()
+        handle = StagedLoadHandle(None, (), 2)
+        result = LoadResult(inserted_rows=2, updated_rows=0, total_rows=2, staging_rows=2, commit_receipt_id="synthetic")
+    
+        class Service:
+            def resume(self, *args):
+                events.append("resume")
+                return result if recovered else None
+    
+            def stage(self, *args):
+                events.append("stage")
+                return handle
+    
+            def finalize(self, *args):
+                events.append("publish")
+                return result
+    
+            def cleanup(self, *args):
+                events.append("cleanup")
+    
+            def cleanup_recovered(self, *args):
+                events.append("cleanup-recovered")
+    
+            def abort(self, *args):
+                events.append("abort")
+    
+        service = Service()
+    
+        def bindings(cfg, owner, lease, cancelled):
+            context = SimpleNamespace(
+                plan=SimpleNamespace(target_id="target"), lease=lease, journal_factory=lambda: journal, cancelled=cancelled
+            )
+            return NativeRuntimeBindings(service, context, None)
+    
+        @contextmanager
+        def source(*args):
+            events.append("source")
+            yield object()
+    
+        def quality(*args):
+            events.append("quality")
+            if quality_fails:
+                raise ValueError("quality")
+    
+        def evidence(*args):
+            events.append("evidence")
+            if evidence_fails:
+                raise ValueError("evidence")
+    
+>       value = NativeMssqlRuntime(
+            observer=observer,
+            store=SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1),
+            target_id="target",
+            bindings=bindings,
+            source=source,
+            preflight=lambda _: events.append("preflight"),
+            quality=quality,
+            evidence=evidence,
+            advance_state=lambda *args: events.append("state"),
+        )
+E       TypeError: NativeMssqlRuntime.__init__() got an unexpected keyword argument 'observer'
+
+tests/test_mssql_native_runtime.py:85: TypeError
+_________ test_observer_failure_cannot_change_business_outcome[False] __________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_observer_failure_cannot_c0')
+quality_fails = False
+
+    @pytest.mark.parametrize("quality_fails", [False, True])
+    def test_observer_failure_cannot_change_business_outcome(tmp_path, quality_fails):
+        class BrokenObserver:
+            def record(self, observation):
+                raise RuntimeError("observer failure must not replace business failure")
+    
+>       value, events, _ = runtime(tmp_path, observer=BrokenObserver(), quality_fails=quality_fails)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_runtime.py:160: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_observer_failure_cannot_c0')
+
+    def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
+        events = []
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            phase = "published"
+    
+            def state(self):
+                return {"phase": self.phase}
+    
+            def evidence_complete(self):
+                self.phase = "evidence-complete"
+                events.append("evidence-marker")
+    
+            def succeeded(self):
+                self.phase = "succeeded"
+                events.append("state-marker")
+    
+        journal = Journal()
+        handle = StagedLoadHandle(None, (), 2)
+        result = LoadResult(inserted_rows=2, updated_rows=0, total_rows=2, staging_rows=2, commit_receipt_id="synthetic")
+    
+        class Service:
+            def resume(self, *args):
+                events.append("resume")
+                return result if recovered else None
+    
+            def stage(self, *args):
+                events.append("stage")
+                return handle
+    
+            def finalize(self, *args):
+                events.append("publish")
+                return result
+    
+            def cleanup(self, *args):
+                events.append("cleanup")
+    
+            def cleanup_recovered(self, *args):
+                events.append("cleanup-recovered")
+    
+            def abort(self, *args):
+                events.append("abort")
+    
+        service = Service()
+    
+        def bindings(cfg, owner, lease, cancelled):
+            context = SimpleNamespace(
+                plan=SimpleNamespace(target_id="target"), lease=lease, journal_factory=lambda: journal, cancelled=cancelled
+            )
+            return NativeRuntimeBindings(service, context, None)
+    
+        @contextmanager
+        def source(*args):
+            events.append("source")
+            yield object()
+    
+        def quality(*args):
+            events.append("quality")
+            if quality_fails:
+                raise ValueError("quality")
+    
+        def evidence(*args):
+            events.append("evidence")
+            if evidence_fails:
+                raise ValueError("evidence")
+    
+>       value = NativeMssqlRuntime(
+            observer=observer,
+            store=SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1),
+            target_id="target",
+            bindings=bindings,
+            source=source,
+            preflight=lambda _: events.append("preflight"),
+            quality=quality,
+            evidence=evidence,
+            advance_state=lambda *args: events.append("state"),
+        )
+E       TypeError: NativeMssqlRuntime.__init__() got an unexpected keyword argument 'observer'
+
+tests/test_mssql_native_runtime.py:85: TypeError
+__________ test_observer_failure_cannot_change_business_outcome[True] __________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_observer_failure_cannot_c1')
+quality_fails = True
+
+    @pytest.mark.parametrize("quality_fails", [False, True])
+    def test_observer_failure_cannot_change_business_outcome(tmp_path, quality_fails):
+        class BrokenObserver:
+            def record(self, observation):
+                raise RuntimeError("observer failure must not replace business failure")
+    
+>       value, events, _ = runtime(tmp_path, observer=BrokenObserver(), quality_fails=quality_fails)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_runtime.py:160: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3637/test_observer_failure_cannot_c1')
+
+    def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
+        events = []
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            phase = "published"
+    
+            def state(self):
+                return {"phase": self.phase}
+    
+            def evidence_complete(self):
+                self.phase = "evidence-complete"
+                events.append("evidence-marker")
+    
+            def succeeded(self):
+                self.phase = "succeeded"
+                events.append("state-marker")
+    
+        journal = Journal()
+        handle = StagedLoadHandle(None, (), 2)
+        result = LoadResult(inserted_rows=2, updated_rows=0, total_rows=2, staging_rows=2, commit_receipt_id="synthetic")
+    
+        class Service:
+            def resume(self, *args):
+                events.append("resume")
+                return result if recovered else None
+    
+            def stage(self, *args):
+                events.append("stage")
+                return handle
+    
+            def finalize(self, *args):
+                events.append("publish")
+                return result
+    
+            def cleanup(self, *args):
+                events.append("cleanup")
+    
+            def cleanup_recovered(self, *args):
+                events.append("cleanup-recovered")
+    
+            def abort(self, *args):
+                events.append("abort")
+    
+        service = Service()
+    
+        def bindings(cfg, owner, lease, cancelled):
+            context = SimpleNamespace(
+                plan=SimpleNamespace(target_id="target"), lease=lease, journal_factory=lambda: journal, cancelled=cancelled
+            )
+            return NativeRuntimeBindings(service, context, None)
+    
+        @contextmanager
+        def source(*args):
+            events.append("source")
+            yield object()
+    
+        def quality(*args):
+            events.append("quality")
+            if quality_fails:
+                raise ValueError("quality")
+    
+        def evidence(*args):
+            events.append("evidence")
+            if evidence_fails:
+                raise ValueError("evidence")
+    
+>       value = NativeMssqlRuntime(
+            observer=observer,
+            store=SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1),
+            target_id="target",
+            bindings=bindings,
+            source=source,
+            preflight=lambda _: events.append("preflight"),
+            quality=quality,
+            evidence=evidence,
+            advance_state=lambda *args: events.append("state"),
+        )
+E       TypeError: NativeMssqlRuntime.__init__() got an unexpected keyword argument 'observer'
+
+tests/test_mssql_native_runtime.py:85: TypeError
+=========================== short test summary info ============================
+FAILED tests/test_mssql_native_runtime.py::test_order_and_complete_result - T...
+FAILED tests/test_mssql_native_runtime.py::test_published_recovery_never_opens_source_or_runs_quality
+FAILED tests/test_mssql_native_runtime.py::test_evidence_failure_does_not_advance_or_abort_publication
+FAILED tests/test_mssql_native_runtime.py::test_quality_failure_aborts_before_target_mutation
+FAILED tests/test_mssql_native_runtime.py::test_optional_observer_records_actual_runtime_boundaries[False]
+FAILED tests/test_mssql_native_runtime.py::test_optional_observer_records_actual_runtime_boundaries[True]
+FAILED tests/test_mssql_native_runtime.py::test_observer_failure_cannot_change_business_outcome[False]
+FAILED tests/test_mssql_native_runtime.py::test_observer_failure_cannot_change_business_outcome[True]

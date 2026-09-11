@@ -62,7 +62,9 @@ def setup(tmp_path, target, **overrides):
         max_total_encoded_bytes=10000,
         stage_allocated_bytes_stop_threshold=10000,
         max_rows=1,
-        max_bytes=1024,
+        # Positive flows need room for the serialized contract and temporary path.
+        # Exact byte-limit rejection is exercised separately with explicit caps.
+        max_bytes=4096,
         max_row_bytes=256,
         parallelism=2,
         **overrides,
@@ -77,7 +79,11 @@ def setup(tmp_path, target, **overrides):
     return executor, replace(plan, wire_fingerprint=contract.type_layout_hash), lease, contract
 
 
-def test_spawned_encoding_and_imports_overlap_and_recover_without_source(tmp_path):
+@pytest.mark.parametrize("long_work_path", [False, True], ids=["default-path", "long-path"])
+def test_spawned_encoding_and_imports_overlap_and_recover_without_source(tmp_path, long_work_path):
+    if long_work_path:
+        tmp_path = tmp_path / ("long-worker-parent-" + "x" * 120)
+        tmp_path.mkdir()
     target = Target(Barrier(2, timeout=20))
     executor, plan, lease, contract = setup(tmp_path, target)
     result = executor.stage(plan, iter([(7,), (7,)]), contract, lease)
@@ -93,6 +99,31 @@ def test_spawned_encoding_and_imports_overlap_and_recover_without_source(tmp_pat
     assert all(o["worker"] != os.getpid() for o in result.observations if o["phase"] == "encode")
 
 
+def test_insufficient_ipc_capacity_closes_unpulled_source_without_completion(tmp_path):
+    class UnpulledSource:
+        closed = False
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            raise AssertionError("metadata admission must reject before pulling rows")
+
+        def close(self):
+            self.closed = True
+
+    target = Target()
+    executor, plan, lease, contract = setup(tmp_path, target)
+    executor.limits = replace(executor.limits, max_bytes=64, max_row_bytes=64)
+    source = UnpulledSource()
+    with pytest.raises(WindowContractError, match="mssql_native.IPC_metadata_limit_exceeded"):
+        executor.stage(plan, source, contract, lease)
+    assert source.closed
+    assert target.files == []
+    assert target.receipts == {}
+    assert NativeChunkJournal(executor.store, lease, plan).completed() is None
+
+
 def test_import_retries_only_retained_identical_bytes(tmp_path):
     target = Target(failures=2)
     executor, plan, lease, contract = setup(tmp_path, target)
@@ -100,6 +131,77 @@ def test_import_retries_only_retained_identical_bytes(tmp_path):
     assert result.receipts[0].attempt_id == "run-0-2"
     assert target.files[0] == target.files[1] == target.files[2]
     assert target.settled == ["run-0-0", "run-0-1"]
+
+
+@pytest.mark.parametrize("rows", [[(9,), (9,)], [{"value": 9}, {"value": 9}]])
+def test_scheduler_reuses_frame_size_with_real_spawned_workers(tmp_path, monkeypatch, rows):
+    from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+
+    sizes = []
+    original = MssqlNativeEncoder.encoded_row_size
+
+    def measured_size(self, row):
+        size = original(self, row)
+        sizes.append(size)
+        return size
+
+    monkeypatch.setattr(MssqlNativeEncoder, "encoded_row_size", measured_size)
+    target = Target()
+    executor, plan, lease, contract = setup(tmp_path, target)
+    result = executor.stage(plan, iter(rows), contract, lease)
+    # Spawned encoders validate their own values. The parent sizes each frame
+    # once; the scheduler must reuse that reservation rather than walk it again.
+    assert len(sizes) == len(rows)
+    assert sum(sizes) == sum(receipt.encoded_bytes for receipt in result.receipts)
+    assert sum(map(len, target.files)) == sum(sizes)
+
+
+@pytest.mark.parametrize("delta,code", [(1, "encoder_size_authority_changed"), (-1, "chunk_bytes_exceeded")])
+def test_frame_reservation_cannot_override_actual_encoded_bytes(tmp_path, monkeypatch, delta, code):
+    import dpone.runtime.mssql_native_chunks as chunks
+
+    original = chunks.sized_native_frames
+
+    def corrupted(*args, **kwargs):
+        for frame in original(*args, **kwargs):
+            yield replace(frame, encoded_bytes=frame.encoded_bytes + delta)
+
+    monkeypatch.setattr(chunks, "sized_native_frames", corrupted)
+    target = Target()
+    executor, plan, lease, contract = setup(tmp_path, target)
+    with pytest.raises(WindowContractError, match=code):
+        executor.stage(plan, iter([(7,)]), contract, lease)
+    assert not target.files
+    assert NativeChunkJournal(executor.store, lease, plan).completed() is None
+
+
+@pytest.mark.parametrize("mapping", [False, True])
+@pytest.mark.parametrize("view", [False, True])
+def test_spawned_workers_keep_values_from_reused_driver_buffers(tmp_path, mapping, view):
+    from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+
+    target = Target()
+    executor, plan, lease, _ = setup(tmp_path, target)
+    contract = build_mssql_bcp_native_contract(schema=[("value", "varbinary(8)")], query="SELECT synthetic")
+    plan = replace(plan, wire_fingerprint=contract.type_layout_hash)
+    executor.limits = replace(executor.limits, max_bytes=4096)
+    buffer = bytearray(b"a")
+    container = (
+        {"value": memoryview(buffer) if view else buffer} if mapping else [memoryview(buffer) if view else buffer]
+    )
+
+    def rows():
+        for content in (b"a", b"b", b"c"):
+            buffer[:] = content
+            yield container
+        buffer[:] = b"z"
+
+    result = executor.stage(plan, rows(), contract, lease)
+    encoder = MssqlNativeEncoder(contract, max_row_bytes=executor.limits.max_row_bytes)
+    expected = [encoder.encode_row((content,)) for content in (b"a", b"b", b"c")]
+    assert sorted(target.files) == sorted(expected)
+    assert result.rows == 3
+    assert sum(receipt.encoded_bytes for receipt in result.receipts) == sum(map(len, expected))
 
 
 def test_retry_exhaustion_requires_reextraction(tmp_path):
@@ -284,3 +386,58 @@ def test_allocation_overshoot_is_durable_without_stage_complete(tmp_path, worker
     assert len(failed) == workers
     assert failed[0]["allocated_before"] == 0
     assert failed[0]["allocated_after"] == 20000
+
+
+def test_source_work_excludes_adapter_and_downstream_suspension(monkeypatch):
+    from dpone.runtime.mssql_native_chunks_observations import ObservedNativeRows
+
+    clock, closed = [0], []
+    monkeypatch.setattr("dpone.runtime.mssql_native_chunks_observations.time.monotonic_ns", lambda: clock[0])
+
+    def source():
+        try:
+            for value in (1, 2):
+                clock[0] += 3
+                yield (value,)
+        finally:
+            closed.append(True)
+
+    def adapt(rows):
+        try:
+            for row in rows:
+                clock[0] += 7
+                yield row
+        finally:
+            rows.close()
+
+    rows = ObservedNativeRows(source(), adapt)
+    assert next(rows) == (1,)
+    clock[0] += 100
+    assert rows.metrics()["source_read_work_seconds"].value == 3 / 1e9
+    assert next(rows) == (2,)
+    assert rows.metrics()["source_read_work_seconds"].value == 3 / 1e9
+    rows.close()
+    assert closed == [True]
+
+
+def test_disabled_source_observation_never_reads_clock(monkeypatch):
+    from dpone.runtime.mssql_native_chunks_observations import delivery_session
+
+    def unavailable_clock():
+        raise AssertionError("disabled diagnostics read a clock")
+
+    monkeypatch.setattr("dpone.runtime.mssql_native_chunks_observations.time.monotonic_ns", unavailable_clock)
+    session = delivery_session(None)
+    assert list(session.source_rows(iter([(1,)]), lambda rows: rows)) == [(1,)]
+    assert session.snapshot()["status"] == "UNVERIFIED"
+
+
+def test_failed_worker_encoding_returns_diagnostics_without_masking_error(tmp_path):
+    from dpone.runtime.mssql_native_chunks import _encode
+
+    wire = build_mssql_bcp_native_contract(schema=[("value", "int")], query="synthetic")
+    result, legacy, sidecar = _encode(wire, [("invalid",)], tmp_path / "bad.native", 0, 64, 64, observed=True)
+    assert isinstance(result, ValueError)
+    assert sidecar["observations"][0]["outcome"] == "failed"
+    assert sidecar["observations"][0]["phase"] == "encode"
+    assert set(legacy) == {"phase", "start", "end", "worker"}

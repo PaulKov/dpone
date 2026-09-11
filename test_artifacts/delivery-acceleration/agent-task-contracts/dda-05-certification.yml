@@ -1,0 +1,162 @@
+schema_version: 1
+task_id: DDA-05
+title: Real-row delivery and performance harness
+goal: Implement an explicitly opted-in real-row native delivery/SWITCH-component harness with reproducible evidence.
+specification: docs/feature-design-data-delivery-acceleration-v1.md
+base_commit: d5ad9aaecc900c24df421b160ed36b4cfc726e45
+integrator: DDA-06 delivery acceleration integrator
+acceptance_criteria:
+- Build deterministic narrow/wide/Unicode/Decimal/NULL/binary/skewed synthetic profiles and exact-multiset correctness
+  fixtures that execute the real bounded-native composition when an environment is explicitly approved.
+- Implement current-baseline and candidate execution adapters behind the frozen report envelope so the harness can
+  be authored before optimization modules land.
+- Record exact commit/dirty state, dependencies/server/BCP versions, environment/workload/config digests, layout,
+  limits, raw trials, fidelity, rows/bytes, process-set RSS and available SQL observations.
+- Enforce a warmup and at least three successful comparable trials for median claims; exclude failed/skipped trials
+  and reject mismatched identities/layouts. No p95 claim from three trials.
+- Cover real BCP fidelity, empty/outside-window invariance, post-EOF source-free recovery and known/unknown commit
+  paths. SWITCH fixtures test the isolated component, not falsely certified normal route admission.
+- No live SQL/container startup or credentials use without a separately explicit approved disposable environment.
+  Collection/import/help and hermetic tests work without services; absent environment reports SKIP/UNVERIFIED.
+- Synthetic harness tests prove input validation, redaction, output atomicity and absence handling. Match DDA-01
+  comparison input contract with a local fixed fixture, without importing its unfinished branch.
+- Document exact preparation/run/observation/recovery/cleanup commands and object ownership; do not edit shared
+  integration fixtures.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - internal implementation
+  - documentation
+  migration_required: false
+owned_paths:
+- tools/native_delivery_live_benchmark.py
+- tools/native_delivery_live_support
+- tests/integration/mssql/test_clickhouse_mssql_bounded_native_delivery_integration.py
+- tests/integration/mssql/test_clickhouse_mssql_partition_switch_integration.py
+- tests/integration/mssql/clickhouse_mssql_delivery_support.py
+- tests/test_native_delivery_live_benchmark.py
+- docs/delivery-acceleration/certification.md
+- test_artifacts/delivery-acceleration/dda-05
+integrator_owned_paths: []
+read_only_paths:
+- AGENTS.md
+- docs/AGENTS.md
+- docs/feature-design-standard.md
+- docs/engineering-standards.md
+- docs/import-rules.md
+- docs/agent-development.md
+- docs/testing/index.md
+- docs/documentation-standard.md
+- docs/benchmarks/quality_budgets.yml
+- docs/feature-design-data-delivery-acceleration-v1.md
+- docs/data-delivery-acceleration-tasks.md
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- src/dpone/schema
+- src/dpone/config/mssql_strategy_contract_policies.py
+- src/dpone/manifest/mssql_native_policy.py
+- tests/conftest.py
+- tests/integration/conftest.py
+- src/dpone/contracts/native_delivery_observations.py
+- src/dpone/ports/native_delivery_observer.py
+- src/dpone/runtime/native_delivery_observations.py
+- src/dpone/runtime/native_delivery_benchmark.py
+- tools/native_delivery_benchmark.py
+- tests/test_mssql_native_delivery_observations.py
+- tests/test_mssql_native_delivery_benchmark.py
+- docs/delivery-acceleration/observations.md
+- src/dpone/runtime/sinks/mssql_native_prepared_digests.py
+- src/dpone/runtime/sinks/mssql_native_prepared_insert.py
+- tests/test_mssql_native_integrity_readbacks.py
+- tests/test_mssql_native_metadata_insert.py
+- tests/test_mssql_native_metadata_insert_parity.py
+- docs/delivery-acceleration/preparation.md
+- src/dpone/runtime/mssql_native_sized_frames.py
+- src/dpone/runtime/mssql_native_chunks_files.py
+- tests/test_mssql_native_chunks_files.py
+- tests/test_mssql_native_sized_frames.py
+- docs/delivery-acceleration/frames.md
+- src/dpone/contracts/native_mssql_switch.py
+- src/dpone/ports/native_mssql_switch.py
+- src/dpone/runtime/sinks/mssql_native_switch
+- tests/test_mssql_native_partition_switch.py
+- tests/test_mssql_native_partition_switch_recovery.py
+- tests/test_mssql_native_partition_switch_catalog.py
+- docs/delivery-acceleration/partition-switch.md
+- src/dpone/runtime/mssql_native_chunks.py
+- src/dpone/runtime/mssql_native_chunks_observations.py
+- src/dpone/runtime/mssql_native_runtime.py
+- src/dpone/runtime/sinks/mssql_native_prepare.py
+- src/dpone/runtime/sinks/mssql_native_composition.py
+- src/dpone/runtime/sinks/mssql_native_import.py
+- src/dpone/runtime/sinks/mssql_native_staged_load.py
+- src/dpone/runtime/sinks/strategies/mssql/mssql_native_staging.py
+- src/dpone/runtime/sinks/strategies/mssql/mssql_transaction_finalizer.py
+- tests/test_mssql_native_chunks_execution.py
+- tests/test_mssql_native_staged_prepare.py
+- tests/test_mssql_native_staged_finalizer.py
+- tests/test_mssql_native_staged_recovery.py
+- tests/test_mssql_native_staged_verification.py
+- tests/test_mssql_native_staged_import.py
+- tests/test_mssql_native_runtime.py
+- tests/test_mssql_native_composition.py
+- tests/test_mssql_native_delivery_integration.py
+- docs/delivery-acceleration/index.md
+- docs/delivery-acceleration/operations.md
+- docs/mssql-native-transport.md
+- docs/feature-design-clickhouse-mssql-bounded-native-v1.md
+- docs/feature-design-data-delivery-acceleration-v1.md
+- docs/data-delivery-acceleration-tasks.md
+- docs/architecture.md
+- docs/adr
+- docs/adr-index.md
+- test_artifacts/delivery-acceleration/dda-01
+- test_artifacts/delivery-acceleration/dda-02
+- test_artifacts/delivery-acceleration/dda-03
+- test_artifacts/delivery-acceleration/dda-04
+- test_artifacts/delivery-acceleration/dda-06
+- test_artifacts/delivery-acceleration/measurement
+shared_file_owner: DDA-06 delivery acceleration integrator
+dependencies: []
+required_checks:
+  focused:
+  - uv run pytest tests/test_native_delivery_live_benchmark.py -q
+  broad:
+  - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
+  - uv run ruff check .
+  - uv run ruff format --check .
+  - uv run mypy --config-file mypy.ini
+  - uv run dpone docs check-import-rules
+  - uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json
+  - Run dpone docs check-module-size with the exact merge-base/head recipe from AGENTS.md; do not weaken budgets.
+  - PYTEST_XDIST_AUTO_NUM_WORKERS=2 uv run pytest -m 'not integration_live' -n auto --dist loadfile
+  - uv run dpone docs check-docs
+  - uv run dpone docs check-generated-references
+  - uv run pytest tests/test_docs_language_contracts.py -q
+  - uv run mkdocs build --strict
+  live:
+  - SKIP unless the maintainer explicitly approves the disposable environment; implement applicable live tests without
+    running services by default.
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
+- Do not broaden scope, activate native SWITCH, alter source snapshot semantics, rewrite history or publish a release.

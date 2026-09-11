@@ -31,6 +31,7 @@ class MemoryConnector:
         self.tables = {"[db].[stage].[chunk0]": [{"n": 7}, {"n": 7}], "[db].[stage].[chunk1]": [{"n": 7}]}
         self.properties = {}
         self.statements = []
+        self.typed_readbacks = []
 
     def quote_identifier(self, name):
         return "[" + name.replace("]", "]]") + "]"
@@ -59,8 +60,23 @@ class MemoryConnector:
             self.properties[self.qualified_name(params[1], params[2], database="db")] = params[0]
         elif sql.startswith("INSERT INTO "):
             target = sql.split("INSERT INTO ", 1)[1].split(" (", 1)[0]
-            for select in sql.split(") ", 1)[1].split(" UNION ALL "):
-                self.tables[target].extend(dict(row) for row in self.tables[select.split(" FROM ", 1)[1]])
+            # A deliberately finite SQL storage double: execute the explicit raw
+            # SELECT/UNION ALL source and validate the canonical metadata clauses.
+            # Full expression/type parity is covered by the helper and live tests.
+            sources = re.findall(r"FROM (\[[^]]+\]\.\[[^]]+\]\.\[[^]]+\])", sql)
+            for source in sources:
+                self.tables[target].extend(dict(row) for row in self.tables[source])
+            if "AS [__dpone__load_id]" in sql:
+                assert "N'load' AS [__dpone__load_id]" in sql
+                assert "HASHBYTES" in sql
+                assert "AS [__dpone__loaded_at]" in sql and "AS [__dpone__extracted_at]" in sql
+                for row in self.tables[target]:
+                    row.update(
+                        __dpone__load_id="load",
+                        __dpone__loaded_at=datetime(2026, 1, 1),
+                        __dpone__row_id="f" * 64,
+                        __dpone__extracted_at=datetime(2026, 1, 1),
+                    )
         elif sql.startswith("UPDATE n SET "):
             target = sql.rsplit(" FROM ", 1)[1].removesuffix(" AS n")
             assert "[__dpone__load_id] = N'load'" in sql
@@ -86,6 +102,7 @@ class MemoryConnector:
         return []
 
     def get_records_iterator(self, sql):
+        self.typed_readbacks.append(sql)
         names = re.findall(r"\[([^\]]+)\]", sql.split(" FROM ", 1)[0])
         return iter({name: row[name] for name in names} for row in self.tables[sql.split(" FROM ", 1)[1]])
 
@@ -214,6 +231,10 @@ def test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepare
         assert any(" UNION ALL " in sql for sql in connector.statements)
     assert journal.state["stage"]["consumed_payload_evidence"]["actual_native_rows"] == sum(counts)
     preparer.reverify(prepared)
+    # One initial dual digest plus an independent prepublication full digest.
+    # Restoring below deliberately adds another boundary and therefore a scan.
+    assert len(connector.typed_readbacks) == 2
+    assert not any(sql.startswith("UPDATE n SET ") for sql in connector.statements)
     if default_lineage:
         assert tuple(prepared.staging.columns) == (
             "n",

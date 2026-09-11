@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from psycopg import sql
 
@@ -12,7 +12,6 @@ from dpone.contracts.postgres_source_authority import (
     SelectedPostgresSourceAuthority,
     ascii_case_alias,
 )
-from dpone.contracts.runtime_connection import ResolvedBindingConnection
 from dpone.contracts.source_physical_identity import SourcePhysicalIdentity
 from dpone.runtime.sources.postgres_source_authority_observation import (
     PostgresSourceAuthorityVerificationError,
@@ -24,6 +23,9 @@ from dpone.runtime.sources.postgres_source_authority_observation import (
 from dpone.runtime.sources.strategies.postgres.postgres_snapshot_lease import (
     PostgresRepeatableReadSnapshotLease,
 )
+
+if TYPE_CHECKING:
+    from dpone.contracts.runtime_connection import ResolvedBindingConnection
 
 POSTGRES_SOURCE_AUTHORITY_SHA256_OPTION = "postgres_source_authority_sha256"
 _ASCII_UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"

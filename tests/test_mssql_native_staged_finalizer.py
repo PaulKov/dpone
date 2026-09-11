@@ -55,6 +55,11 @@ class _PublicationConnector(_FinalizerConnector):
         super().__init__(**kwargs)
         self.target_lock = _LockSession()
         self.lock_sessions = []
+        self.bound_queries = []
+
+    def execute_query(self, sql, params=None):
+        self.bound_queries.append((sql, params))
+        return super().execute_query(sql, params)
 
     def open_session(self, *, application_name):
         session = _LockSession()
@@ -78,6 +83,8 @@ def test_native_service_uses_transaction_receipt_and_fresh_probe(lost_ack, probe
     state = _FinalizerState(probe_after_commit=probe)
     events = []
     stage = _staging(2)
+    stage.columns = ("value", "__dpone__loaded_at")
+    stage.database, stage.schema, stage.table = "DWH", "stage", "prepared"
     prepared = NativePreparedStage(
         stage, MssqlTransactionAdmission(operation=_operation()), _source_lifecycle_receipt(), None, None
     )
@@ -143,6 +150,15 @@ def test_native_service_uses_transaction_receipt_and_fresh_probe(lost_ack, probe
     assert state.receipt_inserts == 1
     assert state.fresh_probes == int(lost_ack)
     assert connector.calls.count("TRUNCATE TABLE [db].[dbo].[target]") == 1
+    clock_update = "UPDATE [DWH].[stage].[prepared] SET [__dpone__loaded_at] = ?"
+    assert connector.calls.count(clock_update) == 1
+    assert (
+        connector.calls.index("SELECT SYSUTCDATETIME() AS loaded_at_utc")
+        < connector.calls.index(clock_update)
+        < connector.calls.index("TRUNCATE TABLE [db].[dbo].[target]")
+    )
+    assert state.persisted is not None
+    assert (clock_update, (state.persisted.loaded_at_utc.replace(tzinfo=None),)) in connector.bound_queries
     assert len(connector.lock_sessions) == 1
     assert connector.lock_sessions[0].released
     assert connector.lock_sessions[0].closed

@@ -1,0 +1,26 @@
+{
+  "command": [
+    "uv",
+    "run",
+    "dpone",
+    "docs",
+    "check-docs"
+  ],
+  "source_before": {
+    "commit": "61bcebc0c96b4db535bd4494de6f30cb15d11d18",
+    "tracked_bytes_sha256": "ec97698139cd5226fd0989419859e1b274a5157ed0eb76b3e61ac4735275a5fe",
+    "dirty": "M docs/quality-metrics.md",
+    "document_sha256": "64af8270add0193990edaad8e7e05f30ed247192b2ccb868e786b8999e99bb9e"
+  },
+  "source_after": {
+    "commit": "61bcebc0c96b4db535bd4494de6f30cb15d11d18",
+    "tracked_bytes_sha256": "ec97698139cd5226fd0989419859e1b274a5157ed0eb76b3e61ac4735275a5fe",
+    "dirty": "M docs/quality-metrics.md",
+    "document_sha256": "64af8270add0193990edaad8e7e05f30ed247192b2ccb868e786b8999e99bb9e"
+  },
+  "unchanged": true,
+  "status": "PASS",
+  "exit_code": 0,
+  "duration_seconds": 6.219,
+  "identity_note": "Generated documentation candidate; exact original source commit plus document hash and all tracked bytes. Final doc-only commit follows independent review."
+}

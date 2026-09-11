@@ -1,0 +1,286 @@
+EEEEEE......FFFFFFFFFFFFFFFFFF..................FFFF..FFFFFF             [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of test_absolute_current_harness_executes_real_baseline_and_retains_honest_identity _
+tests/test_native_delivery_baseline_compatibility.py:36: in baseline_python
+    site = subprocess.check_output(
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:466: in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:571: in run
+    raise CalledProcessError(retcode, process.args,
+E   subprocess.CalledProcessError: Command '['/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3823/dda-baseline0/venv/bin/python', '-I', '-c', "import sysconfig; print(sysconfig.get_path('purelib'))"]' died with <Signals.SIGABRT: 6>.
+---------------------------- Captured stderr setup -----------------------------
+dyld[39945]: Library not loaded: @executable_path/../lib/libpython3.12.dylib
+  Referenced from: <4C4C444C-5555-3144-A1DE-4E044EA3FC22> /private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3823/dda-baseline0/venv/bin/python
+  Reason: tried: '/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3823/dda-baseline0/venv/lib/libpython3.12.dylib' (no such file)
+_ ERROR at setup of test_baseline_without_approval_writes_skip_without_loading_factory _
+tests/test_native_delivery_baseline_compatibility.py:36: in baseline_python
+    site = subprocess.check_output(
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:466: in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:571: in run
+    raise CalledProcessError(retcode, process.args,
+E   subprocess.CalledProcessError: Command '['/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3823/dda-baseline0/venv/bin/python', '-I', '-c', "import sysconfig; print(sysconfig.get_path('purelib'))"]' died with <Signals.SIGABRT: 6>.
+_ ERROR at setup of test_baseline_invalid_limits_fail_before_factory_or_artifacts[limits0] _
+tests/test_native_delivery_baseline_compatibility.py:36: in baseline_python
+    site = subprocess.check_output(
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:466: in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:571: in run
+    raise CalledProcessError(retcode, process.args,
+E   subprocess.CalledProcessError: Command '['/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3823/dda-baseline0/venv/bin/python', '-I', '-c', "import sysconfig; print(sysconfig.get_path('purelib'))"]' died with <Signals.SIGABRT: 6>.
+_ ERROR at setup of test_baseline_invalid_limits_fail_before_factory_or_artifacts[limits1] _
+tests/test_native_delivery_baseline_compatibility.py:36: in baseline_python
+    site = subprocess.check_output(
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:466: in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:571: in run
+    raise CalledProcessError(retcode, process.args,
+E   subprocess.CalledProcessError: Command '['/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3823/dda-baseline0/venv/bin/python', '-I', '-c', "import sysconfig; print(sysconfig.get_path('purelib'))"]' died with <Signals.SIGABRT: 6>.
+_ ERROR at setup of test_baseline_invalid_limits_fail_before_factory_or_artifacts[limits2] _
+tests/test_native_delivery_baseline_compatibility.py:36: in baseline_python
+    site = subprocess.check_output(
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:466: in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:571: in run
+    raise CalledProcessError(retcode, process.args,
+E   subprocess.CalledProcessError: Command '['/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3823/dda-baseline0/venv/bin/python', '-I', '-c', "import sysconfig; print(sysconfig.get_path('purelib'))"]' died with <Signals.SIGABRT: 6>.
+_ ERROR at setup of test_baseline_invalid_limits_fail_before_factory_or_artifacts[limits3] _
+tests/test_native_delivery_baseline_compatibility.py:36: in baseline_python
+    site = subprocess.check_output(
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:466: in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:571: in run
+    raise CalledProcessError(retcode, process.args,
+E   subprocess.CalledProcessError: Command '['/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3823/dda-baseline0/venv/bin/python', '-I', '-c', "import sysconfig; print(sysconfig.get_path('purelib'))"]' died with <Signals.SIGABRT: 6>.
+=================================== FAILURES ===================================
+_ test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[bounded-FAIL] _
+tests/test_native_delivery_live_entrypoints.py:78: in test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[bounded-SKIP] _
+tests/test_native_delivery_live_entrypoints.py:78: in test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[bounded-UNVERIFIED] _
+tests/test_native_delivery_live_entrypoints.py:78: in test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[bounded-unknown] _
+tests/test_native_delivery_live_entrypoints.py:78: in test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[bounded-None] _
+tests/test_native_delivery_live_entrypoints.py:78: in test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[switch-FAIL] _
+tests/test_native_delivery_live_entrypoints.py:78: in test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[switch-SKIP] _
+tests/test_native_delivery_live_entrypoints.py:78: in test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[switch-UNVERIFIED] _
+tests/test_native_delivery_live_entrypoints.py:78: in test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[switch-unknown] _
+tests/test_native_delivery_live_entrypoints.py:78: in test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[switch-None] _
+tests/test_native_delivery_live_entrypoints.py:78: in test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_______ test_live_entrypoint_requires_boolean_dirty_evidence[bounded-1] ________
+tests/test_native_delivery_live_entrypoints.py:87: in test_live_entrypoint_requires_boolean_dirty_evidence
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+______ test_live_entrypoint_requires_boolean_dirty_evidence[bounded-true] ______
+tests/test_native_delivery_live_entrypoints.py:87: in test_live_entrypoint_requires_boolean_dirty_evidence
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_____ test_live_entrypoint_requires_boolean_dirty_evidence[bounded-dirty2] _____
+tests/test_native_delivery_live_entrypoints.py:87: in test_live_entrypoint_requires_boolean_dirty_evidence
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+______ test_live_entrypoint_requires_boolean_dirty_evidence[bounded-None] ______
+tests/test_native_delivery_live_entrypoints.py:87: in test_live_entrypoint_requires_boolean_dirty_evidence
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+________ test_live_entrypoint_requires_boolean_dirty_evidence[switch-1] ________
+tests/test_native_delivery_live_entrypoints.py:87: in test_live_entrypoint_requires_boolean_dirty_evidence
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+______ test_live_entrypoint_requires_boolean_dirty_evidence[switch-true] _______
+tests/test_native_delivery_live_entrypoints.py:87: in test_live_entrypoint_requires_boolean_dirty_evidence
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_____ test_live_entrypoint_requires_boolean_dirty_evidence[switch-dirty2] ______
+tests/test_native_delivery_live_entrypoints.py:87: in test_live_entrypoint_requires_boolean_dirty_evidence
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+______ test_live_entrypoint_requires_boolean_dirty_evidence[switch-None] _______
+tests/test_native_delivery_live_entrypoints.py:87: in test_live_entrypoint_requires_boolean_dirty_evidence
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+____ test_live_entrypoint_requires_every_component_proof[switch-empty-PASS] ____
+tests/test_native_delivery_live_entrypoints.py:107: in test_live_entrypoint_requires_every_component_proof
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_live_entrypoint_requires_every_component_proof[switch-empty-UNVERIFIED] _
+tests/test_native_delivery_live_entrypoints.py:107: in test_live_entrypoint_requires_every_component_proof
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+___ test_live_entrypoint_requires_every_component_proof[switch-partial-PASS] ___
+tests/test_native_delivery_live_entrypoints.py:107: in test_live_entrypoint_requires_every_component_proof
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_live_entrypoint_requires_every_component_proof[switch-partial-UNVERIFIED] _
+tests/test_native_delivery_live_entrypoints.py:107: in test_live_entrypoint_requires_every_component_proof
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+______ test_hermetic_execution_cannot_obtain_live_allowance[bounded-PASS] ______
+tests/test_native_delivery_live_entrypoints.py:116: in test_hermetic_execution_cannot_obtain_live_allowance
+    assert_redacted_failure(invoke, report, execution="hermetic")
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+___ test_hermetic_execution_cannot_obtain_live_allowance[bounded-UNVERIFIED] ___
+tests/test_native_delivery_live_entrypoints.py:116: in test_hermetic_execution_cannot_obtain_live_allowance
+    assert_redacted_failure(invoke, report, execution="hermetic")
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+______ test_hermetic_execution_cannot_obtain_live_allowance[switch-PASS] _______
+tests/test_native_delivery_live_entrypoints.py:116: in test_hermetic_execution_cannot_obtain_live_allowance
+    assert_redacted_failure(invoke, report, execution="hermetic")
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+___ test_hermetic_execution_cannot_obtain_live_allowance[switch-UNVERIFIED] ____
+tests/test_native_delivery_live_entrypoints.py:116: in test_hermetic_execution_cannot_obtain_live_allowance
+    assert_redacted_failure(invoke, report, execution="hermetic")
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_actual_producer_late_identity_failure_is_rejected_by_live_entrypoint[bounded] _
+tests/test_native_delivery_live_entrypoints.py:147: in test_actual_producer_late_identity_failure_is_rejected_by_live_entrypoint
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+_ test_actual_producer_late_identity_failure_is_rejected_by_live_entrypoint[switch] _
+tests/test_native_delivery_live_entrypoints.py:147: in test_actual_producer_late_identity_failure_is_rejected_by_live_entrypoint
+    assert_redacted_failure(invoke, report)
+tests/test_native_delivery_live_entrypoints.py:53: in assert_redacted_failure
+    with pytest.raises(pytest.fail.Exception) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'Failed'>
+=========================== short test summary info ============================
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[bounded-FAIL]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[bounded-SKIP]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[bounded-UNVERIFIED]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[bounded-unknown]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[bounded-None]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[switch-FAIL]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[switch-SKIP]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[switch-UNVERIFIED]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[switch-unknown]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_rejects_final_failure_absence_or_clean_unverified[switch-None]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_boolean_dirty_evidence[bounded-1]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_boolean_dirty_evidence[bounded-true]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_boolean_dirty_evidence[bounded-dirty2]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_boolean_dirty_evidence[bounded-None]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_boolean_dirty_evidence[switch-1]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_boolean_dirty_evidence[switch-true]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_boolean_dirty_evidence[switch-dirty2]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_boolean_dirty_evidence[switch-None]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_every_component_proof[switch-empty-PASS]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_every_component_proof[switch-empty-UNVERIFIED]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_every_component_proof[switch-partial-PASS]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_live_entrypoint_requires_every_component_proof[switch-partial-UNVERIFIED]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_hermetic_execution_cannot_obtain_live_allowance[bounded-PASS]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_hermetic_execution_cannot_obtain_live_allowance[bounded-UNVERIFIED]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_hermetic_execution_cannot_obtain_live_allowance[switch-PASS]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_hermetic_execution_cannot_obtain_live_allowance[switch-UNVERIFIED]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_actual_producer_late_identity_failure_is_rejected_by_live_entrypoint[bounded]
+FAILED tests/test_native_delivery_live_entrypoints.py::test_actual_producer_late_identity_failure_is_rejected_by_live_entrypoint[switch]
+ERROR tests/test_native_delivery_baseline_compatibility.py::test_absolute_current_harness_executes_real_baseline_and_retains_honest_identity
+ERROR tests/test_native_delivery_baseline_compatibility.py::test_baseline_without_approval_writes_skip_without_loading_factory
+ERROR tests/test_native_delivery_baseline_compatibility.py::test_baseline_invalid_limits_fail_before_factory_or_artifacts[limits0]
+ERROR tests/test_native_delivery_baseline_compatibility.py::test_baseline_invalid_limits_fail_before_factory_or_artifacts[limits1]
+ERROR tests/test_native_delivery_baseline_compatibility.py::test_baseline_invalid_limits_fail_before_factory_or_artifacts[limits2]
+ERROR tests/test_native_delivery_baseline_compatibility.py::test_baseline_invalid_limits_fail_before_factory_or_artifacts[limits3]

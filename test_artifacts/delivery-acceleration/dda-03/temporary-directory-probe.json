@@ -1,0 +1,16 @@
+[
+  {
+    "parent": "/tmp",
+    "effective_gid": 20,
+    "directory_gid": 0,
+    "requested_mode": "0o2777",
+    "observed_mode": "0o777"
+  },
+  {
+    "parent": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T",
+    "effective_gid": 20,
+    "directory_gid": 20,
+    "requested_mode": "0o2777",
+    "observed_mode": "0o2777"
+  }
+]

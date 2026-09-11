@@ -1,0 +1,20 @@
+[
+  {
+    "count": 0,
+    "native_row_hex": "07000000",
+    "envelope": "[\"mssql-native-sha256-sum-v1\", 0, 0]",
+    "digest": "c6e78d3d47035008350c6c45819524ec91fdb3c0822cd9d0ebc0df247d36c0a7"
+  },
+  {
+    "count": 1,
+    "native_row_hex": "07000000",
+    "envelope": "[\"mssql-native-sha256-sum-v1\", 1, 105108402282682860105284782112866156691526685123493161825670067694997399628331]",
+    "digest": "f671ff73e1e57bfc9890e299b6b7f4adc9164163265d170aaa6e9bcef0644a14"
+  },
+  {
+    "count": 3,
+    "native_row_hex": "07000000",
+    "envelope": "[\"mssql-native-sha256-sum-v1\", 3, 83741028373416189468712376321222654368040086039198357398095035069165939605121]",
+    "digest": "9d48267a0b459391737bd86bf539d4d19ef8ef4eaa3b3d6598cc9d6d862e4b5e"
+  }
+]

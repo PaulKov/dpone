@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "source_commit": "7c25ce910ff4e3a929b46aa01237840ae92ef512",
+  "status": "FAIL",
+  "receipt": "remediation-retry-full-nonlive.json",
+  "junit": {
+    "path": "remediation-retry-full-nonlive-junit.xml",
+    "sha256": "8098f5bc4839f3f709fa9121191f40505c46d102fd1c35a18ab5c891652e9f5b",
+    "tests": 21842,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 570,
+    "passed": 21271
+  },
+  "failures": [
+    {
+      "test": "tests.test_dbt_inline_publishing.test_demo_real_parse_validates_and_can_publish_the_generated_manifest",
+      "time": "120.321",
+      "message": "subprocess.TimeoutExpired: Command '('bash', 'examples/dbt-inline-publishing/run_demo.sh')' timed out after 120 seconds",
+      "details": "tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dpone-dda06-remediation-full-4uw5fyxw/pytest/popen-gw0/test_demo_real_parse_validates0')\n\n    def test_demo_real_parse_validates_and_can_publish_the_generated_manifest(\n        tmp_path: Path,\n    ) -> None:\n        generated_manifest = tmp_path / \"manifest.json\"\n>       completed = subprocess.run(\n            (\"bash\", \"examples/dbt-inline-publishing/run_demo.sh\"),\n            cwd=ROOT,\n            check=False,\n            capture_output=True,\n            text=True,\n            timeout=120,\n            env={\n                **os.environ,\n                \"DPONE_DBT_DEMO_MODE\": \"parse\",\n                \"DPONE_DBT_DEMO_MANIFEST_OUTPUT\": str(generated_manifest),\n            },\n        )\n\ntests/test_dbt_inline_publishing.py:132: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:550: in run\n    stdout, stderr = process.communicate(input, timeout=timeout)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:1209: in communicate\n    stdout, stderr = self._communicate(input, endtime, timeout)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:2116: in _communicate\n    self._check_timeout(endtime, orig_timeout, stdout, stderr)\n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <Popen: returncode: -9 args: ('bash', 'examples/dbt-inline-publishing/run_de...>\nendtime = 826823.996539625, orig_timeout = 120\nstdout_seq = [b'19:32:57  Running with dbt=1.12.3\\n', b'19:33:04  Updating lock file in file path: /private/var/folders/vv/w85gvsm1...ml\\n', b'19:33:04  Installing ../../packages/dbt-dpone\\n19:33:04  Installed from <local @ ../../packages/dbt-dpone>\\n']\nstderr_seq = [], skip_check_and_raise = False\n\n    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,\n                       skip_check_and_raise=False):\n        \"\"\"Convenience for checking if a timeout has expired.\"\"\"\n        if endtime is None:\n            return\n        if skip_check_and_raise or _time() > endtime:\n>           raise TimeoutExpired(\n                    self.args, orig_timeout,\n                    output=b''.join(stdout_seq) if stdout_seq else None,\n                    stderr=b''.join(stderr_seq) if stderr_seq else None)\nE           subprocess.TimeoutExpired: Command '('bash', 'examples/dbt-inline-publishing/run_demo.sh')' timed out after 120 seconds\n\n../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/subprocess.py:1253: TimeoutExpired"
+    }
+  ],
+  "skip_reasons": [
+    {
+      "reason": "Set DPONE_RUN_INTEGRATION_MATRIX=1 to run the manual source->sink strategy matrix.",
+      "count": 474
+    },
+    {
+      "reason": "collection skipped",
+      "count": 31
+    },
+    {
+      "reason": "Integration tests are disabled. Set DPONE_RUN_INTEGRATION=1 to enable them.",
+      "count": 9
+    },
+    {
+      "reason": "apache-airflow-providers-microsoft-mssql not installed in this environment",
+      "count": 7
+    },
+    {
+      "reason": "DPONE_IT_MSSQL_HOST is not configured",
+      "count": 5
+    },
+    {
+      "reason": "could not import 'airflow.providers.cncf.kubernetes.operators.pod': No module named 'airflow.providers.cncf'",
+      "count": 4
+    },
+    {
+      "reason": "process-tree containment requires Linux procfs",
+      "count": 4
+    },
+    {
+      "reason": "Set DPONE_RUN_INTEGRATION_REPLAY_SERVICES=1 and start docker/docker-compose.integration.yml.",
+      "count": 4
+    },
+    {
+      "reason": "set DPONE_RUN_INTEGRATION=1 to run ClickHouse live tests",
+      "count": 4
+    },
+    {
+      "reason": "requires Windows",
+      "count": 2
+    },
+    {
+      "reason": "DPONE_IT_MSSQL_CDC_HOST or DPONE_IT_MSSQL_HOST is not configured",
+      "count": 2
+    },
+    {
+      "reason": "MySQL/ClickHouse integration host not configured",
+      "count": 2
+    },
+    {
+      "reason": "MySQL/MSSQL integration host not configured",
+      "count": 2
+    },
+    {
+      "reason": "MySQL/Postgres integration host not configured",
+      "count": 2
+    },
+    {
+      "reason": "PostgreSQL + MSSQL integration credentials are not configured",
+      "count": 2
+    },
+    {
+      "reason": "Set DPONE_RUN_INTEGRATION_REPLAY=1 to run replay integration gate.",
+      "count": 2
+    },
+    {
+      "reason": "requires Win32 directory sharing semantics",
+      "count": 1
+    },
+    {
+      "reason": "alternate interpreter is not a compatible macOS launcher",
+      "count": 1
+    },
+    {
+      "reason": "requires Linux child reaping semantics",
+      "count": 1
+    },
+    {
+      "reason": "requires Windows anonymous-pipe backpressure",
+      "count": 1
+    },
+    {
+      "reason": "setuptools is bundled by Python 3.11 ensurepip",
+      "count": 1
+    },
+    {
+      "reason": "requires Windows environment-block semantics",
+      "count": 1
+    },
+    {
+      "reason": "DPONE_KAFKA_BOOTSTRAP_SERVERS is not configured",
+      "count": 1
+    },
+    {
+      "reason": "DPONE_SCHEMA_REGISTRY_URL is not configured",
+      "count": 1
+    },
+    {
+      "reason": "MySQL integration host not configured (DPONE_IT_MYSQL_*)",
+      "count": 1
+    },
+    {
+      "reason": "MySQL/Kafka integration host not configured",
+      "count": 1
+    },
+    {
+      "reason": "set DPONE_ENABLE_NESTED_LIVE=1 to run nested live certification harness",
+      "count": 1
+    },
+    {
+      "reason": "set DPONE_RUN_INTEGRATION=1 for Docker PostgreSQL",
+      "count": 1
+    },
+    {
+      "reason": "DPONE_IT_PG_CDC_HOST is not configured",
+      "count": 1
+    },
+    {
+      "reason": "real Airflow distribution is not installed",
+      "count": 1
+    }
+  ],
+  "classification": "One existing dbt demo subprocess exceeded unchanged120-second deadline during initially shared-host full run. Resource pressure is observed context consistent with timeout, not a proven sole cause. Test/demo/package unchanged from master.",
+  "closure_evidence": [
+    "remediation-dbt-replay.json",
+    "remediation-dbt-replay-junit.xml",
+    "remediation-ci-7c25ce9/full-population-audit.json"
+  ],
+  "local_failure_preserved": true,
+  "replay": "Whole93testmodule PASS with original timeout, no skips, no source changes.",
+  "ci": "Exact21811collectednode population partitioned once per Python3.11/3.12; all16shards PASS. Failed localnode selected in shard2, unconditional/no skip path."
+}

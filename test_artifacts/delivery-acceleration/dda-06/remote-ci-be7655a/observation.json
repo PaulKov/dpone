@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "observation_kind": "read_only_github_job",
+  "observed_at": "2026-09-10T18:02:51.711580+00:00",
+  "commands": [
+    [
+      "gh",
+      "api",
+      "repos/PaulKov/dpone/actions/jobs/102981784835"
+    ],
+    [
+      "gh",
+      "api",
+      "repos/PaulKov/dpone/actions/jobs/102981784835/logs",
+      "--allow-escape-sequences"
+    ]
+  ],
+  "job_id": 102981784835,
+  "run_id": 34509939892,
+  "head_sha": "be7655ac2e36cd1e9601217c6b0a1fbd10e2eb3f",
+  "name": "Quality preflight",
+  "status": "completed",
+  "conclusion": "failure",
+  "html_url": "https://github.com/PaulKov/dpone/actions/runs/34509939892/job/102981784835",
+  "job_json_sha256": "03e100086bb49d5f18108cc11be694d1e30875e3b9aa7278d61d0394e79865f9",
+  "full_remote_log_sha256": "dd25330177fe1305fc2b155d20bb6cef3cc386210272e029722734f850ab0675",
+  "retained_excerpt": "layer-step.log",
+  "retained_excerpt_sha256": "a0215aad2b203fe89b8f0c5f2459b93864c43215677e3fb70a7b643e0a3318c2",
+  "retention": "Only the exact layer-check step is retained locally; complete log remains at the provider job URL.",
+  "boundary": "This is provider-reported CI evidence, distinct from local exact-source receipts and later PR heads."
+}

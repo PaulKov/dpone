@@ -1,0 +1,25 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_ test_architecture_fitness_current_repo_stays_inside_pre_release_cross_layer_budget _
+
+    def test_architecture_fitness_current_repo_stays_inside_pre_release_cross_layer_budget() -> None:
+        max_clustering = _resolve_max_avg_clustering(repo_root=Path.cwd(), explicit_value=None)
+        report = analyze_architecture_fitness(
+            Path("src/dpone"),
+            repo_root=Path.cwd(),
+            thresholds=ArchitectureFitnessThresholds(
+                target_avg_clustering=0.18,
+                max_avg_clustering=max_clustering,
+                max_cross_layer_ratio=0.300,
+            ),
+            top_n=20,
+        )
+    
+        assert report.avg_clustering <= max_clustering
+>       assert report.cross_layer_ratio <= 0.300
+E       AssertionError: assert 0.30020726519035673 <= 0.3
+E        +  where 0.30020726519035673 = ArchitectureFitnessReport(package='src/dpone', avg_clustering=0.18174658401113647, cross_layer_ratio=0.300207265190356...lClusteringDiagnostic(module='dpone.adapters.hermetic_test_memory', degree=2, coefficient=1.0, inbound=1, outbound=1))).cross_layer_ratio
+
+tests/test_architecture_fitness_gate.py:149: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_architecture_fitness_gate.py::test_architecture_fitness_current_repo_stays_inside_pre_release_cross_layer_budget

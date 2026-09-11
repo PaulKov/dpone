@@ -1,0 +1,44 @@
+....................................FFF..F                               [100%]
+=================================== FAILURES ===================================
+____ test_single_projection_encodes_once_per_row_and_opens_readback_once[0] ____
+
+count = 0, monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1096b6bd0>
+
+    @pytest.mark.parametrize("count", [0, 1, 3])
+    def test_single_projection_encodes_once_per_row_and_opens_readback_once(count, monkeypatch):
+>       from dpone.runtime.sinks.mssql_native_prepared_digests import digest_prepared_projection
+E       ImportError: cannot import name 'digest_prepared_projection' from 'dpone.runtime.sinks.mssql_native_prepared_digests' (/Users/paulkov007/.codex/worktrees/b364/dpone-public/src/dpone/runtime/sinks/mssql_native_prepared_digests.py)
+
+tests/test_mssql_native_integrity_readbacks.py:336: ImportError
+____ test_single_projection_encodes_once_per_row_and_opens_readback_once[1] ____
+
+count = 1, monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1096b7f80>
+
+    @pytest.mark.parametrize("count", [0, 1, 3])
+    def test_single_projection_encodes_once_per_row_and_opens_readback_once(count, monkeypatch):
+>       from dpone.runtime.sinks.mssql_native_prepared_digests import digest_prepared_projection
+E       ImportError: cannot import name 'digest_prepared_projection' from 'dpone.runtime.sinks.mssql_native_prepared_digests' (/Users/paulkov007/.codex/worktrees/b364/dpone-public/src/dpone/runtime/sinks/mssql_native_prepared_digests.py)
+
+tests/test_mssql_native_integrity_readbacks.py:336: ImportError
+____ test_single_projection_encodes_once_per_row_and_opens_readback_once[3] ____
+
+count = 3, monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10992fb00>
+
+    @pytest.mark.parametrize("count", [0, 1, 3])
+    def test_single_projection_encodes_once_per_row_and_opens_readback_once(count, monkeypatch):
+>       from dpone.runtime.sinks.mssql_native_prepared_digests import digest_prepared_projection
+E       ImportError: cannot import name 'digest_prepared_projection' from 'dpone.runtime.sinks.mssql_native_prepared_digests' (/Users/paulkov007/.codex/worktrees/b364/dpone-public/src/dpone/runtime/sinks/mssql_native_prepared_digests.py)
+
+tests/test_mssql_native_integrity_readbacks.py:336: ImportError
+_ test_single_projection_validates_allowance_before_encoder_and_eager_readback _
+
+    def test_single_projection_validates_allowance_before_encoder_and_eager_readback():
+>       from dpone.runtime.sinks.mssql_native_prepared_digests import digest_prepared_projection
+E       ImportError: cannot import name 'digest_prepared_projection' from 'dpone.runtime.sinks.mssql_native_prepared_digests' (/Users/paulkov007/.codex/worktrees/b364/dpone-public/src/dpone/runtime/sinks/mssql_native_prepared_digests.py)
+
+tests/test_mssql_native_integrity_readbacks.py:383: ImportError
+=========================== short test summary info ============================
+FAILED tests/test_mssql_native_integrity_readbacks.py::test_single_projection_encodes_once_per_row_and_opens_readback_once[0]
+FAILED tests/test_mssql_native_integrity_readbacks.py::test_single_projection_encodes_once_per_row_and_opens_readback_once[1]
+FAILED tests/test_mssql_native_integrity_readbacks.py::test_single_projection_encodes_once_per_row_and_opens_readback_once[3]
+FAILED tests/test_mssql_native_integrity_readbacks.py::test_single_projection_validates_allowance_before_encoder_and_eager_readback

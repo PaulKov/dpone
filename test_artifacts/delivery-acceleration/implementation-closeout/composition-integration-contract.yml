@@ -1,0 +1,74 @@
+schema_version: 1
+task_id: DDA-06-COMPOSITION-INTEGRATION
+title: Preserve release 0.78.0 while integrating reviewed delivery implementation
+goal: Combine the two reviewed implementations with exact foreign-source preservation and current validation.
+specification: docs/feature-design-data-delivery-acceleration-v1.md
+base_commit: a2fe3a34f7c143625cea6d1b947c749ffc6d4dc9
+integrator: root delivery acceleration integrator
+acceptance_criteria:
+  - Continue the maintainer's 2026-09-11 implementation completion instruction after the parallel PR36 advanced master.
+  - Retain reviewed delivery fa5c2383b51a59a69e5fae41b4cc7fc69dceec21 and all previous branches and reports.
+  - Start from pinned upstream a2fe3a34f7c143625cea6d1b947c749ffc6d4dc9 and import reviewed c1a56b0 then fa5c2383 with provenance.
+  - Preserve all 228 upstream-only paths with exact modes and blobs, and all delivery production/test files unchanged from fa5c2383.
+  - Reconcile only the five overlapping shared documentation files; keep the complete 0.78.0-and-earlier changelog suffix.
+  - Preserve ADR0059 through ADR0062, both architecture sections and both navigation additions.
+  - Keep upstream quality metrics provisionally until the unchanged canonical producer regenerates them; preserve thresholds and baselines.
+  - Limit further closeout edits to lifecycle, current integration identity and evidence links; retain prior reports byte-for-byte.
+  - Validate the combined code, dependencies and graph, focused adjacent contracts, docs and complete final-head PR CI; obtain independent follow-up.
+  - Integrate through the ordinary allowed squash path after exact-head checks and verify automatic merge closure and tree identity.
+public_contract_impact:
+  level: none
+  surfaces: [documentation integration status]
+  migration_required: false
+owned_paths:
+  - docs/feature-design-data-delivery-acceleration-v1.md
+  - docs/data-delivery-acceleration-tasks.md
+  - test_artifacts/delivery-acceleration/implementation-closeout/completion.md
+  - test_artifacts/delivery-acceleration/implementation-closeout/composition-integration-contract.yml
+integrator_owned_paths:
+  - CHANGELOG.md
+  - docs/adr-index.md
+  - docs/architecture.md
+  - docs/quality-metrics.md
+  - mkdocs.yml
+read_only_paths:
+  - AGENTS.md
+  - docs/AGENTS.md
+  - test_artifacts/delivery-acceleration/implementation-closeout/task-contract.yml
+  - test_artifacts/delivery-acceleration/implementation-closeout/review-copy-manifest.json
+  - docs/benchmarks/quality_budgets.yml
+forbidden_paths:
+  - CHANGELOG.md
+  - docs/adr-index.md
+  - docs/architecture.md
+  - docs/quality-metrics.md
+  - mkdocs.yml
+  - src
+  - tests
+  - tools
+  - packages
+  - pyproject.toml
+  - uv.lock
+  - .github/workflows
+shared_file_owner: root delivery acceleration integrator
+dependencies: []
+required_checks:
+  focused:
+    - Combined delivery benchmark, baseline, runtime and adjacent source-cursor/catalog/composition activation contract tests.
+  broad:
+    - Unchanged lint, format, mypy, import, layer, architecture, module-size, documentation and generated-metrics checks.
+    - Complete required final-head PR CI and independently verified full per-interpreter non-live population.
+  live:
+    - SKIP; no approved disposable delivery environment.
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.
+  - An upstream-only or delivery production/test blob differs from its pinned input.
+  - A combined gate fails; do not weaken thresholds or reclassify failure as success.
+  - Do not release, tag, publish packages, change providers, rewrite history or delete retained branches.

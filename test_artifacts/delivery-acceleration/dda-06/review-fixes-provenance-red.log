@@ -1,0 +1,39 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+___ test_reviewed_import_accepts_only_exact_patch_blob_or_pinned_resolution ____
+/Users/paulkov007/.codex/worktrees/b364/dpone-public/tests/test_native_delivery_upstream_provenance.py:47: in test_reviewed_import_accepts_only_exact_patch_blob_or_pinned_resolution
+    assert audit.reviewed_upstream_import(imported, upstream, approved)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'dda_ownership' has no attribute 'reviewed_upstream_import'
+_ test_import_rejects_altered_foreign_blob_unexpected_path_and_unapproved_resolution[foreign] _
+/Users/paulkov007/.codex/worktrees/b364/dpone-public/tests/test_native_delivery_upstream_provenance.py:60: in test_import_rejects_altered_foreign_blob_unexpected_path_and_unapproved_resolution
+    assert not audit.reviewed_upstream_import(audit.git("rev-parse", "HEAD"), upstream, approved)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'dda_ownership' has no attribute 'reviewed_upstream_import'
+_ test_import_rejects_altered_foreign_blob_unexpected_path_and_unapproved_resolution[unexpected] _
+/Users/paulkov007/.codex/worktrees/b364/dpone-public/tests/test_native_delivery_upstream_provenance.py:60: in test_import_rejects_altered_foreign_blob_unexpected_path_and_unapproved_resolution
+    assert not audit.reviewed_upstream_import(audit.git("rev-parse", "HEAD"), upstream, approved)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'dda_ownership' has no attribute 'reviewed_upstream_import'
+_ test_import_rejects_altered_foreign_blob_unexpected_path_and_unapproved_resolution[resolution] _
+/Users/paulkov007/.codex/worktrees/b364/dpone-public/tests/test_native_delivery_upstream_provenance.py:60: in test_import_rejects_altered_foreign_blob_unexpected_path_and_unapproved_resolution
+    assert not audit.reviewed_upstream_import(audit.git("rev-parse", "HEAD"), upstream, approved)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'dda_ownership' has no attribute 'reviewed_upstream_import'
+__________ test_final_preservation_checks_upstream_only_mode_and_blob __________
+/Users/paulkov007/.codex/worktrees/b364/dpone-public/tests/test_native_delivery_upstream_provenance.py:65: in test_final_preservation_checks_upstream_only_mode_and_blob
+    assert audit.upstream_preservation(base, upstream, integration, imported) == {
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'dda_ownership' has no attribute 'upstream_preservation'
+_______________ test_final_preservation_rejects_mode_only_change _______________
+/Users/paulkov007/.codex/worktrees/b364/dpone-public/tests/test_native_delivery_upstream_provenance.py:80: in test_final_preservation_rejects_mode_only_change
+    assert audit.upstream_preservation(base, upstream, integration, "HEAD")["violations"] == ["foreign.py"]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'dda_ownership' has no attribute 'upstream_preservation'
+=========================== short test summary info ============================
+FAILED tests/test_native_delivery_upstream_provenance.py::test_reviewed_import_accepts_only_exact_patch_blob_or_pinned_resolution
+FAILED tests/test_native_delivery_upstream_provenance.py::test_import_rejects_altered_foreign_blob_unexpected_path_and_unapproved_resolution[foreign]
+FAILED tests/test_native_delivery_upstream_provenance.py::test_import_rejects_altered_foreign_blob_unexpected_path_and_unapproved_resolution[unexpected]
+FAILED tests/test_native_delivery_upstream_provenance.py::test_import_rejects_altered_foreign_blob_unexpected_path_and_unapproved_resolution[resolution]
+FAILED tests/test_native_delivery_upstream_provenance.py::test_final_preservation_checks_upstream_only_mode_and_blob
+FAILED tests/test_native_delivery_upstream_provenance.py::test_final_preservation_rejects_mode_only_change

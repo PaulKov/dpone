@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "name": "review-fixes-architecture-tests",
+  "command": [
+    "uv",
+    "run",
+    "pytest",
+    "tests/test_architecture_fitness_gate.py",
+    "tests/test_docs_language_contracts.py",
+    "-q",
+    "--junitxml=test_artifacts/delivery-acceleration/dda-06/review-fixes-architecture-docs-junit.xml"
+  ],
+  "source_before": {
+    "commit": "b5b9f0eb34148febc858efcd5ca513180706a84c",
+    "tree": "31abad483b9db82783be8903b8f59ed3ad72c437",
+    "source_sha256": "92449b29ba6905b82b708f7010a589ea9b50e1a8949c8cf0fa85b12aafbb820d",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "review-fixes-architecture-tests.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "b5b9f0eb34148febc858efcd5ca513180706a84c",
+    "tree": "31abad483b9db82783be8903b8f59ed3ad72c437",
+    "source_sha256": "92449b29ba6905b82b708f7010a589ea9b50e1a8949c8cf0fa85b12aafbb820d",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 189.415,
+  "log_sha256": "19da9087d92935b2064df20f632357e22786ce3e50fd7075c1f2ef56c47433ca"
+}

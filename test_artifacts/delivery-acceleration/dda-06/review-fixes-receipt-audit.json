@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "receipt_count": 24,
+  "receipts": {
+    "review-fixes-annotation-before.json": {
+      "status": "PASS",
+      "receipt_sha256": "6d9ba149e274d8277d1ce50eace5ffa9d88463fa1a74aab7fad80ab0cd8cbe60",
+      "log_sha256": "b2c6720453f06d35157bf6fc9703ffce184bf1d11bc189b38e5a9b17338d728b",
+      "source_commit": "10215228c2020b7016e3aa5f5b879121026ffed3"
+    },
+    "review-fixes-architecture-tests.json": {
+      "status": "PASS",
+      "receipt_sha256": "aeafd40422215f0e5a62f7918b4e1748e726d494f5ec069e5a29eefa35a73737",
+      "log_sha256": "19da9087d92935b2064df20f632357e22786ce3e50fd7075c1f2ef56c47433ca",
+      "source_commit": "b5b9f0eb34148febc858efcd5ca513180706a84c"
+    },
+    "review-fixes-baseline-red.json": {
+      "status": "FAIL",
+      "receipt_sha256": "f6cffb445470fa303be3d8b86a1984545a2c563522bb787487d9291db2f8f96d",
+      "log_sha256": "19a8ad62b6ff15feaa0286ca0641b442e6be07cd7badae72e5cf61757c54d2f7",
+      "source_commit": "3b510b62312fbc6cbabdd86b573a4de785149a39"
+    },
+    "review-fixes-check-selection.json": {
+      "status": "PASS",
+      "receipt_sha256": "5e365205821a5c6917a0e7e701bb9b98923deadd15333c02ff286c621c1af564",
+      "log_sha256": "ff7a0aa7002fd1da4a197d6edca89adc498279e2ec8f4abcd889559db8e27eb2",
+      "source_commit": "b5b9f0eb34148febc858efcd5ca513180706a84c"
+    },
+    "review-fixes-docs-focused.json": {
+      "status": "PASS",
+      "receipt_sha256": "4e5888030687d2adc78cdb282b473bfabdd0e8391ecdc9f8110fd1a9146733a1",
+      "log_sha256": "5cba8a0d336f6301764b9e7cb54d2168880bd1238a4afa7c45b0666fad715409",
+      "source_commit": "425e06de2c160cc8b36c44ef3bc8904392147a00"
+    },
+    "review-fixes-docs-preliminary.json": {
+      "status": "PASS",
+      "receipt_sha256": "22d3d1fafbab902d018c21c4f90a0c57b33f15d3a03e6309b007143ac8218bce",
+      "log_sha256": "f6eb1245506d956c93c3a9c8d068a7a4573ca1aec2c62ff05b557af7e53cfc6f",
+      "source_commit": "425e06de2c160cc8b36c44ef3bc8904392147a00"
+    },
+    "review-fixes-final-docs.json": {
+      "status": "PASS",
+      "receipt_sha256": "9e3b1817e05a4002cfc3d049e8d67ba4c3ea235878506de69ea3f045999b7756",
+      "log_sha256": "f6eb1245506d956c93c3a9c8d068a7a4573ca1aec2c62ff05b557af7e53cfc6f",
+      "source_commit": "b5b9f0eb34148febc858efcd5ca513180706a84c"
+    },
+    "review-fixes-fitness.json": {
+      "status": "PASS",
+      "receipt_sha256": "fec9a4d2d00e1f82b81abaf762425e7bd5ad7e308e97b0ae2cc24d39851a2a8a",
+      "log_sha256": "8659e3d13fdbe72073a9648ea1d5efeacc10d64d768ece330c2823aba4fd2e47",
+      "source_commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a"
+    },
+    "review-fixes-focused-green.json": {
+      "status": "PASS",
+      "receipt_sha256": "1cb244367830f079cd4b6b2816086906d3c84bb05af37e6d15646214f7006e36",
+      "log_sha256": "3dc0a67e957ff2e06601ee1e4e3ca9c30c61bf6534256d93b1ea5b381ec5f318",
+      "source_commit": "f5705f83249d79f5db944b4b7fa75ae95f428609"
+    },
+    "review-fixes-format.json": {
+      "status": "PASS",
+      "receipt_sha256": "9f7320f4f78394e474b4d66343f01fb45822ff6461d964cf4b37fa89915bd0eb",
+      "log_sha256": "30699def31dce1c96c740b4afd0328f7d8aa48ce784f239b4c743db74594588c",
+      "source_commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a"
+    },
+    "review-fixes-generated-references.json": {
+      "status": "PASS",
+      "receipt_sha256": "c6723bf71460f1932f5e57ae65fbf7d9419d2b420e7401b9a086490d1924e066",
+      "log_sha256": "27487fb254e451dd9eadd3eba343c42f9f2d5a7a59d72fda4d936a3864a72bb2",
+      "source_commit": "b5b9f0eb34148febc858efcd5ca513180706a84c"
+    },
+    "review-fixes-imports.json": {
+      "status": "PASS",
+      "receipt_sha256": "a54ea4f05b755125971725b643116436a6ad4647271fa09218ed13cc6afd0475",
+      "log_sha256": "c5c49921dc979452eabca48123445542eb75bb5f1b6b93f6aa5d8918542ef8fd",
+      "source_commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a"
+    },
+    "review-fixes-layer-green.json": {
+      "status": "PASS",
+      "receipt_sha256": "ee5cc6137298eb25ab9b0af77b2551ec7e2fb14e92e4896d06f69c0643a4c5c4",
+      "log_sha256": "5ae016cc09f72b40b3021829045cfc252f1eef888e742cf1ce4ed4add6e9a461",
+      "source_commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a"
+    },
+    "review-fixes-layer-red.json": {
+      "status": "FAIL",
+      "receipt_sha256": "71d349eed45e45adcb084e521d02e18eb54c33f24066e973ac1ec497b840759a",
+      "log_sha256": "dc7172484494035f52f03b4d36c1327539f4a9ef7e00e590cd95af5ef5a8afc4",
+      "source_commit": "10215228c2020b7016e3aa5f5b879121026ffed3"
+    },
+    "review-fixes-mkdocs.json": {
+      "status": "PASS",
+      "receipt_sha256": "a169ce0bb091052f77522952e5c79a0de88bb2195085e05ab7933da618423f08",
+      "log_sha256": "de84bad7f4213ed2b2d94691fb54741320a21fea67fbaaa665f6aff83b8146fc",
+      "source_commit": "b5b9f0eb34148febc858efcd5ca513180706a84c"
+    },
+    "review-fixes-module-size-corrected.json": {
+      "status": "PASS",
+      "receipt_sha256": "aa3f3e2ec00b3afef88f7d208946ba20ca56298e42f922c07e212dd565f45d18",
+      "log_sha256": "eb42e95ec1f454ed24c0d2e62c35a78e6fb3977416b6c2e89320bf877d3b7930",
+      "source_commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a"
+    },
+    "review-fixes-module-size.json": {
+      "status": "FAIL",
+      "receipt_sha256": "aa5b40c4482861401ba96af9e3145c80810739c894fed0a91cdd73108afe4a7e",
+      "log_sha256": "3ff136bc81ff3388d082e878f0304554ae677291a127aacd7c6042418b32ae19",
+      "source_commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a"
+    },
+    "review-fixes-mypy.json": {
+      "status": "PASS",
+      "receipt_sha256": "57ee6bf71f72ceee075d022db3bc9f881ae55c712bddd1326459c1912dd4cfa0",
+      "log_sha256": "472b6b773611784b6d0306310a52d6ec5a41acdeb51cc1bcbfaf7055c1c79db5",
+      "source_commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a"
+    },
+    "review-fixes-ownership.json": {
+      "status": "PASS",
+      "receipt_sha256": "ab3ca4b53df7f9e42a311a9837ce17e351af5d68db86f71ef6de5becc06e7ee6",
+      "log_sha256": "75996d3f5a7c423b4db158483868607dd5b4c61f205f8a3ccdc7ff7862fcc19d",
+      "source_commit": "425e06de2c160cc8b36c44ef3bc8904392147a00"
+    },
+    "review-fixes-provenance-green.json": {
+      "status": "PASS",
+      "receipt_sha256": "d91f7df265d24ae5911ee8436ee57dc65867d29eeb93131d970ed17daaf13c11",
+      "log_sha256": "83a1593c5b5783693fe3006d1f6597bcb4f3a5968f23b59481ee09a0477f910a",
+      "source_commit": "425e06de2c160cc8b36c44ef3bc8904392147a00"
+    },
+    "review-fixes-provenance-red.json": {
+      "status": "FAIL",
+      "receipt_sha256": "145002be029cc311de66f2ce9d4340ddcb8cc6ae782120c6cae5f538359aded7",
+      "log_sha256": "afbf38d8b9f80988ccb757f07a31a708b472944ed06cf360f7119379ca2935ae",
+      "source_commit": "20f7e73a3f19ec840b72672f20db31b798c36421"
+    },
+    "review-fixes-red.json": {
+      "status": "FAIL",
+      "receipt_sha256": "47fbc51be7e5899d9f6719b0921f0ab093036fab4bf474460bbe8aa136383d22",
+      "log_sha256": "9e12ae4b2d059a3d50b222526f8e5c4b1f2c4662d91ccda6fb4e3906f64c2f5d",
+      "source_commit": "14bebb61f46d0d10c41b1a19bc44b64e1d752275"
+    },
+    "review-fixes-ruff.json": {
+      "status": "PASS",
+      "receipt_sha256": "da5b3322a1f84133ebd9ffb6da70bfe59dcd7be6273dfe8b22927212c7151411",
+      "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "source_commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a"
+    },
+    "review-fixes-supplement-focused.json": {
+      "status": "PASS",
+      "receipt_sha256": "15b6a7d9166a4d28068bb003867262571767d9636434978095d82ffe13475c36",
+      "log_sha256": "a5bad37fc2190bed21c8f7befa636dc4fbe8b2f6206048cff2d3378a016c4864",
+      "source_commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a"
+    }
+  },
+  "junit": {
+    "review-fixes-architecture-docs-junit.xml": {
+      "tests": 73,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "244244d4d82914946e6b8e7848c655c6cb2ce4475ce555e24435fadf7ccaa749"
+    },
+    "review-fixes-focused-green-junit.xml": {
+      "tests": 251,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0823851b95255b3c65f1352e02c888604687680d3338c3e2b645efe0fa7708a5"
+    },
+    "review-fixes-provenance-green-junit.xml": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "55792f2981064068f11aaf59b2fd5c6ba7eceac33426c62e7e64589b070d0d66"
+    },
+    "review-fixes-supplement-focused-junit.xml": {
+      "tests": 56,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "bd767bc44abcb8fff53efc856ef3d204280e08b953a61de848aa8e4f71924d8e"
+    }
+  },
+  "limitations": [
+    "This audit verifies retained local receipts; final replacement-head CI is separate."
+  ]
+}

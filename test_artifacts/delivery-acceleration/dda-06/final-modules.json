@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "name": "final-modules",
+  "command": [
+    "uv",
+    "run",
+    "dpone",
+    "docs",
+    "check-module-size",
+    "--baseline",
+    "docs/module_size_baseline.json",
+    "--base-ref",
+    "d5ad9aaecc900c24df421b160ed36b4cfc726e45",
+    "--head-ref",
+    "be7655ac2e36cd1e9601217c6b0a1fbd10e2eb3f"
+  ],
+  "source_before": {
+    "commit": "be7655ac2e36cd1e9601217c6b0a1fbd10e2eb3f",
+    "tree": "210b8ed74cd3f5302597ae88dec705255f27c507",
+    "source_sha256": "1b812c16044b8a9cb45cc634cb1177307d784016a985ff9e32c82c14c6507913",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "final-modules.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "be7655ac2e36cd1e9601217c6b0a1fbd10e2eb3f",
+    "tree": "210b8ed74cd3f5302597ae88dec705255f27c507",
+    "source_sha256": "1b812c16044b8a9cb45cc634cb1177307d784016a985ff9e32c82c14c6507913",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 15.347,
+  "log_sha256": "b62902b9514c7fc7b0e515996e390701c5fc5ea4a33728917589e382c4e7c6b6"
+}

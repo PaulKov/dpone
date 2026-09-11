@@ -1,0 +1,2 @@
+warning: `VIRTUAL_ENV=/Users/paulkov007/.codex/worktrees/b364/dpone-public/.venv` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
+ERROR: Quality metrics docs are outdated (/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dpone-dda02-metrics-_3vit3hu/checkout/docs/quality-metrics.md). Run: dpone docs update-dev-metrics

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "name": "review-fixes-mypy",
+  "command": [
+    "uv",
+    "run",
+    "mypy",
+    "--config-file",
+    "mypy.ini"
+  ],
+  "source_before": {
+    "commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a",
+    "tree": "54a3557e3e741497d14e35fab415da3dad5f5ff8",
+    "source_sha256": "6f22184878f8578fd71e38a8247910e2190c31989a007c4a0d2426da88cf83d7",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "review-fixes-mypy.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a",
+    "tree": "54a3557e3e741497d14e35fab415da3dad5f5ff8",
+    "source_sha256": "6f22184878f8578fd71e38a8247910e2190c31989a007c4a0d2426da88cf83d7",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 25.058,
+  "log_sha256": "472b6b773611784b6d0306310a52d6ec5a41acdeb51cc1bcbfaf7055c1c79db5"
+}

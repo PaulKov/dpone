@@ -1,0 +1,70 @@
+schema_version: 1
+task_id: DDA-06-IMPLEMENTATION-CLOSEOUT
+title: Close implementation status and integrate the reviewed delivery work
+goal: Record completed bounded implementation and integrate the reviewed PR without changing runtime behavior.
+specification: docs/feature-design-data-delivery-acceleration-v1.md
+base_commit: c1a56b055f079bcc6dd9957300c5494f00b6080c
+integrator: root delivery acceleration integrator
+acceptance_criteria:
+  - The maintainer's 2026-09-11 completion instruction authorizes this new closeout and integration scope.
+  - Change only lifecycle status, verification date, current task status and evidence links in the two planning documents.
+  - Keep the original approved algorithms, immutable planning commit, historical dispatch and prior evidence unchanged.
+  - Retain the three independent review reports byte-for-byte with their original reviewed commit identities.
+  - Keep live certification UNVERIFIED and public SWITCH activation excluded.
+  - Validate documentation, obtain independent closeout review and require all final-head PR checks before integration.
+  - Integrate through the allowed normal squash path with exact head matching and verify tree identity and automatic merge closure.
+public_contract_impact:
+  level: none
+  surfaces: [documentation lifecycle status]
+  migration_required: false
+owned_paths:
+  - docs/feature-design-data-delivery-acceleration-v1.md
+  - docs/data-delivery-acceleration-tasks.md
+  - test_artifacts/delivery-acceleration/implementation-closeout/task-contract.yml
+  - test_artifacts/delivery-acceleration/implementation-closeout/completion.md
+  - test_artifacts/delivery-acceleration/implementation-closeout/implementation-review.md
+  - test_artifacts/delivery-acceleration/implementation-closeout/identity-review.md
+  - test_artifacts/delivery-acceleration/implementation-closeout/quality-ci-review.md
+  - test_artifacts/delivery-acceleration/implementation-closeout/review-copy-manifest.json
+integrator_owned_paths: []
+read_only_paths:
+  - AGENTS.md
+  - docs/AGENTS.md
+  - docs/feature-design-standard.md
+  - docs/documentation-standard.md
+  - docs/agent-pr-merge-receipt-runbook.md
+  - test_artifacts/delivery-acceleration/planning-amendments
+forbidden_paths:
+  - src
+  - tests
+  - tools
+  - packages
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/quality-metrics.md
+shared_file_owner: root delivery acceleration integrator
+dependencies: []
+required_checks:
+  focused:
+    - uv run dpone docs check-docs
+    - uv run pytest tests/test_docs_language_contracts.py -q
+    - uv run mkdocs build --strict
+  broad:
+    - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
+    - Complete required PR CI on the final head; no duplicate local Python execution for documentation-only changes.
+  live:
+    - SKIP; no approved disposable delivery environment.
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.
+  - New upstream changes require preservation assessment before integration.
+  - Do not release, tag, publish packages, change providers, rewrite history or delete retained branches.

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
-from dpone.contracts.mssql_physical_design import MssqlPhysicalDesignContract
+if TYPE_CHECKING:
+    from dpone.contracts.mssql_physical_design import MssqlPhysicalDesignContract
 
 
 def resolve_mssql_physical_filegroups(

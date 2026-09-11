@@ -1,0 +1,23 @@
+{
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "python": "3.12.11",
+  "uv": "uv 0.12.10 (3c979abda 2026-09-04 aarch64-apple-darwin)",
+  "packages": {
+    "dpone": "0.76.0",
+    "pytest": "9.0.3",
+    "pytest-xdist": "3.8.0",
+    "ruff": "0.15.6",
+    "mypy": "1.19.1",
+    "mkdocs": "1.6.1"
+  },
+  "source_commit": "d8b09de644ab3bf72f9eee7b51cc8b8e38ca8a3c",
+  "baseline": "d5ad9aaecc900c24df421b160ed36b4cfc726e45",
+  "planning_dependency": "f3682940f8864563cde0e6b6ecee60f746b49020",
+  "live_sql": {
+    "status": "SKIP",
+    "reason": "No explicitly approved disposable environment or credentials"
+  },
+  "live_correctness_and_performance": "UNVERIFIED",
+  "packaging_release_provider_changes": "N/A"
+}

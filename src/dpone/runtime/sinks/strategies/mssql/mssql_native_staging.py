@@ -19,13 +19,12 @@ from dpone.runtime.sinks.strategies.mssql.mssql_native_schema import (
     mssql_unique_keys,
     resolve_mssql_native_schema,
 )
+from dpone.runtime.sinks.strategies.mssql.mssql_native_staging_checks import MssqlNativeStagingChecks
 from dpone.runtime.support.mssql_native_canonical import row_hash_expression
 from dpone.runtime.support.mssql_native_projection import (
-    decoded_staging_expression,
     native_value_expression,
     validate_native_conversions,
 )
-from dpone.runtime.support.mssql_snapshot_projection import is_text_key_type
 
 
 class MssqlNativeStagingNormalizer:
@@ -35,6 +34,7 @@ class MssqlNativeStagingNormalizer:
         self._strategy = strategy
         self._connector = strategy.connector
         self._staging = strategy.staging_manager
+        self._checks = MssqlNativeStagingChecks(strategy)
 
     def resolve_schema(
         self,
@@ -123,7 +123,7 @@ class MssqlNativeStagingNormalizer:
         equality_keys = mssql_equality_keys(load_config, keys)
         target_to_wire = {target: wire for wire, target in resolved.wire_to_target.items()}
         with self._staging.database_authority_scope(decoded):
-            self._validate_required_keys(decoded, [target_to_wire[key] for key in keys])
+            self._checks.validate_required_keys(decoded, [target_to_wire[key] for key in keys])
         options = dict(getattr(load_config, "options", {}) or {})
         options.update(
             {
@@ -187,7 +187,7 @@ class MssqlNativeStagingNormalizer:
             # receipt count; any conversion error aborts the statement.
             native.bulk_text_codec = None
             with self._staging.database_authority_scope(native):
-                self._validate_key_sql_semantics(native, keys, equality_keys)
+                self._checks.validate_key_sql_semantics(native, keys, equality_keys)
             if (
                 isinstance(evidence_raw.row_count, bool)
                 or not isinstance(evidence_raw.row_count, int)
@@ -216,6 +216,18 @@ class MssqlNativeStagingNormalizer:
     ) -> StagingTableArtifact:
         """Finalize a one-table business-prefix BCP materialization."""
 
+        self._validate_direct_native(load_config, native, schema, resolved)
+        self._project_authoritative_metadata(native, resolved, lineage)
+        return self._complete_direct_native(load_config, native, resolved, lineage)
+
+    def _validate_direct_native(
+        self,
+        load_config: Any,
+        native: StagingTableArtifact,
+        schema: Sequence[tuple[str, str]],
+        resolved: ResolvedMssqlNativeSchema,
+    ) -> None:
+        """Validate the typed stage and required keys before issuing evidence."""
         wire_names = tuple(str(name) for name, _dtype in schema)
         if (
             not native.typed_file_ingestion
@@ -227,12 +239,20 @@ class MssqlNativeStagingNormalizer:
             or native.bulk_text_codec is not None
         ):
             _raise("mssql_native_projection.direct_staging_contract_invalid")
+        self._checks.validate_required_keys(native, mssql_unique_keys(load_config))
+
+    def _complete_direct_native(
+        self,
+        load_config: Any,
+        native: StagingTableArtifact,
+        resolved: ResolvedMssqlNativeSchema,
+        lineage: Any,
+    ) -> StagingTableArtifact:
+        """Check projected key/count semantics and finalize consumed evidence."""
         keys = mssql_unique_keys(load_config)
         equality_keys = mssql_equality_keys(load_config, keys)
-        self._validate_required_keys(native, keys)
-        self._project_authoritative_metadata(native, resolved, lineage)
-        self._validate_key_sql_semantics(native, keys, equality_keys)
-        actual_rows = self._count_rows(native)
+        self._checks.validate_key_sql_semantics(native, keys, equality_keys)
+        actual_rows = self._checks.count_rows(native)
         if actual_rows != native.row_count:
             _raise("mssql_native_projection.direct_row_count_mismatch")
         native.row_count = actual_rows
@@ -302,55 +322,6 @@ class MssqlNativeStagingNormalizer:
             }
             for target in resolved.ordered_target_names
         )
-
-    def _validate_required_keys(self, raw: StagingTableArtifact, keys: Sequence[str]) -> None:
-        if not keys:
-            return
-        predicates = [f"{decoded_staging_expression(self._strategy, raw, column, 'r')} IS NULL" for column in keys]
-        rows = self._connector.get_records(
-            f"SELECT TOP (1) 1 AS invalid_key FROM {self._strategy._staging_name(raw)} AS r "
-            f"WHERE {' OR '.join(predicates)}",
-            as_dict=True,
-        )
-        if rows:
-            _raise("mssql_native_projection.unique_key_null")
-
-    def _count_rows(self, artifact: StagingTableArtifact) -> int:
-        """Read back direct-native rows before issuing terminal evidence."""
-
-        rows = self._connector.get_records(f"SELECT COUNT_BIG(*) FROM {self._strategy._staging_name(artifact)}")
-        if not rows or isinstance(rows[0][0], bool) or not isinstance(rows[0][0], int):
-            _raise("mssql_native_projection.native_row_count_unavailable")
-        return int(rows[0][0])
-
-    def _validate_key_sql_semantics(
-        self,
-        native: StagingTableArtifact,
-        keys: Sequence[str],
-        equality_keys: Sequence[str],
-    ) -> None:
-        if not equality_keys:
-            return
-        text_keys = [key for key in equality_keys if is_text_key_type(native.target_column_types.get(key, ""))]
-        if text_keys:
-            padded = " OR ".join(
-                f"DATALENGTH({self._connector.quote_identifier(key)}) <> "
-                f"DATALENGTH(RTRIM({self._connector.quote_identifier(key)}))"
-                for key in text_keys
-            )
-            rows = self._connector.get_records(
-                f"SELECT TOP (1) 1 FROM {self._strategy._staging_name(native)} WHERE {padded}"
-            )
-            if rows:
-                _raise("mssql_native_projection.text_key_trailing_space_unsupported")
-        if not keys:
-            return
-        grouped = ", ".join(self._connector.quote_identifier(key) for key in keys)
-        rows = self._connector.get_records(
-            f"SELECT TOP (1) 1 FROM {self._strategy._staging_name(native)} GROUP BY {grouped} HAVING COUNT_BIG(*) > 1"
-        )
-        if rows:
-            _raise("mssql_native_projection.key_sql_equivalence_collision")
 
 
 def _raise(code: str) -> None:
