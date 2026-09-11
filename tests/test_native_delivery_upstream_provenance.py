@@ -35,7 +35,7 @@ def history(tmp_path, monkeypatch):
     audit.git("commit", "-qam", "integration")
     integration = audit.git("rev-parse", "HEAD")
     Path("foreign.py").write_text("upstream = True\n")
-    Path("CHANGELOG.md").write_text("Integration\nUpstream\nBase\n")
+    Path("CHANGELOG.md").write_text("Integration and Upstream\nBase\n")
     audit.git("commit", "-qam", f"import\n\n(cherry picked from commit {upstream})")
     imported = audit.git("rev-parse", "HEAD")
     approved = {"CHANGELOG.md": audit.git("ls-tree", imported, "--", "CHANGELOG.md")}
@@ -46,6 +46,13 @@ def test_reviewed_import_accepts_only_exact_patch_blob_or_pinned_resolution(hist
     _, upstream, _, imported, approved = history
     assert audit.reviewed_upstream_import(imported, upstream, approved)
     assert not audit.reviewed_upstream_import(imported, upstream, {})
+
+
+def test_merge_cannot_bypass_import_delta_verification(history):
+    _, upstream, integration, imported, approved = history
+    tree = audit.git("rev-parse", f"{imported}^{{tree}}")
+    merge = audit.git("commit-tree", tree, "-p", integration, "-p", upstream, "-m", "invalid merge import")
+    assert not audit.reviewed_upstream_import(merge, upstream, approved)
 
 
 @pytest.mark.parametrize("mutation", ["foreign", "unexpected", "resolution"])
