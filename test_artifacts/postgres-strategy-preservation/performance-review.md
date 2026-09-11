@@ -4,6 +4,10 @@ The maintainer requested further refinement, another independent subagent
 review, and large-partition performance tests in the available local Docker
 environment. The root agent remains the only writer.
 
+Implementation status: **MERGED** through MR #32. Final CI, owner approval and
+the exact reviewed-to-integrated tree binding are recorded in
+[closure.md](closure.md). Measurements below retain their original source IDs.
+
 ## Independent finding and correction
 
 Fresh-context read-only reviewer `/root/postgres_final_independent_review`
@@ -98,7 +102,7 @@ the timing difference cannot be attributed to a code improvement or the merge.
 The original draft MR #31 conflicted with the merged Airflow 0.77.0 baseline
 `e15ad32b850708207c2f8f1b6faf597ef0f5b0b1`. The local merge was rejected by
 the branch's linear-history rule, and its history cannot be force-pushed.
-[Replacement draft MR #32](https://github.com/PaulKov/dpone/pull/32) preserves
+[Replacement MR #32](https://github.com/PaulKov/dpone/pull/32) preserves
 the complete resolved tree in a linear commit:
 `bef37a7752db43dcae42298da7bd62509a186535`, with the baseline as its only parent.
 The independent reviewer checked that both commits have identical tree
@@ -149,7 +153,7 @@ claim. Long reader waits remain an operational limitation of this lock scope.
 | Documentation, generated references and compatibility | PASS | `performance-docs-final.log`, `performance-docs-language-final.log`, `performance-mkdocs-final.log`, `performance-generated-final.log`, `performance-compatibility-final.log`; strict MkDocs passed |
 | Agent-control governance | PASS | `performance-agent-governance-gate.json`; source-bound local gate, separate from the CI attestation |
 | Final independent review | PASS | Fresh-context read-only `/root/postgres_final_independent_review`: APPROVE on `bef37a7752db43dcae42298da7bd62509a186535` and final docs/evidence; no actionable defects |
-| Final MR CI | UNVERIFIED | Normal CI is running on replacement MR #32; historical source receipts are not final-head passes |
+| Final MR CI | PASS | [Run 34531053345](https://github.com/PaulKov/dpone/actions/runs/34531053345), reviewed head `f643a7e`: all 16 Python 3.11/3.12 shards and both aggregate gates passed; independent coverage audit recorded in [closure.md](closure.md) |
 | Other live routes and release | N/A | This follow-up exercises the approved local PostgreSQL environment; no new Kubernetes campaign or publication |
 
 The initial incremental mypy run crashed while resolving a cached OpenTelemetry
@@ -162,9 +166,9 @@ Documentation now covers the operational lock cost, measured capacity,
 reproduction and limits. The snapshot correction changes public row accounting
 only: hard deletions cannot inflate loaded rows; inserted/updated behavior and
 manifest fields remain unchanged. No migration is required. All review findings
-have corrections and are closed by the independent reviewer. The result is ready
-for maintainer review; merge remains contingent on the final CI and owner
-acceptance. Release readiness is outside this campaign.
+have corrections and are closed by the independent reviewer. The maintainer
+approved the final diff and MR #32 was merged after all required checks passed.
+Release readiness is outside this campaign.
 
 The final reviewer independently reran both published-source verifiers,
 validated all 45 direct evidence hashes, checked the two documentation tables
