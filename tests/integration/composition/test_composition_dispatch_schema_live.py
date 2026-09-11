@@ -93,6 +93,24 @@ _STAGES = frozenset(
 )
 
 
+class DispatchDiagnostics(ControlDiagnostics):
+    """Retain only fixed renderer-owned invariant names, never driver text."""
+
+    def call(self, operation, scope, connection, execution, stage):
+        try:
+            return super().call(operation, scope, connection, execution, stage)
+        except Exception as error:
+            names = tuple(
+                "DPONE_COMPOSITION_DISPATCH_" + suffix
+                for suffix in ("IMMUTABLE", "LOCK", "ORIGINAL", "CLOSED", "MISSING", "PHASE", "UNRESOLVED")
+            )
+            message = " ".join(value[:8192] for value in getattr(error, "args", ())[:4] if type(value) is str)
+            with self._lock:
+                if self.events:
+                    self.events[-1]["invariants"] = [name for name in names if name in message]
+            raise
+
+
 @contextmanager
 def observed_transaction(case, stage, record_property):
     """Record bounded numeric driver diagnostics before transaction sanitization.
@@ -103,7 +121,7 @@ def observed_transaction(case, stage, record_property):
     """
     if stage not in _STAGES:
         raise ValueError("dispatch_diagnostic_stage")
-    diagnostics = ControlDiagnostics()
+    diagnostics = DispatchDiagnostics()
     factory = diagnostics.factory(case.database.connect, scope="attempt")
     try:
         with composition_control_transaction(factory, case.schema, case.service_id) as ledger:

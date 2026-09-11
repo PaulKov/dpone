@@ -94,3 +94,16 @@ def test_observer_rejects_untrusted_stage_before_io():
     with pytest.raises(ValueError, match="dispatch_diagnostic_stage"):
         with live.observed_transaction(None, "private caller text", lambda *args: None):
             raise AssertionError("unreachable")
+
+
+def test_diagnostic_retains_only_closed_invariant_names():
+    diagnostics = live.DispatchDiagnostics()
+
+    def reject():
+        raise RuntimeError("42000", "PRIVATE_PASSWORD DPONE_COMPOSITION_DISPATCH_LOCK (51000) extra")
+
+    with pytest.raises(RuntimeError):
+        diagnostics.call(reject, "attempt", 1, 1, "execute")
+    observed = diagnostics.snapshot()
+    assert observed["events"][0]["invariants"] == ["DPONE_COMPOSITION_DISPATCH_LOCK"]
+    assert "PRIVATE" not in str(observed) and "extra" not in str(observed)

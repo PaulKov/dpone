@@ -45,7 +45,11 @@ class MssqlCompositionTransferAccess:
         ledger.require_transaction(transaction)
 
     def require(self, ledger: CompositionMssqlLedger, credentials: MssqlIssuedCredentials) -> None:
-        """Independently audit actual principal identity and the closed grant set."""
+        """Audit exact rights, allowing only read-only built-in public catalogs.
+
+        Negative object IDs plus IsMSShipped exclude user-created objects,
+        including all control tables. Built-in grants confer no ledger writes.
+        """
         transaction = ledger.require_transaction()
         require_transaction_fence_schema(ledger.cursor, ledger.schema)
         ledger.cursor.execute(
@@ -59,8 +63,10 @@ class MssqlCompositionTransferAccess:
             "AND x.permission_name='EXECUTE'), "
             "(SELECT COUNT(*) FROM sys.database_permissions x "
             "WHERE x.grantee_principal_id=DATABASE_PRINCIPAL_ID('public') "
-            "AND NOT (x.state='G' AND x.class=0 AND x.permission_name IN "
-            "('CONNECT','VIEW ANY COLUMN ENCRYPTION KEY DEFINITION','VIEW ANY COLUMN MASTER KEY DEFINITION'))) "
+            "AND NOT (x.state='G' AND ((x.class=0 AND x.permission_name IN "
+            "('CONNECT','VIEW ANY COLUMN ENCRYPTION KEY DEFINITION','VIEW ANY COLUMN MASTER KEY DEFINITION')) "
+            "OR (x.class=1 AND x.major_id<0 AND x.minor_id=0 AND OBJECTPROPERTYEX(x.major_id,'IsMSShipped')=1 "
+            "AND x.permission_name IN ('SELECT','VIEW DEFINITION'))))) "
             "FROM sys.database_principals p WHERE p.name=? OR p.sid=?;",
             f"[{ledger.schema}].[{TRANSFER_PROCEDURE}]",
             f"[{ledger.schema}].[{TRANSFER_PROCEDURE}]",

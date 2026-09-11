@@ -258,3 +258,17 @@ A focused base-coordinator PR may precede the ClickHouse integration PR. Neither
 its merge nor a MSSQL-only synthetic PASS is acceptance for the required complete
 downstream scenario. Public activation remains fail closed until all workload
 capabilities in the selected parent are provided and verified.
+
+
+## Native materialization evidence interpretation
+
+The internal dbt outcome expectation's schema fingerprint identifies declared
+column and type obligations from the verified source manifest. Empty or untyped
+manifest declarations remain explicit absence of those obligations; they do not
+assert an inferred complete physical schema. The actual SQL observer must prove
+each selected target exists as the expected table or view and satisfies every
+declared obligation, retaining complete bounded catalog originals under the
+protected outcome producer. A matching fingerprint alone supplies no evidence.
+Full fixture schema and data parity remain separate mandatory live campaign
+checks. This interpretation preserves support for dbt models without enforced
+column contracts and does not broaden their admitted write footprint.

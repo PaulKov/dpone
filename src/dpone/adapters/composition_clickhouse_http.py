@@ -115,7 +115,7 @@ class _CompleteHeaderReader:
         return line
 
 
-class _CompleteHttpResponse(http.client.HTTPResponse):
+class CompleteHttpResponse(http.client.HTTPResponse):
     """Require complete CRLF chunk framing and reject uninspected trailers."""
 
     # CPython sets fp to None at complete chunk EOF; its stub omits that
@@ -259,7 +259,7 @@ class BoundedClickHouseHttp:
         try:
             connection = self._connection()
             connection.timeout = max(0, deadline - time.monotonic())
-            connection.response_class = _CompleteHttpResponse
+            connection.response_class = CompleteHttpResponse
             connection.connect()
             assert connection.sock is not None
             transport_socket = connection.sock
