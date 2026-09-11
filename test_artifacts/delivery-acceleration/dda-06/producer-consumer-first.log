@@ -1,0 +1,196 @@
+FFFFF...                                                                 [100%]
+=================================== FAILURES ===================================
+_ test_real_benchmark_producer_consumer_never_certifies_unapproved_runs[absent] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3647/test_real_benchmark_producer_c0')
+kind = 'absent'
+
+    @pytest.mark.parametrize("kind", ["absent", "hermetic"])
+    def test_real_benchmark_producer_consumer_never_certifies_unapproved_runs(tmp_path, kind):
+        from tools.native_delivery_live_support.artifacts import ArtifactStore
+        from tools.native_delivery_live_support.hermetic import LIMITS, produce_fixture
+        from tools.native_delivery_live_support.profiles import Dataset
+        from tools.native_delivery_live_support.runner import absent_run, configuration, route_record
+    
+        from dpone.runtime.native_delivery_benchmark import compare
+    
+        paths = [tmp_path / name / "run.json" for name in ("baseline", "candidate")]
+        for path in paths:
+            if kind == "hermetic":
+                produce_fixture(path.parent)
+            else:
+>               absent_run(
+                    ArtifactStore(path),
+                    Dataset("unicode", 16),
+                    configuration(LIMITS),
+                    route_record("partition_replace", "bounded_native"),
+                    {"commit": "d5ad9aaecc900c24df421b160ed36b4cfc726e45", "dirty": False, "execution": "unavailable"},
+                    "disposable_environment_not_approved",
+                )
+
+tests/test_mssql_native_delivery_integration.py:246: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/native_delivery_live_support/runner.py:95: in absent_run
+    ref = receipt(
+tools/native_delivery_live_support/correctness.py:140: in receipt
+    evidence = store.write(
+tools/native_delivery_live_support/artifacts.py:70: in write
+    self.directory.mkdir(mode=0o700, exist_ok=True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3647/test_real_benchmark_producer_c0/baseline/delivery-c4941ae6d4bf4b8b91fc307d3a701df6')
+mode = 448, parents = False, exist_ok = True
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+>           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3647/test_real_benchmark_producer_c0/baseline/delivery-c4941ae6d4bf4b8b91fc307d3a701df6'
+
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/pathlib.py:1311: FileNotFoundError
+_ test_real_benchmark_producer_consumer_never_certifies_unapproved_runs[hermetic] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3647/test_real_benchmark_producer_c1')
+kind = 'hermetic'
+
+    @pytest.mark.parametrize("kind", ["absent", "hermetic"])
+    def test_real_benchmark_producer_consumer_never_certifies_unapproved_runs(tmp_path, kind):
+        from tools.native_delivery_live_support.artifacts import ArtifactStore
+        from tools.native_delivery_live_support.hermetic import LIMITS, produce_fixture
+        from tools.native_delivery_live_support.profiles import Dataset
+        from tools.native_delivery_live_support.runner import absent_run, configuration, route_record
+    
+        from dpone.runtime.native_delivery_benchmark import compare
+    
+        paths = [tmp_path / name / "run.json" for name in ("baseline", "candidate")]
+        for path in paths:
+            if kind == "hermetic":
+>               produce_fixture(path.parent)
+
+tests/test_mssql_native_delivery_integration.py:244: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/native_delivery_live_support/hermetic.py:115: in produce_fixture
+    return run_benchmark(
+tools/native_delivery_live_support/runner.py:235: in run_benchmark
+    store.preflight()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <tools.native_delivery_live_support.artifacts.ArtifactStore object at 0x10969e150>
+
+    def preflight(self) -> None:
+        """Refuse unusable destinations before any service is invoked."""
+        if not self.output.parent.is_dir() or self.output.is_symlink():
+>           raise ValueError("invalid_output_destination")
+E           ValueError: invalid_output_destination
+
+tools/native_delivery_live_support/artifacts.py:59: ValueError
+________ test_real_produced_benchmark_rejects_tampering[retained_bytes] ________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3647/test_real_produced_benchmark_r0')
+tamper = 'retained_bytes'
+
+    @pytest.mark.parametrize("tamper", ["retained_bytes", "schema", "binding"])
+    def test_real_produced_benchmark_rejects_tampering(tmp_path, tamper):
+        import json
+    
+        from tools.native_delivery_live_support.hermetic import produce_fixture
+    
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError, compare
+    
+        paths = [tmp_path / name / "run.json" for name in ("baseline", "candidate")]
+        for path in paths:
+>           produce_fixture(path.parent)
+
+tests/test_mssql_native_delivery_integration.py:269: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/native_delivery_live_support/hermetic.py:115: in produce_fixture
+    return run_benchmark(
+tools/native_delivery_live_support/runner.py:235: in run_benchmark
+    store.preflight()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <tools.native_delivery_live_support.artifacts.ArtifactStore object at 0x10969d790>
+
+    def preflight(self) -> None:
+        """Refuse unusable destinations before any service is invoked."""
+        if not self.output.parent.is_dir() or self.output.is_symlink():
+>           raise ValueError("invalid_output_destination")
+E           ValueError: invalid_output_destination
+
+tools/native_delivery_live_support/artifacts.py:59: ValueError
+____________ test_real_produced_benchmark_rejects_tampering[schema] ____________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3647/test_real_produced_benchmark_r1')
+tamper = 'schema'
+
+    @pytest.mark.parametrize("tamper", ["retained_bytes", "schema", "binding"])
+    def test_real_produced_benchmark_rejects_tampering(tmp_path, tamper):
+        import json
+    
+        from tools.native_delivery_live_support.hermetic import produce_fixture
+    
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError, compare
+    
+        paths = [tmp_path / name / "run.json" for name in ("baseline", "candidate")]
+        for path in paths:
+>           produce_fixture(path.parent)
+
+tests/test_mssql_native_delivery_integration.py:269: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/native_delivery_live_support/hermetic.py:115: in produce_fixture
+    return run_benchmark(
+tools/native_delivery_live_support/runner.py:235: in run_benchmark
+    store.preflight()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <tools.native_delivery_live_support.artifacts.ArtifactStore object at 0x10969e570>
+
+    def preflight(self) -> None:
+        """Refuse unusable destinations before any service is invoked."""
+        if not self.output.parent.is_dir() or self.output.is_symlink():
+>           raise ValueError("invalid_output_destination")
+E           ValueError: invalid_output_destination
+
+tools/native_delivery_live_support/artifacts.py:59: ValueError
+___________ test_real_produced_benchmark_rejects_tampering[binding] ____________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3647/test_real_produced_benchmark_r2')
+tamper = 'binding'
+
+    @pytest.mark.parametrize("tamper", ["retained_bytes", "schema", "binding"])
+    def test_real_produced_benchmark_rejects_tampering(tmp_path, tamper):
+        import json
+    
+        from tools.native_delivery_live_support.hermetic import produce_fixture
+    
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError, compare
+    
+        paths = [tmp_path / name / "run.json" for name in ("baseline", "candidate")]
+        for path in paths:
+>           produce_fixture(path.parent)
+
+tests/test_mssql_native_delivery_integration.py:269: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/native_delivery_live_support/hermetic.py:115: in produce_fixture
+    return run_benchmark(
+tools/native_delivery_live_support/runner.py:235: in run_benchmark
+    store.preflight()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <tools.native_delivery_live_support.artifacts.ArtifactStore object at 0x10969d460>
+
+    def preflight(self) -> None:
+        """Refuse unusable destinations before any service is invoked."""
+        if not self.output.parent.is_dir() or self.output.is_symlink():
+>           raise ValueError("invalid_output_destination")
+E           ValueError: invalid_output_destination
+
+tools/native_delivery_live_support/artifacts.py:59: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_mssql_native_delivery_integration.py::test_real_benchmark_producer_consumer_never_certifies_unapproved_runs[absent]
+FAILED tests/test_mssql_native_delivery_integration.py::test_real_benchmark_producer_consumer_never_certifies_unapproved_runs[hermetic]
+FAILED tests/test_mssql_native_delivery_integration.py::test_real_produced_benchmark_rejects_tampering[retained_bytes]
+FAILED tests/test_mssql_native_delivery_integration.py::test_real_produced_benchmark_rejects_tampering[schema]
+FAILED tests/test_mssql_native_delivery_integration.py::test_real_produced_benchmark_rejects_tampering[binding]

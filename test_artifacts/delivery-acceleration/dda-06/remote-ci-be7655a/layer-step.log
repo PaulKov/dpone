@@ -1,0 +1,38 @@
+2026-09-10T17:51:16.4086645Z ##[group]Run uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json
+2026-09-10T17:51:16.4088137Z [36;1muv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json[0m
+2026-09-10T17:51:16.4131180Z shell: /usr/bin/bash -e {0}
+2026-09-10T17:51:16.4131606Z env:
+2026-09-10T17:51:16.4131985Z   DPONE_TEST_USE_INSTALLED_PACKAGE: 1
+2026-09-10T17:51:16.4132628Z   UV_PYTHON_INSTALL_DIR: /home/runner/work/_temp/uv-python-dir
+2026-09-10T17:51:16.4133347Z   UV_CACHE_DIR: /home/runner/work/_temp/setup-uv-cache
+2026-09-10T17:51:16.4134032Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.14/x64
+2026-09-10T17:51:16.4134813Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.14/x64/lib/pkgconfig
+2026-09-10T17:51:16.4135596Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.14/x64
+2026-09-10T17:51:16.4136288Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.14/x64
+2026-09-10T17:51:16.4137329Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.14/x64
+2026-09-10T17:51:16.4138075Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.14/x64/lib
+2026-09-10T17:51:16.4138685Z ##[endgroup]
+2026-09-10T17:51:26.9682901Z ERROR: Layer metrics gate failed: 1 issue(s)
+2026-09-10T17:51:26.9691428Z Layer metrics check for /home/runner/work/dpone/dpone/src/dpone
+2026-09-10T17:51:26.9692075Z Status: FAIL
+2026-09-10T17:51:26.9692811Z Current: layers=58, edges=9199, intra_ratio=0.701, cross_ratio=0.299, max_cross_flow=215
+2026-09-10T17:51:26.9693550Z Excluded layers: dpone.compat
+2026-09-10T17:51:26.9694307Z Thresholds:
+2026-09-10T17:51:26.9694960Z   - min_intra_layer_ratio: 0.55
+2026-09-10T17:51:26.9695702Z   - max_cross_layer_ratio: 0.45
+2026-09-10T17:51:26.9696609Z   - max_top_cross_layer_flow: n/a
+2026-09-10T17:51:26.9697881Z   - allowed_ratio_regression: 0.020
+2026-09-10T17:51:26.9698793Z   - allowed_flow_regression: 5
+2026-09-10T17:51:26.9699361Z Baseline:
+2026-09-10T17:51:26.9699849Z   - intra_ratio: 0.701 (delta +0.000)
+2026-09-10T17:51:26.9711122Z   - cross_ratio: 0.299 (delta -0.000)
+2026-09-10T17:51:26.9711612Z   - max_cross_flow: 209 (delta +6)
+2026-09-10T17:51:26.9711958Z Top cross-layer flows:
+2026-09-10T17:51:26.9712226Z   - dpone.runtime -> dpone.contracts: 215
+2026-09-10T17:51:26.9712560Z   - dpone.services -> dpone.contracts: 152
+2026-09-10T17:51:26.9712868Z   - dpone.services -> dpone.gitops: 109
+2026-09-10T17:51:26.9713162Z   - dpone.adapters -> dpone.ports: 102
+2026-09-10T17:51:26.9713449Z   - dpone.commands -> dpone.services: 100
+2026-09-10T17:51:26.9713726Z Issues (1):
+2026-09-10T17:51:26.9714285Z   - [ERROR] TOP_CROSS_LAYER_FLOW_REGRESSION: Largest cross-layer flow regressed beyond allowed tolerance, current=215, threshold=214, baseline=209
+2026-09-10T17:51:27.1809261Z ##[error]Process completed with exit code 2.

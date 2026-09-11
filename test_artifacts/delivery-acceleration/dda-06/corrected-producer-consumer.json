@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "name": "corrected-producer-consumer",
+  "command": [
+    "uv",
+    "run",
+    "pytest",
+    "tests/test_mssql_native_delivery_integration.py",
+    "tests/test_native_delivery_live_benchmark.py",
+    "tests/test_native_delivery_live_recovery_boundaries.py",
+    "tests/test_mssql_native_delivery_benchmark.py",
+    "tests/test_mssql_native_delivery_observations.py",
+    "-q"
+  ],
+  "source_before": {
+    "commit": "003d7d5073306f3cb445d9179acc420cd3dcc952",
+    "tree": "81d358937ca9bb26880304e7fd9f9b68b72ea368",
+    "source_sha256": "d10ebd8205f21733539684546be66c717161e99f6069a07d750a238177a75b51",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "corrected-producer-consumer.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "003d7d5073306f3cb445d9179acc420cd3dcc952",
+    "tree": "81d358937ca9bb26880304e7fd9f9b68b72ea368",
+    "source_sha256": "d10ebd8205f21733539684546be66c717161e99f6069a07d750a238177a75b51",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 105.469,
+  "log_sha256": "e1e684e6c7a7804dd91f3012694d4827f8d2e945f0cfff1f95d3d59fb7ccb41a"
+}

@@ -1,0 +1,19 @@
+FF....                                                                   [100%]
+=================================== FAILURES ===================================
+_ test_absolute_current_harness_executes_real_baseline_and_retains_honest_identity _
+tests/test_native_delivery_baseline_compatibility.py:117: in test_absolute_current_harness_executes_real_baseline_and_retains_honest_identity
+    assert result.returncode == 0, result.stderr
+E   AssertionError: native_delivery.invalid_input_or_execution; inspect configuration, factory and retained evidence
+E     
+E   assert 2 == 0
+E    +  where 2 = CompletedProcess(args=['/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3824/dda-...stdout='', stderr='native_delivery.invalid_input_or_execution; inspect configuration, factory and retained evidence\n').returncode
+______ test_baseline_without_approval_writes_skip_without_loading_factory ______
+tests/test_native_delivery_baseline_compatibility.py:138: in test_baseline_without_approval_writes_skip_without_loading_factory
+    assert result.returncode == 0, result.stderr
+E   AssertionError: native_delivery.invalid_input_or_execution; inspect configuration, factory and retained evidence
+E     
+E   assert 2 == 0
+E    +  where 2 = CompletedProcess(args=['/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3824/dda-...stdout='', stderr='native_delivery.invalid_input_or_execution; inspect configuration, factory and retained evidence\n').returncode
+=========================== short test summary info ============================
+FAILED tests/test_native_delivery_baseline_compatibility.py::test_absolute_current_harness_executes_real_baseline_and_retains_honest_identity
+FAILED tests/test_native_delivery_baseline_compatibility.py::test_baseline_without_approval_writes_skip_without_loading_factory

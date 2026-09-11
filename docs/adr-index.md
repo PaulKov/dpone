@@ -64,3 +64,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0057: Bounded-window publication and recovery authority (Accepted)](adr/0057-bounded-window-atomic-publication.md)
 
 - [ADR 0058: Verified release composition preserves constituent authority (Accepted)](adr/0058-verified-release-composition.md)
+
+- [ADR 0062: SQL Server SWITCH has an explicit activation boundary (Accepted for isolated component)](adr/0062-isolated-mssql-switch-activation.md)

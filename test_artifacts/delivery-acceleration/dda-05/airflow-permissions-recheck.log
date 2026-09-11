@@ -1,0 +1,175 @@
+...FF.....                                                               [100%]
+=================================== FAILURES ===================================
+_________ test_ensure_shared_directory_accepts_foreign_owned_superset __________
+
+tmp_path = PosixPath('/private/tmp/dpone-dda05-airflow-permissions/test_ensure_shared_directory_a0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a616cc0>
+
+    def test_ensure_shared_directory_accepts_foreign_owned_superset(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        root = tmp_path / "cache"
+        root.mkdir()
+        os.chmod(root, 0o2777)
+        monkeypatch.setattr(cache_permissions, "_inode_owned_by_effective_user", lambda _metadata: False)
+    
+        def fail_if_called(*_args: object, **_kwargs: object) -> None:
+            raise AssertionError("foreign-owned shared roots must not be chmod'd")
+    
+        monkeypatch.setattr(os, "fchmod", fail_if_called)
+    
+>       ensure_shared_directory(root)
+
+tests/test_airflow_cache_shared_directory_mode.py:67: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_permissions.py:44: in ensure_shared_directory
+    _ensure_directory_mode(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/private/tmp/dpone-dda05-airflow-permissions/test_ensure_shared_directory_a0/cache')
+mode = 1533
+
+    def _ensure_directory_mode(
+        path: Path,
+        mode: int,
+        *,
+        foreign_contract: ForeignDirectoryContract,
+    ) -> None:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+        )
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISDIR(metadata.st_mode):
+                raise NotADirectoryError(path)
+            owned = _inode_owned_by_effective_user(metadata)
+            if owned and mode & stat.S_ISGID and metadata.st_gid not in _effective_groups():
+                os.fchown(descriptor, -1, os.getegid())
+                metadata = os.fstat(descriptor)
+            current_mode = stat.S_IMODE(metadata.st_mode)
+            if current_mode == mode:
+                return
+            if owned:
+                os.fchmod(descriptor, mode)
+                return
+            if directory_meets_mode_contract(
+                current_mode,
+                mode,
+                foreign_contract=foreign_contract,
+            ):
+                return
+>           raise OSError(
+                errno.EPERM,
+                (
+                    f"foreign-owned directory {path.as_posix()} mode {oct(current_mode)} "
+                    f"does not satisfy {foreign_contract.value} contract {oct(mode)}"
+                ),
+            )
+E           PermissionError: [Errno 1] foreign-owned directory /private/tmp/dpone-dda05-airflow-permissions/test_ensure_shared_directory_a0/cache mode 0o777 does not satisfy minimum contract 0o2775
+
+packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_permissions.py:137: PermissionError
+______ test_ensure_cache_layout_succeeds_on_foreign_owned_shared_superset ______
+
+cache_root = PosixPath('/private/tmp/dpone-dda05-airflow-permissions/test_ensure_cache_layout_succe0/cache')
+
+    def ensure_cache_layout(cache_root: str | Path, *, expected_layout: str) -> dict[str, str]:
+        """Validate or initialize one cache root without mixing incompatible layouts."""
+    
+        _validate_layout_name(expected_layout)
+        root = _cache_root(cache_root)
+        assert_cache_layout_compatible(root, expected_layout=expected_layout)
+        try:
+>           ensure_shared_directory(root)
+
+packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_layout.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_permissions.py:44: in ensure_shared_directory
+    _ensure_directory_mode(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/private/tmp/dpone-dda05-airflow-permissions/test_ensure_cache_layout_succe0/cache')
+mode = 1533
+
+    def _ensure_directory_mode(
+        path: Path,
+        mode: int,
+        *,
+        foreign_contract: ForeignDirectoryContract,
+    ) -> None:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+        )
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISDIR(metadata.st_mode):
+                raise NotADirectoryError(path)
+            owned = _inode_owned_by_effective_user(metadata)
+            if owned and mode & stat.S_ISGID and metadata.st_gid not in _effective_groups():
+                os.fchown(descriptor, -1, os.getegid())
+                metadata = os.fstat(descriptor)
+            current_mode = stat.S_IMODE(metadata.st_mode)
+            if current_mode == mode:
+                return
+            if owned:
+                os.fchmod(descriptor, mode)
+                return
+            if directory_meets_mode_contract(
+                current_mode,
+                mode,
+                foreign_contract=foreign_contract,
+            ):
+                return
+>           raise OSError(
+                errno.EPERM,
+                (
+                    f"foreign-owned directory {path.as_posix()} mode {oct(current_mode)} "
+                    f"does not satisfy {foreign_contract.value} contract {oct(mode)}"
+                ),
+            )
+E           PermissionError: [Errno 1] foreign-owned directory /private/tmp/dpone-dda05-airflow-permissions/test_ensure_cache_layout_succe0/cache mode 0o777 does not satisfy minimum contract 0o2775
+
+packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_permissions.py:137: PermissionError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/private/tmp/dpone-dda05-airflow-permissions/test_ensure_cache_layout_succe0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a77da60>
+
+    def test_ensure_cache_layout_succeeds_on_foreign_owned_shared_superset(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        root = tmp_path / "cache"
+        root.mkdir()
+        os.chmod(root, 0o2777)
+        monkeypatch.setattr(cache_permissions, "_inode_owned_by_effective_user", lambda _metadata: False)
+    
+>       payload = ensure_cache_layout(root, expected_layout=EXACT_DEPLOYMENT_LAYOUT)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_airflow_cache_shared_directory_mode.py:80: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cache_root = PosixPath('/private/tmp/dpone-dda05-airflow-permissions/test_ensure_cache_layout_succe0/cache')
+
+    def ensure_cache_layout(cache_root: str | Path, *, expected_layout: str) -> dict[str, str]:
+        """Validate or initialize one cache root without mixing incompatible layouts."""
+    
+        _validate_layout_name(expected_layout)
+        root = _cache_root(cache_root)
+        assert_cache_layout_compatible(root, expected_layout=expected_layout)
+        try:
+            ensure_shared_directory(root)
+        except OSError as exc:
+>           raise CacheLayoutError(
+                "DPONE_CACHE_LAYOUT_WRITE_FAILED",
+                "Airflow cache root could not be initialized",
+                root.as_posix(),
+            ) from exc
+E           dpone_airflow_pack.cache_layout.CacheLayoutError: DPONE_CACHE_LAYOUT_WRITE_FAILED: Airflow cache root could not be initialized: /private/tmp/dpone-dda05-airflow-permissions/test_ensure_cache_layout_succe0/cache
+
+packages/dpone-airflow-pack/src/dpone_airflow_pack/cache_layout.py:47: CacheLayoutError
+=========================== short test summary info ============================
+FAILED tests/test_airflow_cache_shared_directory_mode.py::test_ensure_shared_directory_accepts_foreign_owned_superset
+FAILED tests/test_airflow_cache_shared_directory_mode.py::test_ensure_cache_layout_succeeds_on_foreign_owned_shared_superset

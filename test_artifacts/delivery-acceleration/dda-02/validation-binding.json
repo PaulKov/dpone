@@ -1,0 +1,109 @@
+{
+  "reviewed_source_head": "ad9d96bce22a3514caaf70b0007251f1dc0c89f2",
+  "bindings": {
+    "focused": {
+      "recorded_head": "3f37418f898bcd60f475ede8fbd89ca5ad24c7a4",
+      "file_hash_matches": {
+        "src/dpone/runtime/sinks/mssql_native_prepared_digests.py": true,
+        "src/dpone/runtime/sinks/mssql_native_prepared_insert.py": true,
+        "docs/delivery-acceleration/preparation.md": false,
+        "tests/test_mssql_native_integrity_readbacks.py": true,
+        "tests/test_mssql_native_metadata_insert.py": true,
+        "tests/test_mssql_native_metadata_insert_parity.py": true
+      },
+      "helper_test_bytes_match": true,
+      "command_statuses": {
+        "focused.log": "PASS"
+      }
+    },
+    "static": {
+      "recorded_head": "f3682940f8864563cde0e6b6ecee60f746b49020",
+      "file_hash_matches": {
+        "src/dpone/runtime/sinks/mssql_native_prepared_digests.py": true,
+        "src/dpone/runtime/sinks/mssql_native_prepared_insert.py": true,
+        "docs/delivery-acceleration/preparation.md": false,
+        "tests/test_mssql_native_integrity_readbacks.py": true,
+        "tests/test_mssql_native_metadata_insert.py": true,
+        "tests/test_mssql_native_metadata_insert_parity.py": true
+      },
+      "helper_test_bytes_match": true,
+      "command_statuses": {
+        "contract.log": "PASS",
+        "plan.log": "PASS",
+        "ruff.log": "PASS",
+        "format.log": "PASS",
+        "mypy.log": "PASS",
+        "helper-mypy.log": "PASS",
+        "imports.log": "PASS",
+        "layers.log": "PASS"
+      }
+    },
+    "docs": {
+      "recorded_head": "3f37418f898bcd60f475ede8fbd89ca5ad24c7a4",
+      "file_hash_matches": {
+        "src/dpone/runtime/sinks/mssql_native_prepared_digests.py": true,
+        "src/dpone/runtime/sinks/mssql_native_prepared_insert.py": true,
+        "docs/delivery-acceleration/preparation.md": true,
+        "tests/test_mssql_native_integrity_readbacks.py": true,
+        "tests/test_mssql_native_metadata_insert.py": true,
+        "tests/test_mssql_native_metadata_insert_parity.py": true
+      },
+      "helper_test_bytes_match": true,
+      "command_statuses": {
+        "docs.log": "PASS",
+        "generated.log": "PASS",
+        "docs-language.log": "PASS",
+        "mkdocs.log": "PASS"
+      }
+    },
+    "size": {
+      "recorded_head": "ad9d96bce22a3514caaf70b0007251f1dc0c89f2",
+      "file_hash_matches": {
+        "src/dpone/runtime/sinks/mssql_native_prepared_digests.py": true,
+        "src/dpone/runtime/sinks/mssql_native_prepared_insert.py": true,
+        "docs/delivery-acceleration/preparation.md": true,
+        "tests/test_mssql_native_integrity_readbacks.py": true,
+        "tests/test_mssql_native_metadata_insert.py": true,
+        "tests/test_mssql_native_metadata_insert_parity.py": true
+      },
+      "helper_test_bytes_match": true,
+      "command_statuses": {
+        "size.log": "PASS"
+      }
+    },
+    "suite": {
+      "recorded_head": "f3682940f8864563cde0e6b6ecee60f746b49020",
+      "file_hash_matches": {
+        "src/dpone/runtime/sinks/mssql_native_prepared_digests.py": true,
+        "src/dpone/runtime/sinks/mssql_native_prepared_insert.py": true,
+        "docs/delivery-acceleration/preparation.md": false,
+        "tests/test_mssql_native_integrity_readbacks.py": true,
+        "tests/test_mssql_native_metadata_insert.py": true,
+        "tests/test_mssql_native_metadata_insert_parity.py": true
+      },
+      "helper_test_bytes_match": true,
+      "command_statuses": {
+        "pytest.log": "FAIL"
+      }
+    }
+  },
+  "status": "PASS",
+  "interpretation": "PASS binds helper/test bytes and subsequent documentation validation only; it does not upgrade any failing command or certify a full final-HEAD suite.",
+  "environment_setup_command": [
+    "uv",
+    "sync",
+    "--frozen",
+    "--extra",
+    "postgres",
+    "--extra",
+    "gcp",
+    "--extra",
+    "columnar",
+    "--extra",
+    "accel",
+    "--extra",
+    "dbt-mssql",
+    "--extra",
+    "s3"
+  ]
+}

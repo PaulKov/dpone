@@ -1,0 +1,9 @@
+INFO: Airflow public contract is compatible
+Airflow public contract: PASSED
+- target release: 1.0.0
+- baseline: sha256:67354f5cb04282355b9c5e61123963a18875e693c1edfb01e0eb2845d95da320
+- cli: 25/25 compatible
+- packages: 1/1 compatible
+- python: 16/16 compatible
+- python_modules: 9/9 compatible
+- schemas: 75/75 compatible

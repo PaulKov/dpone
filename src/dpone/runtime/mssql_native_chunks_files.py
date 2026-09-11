@@ -9,17 +9,16 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import pickle
-from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterator
+from contextlib import closing
 from pathlib import Path
-from typing import TypeAlias
 
 from dpone.contracts.bounded_window import WindowContractError
 from dpone.contracts.mssql_native_chunks import EncodedNativeFile, NativeChunkLimits
 from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+from dpone.runtime.mssql_native_sized_frames import NativeRow as NativeRow
+from dpone.runtime.mssql_native_sized_frames import sized_native_frames
 from dpone.runtime.native_wire_models import SourceNativeWireContract
-
-NativeRow: TypeAlias = Sequence[object] | Mapping[str, object]
 
 
 def native_multiset_digest(count: int, total: int) -> str:
@@ -34,46 +33,14 @@ def native_frames(
     check: Callable[[], None] | None = None,
     ipc_overhead: int = 0,
 ) -> Generator[tuple[NativeRow, ...], None, None]:
-    """One producer bounds native and serialized IPC bytes independently.
+    """Compatibility tuple adapter over the single bounded framing algorithm.
 
-    Individual pickle lengths plus conservative framing overhead avoid repeatedly
-    serializing an ever-growing frame. Exact aggregate IPC size is checked before
-    submission. Sizing is not value-validation evidence; workers check all values.
+    Closing this adapter also releases its sized iterator. The caller retains
+    ownership of the source iterator, as with :func:`sized_native_frames`.
     """
-    encoder = MssqlNativeEncoder(contract, max_row_bytes=limits.max_row_bytes)
-    frame: list[NativeRow] = []
-    native_bytes, ipc_bytes = 0, 64 + ipc_overhead
-    emitted = False
-    for index, source_row in enumerate(rows):
-        if check is not None and index % 1024 == 0:
-            check()
-
-        # Drivers may reuse a row container or binary buffer between fetches.
-        def freeze(value: object) -> object:
-            return bytes(value) if isinstance(value, (bytearray, memoryview)) else value
-
-        row: NativeRow = (
-            {key: freeze(value) for key, value in source_row.items()}
-            if isinstance(source_row, Mapping)
-            else tuple(freeze(value) for value in source_row)
-        )
-        size = encoder.encoded_row_size(row)
-        ipc_size = len(pickle.dumps(row, protocol=5)) + 16
-        if size > limits.max_row_bytes or ipc_size + 64 + ipc_overhead > limits.max_bytes:
-            raise WindowContractError("mssql_native.row_exceeds_frame_limit")
-        if frame and (
-            native_bytes + size > limits.max_bytes
-            or ipc_bytes + ipc_size > limits.max_bytes
-            or len(frame) >= limits.max_rows
-        ):
-            yield tuple(frame)
-            emitted = True
-            frame, native_bytes, ipc_bytes = [], 0, 64 + ipc_overhead
-        frame.append(row)
-        native_bytes += size
-        ipc_bytes += ipc_size
-    if frame or not emitted:
-        yield tuple(frame)
+    with closing(sized_native_frames(rows, contract, limits, check, ipc_overhead)) as frames:
+        for frame in frames:
+            yield frame.rows
 
 
 def encode_native_frame(

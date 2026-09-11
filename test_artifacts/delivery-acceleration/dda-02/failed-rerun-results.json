@@ -1,0 +1,22 @@
+{
+  "head": "3f37418f898bcd60f475ede8fbd89ca5ad24c7a4",
+  "command": [
+    "uv",
+    "run",
+    "pytest",
+    "--lf",
+    "--last-failed-no-failures",
+    "none",
+    "-m",
+    "not integration_live",
+    "-n",
+    "auto",
+    "--dist",
+    "loadfile"
+  ],
+  "environment_setup": "environment-extras.log",
+  "seconds": 90.173,
+  "exit_code": 1,
+  "status": "FAIL",
+  "log": "failed-rerun.log"
+}

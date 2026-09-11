@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "name": "review-fixes-provenance-red",
+  "command": [
+    "uv",
+    "run",
+    "pytest",
+    "tests/test_native_delivery_upstream_provenance.py",
+    "-q",
+    "--tb=short"
+  ],
+  "source_before": {
+    "commit": "20f7e73a3f19ec840b72672f20db31b798c36421",
+    "tree": "fd1929b684dc06835632138070d3e9218f14d750",
+    "source_sha256": "f1505b92c5fd434a30aa8f7aecdbd7bd0c2174d512b9eea153b9b0b1c369ab96",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "FAIL",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "review-fixes-provenance-red.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "20f7e73a3f19ec840b72672f20db31b798c36421",
+    "tree": "fd1929b684dc06835632138070d3e9218f14d750",
+    "source_sha256": "f1505b92c5fd434a30aa8f7aecdbd7bd0c2174d512b9eea153b9b0b1c369ab96",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 1,
+  "duration_seconds": 8.602,
+  "log_sha256": "afbf38d8b9f80988ccb757f07a31a708b472944ed06cf360f7119379ca2935ae"
+}

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "name": "final-package-metadata",
+  "command": [
+    "uv",
+    "tool",
+    "run",
+    "twine",
+    "check",
+    "dist/dpone_airflow_pack-0.76.0.tar.gz",
+    "dist/dpone_airflow_pack-0.76.0-py3-none-any.whl",
+    "dist/apache_airflow_providers_dpone-0.76.0.tar.gz",
+    "dist/apache_airflow_providers_dpone-0.76.0-py3-none-any.whl"
+  ],
+  "source_before": {
+    "commit": "be7655ac2e36cd1e9601217c6b0a1fbd10e2eb3f",
+    "tree": "210b8ed74cd3f5302597ae88dec705255f27c507",
+    "source_sha256": "1b812c16044b8a9cb45cc634cb1177307d784016a985ff9e32c82c14c6507913",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "final-package-metadata.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "be7655ac2e36cd1e9601217c6b0a1fbd10e2eb3f",
+    "tree": "210b8ed74cd3f5302597ae88dec705255f27c507",
+    "source_sha256": "1b812c16044b8a9cb45cc634cb1177307d784016a985ff9e32c82c14c6507913",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 2.537,
+  "log_sha256": "629ed23e3a4f07f9fce2668c221f09cc6b0b5ae272d2e13e0bf97236e191bf7d"
+}

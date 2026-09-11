@@ -1,0 +1,10 @@
+{
+  "max_total_encoded_bytes": 104857600,
+  "stage_allocated_bytes_stop_threshold": 104857600,
+  "max_rows": 65536,
+  "max_bytes": 16777216,
+  "max_row_bytes": 1048576,
+  "max_pending": 2,
+  "max_staging_tables": 1024,
+  "parallelism": 1
+}

@@ -1,0 +1,134 @@
+{
+  "status": "PASS",
+  "head_sha": "7c25ce910ff4e3a929b46aa01237840ae92ef512",
+  "quality_run_id": 34519291360,
+  "population_count": 21811,
+  "versions": [
+    {
+      "schema_version": 1,
+      "head_sha": "7c25ce910ff4e3a929b46aa01237840ae92ef512",
+      "python_version": "3.11",
+      "shard_count": 8,
+      "population_count": 21811,
+      "population_sha256": "f21b1638e67c819e9b7bead346eb2c089eaa8c7c0ea74cee6c4f6e57aa7fbcd5",
+      "shard_durations_seconds": [
+        314.0,
+        233.0,
+        367.0,
+        206.0,
+        270.0,
+        258.0,
+        208.0,
+        172.0
+      ],
+      "status": "PASS",
+      "dbt_node_shard": 2,
+      "all_shard_jobs_and_execution_steps": "success"
+    },
+    {
+      "schema_version": 1,
+      "head_sha": "7c25ce910ff4e3a929b46aa01237840ae92ef512",
+      "python_version": "3.12",
+      "shard_count": 8,
+      "population_count": 21811,
+      "population_sha256": "f21b1638e67c819e9b7bead346eb2c089eaa8c7c0ea74cee6c4f6e57aa7fbcd5",
+      "shard_durations_seconds": [
+        366.0,
+        186.0,
+        368.0,
+        199.0,
+        192.0,
+        265.0,
+        219.0,
+        208.0
+      ],
+      "status": "PASS",
+      "dbt_node_shard": 2,
+      "all_shard_jobs_and_execution_steps": "success"
+    }
+  ],
+  "failed_local_node": "tests/test_dbt_inline_publishing.py::test_demo_real_parse_validates_and_can_publish_the_generated_manifest",
+  "node_result_basis": "Exact node is selected once per interpreter by canonical unmodified sharding; all16 execution steps/jobs succeeded; test contains no skip/xfail/decorator path. Thus same unconditional test passed in both CI interpreters. LocalFAIL remains separate.",
+  "test_sha256": "9c13cab7199fe55dd1e8123a07f76e5ce08dfaf23538d115d37acae3dd138835",
+  "demo_sha256": "342aad021997ddf86bbce27abe2981a01657c124e6b9540ec50437164ea14461",
+  "test_demo_package_unchanged_from_master": true,
+  "input_hashes": [
+    {
+      "path": "population/nodeids.txt",
+      "sha256": "f21b1638e67c819e9b7bead346eb2c089eaa8c7c0ea74cee6c4f6e57aa7fbcd5"
+    },
+    {
+      "path": "population/shard-manifest.json",
+      "sha256": "786c7e1377d6a69df95fd03d9fb15f7ae6c744560a5e3ca6c2ab8d1e9bcf2086"
+    },
+    {
+      "path": "quality-run.json",
+      "sha256": "8b50a3118954f68d5dbaeb28313fa7d9659af8d509033a33a949b78c3c911cfb"
+    },
+    {
+      "path": "shards/quality-shard-3.11-0/test_artifacts/ci-quality/receipt.json",
+      "sha256": "5c233268012f65dc409150951b73abcfea0183f135a73e0e762be7db0e322013"
+    },
+    {
+      "path": "shards/quality-shard-3.11-1/test_artifacts/ci-quality/receipt.json",
+      "sha256": "ca58c9c935dd3c2dd26ec6246272622d0f5026087c5d790ee4d30a14f96fe23d"
+    },
+    {
+      "path": "shards/quality-shard-3.11-2/test_artifacts/ci-quality/receipt.json",
+      "sha256": "c7393829e809e633b6ad250188e4b662ba72c985a1d70e5ad74095c9da8ea8ec"
+    },
+    {
+      "path": "shards/quality-shard-3.11-3/test_artifacts/ci-quality/receipt.json",
+      "sha256": "3f51364e7f1933f09e47b0e22d8b974dbde8abe5ae3161604bae551aa95ac2fe"
+    },
+    {
+      "path": "shards/quality-shard-3.11-4/test_artifacts/ci-quality/receipt.json",
+      "sha256": "c12e33442ac207e794a9c063038a025fc8e0bc4984b91a3e725725cb3be9f822"
+    },
+    {
+      "path": "shards/quality-shard-3.11-5/test_artifacts/ci-quality/receipt.json",
+      "sha256": "1e363487b84fc0d9a60a16465a80765a2c2468b59c57d3d7c33c806241beb3e0"
+    },
+    {
+      "path": "shards/quality-shard-3.11-6/test_artifacts/ci-quality/receipt.json",
+      "sha256": "0f2d3631e3663644a49493eda43ce3673f18633753c0f08ad6681b2c78fd767b"
+    },
+    {
+      "path": "shards/quality-shard-3.11-7/test_artifacts/ci-quality/receipt.json",
+      "sha256": "91cdeb09b554767f173d826f06ee1eb4a59d3a7c5edc0929205fbe08ddef8184"
+    },
+    {
+      "path": "shards/quality-shard-3.12-0/test_artifacts/ci-quality/receipt.json",
+      "sha256": "007492f371227dbc6588532cb43c02876874a2b3702584dce1667c72a613e842"
+    },
+    {
+      "path": "shards/quality-shard-3.12-1/test_artifacts/ci-quality/receipt.json",
+      "sha256": "274bd5f67ebf55a58b72362549875ce80a144b00cd3202176640e1c4912fd2a3"
+    },
+    {
+      "path": "shards/quality-shard-3.12-2/test_artifacts/ci-quality/receipt.json",
+      "sha256": "9a74f3ada2a19cb4a3f8e3db7c4aa0c856e1188b3feff286414c93382dd49336"
+    },
+    {
+      "path": "shards/quality-shard-3.12-3/test_artifacts/ci-quality/receipt.json",
+      "sha256": "5ce9b4825762454d1693d6b6d62ea239c4ad6e234d43c44c8d5f3f9ac8537896"
+    },
+    {
+      "path": "shards/quality-shard-3.12-4/test_artifacts/ci-quality/receipt.json",
+      "sha256": "6342f17376091aabe2ee2054e8d3c5d1659a9aa9faed5c6cdcadb64884aad37b"
+    },
+    {
+      "path": "shards/quality-shard-3.12-5/test_artifacts/ci-quality/receipt.json",
+      "sha256": "7696a354f6c051f3a2a249699389c818e6782554dc222dfe5b45d8131ea99ede"
+    },
+    {
+      "path": "shards/quality-shard-3.12-6/test_artifacts/ci-quality/receipt.json",
+      "sha256": "cbd6e300086641505b78d0ff62271f643e2dcea372285b72d2f01a35a370e8b3"
+    },
+    {
+      "path": "shards/quality-shard-3.12-7/test_artifacts/ci-quality/receipt.json",
+      "sha256": "4608a40541063d27c4aec97c97d7ddbb6cab9312cd03b4bb09e032d34a6a6dec"
+    }
+  ],
+  "coverage_files": "Downloaded provider .coverage files remain local; membership proof retains receipts/population and job metadata."
+}

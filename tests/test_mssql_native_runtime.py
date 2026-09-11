@@ -12,7 +12,7 @@ from dpone.runtime.sinks.load_result import LoadResult
 from tests.test_mssql_native_policy import config
 
 
-def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False):
+def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
     events = []
 
     class Journal:
@@ -83,6 +83,7 @@ def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=Fa
             raise ValueError("evidence")
 
     value = NativeMssqlRuntime(
+        observer=observer,
         store=SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1),
         target_id="target",
         bindings=bindings,
@@ -133,3 +134,54 @@ def test_quality_failure_aborts_before_target_mutation(tmp_path):
     with pytest.raises(ValueError, match="quality"):
         value.run(config(), owner="invocation")
     assert "abort" in events and "publish" not in events
+
+
+@pytest.mark.parametrize("recovered", [False, True])
+def test_optional_observer_records_actual_runtime_boundaries(tmp_path, recovered):
+    from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
+
+    observer = BoundedNativeDeliveryObserver()
+    value, events, _ = runtime(tmp_path, recovered=recovered, observer=observer)
+    assert value.run(config(), owner="invocation").status == "success"
+    report = observer.snapshot()
+    phases = [item["phase"] for item in report["observations"]]
+    assert phases == (["evidence", "checkpoint"] if recovered else ["quality", "publish", "evidence", "checkpoint"])
+    assert report["status"] == "PASS"
+    assert all(item["durations"]["delivery"]["value"] is None for item in report["recorders"])
+    assert "source" not in phases
+
+
+@pytest.mark.parametrize("quality_fails", [False, True])
+def test_observer_failure_cannot_change_business_outcome(tmp_path, quality_fails):
+    class BrokenObserver:
+        def record(self, observation):
+            raise RuntimeError("observer failure must not replace business failure")
+
+    value, events, _ = runtime(tmp_path, observer=BrokenObserver(), quality_fails=quality_fails)
+    if quality_fails:
+        with pytest.raises(ValueError, match="^quality$"):
+            value.run(config(), owner="invocation")
+        assert "publish" not in events
+    else:
+        assert value.run(config(), owner="invocation").status == "success"
+        assert "state" in events
+    assert value.observations.snapshot()["status"] == "UNVERIFIED"
+
+
+def test_runtime_observations_identify_the_executing_thread(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import get_ident
+
+    from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
+
+    observer = BoundedNativeDeliveryObserver()
+    value, _, _ = runtime(tmp_path, observer=observer)
+
+    def execute():
+        value.run(config(), owner="invocation")
+        return get_ident()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        worker = pool.submit(execute).result()
+    assert worker != get_ident()
+    assert {item["worker_id"] for item in observer.snapshot()["observations"]} == {f"runtime:{worker}"}

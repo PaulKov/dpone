@@ -1,0 +1,134 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+_ test_transaction_state_is_uncached_shape_only_observation_without_constructor_io _
+
+    def test_transaction_state_is_uncached_shape_only_observation_without_constructor_io():
+        rows = [dict(state=0, depth=2, session_id=0, database_id=7, xact_abort=0, isolation=2)]
+        requests = []
+    
+        def query(sql, parameters=()):
+            requests.append((sql, parameters))
+            return rows
+    
+        catalog = NativeSwitchCatalog(SimpleNamespace(query=query))
+        assert requests == []
+>       assert catalog.transaction_state() is rows[0]
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'NativeSwitchCatalog' object has no attribute 'transaction_state'
+
+tests/test_mssql_native_partition_switch_catalog.py:27: AttributeError
+___________ test_transaction_state_rejects_unknown_row_shape[empty] ____________
+
+shape = 'empty'
+
+    @pytest.mark.parametrize("shape", ["empty", "multiple", "missing", "extra"])
+    def test_transaction_state_rejects_unknown_row_shape(shape):
+        row = dict(state=1, depth=1, session_id=51, database_id=7, xact_abort=16384, isolation=4)
+        rows = [row]
+        if shape == "empty":
+            rows = []
+        elif shape == "multiple":
+            rows = [row, row]
+        elif shape == "missing":
+            row.pop("state")
+        else:
+            row["unexpected"] = 1
+        catalog = NativeSwitchCatalog(SimpleNamespace(query=lambda sql: rows))
+        with pytest.raises(NativeSwitchRejected, match="metadata_unknown"):
+>           catalog.transaction_state()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'NativeSwitchCatalog' object has no attribute 'transaction_state'
+
+tests/test_mssql_native_partition_switch_catalog.py:47: AttributeError
+__________ test_transaction_state_rejects_unknown_row_shape[multiple] __________
+
+shape = 'multiple'
+
+    @pytest.mark.parametrize("shape", ["empty", "multiple", "missing", "extra"])
+    def test_transaction_state_rejects_unknown_row_shape(shape):
+        row = dict(state=1, depth=1, session_id=51, database_id=7, xact_abort=16384, isolation=4)
+        rows = [row]
+        if shape == "empty":
+            rows = []
+        elif shape == "multiple":
+            rows = [row, row]
+        elif shape == "missing":
+            row.pop("state")
+        else:
+            row["unexpected"] = 1
+        catalog = NativeSwitchCatalog(SimpleNamespace(query=lambda sql: rows))
+        with pytest.raises(NativeSwitchRejected, match="metadata_unknown"):
+>           catalog.transaction_state()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'NativeSwitchCatalog' object has no attribute 'transaction_state'
+
+tests/test_mssql_native_partition_switch_catalog.py:47: AttributeError
+__________ test_transaction_state_rejects_unknown_row_shape[missing] ___________
+
+shape = 'missing'
+
+    @pytest.mark.parametrize("shape", ["empty", "multiple", "missing", "extra"])
+    def test_transaction_state_rejects_unknown_row_shape(shape):
+        row = dict(state=1, depth=1, session_id=51, database_id=7, xact_abort=16384, isolation=4)
+        rows = [row]
+        if shape == "empty":
+            rows = []
+        elif shape == "multiple":
+            rows = [row, row]
+        elif shape == "missing":
+            row.pop("state")
+        else:
+            row["unexpected"] = 1
+        catalog = NativeSwitchCatalog(SimpleNamespace(query=lambda sql: rows))
+        with pytest.raises(NativeSwitchRejected, match="metadata_unknown"):
+>           catalog.transaction_state()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'NativeSwitchCatalog' object has no attribute 'transaction_state'
+
+tests/test_mssql_native_partition_switch_catalog.py:47: AttributeError
+___________ test_transaction_state_rejects_unknown_row_shape[extra] ____________
+
+shape = 'extra'
+
+    @pytest.mark.parametrize("shape", ["empty", "multiple", "missing", "extra"])
+    def test_transaction_state_rejects_unknown_row_shape(shape):
+        row = dict(state=1, depth=1, session_id=51, database_id=7, xact_abort=16384, isolation=4)
+        rows = [row]
+        if shape == "empty":
+            rows = []
+        elif shape == "multiple":
+            rows = [row, row]
+        elif shape == "missing":
+            row.pop("state")
+        else:
+            row["unexpected"] = 1
+        catalog = NativeSwitchCatalog(SimpleNamespace(query=lambda sql: rows))
+        with pytest.raises(NativeSwitchRejected, match="metadata_unknown"):
+>           catalog.transaction_state()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'NativeSwitchCatalog' object has no attribute 'transaction_state'
+
+tests/test_mssql_native_partition_switch_catalog.py:47: AttributeError
+________ test_transaction_state_propagates_query_failure_without_retry _________
+
+    def test_transaction_state_propagates_query_failure_without_retry():
+        failure = OSError("lost session")
+        requests = []
+    
+        def query(sql):
+            requests.append(sql)
+            raise failure
+    
+        with pytest.raises(OSError) as caught:
+>           NativeSwitchCatalog(SimpleNamespace(query=query)).transaction_state()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'NativeSwitchCatalog' object has no attribute 'transaction_state'
+
+tests/test_mssql_native_partition_switch_catalog.py:59: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_mssql_native_partition_switch_catalog.py::test_transaction_state_is_uncached_shape_only_observation_without_constructor_io
+FAILED tests/test_mssql_native_partition_switch_catalog.py::test_transaction_state_rejects_unknown_row_shape[empty]
+FAILED tests/test_mssql_native_partition_switch_catalog.py::test_transaction_state_rejects_unknown_row_shape[multiple]
+FAILED tests/test_mssql_native_partition_switch_catalog.py::test_transaction_state_rejects_unknown_row_shape[missing]
+FAILED tests/test_mssql_native_partition_switch_catalog.py::test_transaction_state_rejects_unknown_row_shape[extra]
+FAILED tests/test_mssql_native_partition_switch_catalog.py::test_transaction_state_propagates_query_failure_without_retry

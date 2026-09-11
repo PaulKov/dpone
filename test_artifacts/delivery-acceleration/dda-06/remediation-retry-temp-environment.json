@@ -1,0 +1,12 @@
+{
+  "source_commit": "7c25ce910ff4e3a929b46aa01237840ae92ef512",
+  "status": "PASS",
+  "parent": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dpone-dda06-remediation-full-4uw5fyxw",
+  "basetemp": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dpone-dda06-remediation-full-4uw5fyxw/pytest",
+  "effective_gid": 20,
+  "parent_gid": 20,
+  "parent_mode": "0o700",
+  "probe_mode": "0o2777",
+  "probe_gid": 20,
+  "purpose": "Full retry uses identical long prefix and pytest child as failed full harness; no shorter-path workaround."
+}

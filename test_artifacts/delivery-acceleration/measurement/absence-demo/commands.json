@@ -1,0 +1,81 @@
+[
+  {
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "tools/native_delivery_live_benchmark.py",
+      "run",
+      "--profile",
+      "unicode",
+      "--rows",
+      "10000",
+      "--seed",
+      "7",
+      "--trials",
+      "3",
+      "--limits",
+      "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/limits.json",
+      "--output",
+      "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/baseline/run.json"
+    ],
+    "exit_code": 0,
+    "stdout": "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/baseline/run.json: SKIP\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "tools/native_delivery_live_benchmark.py",
+      "run",
+      "--profile",
+      "unicode",
+      "--rows",
+      "10000",
+      "--seed",
+      "7",
+      "--trials",
+      "3",
+      "--limits",
+      "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/limits.json",
+      "--output",
+      "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/run.json"
+    ],
+    "exit_code": 0,
+    "stdout": "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/run.json: SKIP\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "tools/native_delivery_live_benchmark.py",
+      "inspect",
+      "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/run.json"
+    ],
+    "exit_code": 0,
+    "stdout": "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/run.json: SKIP; eligible_trials=0\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "tools/native_delivery_benchmark.py",
+      "compare",
+      "--baseline",
+      "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/baseline/run.json",
+      "--candidate",
+      "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/run.json",
+      "--output",
+      "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/comparison.json"
+    ],
+    "exit_code": 0,
+    "stdout": "/Users/paulkov007/.codex/worktrees/b364/dpone-public/test_artifacts/delivery-acceleration/measurement/absence-demo/comparison.json UNVERIFIED\n",
+    "stderr": "native_delivery_benchmark: inspect report status and limitations\n"
+  }
+]

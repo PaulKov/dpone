@@ -1,0 +1,893 @@
+FFFFFFFF                                                                 [100%]
+=================================== FAILURES ===================================
+______ test_scheduler_reuses_frame_size_with_real_spawned_workers[rows0] _______
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3575/test_scheduler_reuses_frame_si0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1088bffb0>
+rows = [(9,), (9,)]
+
+    @pytest.mark.parametrize("rows", [[(9,), (9,)], [{"value": 9}, {"value": 9}]])
+    def test_scheduler_reuses_frame_size_with_real_spawned_workers(tmp_path, monkeypatch, rows):
+        from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+    
+        sizes = []
+        original = MssqlNativeEncoder.encoded_row_size
+    
+        def measured_size(self, row):
+            size = original(self, row)
+            sizes.append(size)
+            return size
+    
+        monkeypatch.setattr(MssqlNativeEncoder, "encoded_row_size", measured_size)
+        target = Target()
+        executor, plan, lease, contract = setup(tmp_path, target)
+        result = executor.stage(plan, iter(rows), contract, lease)
+        # Spawned encoders validate their own values. The parent sizes each frame
+        # once; the scheduler must reuse that reservation rather than walk it again.
+>       assert len(sizes) == len(rows)
+E       assert 4 == 2
+E        +  where 4 = len([4, 4, 4, 4])
+E        +  and   2 = len([(9,), (9,)])
+
+tests/test_mssql_native_chunks_execution.py:123: AssertionError
+______ test_scheduler_reuses_frame_size_with_real_spawned_workers[rows1] _______
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3575/test_scheduler_reuses_frame_si1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x108b2dfa0>
+rows = [{'value': 9}, {'value': 9}]
+
+    @pytest.mark.parametrize("rows", [[(9,), (9,)], [{"value": 9}, {"value": 9}]])
+    def test_scheduler_reuses_frame_size_with_real_spawned_workers(tmp_path, monkeypatch, rows):
+        from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+    
+        sizes = []
+        original = MssqlNativeEncoder.encoded_row_size
+    
+        def measured_size(self, row):
+            size = original(self, row)
+            sizes.append(size)
+            return size
+    
+        monkeypatch.setattr(MssqlNativeEncoder, "encoded_row_size", measured_size)
+        target = Target()
+        executor, plan, lease, contract = setup(tmp_path, target)
+        result = executor.stage(plan, iter(rows), contract, lease)
+        # Spawned encoders validate their own values. The parent sizes each frame
+        # once; the scheduler must reuse that reservation rather than walk it again.
+>       assert len(sizes) == len(rows)
+E       AssertionError: assert 4 == 2
+E        +  where 4 = len([4, 4, 4, 4])
+E        +  and   2 = len([{'value': 9}, {'value': 9}])
+
+tests/test_mssql_native_chunks_execution.py:123: AssertionError
+_ test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[False-counts0] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3575/test_real_native_prepare_keeps0')
+counts = (2, 1), default_lineage = False
+
+    @pytest.mark.parametrize("counts", [(2, 1), (0,), (1, 1, 1)])
+    @pytest.mark.parametrize("default_lineage", [False, True])
+    def test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity(
+        tmp_path, counts, default_lineage
+    ):
+        base = prepared_fixture()
+        connector = MemoryConnector()
+        connector.tables.clear()
+        manager = MSSQLStagingManager(connector)
+        strategy = MSSQLFullRefreshStrategy(connector, SimpleNamespace(), manager)
+        config = LoadConfig(
+            "source",
+            "target",
+            "default",
+            "events",
+            "dbo",
+            "target",
+            target_database="db",
+            staging_database="db",
+            staging_schema="stage",
+            options={
+                "__dpone_load_identity": {"run_id": "run", "load_id": "load"},
+                **({} if default_lineage else {"lineage": False}),
+            },
+        )
+        wire = build_mssql_bcp_native_contract(schema=(("n", "int"),), query="test", target_format="mssql_native")
+        encoder = MssqlNativeEncoder(wire, max_row_bytes=1024)
+        receipts = []
+        for ordinal, count in enumerate(counts):
+            connector.tables[f"[db].[stage].[chunk{ordinal}]"] = [{"n": 7}] * count
+            path = tmp_path / f"chunk{ordinal}.bin"
+            path.write_bytes(encoder.encode_row({"n": 7}) * count)
+            file = FileExportArtifact(str(path), ("n",), format="mssql-native", rows_exported=count)
+            total = int.from_bytes(sha256(encoder.encode_row({"n": 7})).digest(), "big") * count % (1 << 256)
+            part = (
+                ConsumedPayloadEvidence.empty()
+                .append_verified_file(
+                    file,
+                    validated_schema=(("n", "int"),),
+                    source_provenance_sha256=canonical_source_provenance_sha256(
+                        relation_dialect=None, relation_schema=None, relation_metadata=None, fallback_schema=(("n", "int"),)
+                    ),
+                    actual_raw_rows=count,
+                    order_key=f"native:{ordinal:020d}",
+                )
+                .parts[0]
+                .to_payload()
+            )
+            part["native_typed_sum"] = total
+            receipts.append(
+                NativeChunkReceipt(
+                    ordinal,
+                    f"attempt{ordinal}",
+                    f"[db].[stage].[chunk{ordinal}]",
+                    count,
+                    path.stat().st_size,
+                    sha256(path.read_bytes()).hexdigest(),
+                    native_multiset_digest(count, total),
+                    part,
+                )
+            )
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            state = None
+    
+            def preparation_started(self, binding):
+                self.state = binding
+    
+            def prepared(self, binding):
+                assert binding["planned_stage"] == self.state["planned_stage"]
+                self.state = binding
+    
+        journal = Journal()
+    
+        class Executor:
+            def stage(self, plan, rows, contract, lease, **kwargs):
+                assert list(rows) == [(7,)] * sum(counts)
+                assert kwargs["completion_metadata"]()["lifecycle"]["extraction_completed_at"]
+                return SimpleNamespace(receipts=receipts, rows=sum(counts))
+    
+        capacity_observations = []
+    
+        def capacity(extra_tables):
+            observed = len(connector.tables)
+            capacity_observations.append((observed, extra_tables))
+            if observed + extra_tables > len(counts) + 1:
+                raise ValueError("staging_table_limit_exceeded")
+    
+        context = NativeStageContext(
+            NativeChunkPlan("run", "target", "query", "window", "schema", "wire"),
+            wire,
+            Executor(),
+            object(),
+            lambda: iter([(7,)] * sum(counts)),
+            lambda receipts: None,
+            lambda receipts: None,
+            capacity,
+            lambda: journal,
+            nullcontext,
+            max_row_bytes=4,
+        )
+        payload = SimpleNamespace(
+            schema=(("n", "int"),),
+            relation_schema=None,
+            relation_metadata=None,
+            relation_dialect=None,
+            target_projection=None,
+            mssql_transaction_admission=base.admission,
+            mssql_target_mutation_plan=base.mutation_plan,
+            require_completed_extraction=lambda: base.source_lifecycle,
+        )
+        sink = SimpleNamespace(connector=connector, _strategy_map={LoadStrategy.FULL_REFRESH: strategy})
+        preparer = MssqlNativeStagePreparer(sink, lambda *args: context)
+        prepared = preparer.stage(config, payload)
+        assert prepared.staging.row_count == sum(counts)
+        assert [row["n"] for row in connector.tables[strategy._staging_name(prepared.staging)]] == [7] * sum(counts)
+        if len(counts) > 1:
+            assert any(" UNION ALL " in sql for sql in connector.statements)
+        assert journal.state["stage"]["consumed_payload_evidence"]["actual_native_rows"] == sum(counts)
+        preparer.reverify(prepared)
+        # One initial dual digest plus an independent prepublication full digest.
+        # Restoring below deliberately adds another boundary and therefore a scan.
+>       assert len(connector.typed_readbacks) == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = len(['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n] FROM [db...d8d9dc877900b074494]', 'SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'])
+E        +    where ['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n] FROM [db...d8d9dc877900b074494]', 'SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'] = <tests.test_mssql_native_staged_prepare.MemoryConnector object at 0x108703c80>.typed_readbacks
+
+tests/test_mssql_native_staged_prepare.py:221: AssertionError
+_ test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[False-counts1] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3575/test_real_native_prepare_keeps1')
+counts = (0,), default_lineage = False
+
+    @pytest.mark.parametrize("counts", [(2, 1), (0,), (1, 1, 1)])
+    @pytest.mark.parametrize("default_lineage", [False, True])
+    def test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity(
+        tmp_path, counts, default_lineage
+    ):
+        base = prepared_fixture()
+        connector = MemoryConnector()
+        connector.tables.clear()
+        manager = MSSQLStagingManager(connector)
+        strategy = MSSQLFullRefreshStrategy(connector, SimpleNamespace(), manager)
+        config = LoadConfig(
+            "source",
+            "target",
+            "default",
+            "events",
+            "dbo",
+            "target",
+            target_database="db",
+            staging_database="db",
+            staging_schema="stage",
+            options={
+                "__dpone_load_identity": {"run_id": "run", "load_id": "load"},
+                **({} if default_lineage else {"lineage": False}),
+            },
+        )
+        wire = build_mssql_bcp_native_contract(schema=(("n", "int"),), query="test", target_format="mssql_native")
+        encoder = MssqlNativeEncoder(wire, max_row_bytes=1024)
+        receipts = []
+        for ordinal, count in enumerate(counts):
+            connector.tables[f"[db].[stage].[chunk{ordinal}]"] = [{"n": 7}] * count
+            path = tmp_path / f"chunk{ordinal}.bin"
+            path.write_bytes(encoder.encode_row({"n": 7}) * count)
+            file = FileExportArtifact(str(path), ("n",), format="mssql-native", rows_exported=count)
+            total = int.from_bytes(sha256(encoder.encode_row({"n": 7})).digest(), "big") * count % (1 << 256)
+            part = (
+                ConsumedPayloadEvidence.empty()
+                .append_verified_file(
+                    file,
+                    validated_schema=(("n", "int"),),
+                    source_provenance_sha256=canonical_source_provenance_sha256(
+                        relation_dialect=None, relation_schema=None, relation_metadata=None, fallback_schema=(("n", "int"),)
+                    ),
+                    actual_raw_rows=count,
+                    order_key=f"native:{ordinal:020d}",
+                )
+                .parts[0]
+                .to_payload()
+            )
+            part["native_typed_sum"] = total
+            receipts.append(
+                NativeChunkReceipt(
+                    ordinal,
+                    f"attempt{ordinal}",
+                    f"[db].[stage].[chunk{ordinal}]",
+                    count,
+                    path.stat().st_size,
+                    sha256(path.read_bytes()).hexdigest(),
+                    native_multiset_digest(count, total),
+                    part,
+                )
+            )
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            state = None
+    
+            def preparation_started(self, binding):
+                self.state = binding
+    
+            def prepared(self, binding):
+                assert binding["planned_stage"] == self.state["planned_stage"]
+                self.state = binding
+    
+        journal = Journal()
+    
+        class Executor:
+            def stage(self, plan, rows, contract, lease, **kwargs):
+                assert list(rows) == [(7,)] * sum(counts)
+                assert kwargs["completion_metadata"]()["lifecycle"]["extraction_completed_at"]
+                return SimpleNamespace(receipts=receipts, rows=sum(counts))
+    
+        capacity_observations = []
+    
+        def capacity(extra_tables):
+            observed = len(connector.tables)
+            capacity_observations.append((observed, extra_tables))
+            if observed + extra_tables > len(counts) + 1:
+                raise ValueError("staging_table_limit_exceeded")
+    
+        context = NativeStageContext(
+            NativeChunkPlan("run", "target", "query", "window", "schema", "wire"),
+            wire,
+            Executor(),
+            object(),
+            lambda: iter([(7,)] * sum(counts)),
+            lambda receipts: None,
+            lambda receipts: None,
+            capacity,
+            lambda: journal,
+            nullcontext,
+            max_row_bytes=4,
+        )
+        payload = SimpleNamespace(
+            schema=(("n", "int"),),
+            relation_schema=None,
+            relation_metadata=None,
+            relation_dialect=None,
+            target_projection=None,
+            mssql_transaction_admission=base.admission,
+            mssql_target_mutation_plan=base.mutation_plan,
+            require_completed_extraction=lambda: base.source_lifecycle,
+        )
+        sink = SimpleNamespace(connector=connector, _strategy_map={LoadStrategy.FULL_REFRESH: strategy})
+        preparer = MssqlNativeStagePreparer(sink, lambda *args: context)
+        prepared = preparer.stage(config, payload)
+        assert prepared.staging.row_count == sum(counts)
+        assert [row["n"] for row in connector.tables[strategy._staging_name(prepared.staging)]] == [7] * sum(counts)
+        if len(counts) > 1:
+            assert any(" UNION ALL " in sql for sql in connector.statements)
+        assert journal.state["stage"]["consumed_payload_evidence"]["actual_native_rows"] == sum(counts)
+        preparer.reverify(prepared)
+        # One initial dual digest plus an independent prepublication full digest.
+        # Restoring below deliberately adds another boundary and therefore a scan.
+>       assert len(connector.typed_readbacks) == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = len(['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n] FROM [db...d8d9dc877900b074494]', 'SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'])
+E        +    where ['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n] FROM [db...d8d9dc877900b074494]', 'SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'] = <tests.test_mssql_native_staged_prepare.MemoryConnector object at 0x108b2ffe0>.typed_readbacks
+
+tests/test_mssql_native_staged_prepare.py:221: AssertionError
+_ test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[False-counts2] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3575/test_real_native_prepare_keeps2')
+counts = (1, 1, 1), default_lineage = False
+
+    @pytest.mark.parametrize("counts", [(2, 1), (0,), (1, 1, 1)])
+    @pytest.mark.parametrize("default_lineage", [False, True])
+    def test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity(
+        tmp_path, counts, default_lineage
+    ):
+        base = prepared_fixture()
+        connector = MemoryConnector()
+        connector.tables.clear()
+        manager = MSSQLStagingManager(connector)
+        strategy = MSSQLFullRefreshStrategy(connector, SimpleNamespace(), manager)
+        config = LoadConfig(
+            "source",
+            "target",
+            "default",
+            "events",
+            "dbo",
+            "target",
+            target_database="db",
+            staging_database="db",
+            staging_schema="stage",
+            options={
+                "__dpone_load_identity": {"run_id": "run", "load_id": "load"},
+                **({} if default_lineage else {"lineage": False}),
+            },
+        )
+        wire = build_mssql_bcp_native_contract(schema=(("n", "int"),), query="test", target_format="mssql_native")
+        encoder = MssqlNativeEncoder(wire, max_row_bytes=1024)
+        receipts = []
+        for ordinal, count in enumerate(counts):
+            connector.tables[f"[db].[stage].[chunk{ordinal}]"] = [{"n": 7}] * count
+            path = tmp_path / f"chunk{ordinal}.bin"
+            path.write_bytes(encoder.encode_row({"n": 7}) * count)
+            file = FileExportArtifact(str(path), ("n",), format="mssql-native", rows_exported=count)
+            total = int.from_bytes(sha256(encoder.encode_row({"n": 7})).digest(), "big") * count % (1 << 256)
+            part = (
+                ConsumedPayloadEvidence.empty()
+                .append_verified_file(
+                    file,
+                    validated_schema=(("n", "int"),),
+                    source_provenance_sha256=canonical_source_provenance_sha256(
+                        relation_dialect=None, relation_schema=None, relation_metadata=None, fallback_schema=(("n", "int"),)
+                    ),
+                    actual_raw_rows=count,
+                    order_key=f"native:{ordinal:020d}",
+                )
+                .parts[0]
+                .to_payload()
+            )
+            part["native_typed_sum"] = total
+            receipts.append(
+                NativeChunkReceipt(
+                    ordinal,
+                    f"attempt{ordinal}",
+                    f"[db].[stage].[chunk{ordinal}]",
+                    count,
+                    path.stat().st_size,
+                    sha256(path.read_bytes()).hexdigest(),
+                    native_multiset_digest(count, total),
+                    part,
+                )
+            )
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            state = None
+    
+            def preparation_started(self, binding):
+                self.state = binding
+    
+            def prepared(self, binding):
+                assert binding["planned_stage"] == self.state["planned_stage"]
+                self.state = binding
+    
+        journal = Journal()
+    
+        class Executor:
+            def stage(self, plan, rows, contract, lease, **kwargs):
+                assert list(rows) == [(7,)] * sum(counts)
+                assert kwargs["completion_metadata"]()["lifecycle"]["extraction_completed_at"]
+                return SimpleNamespace(receipts=receipts, rows=sum(counts))
+    
+        capacity_observations = []
+    
+        def capacity(extra_tables):
+            observed = len(connector.tables)
+            capacity_observations.append((observed, extra_tables))
+            if observed + extra_tables > len(counts) + 1:
+                raise ValueError("staging_table_limit_exceeded")
+    
+        context = NativeStageContext(
+            NativeChunkPlan("run", "target", "query", "window", "schema", "wire"),
+            wire,
+            Executor(),
+            object(),
+            lambda: iter([(7,)] * sum(counts)),
+            lambda receipts: None,
+            lambda receipts: None,
+            capacity,
+            lambda: journal,
+            nullcontext,
+            max_row_bytes=4,
+        )
+        payload = SimpleNamespace(
+            schema=(("n", "int"),),
+            relation_schema=None,
+            relation_metadata=None,
+            relation_dialect=None,
+            target_projection=None,
+            mssql_transaction_admission=base.admission,
+            mssql_target_mutation_plan=base.mutation_plan,
+            require_completed_extraction=lambda: base.source_lifecycle,
+        )
+        sink = SimpleNamespace(connector=connector, _strategy_map={LoadStrategy.FULL_REFRESH: strategy})
+        preparer = MssqlNativeStagePreparer(sink, lambda *args: context)
+        prepared = preparer.stage(config, payload)
+        assert prepared.staging.row_count == sum(counts)
+        assert [row["n"] for row in connector.tables[strategy._staging_name(prepared.staging)]] == [7] * sum(counts)
+        if len(counts) > 1:
+            assert any(" UNION ALL " in sql for sql in connector.statements)
+        assert journal.state["stage"]["consumed_payload_evidence"]["actual_native_rows"] == sum(counts)
+        preparer.reverify(prepared)
+        # One initial dual digest plus an independent prepublication full digest.
+        # Restoring below deliberately adds another boundary and therefore a scan.
+>       assert len(connector.typed_readbacks) == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = len(['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n] FROM [db...d8d9dc877900b074494]', 'SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'])
+E        +    where ['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n] FROM [db...d8d9dc877900b074494]', 'SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'] = <tests.test_mssql_native_staged_prepare.MemoryConnector object at 0x108b84920>.typed_readbacks
+
+tests/test_mssql_native_staged_prepare.py:221: AssertionError
+_ test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[True-counts0] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3575/test_real_native_prepare_keeps3')
+counts = (2, 1), default_lineage = True
+
+    @pytest.mark.parametrize("counts", [(2, 1), (0,), (1, 1, 1)])
+    @pytest.mark.parametrize("default_lineage", [False, True])
+    def test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity(
+        tmp_path, counts, default_lineage
+    ):
+        base = prepared_fixture()
+        connector = MemoryConnector()
+        connector.tables.clear()
+        manager = MSSQLStagingManager(connector)
+        strategy = MSSQLFullRefreshStrategy(connector, SimpleNamespace(), manager)
+        config = LoadConfig(
+            "source",
+            "target",
+            "default",
+            "events",
+            "dbo",
+            "target",
+            target_database="db",
+            staging_database="db",
+            staging_schema="stage",
+            options={
+                "__dpone_load_identity": {"run_id": "run", "load_id": "load"},
+                **({} if default_lineage else {"lineage": False}),
+            },
+        )
+        wire = build_mssql_bcp_native_contract(schema=(("n", "int"),), query="test", target_format="mssql_native")
+        encoder = MssqlNativeEncoder(wire, max_row_bytes=1024)
+        receipts = []
+        for ordinal, count in enumerate(counts):
+            connector.tables[f"[db].[stage].[chunk{ordinal}]"] = [{"n": 7}] * count
+            path = tmp_path / f"chunk{ordinal}.bin"
+            path.write_bytes(encoder.encode_row({"n": 7}) * count)
+            file = FileExportArtifact(str(path), ("n",), format="mssql-native", rows_exported=count)
+            total = int.from_bytes(sha256(encoder.encode_row({"n": 7})).digest(), "big") * count % (1 << 256)
+            part = (
+                ConsumedPayloadEvidence.empty()
+                .append_verified_file(
+                    file,
+                    validated_schema=(("n", "int"),),
+                    source_provenance_sha256=canonical_source_provenance_sha256(
+                        relation_dialect=None, relation_schema=None, relation_metadata=None, fallback_schema=(("n", "int"),)
+                    ),
+                    actual_raw_rows=count,
+                    order_key=f"native:{ordinal:020d}",
+                )
+                .parts[0]
+                .to_payload()
+            )
+            part["native_typed_sum"] = total
+            receipts.append(
+                NativeChunkReceipt(
+                    ordinal,
+                    f"attempt{ordinal}",
+                    f"[db].[stage].[chunk{ordinal}]",
+                    count,
+                    path.stat().st_size,
+                    sha256(path.read_bytes()).hexdigest(),
+                    native_multiset_digest(count, total),
+                    part,
+                )
+            )
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            state = None
+    
+            def preparation_started(self, binding):
+                self.state = binding
+    
+            def prepared(self, binding):
+                assert binding["planned_stage"] == self.state["planned_stage"]
+                self.state = binding
+    
+        journal = Journal()
+    
+        class Executor:
+            def stage(self, plan, rows, contract, lease, **kwargs):
+                assert list(rows) == [(7,)] * sum(counts)
+                assert kwargs["completion_metadata"]()["lifecycle"]["extraction_completed_at"]
+                return SimpleNamespace(receipts=receipts, rows=sum(counts))
+    
+        capacity_observations = []
+    
+        def capacity(extra_tables):
+            observed = len(connector.tables)
+            capacity_observations.append((observed, extra_tables))
+            if observed + extra_tables > len(counts) + 1:
+                raise ValueError("staging_table_limit_exceeded")
+    
+        context = NativeStageContext(
+            NativeChunkPlan("run", "target", "query", "window", "schema", "wire"),
+            wire,
+            Executor(),
+            object(),
+            lambda: iter([(7,)] * sum(counts)),
+            lambda receipts: None,
+            lambda receipts: None,
+            capacity,
+            lambda: journal,
+            nullcontext,
+            max_row_bytes=4,
+        )
+        payload = SimpleNamespace(
+            schema=(("n", "int"),),
+            relation_schema=None,
+            relation_metadata=None,
+            relation_dialect=None,
+            target_projection=None,
+            mssql_transaction_admission=base.admission,
+            mssql_target_mutation_plan=base.mutation_plan,
+            require_completed_extraction=lambda: base.source_lifecycle,
+        )
+        sink = SimpleNamespace(connector=connector, _strategy_map={LoadStrategy.FULL_REFRESH: strategy})
+        preparer = MssqlNativeStagePreparer(sink, lambda *args: context)
+        prepared = preparer.stage(config, payload)
+        assert prepared.staging.row_count == sum(counts)
+        assert [row["n"] for row in connector.tables[strategy._staging_name(prepared.staging)]] == [7] * sum(counts)
+        if len(counts) > 1:
+            assert any(" UNION ALL " in sql for sql in connector.statements)
+        assert journal.state["stage"]["consumed_payload_evidence"]["actual_native_rows"] == sum(counts)
+        preparer.reverify(prepared)
+        # One initial dual digest plus an independent prepublication full digest.
+        # Restoring below deliberately adds another boundary and therefore a scan.
+>       assert len(connector.typed_readbacks) == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = len(['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n], [__dpon...__row_id], [__dpone__extracted_at] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'])
+E        +    where ['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n], [__dpon...__row_id], [__dpone__extracted_at] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'] = <tests.test_mssql_native_staged_prepare.MemoryConnector object at 0x108b86360>.typed_readbacks
+
+tests/test_mssql_native_staged_prepare.py:221: AssertionError
+_ test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[True-counts1] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3575/test_real_native_prepare_keeps4')
+counts = (0,), default_lineage = True
+
+    @pytest.mark.parametrize("counts", [(2, 1), (0,), (1, 1, 1)])
+    @pytest.mark.parametrize("default_lineage", [False, True])
+    def test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity(
+        tmp_path, counts, default_lineage
+    ):
+        base = prepared_fixture()
+        connector = MemoryConnector()
+        connector.tables.clear()
+        manager = MSSQLStagingManager(connector)
+        strategy = MSSQLFullRefreshStrategy(connector, SimpleNamespace(), manager)
+        config = LoadConfig(
+            "source",
+            "target",
+            "default",
+            "events",
+            "dbo",
+            "target",
+            target_database="db",
+            staging_database="db",
+            staging_schema="stage",
+            options={
+                "__dpone_load_identity": {"run_id": "run", "load_id": "load"},
+                **({} if default_lineage else {"lineage": False}),
+            },
+        )
+        wire = build_mssql_bcp_native_contract(schema=(("n", "int"),), query="test", target_format="mssql_native")
+        encoder = MssqlNativeEncoder(wire, max_row_bytes=1024)
+        receipts = []
+        for ordinal, count in enumerate(counts):
+            connector.tables[f"[db].[stage].[chunk{ordinal}]"] = [{"n": 7}] * count
+            path = tmp_path / f"chunk{ordinal}.bin"
+            path.write_bytes(encoder.encode_row({"n": 7}) * count)
+            file = FileExportArtifact(str(path), ("n",), format="mssql-native", rows_exported=count)
+            total = int.from_bytes(sha256(encoder.encode_row({"n": 7})).digest(), "big") * count % (1 << 256)
+            part = (
+                ConsumedPayloadEvidence.empty()
+                .append_verified_file(
+                    file,
+                    validated_schema=(("n", "int"),),
+                    source_provenance_sha256=canonical_source_provenance_sha256(
+                        relation_dialect=None, relation_schema=None, relation_metadata=None, fallback_schema=(("n", "int"),)
+                    ),
+                    actual_raw_rows=count,
+                    order_key=f"native:{ordinal:020d}",
+                )
+                .parts[0]
+                .to_payload()
+            )
+            part["native_typed_sum"] = total
+            receipts.append(
+                NativeChunkReceipt(
+                    ordinal,
+                    f"attempt{ordinal}",
+                    f"[db].[stage].[chunk{ordinal}]",
+                    count,
+                    path.stat().st_size,
+                    sha256(path.read_bytes()).hexdigest(),
+                    native_multiset_digest(count, total),
+                    part,
+                )
+            )
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            state = None
+    
+            def preparation_started(self, binding):
+                self.state = binding
+    
+            def prepared(self, binding):
+                assert binding["planned_stage"] == self.state["planned_stage"]
+                self.state = binding
+    
+        journal = Journal()
+    
+        class Executor:
+            def stage(self, plan, rows, contract, lease, **kwargs):
+                assert list(rows) == [(7,)] * sum(counts)
+                assert kwargs["completion_metadata"]()["lifecycle"]["extraction_completed_at"]
+                return SimpleNamespace(receipts=receipts, rows=sum(counts))
+    
+        capacity_observations = []
+    
+        def capacity(extra_tables):
+            observed = len(connector.tables)
+            capacity_observations.append((observed, extra_tables))
+            if observed + extra_tables > len(counts) + 1:
+                raise ValueError("staging_table_limit_exceeded")
+    
+        context = NativeStageContext(
+            NativeChunkPlan("run", "target", "query", "window", "schema", "wire"),
+            wire,
+            Executor(),
+            object(),
+            lambda: iter([(7,)] * sum(counts)),
+            lambda receipts: None,
+            lambda receipts: None,
+            capacity,
+            lambda: journal,
+            nullcontext,
+            max_row_bytes=4,
+        )
+        payload = SimpleNamespace(
+            schema=(("n", "int"),),
+            relation_schema=None,
+            relation_metadata=None,
+            relation_dialect=None,
+            target_projection=None,
+            mssql_transaction_admission=base.admission,
+            mssql_target_mutation_plan=base.mutation_plan,
+            require_completed_extraction=lambda: base.source_lifecycle,
+        )
+        sink = SimpleNamespace(connector=connector, _strategy_map={LoadStrategy.FULL_REFRESH: strategy})
+        preparer = MssqlNativeStagePreparer(sink, lambda *args: context)
+        prepared = preparer.stage(config, payload)
+        assert prepared.staging.row_count == sum(counts)
+        assert [row["n"] for row in connector.tables[strategy._staging_name(prepared.staging)]] == [7] * sum(counts)
+        if len(counts) > 1:
+            assert any(" UNION ALL " in sql for sql in connector.statements)
+        assert journal.state["stage"]["consumed_payload_evidence"]["actual_native_rows"] == sum(counts)
+        preparer.reverify(prepared)
+        # One initial dual digest plus an independent prepublication full digest.
+        # Restoring below deliberately adds another boundary and therefore a scan.
+>       assert len(connector.typed_readbacks) == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = len(['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n], [__dpon...__row_id], [__dpone__extracted_at] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'])
+E        +    where ['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n], [__dpon...__row_id], [__dpone__extracted_at] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'] = <tests.test_mssql_native_staged_prepare.MemoryConnector object at 0x1087b0830>.typed_readbacks
+
+tests/test_mssql_native_staged_prepare.py:221: AssertionError
+_ test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[True-counts2] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3575/test_real_native_prepare_keeps5')
+counts = (1, 1, 1), default_lineage = True
+
+    @pytest.mark.parametrize("counts", [(2, 1), (0,), (1, 1, 1)])
+    @pytest.mark.parametrize("default_lineage", [False, True])
+    def test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity(
+        tmp_path, counts, default_lineage
+    ):
+        base = prepared_fixture()
+        connector = MemoryConnector()
+        connector.tables.clear()
+        manager = MSSQLStagingManager(connector)
+        strategy = MSSQLFullRefreshStrategy(connector, SimpleNamespace(), manager)
+        config = LoadConfig(
+            "source",
+            "target",
+            "default",
+            "events",
+            "dbo",
+            "target",
+            target_database="db",
+            staging_database="db",
+            staging_schema="stage",
+            options={
+                "__dpone_load_identity": {"run_id": "run", "load_id": "load"},
+                **({} if default_lineage else {"lineage": False}),
+            },
+        )
+        wire = build_mssql_bcp_native_contract(schema=(("n", "int"),), query="test", target_format="mssql_native")
+        encoder = MssqlNativeEncoder(wire, max_row_bytes=1024)
+        receipts = []
+        for ordinal, count in enumerate(counts):
+            connector.tables[f"[db].[stage].[chunk{ordinal}]"] = [{"n": 7}] * count
+            path = tmp_path / f"chunk{ordinal}.bin"
+            path.write_bytes(encoder.encode_row({"n": 7}) * count)
+            file = FileExportArtifact(str(path), ("n",), format="mssql-native", rows_exported=count)
+            total = int.from_bytes(sha256(encoder.encode_row({"n": 7})).digest(), "big") * count % (1 << 256)
+            part = (
+                ConsumedPayloadEvidence.empty()
+                .append_verified_file(
+                    file,
+                    validated_schema=(("n", "int"),),
+                    source_provenance_sha256=canonical_source_provenance_sha256(
+                        relation_dialect=None, relation_schema=None, relation_metadata=None, fallback_schema=(("n", "int"),)
+                    ),
+                    actual_raw_rows=count,
+                    order_key=f"native:{ordinal:020d}",
+                )
+                .parts[0]
+                .to_payload()
+            )
+            part["native_typed_sum"] = total
+            receipts.append(
+                NativeChunkReceipt(
+                    ordinal,
+                    f"attempt{ordinal}",
+                    f"[db].[stage].[chunk{ordinal}]",
+                    count,
+                    path.stat().st_size,
+                    sha256(path.read_bytes()).hexdigest(),
+                    native_multiset_digest(count, total),
+                    part,
+                )
+            )
+    
+        class Journal:
+            @property
+            def publication(self):
+                return self
+    
+            state = None
+    
+            def preparation_started(self, binding):
+                self.state = binding
+    
+            def prepared(self, binding):
+                assert binding["planned_stage"] == self.state["planned_stage"]
+                self.state = binding
+    
+        journal = Journal()
+    
+        class Executor:
+            def stage(self, plan, rows, contract, lease, **kwargs):
+                assert list(rows) == [(7,)] * sum(counts)
+                assert kwargs["completion_metadata"]()["lifecycle"]["extraction_completed_at"]
+                return SimpleNamespace(receipts=receipts, rows=sum(counts))
+    
+        capacity_observations = []
+    
+        def capacity(extra_tables):
+            observed = len(connector.tables)
+            capacity_observations.append((observed, extra_tables))
+            if observed + extra_tables > len(counts) + 1:
+                raise ValueError("staging_table_limit_exceeded")
+    
+        context = NativeStageContext(
+            NativeChunkPlan("run", "target", "query", "window", "schema", "wire"),
+            wire,
+            Executor(),
+            object(),
+            lambda: iter([(7,)] * sum(counts)),
+            lambda receipts: None,
+            lambda receipts: None,
+            capacity,
+            lambda: journal,
+            nullcontext,
+            max_row_bytes=4,
+        )
+        payload = SimpleNamespace(
+            schema=(("n", "int"),),
+            relation_schema=None,
+            relation_metadata=None,
+            relation_dialect=None,
+            target_projection=None,
+            mssql_transaction_admission=base.admission,
+            mssql_target_mutation_plan=base.mutation_plan,
+            require_completed_extraction=lambda: base.source_lifecycle,
+        )
+        sink = SimpleNamespace(connector=connector, _strategy_map={LoadStrategy.FULL_REFRESH: strategy})
+        preparer = MssqlNativeStagePreparer(sink, lambda *args: context)
+        prepared = preparer.stage(config, payload)
+        assert prepared.staging.row_count == sum(counts)
+        assert [row["n"] for row in connector.tables[strategy._staging_name(prepared.staging)]] == [7] * sum(counts)
+        if len(counts) > 1:
+            assert any(" UNION ALL " in sql for sql in connector.statements)
+        assert journal.state["stage"]["consumed_payload_evidence"]["actual_native_rows"] == sum(counts)
+        preparer.reverify(prepared)
+        # One initial dual digest plus an independent prepublication full digest.
+        # Restoring below deliberately adds another boundary and therefore a scan.
+>       assert len(connector.typed_readbacks) == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = len(['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n], [__dpon...__row_id], [__dpone__extracted_at] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'])
+E        +    where ['SELECT [n] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]', 'SELECT [n], [__dpon...__row_id], [__dpone__extracted_at] FROM [db].[stage].[dpone_native_prepared_26f3fd1f103092d7102ecd8d9dc877900b074494]'] = <tests.test_mssql_native_staged_prepare.MemoryConnector object at 0x1087b3680>.typed_readbacks
+
+tests/test_mssql_native_staged_prepare.py:221: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mssql_native_chunks_execution.py::test_scheduler_reuses_frame_size_with_real_spawned_workers[rows0]
+FAILED tests/test_mssql_native_chunks_execution.py::test_scheduler_reuses_frame_size_with_real_spawned_workers[rows1]
+FAILED tests/test_mssql_native_staged_prepare.py::test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[False-counts0]
+FAILED tests/test_mssql_native_staged_prepare.py::test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[False-counts1]
+FAILED tests/test_mssql_native_staged_prepare.py::test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[False-counts2]
+FAILED tests/test_mssql_native_staged_prepare.py::test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[True-counts0]
+FAILED tests/test_mssql_native_staged_prepare.py::test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[True-counts1]
+FAILED tests/test_mssql_native_staged_prepare.py::test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepared_identity[True-counts2]

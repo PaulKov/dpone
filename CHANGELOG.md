@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Changed
+
+- Reduce bounded native MSSQL preparation to one metadata-bearing INSERT and one
+  dual-digest iterator; preserve all four raw checks and the independent prepared
+  prepublication check. Reuse frame sizes without removing native-file validation.
+- Add optional bounded phase observations and offline benchmark comparison with
+  explicit missing-evidence results. Existing manifests, bytes, journals and
+  recovery remain compatible. SQL Server partition SWITCH is an isolated,
+  unregistered component; public native SWITCH remains rejected before I/O.
+  See [delivery acceleration](docs/delivery-acceleration/index.md). Live fidelity
+  and measured performance remain unverified.
+
+### Fixed
+
+- Verify benchmark configuration and full environment checksums before accepting
+  retained proofs. Permit the tested dpone version to differ across comparable
+  subjects while retaining all dependency, server, layout and resource checks.
+- Keep the delivery benchmark launch compatible with the pinned baseline's
+  canonical limit model. Require the final report verdict in both live delivery
+  tests, including identity failures detected after successful component proofs.
+
 ## 0.77.1 - 2026-09-11
 
 ### Fixed

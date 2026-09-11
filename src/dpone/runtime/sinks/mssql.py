@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 
 from dpone.config.load_strategy import LoadStrategy
 from dpone.config.mssql_strategy_contract import normalize_mssql_load_strategy
-from dpone.contracts.mssql_type_contract import MssqlCatalogColumn
 from dpone.manifest.mssql_native_policy import native_requested, validate_native_config
 from dpone.readiness.physical_apply import DdlExecutionRequest
 from dpone.readiness.schema_evolution import SchemaPlan
@@ -39,6 +38,7 @@ from dpone.runtime.support.mssql_object_name import MSSQLObjectName
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
+    from dpone.contracts.mssql_type_contract import MssqlCatalogColumn
     from dpone.ports.mssql_connector import MSSQLConnectorPort
 
 

@@ -1,0 +1,22 @@
+[
+  {
+    "origin": "/tmp/dpone-ipc-fixture-review-r0ck4qcg/review-environment.json",
+    "retained": "review-environment.json",
+    "sha256": "c0f3b94d59778f9400e8fdaa7a7c739fad7f10286b06211fbbb21d0639ff3214"
+  },
+  {
+    "origin": "/tmp/dpone-ipc-fixture-review-r0ck4qcg/focused-junit.xml",
+    "retained": "focused-junit.xml",
+    "sha256": "d687f061faf212427319bad5af9ae11d05a29e63cc9cef0a670f95a38fee98c7"
+  },
+  {
+    "origin": "/tmp/dpone-ipc-fixture-review-r0ck4qcg/focused.log",
+    "retained": "focused.log",
+    "sha256": "175b313777feaca8377195a574776cdc5425e1772020e29565b02770dd06227e"
+  },
+  {
+    "origin": "/tmp/dpone-ipc-fixture-review-r0ck4qcg/independent-causality.json",
+    "retained": "independent-causality.json",
+    "sha256": "b38826de6bd12bc1ba4915fbdbea10c1331d3d01c9335ebeffa9292792cf55c1"
+  }
+]

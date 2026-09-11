@@ -1,0 +1,18 @@
+usage: native_delivery_live_benchmark.py [-h]
+                                         {run,inspect,recover,cleanup} ...
+
+Opt-in real-row harness. No service discovery occurs on import/help/absence.
+
+positional arguments:
+  {run,inspect,recover,cleanup}
+    run                 Write one run envelope; no approval writes SKIP
+                        without loading the factory.
+    inspect             Verify retained evidence and list eligible trial count
+                        without services.
+    recover             Reattach an existing owned invocation; never provision
+                        new objects.
+    cleanup             Reattach an existing owned invocation; never provision
+                        new objects.
+
+options:
+  -h, --help            show this help message and exit

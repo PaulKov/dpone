@@ -1,0 +1,43 @@
+{
+  "source_commit": "7c25ce910ff4e3a929b46aa01237840ae92ef512",
+  "run_id": 34519291252,
+  "repository": "PaulKov/dpone",
+  "artifact": "agent-pr-receipt",
+  "command": [
+    "gh",
+    "run",
+    "download",
+    "34519291252",
+    "--name",
+    "agent-pr-receipt",
+    "--dir",
+    "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt"
+  ],
+  "files": [
+    {
+      "path": "agent-pr-receipt/agent_audit_manifest.json",
+      "sha256": "5586482c52d7d07dd1cc09ca3007604ec5f1cfb60d0911b784ced27b220190bd"
+    },
+    {
+      "path": "agent-pr-receipt/agent_pr_receipt.json",
+      "sha256": "897e685b74f8fbf70f0ced6089fc007b1973570c935157625070e150df96d1de"
+    },
+    {
+      "path": "agent-pr-receipt/pr-body.md",
+      "sha256": "2738d3f28fdf9cb9dba0ad03951425863bcc4f604c86b5f9653f77b6908aa906"
+    },
+    {
+      "path": "agent-pr-receipt/pr-changed-paths.txt",
+      "sha256": "446c054414bc56e3de6f66c4c50c595cdf5fea71e6476834a669472c1fec0506"
+    },
+    {
+      "path": "agent-pr-receipt/pr-head-sha.txt",
+      "sha256": "d25c7b29af7ab46b91fd967f0687396a222ba547f487977ea7bc441246b0b7aa"
+    },
+    {
+      "path": "agent-pr-receipt/pr-receipt-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    }
+  ],
+  "scope": "Provider artifact downloaded unchanged; required status checks and head are separately observed through run_check receipts."
+}

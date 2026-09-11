@@ -1,0 +1,9 @@
+{
+  "platform_temp": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T",
+  "basetemp": "/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/dpone-dda06-full-zlth2h70/pytest",
+  "effective_gid": 20,
+  "root_gid": 20,
+  "sgid_requested": "0o2777",
+  "sgid_observed": "0o2777",
+  "status": "PASS"
+}

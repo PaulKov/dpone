@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "name": "review-fixes-red",
+  "command": [
+    "uv",
+    "run",
+    "pytest",
+    "tests/test_native_delivery_baseline_compatibility.py",
+    "tests/test_native_delivery_live_entrypoints.py",
+    "-q",
+    "--tb=short"
+  ],
+  "source_before": {
+    "commit": "14bebb61f46d0d10c41b1a19bc44b64e1d752275",
+    "tree": "8e6dedeab376d4b6a2e39dcebbf87b04633cb99d",
+    "source_sha256": "08b453228ba7a7cac36f4efe507e6104f3eaa6ae1f50fdfe49447c6e5ceb3734",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "FAIL",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "review-fixes-red.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "14bebb61f46d0d10c41b1a19bc44b64e1d752275",
+    "tree": "8e6dedeab376d4b6a2e39dcebbf87b04633cb99d",
+    "source_sha256": "08b453228ba7a7cac36f4efe507e6104f3eaa6ae1f50fdfe49447c6e5ceb3734",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 1,
+  "duration_seconds": 5.658,
+  "log_sha256": "9e12ae4b2d059a3d50b222526f8e5c4b1f2c4662d91ccda6fb4e3906f64c2f5d"
+}

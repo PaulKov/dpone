@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.mssql_physical_design import MssqlPhysicalDesignContract
-from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
 from dpone.readiness.physical_state import PhysicalTableState
 from dpone.readiness.schema_evolution import ColumnDef
 from dpone.runtime.sinks.mssql_filegroup_authority import resolve_mssql_physical_filegroups
@@ -46,6 +45,9 @@ from dpone.runtime.sinks.strategies.mssql.mssql_strategy_metadata import (
 from dpone.runtime.support.mssql_snapshot_projection import (
     resolved_mssql_target_column_type,
 )
+
+if TYPE_CHECKING:
+    from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
 
 
 @dataclass(frozen=True, slots=True)

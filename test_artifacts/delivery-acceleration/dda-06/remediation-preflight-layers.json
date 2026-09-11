@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "name": "remediation-preflight-layers",
+  "command": [
+    "uv",
+    "run",
+    "dpone",
+    "docs",
+    "check-layer-metrics",
+    "--baseline",
+    "docs/layer_metrics_baseline.json"
+  ],
+  "source_before": {
+    "commit": "2f44960964be27f708873223c98c9dfdac17a9c9",
+    "tree": "8ec15196f64efa10769074c4f95c7a55ae9e3b28",
+    "source_sha256": "5dd0939de61cc884ae706b61af4038a2c1fffe034e3294c7b976365df49f0082",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "remediation-preflight-layers.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "2f44960964be27f708873223c98c9dfdac17a9c9",
+    "tree": "8ec15196f64efa10769074c4f95c7a55ae9e3b28",
+    "source_sha256": "5dd0939de61cc884ae706b61af4038a2c1fffe034e3294c7b976365df49f0082",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 4.179,
+  "log_sha256": "a282ff553f588b34c20d802902273d6bef43f0a645b1ea73f6fbbc8cd55f850e"
+}

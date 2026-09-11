@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "source_commit": "fe80a578141bf664b8160a00cda4533c9af8b70f",
+  "contract": "test_artifacts/delivery-acceleration/planning-amendments/dda-06-native-annotation-scope.yml",
+  "contract_sha256": "865cd8346fd911cc187251aed78a3e670ae1a63341af74ac3809e0b5e662ec5b",
+  "status": "PASS",
+  "owned_paths": [
+    "CHANGELOG.md",
+    "docs/adr-index.md",
+    "docs/adr/0062-isolated-mssql-switch-activation.md",
+    "docs/architecture.md",
+    "docs/delivery-acceleration/index.md",
+    "docs/delivery-acceleration/operations.md",
+    "docs/mssql-native-transport.md",
+    "mkdocs.yml",
+    "src/dpone/runtime/etl/mssql_fresh_target_preplan.py",
+    "src/dpone/runtime/etl/mssql_operation_lease.py",
+    "src/dpone/runtime/mssql_native_chunks.py",
+    "src/dpone/runtime/mssql_native_chunks_observations.py",
+    "src/dpone/runtime/mssql_native_runtime.py",
+    "src/dpone/runtime/sinks/mssql.py",
+    "src/dpone/runtime/sinks/mssql_filegroup_authority.py",
+    "src/dpone/runtime/sinks/mssql_native_composition.py",
+    "src/dpone/runtime/sinks/mssql_native_import.py",
+    "src/dpone/runtime/sinks/mssql_native_prepare.py",
+    "src/dpone/runtime/sinks/mssql_target_mutation_plan.py",
+    "src/dpone/runtime/sinks/strategies/mssql/mssql_native_staging.py",
+    "src/dpone/runtime/sinks/strategies/mssql/mssql_native_staging_checks.py",
+    "src/dpone/runtime/state/mssql_database_authority_support.py",
+    "test_artifacts/delivery-acceleration/dda-06/after-six-annotations-layers.log",
+    "test_artifacts/delivery-acceleration/dda-06/annotation-staging-regression.log",
+    "test_artifacts/delivery-acceleration/dda-06/before-annotations-architecture.json",
+    "test_artifacts/delivery-acceleration/dda-06/before-annotations-architecture.log",
+    "test_artifacts/delivery-acceleration/dda-06/before-annotations-layers.json",
+    "test_artifacts/delivery-acceleration/dda-06/before-annotations-layers.log",
+    "test_artifacts/delivery-acceleration/dda-06/check-selection-integrated.md",
+    "test_artifacts/delivery-acceleration/dda-06/check-selection-preparation.md",
+    "test_artifacts/delivery-acceleration/dda-06/dependencies.md",
+    "test_artifacts/delivery-acceleration/dda-06/docs-preflight.json",
+    "test_artifacts/delivery-acceleration/dda-06/docs-preflight.log",
+    "test_artifacts/delivery-acceleration/dda-06/environment-sync.log",
+    "test_artifacts/delivery-acceleration/dda-06/finalizer-clock-regression.log",
+    "test_artifacts/delivery-acceleration/dda-06/format-preflight.log",
+    "test_artifacts/delivery-acceleration/dda-06/green-frames.log",
+    "test_artifacts/delivery-acceleration/dda-06/green-preparation.log",
+    "test_artifacts/delivery-acceleration/dda-06/green-tamper-boundaries.log",
+    "test_artifacts/delivery-acceleration/dda-06/integration-plan.md",
+    "test_artifacts/delivery-acceleration/dda-06/module-size-preparation-frames.log",
+    "test_artifacts/delivery-acceleration/dda-06/mutable-buffer-regression.log",
+    "test_artifacts/delivery-acceleration/dda-06/native-focused.json",
+    "test_artifacts/delivery-acceleration/dda-06/native-focused.log",
+    "test_artifacts/delivery-acceleration/dda-06/observation-review.md",
+    "test_artifacts/delivery-acceleration/dda-06/observation-typing-first.log",
+    "test_artifacts/delivery-acceleration/dda-06/observation-wiring-first.log",
+    "test_artifacts/delivery-acceleration/dda-06/observation-wiring-reviewed.log",
+    "test_artifacts/delivery-acceleration/dda-06/preflight-review.md",
+    "test_artifacts/delivery-acceleration/dda-06/producer-consumer-first.log",
+    "test_artifacts/delivery-acceleration/dda-06/producer-consumer-green.log",
+    "test_artifacts/delivery-acceleration/dda-06/red-integrated.log",
+    "test_artifacts/delivery-acceleration/dda-06/red-observation-wiring.log",
+    "test_artifacts/delivery-acceleration/dda-06/red-structural.log",
+    "test_artifacts/delivery-acceleration/dda-06/ruff-preflight.log",
+    "test_artifacts/delivery-acceleration/dda-06/run_check.py",
+    "test_artifacts/delivery-acceleration/dda-06/scoped-final-architecture.json",
+    "test_artifacts/delivery-acceleration/dda-06/scoped-final-architecture.log",
+    "test_artifacts/delivery-acceleration/dda-06/scoped-final-layers.json",
+    "test_artifacts/delivery-acceleration/dda-06/scoped-final-layers.log",
+    "test_artifacts/delivery-acceleration/dda-06/source-imports.json",
+    "test_artifacts/delivery-acceleration/dda-06/source-imports.log",
+    "test_artifacts/delivery-acceleration/dda-06/source-modules-full-sha.json",
+    "test_artifacts/delivery-acceleration/dda-06/source-modules-full-sha.log",
+    "test_artifacts/delivery-acceleration/dda-06/source-modules.json",
+    "test_artifacts/delivery-acceleration/dda-06/source-modules.log",
+    "test_artifacts/delivery-acceleration/dda-06/source-typing.json",
+    "test_artifacts/delivery-acceleration/dda-06/source-typing.log",
+    "test_artifacts/delivery-acceleration/dda-06/supplemental-contracts/dda-01-observations.yml",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/baseline/delivery-32c45089eee84a71949ce8daccf914f2/failure-recovery-correctness.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/baseline/delivery-32c45089eee84a71949ce8daccf914f2/failure-recovery-observation.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/baseline/delivery-32c45089eee84a71949ce8daccf914f2/sample-correctness.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/baseline/delivery-32c45089eee84a71949ce8daccf914f2/sample-observation.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/baseline/delivery-32c45089eee84a71949ce8daccf914f2/type-fidelity-correctness.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/baseline/delivery-32c45089eee84a71949ce8daccf914f2/type-fidelity-observation.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/baseline/run.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/delivery-a919200d3225452f899a2fa2bb7d8630/failure-recovery-correctness.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/delivery-a919200d3225452f899a2fa2bb7d8630/failure-recovery-observation.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/delivery-a919200d3225452f899a2fa2bb7d8630/sample-correctness.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/delivery-a919200d3225452f899a2fa2bb7d8630/sample-observation.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/delivery-a919200d3225452f899a2fa2bb7d8630/type-fidelity-correctness.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/delivery-a919200d3225452f899a2fa2bb7d8630/type-fidelity-observation.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/candidate/run.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/commands.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/comparison.json",
+    "test_artifacts/delivery-acceleration/measurement/absence-demo/limits.json",
+    "test_artifacts/delivery-acceleration/measurement/run_absence_demo.py",
+    "tests/test_mssql_native_chunks_execution.py",
+    "tests/test_mssql_native_delivery_integration.py",
+    "tests/test_mssql_native_runtime.py",
+    "tests/test_mssql_native_staged_finalizer.py",
+    "tests/test_mssql_native_staged_prepare.py"
+  ],
+  "reviewed_imports_excluded_from_own_path_audit": [
+    {
+      "commit": "8826852b1cf901f2173ac15772d509e94ea73b6b",
+      "original": "85e598c76b560d2617e1fd3b80fa65bee3d0745c"
+    },
+    {
+      "commit": "a3c3a2ecec879a8a4bddc47df6e52e9f207cd21f",
+      "original": "3dea445d22d7b88b83c37d8f6383670cb6f91447"
+    },
+    {
+      "commit": "f8ef4d8baf9df0c14f35c4ec8bf393d4fcdad93c",
+      "original": "3f37418f898bcd60f475ede8fbd89ca5ad24c7a4"
+    },
+    {
+      "commit": "f9e0c37e447c846b45f16b96f69efeeea8f68990",
+      "original": "a029878ac638c8ad7a2a59c28ac503fa860e7e9d"
+    },
+    {
+      "commit": "79aad2a40760df38a37bc8f3d8e78a3422ed1195",
+      "original": "ad5c117f89c7df33f2bdc2e1aa42d671ca8e0f1b"
+    },
+    {
+      "commit": "4d3152cea62d26161225ba94d4c2715ec6263112",
+      "original": "9795f01cb9a7ad01f404ce69e1356fa2aa32a399"
+    },
+    {
+      "commit": "b8999cc33ef7a6f1eeec06f360c66c9a931c8a32",
+      "original": "d8b09de644ab3bf72f9eee7b51cc8b8e38ca8a3c"
+    },
+    {
+      "commit": "9be1a4c4373991f89a1c059c96cddd39b9fd800f",
+      "original": "4edfb91fb160acb3e1a7505d0e1393e4bf8daeff"
+    },
+    {
+      "commit": "1887352a0aac6e3c8dca14684f0182b697154224",
+      "original": "b8ae950b82449575d181da751bad39231c95d4d8"
+    },
+    {
+      "commit": "db0077f1b21f15e08d79bdf57f8f57f3d3aa0758",
+      "original": "94bbd3c747c842c355a0dda2e93bba9e714f1d8d"
+    },
+    {
+      "commit": "4ed4004f3ed04947f03c2db8c05574f88d7f8af5",
+      "original": "7912df97987db228e2f2e8e52540939af474669b"
+    },
+    {
+      "commit": "62558a6f956e0a70443a95e6b573ca0b0ab7b463",
+      "original": "d406dbf5644b02cd8483f3990249e55c075b0e54"
+    },
+    {
+      "commit": "bd3bc67e9cb59f758291bbb2ad6ec7f01450f1e2",
+      "original": "5cc2296b2f01cc0f6181880a69ee411dae1f2ef0"
+    },
+    {
+      "commit": "5bd0b6748eace9a1c2f93027d36b8c35d852d38b",
+      "original": "518cc16bd5971bebd784497d4196c69759ca2561"
+    },
+    {
+      "commit": "b77266a7418bf66d577d9051039d7393d1b57fb4",
+      "original": "f09af019e291113cf88c5f0525e9e49670087769"
+    },
+    {
+      "commit": "fe789e6208f7c8a5d71a42d29130d298040d8f0b",
+      "original": "957c239ab2964b54bda41c99dad6877d4ddf9602"
+    },
+    {
+      "commit": "8a237fe82b5986ce3b6e7078ca90a0d2ea5e8ad3",
+      "original": "7fcdabd43ed8656f1de52415fa66d8b7db6befd4"
+    },
+    {
+      "commit": "a4db8b288f29e2c1a49b1bb1e278710d017f7018",
+      "original": "3e578759fc531f4a7701d977241f327b28883417"
+    },
+    {
+      "commit": "9466d0857dd56c78b93c01923fc464d402810397",
+      "original": "ad9d96bce22a3514caaf70b0007251f1dc0c89f2"
+    },
+    {
+      "commit": "36657d6bb78a104034f521c4573682f3dbaed499",
+      "original": "039fe201c9c24c9f95f1b2af55794c384b2299c5"
+    },
+    {
+      "commit": "cec722ceaa06a84d428416f7885cec384e8465d2",
+      "original": "5761738a123f349507e3a13f075699181f450123"
+    },
+    {
+      "commit": "1206de6acdd00df3d76c349269b6d7a078cb489d",
+      "original": "61bcebc0c96b4db535bd4494de6f30cb15d11d18"
+    },
+    {
+      "commit": "fe80a578141bf664b8160a00cda4533c9af8b70f",
+      "original": "006e0a1852a10e3f0a519b94edfc79f94c476d65"
+    }
+  ],
+  "violations": []
+}
