@@ -21,6 +21,10 @@ from dpone.contracts.dbt_runtime import (
     validate_dbt_runtime_release_identity,
     validate_dbt_runtime_source_projection,
 )
+from dpone.runtime.composition_verified_dispatch import (
+    RUNTIME_RELEASE_ADMISSION_ENV,
+    release_composition_admission,
+)
 from dpone.runtime.dbt_project_bundle import verify_dbt_project_bundle_tree
 from dpone.runtime.deployment_cache_common import DeploymentCacheError, open_regular_file
 from dpone.runtime.init_fetch_contract import InitFetchError, cache_relative_path
@@ -123,6 +127,7 @@ class VerifiedPackLauncher:
             except Exception as exc:
                 raise _launcher_error("dbt project bundle worktree verification failed") from exc
         argv, environment = _selected_command(pack, plan)
+        admission = _runtime_release_admission(payloads[plan.release.artifact_ref])
         # Separate hooks hydrate the same canonical connections as the runtime.
         # Both receive only the context whose artifacts were verified above.
         environment = {
@@ -132,6 +137,11 @@ class VerifiedPackLauncher:
                 artifact_root=self._artifact_root,
             ).as_posix(),
         }
+        # A pack can never supply its own admission: only authenticated release
+        # bytes may add the marker, and legacy releases keep no marker at all.
+        environment.pop(RUNTIME_RELEASE_ADMISSION_ENV, None)
+        if admission is not None:
+            environment[RUNTIME_RELEASE_ADMISSION_ENV] = admission
         _validate_worktree_command(
             argv,
             root=self._worktree_root,
@@ -156,6 +166,13 @@ class VerifiedPackLauncher:
                 else "xcom_gate"
             ),
         )
+
+
+def _runtime_release_admission(payload: bytes) -> str | None:
+    try:
+        return release_composition_admission(payload)
+    except ValueError as exc:
+        raise _launcher_error("verified release authority could not be projected") from exc
 
 
 def _runtime_connection_context_path(
@@ -312,6 +329,7 @@ def _launcher_error(message: str) -> InitFetchError:
 
 __all__ = [
     "RUNTIME_CONNECTION_CONTEXT_ENV",
+    "RUNTIME_RELEASE_ADMISSION_ENV",
     "VerifiedPackCommand",
     "VerifiedPackLauncher",
 ]
