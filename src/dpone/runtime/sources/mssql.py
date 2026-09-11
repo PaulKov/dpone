@@ -6,12 +6,16 @@ from typing import TYPE_CHECKING, Any
 
 from dpone.config.load_strategy import LoadStrategy
 from dpone.contracts.mssql_source_checkpoint import MssqlTransactionCheckpointMode
-from dpone.contracts.target_max_incremental_cursor import assert_target_max_mssql_cursor_supported
 from dpone.runtime.internal_query_capability import InternalQueryCapabilityDecision
 from dpone.runtime.sources.extract_result import ExtractResult
 from dpone.runtime.sources.source_protocol import AbstractSource
 from dpone.runtime.sources.strategies.base import SourceStrategy
 from dpone.runtime.sources.strategies.mssql import MSSQLFullExtractStrategy, MSSQLIncrementalExtractStrategy
+
+# Preserve the historical helper import as an identity re-export.
+from dpone.runtime.sources.strategies.mssql.mssql_incremental import (
+    assert_target_max_mssql_cursor_supported as assert_target_max_mssql_cursor_supported,
+)
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
@@ -98,10 +102,5 @@ class MSSQLSource(AbstractSource):
         if strategy is None:
             raise ValueError(f"Unsupported MSSQL load strategy: {load_config.load_strategy.value}")
         if strategy is self._incremental_extract:
-            options = getattr(load_config, "options", {}) or {}
-            assert_target_max_mssql_cursor_supported(
-                source_type=self.target_max_cursor_source_type,
-                configured_sink=options.get("sink_type") or options.get("target_type"),
-                sink_connector=self.sink_connector,
-            )
+            MSSQLIncrementalExtractStrategy.require_source_route_safe(load_config, self)
         return strategy

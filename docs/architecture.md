@@ -1734,3 +1734,30 @@ all readers before using v3. Composition activation is unavailable until physica
 admission covers every constituent; see the
 [contracts](release-composition-reference.md) and
 [migration and recovery guide](release-composition-operations.md).
+
+The [parent activation contract](composition-activation-contract.md) adds a
+separate full-composition coordinator without changing native-v2 authority.
+Default activation remains unavailable pending protected backend/worker
+integration and actual downstream evidence.
+
+### Composition implementation boundaries
+
+The foundation keeps pure identity/document validation separate from occurrence
+models, and generic SQL catalog vocabulary separate from the concrete ledger
+layout. Activation preparation and lifecycle share one saga owner; pure DDL
+rendering remains separate from live catalog inspection. Snapshot subjects own
+their pure consistency checks while the injected publisher retains all I/O,
+observation ordering and unknown-outcome recovery. Immutable snapshot subjects
+and observations have a separate contract owner from intent, state transitions
+and durable record codecs; historical public model imports retain identity.
+
+Import domain models from their documented `dpone.contracts` paths and
+capabilities from their documented `dpone.ports` paths. The new internal
+composition modules defer annotation-only dependencies. Newly introduced
+Protocol methods therefore expose string annotations; this refines unreleased
+implementation metadata and does not change the published native-v2 annotation
+contract. Dataclass field types, runtime bases and supported reexports remain
+available at runtime. Incidental imported model aliases are not additional supported API paths; reflective
+`typing.get_type_hints` callers must supply the appropriate contract namespace.
+This annotation convention does not remove executed type checks or change
+signed document shapes, fingerprints, SQL or execution authority.

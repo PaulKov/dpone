@@ -86,12 +86,16 @@ class OrdinaryPackClosureVerifier:
                 mode=pack["mode"],
                 runner_policy=pack["runner_policy"],
                 include_live_gates=False,
+                # State-bearing MSSQL sources are authored before deployment
+                # bindings exist. Reproduce their declared logical outlets;
+                # physical authority is checked only after sealed bindings.
+                outlet_binding="logical" if "state" in manifest else "physical",
             ).to_jsonable()
             # All executable views, including every bootstrap command, process
             # plan, pod projection and compatibility shell command, are checked.
             if _source_semantics(rebuilt) != _source_semantics(pack):
                 raise OrdinaryReleaseInventoryError(
-                    "ordinary pack differs from its declarative producer; regenerate with the supported default builder"
+                    "ordinary pack differs from its declarative producer; regenerate state-bearing MSSQL packs with logical outlets and other packs with the default builder"
                 )
             return transfer_relation_write(
                 project_path="standalone",
@@ -142,10 +146,12 @@ class OrdinaryPackClosureVerifier:
     def _require_single_transfer(manifest: object, workload_id: str) -> None:
         if not isinstance(manifest, Mapping) or manifest.get("name") != workload_id:
             raise OrdinaryReleaseInventoryError("ordinary transfer manifest identity is invalid")
-        if set(manifest) - {"name", "description", "source", "sink", "gitops"}:
+        if set(manifest) - {"name", "description", "source", "sink", "state", "gitops"}:
             raise OrdinaryReleaseInventoryError(
                 "ordinary composition supports one plain transfer manifest per workload; batch, authoring and hooks are unsupported"
             )
+        if "state" in manifest:
+            _require_external_mssql_state(manifest["state"], manifest.get("sink"))
         if "gitops" in manifest:
             _require_resource_only_gitops(manifest)
         source = manifest.get("source")
@@ -186,3 +192,30 @@ def _source_semantics(pack: Mapping[str, Any]) -> dict[str, Any]:
     if result.get("connection_projection") in ({}, {"query_overrides": {}}):
         result["connection_projection"] = {}
     return result
+
+
+def _require_external_mssql_state(state: object, sink: object) -> None:
+    """Allow an explicit bounded policy, without inventing runtime defaults.
+
+    This is source-shape admission only. Physical state/target co-location and
+    provisioned table authority still require the runtime's existing verifier.
+    """
+    if (
+        not isinstance(state, Mapping)
+        or set(state) - {"type", "connection_ref", "atomicity", "provisioning", "table"}
+        or state.get("type") != "mssql"
+        or state.get("atomicity") != "target_atomic"
+        or state.get("provisioning") != "external"
+        or not isinstance(state.get("connection_ref"), str)
+        or not state["connection_ref"].strip()
+        or not isinstance(sink, Mapping)
+        or sink.get("type") != "mssql"
+    ):
+        raise OrdinaryReleaseInventoryError("ordinary state requires explicit external target-atomic MSSQL authority")
+    table = state.get("table", {})
+    if (
+        not isinstance(table, Mapping)
+        or set(table) - {"database", "schema", "name"}
+        or any(not isinstance(value, str) or not value.strip() or "\x00" in value for value in table.values())
+    ):
+        raise OrdinaryReleaseInventoryError("ordinary state table coordinates are invalid")

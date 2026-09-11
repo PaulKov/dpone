@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from dpone.contracts.airflow_deployment import current_pointer_violation
 from dpone.runtime.deployment_cache import DeploymentCacheError, DeploymentCacheMaterializer
 from dpone.runtime.deployment_cache_audit import inspect_promotion_audit
 from dpone.runtime.deployment_cache_common import (
@@ -23,6 +22,7 @@ from dpone.runtime.deployment_cache_recovery_models import (
     DeploymentCacheRecoveryPlan,
 )
 from dpone.runtime.deployment_cache_recovery_policy import (
+    assess_pointer,
     has_unidentifiable_current,
     is_audit_only_repair,
     pointer_identity,
@@ -198,7 +198,7 @@ class DeploymentCacheRecoveryPlanner:
                 )
             )
             return None
-        violation = current_pointer_violation(pointer)
+        violation = assess_pointer(pointer).violation
         if violation is not None:
             issues.append(
                 DeploymentCacheRecoveryIssue(

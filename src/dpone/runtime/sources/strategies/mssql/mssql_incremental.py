@@ -14,10 +14,25 @@ from dpone.type_system.source_sink.provenance import SourceRelationDialect
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
+    from dpone.ports.source_cursor_admission import SourceCursorRouteBinding
 
 
 class MSSQLIncrementalExtractStrategy(MSSQLBaseExtractStrategy):
     """Incremental extract using a user-owned monotonic column."""
+
+    @staticmethod
+    def require_source_route_safe(load_config: LoadConfig, binding: SourceCursorRouteBinding) -> None:
+        """Check current facade inputs before invoking the selected strategy.
+
+        Keep options/binding evaluation order. Direct entrypoints retain their
+        independent checks and their own sink binding; no admission is cached.
+        """
+        options = getattr(load_config, "options", {}) or {}
+        assert_target_max_mssql_cursor_supported(
+            source_type=binding.target_max_cursor_source_type,
+            configured_sink=options.get("sink_type") or options.get("target_type"),
+            sink_connector=binding.sink_connector,
+        )
 
     def get_state(self, load_config: LoadConfig) -> dict[str, Any] | None:
         self._assert_route_safe(load_config)

@@ -64,3 +64,9 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0057: Bounded-window publication and recovery authority (Accepted)](adr/0057-bounded-window-atomic-publication.md)
 
 - [ADR 0058: Verified release composition preserves constituent authority (Accepted)](adr/0058-verified-release-composition.md)
+
+- [ADR 0059: Separate complete parent admission from native constituent authority (Accepted)](adr/0059-composition-parent-activation.md)
+
+- [ADR 0060: Explicit authority for isolated synthetic composition execution (Accepted)](adr/0060-nonproduction-composition-authority.md)
+
+- [ADR 0061: Qualification and execution share one physical ownership journal (Accepted)](adr/0061-shared-composition-physical-ownership.md)

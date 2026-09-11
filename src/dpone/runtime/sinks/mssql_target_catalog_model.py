@@ -4,14 +4,13 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
 
-from dpone.contracts.mssql_type_contract import normalize_mssql_physical_type
 from dpone.readiness.schema_evolution import ColumnDef, SchemaPlan
 from dpone.runtime.sinks.mssql_target_catalog_types import (
     canonical_catalog_scalar,
     canonical_mssql_catalog_type,
     mssql_catalog_type_is_text,
-    mssql_catalog_type_shape,
     render_mssql_catalog_type,
+    validated_mssql_catalog_type_shape,
 )
 
 
@@ -334,8 +333,7 @@ def catalog_column_from_definition(
 ) -> MssqlCatalogColumnState:
     """Create the exact standard SQL Server catalog shape for generated DDL."""
 
-    dtype = normalize_mssql_physical_type(column.dtype)
-    base, max_length, precision, scale = mssql_catalog_type_shape(dtype)
+    base, max_length, precision, scale = validated_mssql_catalog_type_shape(column.dtype)
     collation = column.collation or (database_collation if mssql_catalog_type_is_text(base) else None)
     return MssqlCatalogColumnState(
         ordinal=ordinal,
@@ -367,8 +365,7 @@ def altered_catalog_column(
 ) -> MssqlCatalogColumnState:
     """Apply an authorized ALTER COLUMN while preserving unrelated metadata."""
 
-    dtype = normalize_mssql_physical_type(desired.dtype)
-    base, max_length, precision, scale = mssql_catalog_type_shape(dtype)
+    base, max_length, precision, scale = validated_mssql_catalog_type_shape(desired.dtype)
     return replace(
         current,
         system_type_schema="sys",

@@ -1,0 +1,92 @@
+schema_version: 1
+task_id: DPONE-NONPRODUCTION-TRUST-LIVE
+title: Qualify actual isolated SQL trust revision storage
+goal: Execute real append-only SQL trust storage and readback without claiming signatures
+  or worker qualification
+specification: docs/feature-specs/nonproduction-composition-authority.md
+base_commit: 869b11dc38b6011d4e250300b43fd25d113ed7c8
+integrator: root
+acceptance_criteria:
+- Exactly nine unparametrized real SQL cases cover original-byte append/readback,
+  append-only/no replay, revision ABA compare, concurrent next revision, invalid hashes/epochs,
+  schema/trigger drift, transaction lock precondition, lost read acknowledgement and
+  limited provisioner privileges.
+- Use only existing newly disposable runner environment token/loopback container and
+  newly created owned database. Do not connect corporate/externally supplied instances,
+  localARM64 SQL, PyPI or business fixtures.
+- Use actual producer renderer/provider through real DBAPI with separately provisioned
+  pins. Fixture trust documents are storage fixtures only; no genuine signature, grant
+  consumption or worker certification is claimed.
+- Bounded fixed JUnit observations only; never expose credentials, SQL arguments or
+  driver raw messages. Scope sanitizer to exact new live module, preserve unrelated
+  failure reports.
+- Every fault cleanup restores only owned resources and leaves records honest; no
+  blanket evidence fabrication or assertion weakening. Preserve existing store/gate
+  profile IDs.
+- 'No workflow/runner edits here: root owns adding exact trust profile inventory and
+  generated workflow snapshots after independent review.'
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python
+  - runtime
+  - state
+  - evidence
+  - documentation
+  migration_required: false
+owned_paths:
+- tests/integration/composition/test_nonproduction_mssql_trust_live.py
+- tests/integration/composition/nonproduction_mssql_trust_live_support.py
+- tests/test_nonproduction_mssql_trust_live_support.py
+integrator_owned_paths: []
+read_only_paths:
+- src/dpone
+- docs
+- tools
+- tests/integration/composition/mssql_store_live_support.py
+- tests/integration/composition/mssql_gate_live_provisioning.py
+- tests/nonproduction_authority_helpers.py
+- tests/nonproduction_signature_helpers.py
+- pyproject.toml
+- uv.lock
+forbidden_paths:
+- .git
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+shared_file_owner: root
+dependencies:
+- DPONE-NONPRODUCTION-GRANT-SIGNATURE
+required_checks:
+  focused:
+  - support negative/redaction/optin contracts
+  - exact9case collection andexplicitoptoutSKIP
+  broad:
+  - ruff/format/mypy owned files
+  - canonical module size
+  live:
+  - Root will run actual newly isolated Linux x86_64 SQLServer2022 pinned image after
+    exactcommit; no localARM64run
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- An authority change exceeds the separately approved nonproduction-composition-authority
+  amendment.
+- Another writer owns the same semantic contract.
+- A live check would access corporate or private systems.

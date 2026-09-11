@@ -1,0 +1,92 @@
+schema_version: 1
+task_id: DPONE-V3-CURRENT-POINTER-POLICY
+title: Consolidate complete pure current pointer assessment
+goal: Remove repeated current-pointer policy ownership while preserving strict admission and diagnostic
+  recovery behavior.
+specification: docs/feature-specs/composition-activation-execution.md
+base_commit: 9974bcde380db703f616addde080b2388578fddf
+integrator: root
+shared_file_owner: root
+acceptance_criteria:
+- APPROVED behavior-preserving internal refactor. Pure PointerAssessment retains canonical diagnostic
+  IDs even for structurally invalid authorization. Strict current identity rejects the original violation;
+  recovery preserves the existing issue order and independently canonical IDs. Keep pointer_identity and
+  all filesystem/CAS/locking effects unchanged.
+- Own only3 existing runtime paths and1 new test. Preserve all other7941 existing originals and public
+  imports, wire bytes, codes/messages, physical CAS and no-follow checks.
+- Keep all filesystem/transaction/CAS/projection/audit effects in existing callers; new assessment is
+  pure documentary metadata, never authority.
+- Use existing canonical violation/identity rules without weakening them or imposing strict-admission
+  behavior on recovery diagnosis.
+- Run RED/GREEN isolated meaningful policy tests plus unchanged current/recovery/retention compatibility.
+  All4 files <=350 canonical SLOC; observe all architecture gates without exemptions.
+- Use prepared isolated worktree/environment and exact7944-file prerequisite manifest. No other worktree
+  edits, commit, push, live, SQL or PyPI. Root integrates and reviews.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python_api
+  - state
+  migration_required: false
+owned_paths:
+- src/dpone/runtime/deployment_cache_recovery_policy.py
+- src/dpone/runtime/deployment_cache_current_state.py
+- src/dpone/runtime/deployment_cache_recovery.py
+- tests/test_deployment_cache_pointer_policy.py
+integrator_owned_paths: []
+read_only_paths:
+- AGENTS.md
+- src/dpone/AGENTS.md
+- tests/AGENTS.md
+- docs
+- src/dpone/contracts
+- tests/test_airflow_cache_promotion_integrity.py
+- src/dpone/runtime/deployment_cache_recovery_models.py
+- src/dpone/runtime/deployment_cache_common.py
+- src/dpone/runtime/deployment_cache_materializer.py
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- tests/conftest.py
+- docs
+- src/dpone/contracts
+- src/dpone/adapters
+- src/dpone/ports
+- tools
+dependencies:
+- docs/composition-activation-contract.md
+- docs/adr/0061-shared-composition-physical-ownership.md
+- Exact dispatch base and immutable approved contract/prerequisite manifests retained in the implementation
+  evidence; all unowned tracked source originals remain read-only.
+required_checks:
+  focused:
+  - RED/GREEN new policy tests, preserving diagnostic identities for malformed pointers and strict refusal.
+  - Existing current/recovery/promotion/retention/no-follow/CAS compatibility suites.
+  - Scoped Ruff/format, cold explicit4-file mypy, canonical size/import/graph/layer observations, exact
+    source/prerequisite freeze.
+  broad:
+  - Root change-aware integrated required broad gate and independent fresh implementation review.
+  live:
+  - 'N/A: pure internal refactor; only existing temporary-cache tests.'
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
+- Existing strict/recovery error precedence or physical CAS/side effect ordering cannot be preserved.

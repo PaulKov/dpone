@@ -1,0 +1,98 @@
+schema_version: 1
+task_id: DPONE-NONPRODUCTION-SQL-TRUST
+title: Read independently provisioned nonproduction trust revisions
+goal: Read independently provisioned nonproduction trust revisions
+specification: docs/feature-specs/nonproduction-composition-authority.md
+base_commit: 0a340b20120a7ee5ac66b55c90a9dfff051c4a10
+integrator: root
+acceptance_criteria:
+- Add externally installed SQL trust extension and injected read-only NonproductionTrustProvider
+  against the existing protected control connection/service; runtime never installs,
+  updates or discovers pins from grants.
+- Persist full original policy/verifier bytes and exact external hashes/current revocation
+  epoch with independently selected environment and strictly append-only monotonic
+  revisions; fixed renderer and strict original schema/module integrity checks.
+- Read latest complete version on a fresh protected connection, verify external service/environment,
+  exact original bounded byte pins and policy environment/epoch consistency. Expose
+  documentary revision+snapshot for private compare-and-commit bracketing, never a
+  transferable executor permit.
+- Provide narrow same-ledger reread/require-equal revision capability for later admission
+  transaction; no separate commit between future budget and RUNNING writes.
+- Schema must prevent UPDATE/DELETE and revision rollback/reuse/ABA under normal protected
+  provisioner operations, with concurrent append ordering; catalogue/permission assumptions
+  explicit, not inferred from table names.
+- Keep authenticator tuple API and all native/production contracts unchanged; no grant
+  consumption, credential issuance, new signer or worker factory.
+- Cover SQL observation shape/pin/env/epoch/revision errors, unavailable/commit/cleanup
+  behavior, immutable DDL and actual renderer hashes. No fake livePASS or budget change.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python
+  - runtime
+  - state
+  - evidence
+  - documentation
+  migration_required: false
+owned_paths:
+- src/dpone/adapters/nonproduction_mssql_schema.py
+- src/dpone/adapters/nonproduction_mssql_trust.py
+- tests/test_nonproduction_mssql_trust.py
+- tests/test_nonproduction_mssql_schema.py
+integrator_owned_paths: []
+read_only_paths:
+- docs
+- src/dpone/contracts
+- src/dpone/ports
+- src/dpone/runtime
+- src/dpone/adapters/composition_mssql_attempts.py
+- src/dpone/adapters/composition_mssql_store_queries.py
+- src/dpone/adapters/composition_mssql_schema.py
+- src/dpone/adapters/dbapi_lifecycle.py
+- tests/nonproduction_authority_helpers.py
+- tests/nonproduction_signature_helpers.py
+- pyproject.toml
+- uv.lock
+forbidden_paths:
+- .git
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+shared_file_owner: root
+dependencies:
+- DPONE-NONPRODUCTION-GRANT-SIGNATURE
+required_checks:
+  focused:
+  - red-green owned component and relevant old boundary tests
+  broad:
+  - ruff and format owned files
+  - mypy owned files
+  - import rules
+  - layer metrics
+  - canonical module size
+  live:
+  - 'UNVERIFIED: concrete SQL trust extension and full campaign require later isolated
+    Linux qualification'
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- An authority change exceeds the separately approved nonproduction-composition-authority
+  amendment.
+- Another writer owns the same semantic contract.
+- A live check would access corporate or private systems.
