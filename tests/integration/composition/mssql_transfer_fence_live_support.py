@@ -52,6 +52,105 @@ def transfer_batches(database, schema):
     )
 
 
+def observe_transfer_permissions(cursor, credentials=None):
+    """Bounded public or issued-user grants, with no grantee names or SIDs."""
+    predicate = (
+        "x.grantee_principal_id=DATABASE_PRINCIPAL_ID('public')"
+        if credentials is None
+        else "x.grantee_principal_id IN (SELECT principal_id FROM sys.database_principals WHERE name=? OR sid=?)"
+    )
+    cursor.execute(
+        "SELECT TOP (33) x.state,x.class,x.major_id,x.minor_id,x.permission_name,"
+        "CASE WHEN x.class=1 THEN CONVERT(int,OBJECTPROPERTYEX(x.major_id,'IsMSShipped')) END "
+        "FROM sys.database_permissions x WHERE "
+        + predicate
+        + " ORDER BY x.class,x.major_id,x.minor_id,x.permission_name,x.state;",
+        *(() if credentials is None else (credentials.login_name, credentials.login_sid)),
+    )
+    rows = tuple(tuple(row) for row in cursor.fetchall())
+    if len(rows) > 33:
+        raise RuntimeError("transfer_permission_observation_budget")
+    for row in rows:
+        if (
+            len(row) != 6
+            or row[0] not in {"G", "D", "W", "R"}
+            or any(type(value) is not int or not -(2**31) <= value < 2**31 for value in row[1:4])
+            or type(row[4]) is not str
+            or re.fullmatch(r"[A-Z_ ]{1,128}", row[4]) is None
+            or (row[5] is not None and (type(row[5]) is not int or row[5] not in (0, 1)))
+        ):
+            raise RuntimeError("transfer_permission_observation_shape")
+    return {
+        "columns": ["state", "class", "major_id", "minor_id", "permission_name", "object_is_ms_shipped"],
+        "rows": [list(row) for row in rows[:32]],
+        "truncated": len(rows) > 32,
+    }
+
+
+def observe_transfer_user_policy(cursor, schema, credentials):
+    """Same-ledger policy tuple before rollback, replacing identity with booleans."""
+    cursor.execute(
+        "SELECT TOP (2) CASE WHEN p.name=? AND DATALENGTH(p.name)=DATALENGTH(?) THEN 1 ELSE 0 END,"
+        "CASE WHEN p.sid=? THEN 1 ELSE 0 END,p.type,p.authentication_type,"
+        "(SELECT COUNT(*) FROM sys.database_role_members r WHERE r.member_principal_id=p.principal_id),"
+        "(SELECT COUNT(*) FROM sys.database_permissions x WHERE x.grantee_principal_id=p.principal_id "
+        "AND NOT (x.state='G' AND ((x.class=0 AND x.permission_name='CONNECT') OR "
+        "(x.class=1 AND x.major_id=OBJECT_ID(?) AND x.minor_id=0 AND x.permission_name='EXECUTE')))),"
+        "(SELECT COUNT(*) FROM sys.database_permissions x WHERE x.grantee_principal_id=p.principal_id "
+        "AND x.state='G' AND x.class=1 AND x.major_id=OBJECT_ID(?) AND x.minor_id=0 AND x.permission_name='EXECUTE'),"
+        "(SELECT COUNT(*) FROM sys.database_permissions x WHERE x.grantee_principal_id=DATABASE_PRINCIPAL_ID('public') "
+        "AND NOT (x.state='G' AND x.class=0 AND x.permission_name IN "
+        "('CONNECT','VIEW ANY COLUMN ENCRYPTION KEY DEFINITION','VIEW ANY COLUMN MASTER KEY DEFINITION'))) "
+        "FROM sys.database_principals p WHERE p.name=? OR p.sid=?;",
+        credentials.login_name,
+        credentials.login_name,
+        credentials.login_sid,
+        f"[{schema}].[{TRANSFER_PROCEDURE}]",
+        f"[{schema}].[{TRANSFER_PROCEDURE}]",
+        credentials.login_name,
+        credentials.login_sid,
+    )
+    rows = tuple(tuple(row) for row in cursor.fetchall())
+    if len(rows) > 2 or any(
+        len(row) != 8
+        or type(row[2]) is not str
+        or re.fullmatch(r"[A-Z]", row[2]) is None
+        or any(type(value) is not int or not 0 <= value < 2**31 for value in (*row[:2], *row[3:]))
+        for row in rows
+    ):
+        raise RuntimeError("transfer_policy_observation_shape")
+    return {
+        "policy_columns": [
+            "name_matches",
+            "sid_matches",
+            "type",
+            "authentication_type",
+            "role_count",
+            "unexpected_user_permissions",
+            "exact_procedure_execute_count",
+            "unexpected_public_permissions",
+        ],
+        "expected_policy_row": [1, 1, "S", 1, 0, 0, 1, 0],
+        "policy_rows": [list(row) for row in rows],
+        "public_permissions": observe_transfer_permissions(cursor),
+        "user_permissions": observe_transfer_permissions(cursor, credentials),
+    }
+
+
+class ObservedTransferAccess(MssqlCompositionTransferAccess):
+    """Fixture-only read observer; inherited granting and rejection remain exact."""
+
+    def __init__(self, record_property):
+        self.record_property = record_property
+
+    def require(self, ledger, credentials):
+        self.record_property(
+            "dpone.gate.transfer_user_policy",
+            observation_document(observe_transfer_user_policy(ledger.cursor, ledger.schema, credentials)),
+        )
+        super().require(ledger, credentials)
+
+
 class TransferGateCase(GateCase):
     """Retain existing live provisioning/cleanup and select its ordinary transfer."""
 
@@ -125,7 +224,7 @@ class TransferGateCase(GateCase):
             expected_service_id=self.environment.service_id,
             control_database=self.environment.database.database,
             control_schema=self.environment.schema,
-            transfer_access=MssqlCompositionTransferAccess(),
+            transfer_access=ObservedTransferAccess(self.record_property),
         )
 
     def verify_operation(self, attempt, operation, write, mutation_plan_sha256, plan):
@@ -266,6 +365,10 @@ def transfer_fence_environment(gate_environment):
 @pytest.fixture
 def transfer_case(transfer_fence_environment, record_property):
     diagnostics, case = ControlDiagnostics(), None
+    with closing(transfer_fence_environment.connect()) as connection, closing(connection.cursor()) as cursor:
+        record_property(
+            "dpone.gate.transfer_public_before_issue", observation_document(observe_transfer_permissions(cursor))
+        )
     record_property(
         "dpone.gate.transfer_module_catalog", observation_document(observe_transfer_module(transfer_fence_environment))
     )
