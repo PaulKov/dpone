@@ -259,3 +259,37 @@ Next: use the assigned contract and the
 [agent development workflow](agent-development.md); consult the
 [native recovery guide](mssql-native-transport.md#diagnose-and-recover) for
 the state and receipt rules that every optimization preserves.
+
+## Implementation closeout
+
+The bounded implementation is complete in
+[integration PR #37](https://github.com/PaulKov/dpone/pull/37). Its closeout links
+the reviewed source, independent findings and their resolution, exact-head CI,
+and preservation of the parallel 0.77.1 release. The maintainer's subsequent
+2026-09-11 completion instruction authorizes this lifecycle update and integration;
+the original dispatch record and task contracts above remain historical records.
+The specification's `IMPLEMENTED` state describes the code and documentation
+landed through that PR; before merge, its branch remains an integration proposal.
+
+| Task | Completed deliverable | Evidence and user guidance |
+|---|---|---|
+| DDA-01 | Bounded observations, validated report identity and cross-version comparison | [Observations](delivery-acceleration/observations.md) |
+| DDA-02 | One prepared iterator computes both digests; metadata shares the preparation INSERT | [Preparation](delivery-acceleration/preparation.md) |
+| DDA-03 | Scheduler reuses bounded frame sizes; tuple API remains compatible | [Frames](delivery-acceleration/frames.md) |
+| DDA-04 | Isolated catalog, planner and transaction-bound SWITCH executor | [Isolated SWITCH](delivery-acceleration/partition-switch.md) |
+| DDA-05 | Real-row benchmark/certification harness and baseline compatibility | [Certification](delivery-acceleration/certification.md) |
+| DDA-06 | Shared runtime wiring, compatibility, recovery, documentation and independent review | [Overview](delivery-acceleration/index.md) and [operations](delivery-acceleration/operations.md) |
+
+The reviewed implementation at `c1a56b055f079bcc6dd9957300c5494f00b6080c`
+passed all 21 required contexts. Its
+[quality CI run](https://github.com/PaulKov/dpone/actions/runs/34573417026)
+has 16 successful test parts whose verified union covers all 22,149 unique
+non-live scenarios on each of Python 3.11 and 3.12. This population count is not
+a claim of zero skipped tests. The PR records checks for subsequent closeout
+commits separately; historical FAIL/HOLD reports are preserved with their
+original identities and successor evidence.
+
+Existing manifests, wire/journal/checkpoint formats and recovery require no
+migration. Public native SWITCH remains rejected. Live execution is SKIP until
+an approved environment is supplied; measured acceleration and live certification
+remain UNVERIFIED. No version bump or package publication is part of this closeout.
