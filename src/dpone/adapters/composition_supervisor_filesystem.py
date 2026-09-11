@@ -13,9 +13,10 @@ from __future__ import annotations
 import os
 import stat
 import sys
-from pathlib import Path
+from collections.abc import Callable
+from pathlib import Path, PurePosixPath
 
-from dpone.contracts.composition_dbt_outcome import DbtCaptureError
+from dpone.contracts.composition_dbt_outcome import MAX_ARTIFACT_BYTES, DbtCaptureError
 
 PROTECTED_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 
@@ -59,9 +60,69 @@ def open_protected(path: Path, *, traversable: bool = True) -> int:
         raise
 
 
+def read_protected_original(root: Path, relative: str, *, max_bytes: int = MAX_ARTIFACT_BYTES) -> bytes:
+    """Reopen one root-owned original and return its exact current bytes.
+
+    Every component below ``root`` is opened with ``O_NOFOLLOW``, the file must be
+    a single-linked regular root-owned file that no other account can write, and
+    its inode identity plus size must be unchanged across the read. A protected
+    original that was replaced or truncated while being read is rejected rather
+    than hashed, so a mutated artifact can never authorize a dispatch.
+    """
+
+    root = absolute_supervisor_path(root)
+    path = PurePosixPath(relative)
+    if path.is_absolute() or not path.parts or any(part in {".", ".."} for part in path.parts):
+        raise DbtCaptureError("capture_allocation_path")
+    require_supervisor()
+    parent = open_protected(root / path.parent, traversable=False)
+    descriptor = None
+    try:
+        descriptor = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or before.st_uid != 0
+            or before.st_mode & 0o022
+            or not 0 < before.st_size <= max_bytes
+        ):
+            raise DbtCaptureError("capture_preflight_original")
+        chunks = []
+        while chunk := os.read(descriptor, 65536):
+            chunks.append(chunk)
+        payload = b"".join(chunks)
+        after = os.fstat(descriptor)
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+        ) or len(payload) != before.st_size:
+            raise DbtCaptureError("capture_preflight_changed")
+        return payload
+    except OSError:
+        raise DbtCaptureError("capture_preflight_original") from None
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent)
+
+
+def protected_original_reader(root: Path, relative: str) -> Callable[[], bytes]:
+    """Bind one protected original to a reader that reopens it on every call."""
+
+    def read() -> bytes:
+        return read_protected_original(root, relative)
+
+    return read
+
+
 __all__ = [
     "PROTECTED_FLAGS",
     "absolute_supervisor_path",
     "open_protected",
+    "protected_original_reader",
+    "read_protected_original",
     "require_supervisor",
 ]
