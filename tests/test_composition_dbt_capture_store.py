@@ -250,3 +250,62 @@ def test_undispatched_requires_protected_closed_gate_and_no_dispatch(scenario):
     database.data["capture_gate"] = "READY"
     with pytest.raises(DbtCaptureError):
         store.record_dispatch_once(intent, original)
+
+
+@pytest.fixture
+def closed_undispatched(scenario):
+    database, store, intent, _, _, _ = scenario
+    store.register(intent.attempt)
+    database.data["capture_gate"] = "CLOSED"
+    closure = canonical_json_bytes(
+        {
+            "attempt_sha256": intent.attempt.attempt_sha256,
+            "intent_sha256": intent.intent_sha256,
+            "build_dispatched": False,
+            "closed": True,
+        }
+    )
+    observations = []
+
+    def verify(ledger, attempt):
+        observations.append((ledger.require_transaction(), attempt))
+        return closure
+
+    store._verify_closure = verify
+    return database, store, intent, closure, observations
+
+
+@pytest.mark.parametrize("lost_ack", [False, True])
+def test_undispatched_exact_recovery_reobserves_closure_and_fresh_original(closed_undispatched, lost_ack):
+    database, store, intent, closure, observations = closed_undispatched
+    database.fail_commit = lost_ack
+    if lost_ack:
+        with pytest.raises(DbtCaptureError, match="capture_commit_unknown"):
+            store.record_undispatched(intent.attempt)
+    else:
+        store.record_undispatched(intent.attempt)
+    database.fail_commit = False
+    original_rows = dict(database.data["dbt_events"])
+    previous = len(database.connections)
+    store.record_undispatched(intent.attempt)
+    assert len(database.connections) == previous + 2
+    assert len(observations) == 2
+    assert observations[0][0] != observations[1][0]
+    assert database.data["dbt_events"] == original_rows
+    assert store.read_capture(intent.attempt).undispatched_closure_original == closure
+
+
+@pytest.mark.parametrize("fault", ["closure", "gate", "issued_sid"])
+def test_undispatched_recovery_rejects_conflicting_original_or_authority(closed_undispatched, fault):
+    database, store, intent, closure, _ = closed_undispatched
+    store.record_undispatched(intent.attempt)
+    original_rows = dict(database.data["dbt_events"])
+    if fault == "closure":
+        store._verify_closure = lambda ledger, attempt: closure + b" "
+    elif fault == "gate":
+        database.data["capture_gate"] = "READY"
+    else:
+        database.data["capture_principal"] = "mssql-sid:" + "62" * 16
+    with pytest.raises((DbtCaptureError, ValueError)):
+        store.record_undispatched(intent.attempt)
+    assert database.data["dbt_events"] == original_rows

@@ -21,7 +21,12 @@ from tests.integration.composition.mssql_store_live_support import drain_results
 from dpone.adapters.composition_mssql_login_gate import MssqlCompositionLoginGate
 from dpone.adapters.composition_mssql_transaction_binding import MssqlCompositionTransactionBindings
 from dpone.adapters.composition_mssql_transaction_fence import MssqlCompositionTransactionFence
-from dpone.adapters.composition_mssql_transaction_fence_schema import render_composition_mssql_transaction_fence
+from dpone.adapters.composition_mssql_transaction_fence_schema import (
+    TRANSFER_PROCEDURE,
+    module_sha256,
+    render_composition_mssql_transaction_fence,
+    transfer_procedure_sql,
+)
 from dpone.adapters.composition_mssql_transfer_access import MssqlCompositionTransferAccess
 from dpone.contracts.composition_activation import CompositionAdmissionError
 from dpone.contracts.composition_execution import CompositionExecutionPlan
@@ -179,6 +184,71 @@ class TransferGateCase(GateCase):
         )
 
 
+def observe_transfer_module(environment):
+    """Read at most two catalog rows; preserve padding and exact module hashes.
+
+    Never select module text, login names, connection parameters or error text.
+    These observations diagnose admission failure and never alter its decision.
+    """
+    expected = transfer_procedure_sql(environment.schema)
+    rows = environment.sql(
+        "SELECT TOP (2) p.type,CONVERT(int,m.uses_ansi_nulls),CONVERT(int,m.uses_quoted_identifier),"
+        "m.execute_as_principal_id,HASHBYTES('SHA2_256',m.definition),"
+        "CONVERT(int,p.is_auto_executed),CONVERT(int,p.is_execution_replicated),"
+        "p.principal_id,s.principal_id,DATALENGTH(m.definition),"
+        "CONVERT(varchar(4),CONVERT(binary(2),p.type),2) "
+        "FROM sys.procedures p JOIN sys.sql_modules m ON m.object_id=p.object_id "
+        "JOIN sys.schemas s ON s.schema_id=p.schema_id WHERE p.object_id=OBJECT_ID(?,N'P');",
+        f"[{environment.schema}].[{TRANSFER_PROCEDURE}]",
+    )
+    if len(rows) > 2:
+        raise RuntimeError("transfer_module_observation_budget")
+    observed = []
+    for row in rows:
+        if (
+            len(row) != 11
+            or type(row[0]) is not str
+            or len(row[0]) > 2
+            or any(
+                value is not None and (type(value) is not int or not -(2**31) <= value < 2**31)
+                for value in (*row[1:4], *row[5:10])
+            )
+            or (row[4] is not None and (type(row[4]) is not bytes or len(row[4]) != 32))
+            or type(row[10]) is not str
+            or re.fullmatch(r"[0-9A-Fa-f]{4}", row[10]) is None
+        ):
+            raise RuntimeError("transfer_module_observation_shape")
+        observed.append([*row[:4], row[4].hex() if row[4] is not None else None, *row[5:]])
+    return {
+        "columns": [
+            "type",
+            "ansi_nulls",
+            "quoted_identifier",
+            "execute_as_principal_id",
+            "module_sha256",
+            "auto_executed",
+            "execution_replicated",
+            "object_owner_id",
+            "schema_owner_id",
+            "definition_utf16_bytes",
+            "type_binary_hex",
+        ],
+        "expected_auditor_row": [
+            "P",
+            1,
+            1,
+            -2,
+            module_sha256(expected).hex(),
+            0,
+            0,
+            None,
+            1,
+        ],
+        "expected_definition_utf16_bytes": len(expected.encode("utf-16le")),
+        "observed": observed,
+    }
+
+
 @pytest.fixture(scope="session")
 def transfer_fence_environment(gate_environment):
     """Install once using the fixture administrator's pre-trigger lifeline."""
@@ -196,6 +266,9 @@ def transfer_fence_environment(gate_environment):
 @pytest.fixture
 def transfer_case(transfer_fence_environment, record_property):
     diagnostics, case = ControlDiagnostics(), None
+    record_property(
+        "dpone.gate.transfer_module_catalog", observation_document(observe_transfer_module(transfer_fence_environment))
+    )
     try:
         case = TransferGateCase(transfer_fence_environment, record_property, diagnostics=diagnostics)
         yield case

@@ -5,12 +5,12 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import Any
 
-from dpone.adapters.composition_mssql_transaction_fence import MssqlCompositionTransactionFence
 from dpone.contracts.mssql_transaction_governance import (
     MssqlCleanupDisposition,
     MssqlGenericCommitReceipt,
     MssqlTransactionAdmission,
 )
+from dpone.ports.composition_mssql_transaction import CompositionMssqlTransactionFence
 from dpone.runtime.extraction_lifecycle import ExtractionLifecycleReceipt
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 from dpone.runtime.sinks.mssql_receipt_projection import load_result_from_mssql_receipt
@@ -81,7 +81,7 @@ class MssqlGenericTransactionFinalizer:
         target_identity_assertion: Any = assert_mssql_physical_target_identity,
         catalog_revalidator: Any = assert_target_catalog_expectations,
         target_contract_validator: Any | None = None,
-        composition_fence: MssqlCompositionTransactionFence | None = None,
+        composition_fence: CompositionMssqlTransactionFence | None = None,
     ) -> None:
         self._composition_fence = composition_fence
         self._strategy = strategy

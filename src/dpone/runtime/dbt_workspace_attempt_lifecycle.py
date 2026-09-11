@@ -38,6 +38,15 @@ class DbtWorkspaceAttemptLifecycle:
         self._request_factory = request_factory
         self._admission = admission
 
+    @staticmethod
+    def require_target(expected_sha256: str, observed_sha256: str) -> None:
+        """Require profile resolution to retain the locked logical target."""
+        if observed_sha256 != expected_sha256:
+            raise DbtPublishingError(
+                "DPONE_DBT_TARGET_IDENTITY_MISMATCH",
+                "Rendered dbt target identity differs from the release",
+            )
+
     def admit(
         self,
         pack: DbtExecutionPack,

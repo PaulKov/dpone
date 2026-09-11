@@ -148,11 +148,8 @@ class DbtExecutionService:
                 validated_pack.adapter_runtime,
             )
             credential_versions = rendered.credential_versions
-            if rendered.logical_target_sha256 != dbt_target_identity_sha256(invocation_profile):
-                raise DbtPublishingError(
-                    "DPONE_DBT_TARGET_IDENTITY_MISMATCH",
-                    "Rendered dbt target identity differs from the release",
-                )
+            expected_target = dbt_target_identity_sha256(invocation_profile)
+            self._workspace_attempts.require_target(expected_target, rendered.logical_target_sha256)
             output_paths = prepare_dbt_output_paths(
                 Path(run_output_root),
                 validated_pack.target_path,

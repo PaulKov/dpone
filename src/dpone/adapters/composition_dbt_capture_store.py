@@ -135,14 +135,14 @@ class MssqlDbtCaptureStore:
         return events.get("CAPTURE", events.get("UNDISPATCHED"))
 
     def record_undispatched(self, attempt: CompositionAttemptIdentity) -> None:
-        """Prove protected closure and absence of dispatch under one ledger lock."""
+        """Reverify closure under the ledger lock; recover only exact originals."""
         if self._verify_closure is None:
             raise DbtCaptureError("capture_closure_verifier")
         with self._transaction() as ledger:
             registration, events = self._load_in(ledger, attempt)
             intent = registration[0]
             gate = self._authorize(ledger, intent, active=False)
-            if gate.state != "CLOSED" or events:
+            if gate.state != "CLOSED" or set(events) - {"UNDISPATCHED"}:
                 raise DbtCaptureError("capture_undispatched_conflict")
             transaction = ledger.require_transaction()
             closure = self._verify_closure(ledger, attempt)
@@ -161,7 +161,11 @@ class MssqlDbtCaptureStore:
             ):
                 raise DbtCaptureError("capture_undispatched_closure")
             value = DbtCaptureRecord(intent, "UNDISPATCHED", undispatched_closure_original=closure)
-            self._insert(ledger, intent, "UNDISPATCHED", value)
+            previous = events.get("UNDISPATCHED")
+            if previous is None:
+                self._insert(ledger, intent, "UNDISPATCHED", value)
+            elif previous != value:
+                raise DbtCaptureError("capture_undispatched_conflict")
             if self._load_in(ledger, attempt)[1] != {"UNDISPATCHED": value}:
                 raise DbtCaptureError("capture_event_readback")
         if self.read_capture(attempt) != value:
