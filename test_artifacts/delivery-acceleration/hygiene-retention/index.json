@@ -1,0 +1,265 @@
+{
+  "historical_results": "All original PASS, FAIL, errors, skips, node IDs, hashes and producer identities remain unchanged at the original commit and in the verified external archive",
+  "hygiene_archive_sha256": "1c715f804777dd3c12632d89a779da4c3df839ae4cdbf9f476e7283cbe51a868",
+  "hygiene_run_id": 34585752463,
+  "original_retention": {
+    "archive_sha256": "b4c1d695b5aae8a61d23755142514adb0527d81b69397a253a79e76005028832",
+    "files": 796,
+    "inventory_sha256": "42264395c79af082c108261b566ff7f1a6e42df8f7d263c271c2dcac4f2f497b"
+  },
+  "producer_sha256": "7a2b13f9e0d1e825866bd54fd5eacc0c9b6609894dab9cd3ab0f767006c895ce",
+  "relocated_files": [
+    {
+      "git_blob": "53c736ba4f5741e89938aafbed565fad6eca97d5",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-04/focused-junit.xml",
+      "sha256": "5fa2345495b9f25fc02d680666f513a2b6c73feea8836a86c2a3be61f6cad214",
+      "size_bytes": 16661
+    },
+    {
+      "git_blob": "09d8da17d17a183f57a45913cdc79836d0d46ae9",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/final-authority-regressions-junit.xml",
+      "sha256": "71e27e4783c14e3eaa062685dd6c3ad843c9bdc2fa0b48c9ff011d2663e0795a",
+      "size_bytes": 49624
+    },
+    {
+      "git_blob": "8015b7ef5fea7db4f7e9b4f6889bfe9914ec2f18",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/final-full-nonlive-junit.xml",
+      "sha256": "0173767ccfcfbe1e94380cbe214076936b45703646faf93206830099ea19a116",
+      "size_bytes": 6238868
+    },
+    {
+      "git_blob": "c0944daf01442b92121dc548a7093013214e07da",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/final-native-focused-junit.xml",
+      "sha256": "c9bb1f3ccb931af55517aba806eb852fa101fba456e0878ac1a711d9abde33b0",
+      "size_bytes": 77331
+    },
+    {
+      "git_blob": "151e0045664b8925671c2643947a78d8c1e3b61f",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-annotations-baseline-junit.xml",
+      "sha256": "9e3f248861c0f0575a3d9d2f0f587f3957299062ec2e2897135465fd861ccfba",
+      "size_bytes": 929
+    },
+    {
+      "git_blob": "77bf213b61481bbb54b62f04d29d33a1d0f9e069",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-annotations-green-junit.xml",
+      "sha256": "c3726192e43a1b765b8142b29c15f257dbf2c0634a7805cc1092599df0122e0d",
+      "size_bytes": 10646
+    },
+    {
+      "git_blob": "a24b8e399981b4ccf24edab884c91cb3722de450",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-catalog-green-junit.xml",
+      "sha256": "48661321c8bf66f3654deee8311d02027351823801019584eac85ffaa7353a4c",
+      "size_bytes": 17765
+    },
+    {
+      "git_blob": "612352a1ace2ac74384c2cbaadd22fd4da715742",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/population/nodeids.txt",
+      "sha256": "f21b1638e67c819e9b7bead346eb2c089eaa8c7c0ea74cee6c4f6e57aa7fbcd5",
+      "size_bytes": 5167094
+    },
+    {
+      "git_blob": "fc6be9905575d83a6e399439a218d629972d3b3a",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/population/shard-manifest.json",
+      "sha256": "786c7e1377d6a69df95fd03d9fb15f7ae6c744560a5e3ca6c2ab8d1e9bcf2086",
+      "size_bytes": 5409855
+    },
+    {
+      "git_blob": "797c5821a230c6ad5985555e558877bed5503779",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/shards/quality-shard-3.11-0/test_artifacts/ci-quality/receipt.json",
+      "sha256": "5c233268012f65dc409150951b73abcfea0183f135a73e0e762be7db0e322013",
+      "size_bytes": 365065
+    },
+    {
+      "git_blob": "5f08882dd2bdc38a4a012c85102672a49b8e1e53",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/shards/quality-shard-3.11-5/test_artifacts/ci-quality/receipt.json",
+      "sha256": "1e363487b84fc0d9a60a16465a80765a2c2468b59c57d3d7c33c806241beb3e0",
+      "size_bytes": 1415887
+    },
+    {
+      "git_blob": "8822140f6603ab8d0163726e83a61994947d1ec4",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/shards/quality-shard-3.11-7/test_artifacts/ci-quality/receipt.json",
+      "sha256": "91cdeb09b554767f173d826f06ee1eb4a59d3a7c5edc0929205fbe08ddef8184",
+      "size_bytes": 425290
+    },
+    {
+      "git_blob": "1787be16965ec392a2750e7dd44fa5b467abd035",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/shards/quality-shard-3.12-0/test_artifacts/ci-quality/receipt.json",
+      "sha256": "007492f371227dbc6588532cb43c02876874a2b3702584dce1667c72a613e842",
+      "size_bytes": 365065
+    },
+    {
+      "git_blob": "10e8e1a7451e9deb729fb1bcd42da0df87d83e02",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/shards/quality-shard-3.12-5/test_artifacts/ci-quality/receipt.json",
+      "sha256": "7696a354f6c051f3a2a249699389c818e6782554dc222dfe5b45d8131ea99ede",
+      "size_bytes": 1415887
+    },
+    {
+      "git_blob": "acb99586897b6facd08123e979d5397fbf065510",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/shards/quality-shard-3.12-7/test_artifacts/ci-quality/receipt.json",
+      "sha256": "4608a40541063d27c4aec97c97d7ddbb6cab9312cd03b4bb09e032d34a6a6dec",
+      "size_bytes": 425290
+    },
+    {
+      "git_blob": "cff77439e0b93853e97f20b52ce012ddd7f081a6",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-dbt-replay-junit.xml",
+      "sha256": "a2b75745cbb864e51c0262cc9ee035fa9c21955f28ed34e5eecc0782e92867d5",
+      "size_bytes": 13398
+    },
+    {
+      "git_blob": "b4457eeeb8dfde3c9e931773ed5840508dd71a07",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-digest-baseline-junit.xml",
+      "sha256": "142f0f70e00503a5ee1d1770ab73b11c0bb60610bce0ada57c31d6b0cf459edd",
+      "size_bytes": 8053
+    },
+    {
+      "git_blob": "89cfb4ca37b6da3210ca798f75313196b961b0d6",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-digest-errors-junit.xml",
+      "sha256": "7385827245ba39539ecdc5990f5f8c77a2afdd0ef5580197ab747a51fc18be7b",
+      "size_bytes": 9461
+    },
+    {
+      "git_blob": "173b938e6a6d5a7c9ec2400c84b8430006af338f",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-digest-green-junit.xml",
+      "sha256": "e6ebc085028dd154d4b44d6c99ae1aca936d3dcc608a5e7be75f09bca040d194",
+      "size_bytes": 14248
+    },
+    {
+      "git_blob": "83a5cf46eaef91e33ce9f88bc6c85885c6352c2b",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-final-architecture-tests-junit.xml",
+      "sha256": "1760646fdb8aba07382755abd80fa4f658960738b7b8d24fd95c003640708542",
+      "size_bytes": 6218
+    },
+    {
+      "git_blob": "bb56cb172456c6681c1479103c71cf05582ddc4a",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-final-authority-regressions-junit.xml",
+      "sha256": "b8928b8bde1d119ddbb8cb534178ee5cb8aafac72cdef7a2feb3f17781f0b194",
+      "size_bytes": 49624
+    },
+    {
+      "git_blob": "14e884dd59288faa2a9ce33ad9830081bf4c8903",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-final-full-nonlive-junit.xml",
+      "sha256": "e929b92ffaa72fe6e505291f278ef8db6372681590eb032de9ca614f34348230",
+      "size_bytes": 6313710
+    },
+    {
+      "git_blob": "fa1dc0a0b00ed8fd99a40251bd4478850c4883d8",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-final-native-focused-junit.xml",
+      "sha256": "07b0abb3278b361058bc99144924f02dc16f8c55de4c049daa87628d89943cb4",
+      "size_bytes": 83791
+    },
+    {
+      "git_blob": "f0dd12bf2fd81a60d928d739ef106ef05dbbf21f",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ipc-fixture-final-junit.xml",
+      "sha256": "644a2a7fd3ba5970bfd2fd013b90a771f887ada59b8fddfd61693bede090f4dd",
+      "size_bytes": 10773
+    },
+    {
+      "git_blob": "abc4f22ef9c7ae7dff0f8fb79f9ffaebdde1a6b6",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ipc-fixture-green-junit.xml",
+      "sha256": "89198d5df0f26e97dc9799dae077ea1ea91f1606a769650ba271ac2434f4ac96",
+      "size_bytes": 10615
+    },
+    {
+      "git_blob": "ca3768b0a1544a546f6956c2a604ec6a364c7f0e",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ipc-fixture-red-junit.xml",
+      "sha256": "f2e81bfd1aa4dbfee1cb7fa1e74f29691bd2f821d90539c2c892b7d7eb257fab",
+      "size_bytes": 3568
+    },
+    {
+      "git_blob": "c374b0dc0f0b7972f5f91127d3106614205922ad",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ipc-independent/focused-junit.xml",
+      "sha256": "d687f061faf212427319bad5af9ae11d05a29e63cc9cef0a670f95a38fee98c7",
+      "size_bytes": 11877
+    },
+    {
+      "git_blob": "748a867b225851b8c0685f6e46bca56783ef7ae2",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-retry-architecture-tests-junit.xml",
+      "sha256": "3deb4d3611b5c0e5b09f374a1cccdcaef75710e3f2e3929ce6f393dc0b9dcee7",
+      "size_bytes": 6220
+    },
+    {
+      "git_blob": "8e0303221c7cebb231e1f098456569f67dcb6e23",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-retry-authority-regressions-junit.xml",
+      "sha256": "7dc6e227c774efa20b01efe0aef78c0fa2a95dd4e85ab9350b6107f342b00283",
+      "size_bytes": 49624
+    },
+    {
+      "git_blob": "95b847074df0a6f94f486f7b668e402fbb618c03",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-retry-full-nonlive-junit.xml",
+      "sha256": "8098f5bc4839f3f709fa9121191f40505c46d102fd1c35a18ab5c891652e9f5b",
+      "size_bytes": 6245931
+    },
+    {
+      "git_blob": "11a15e079ef1939d9ff6204c433262fc2224a5b4",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-retry-native-focused-junit.xml",
+      "sha256": "14a4c47ff1a7a1f641c4dc09b7047e329a6bf7c81680a8e896ed94064d1a11c3",
+      "size_bytes": 84128
+    },
+    {
+      "git_blob": "9ffdc092938eb6faf975df619fa5fa2fd2b361ff",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/review-fixes-architecture-docs-junit.xml",
+      "sha256": "244244d4d82914946e6b8e7848c655c6cb2ce4475ce555e24435fadf7ccaa749",
+      "size_bytes": 10732
+    },
+    {
+      "git_blob": "f6ac8927f1432e473644486173236251a7cd3aa7",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/review-fixes-focused-green-junit.xml",
+      "sha256": "0823851b95255b3c65f1352e02c888604687680d3338c3e2b645efe0fa7708a5",
+      "size_bytes": 40999
+    },
+    {
+      "git_blob": "7c9e95f56047a2aa2b2b53a4bae2f13d285c8448",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/review-fixes-provenance-green-junit.xml",
+      "sha256": "55792f2981064068f11aaf59b2fd5c6ba7eceac33426c62e7e64589b070d0d66",
+      "size_bytes": 1419
+    },
+    {
+      "git_blob": "fa33c0b6b37a316fc18b99a80d1fb7928d2833c7",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/review-fixes-supplement-focused-junit.xml",
+      "sha256": "bd767bc44abcb8fff53efc856ef3d204280e08b953a61de848aa8e4f71924d8e",
+      "size_bytes": 9305
+    }
+  ],
+  "retrieval": "Read original paths with git show <source_commit>:<path>; restore complete original context with git archive <source_commit> test_artifacts/delivery-acceleration",
+  "schema": "dpone.dda.historical-evidence-retention.v1",
+  "scope": "Historical original retention and location only; no new execution or release certification",
+  "source_commit": "6a69861832ffc3dea86fb05d0dd882645399f21a",
+  "source_subtree": "test_artifacts/delivery-acceleration/",
+  "source_tree": "ea2153662106bbd58b27e3ca963425796145fdc9",
+  "status": "N/A"
+}
