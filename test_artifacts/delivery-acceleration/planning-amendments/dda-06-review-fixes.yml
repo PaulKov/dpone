@@ -124,6 +124,22 @@ acceptance_criteria:
 - Use new review-fixes-* evidence. Independently review each correction, then freeze source and run required focused/static/docs
   and complete non-live gates. Preserve 0.77.0 versions/dependencies and every adopted upstream-only file; do
   not publish or run live/PyPI checks.
+- Final integration supplement in dda-06-review-fixes.md supersedes the earlier active-PG-owner exclusion for
+  one exact postponed function-annotation import only. The migration owner confirmed no active writer or pending
+  edit. Move ResolvedBindingConnection to TYPE_CHECKING in runtime/sources/postgres_source_authority.py; preserve
+  all executable code, raw annotations, canonical get_type_hints and runtime/dataclass dependencies. Do not touch
+  private migration worktrees.
+- Preserve all 138 upstream-only mode/blob entries. The newly owned annotation-only path did not change in either
+  pinned upstream commit and is not an exception to the foreign preservation check. Independently review and execute
+  unchanged PG authority, introspection, layer, fitness and type checks; retain the actual preceding flow215 FAIL.
+- After source H passes scoped implementation review and required static/docs checks, retain its historical ownership
+  audit, push the old branch, then transfer its exact whole tree to codex/dda-06-reviewed-delivery whose parent
+  is pinned fa20. Prove staged/committed tree equality and parent identity through a producer; record H in commit
+  provenance. Create a replacement PR without merges, force pushes, rule changes or deletion of old history. PR25
+  stays preserved and linked as superseded.
+- Complete final exact-head CI collection accounting on Python3.11/3.12 satisfies the broad non-live gate; duplicate
+  unchanged localfull is N/A with explicit reason unless a concrete failure requires reproduction. Recompute actual
+  new-PR receipt applicability and retain artifacts honestly without avoidable source churn.
 public_contract_impact:
   level: compatible
   surfaces:
@@ -196,6 +212,7 @@ owned_paths:
 - tests/integration/mssql/test_clickhouse_mssql_partition_switch_integration.py
 - docs/delivery-acceleration/certification.md
 - tests/test_native_delivery_upstream_provenance.py
+- src/dpone/runtime/sources/postgres_source_authority.py
 integrator_owned_paths:
 - CHANGELOG.md
 - mkdocs.yml
@@ -280,6 +297,8 @@ required_checks:
     tests/test_native_delivery_live_benchmark.py tests/test_native_delivery_live_recovery_boundaries.py tests/test_mssql_native_delivery_benchmark.py
     -q
   - uv run pytest tests/test_native_delivery_upstream_provenance.py -q
+  - uv run pytest tests/test_native_delivery_architecture_compatibility.py tests/test_postgres_source_authority.py
+    -q
   broad:
   - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
   - uv run ruff check .
