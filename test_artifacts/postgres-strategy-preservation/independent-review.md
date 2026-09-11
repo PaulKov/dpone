@@ -1,5 +1,10 @@
 # Independent post-implementation review
 
+Historical review snapshot: this page retains the findings and validation state
+at the source commits named below. The later snapshot metric correction and
+large-partition measurements are in [performance-review.md](performance-review.md).
+Final CI, owner approval and merge evidence are in [closure.md](closure.md).
+
 Requested by the maintainer on 2026-09-10. Reviewer:
 `/root/post_feature_independent_review`, a read-only `dpone_architect` subagent
 started with no inherited conversation. The reviewer did not implement the

@@ -1,10 +1,15 @@
 # PostgreSQL strategy preservation evidence
 
-Latest production source: `bef37a7752db43dcae42298da7bd62509a186535`.
-Current baseline: `e15ad32b850708207c2f8f1b6faf597ef0f5b0b1`.
-Current MR: <https://github.com/PaulKov/dpone/pull/32>, replacing #31 after
-integration with current master. See [performance-review.md](performance-review.md)
-for final-source measurements and review. The historical campaigns below used
+The implementation was merged into `master` through
+[MR #32](https://github.com/PaulKov/dpone/pull/32), replacing #31. Reviewed head
+`f643a7e7de97578c5ac86e5ed97e29d3499185e1` and integration commit
+`fa20f554bab3024f240b92aadf176527ee967925` have identical trees.
+See [closure.md](closure.md) for completed checks, owner approval and deployment
+evidence, and [performance-review.md](performance-review.md) for measurements.
+
+Measured source: `bef37a7752db43dcae42298da7bd62509a186535`.
+Implementation baseline: `e15ad32b850708207c2f8f1b6faf597ef0f5b0b1`.
+The historical campaigns below used
 source `1ff83879fc7640d358cad15402672eafddcabf41` and baseline
 `d5ad9aaecc900c24df421b160ed36b4cfc726e45`.
 
@@ -166,7 +171,8 @@ extraction lifecycle, compatibility and architecture docs, schema descriptions
 and CHANGELOG. The journey explains preservation, exchange tradeoffs, lock/FK
 failures, retry, commit uncertainty and inspection of previously affected tables.
 
-The scoped implementation and live proof are ready for review. Full source CI
-passed on `30e9221`; the final documentation/proof follow-up preserves those
-production and test bytes. GitHub checks on the eventual MR head remain the
-merge gate. No merge, release or PyPI publication was performed by this task.
+The scoped implementation, documentation and live proof are merged. Final-head
+CI, independent review and the immutable merge receipt passed; see
+[closure.md](closure.md) for the source identities and provider evidence.
+Earlier campaign results above remain attributed to their original sources.
+Release and PyPI publication are outside this task.
