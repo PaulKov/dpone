@@ -1,0 +1,162 @@
+{
+  "package": "/Users/paulkov007/.codex/worktrees/b364/dpone-public/src/dpone",
+  "ok": true,
+  "issue_count": 1,
+  "avg_clustering": 0.18138267639221242,
+  "cross_layer_ratio": 0.29897914856646396,
+  "max_module_ce": 24,
+  "max_module_ce_name": "dpone.app.dbt_promotion_composition",
+  "issues": [
+    {
+      "severity": "warn",
+      "code": "avg_clustering_above_target",
+      "message": "Average clustering is controlled but still above the target green zone.",
+      "module": null,
+      "value": 0.18138267639221242,
+      "threshold": 0.18
+    }
+  ],
+  "class_findings": [],
+  "local_clustering": [
+    {
+      "module": "dpone.adapters.bounded_window_journal",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 1,
+      "outbound": 2
+    },
+    {
+      "module": "dpone.backfill.chunk_scope",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 1,
+      "outbound": 2
+    },
+    {
+      "module": "dpone.backfill.execution_policy_models",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 2,
+      "outbound": 1
+    },
+    {
+      "module": "dpone.backfill.process_lane_receipt",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 2,
+      "outbound": 1
+    },
+    {
+      "module": "dpone.gitops.airflow_cluster_doctor",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 0,
+      "outbound": 3
+    },
+    {
+      "module": "dpone.gitops.airflow_cluster_doctor_commands",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 1,
+      "outbound": 2
+    },
+    {
+      "module": "dpone.gitops.airflow_mssql_explicit_authority",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 2,
+      "outbound": 3
+    },
+    {
+      "module": "dpone.manifest.authoring_migration_models",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 3,
+      "outbound": 0
+    },
+    {
+      "module": "dpone.manifest.authoring_migration_transaction",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 1,
+      "outbound": 2
+    },
+    {
+      "module": "dpone.manifest.confined_transaction_journal",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 1,
+      "outbound": 2
+    },
+    {
+      "module": "dpone.ops.routes.run_supervisor_models",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 2,
+      "outbound": 1
+    },
+    {
+      "module": "dpone.ops.routes.run_supervisor_policy",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 1,
+      "outbound": 2
+    },
+    {
+      "module": "dpone.readiness.nested_stress",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 0,
+      "outbound": 3
+    },
+    {
+      "module": "dpone.runtime.cdc.typed_materialization_projection",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 2,
+      "outbound": 1
+    },
+    {
+      "module": "dpone.runtime.dbt_package_readiness",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 1,
+      "outbound": 2
+    },
+    {
+      "module": "dpone.runtime.deployment_cache_commit",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 1,
+      "outbound": 2
+    },
+    {
+      "module": "dpone.runtime.etl.nested_load_config",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 2,
+      "outbound": 1
+    },
+    {
+      "module": "dpone.runtime.native_wire_mssql_framing",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 2,
+      "outbound": 1
+    },
+    {
+      "module": "dpone.runtime.sinks.clickhouse_window_admission",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 1,
+      "outbound": 2
+    },
+    {
+      "module": "dpone.runtime.sinks.mssql_native_switch",
+      "degree": 3,
+      "coefficient": 1.0,
+      "inbound": 0,
+      "outbound": 3
+    }
+  ]
+}

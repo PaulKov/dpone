@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "name": "review-fixes-module-size",
+  "command": [
+    "uv",
+    "run",
+    "dpone",
+    "docs",
+    "check-module-size",
+    "--baseline",
+    "docs/module_size_baseline.json",
+    "--base-ref",
+    "d5ad9aaecc900c24df421b160ed36b4cfc726e45",
+    "--head-ref",
+    "ec7e2bf"
+  ],
+  "source_before": {
+    "commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a",
+    "tree": "54a3557e3e741497d14e35fab415da3dad5f5ff8",
+    "source_sha256": "6f22184878f8578fd71e38a8247910e2190c31989a007c4a0d2426da88cf83d7",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "FAIL",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "review-fixes-module-size.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "ec7e2bf101c3c72b8dfa9ce6ceac78e43cfc561a",
+    "tree": "54a3557e3e741497d14e35fab415da3dad5f5ff8",
+    "source_sha256": "6f22184878f8578fd71e38a8247910e2190c31989a007c4a0d2426da88cf83d7",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 2,
+  "duration_seconds": 13.075,
+  "log_sha256": "3ff136bc81ff3388d082e878f0304554ae677291a127aacd7c6042418b32ae19"
+}

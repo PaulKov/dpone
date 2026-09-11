@@ -1,0 +1,22 @@
+INFO: Layer metrics gate OK
+Layer metrics check for /Users/paulkov007/.codex/worktrees/b364/dpone-public/src/dpone
+Status: OK
+Current: layers=58, edges=9208, intra_ratio=0.701, cross_ratio=0.299, max_cross_flow=214
+Excluded layers: dpone.compat
+Thresholds:
+  - min_intra_layer_ratio: 0.55
+  - max_cross_layer_ratio: 0.45
+  - max_top_cross_layer_flow: n/a
+  - allowed_ratio_regression: 0.020
+  - allowed_flow_regression: 5
+Baseline:
+  - intra_ratio: 0.701 (delta +0.000)
+  - cross_ratio: 0.299 (delta -0.000)
+  - max_cross_flow: 209 (delta +5)
+Top cross-layer flows:
+  - dpone.runtime -> dpone.contracts: 214
+  - dpone.services -> dpone.contracts: 152
+  - dpone.services -> dpone.gitops: 109
+  - dpone.adapters -> dpone.ports: 102
+  - dpone.commands -> dpone.services: 100
+Issues: none

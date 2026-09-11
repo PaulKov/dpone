@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "name": "review-fixes-provenance-green",
+  "command": [
+    "uv",
+    "run",
+    "pytest",
+    "tests/test_native_delivery_upstream_provenance.py",
+    "-q",
+    "--junitxml=test_artifacts/delivery-acceleration/dda-06/review-fixes-provenance-green-junit.xml"
+  ],
+  "source_before": {
+    "commit": "425e06de2c160cc8b36c44ef3bc8904392147a00",
+    "tree": "28975b115abad8ac4df03827551f1d22cf631907",
+    "source_sha256": "ce9ca6935d5cc9ef9a7b754d5ba21569d7d45e7ba246e3428b471017fb5c2091",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "review-fixes-provenance-green.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "425e06de2c160cc8b36c44ef3bc8904392147a00",
+    "tree": "28975b115abad8ac4df03827551f1d22cf631907",
+    "source_sha256": "ce9ca6935d5cc9ef9a7b754d5ba21569d7d45e7ba246e3428b471017fb5c2091",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 22.128,
+  "log_sha256": "83a1593c5b5783693fe3006d1f6597bcb4f3a5968f23b59481ee09a0477f910a"
+}

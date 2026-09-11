@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "name": "review-fixes-layer-red",
+  "command": [
+    "uv",
+    "run",
+    "dpone",
+    "docs",
+    "check-layer-metrics",
+    "--baseline",
+    "docs/layer_metrics_baseline.json"
+  ],
+  "source_before": {
+    "commit": "10215228c2020b7016e3aa5f5b879121026ffed3",
+    "tree": "b6b3df5f74dc1287a2cccd874e773f54979087bf",
+    "source_sha256": "24e882ac863c5f199f9064b06aa09a559a811347904626920d40de086bc58884",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "FAIL",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "review-fixes-layer-red.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "10215228c2020b7016e3aa5f5b879121026ffed3",
+    "tree": "b6b3df5f74dc1287a2cccd874e773f54979087bf",
+    "source_sha256": "24e882ac863c5f199f9064b06aa09a559a811347904626920d40de086bc58884",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 2,
+  "duration_seconds": 50.571,
+  "log_sha256": "dc7172484494035f52f03b4d36c1327539f4a9ef7e00e590cd95af5ef5a8afc4"
+}
