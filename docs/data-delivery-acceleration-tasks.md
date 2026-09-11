@@ -262,14 +262,14 @@ the state and receipt rules that every optimization preserves.
 
 ## Implementation closeout
 
-The bounded implementation is complete in
-[integration PR #37](https://github.com/PaulKov/dpone/pull/37). Its closeout links
+The bounded implementation is complete. The
+[implementation closeout](https://github.com/PaulKov/dpone/blob/codex/dda-06-composition-integration/test_artifacts/delivery-acceleration/implementation-closeout/completion.md) links
 the reviewed source, independent findings and their resolution, exact-head CI,
-and preservation of the parallel 0.77.1 release. The maintainer's subsequent
+and preservation of the parallel 0.78.0 release and its 0.77.1 history. The maintainer's subsequent
 2026-09-11 completion instruction authorizes this lifecycle update and integration;
 the original dispatch record and task contracts above remain historical records.
 The specification's `IMPLEMENTED` state describes the code and documentation
-landed through that PR; before merge, its branch remains an integration proposal.
+landed through the integration PR; before merge, its branch remains an integration proposal.
 
 | Task | Completed deliverable | Evidence and user guidance |
 |---|---|---|

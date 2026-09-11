@@ -12,7 +12,7 @@
 - Last verified: 2026-09-11
 
 Implementation status covers the bounded code and documentation scope below.
-The [implementation closeout](https://github.com/PaulKov/dpone/pull/37)
+The [implementation closeout](https://github.com/PaulKov/dpone/blob/codex/dda-06-composition-integration/test_artifacts/delivery-acceleration/implementation-closeout/completion.md)
 links the reviewed implementation, validation and integration PR. Live performance
 remains UNVERIFIED; public native SWITCH activation remains outside this scope.
 The original approved planning revision and historical evidence are retained.
@@ -606,5 +606,5 @@ seams early but starts dependent edits only after reviewed handoffs.
 - [x] Structural and live performance acceptance are separate and measurable.
 - [x] Shared-file ownership, task DoD and integration dependencies are explicit.
 - [x] Maintainer authorized specification and implementation dispatch in this task.
-- [x] Implementation complete and [exact-head validation linked](https://github.com/PaulKov/dpone/pull/37).
+- [x] Implementation complete and [exact-head validation linked](https://github.com/PaulKov/dpone/blob/codex/dda-06-composition-integration/test_artifacts/delivery-acceleration/implementation-closeout/completion.md).
 - [ ] Real-row performance evidence available; currently UNVERIFIED.

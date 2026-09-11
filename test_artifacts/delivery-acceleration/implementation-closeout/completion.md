@@ -1,7 +1,8 @@
 # Bounded delivery implementation closeout
 
 The approved DDA-01 through DDA-06 code scope is implemented and independently
-reviewed. This record accompanies [integration PR37](https://github.com/PaulKov/dpone/pull/37).
+reviewed. This record accompanies the successor integration of delivery work
+from [PR37](https://github.com/PaulKov/dpone/pull/37) onto the parallel 0.78.0 foundation.
 Before merge it is a closeout proposal; the specification's IMPLEMENTED lifecycle
 state applies when this code and documentation land through that PR. The PR's
 provider state records integration and final-head checks. No release is implied.
@@ -34,9 +35,9 @@ contracts and immutable planning history are not rewritten.
 
 Reviewed implementation: `81a7f4813dc9a4a4d41f81401cf4490d284b51d2`.
 Frozen source: `971e9a4a827604292af612052c4b311fd8b11ba1`.
-Integrated PR source: `c1a56b055f079bcc6dd9957300c5494f00b6080c`.
+Reviewed delivery PR source before closeout: `c1a56b055f079bcc6dd9957300c5494f00b6080c`.
 Frozen and PR source tree: `987c7c61fc9ecc4032fab9a31cdacb3d0ad505e0`.
-Preserved parent: `a1aadcaf6beaa2e82abcac27f2aed0b5113986f7` (release 0.77.1).
+Original delivery parent: `a1aadcaf6beaa2e82abcac27f2aed0b5113986f7` (release 0.77.1).
 
 | Check | Recorded result and evidence |
 |---|---|
@@ -73,3 +74,24 @@ approved environment described by the certification guide. Public native SWITCH
 requires a future activation contract. Merge verification binds the eventual
 integration commit to the reviewed tree through the automatic closure receipt;
 package release is a separate operation.
+
+## Preservation of the parallel composition release
+
+While closeout was being validated, PR36 advanced master to
+`a2fe3a34f7c143625cea6d1b947c749ffc6d4dc9` (release 0.78.0). The
+[bounded integration supplement](composition-integration-contract.yml) permits
+reconciliation of five shared documentation files and current closeout links.
+The successor starts from that upstream commit and imports c1a56b0 then fa5c2383
+with provenance. All 228 upstream-only file modes/blobs and all DDA production/test
+blobs are preserved from their respective pinned inputs. No production adaptation
+is introduced by the combination.
+
+Both architecture sections, all ADR0059–0062 and both navigation additions are
+retained. Delivery changelog entries remain under Unreleased; the complete
+upstream 0.78.0-and-earlier suffix is unchanged. Upstream versions, package pins,
+lockfile, policy and workflow remain exact upstream bytes. The canonical metrics
+producer regenerates the combined dashboard; previous metrics/gate evidence and
+c1's 22,149-node population remain historical until the combined source is checked.
+The integration PR records new validation, independent preservation review and
+its own final-head CI before merging. No old report is relabeled as a combined
+source pass.
