@@ -18,6 +18,7 @@ from threading import Barrier, Thread
 import pytest
 
 from dpone.adapters import composition_child_identity_allocator as allocation
+from dpone.adapters import composition_child_identity_store
 from dpone.adapters.composition_child_identity_allocator import (
     CHILD_IDENTITY_SCHEMA,
     CompositionChildIdentity,
@@ -426,6 +427,18 @@ def test_leftover_staging_artifacts_never_gate_allocation(root):
     # and is never reclaimed by allocation.
     assert set(final_names(root)) == {*expected_names(identity), ".staging-" + "f" * 64}
     assert allocator_for(root).read(identity.uid).attempt_sha256 == attempt().attempt_sha256
+
+
+def test_store_refuses_to_remove_a_final_tombstone(root):
+    identity = allocator_for(root).allocate(attempt())
+    final = f"uid-{identity.uid}.json"
+    descriptor = os.open(root / "identities", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(DbtCaptureError, match="child_identity_record"):
+            composition_child_identity_store.discard(descriptor, final)
+    finally:
+        os.close(descriptor)
+    assert (root / "identities" / final).exists()
 
 
 def test_unreadable_candidate_record_reports_a_record_error(root, monkeypatch):
