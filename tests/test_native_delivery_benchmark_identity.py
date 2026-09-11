@@ -40,6 +40,7 @@ def produce(tmp_path, monkeypatch):
 
     def create(name, *, version="0.77.1", seconds=10, change=None):
         directory = tmp_path / name
+        directory.mkdir()
         factory = HermeticRouteFactory()
         # Only exercise consumer eligibility branches; this factory has no services.
         factory.execution = "live"
