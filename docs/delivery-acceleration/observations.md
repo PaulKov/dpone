@@ -162,9 +162,12 @@ replaces input envelopes or referenced artifacts, even with overwrite.
 | 1 | A correctness or measured acceptance gate failed; report retained | Inspect failed receipts/cases and rerun the responsible producer after correction |
 | 2 | Usage, schema, identity, retained bytes, or output failure | Correct the input/path problem; do not hand-edit evidence to manufacture PASS |
 
-An existing output produces `output_exists_use_overwrite`. Wrong versions or
+An existing output produces `output_exists_use_overwrite`. Unsupported schema versions or
 missing required identity produce `invalid_schema`; escaping paths and tampered
-bytes produce `artifact_path_escape` and `artifact_hash_mismatch`. Missing timing,
+bytes produce `artifact_path_escape` and `artifact_hash_mismatch`. A description
+that disagrees with its recorded checksum produces `configuration_digest_mismatch`
+or `environment_digest_mismatch`. Regenerate that run with its producer; changing
+only the envelope checksum cannot repair its retained receipt bindings. Missing timing,
 dirty code, absent live proof, missing declared cases and too few eligible samples
 produce an UNVERIFIED report. Unknown schemas are rejected; no coercion or legacy
 format migration is attempted. Retain the complete input directories when moving
@@ -175,11 +178,18 @@ reports to another machine.
 The producer identity describes the harness; the subject identity is the exact
 full Git SHA and dirty flag of the dpone checkout executed. Every receipt binds
 subject, workload, configuration, environment, route, scope and sample. The
-consumer validates the frozen schema, exact NativeChunkLimits fields, identical
-workload/configuration/environment descriptions and physical layout across sides,
-and retained SHA-256 bytes. Configuration/environment/workload hashes are opaque
-producer identities: comparison checks their bindings and descriptive equality;
-it does not invent missing content preimages or claim to recompute dataset bytes.
+consumer validates the frozen schema, exact NativeChunkLimits fields, canonical
+configuration and full environment checksums, and retained SHA-256 bytes before
+accepting receipts or samples. Each environment checksum includes the recorded
+dpone version. Across subjects, workload, configuration, physical layout, resource
+values/types and all third-party version entries must match; only the value of an
+existing `versions.dpone` entry may differ. This allows the pinned baseline and
+candidate to have different package versions while preserving each run's full
+identity and receipt bindings. Missing versus present version entries still differ.
+Within-run drift checks continue to include the dpone version.
+
+The workload checksum remains a producer identity bound to retained proofs;
+offline comparison does not claim to recompute unavailable dataset bytes.
 
 Artifact paths are relative to their envelope directory and must remain beneath
 it. Absolute references, traversal and symlink escape are rejected. Evidence

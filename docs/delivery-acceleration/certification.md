@@ -84,6 +84,13 @@ for drift around every trial. Run outputs outside both checkouts so report files
 do not change Git dirty state. Review exact commits and environments separately;
 a factory label cannot prove which code ran.
 
+The version of dpone under test may differ between baseline and candidate. Both
+reports retain that version in their complete environment checksums and receipt
+bindings. Cross-subject comparison excludes only its value; Python, dependency,
+server and BCP versions, version-key presence, layout and resource values/types
+must still match. Run comparison with the candidate installation; the baseline
+interpreter remains supported for the current harness's `run`, `inspect` and help.
+
 The `baseline` adapter requires the actual imported dpone checkout to be
 `d5ad9aaecc900c24df421b160ed36b4cfc726e45`. The `candidate` adapter records the
 actual imported checkout. The producer records its own checkout independently.
@@ -169,6 +176,12 @@ remain intact. `inspect` verifies this producer's deterministic workload,
 configuration and environment digests, then rejects changed bytes, mismatched receipt identities,
 path traversal and symlinks. Hashes protect retained bytes, not the trustworthiness
 of a self-authored claim.
+
+Offline comparison also recomputes the normalized configuration and complete
+environment checksums before inspecting their proofs. A digest mismatch is an
+input error, even when both subjects contain the same stale description. Restore
+the original evidence or regenerate the affected run through its producer;
+editing an envelope or its checksum does not update the retained proof bindings.
 
 | Observation | Meaning and availability |
 |---|---|

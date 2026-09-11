@@ -8,9 +8,15 @@ and its durable invocation, target receipt and fenced journal authorities.
 ## Diagnose preparation work
 
 Start with the exact invocation, subject commit, workload and configured limits.
-Compare equivalent runs only: dataset identity, target layout, environment and
-resource limits must match. A harness's producer commit identifies the harness;
+Compare equivalent runs only: dataset identity, target layout, third-party
+environment and resource limits must match. The tested dpone package version may
+differ across subjects; every run still retains and verifies its full environment
+checksum, including that version. A harness's producer commit identifies the harness;
 the subject commit identifies the dpone implementation actually executed.
+
+`configuration_digest_mismatch` or `environment_digest_mismatch` means an envelope
+description disagrees with its checksum. Restore retained original bytes or rerun
+the producer. Updating only a checksum cannot repair existing receipt bindings.
 
 | Observation | Interpretation | Next action |
 |---|---|---|

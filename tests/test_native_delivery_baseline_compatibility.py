@@ -131,6 +131,22 @@ def test_absolute_current_harness_executes_real_baseline_and_retains_honest_iden
     assert report["fidelity_receipt"]["status"] == report["recovery_receipt"]["status"] == "PASS"
     assert len(report["samples"]) == 4
     assert all(sample["status"] == "PASS" for sample in report["samples"])
+    python, _ = baseline_python
+    for arguments, expected in (
+        (["inspect", str(output)], f"{output}: UNVERIFIED; eligible_trials=0"),
+        (["--help"], "inspect"),
+    ):
+        inspected = subprocess.run(
+            [str(python), "-I", str(HARNESS), *arguments],
+            cwd=checkout,
+            env={key: os.environ[key] for key in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP") if key in os.environ},
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert inspected.returncode == 0, inspected.stderr
+        assert inspected.stderr == "" and expected in inspected.stdout
+    assert subprocess.check_output(["git", "-C", str(checkout), "status", "--porcelain"], text=True) == ""
 
 
 def test_baseline_without_approval_writes_skip_without_loading_factory(baseline_python, tmp_path):

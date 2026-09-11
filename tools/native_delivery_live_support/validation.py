@@ -183,6 +183,18 @@ def validate_run(envelope: dict[str, Any], root: Path) -> list[dict[str, Any]]:
 
 
 def require_comparable(baseline: dict[str, Any], candidate: dict[str, Any]) -> None:
-    """Reject workload, limits, server, resource or physical layout drift."""
+    """Compare validated subjects using the candidate's policy, retaining full digests.
+
+    The comparison-only import keeps baseline run/inspect/help independent of
+    candidate contracts. Only the independently bound dpone version may differ.
+    """
+    from dpone.contracts.native_delivery_observations import comparable_delivery_environment
+
+    for envelope in (baseline, candidate):
+        environment = envelope["environment"]
+        _require(digest({k: v for k, v in environment.items() if k != "sha256"}) == environment["sha256"])
     for key in ("workload", "configuration", "environment", "route"):
-        _require(canonical_json(baseline[key]) == canonical_json(candidate[key]))
+        left, right = baseline[key], candidate[key]
+        if key == "environment":
+            left, right = map(comparable_delivery_environment, (left, right))
+        _require(canonical_json(left) == canonical_json(right))

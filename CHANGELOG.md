@@ -16,6 +16,9 @@
 
 ### Fixed
 
+- Verify benchmark configuration and full environment checksums before accepting
+  retained proofs. Permit the tested dpone version to differ across comparable
+  subjects while retaining all dependency, server, layout and resource checks.
 - Keep the delivery benchmark launch compatible with the pinned baseline's
   canonical limit model. Require the final report verdict in both live delivery
   tests, including identity failures detected after successful component proofs.

@@ -201,6 +201,20 @@ def normalize_delivery_limits(limits: Mapping[str, Any]) -> dict[str, Any]:
     return asdict(NativeChunkLimits(**limits))
 
 
+def comparable_delivery_environment(environment: Mapping[str, Any]) -> dict[str, Any]:
+    """Project a validated environment for comparison across tested subjects.
+
+    Each original environment, including its dpone version, must first satisfy
+    its own full digest and receipt bindings. Only the tested package's version
+    value may differ across subjects; its presence and every other field remain
+    significant. This projection never changes the supplied mappings.
+    """
+    return {
+        **{key: value for key, value in environment.items() if key != "sha256"},
+        "versions": {key: None if key == "dpone" else value for key, value in environment["versions"].items()},
+    }
+
+
 RUN_SCHEMA = _record(
     schema_version={"const": 1, "type": "integer"},
     kind={"const": "native-delivery-run"},

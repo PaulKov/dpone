@@ -18,6 +18,7 @@ from dpone.contracts.native_delivery_observations import (
     CHECKS_BY_SCOPE,
     RECEIPT_SCHEMA,
     RUN_SCHEMA,
+    comparable_delivery_environment,
     normalize_delivery_limits,
 )
 from dpone.runtime.native_delivery_benchmark_artifacts import (
@@ -147,9 +148,14 @@ def _run(store: BenchmarkArtifacts, path: Path) -> tuple[dict[str, Any], dict[st
         raise BenchmarkInputError("invalid_workload_integer")
     limits = run["configuration"]["limits"]
     try:
-        normalize_delivery_limits(limits)
+        normalized_limits = normalize_delivery_limits(limits)
     except (TypeError, ValueError):
         raise BenchmarkInputError("invalid_limits") from None
+    if content_sha256(canonical_json(normalized_limits)) != run["configuration"]["sha256"]:
+        raise BenchmarkInputError("configuration_digest_mismatch")
+    environment = run["environment"]
+    if content_sha256(canonical_json({k: v for k, v in environment.items() if k != "sha256"})) != environment["sha256"]:
+        raise BenchmarkInputError("environment_digest_mismatch")
     statuses = [run["status"]]
     if run["route"]["mode"] == "isolated_switch" and run["route"]["strategy"] != "partition_replace":
         raise BenchmarkInputError("invalid_switch_route")
@@ -277,7 +283,10 @@ def compare(baseline: Path, candidate: Path, *, output: Path | None = None, over
         left, left_summary = before[key]
         right, right_summary = after[key]
         for identity in ("route", "workload", "configuration", "environment"):
-            if canonical_json(left[identity]) != canonical_json(right[identity]):
+            left_value, right_value = left[identity], right[identity]
+            if identity == "environment":
+                left_value, right_value = map(comparable_delivery_environment, (left_value, right_value))
+            if canonical_json(left_value) != canonical_json(right_value):
                 raise BenchmarkInputError(f"{identity}_drift")
         status = _status([left_summary["status"], right_summary["status"]])
         ratio = right_summary["median_seconds"] / left_summary["median_seconds"] if status == "PASS" else None
