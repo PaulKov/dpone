@@ -155,6 +155,19 @@ def _strict_airflow_build_args(runtime_image_digest: str) -> list[str]:
     ]
 
 
+def _composition_supervisor_args() -> list[str]:
+    return [
+        "--composition-supervisor-pvc",
+        "dpone-composition-supervisor",
+        "--composition-child-uid-start",
+        "1000000000",
+        "--composition-child-gid-start",
+        "1000000000",
+        "--composition-child-identity-count",
+        "1000000",
+    ]
+
+
 def _safe_sample_cache_root(root: Path) -> Path:
     return root / ".dpone-cache" / "safe-sample-deployments"
 
@@ -2335,6 +2348,80 @@ def test_airflow_build_rejects_partial_registry_config_arguments_before_side_eff
     assert stderr == ""
     payload = json.loads(stdout)
     assert payload["errors"][0]["code"] == "DPONE_DEPLOYMENT_CONFIG_REF_INVALID"
+    assert not (tmp_path / ".dpone-cache" / "deployments").exists()
+
+
+@pytest.mark.parametrize(
+    "missing_option",
+    [
+        "--composition-supervisor-pvc",
+        "--composition-child-uid-start",
+        "--composition-child-gid-start",
+        "--composition-child-identity-count",
+    ],
+)
+def test_airflow_build_rejects_partial_composition_supervisor_group_before_side_effects(
+    missing_option: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _run_cli(["init", "project", "--airflow", "--format", "json"], capsys)
+    release_id = _write_airflow_build_release(tmp_path)
+    runtime_image_digest = "sha256:" + "b" * 64
+    build_args = [
+        "airflow",
+        "build",
+        "--release-id",
+        release_id,
+        "--environment",
+        "dev",
+        *_strict_airflow_build_args(runtime_image_digest),
+        *_composition_supervisor_args(),
+        "--format",
+        "json",
+    ]
+    option_index = build_args.index(missing_option)
+    del build_args[option_index : option_index + 2]
+
+    code, stdout, stderr = _run_cli(build_args, capsys)
+
+    assert code == 2
+    assert stderr == ""
+    assert json.loads(stdout)["errors"][0]["code"] == "DPONE_COMPOSITION_SUPERVISOR_GROUP_INCOMPLETE"
+    assert not (tmp_path / ".dpone-cache" / "deployments").exists()
+
+
+def test_airflow_build_forbids_composition_supervisor_for_v1_release(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _run_cli(["init", "project", "--airflow", "--format", "json"], capsys)
+    release_id = _write_airflow_build_release(tmp_path)
+    runtime_image_digest = "sha256:" + "b" * 64
+
+    code, stdout, stderr = _run_cli(
+        [
+            "airflow",
+            "build",
+            "--release-id",
+            release_id,
+            "--environment",
+            "dev",
+            *_strict_airflow_build_args(runtime_image_digest),
+            *_composition_supervisor_args(),
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+
+    assert code == 1
+    assert stderr == ""
+    assert json.loads(stdout)["errors"][0]["code"] == "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN"
     assert not (tmp_path / ".dpone-cache" / "deployments").exists()
 
 

@@ -19,6 +19,7 @@ from dpone_airflow_pack.cache_artifact_contract import (
     read_confined_cache_file_with_identity,
     resolve_cache_artifact,
 )
+from dpone_airflow_pack.connection_names import require_kubernetes_dns_label
 from dpone_airflow_pack.deployment_index_artifacts import (
     AirflowIndexArtifact,
     _is_canonical_sha256_digest,
@@ -76,6 +77,7 @@ class AirflowDeploymentIndex:
     schema: str = INDEX_SCHEMA_V1
     runtime_image_ref: str | None = None
     delivery_context: InitFetchDeliveryContext | None = None
+    composition_supervisor: Mapping[str, object] | None = None
 
 
 def load_airflow_deployment_index(
@@ -221,6 +223,67 @@ def _load_airflow_deployment_index(
         schema=str(schema),
         runtime_image_ref=optional_text(payload.get("runtime_image_ref"), "runtime_image_ref", path),
         delivery_context=delivery_context,
+        composition_supervisor=_composition_supervisor_from_payload(payload, path=path),
+    )
+
+
+def _composition_supervisor_from_payload(
+    payload: Mapping[str, Any],
+    *,
+    path: Path,
+) -> Mapping[str, object] | None:
+    value = payload.get("composition_supervisor")
+    schema = payload.get("schema")
+    if value is None:
+        return None
+    if schema != INDEX_SCHEMA_V3:
+        raise AirflowDeploymentIndexError(
+            "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN",
+            "composition supervisor is forbidden on v1/v2 deployment indexes",
+            path=path.as_posix(),
+        )
+    fields = {
+        "schema",
+        "persistent_volume_claim",
+        "child_uid_start",
+        "child_gid_start",
+        "child_identity_count",
+    }
+    if not isinstance(value, Mapping) or set(value) != fields:
+        raise _invalid_composition_supervisor(path)
+    if value.get("schema") != "dpone.composition-supervisor.v1":
+        raise _invalid_composition_supervisor(path)
+    try:
+        persistent_volume_claim = require_kubernetes_dns_label(
+            value.get("persistent_volume_claim"),
+            context="composition supervisor persistent_volume_claim",
+        )
+    except ValueError as exc:
+        raise _invalid_composition_supervisor(path) from exc
+    if persistent_volume_claim != value.get("persistent_volume_claim"):
+        raise _invalid_composition_supervisor(path)
+    child_identity_count = value.get("child_identity_count")
+    child_uid_start = value.get("child_uid_start")
+    child_gid_start = value.get("child_gid_start")
+    if type(child_identity_count) is not int or child_identity_count < 1_000_000:
+        raise _invalid_composition_supervisor(path)
+    for start in (child_uid_start, child_gid_start):
+        if type(start) is not int or start < 1_000_000 or start + child_identity_count >= 2**31:
+            raise _invalid_composition_supervisor(path)
+    return {
+        "schema": "dpone.composition-supervisor.v1",
+        "persistent_volume_claim": persistent_volume_claim,
+        "child_uid_start": child_uid_start,
+        "child_gid_start": child_gid_start,
+        "child_identity_count": child_identity_count,
+    }
+
+
+def _invalid_composition_supervisor(path: Path) -> AirflowDeploymentIndexError:
+    return AirflowDeploymentIndexError(
+        "DPONE_COMPOSITION_SUPERVISOR_INVALID",
+        "composition supervisor deployment capability is invalid",
+        path=path.as_posix(),
     )
 
 

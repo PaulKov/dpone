@@ -6,11 +6,17 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from dpone.contracts.composition_supervisor import (
+    CompositionSupervisorProjection,
+    supervisor_projection_for_release,
+)
 from dpone.manifest.confined_files import read_confined_file
 from dpone.readiness.airflow_connection_runtime_registry import (
     runtime_connection_snapshots as build_runtime_connection_snapshots,
 )
 from dpone.readiness.airflow_deployment_artifacts import (
+    bytes_descriptor,
+    digest_dir,
     json_bytes,
     load_local_safe_sample_v1_inputs,
     load_strict_projection_inputs,
@@ -99,6 +105,7 @@ class AirflowDeploymentProjectionService:
         airflow_bundle_ref: str | None = None,
         dev_evidence_pvc_claim: str | None = None,
         dev_evidence_worker_queue: str | None = None,
+        composition_supervisor: Mapping[str, object] | None = None,
         semantic_refresh_sidecars: SemanticRefreshDagSidecarFactory | None = None,
     ) -> AirflowDeploymentProjection:
         """Materialize a strict executable v2 environment projection."""
@@ -117,6 +124,10 @@ class AirflowDeploymentProjectionService:
             cache_root=self._cache_root,
             release_id=release_id,
             environment=environment,
+        )
+        supervisor_projection = _supervisor_projection(
+            release_schema=inputs.release_schema,
+            value=composition_supervisor,
         )
         if not inputs.workload_packs:
             raise AirflowDeploymentProjectionError(
@@ -189,6 +200,12 @@ class AirflowDeploymentProjectionService:
             release_bytes=inputs.release_bytes,
             mssql_outlet_projection=mssql_outlet_projection,
         )
+        if supervisor_projection is not None:
+            deployment_bytes = _seal_composition_supervisor_projection(
+                deployment=deployment,
+                airflow_index=airflow_index,
+                projection=supervisor_projection,
+            )
         sidecar_files: dict[str, bytes] = {}
         if semantic_refresh_sidecars is not None:
             sidecars = semantic_refresh_sidecars.build(
@@ -318,6 +335,57 @@ class AirflowDeploymentProjectionService:
             connection_registry_fingerprint=connection_registry_fingerprint,
             credential_runtime_fingerprint=credential_runtime_fingerprint,
         )
+
+
+def _supervisor_projection(
+    *,
+    release_schema: str,
+    value: Mapping[str, object] | None,
+) -> CompositionSupervisorProjection | None:
+    try:
+        return supervisor_projection_for_release(release_schema=release_schema, value=value)
+    except ValueError as exc:
+        reason = str(exc)
+        if reason == "composition_supervisor_required":
+            code = "DPONE_COMPOSITION_SUPERVISOR_REQUIRED"
+            message = "composition release requires a complete supervisor deployment capability"
+        elif reason == "composition_supervisor_forbidden":
+            code = "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN"
+            message = "native v1/v2 and ordinary releases cannot carry a composition supervisor capability"
+        else:
+            code = "DPONE_COMPOSITION_SUPERVISOR_INVALID"
+            message = "composition supervisor deployment capability is invalid"
+        raise AirflowDeploymentProjectionError(code, message) from exc
+
+
+def _seal_composition_supervisor_projection(
+    *,
+    deployment: dict[str, Any],
+    airflow_index: dict[str, Any],
+    projection: CompositionSupervisorProjection,
+) -> bytes:
+    """Mirror the capability and reseal deployment identity and descriptor."""
+
+    if (
+        deployment.get("schema") != "dpone.deployment-set.v3"
+        or airflow_index.get("schema") != "dpone.airflow-deployment-index.v3"
+    ):
+        raise AirflowDeploymentProjectionError(
+            "DPONE_COMPOSITION_SUPERVISOR_INVALID",
+            "composition supervisor requires the v3 deployment wire pair",
+        )
+    projection_payload = projection.to_dict()
+    deployment["composition_supervisor"] = projection_payload
+    deployment_id = compute_deployment_id(deployment)
+    deployment["deployment_id"] = deployment_id
+    deployment_bytes = json_bytes(deployment)
+    airflow_index["deployment_id"] = deployment_id
+    airflow_index["composition_supervisor"] = projection.to_dict()
+    airflow_index["deployment"] = bytes_descriptor(
+        artifact_ref=(f"cache://deployments/{deployment['environment']}/{digest_dir(deployment_id)}/deployment.json"),
+        payload=deployment_bytes,
+    )
+    return deployment_bytes
 
 
 __all__ = [
