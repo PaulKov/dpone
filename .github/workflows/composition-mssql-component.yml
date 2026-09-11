@@ -1,0 +1,88 @@
+# Real SQL ledger, gate, trust and registration; no route or parent certification.
+name: Composition SQL Server component
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/composition-mssql-component.yml"
+      - "src/dpone/adapters/composition_mssql_*.py"
+      - "src/dpone/adapters/nonproduction_mssql_*.py"
+      - "src/dpone/contracts/composition_*.py"
+      - "src/dpone/contracts/nonproduction_*.py"
+      - "src/dpone/ports/nonproduction_authentication.py"
+      - "src/dpone/ports/composition_sql.py"
+      - "tests/integration/composition/**"
+      - "tests/test_composition_mssql_synthetic_runner.py"
+      - "tests/test_nonproduction_mssql_trust_live_support.py"
+      - "tests/test_nonproduction_mssql_registration_live_support.py"
+      - "tools/composition_mssql_synthetic.py"
+      - "tools/composition_mssql_profiles.py"
+      - "tools/composition_mssql_check_catalog.py"
+      - "pyproject.toml"
+      - "uv.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  control-ledger:
+    name: Composition ${{ matrix.profile }} / SQL Server 2022
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [store, gate, trust, registration]
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Microsoft ODBC Driver 18
+        run: |
+          set -euo pipefail
+          . /etc/os-release
+          test "$ID:$VERSION_ID" = "ubuntu:24.04"
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg unixodbc-dev
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+            | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" \
+            | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+
+      - name: Install locked component dependencies
+        run: uv sync --locked --extra mssql
+
+      - name: Run on a newly disposable SQL Server
+        env:
+          COMPONENT_PROFILE: ${{ matrix.profile }}
+        run: |
+          uv run python tools/composition_mssql_synthetic.py \
+            --profile "$COMPONENT_PROFILE" \
+            --output-dir "$RUNNER_TEMP/composition-mssql-${COMPONENT_PROFILE}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+      - name: Retain sanitized component observations
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: composition-mssql-${{ matrix.profile }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/composition-mssql-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}/summary.json
+            ${{ runner.temp }}/composition-mssql-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}/junit.xml
+          if-no-files-found: error
+          retention-days: 90

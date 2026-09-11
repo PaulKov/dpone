@@ -1,16 +1,86 @@
-"""Pure decision rules for deployment cache recovery planning and apply."""
+"""Pure current-pointer assessment and deployment cache recovery decisions."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
-from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
+from dpone.contracts.airflow_deployment import (
+    CurrentPointerViolation,
+    current_pointer_violation,
+    is_canonical_sha256_digest,
+)
 from dpone.runtime.deployment_cache_recovery_models import (
     DeploymentCacheRecoveryCandidate,
     DeploymentCacheRecoveryIssue,
     DeploymentCacheRecoveryPlan,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class PointerAssessment:
+    """Report a contract violation and independently usable diagnostic IDs.
+
+    Canonical IDs can survive invalid authorization. They do not establish a
+    healthy pointer, a verified projection or a safe recovery candidate.
+    """
+
+    violation: CurrentPointerViolation | None
+    deployment_id: str | None
+    release_id: str | None
+
+
+def assess_pointer(pointer: Mapping[str, Any] | None, *, expected_environment: str | None = None) -> PointerAssessment:
+    """Assess an observed pointer without replacing file-level absence checks.
+
+    An explicit environment restricts diagnostic IDs to that environment.
+    Otherwise IDs retain the pointer's own raw environment, including when
+    another contract violation makes the pointer unsuitable for admission.
+    """
+
+    if pointer is None:
+        return PointerAssessment(None, None, None)
+    violation = current_pointer_violation(pointer, expected_environment=expected_environment)
+    environment: Any = pointer.get("environment") if expected_environment is None else expected_environment
+    deployment_id, release_id = pointer_identity(pointer, environment=environment)
+    return PointerAssessment(violation, deployment_id, release_id)
+
+
+def assess_current_identity(
+    pointer: Mapping[str, Any],
+    current_metadata: Mapping[str, Any],
+    *,
+    physical_deployment_id: str | None,
+    expected_environment: str | None = None,
+) -> str | None:
+    """Compare pointer, metadata and observed path identities for strict reads.
+
+    The caller remains responsible for no-follow reads, complete projection
+    validation and recovery errors. This comparison performs no observation.
+    """
+
+    pointer_id = str(pointer.get("deployment_id") or "")
+    current_id = str(current_metadata.get("deployment_id") or "")
+    pointer_environment = str(pointer.get("environment") or "")
+    current_environment = str(current_metadata.get("environment") or "")
+    pointer_release_id = str(pointer.get("release_id") or "")
+    current_release_id = str(current_metadata.get("release_ref") or "")
+    assessment = assess_pointer(pointer, expected_environment=expected_environment)
+    if (
+        assessment.violation is not None
+        or not pointer_environment
+        or pointer_environment != current_environment
+        or expected_environment is not None
+        and pointer_environment != expected_environment
+        or not pointer_id
+        or physical_deployment_id is None
+        or physical_deployment_id != current_id
+        or pointer_id != current_id
+        or pointer_release_id != current_release_id
+    ):
+        return None
+    return current_id
 
 
 def pointer_identity(pointer: Mapping[str, Any] | None, *, environment: str) -> tuple[str | None, str | None]:
@@ -74,6 +144,9 @@ def has_unidentifiable_current(plan: DeploymentCacheRecoveryPlan) -> bool:
 
 
 __all__ = [
+    "PointerAssessment",
+    "assess_current_identity",
+    "assess_pointer",
     "has_unidentifiable_current",
     "is_audit_only_repair",
     "pointer_identity",

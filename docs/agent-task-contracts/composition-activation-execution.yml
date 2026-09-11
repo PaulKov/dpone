@@ -1,0 +1,36 @@
+schema_version: 1
+task_id: DPONE-COMPOSITION-ACTIVATION
+title: Composition parent admission foundation
+goal: Implement the full-parent source, admission, lifecycle and attempt-policy foundation while preserving default fail-closed activation.
+specification: docs/feature-specs/composition-activation-execution.md
+base_commit: 67c8ade61732fb1bff267ce3bd26f2af776e79e6
+integrator: root
+acceptance_criteria:
+  - Complete native and ordinary closure is checked after physical binding resolution.
+  - Unknown capabilities, collisions, stale epochs and unknown attempts fail closed.
+  - The cache lifecycle uses distinct complete-parent PREPARED and ACTIVE authority.
+  - Protected backend and real worker integration remain explicit dependent acceptance requirements.
+  - Preserve native v2 and producer integrity; retain explicit live acceptance gaps.
+public_contract_impact:
+  level: compatible
+  surfaces: [cli, python, runtime, state, evidence, documentation]
+  migration_required: false
+owned_paths: [src/dpone, tests, docs, examples, tools]
+integrator_owned_paths: [CHANGELOG.md, mkdocs.yml, .github/workflows]
+read_only_paths: [pyproject.toml, uv.lock, packages]
+forbidden_paths: [.git, pyproject.toml, uv.lock, CHANGELOG.md, mkdocs.yml, .github/workflows]
+shared_file_owner: root
+dependencies: []
+required_checks:
+  focused: [composition admission and execution regression tests]
+  broad: [ruff, mypy, import rules, layer metrics, module size, non-live pytest, docs]
+  live: [isolated synthetic MSSQL and PostgreSQL execution and reconciliation]
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.

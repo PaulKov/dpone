@@ -27,14 +27,24 @@ def canonical_mssql_catalog_type(dtype: str) -> str:
     instead of hashing the shorter, semantically equivalent input declaration.
     """
 
-    normalized = normalize_mssql_physical_type(dtype)
-    base, max_length, precision, scale = mssql_catalog_type_shape(normalized)
+    base, max_length, precision, scale = validated_mssql_catalog_type_shape(dtype)
     return render_mssql_catalog_type(
         base,
         max_length=max_length,
         precision=precision,
         scale=scale,
     )
+
+
+def validated_mssql_catalog_type_shape(dtype: str) -> tuple[str, int, int, int]:
+    """Validate a DDL declaration and project the exact catalog after-image.
+
+    Keep the low-level normalized-shape parser separate so its established
+    accepted input and errors remain unchanged for existing Python callers.
+    """
+
+    normalized = normalize_mssql_physical_type(dtype)
+    return mssql_catalog_type_shape(normalized)
 
 
 def render_mssql_catalog_type(
@@ -127,4 +137,5 @@ __all__ = [
     "mssql_catalog_type_is_text",
     "mssql_catalog_type_shape",
     "render_mssql_catalog_type",
+    "validated_mssql_catalog_type_shape",
 ]
