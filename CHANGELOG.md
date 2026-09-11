@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.79.0 - 2026-09-11
+
 ### Changed
 
 - Reduce bounded native MSSQL preparation to one metadata-bearing INSERT and one
