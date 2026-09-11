@@ -16,8 +16,8 @@ from typing import Protocol
 
 from dpone.adapters.github_artifact_attestation import GitHubAttestationVerification
 from dpone.contracts.nonproduction_authority import NonproductionAuthorityPolicy, NonproductionSignatureSubject
+from dpone.contracts.nonproduction_document import NonproductionAuthorityError, parse_document
 from dpone.contracts.nonproduction_grants import parse_nonproduction_grant
-from dpone.contracts.nonproduction_scope import NonproductionAuthorityError, parse_document
 from dpone.contracts.runtime_artifact_attestation import (
     GITHUB_ATTESTATION_BACKEND,
     MAX_ATTESTATION_BUNDLE_BYTES,

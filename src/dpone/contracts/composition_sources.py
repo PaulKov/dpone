@@ -7,11 +7,14 @@ producer-backed reader may supply this value to an activation composition root.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from dpone.contracts.airflow_deployment import canonical_fingerprint, is_canonical_sha256_digest
-from dpone.contracts.dbt_relation_writes import DbtRelationWrite
 from dpone.contracts.dbt_source_inventory_binding import DbtReleaseSources
 from dpone.contracts.release_composition_ordinary import OrdinaryReleaseCapture
+
+if TYPE_CHECKING:
+    from dpone.contracts.dbt_relation_writes import DbtRelationWrite
 
 
 @dataclass(frozen=True, slots=True)

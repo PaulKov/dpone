@@ -5,7 +5,7 @@ proof originals; a family FK prevents qualification from borrowing SQL issuance.
 Enrollment remains externally provisioned on fresh exclusive physical databases.
 """
 
-from dpone.adapters.composition_mssql_layout import (
+from dpone.adapters.composition_mssql_catalog_types import (
     CompositionCheck,
     CompositionColumn,
     CompositionForeignKey,

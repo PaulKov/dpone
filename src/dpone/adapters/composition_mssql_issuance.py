@@ -10,9 +10,10 @@ from __future__ import annotations
 import re
 import secrets
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
+from dpone.adapters.composition_mssql_catalog import require_composition_mssql_gate_schema
 from dpone.adapters.composition_mssql_database_policy import require_database_policy
-from dpone.adapters.composition_mssql_gate_catalog import require_composition_mssql_gate_schema
 from dpone.adapters.composition_mssql_gate_schema import (
     GATE_READER,
     GATE_TRIGGER,
@@ -23,7 +24,9 @@ from dpone.adapters.composition_mssql_gate_schema import (
 from dpone.adapters.composition_mssql_schema import require_control_schema
 from dpone.adapters.dbapi_lifecycle import row
 from dpone.contracts.composition_control import CompositionAdmissionError, CompositionAttemptIdentity
-from dpone.ports.composition_sql import CompositionSqlContext
+
+if TYPE_CHECKING:
+    from dpone.ports.composition_sql import CompositionSqlContext
 
 
 @dataclass(frozen=True, slots=True)

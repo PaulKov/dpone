@@ -9,6 +9,7 @@ receive independently observed receipts and do not reobserve business activity.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 from dpone.adapters.composition_mssql_historical_gate import (
     _require_attempt,
@@ -22,14 +23,17 @@ from dpone.contracts.composition_activation import (
     CompositionAdmissionError,
     require_digest,
 )
-from dpone.contracts.composition_attempt import (
+from dpone.contracts.composition_persistence import (
     CompositionAttemptIdentity,
+    CompositionAttemptProof,
     CompositionAttemptReceipt,
+    CompositionProofAuthority,
+    decode_attempt_proof,
     require_composition_attempt_scope,
 )
-from dpone.contracts.composition_persistence import decode_attempt_proof
-from dpone.contracts.composition_proof import CompositionAttemptProof, CompositionProofAuthority
-from dpone.ports.composition_sql import CompositionSqlContext
+
+if TYPE_CHECKING:
+    from dpone.ports.composition_sql import CompositionSqlContext
 
 _KINDS = ("CLOSED_GATES", "QUIESCENCE", "OUTCOME")
 

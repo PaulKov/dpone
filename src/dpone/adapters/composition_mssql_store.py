@@ -11,6 +11,7 @@ the adapter never replays a mutation to infer whether a commit succeeded.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from dpone.adapters.composition_mssql_schema import require_control_schema
@@ -22,7 +23,9 @@ from dpone.contracts.composition_control import (
     CompositionAdmissionError,
     encode_activation_request,
 )
-from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
+
+if TYPE_CHECKING:
+    from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
 
 
 class MssqlCompositionActivationStore:

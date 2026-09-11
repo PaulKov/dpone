@@ -12,7 +12,7 @@ from dpone.adapters.composition_mssql_schema import (
     COMPOSITION_MSSQL_SCHEMA_VERSION,
     require_control_schema,
 )
-from dpone.contracts.composition_activation import CompositionAdmissionError
+from dpone.contracts.composition_identity import CompositionAdmissionError
 from dpone.ports.composition_sql import CompositionSqlContext
 
 

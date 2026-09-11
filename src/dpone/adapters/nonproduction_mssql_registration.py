@@ -11,9 +11,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.adapters.nonproduction_mssql_registration_boundary import _RegistrationBoundary
 from dpone.adapters.nonproduction_mssql_registration_schema import (
     REGISTRATION_COLUMNS,
@@ -21,6 +20,7 @@ from dpone.adapters.nonproduction_mssql_registration_schema import (
     require_nonproduction_registration_insert_options,
 )
 from dpone.adapters.nonproduction_mssql_trust import MssqlNonproductionTrustProvider, NonproductionTrustRevision
+from dpone.contracts.nonproduction_document import NonproductionAuthorityError, digest
 from dpone.contracts.nonproduction_grants import (
     NonproductionExecutionGrant,
 )
@@ -32,8 +32,10 @@ from dpone.contracts.nonproduction_registration import (
     require_membership_history,
     workload_document,
 )
-from dpone.contracts.nonproduction_scope import NonproductionAuthorityError, digest
 from dpone.ports.nonproduction_authentication import NonproductionTrustSnapshot
+
+if TYPE_CHECKING:
+    from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 
 
 def _values(record: NonproductionGrantRegistration) -> tuple[Any, ...]:

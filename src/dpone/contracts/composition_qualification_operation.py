@@ -12,9 +12,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, fields
 from typing import Literal
 
-from dpone.contracts.composition_activation import CompositionAdmissionError
+from dpone.contracts.composition_identity import CompositionAdmissionError
 from dpone.contracts.composition_ownership import CompositionOwnerReference, CompositionPhysicalClaim
-from dpone.contracts.nonproduction_scope import (
+from dpone.contracts.nonproduction_document import (
     NonproductionAuthorityError,
     canonical_document,
     digest,

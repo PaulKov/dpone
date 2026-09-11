@@ -8,11 +8,15 @@ necessary drift detection, not effective-permission proof or live certification.
 
 from __future__ import annotations
 
-from dpone.adapters.composition_mssql_gate_schema import module_sha256
+from typing import TYPE_CHECKING
+
+from dpone.adapters.composition_mssql_catalog_types import module_sha256
 from dpone.adapters.composition_mssql_schema import COMPOSITION_MSSQL_LEDGER_LOCK, require_control_schema
-from dpone.contracts.nonproduction_scope import MAX_DOCUMENT_BYTES, NonproductionAuthorityError
+from dpone.contracts.nonproduction_document import MAX_DOCUMENT_BYTES, NonproductionAuthorityError
 from dpone.contracts.runtime_artifact_attestation import MAX_ATTESTATION_BUNDLE_BYTES
-from dpone.ports.sql_connection import SqlControlCursor
+
+if TYPE_CHECKING:
+    from dpone.ports.sql_connection import SqlControlCursor
 
 _BIN = "Latin1_General_100_BIN2"
 _QUALIFICATION_FILTER = "([phase]='qualification')"

@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, fields
 from typing import Any
 
-from dpone.contracts.nonproduction_plan_values import NonproductionPlanObject, NonproductionPlanOriginal
-from dpone.contracts.nonproduction_scope import (
+from dpone.contracts.nonproduction_document import (
     NonproductionAuthorityError,
     canonical_document,
     digest,
@@ -17,6 +16,7 @@ from dpone.contracts.nonproduction_scope import (
     sequence,
     text,
 )
+from dpone.contracts.nonproduction_plan_values import NonproductionPlanObject, NonproductionPlanOriginal
 
 _SCHEMA = "dpone.nonproduction-fixture-plan.v1"
 BCP_PROFILE = "mssql_clickhouse_bcp_wide_v1"

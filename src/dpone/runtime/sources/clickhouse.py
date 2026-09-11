@@ -7,7 +7,6 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 
 from dpone.config.load_strategy import LoadStrategy
-from dpone.contracts.clickhouse_incremental_cursor import assert_clickhouse_mssql_cursor_supported
 from dpone.contracts.mssql_source_checkpoint import MssqlTransactionCheckpointMode
 from dpone.runtime.connectors import ClickHouseConnector
 from dpone.runtime.mssql_spool_route import MSSQL_CHARACTER_SPOOL_REQUIREMENT
@@ -17,6 +16,11 @@ from dpone.runtime.sources.strategies import (
     ClickHouseFullExtractStrategy,
     ClickHouseIncrementalExtractStrategy,
     SourceStrategy,
+)
+
+# Preserve the historical helper import as an identity re-export.
+from dpone.runtime.sources.strategies.clickhouse.clickhouse_incremental_extract import (
+    assert_clickhouse_mssql_cursor_supported as assert_clickhouse_mssql_cursor_supported,
 )
 from dpone.type_system.source_sink.provenance import (
     SourceColumnProvenance,
@@ -206,11 +210,7 @@ class ClickHouseSource(AbstractSource):
                 f"Поддерживаемые: {', '.join(s.value for s in self._strategy_map.keys())}"
             )
         if strategy is self._incremental_extract:
-            options = getattr(load_config, "options", {}) or {}
-            assert_clickhouse_mssql_cursor_supported(
-                configured_sink=options.get("sink_type") or options.get("target_type"),
-                sink_connector=self.sink_connector,
-            )
+            ClickHouseIncrementalExtractStrategy.require_source_route_safe(load_config, self)
         return strategy
 
 

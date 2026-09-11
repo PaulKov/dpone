@@ -9,6 +9,7 @@ unsuccessful reconciliation remains blocking in durable RUNNING/CLOSING records.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from dpone.adapters.composition_mssql_attempts import (
@@ -28,13 +29,15 @@ from dpone.adapters.composition_mssql_issuance import (
     require_worker_users,
 )
 from dpone.adapters.composition_mssql_schema import require_control_schema
-from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.adapters.dbapi_lifecycle import row
 from dpone.contracts.composition_control import (
     CompositionAdmissionError,
     CompositionAttemptIdentity,
     CompositionAttemptProof,
 )
+
+if TYPE_CHECKING:
+    from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 
 
 @dataclass(frozen=True, slots=True)

@@ -5,9 +5,12 @@ must be verified against pinned protected authority before constructing them.
 """
 
 from dataclasses import dataclass
-from uuid import UUID
 
-from dpone.contracts.composition_activation import CompositionAdmissionError, require_digest
+from dpone.contracts.composition_identity import (
+    CompositionAdmissionError,
+    require_digest,
+    require_physical_domain_identity,
+)
 from dpone.contracts.composition_physical_identity import composition_physical_guard_id
 
 
@@ -20,15 +23,11 @@ class CompositionPhysicalDomain:
     physical_subject_sha256: str
 
     def __post_init__(self) -> None:
-        if self.connector not in {"mssql", "clickhouse"}:
-            raise CompositionAdmissionError("physical_connector")
-        try:
-            valid = str(UUID(self.service_id)) == self.service_id
-        except (TypeError, ValueError, AttributeError):
-            valid = False
-        if not valid:
-            raise CompositionAdmissionError("protected_service_id")
-        require_digest(self.physical_subject_sha256)
+        require_physical_domain_identity(
+            connector=self.connector,
+            service_id=self.service_id,
+            physical_subject_sha256=self.physical_subject_sha256,
+        )
 
     @property
     def guard_id(self) -> str:

@@ -6,11 +6,15 @@ from typing import TYPE_CHECKING, Any
 
 from dpone.config.load_strategy import LoadStrategy
 from dpone.contracts.mssql_source_checkpoint import MssqlTransactionCheckpointMode
-from dpone.contracts.target_max_incremental_cursor import assert_target_max_mssql_cursor_supported
 from dpone.runtime.sources.extract_result import ExtractResult
 from dpone.runtime.sources.source_protocol import AbstractSource
 from dpone.runtime.sources.strategies.base import SourceStrategy
 from dpone.runtime.sources.strategies.mysql import MySQLFullExtractStrategy, MySQLIncrementalExtractStrategy
+
+# Preserve the historical helper import as an identity re-export.
+from dpone.runtime.sources.strategies.mysql.mysql_incremental import (
+    assert_target_max_mssql_cursor_supported as assert_target_max_mssql_cursor_supported,
+)
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
@@ -69,12 +73,7 @@ class MySQLSource(AbstractSource):
         if strategy is None:
             raise ValueError(f"Unsupported MySQL load strategy: {load_config.load_strategy.value}")
         if strategy is self._incremental_extract:
-            options = getattr(load_config, "options", {}) or {}
-            assert_target_max_mssql_cursor_supported(
-                source_type=self.target_max_cursor_source_type,
-                configured_sink=options.get("sink_type") or options.get("target_type"),
-                sink_connector=self.sink_connector,
-            )
+            MySQLIncrementalExtractStrategy.require_source_route_safe(load_config, self)
         return strategy
 
 

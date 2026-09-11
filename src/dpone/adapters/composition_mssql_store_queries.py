@@ -8,6 +8,7 @@ history checks, preserve legacy documents and use exact epoch/state comparisons.
 from __future__ import annotations
 
 from functools import partial
+from typing import TYPE_CHECKING
 
 from dpone.adapters.composition_mssql_catalog import require_composition_mssql_schema
 from dpone.adapters.composition_mssql_existing_operation import require_retired_execution_in
@@ -28,8 +29,10 @@ from dpone.contracts.composition_control import (
 )
 from dpone.contracts.composition_ownership import CompositionOwnerReference
 from dpone.contracts.composition_persistence import encode_physical_resource as resource_document
-from dpone.ports.composition_sql import ExecutionTerminalValidator
-from dpone.ports.sql_connection import SqlControlCursor
+
+if TYPE_CHECKING:
+    from dpone.ports.composition_sql import ExecutionTerminalValidator
+    from dpone.ports.sql_connection import SqlControlCursor
 
 
 class CompositionMssqlLedger:

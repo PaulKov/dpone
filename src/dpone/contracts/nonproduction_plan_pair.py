@@ -7,6 +7,7 @@ bound by the existing owner/operation contracts; no current truth is fabricated.
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
+from typing import TYPE_CHECKING
 
 from dpone.contracts.composition_qualification_operation import (
     CompositionQualificationOperation,
@@ -21,7 +22,6 @@ from dpone.contracts.nonproduction_fixture_plan import (
     NonproductionFixturePlan,
 )
 from dpone.contracts.nonproduction_grants import NonproductionQualificationGrant
-from dpone.contracts.nonproduction_plan_values import NonproductionPlanObject
 from dpone.contracts.nonproduction_qualification_plan import (
     NonproductionFixtureSeedItem,
     NonproductionQualificationPlan,
@@ -30,6 +30,9 @@ from dpone.contracts.nonproduction_qualification_plan import (
     NonproductionSourceSealItem,
 )
 from dpone.contracts.nonproduction_scope import NonproductionAuthorityError, NonproductionParticipant
+
+if TYPE_CHECKING:
+    from dpone.contracts.nonproduction_plan_values import NonproductionPlanObject
 
 
 def _require_actions(

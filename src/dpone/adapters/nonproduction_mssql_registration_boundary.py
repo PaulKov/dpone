@@ -11,12 +11,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timezone
 from types import TracebackType
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.adapters.nonproduction_mssql_registration_schema import require_nonproduction_registration_schema
-from dpone.adapters.nonproduction_mssql_trust import MssqlNonproductionTrustProvider, NonproductionTrustRevision
-from dpone.contracts.nonproduction_scope import NonproductionAuthorityError
+from dpone.contracts.nonproduction_document import NonproductionAuthorityError
+
+if TYPE_CHECKING:
+    from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
+    from dpone.adapters.nonproduction_mssql_trust import MssqlNonproductionTrustProvider, NonproductionTrustRevision
 
 
 class _RegistrationBoundary:

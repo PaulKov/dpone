@@ -23,8 +23,7 @@ from dpone.contracts.composition_activation import (
     CompositionWorkloadAdmission,
 )
 from dpone.contracts.composition_persistence import activation_request_fields
-from dpone.contracts.nonproduction_grants import NonproductionExecutionGrant
-from dpone.contracts.nonproduction_scope import (
+from dpone.contracts.nonproduction_document import (
     NonproductionAuthorityError,
     canonical_document,
     digest,
@@ -32,6 +31,7 @@ from dpone.contracts.nonproduction_scope import (
     exact_fields,
     parse_document,
 )
+from dpone.contracts.nonproduction_grants import NonproductionExecutionGrant
 from dpone.contracts.strict_json import strict_json_object
 
 SCHEMA = "dpone.composition-activation-request.nonproduction.v1"

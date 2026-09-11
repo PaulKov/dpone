@@ -7,13 +7,64 @@ from typing import TYPE_CHECKING
 
 from dpone.contracts.composition_control import (
     CompositionActivationOccurrence,
+    CompositionActivationRequest,
     CompositionAdmissionError,
     CompositionOccurrenceContext,
+    CompositionSourceSnapshot,
 )
+from dpone.manifest.composition_execution_plan import plan_composition_execution
+
+
+class CompositionActivationPreparation:
+    """One full-parent plan, explicit installed cells and complete physical proof."""
+
+    def __init__(self, *, physical: CompositionPhysicalAdmission) -> None:
+        self._physical = physical
+
+    def prepare(
+        self, *, sources: CompositionSourceSnapshot, context: CompositionOccurrenceContext
+    ) -> CompositionActivationRequest:
+        """Finish all checks before the caller may drain or reserve resources."""
+        if sources.release_id != context.release_id:
+            raise CompositionAdmissionError("parent_context")
+        plan = plan_composition_execution(sources)
+        plan.require_installed_cells(self._physical.execution_cells)
+        resources = self._physical.observe(plan, context)
+        return CompositionActivationRequest(
+            context=context, source_subject_sha256=sources.subject_sha256, workloads=plan.workloads, resources=resources
+        )
+
+    def require_existing(
+        self,
+        request: CompositionActivationRequest,
+        *,
+        sources: CompositionSourceSnapshot,
+        context: CompositionOccurrenceContext,
+    ) -> None:
+        """Validate immutable original admission while allowing legitimate DDL.
+
+        Do not reconstruct a request from current create/modify timestamps. The
+        protected binding verifier must still reject service/database drift.
+        """
+        request.__post_init__()
+        plan = plan_composition_execution(sources)
+        plan.require_installed_cells(self._physical.execution_cells)
+        if (
+            sources.release_id != context.release_id
+            or request.context != context
+            or request.source_subject_sha256 != sources.subject_sha256
+            or (request.workloads != plan.workloads)
+        ):
+            raise CompositionAdmissionError("immutable_admission_subject")
+        self._physical.require_stable_bindings(request, plan)
+
 
 if TYPE_CHECKING:
-    from dpone.ports.composition_activation import CompositionActivationInputs, CompositionActivationStoreFactory
-    from dpone.services.composition_activation_preparation import CompositionActivationPreparation
+    from dpone.ports.composition_activation import (
+        CompositionActivationInputs,
+        CompositionActivationStoreFactory,
+        CompositionPhysicalAdmission,
+    )
 
 
 class CompositionActivationCoordinator:
@@ -30,7 +81,7 @@ class CompositionActivationCoordinator:
         preparation: CompositionActivationPreparation,
         stores: CompositionActivationStoreFactory,
     ) -> None:
-        self._inputs, self._preparation, self._stores = inputs, preparation, stores
+        self._inputs, self._preparation, self._stores = (inputs, preparation, stores)
 
     def prepare(
         self,
@@ -65,10 +116,7 @@ class CompositionActivationCoordinator:
         return prepared
 
     def activate(
-        self,
-        prepared: CompositionActivationOccurrence,
-        *,
-        projection_root: Path,
+        self, prepared: CompositionActivationOccurrence, *, projection_root: Path
     ) -> CompositionActivationOccurrence:
         """Acknowledge ACTIVE only after the caller's current-pointer CAS commit."""
         return self._transition(prepared, projection_root=projection_root, before="PREPARED", after="ACTIVE")
@@ -102,30 +150,19 @@ class CompositionActivationCoordinator:
         return active
 
     def begin_retirement(
-        self,
-        active: CompositionActivationOccurrence,
-        *,
-        projection_root: Path,
+        self, active: CompositionActivationOccurrence, *, projection_root: Path
     ) -> CompositionActivationOccurrence:
         """Close new attempt admission while retaining all in-flight resource epochs."""
         return self._transition(active, projection_root=projection_root, before="ACTIVE", after="RETIRING")
 
     def finalize_retirement(
-        self,
-        retiring: CompositionActivationOccurrence,
-        *,
-        projection_root: Path,
+        self, retiring: CompositionActivationOccurrence, *, projection_root: Path
     ) -> CompositionActivationOccurrence:
         """Require protected gate closure, quiescence and resolved outcomes before release."""
         return self._transition(retiring, projection_root=projection_root, before="RETIRING", after="RETIRED")
 
     def _transition(
-        self,
-        occurrence: CompositionActivationOccurrence,
-        *,
-        projection_root: Path,
-        before: str,
-        after: str,
+        self, occurrence: CompositionActivationOccurrence, *, projection_root: Path, before: str, after: str
     ) -> CompositionActivationOccurrence:
         occurrence.require_state(before)
         context = occurrence.request.context
@@ -175,12 +212,9 @@ class CompositionActivationCoordinator:
             context.release_id,
             context.deployment_id,
             context.previous_deployment_id,
-        ) != (
-            activation_id,
-            environment,
-            release_id,
-            deployment_id,
-            previous_deployment_id,
-        ):
+        ) != (activation_id, environment, release_id, deployment_id, previous_deployment_id):
             raise CompositionAdmissionError("projection_context")
         return context
+
+
+CompositionActivationPreparation.__module__ = "dpone.services.composition_activation_preparation"

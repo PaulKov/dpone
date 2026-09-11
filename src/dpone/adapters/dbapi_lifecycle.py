@@ -7,9 +7,10 @@ The owning adapter must independently reconcile those outcomes.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
+if TYPE_CHECKING:
+    from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
 
 
 def row(cursor: SqlControlCursor) -> tuple[Any, ...] | None:

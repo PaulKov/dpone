@@ -15,31 +15,27 @@ from dpone.contracts.composition_activation import (
     CompositionPhysicalResource,
     CompositionWorkloadAdmission,
 )
-from dpone.contracts.composition_attempt import (
-    CompositionAttemptIdentity,
-    CompositionAttemptReceipt,
-    require_composition_attempt_admission,
-    require_composition_attempt_scope,
-)
 from dpone.contracts.composition_execution import (
     CompositionExecutionPlan,
     composition_generated_transfer_cell,
     composition_transfer_cell,
 )
 from dpone.contracts.composition_persistence import (
+    CompositionAttemptIdentity,
+    CompositionAttemptProof,
+    CompositionAttemptReceipt,
+    CompositionProofAuthority,
+    composition_attempt_epoch_subject,
     decode_activation_request,
     decode_attempt_identity,
     decode_attempt_proof,
     encode_activation_request,
     encode_attempt_identity,
     encode_attempt_proof,
+    require_composition_attempt_admission,
+    require_composition_attempt_scope,
 )
 from dpone.contracts.composition_physical import CompositionDomainObservation, CompositionPhysicalDomain
-from dpone.contracts.composition_proof import (
-    CompositionAttemptProof,
-    CompositionProofAuthority,
-    composition_attempt_epoch_subject,
-)
 from dpone.contracts.composition_sources import CompositionSourceSnapshot
 from dpone.contracts.dbt_relation_writes import DbtRelationWrite
 from dpone.contracts.dbt_workspace_activation import dbt_relation_write_subject

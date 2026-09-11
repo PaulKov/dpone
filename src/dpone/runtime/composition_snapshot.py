@@ -8,9 +8,9 @@ constructing a record or providing terminal hashes instead of those adapters.
 
 from __future__ import annotations
 
-from dpone.contracts.composition_activation import CompositionAdmissionError, require_digest
-from dpone.contracts.composition_attempt import CompositionAttemptIdentity, require_composition_attempt_scope
-from dpone.contracts.composition_persistence import encode_attempt_identity
+from typing import TYPE_CHECKING
+
+from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
 from dpone.contracts.composition_snapshot import (
     SnapshotCatalogObservation,
     SnapshotPublicationIntent,
@@ -18,12 +18,15 @@ from dpone.contracts.composition_snapshot import (
     SnapshotPublisherClosure,
     classify_snapshot,
 )
-from dpone.ports.composition_snapshot import (
-    ClickHouseSnapshotCatalog,
-    ClickHouseSnapshotExecutor,
-    SnapshotPublicationAuthority,
-    SnapshotPublicationStore,
-)
+
+if TYPE_CHECKING:
+    from dpone.contracts.composition_persistence import CompositionAttemptIdentity
+    from dpone.ports.composition_snapshot import (
+        ClickHouseSnapshotCatalog,
+        ClickHouseSnapshotExecutor,
+        SnapshotPublicationAuthority,
+        SnapshotPublicationStore,
+    )
 
 
 class ClickHouseAtomicSnapshotPublisher:
@@ -52,11 +55,7 @@ class ClickHouseAtomicSnapshotPublisher:
             if type(value) is not SnapshotPublicationIntent:
                 raise CompositionAdmissionError("snapshot_prepared_shape")
             value.__post_init__()
-            if (
-                encode_attempt_identity(value.attempt) != encode_attempt_identity(attempt)
-                or value.generation.record_sha256 != generation_ref
-            ):
-                raise CompositionAdmissionError("snapshot_prepared_subject")
+            value.require_prepared_subject(attempt, generation_ref)
             self._require_current(value, recovery=False)
             self._require_unpublished(value)
             expected = SnapshotPublicationRecord(value)
@@ -144,22 +143,7 @@ class ClickHouseAtomicSnapshotPublisher:
 
     def _require_current(self, intent: SnapshotPublicationIntent, *, recovery: bool) -> None:
         occurrence = self._authority.require_current(intent, recovery=recovery)
-        if occurrence.receipt.state not in ({"ACTIVE", "RETIRING"} if recovery else {"ACTIVE"}):
-            raise CompositionAdmissionError("snapshot_occurrence_state")
-        guards = require_composition_attempt_scope(occurrence, intent.attempt)
-        target = intent.target
-        workload = next(row for row in occurrence.request.workloads if row.workload_id == intent.attempt.workload_id)
-        resource = next((row for row in occurrence.request.resources if row.guard_id == target.guard_id), None)
-        if (
-            target.guard_id not in guards
-            or resource is None
-            or (resource.connector, resource.service_id, resource.physical_subject_sha256)
-            != ("clickhouse", target.service_id, target.physical_subject_sha256)
-            or target.write_subject_sha256 not in resource.write_subjects
-            or target.write_subject_sha256 not in workload.write_subjects
-            or workload.execution_cell != "mssql_clickhouse_full_refresh_v1"
-        ):
-            raise CompositionAdmissionError("snapshot_parent_scope")
+        intent.require_parent_scope(occurrence, recovery=recovery)
 
     def _inspect(self, intent: SnapshotPublicationIntent) -> SnapshotCatalogObservation:
         observation = self._catalog.inspect(intent)

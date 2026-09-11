@@ -14,7 +14,7 @@ from hashlib import sha256
 from typing import Protocol
 
 from dpone.contracts.nonproduction_authority import NonproductionSignatureSubject, require_epoch
-from dpone.contracts.nonproduction_scope import MAX_DOCUMENT_BYTES, NonproductionAuthorityError, digest
+from dpone.contracts.nonproduction_document import MAX_DOCUMENT_BYTES, NonproductionAuthorityError, digest
 
 
 @dataclass(frozen=True, slots=True)

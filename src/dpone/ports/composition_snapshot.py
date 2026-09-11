@@ -4,16 +4,20 @@ Implementations are injected by the composition root. A DTO, a caller digest,
 method presence or a mock is never evidence that these obligations are met.
 """
 
-from typing import Protocol
+from __future__ import annotations
 
-from dpone.contracts.composition_activation import CompositionActivationOccurrence
-from dpone.contracts.composition_attempt import CompositionAttemptIdentity
-from dpone.contracts.composition_snapshot import (
-    SnapshotCatalogObservation,
-    SnapshotPublicationIntent,
-    SnapshotPublicationRecord,
-    SnapshotPublisherClosure,
-)
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dpone.contracts.composition_activation import CompositionActivationOccurrence
+    from dpone.contracts.composition_persistence import CompositionAttemptIdentity
+    from dpone.contracts.composition_snapshot import (
+        SnapshotCatalogObservation,
+        SnapshotPublicationIntent,
+        SnapshotPublicationRecord,
+        SnapshotPublisherClosure,
+    )
+from typing import Protocol
 
 
 class SnapshotPublicationAuthority(Protocol):

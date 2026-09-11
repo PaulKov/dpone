@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.78.0 - 2026-09-11
+
+This release adds the internal composition admission and storage foundation.
+Public composition execution remains unavailable until the protected backend
+and complete worker campaign are implemented and verified. Existing native-v2
+execution and the PostgreSQL fixes shipped in 0.77.1 remain intact.
+
 - Document the approved candidate for an internal scoped execution owner
   original that retains all qualified reads and helper effects, binds genuine
   legacy writes and compares exact

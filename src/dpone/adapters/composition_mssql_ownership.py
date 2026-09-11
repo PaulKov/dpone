@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.adapters.composition_mssql_transaction import require_shared_transaction_in
 from dpone.contracts.composition_activation import (
@@ -23,7 +23,9 @@ from dpone.contracts.composition_ownership import CompositionOwnerReference, Com
 from dpone.contracts.composition_persistence import decode_activation_request, encode_physical_resource
 from dpone.contracts.composition_qualification_operation import CompositionQualificationOwner
 from dpone.contracts.strict_json import canonical_json_bytes
-from dpone.ports.composition_sql import CompositionSqlContext
+
+if TYPE_CHECKING:
+    from dpone.ports.composition_sql import CompositionSqlContext
 
 
 @dataclass(frozen=True, slots=True)

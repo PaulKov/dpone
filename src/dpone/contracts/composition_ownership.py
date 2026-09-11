@@ -11,9 +11,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, fields
 from typing import Literal
 
-from dpone.contracts.composition_activation import CompositionAdmissionError
+from dpone.contracts.composition_identity import CompositionAdmissionError
 from dpone.contracts.composition_physical_identity import composition_physical_guard_id
-from dpone.contracts.nonproduction_scope import (
+from dpone.contracts.nonproduction_document import (
     NonproductionAuthorityError,
     digest,
     document_sha256,

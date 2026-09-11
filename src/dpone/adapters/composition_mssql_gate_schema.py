@@ -8,10 +8,9 @@ engine-specific LOGON/DMV visibility race; the isolated live test is mandatory.
 
 from __future__ import annotations
 
-from hashlib import sha256
-
+from dpone.adapters.composition_mssql_catalog_types import CompositionTrigger
+from dpone.adapters.composition_mssql_catalog_types import module_sha256 as module_sha256
 from dpone.adapters.composition_mssql_gate_layout import COMPOSITION_GATE_TABLES
-from dpone.adapters.composition_mssql_layout import CompositionTrigger
 from dpone.adapters.composition_mssql_schema import render_composition_table, require_control_schema
 
 GATE_TRIGGER = "dpone_composition_login_gate"
@@ -69,11 +68,6 @@ BEGIN
                (i.disabled_evidence_sha256 IS NULL OR i.disabled_evidence_sha256 <> d.disabled_evidence_sha256))
     ) THROW 51000, 'DPONE_COMPOSITION_GATE_IMMUTABLE', 1;
 END;"""
-
-
-def module_sha256(definition: str) -> bytes:
-    """Match HASHBYTES over SQL Server's NVARCHAR module definition bytes."""
-    return sha256(definition.encode("utf-16le")).digest()
 
 
 def render_composition_mssql_login_gate(*, control_database: str, control_schema: str = "dpone_control") -> str:

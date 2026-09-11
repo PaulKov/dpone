@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.adapters.composition_mssql_ownership import (
     SharedOwnerRecord,
@@ -26,17 +26,20 @@ from dpone.contracts.composition_activation import (
     CompositionAdmissionError,
     require_digest,
 )
-from dpone.contracts.composition_attempt import (
+from dpone.contracts.composition_persistence import (
     CompositionAttemptIdentity,
     CompositionAttemptReceipt,
+    decode_attempt_identity,
+    encode_activation_request,
     require_composition_attempt_scope,
 )
-from dpone.contracts.composition_persistence import decode_attempt_identity, encode_activation_request
 from dpone.contracts.composition_qualification_operation import (
     CompositionQualificationOperation,
     CompositionQualificationOwner,
 )
-from dpone.ports.composition_sql import CompositionSqlContext, ExecutionTerminalValidator
+
+if TYPE_CHECKING:
+    from dpone.ports.composition_sql import CompositionSqlContext, ExecutionTerminalValidator
 
 
 @dataclass(frozen=True, slots=True)

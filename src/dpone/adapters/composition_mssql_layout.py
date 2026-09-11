@@ -8,11 +8,31 @@ The eight tables belong to one protected database and transaction lock.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+
+from dpone.adapters.composition_mssql_catalog_types import (
+    COMPOSITION_COLLATION as COMPOSITION_COLLATION,
+)
+from dpone.adapters.composition_mssql_catalog_types import (
+    CompositionCheck as CompositionCheck,
+)
+from dpone.adapters.composition_mssql_catalog_types import (
+    CompositionColumn as CompositionColumn,
+)
+from dpone.adapters.composition_mssql_catalog_types import (
+    CompositionForeignKey as CompositionForeignKey,
+)
+from dpone.adapters.composition_mssql_catalog_types import (
+    CompositionKey as CompositionKey,
+)
+from dpone.adapters.composition_mssql_catalog_types import (
+    CompositionTable as CompositionTable,
+)
+from dpone.adapters.composition_mssql_catalog_types import (
+    CompositionTrigger as CompositionTrigger,
+)
 
 COMPOSITION_MSSQL_SCHEMA_VERSION = 2
 COMPOSITION_MSSQL_LEDGER_LOCK = "dpone:composition-control:v1"
-COMPOSITION_COLLATION = "Latin1_General_100_BIN2"
 LEGACY_COMPOSITION_OBJECTS = ("activations", "activation_domains", "attempts", "attempt_domains")
 
 
@@ -21,67 +41,6 @@ def require_control_schema(value: str) -> str:
     if not isinstance(value, str) or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", value) is None:
         raise ValueError("control_schema must be a simple SQL identifier of at most 128 characters")
     return value
-
-
-@dataclass(frozen=True)
-class CompositionColumn:
-    """A built-in SQL type with exact byte length and nullability."""
-
-    name: str
-    sql_type: str
-    length: int
-    nullable: bool = False
-
-    @property
-    def collation(self) -> str | None:
-        return COMPOSITION_COLLATION if self.sql_type in {"varchar", "nvarchar"} else None
-
-
-@dataclass(frozen=True)
-class CompositionKey:
-    """One named primary or unique key; no filters or ignored duplicates."""
-
-    name: str
-    columns: tuple[str, ...]
-    primary: bool = False
-
-
-@dataclass(frozen=True)
-class CompositionForeignKey:
-    """A trusted, non-cascading exact association to another core table."""
-
-    name: str
-    columns: tuple[str, ...]
-    target: str
-    target_columns: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class CompositionCheck:
-    """A named closed expression, separately inspected with its trust flags."""
-
-    name: str
-    expression: str
-
-
-@dataclass(frozen=True)
-class CompositionTable:
-    """Complete ordered columns and constraints for one mandatory table."""
-
-    name: str
-    columns: tuple[CompositionColumn, ...]
-    keys: tuple[CompositionKey, ...]
-    foreign_keys: tuple[CompositionForeignKey, ...] = ()
-    checks: tuple[CompositionCheck, ...] = ()
-
-
-@dataclass(frozen=True)
-class CompositionTrigger:
-    """Exact internal module and its sorted SQL event set for catalog inspection."""
-
-    name: str
-    definition: str
-    events: tuple[str, ...]
 
 
 def _digest(name: str, *, nullable: bool = False) -> CompositionColumn:

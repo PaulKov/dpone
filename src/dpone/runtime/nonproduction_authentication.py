@@ -16,6 +16,7 @@ from typing import TypeVar
 from dpone.contracts.nonproduction_authority import (
     NonproductionAuthorityPolicy,
     NonproductionSignatureSubject,
+    require_signature_bundle,
     require_validity,
 )
 from dpone.contracts.nonproduction_grants import (
@@ -24,8 +25,10 @@ from dpone.contracts.nonproduction_grants import (
     NonproductionWorkload,
     validate_grant_subject,
 )
-from dpone.contracts.nonproduction_scope import NonproductionAuthorityError, NonproductionScope
-from dpone.contracts.runtime_artifact_attestation import MAX_ATTESTATION_BUNDLE_BYTES
+from dpone.contracts.nonproduction_scope import (
+    NonproductionAuthorityError,
+    NonproductionScope,
+)
 from dpone.ports.nonproduction_authentication import (
     NonproductionGrantSignatureVerifier,
     NonproductionTrustProvider,
@@ -104,8 +107,7 @@ class NonproductionGrantAuthenticator:
         bundle: bytes,
         expected_scope: NonproductionScope,
     ) -> tuple[_Grant, NonproductionSignatureSubject]:
-        if type(bundle) is not bytes or not 1 <= len(bundle) <= MAX_ATTESTATION_BUNDLE_BYTES:
-            raise NonproductionAuthorityError("signature_bundle_budget") from None
+        require_signature_bundle(bundle)
         before, policy, started = self._read_trust()
         policy.require_scope(grant.scope)
         if type(expected_scope) is not NonproductionScope or expected_scope != grant.scope:
@@ -120,7 +122,12 @@ class NonproductionGrantAuthenticator:
         )
         self._require_signer_trust(before, started)
         try:
-            subject = self._verifier.verify(grant_bytes=grant_bytes, sigstore_bundle=bundle, trust=before, now=started)
+            subject = self._verifier.verify(
+                grant_bytes=grant_bytes,
+                sigstore_bundle=bundle,
+                trust=before,
+                now=started,
+            )
         except Exception:
             raise NonproductionAuthorityError("signature_verification") from None
         after, refreshed_policy, finished = self._read_trust()

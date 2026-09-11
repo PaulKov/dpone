@@ -18,9 +18,9 @@ from dpone.adapters.nonproduction_mssql_schema import (
     NONPRODUCTION_MSSQL_SCHEMA_VERSION,
     require_nonproduction_mssql_schema,
 )
-from dpone.contracts.composition_activation import CompositionAdmissionError
+from dpone.contracts.composition_identity import CompositionAdmissionError
 from dpone.contracts.nonproduction_authority import NonproductionAuthorityPolicy
-from dpone.contracts.nonproduction_scope import MAX_DOCUMENT_BYTES, NonproductionAuthorityError, uuid_text
+from dpone.contracts.nonproduction_document import MAX_DOCUMENT_BYTES, NonproductionAuthorityError, uuid_text
 from dpone.ports.nonproduction_authentication import NonproductionTrustSnapshot
 
 

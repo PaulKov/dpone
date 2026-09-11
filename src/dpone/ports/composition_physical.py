@@ -1,14 +1,18 @@
 """Environment-bound physical observation capabilities for the full parent."""
 
-from typing import Protocol
+from __future__ import annotations
 
-from dpone.contracts.composition_control import (
-    CompositionDomainObservation,
-    CompositionExecutionPlan,
-    CompositionOccurrenceContext,
-    CompositionPhysicalDomain,
-    DbtRelationWrite,
-)
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dpone.contracts.composition_control import (
+        CompositionDomainObservation,
+        CompositionExecutionPlan,
+        CompositionOccurrenceContext,
+        CompositionPhysicalDomain,
+        DbtRelationWrite,
+    )
+from typing import Protocol
 
 
 class CompositionPhysicalBackend(Protocol):

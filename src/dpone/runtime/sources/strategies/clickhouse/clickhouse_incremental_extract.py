@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from datetime import date, timedelta
 
 from dpone.contracts.clickhouse_incremental_cursor import assert_clickhouse_mssql_cursor_supported
+from dpone.ports.source_cursor_admission import SourceCursorSinkBinding
 from dpone.runtime.cloud_artifacts import GCSExportArtifact
 from dpone.runtime.sources.extract_result import ExtractResult
 from dpone.runtime.sources.strategies.clickhouse.clickhouse_base import ClickHouseBaseStrategy
@@ -29,6 +30,19 @@ class ClickHouseIncrementalExtractStrategy(ClickHouseBaseStrategy):
     """
     Стратегия инкрементальной выборки из ClickHouse по колонке даты.
     """
+
+    @staticmethod
+    def require_source_route_safe(load_config: object, binding: SourceCursorSinkBinding) -> None:
+        """Check current facade inputs before invoking the selected strategy.
+
+        Keep options/binding evaluation order. Direct entrypoints retain their
+        independent checks and their own sink binding; no admission is cached.
+        """
+        options = getattr(load_config, "options", {}) or {}
+        assert_clickhouse_mssql_cursor_supported(
+            configured_sink=options.get("sink_type") or options.get("target_type"),
+            sink_connector=binding.sink_connector,
+        )
 
     def __init__(
         self,

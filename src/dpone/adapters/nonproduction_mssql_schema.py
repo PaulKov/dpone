@@ -9,10 +9,14 @@ they do not prove that effective database/server permissions enforce isolation.
 
 from __future__ import annotations
 
-from dpone.adapters.composition_mssql_gate_schema import module_sha256
+from typing import TYPE_CHECKING
+
+from dpone.adapters.composition_mssql_catalog_types import module_sha256
 from dpone.adapters.composition_mssql_schema import COMPOSITION_MSSQL_LEDGER_LOCK, require_control_schema
-from dpone.contracts.nonproduction_scope import MAX_DOCUMENT_BYTES, NonproductionAuthorityError
-from dpone.ports.sql_connection import SqlControlCursor
+from dpone.contracts.nonproduction_document import MAX_DOCUMENT_BYTES, NonproductionAuthorityError
+
+if TYPE_CHECKING:
+    from dpone.ports.sql_connection import SqlControlCursor
 
 NONPRODUCTION_MSSQL_SCHEMA_VERSION = 1
 _COLLATION = "Latin1_General_100_BIN2"

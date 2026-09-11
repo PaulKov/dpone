@@ -1,16 +1,20 @@
 """Capabilities for complete parent activation; no native-only substitutions."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dpone.contracts.composition_control import (
+        CompositionActivationOccurrence,
+        CompositionActivationRequest,
+        CompositionExecutionPlan,
+        CompositionOccurrenceContext,
+        CompositionPhysicalResource,
+        CompositionSourceSnapshot,
+    )
 from pathlib import Path
 from typing import Protocol
-
-from dpone.contracts.composition_control import (
-    CompositionActivationOccurrence,
-    CompositionActivationRequest,
-    CompositionExecutionPlan,
-    CompositionOccurrenceContext,
-    CompositionPhysicalResource,
-    CompositionSourceSnapshot,
-)
 
 
 class CompositionActivationInputs(Protocol):
@@ -43,16 +47,10 @@ class CompositionPhysicalAdmission(Protocol):
     def execution_cells(self) -> frozenset[str]: ...
 
     def observe(
-        self,
-        plan: CompositionExecutionPlan,
-        context: CompositionOccurrenceContext,
+        self, plan: CompositionExecutionPlan, context: CompositionOccurrenceContext
     ) -> tuple[CompositionPhysicalResource, ...]: ...
 
-    def require_stable_bindings(
-        self,
-        request: CompositionActivationRequest,
-        plan: CompositionExecutionPlan,
-    ) -> None:
+    def require_stable_bindings(self, request: CompositionActivationRequest, plan: CompositionExecutionPlan) -> None:
         """Recheck protected physical pins, without rehashing changed table catalogs."""
 
 
@@ -81,12 +79,7 @@ class CompositionActivationStore(Protocol):
 class CompositionActivationStoreFactory(Protocol):
     """Rebuild authority from the verified projection for every lifecycle phase."""
 
-    def build(
-        self,
-        *,
-        projection_root: Path,
-        context: CompositionOccurrenceContext,
-    ) -> CompositionActivationStore: ...
+    def build(self, *, projection_root: Path, context: CompositionOccurrenceContext) -> CompositionActivationStore: ...
 
 
 class CompositionActivationCoordinatorPort(Protocol):
@@ -104,10 +97,7 @@ class CompositionActivationCoordinatorPort(Protocol):
     ) -> CompositionActivationOccurrence: ...
 
     def activate(
-        self,
-        prepared: CompositionActivationOccurrence,
-        *,
-        projection_root: Path,
+        self, prepared: CompositionActivationOccurrence, *, projection_root: Path
     ) -> CompositionActivationOccurrence: ...
 
     def require_active(

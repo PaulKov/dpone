@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass, fields
 from typing import Any
 
 from dpone.contracts.composition_physical_identity import composition_physical_guard_id
-from dpone.contracts.nonproduction_scope import (
+from dpone.contracts.nonproduction_document import (
     MAX_DOCUMENT_BYTES,
     NonproductionAuthorityError,
     digest,

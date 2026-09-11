@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from dpone.adapters.composition_mssql_issuance import MssqlEnrollment
 from dpone.adapters.dbapi_lifecycle import row
 from dpone.contracts.airflow_deployment import canonical_fingerprint
 from dpone.contracts.composition_control import (
@@ -15,7 +15,10 @@ from dpone.contracts.composition_control import (
     composition_attempt_epoch_subject,
     encode_attempt_proof,
 )
-from dpone.ports.composition_sql import CompositionSqlContext
+
+if TYPE_CHECKING:
+    from dpone.adapters.composition_mssql_issuance import MssqlEnrollment
+    from dpone.ports.composition_sql import CompositionSqlContext
 
 
 def observe_quiescence(ledger: CompositionSqlContext, sid: bytes, enrollments: tuple[MssqlEnrollment, ...]) -> None:

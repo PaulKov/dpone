@@ -31,6 +31,7 @@ from dpone.contracts.nonproduction_scope import (
     text,
     uuid_text,
 )
+from dpone.contracts.runtime_artifact_attestation import MAX_ATTESTATION_BUNDLE_BYTES
 from dpone.contracts.strict_json import strict_json_object
 
 POLICY_SCHEMA = "dpone.nonproduction-authority-policy.v1"
@@ -43,6 +44,12 @@ _CEILINGS = {
     "max_source_bytes": 1_073_741_824,
     "max_attempt_seconds": 3600,
 }
+
+
+def require_signature_bundle(bundle: bytes) -> None:
+    """Bound raw signature evidence before trust reads or verifier invocation."""
+    if type(bundle) is not bytes or not 1 <= len(bundle) <= MAX_ATTESTATION_BUNDLE_BYTES:
+        raise NonproductionAuthorityError("signature_bundle_budget") from None
 
 
 def utc_timestamp(value: str) -> datetime:

@@ -21,13 +21,7 @@ from dpone.contracts.nonproduction_authority import (
     require_validity,
     utc_timestamp,
 )
-from dpone.contracts.nonproduction_grants import (
-    NonproductionExecutionGrant,
-    NonproductionQualificationGrant,
-    parse_nonproduction_grant,
-    validate_grant_subject,
-)
-from dpone.contracts.nonproduction_scope import (
+from dpone.contracts.nonproduction_document import (
     MAX_DOCUMENT_BYTES,
     NonproductionAuthorityError,
     canonical_document,
@@ -35,6 +29,12 @@ from dpone.contracts.nonproduction_scope import (
     exact_fields,
     ordered,
     text,
+)
+from dpone.contracts.nonproduction_grants import (
+    NonproductionExecutionGrant,
+    NonproductionQualificationGrant,
+    parse_nonproduction_grant,
+    validate_grant_subject,
 )
 from dpone.contracts.runtime_artifact_attestation import MAX_ATTESTATION_BUNDLE_BYTES
 from dpone.contracts.strict_json import strict_json_object

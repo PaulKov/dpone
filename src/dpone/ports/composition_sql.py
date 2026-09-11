@@ -8,7 +8,7 @@ from collections.abc import Callable
 from typing import Protocol
 
 from dpone.contracts.composition_activation import CompositionActivationOccurrence
-from dpone.contracts.composition_attempt import CompositionAttemptReceipt
+from dpone.contracts.composition_persistence import CompositionAttemptReceipt
 from dpone.ports.sql_connection import SqlControlCursor
 
 

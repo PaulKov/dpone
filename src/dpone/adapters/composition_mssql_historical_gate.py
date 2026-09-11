@@ -8,18 +8,23 @@ boundary and injected gate-policy dependency retain their exact catalog audits.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from dpone.adapters.composition_mssql_issuance import require_gate_policy
 from dpone.adapters.composition_mssql_schema import require_control_schema
 from dpone.adapters.composition_mssql_transaction import require_shared_transaction_in
 from dpone.contracts.airflow_deployment import canonical_fingerprint
-from dpone.contracts.composition_activation import CompositionAdmissionError
-from dpone.contracts.composition_attempt import CompositionAttemptIdentity
-from dpone.contracts.composition_proof import CompositionAttemptProof, CompositionProofAuthority
+from dpone.contracts.composition_identity import CompositionAdmissionError
+from dpone.contracts.composition_persistence import (
+    CompositionAttemptIdentity,
+    CompositionAttemptProof,
+    CompositionProofAuthority,
+)
 from dpone.contracts.strict_json import canonical_json_bytes
-from dpone.ports.composition_sql import CompositionSqlContext
+
+if TYPE_CHECKING:
+    from dpone.ports.composition_sql import CompositionSqlContext
 
 
 def _table(context: CompositionSqlContext, name: str) -> str:
