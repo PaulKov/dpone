@@ -1,6 +1,6 @@
 # Feature design: bounded native data-delivery acceleration
 
-- Status: APPROVED
+- Status: IMPLEMENTED
 - Owner: delivery acceleration integrator (DDA-06)
 - Issue: implementation tasks linked from the [execution plan](data-delivery-acceleration-tasks.md)
 - Target release: TBD; no version bump or publication is part of this work
@@ -9,7 +9,13 @@
   independent tasks with DoD, and dispatch of those tasks for implementation.
   This records authorization for the bounded scope below, not a claim that the
   maintainer reviewed every subsequent line or authorized production activation.
-- Last verified: 2026-09-10
+- Last verified: 2026-09-11
+
+Implementation status covers the bounded code and documentation scope below.
+The [implementation closeout](https://github.com/PaulKov/dpone/pull/37)
+links the reviewed implementation, validation and integration PR. Live performance
+remains UNVERIFIED; public native SWITCH activation remains outside this scope.
+The original approved planning revision and historical evidence are retained.
 
 Purpose: specify measurable, compatibility-preserving improvements to bounded
 ClickHouse-to-MSSQL delivery. Audience: implementation engineers, platform owners,
@@ -600,5 +606,5 @@ seams early but starts dependent edits only after reviewed handoffs.
 - [x] Structural and live performance acceptance are separate and measurable.
 - [x] Shared-file ownership, task DoD and integration dependencies are explicit.
 - [x] Maintainer authorized specification and implementation dispatch in this task.
-- [ ] Implementation complete and exact-head validation linked.
+- [x] Implementation complete and [exact-head validation linked](https://github.com/PaulKov/dpone/pull/37).
 - [ ] Real-row performance evidence available; currently UNVERIFIED.

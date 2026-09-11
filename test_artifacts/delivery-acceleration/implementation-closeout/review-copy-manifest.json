@@ -1,0 +1,26 @@
+{
+  "status": "PASS",
+  "operation": "byte-identical retention of authored reviewer reports",
+  "implementation_commit": "c1a56b055f079bcc6dd9957300c5494f00b6080c",
+  "copies": [
+    {
+      "source_path": "/Users/paulkov007/.codex/artifacts/dpone-benchmark-corrections-20260911/fresh-review/report.md",
+      "retained_path": "implementation-review.md",
+      "sha256": "32bd6bd8e1ffce9ea8afe94935bc1cde8a8fb05e5e9e2cf383b7537ff8fbfd52",
+      "size_bytes": 8956
+    },
+    {
+      "source_path": "/Users/paulkov007/.codex/artifacts/dpone-benchmark-corrections-20260911/fresh-review/followup-source-h-and-transfer.md",
+      "retained_path": "identity-review.md",
+      "sha256": "a1d535acef40c28fa0fe352ae94a1188ffbc4dd32103a7057d2ffd7a0dd5674d",
+      "size_bytes": 5789
+    },
+    {
+      "source_path": "/Users/paulkov007/.codex/artifacts/dpone-benchmark-corrections-20260911/fresh-review/followup-ci-population.md",
+      "retained_path": "quality-ci-review.md",
+      "sha256": "218c4ac80ce2ca9a8c1f71cc9c31f1529f1afc08166755a34d1c9ebc18d7cb15",
+      "size_bytes": 3375
+    }
+  ],
+  "producer_sha256": "be70d3e7cda0420040ec43c6722ead2a76ec7df0b71de4c674e2d4e8de8c2d39"
+}
