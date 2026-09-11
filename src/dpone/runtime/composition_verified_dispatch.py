@@ -1,18 +1,21 @@
 """Dispatch authenticated composition workloads without any execution fallback.
 
-This module owns both ends of the composition admission marker: it projects
-``DPONE_RUNTIME_RELEASE_ADMISSION`` only from authenticated
-``dpone.release-set.v3`` release bytes for the verified launcher, and it converts
-that marker plus the non-secret supervisor transport into either an exact typed
-dispatch request or a stable rejection at execution time. Deployment wire v3 is
-never composition authority on its own, because legacy v1/v2 releases with MSSQL
-asset outlets use the same deployment wire.
+Runtime policy only: this module decides whether one prepared command may run as
+immutable composition, which typed request a worker receives, and when a result
+must be refused. All byte and value semantics live behind the single contract
+facade ``dpone.contracts.composition_execution_authority``.
+
+Authority is the authenticated ``VerifiedPackCommand`` environment produced by the
+verified launcher from release and deployment bytes. The ambient pod environment
+is never authority: it can neither admit, erase nor substitute composition. The
+merged child environment is passed onward only so an admitted worker can run its
+own child.
 
 There is no shell, generic or native-v2 fallback. An unrecognized marker, an
-absent dispatcher, missing/noncanonical supervisor authority and any unexpected
-command shape all reject before the runtime opens a source connection or starts
-a child process. Admitted composition commands are exactly the verified runtime
-argv shapes:
+absent dispatcher, missing/noncanonical supervisor authority, an unsafe verified
+input path and any unexpected command shape all reject before the runtime opens a
+source connection or starts a child process. Admitted composition commands are
+exactly the verified runtime argv shapes:
 
 * native dbt: ``dpone dbt execute-pack <execution-pack> --format json``;
 * ordinary transfer: ``dpone run <manifest> --format json [--selector <id>]``.
@@ -22,44 +25,62 @@ share that exact verified prefix. The concrete route stays a decision of the
 injected worker over the verified manifest, never a guess from environment,
 argument text or shell interpretation.
 
-Rejection reasons are fixed sanitized tokens. Command environment values never
-enter a message, a log line, an exception or a request ``repr``.
+A worker that reports success must leave valid current-attempt evidence on the
+run volume it was given; otherwise the attempt is refused instead of publishing a
+passing summary. Rejection reasons are fixed sanitized tokens, and command
+environment values never enter a message, a log line, an exception or a request
+``repr``.
 """
 
 from __future__ import annotations
 
-import base64
-import binascii
-import json
 import logging
 import sys
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol
 
-from dpone.contracts.composition_supervisor import CompositionSupervisorProjection
-from dpone.contracts.release_composition import COMPOSITION_ADMISSION, COMPOSITION_SCHEMA
-from dpone.contracts.release_set_authority import admit_release_authority
-from dpone.contracts.strict_json import strict_json_object
+from dpone.contracts.composition_execution_authority import (
+    COMPOSITION_AUTHORITY_REASONS,
+    COMPOSITION_SUPERVISOR_B64_ENV,
+    RUNTIME_RELEASE_ADMISSION_ENV,
+    SUPERVISOR_AUTHORITY_MISSING,
+    CompositionSupervisorProjection,
+    composition_evidence_object,
+    deployment_supervisor_transport,
+    is_composition_admission,
+    release_composition_admission,
+    supervisor_from_transport,
+)
 from dpone.runtime.verified_pack_diagnostics import diagnostic_message
 
-RUNTIME_RELEASE_ADMISSION_ENV = "DPONE_RUNTIME_RELEASE_ADMISSION"
-COMPOSITION_SUPERVISOR_B64_ENV = "DPONE_COMPOSITION_SUPERVISOR_B64"
 COMPOSITION_DISPATCH_REJECTED = "DPONE_RUNTIME_COMPOSITION_DISPATCH_REJECTED"
 COMPOSITION_DISPATCH_STAGE = "composition_dispatch"
 _COMPOSITION_AUTHORITY_ROLE = "composition_authority"
-_MAX_SUPERVISOR_TRANSPORT_CHARS = 4096
+_EVIDENCE_CLOCK_TOLERANCE_SECONDS = 2.0
 _NATIVE_DBT_COMMAND = ("dpone", "dbt", "execute-pack")
 _ORDINARY_COMMAND = ("dpone", "run")
 _JSON_FORMAT = ("--format", "json")
 _SELECTOR_FLAG = "--selector"
+_UNSAFE_PATH_SEGMENTS = frozenset({"", ".", ".."})
+_CONTROL_CHARACTERS = ("\x00", "\n", "\r")
+
+COMPOSITION_AUTHORITY_ENV_KEYS = (RUNTIME_RELEASE_ADMISSION_ENV, COMPOSITION_SUPERVISOR_B64_ENV)
 
 CompositionDispatchKind = Literal["native_dbt", "ordinary_transfer"]
 
 
 class CompositionDispatchRejection(Exception):
-    """Fail-closed refusal to execute, carrying one fixed sanitized reason."""
+    """Fail-closed refusal to execute, carrying one fixed sanitized reason.
+
+    ``dispatch_started`` is an evidence-preservation obligation, not a detail:
+    when it is true the injected worker already ran and may have written partial
+    attempt evidence, so the caller must record the failure without overwriting
+    ``runtime-evidence.json``. When it is false no worker ran and the caller
+    replaces stale evidence so a refused attempt cannot reuse an earlier result.
+    """
 
     def __init__(self, reason: str, *, dispatch_started: bool = False) -> None:
         self.reason = reason
@@ -77,12 +98,25 @@ class CompositionDispatchRejection(Exception):
 
 
 @dataclass(frozen=True, slots=True)
+class CompositionRunVolume:
+    """The exact attempt-scoped run-volume destinations owned by the executor.
+
+    A worker root writes its evidence and stderr here instead of hard-coding a
+    container path, so run-volume ownership stays with the verified executor.
+    """
+
+    evidence_path: Path
+    stderr_path: Path
+
+
+@dataclass(frozen=True, slots=True)
 class CompositionDispatchRequest:
     """One admitted composition workload, ready for an injected typed worker.
 
     ``verified_input`` is the worktree-relative execution pack or manifest path
-    already verified by the launcher. ``env`` is the exact child environment and
-    is excluded from ``repr`` so no credential can reach a log or traceback.
+    already verified by the launcher and re-checked at this boundary. ``env`` is
+    the exact child environment and is excluded from ``repr`` so no credential can
+    reach a log or traceback.
     """
 
     kind: CompositionDispatchKind
@@ -91,10 +125,10 @@ class CompositionDispatchRequest:
     process_selector: str | None
     working_directory: Path
     supervisor: CompositionSupervisorProjection
+    run_volume: CompositionRunVolume
     env: Mapping[str, str] = field(repr=False)
 
 
-@runtime_checkable
 class CompositionVerifiedDispatcher(Protocol):
     """Injected authority that executes exactly one admitted composition workload."""
 
@@ -102,41 +136,49 @@ class CompositionVerifiedDispatcher(Protocol):
         """Return the child execution status, or raise to reject fail-closed."""
 
 
-def release_composition_admission(payload: bytes) -> str | None:
-    """Project the composition admission marker from authenticated release bytes.
+def composition_command_authority(
+    *,
+    release_payload: bytes,
+    deployment_payload: bytes,
+) -> Mapping[str, str]:
+    """Project the composition environment of one verified command, as one unit.
 
-    Only a registered ``dpone.release-set.v3`` envelope whose constituent
-    authority holds produces a marker. Legacy v1/v2 releases return ``None`` and
-    keep their existing selection and certification diagnostics unchanged. An
-    unprojectable composition authority raises ``ValueError`` with a fixed token,
-    so the caller can report its own public integrity code without release text.
+    The admission marker comes from authenticated release bytes and the pinned
+    non-secret supervisor capability from the sealed deployment bytes. A legacy
+    v1/v2 release yields an empty mapping, even when its MSSQL asset outlets use
+    the same v3 deployment wire. Composition without the exact sealed capability,
+    and a legacy release that carries one, both raise ``ValueError`` with a fixed
+    token so no command is ever produced.
     """
 
-    try:
-        release = strict_json_object(payload)
-        if release.get("schema") != COMPOSITION_SCHEMA:
-            return None
-        authority = admit_release_authority(release)
-    except Exception as exc:
-        raise ValueError("composition_release_authority") from exc
-    if authority.failure is not None:
-        raise ValueError("composition_release_authority")
-    return authority.dbt_runtime_wire_contract
+    admission = release_composition_admission(release_payload)
+    transport = deployment_supervisor_transport(deployment_payload, admission=admission)
+    if admission is None:
+        return {}
+    if transport is None:
+        # Unreachable while the contract holds; fail closed rather than let a
+        # composition release silently degrade to a legacy child.
+        raise ValueError(SUPERVISOR_AUTHORITY_MISSING)
+    return {
+        RUNTIME_RELEASE_ADMISSION_ENV: admission,
+        COMPOSITION_SUPERVISOR_B64_ENV: transport,
+    }
 
 
-def composition_dispatch_required(environment: Mapping[str, str]) -> bool:
-    """Classify the effective child admission marker for one workload attempt.
+def composition_dispatch_required(authority: Mapping[str, str]) -> bool:
+    """Classify the authenticated command admission marker for one attempt.
 
-    An absent or empty marker keeps the existing native-v2 and ordinary child
-    path unchanged. Only the exact authenticated composition marker selects
-    supervised dispatch. Any other non-empty value is rejected, so neither a
-    forged pod variable nor a future marker can reach a generic child.
+    ``authority`` must be the verified ``VerifiedPackCommand`` environment. An
+    absent or empty marker keeps the existing native-v2 and ordinary child path
+    unchanged. Only the exact composition marker selects supervised dispatch. Any
+    other non-empty value is rejected, so no unsupported or future marker can
+    reach a generic child.
     """
 
-    marker = environment.get(RUNTIME_RELEASE_ADMISSION_ENV)
+    marker = authority.get(RUNTIME_RELEASE_ADMISSION_ENV)
     if marker is None or marker == "":
         return False
-    if marker != COMPOSITION_ADMISSION:
+    if not is_composition_admission(marker):
         raise CompositionDispatchRejection("unknown_release_admission")
     return True
 
@@ -145,15 +187,17 @@ def composition_dispatch_request(
     *,
     argv: tuple[str, ...],
     working_directory: Path,
+    authority: Mapping[str, str],
     environment: Mapping[str, str],
+    run_volume: CompositionRunVolume,
 ) -> CompositionDispatchRequest:
     """Build one typed request, or reject before any dispatch or source access.
 
     Supervisor authority is required first: an authenticated v3 release without
-    exact supervisor capability can never execute, whatever its command shape.
+    the exact pinned capability can never execute, whatever its command shape.
     """
 
-    supervisor = _admitted_supervisor(environment)
+    supervisor = _admitted_supervisor(authority)
     kind, verified_input, process_selector = _admitted_command(argv)
     return CompositionDispatchRequest(
         kind=kind,
@@ -162,6 +206,7 @@ def composition_dispatch_request(
         process_selector=process_selector,
         working_directory=working_directory,
         supervisor=supervisor,
+        run_volume=run_volume,
         env=environment,
     )
 
@@ -171,23 +216,30 @@ def run_composition_dispatch(
     *,
     argv: tuple[str, ...],
     working_directory: Path,
+    authority: Mapping[str, str],
     environment: Mapping[str, str],
+    run_volume: CompositionRunVolume,
 ) -> int:
     """Run one admitted composition workload through the injected dispatcher.
 
     Authority is checked before worker availability, so a missing supervisor
-    capability is reported truthfully even while no worker root is wired.
+    capability is reported truthfully even while no worker root is wired. A
+    successful status is accepted only together with valid current-attempt
+    evidence, which keeps a silent worker from publishing a passing summary.
     """
 
     request = composition_dispatch_request(
         argv=argv,
         working_directory=working_directory,
+        authority=authority,
         environment=environment,
+        run_volume=run_volume,
     )
     if dispatcher is None:
         raise CompositionDispatchRejection("composition_dispatcher_unavailable")
+    dispatched_after = time.time() - _EVIDENCE_CLOCK_TOLERANCE_SECONDS
     try:
-        return int(dispatcher.run(request))
+        status = int(dispatcher.run(request))
     except CompositionDispatchRejection:
         raise
     except Exception as exc:
@@ -195,6 +247,9 @@ def run_composition_dispatch(
             "composition_dispatch_failed",
             dispatch_started=True,
         ) from exc
+    if status == 0:
+        _require_current_attempt_evidence(run_volume, since=dispatched_after)
+    return status
 
 
 def report_composition_rejection(
@@ -212,43 +267,40 @@ def report_composition_rejection(
     return exc.diagnostic
 
 
-def _admitted_supervisor(environment: Mapping[str, str]) -> CompositionSupervisorProjection:
-    raw = environment.get(COMPOSITION_SUPERVISOR_B64_ENV)
-    if not isinstance(raw, str) or not raw:
-        raise CompositionDispatchRejection("composition_supervisor_authority_missing")
-    if len(raw) > _MAX_SUPERVISOR_TRANSPORT_CHARS:
-        raise CompositionDispatchRejection("composition_supervisor_authority_oversize")
+def _admitted_supervisor(authority: Mapping[str, str]) -> CompositionSupervisorProjection:
     try:
-        payload = base64.b64decode(raw.encode("ascii"), validate=True)
-    except (binascii.Error, UnicodeEncodeError, ValueError):
-        raise CompositionDispatchRejection("composition_supervisor_authority_invalid") from None
-    if base64.b64encode(payload).decode("ascii") != raw:
-        raise CompositionDispatchRejection("composition_supervisor_authority_noncanonical") from None
-    try:
-        value = json.loads(payload.decode("ascii"))
-    except (UnicodeDecodeError, ValueError):
-        raise CompositionDispatchRejection("composition_supervisor_authority_invalid") from None
-    if not isinstance(value, Mapping):
-        raise CompositionDispatchRejection("composition_supervisor_authority_invalid") from None
-    try:
-        projection = CompositionSupervisorProjection.from_mapping(value)
-    except (KeyError, TypeError, ValueError):
-        raise CompositionDispatchRejection("composition_supervisor_authority_invalid") from None
-    if _canonical_supervisor_bytes(projection) != payload:
-        raise CompositionDispatchRejection("composition_supervisor_authority_noncanonical") from None
-    return projection
+        return supervisor_from_transport(authority.get(COMPOSITION_SUPERVISOR_B64_ENV))
+    except ValueError as exc:
+        raise CompositionDispatchRejection(_authority_reason(exc)) from None
 
 
-def _canonical_supervisor_bytes(projection: CompositionSupervisorProjection) -> bytes:
-    return json.dumps(
-        projection.to_dict(),
-        ensure_ascii=True,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("ascii")
+def _authority_reason(exc: ValueError) -> str:
+    reason = str(exc)
+    return reason if reason in COMPOSITION_AUTHORITY_REASONS else "composition_authority_invalid"
+
+
+def _require_current_attempt_evidence(run_volume: CompositionRunVolume, *, since: float) -> None:
+    try:
+        modified = run_volume.evidence_path.stat().st_mtime
+        payload = run_volume.evidence_path.read_bytes()
+    except OSError:
+        raise CompositionDispatchRejection("composition_evidence_missing", dispatch_started=True) from None
+    if modified < since:
+        raise CompositionDispatchRejection("composition_evidence_stale", dispatch_started=True)
+    try:
+        composition_evidence_object(payload)
+    except ValueError:
+        raise CompositionDispatchRejection("composition_evidence_invalid", dispatch_started=True) from None
 
 
 def _admitted_command(argv: tuple[str, ...]) -> tuple[CompositionDispatchKind, str, str | None]:
+    kind, verified_input, process_selector = _admitted_command_shape(argv)
+    if not _safe_verified_input(verified_input):
+        raise CompositionDispatchRejection("composition_command_path")
+    return kind, verified_input, process_selector
+
+
+def _admitted_command_shape(argv: tuple[str, ...]) -> tuple[CompositionDispatchKind, str, str | None]:
     if argv[:3] == _NATIVE_DBT_COMMAND:
         if len(argv) == 6 and argv[3] and argv[4:] == _JSON_FORMAT:
             return "native_dbt", argv[3], None
@@ -262,7 +314,18 @@ def _admitted_command(argv: tuple[str, ...]) -> tuple[CompositionDispatchKind, s
     raise CompositionDispatchRejection("composition_command_unknown")
 
 
+def _safe_verified_input(value: str) -> bool:
+    """Re-check the launcher-verified relative input at the dispatch boundary."""
+
+    if not value or value.startswith("/") or "\\" in value:
+        return False
+    if any(control in value for control in _CONTROL_CHARACTERS):
+        return False
+    return all(segment not in _UNSAFE_PATH_SEGMENTS for segment in value.split("/"))
+
+
 __all__ = [
+    "COMPOSITION_AUTHORITY_ENV_KEYS",
     "COMPOSITION_DISPATCH_REJECTED",
     "COMPOSITION_DISPATCH_STAGE",
     "COMPOSITION_SUPERVISOR_B64_ENV",
@@ -270,10 +333,11 @@ __all__ = [
     "CompositionDispatchKind",
     "CompositionDispatchRejection",
     "CompositionDispatchRequest",
+    "CompositionRunVolume",
     "CompositionVerifiedDispatcher",
+    "composition_command_authority",
     "composition_dispatch_request",
     "composition_dispatch_required",
-    "release_composition_admission",
     "report_composition_rejection",
     "run_composition_dispatch",
 ]

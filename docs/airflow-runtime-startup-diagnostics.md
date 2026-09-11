@@ -58,25 +58,33 @@ A secondary artifact failure must not hide the original failure.
 ## Composition dispatch rejections
 
 A workload from an authenticated `dpone.release-set.v3` release carries
-`DPONE_RUNTIME_RELEASE_ADMISSION=dpone.release-composition-admission.v1`, which
-the verified launcher derives only from the authenticated release bytes. Such a
-workload runs exclusively through its supervised composition worker. It never
-falls back to native-v2 admission, generic `dpone run` or shell execution, so a
-missing capability is a rejection instead of a degraded run.
+`DPONE_RUNTIME_RELEASE_ADMISSION=dpone.release-composition-admission.v1` plus the
+pinned `DPONE_COMPOSITION_SUPERVISOR_B64` capability. The verified launcher
+derives the marker from the authenticated release bytes and the supervisor
+transport from the sealed deployment bytes, and it pins both into the verified
+command itself. The runtime classifies admission from that command environment
+only, so the ambient Pod environment can neither admit, erase nor substitute
+composition. Such a workload runs exclusively through its supervised composition
+worker. It never falls back to native-v2 admission, generic `dpone run` or shell
+execution, so a missing capability is a rejection instead of a degraded run.
 
 A rejection exits `5`, logs `DPONE_RUNTIME_COMPOSITION_DISPATCH_REJECTED` with
-`stage=composition_dispatch` and a fixed `reason` token, and writes the same
-payload to `runtime-startup-error.json` and `runtime-evidence.json`. No child
-process starts and no source connection opens. Arguments, environment values and
-credentials never appear in the diagnostic.
+`stage=composition_dispatch` and a fixed `reason` token, writes that payload to
+`runtime-startup-error.json`, and publishes a failed summary. An admission
+rejection also replaces `runtime-evidence.json`, because no worker ran, no child
+process started and no source connection opened. A rejection after the worker was
+already dispatched preserves whatever evidence that attempt produced. Arguments,
+environment values and credentials never appear in the diagnostic.
 
 | `reason` | Meaning | Recovery |
 |---|---|---|
-| `unknown_release_admission` | The effective admission variable is neither empty nor the exact composition marker. | Remove the forged or unsupported pod variable and rebuild the deployment with matching provider and runtime-image versions |
+| `unknown_release_admission` | The verified command admission value is neither empty nor the exact composition marker. | Rebuild the deployment with matching provider and runtime-image versions |
 | `composition_dispatcher_unavailable` | The pinned runtime image provides no supervised composition worker. | Activate a deployment whose runtime image includes the composition workers; do not retry the same image |
-| `composition_supervisor_authority_missing` | The base container received no `DPONE_COMPOSITION_SUPERVISOR_B64` capability. | Rebuild the deployment with an approved supervisor capability (`dpone airflow build --composition-supervisor-pvc ...`) |
-| `composition_supervisor_authority_invalid`, `composition_supervisor_authority_noncanonical`, `composition_supervisor_authority_oversize` | The supervisor transport is not the exact canonical projection sealed into the verified deployment index. | Rebuild and promote the deployment; never hand-edit pod environment values |
+| `composition_supervisor_authority_missing` | The verified command carries no pinned `DPONE_COMPOSITION_SUPERVISOR_B64` capability. | Rebuild the deployment with an approved supervisor capability (`dpone airflow build --composition-supervisor-pvc ...`) |
+| `composition_supervisor_authority_invalid`, `composition_supervisor_authority_noncanonical`, `composition_supervisor_authority_oversize`, `composition_authority_invalid` | The supervisor transport is not the exact canonical projection sealed into the verified deployment. | Rebuild and promote the deployment; never hand-edit pod environment values |
 | `composition_command_shape`, `composition_command_unknown` | The verified command is not an admitted composition command. | Rebuild the release with a supported workload command; composition admits only `dpone dbt execute-pack <pack> --format json` and `dpone run <manifest> --format json [--selector <id>]` |
+| `composition_command_path` | The admitted command input is not a safe worktree-relative path. | Rebuild the release; report the projection defect, because a verified command must never carry an absolute or traversing input |
+| `composition_evidence_missing`, `composition_evidence_invalid`, `composition_evidence_stale` | The worker reported success without writing valid evidence for this attempt to the run volume. | Treat the attempt as failed; inspect the worker attempt ledger, then retry with a new task Pod |
 | `composition_dispatch_failed` | The supervised worker itself refused or failed before returning a status. | Inspect the parent attempt ledger and worker evidence for that exact attempt; treat the outcome as unknown until proven |
 
 Use the stage to distinguish directory preparation, output-file opening, process

@@ -18,6 +18,7 @@ from dpone.contracts.stable_error_codes import (
 from dpone.gitops.airflow_pod_contract import AIRFLOW_XCOM_RETURN_PATH
 from dpone.runtime.composition_verified_dispatch import (
     CompositionDispatchRejection,
+    CompositionRunVolume,
     CompositionVerifiedDispatcher,
     composition_dispatch_required,
     report_composition_rejection,
@@ -60,9 +61,12 @@ def execute_verified_pack_command(
     ``get_logs=True`` can stream progress during long runs. Child stdout stays
     file-only (structured evidence JSON must not spam the task log).
 
-    A workload whose authenticated release admission marks immutable composition
-    runs only through ``composition_dispatcher``; it never reaches the generic
-    child path. Rejected admission returns ``5`` with a run-volume diagnostic and
+    A workload whose authenticated command environment marks immutable
+    composition runs only through ``composition_dispatcher``; it never reaches the
+    generic child path. Admission is read from ``command.env`` alone, so the
+    ambient pod environment can neither forge, erase nor substitute composition
+    authority; the merged environment is handed onward only for the admitted
+    child. Rejected admission returns ``5`` with a run-volume diagnostic and
     invalidated summary, so a missing dispatcher cannot degrade into native-v2 or
     shell execution. Admitted dispatch keeps the existing evidence, summary,
     XCom-gate and child exit-code policies unchanged.
@@ -85,9 +89,10 @@ def execute_verified_pack_command(
                 xcom_path = (xcom_return_path or Path(AIRFLOW_XCOM_RETURN_PATH)).absolute()
         files = VerifiedPackServiceFiles(output_dir, xcom_path=xcom_path)
         files.prepare()
-        # Classify admission before any launch: an unknown marker must never
-        # reach a generic child, and a stale summary is already invalidated.
-        composition = composition_dispatch_required(environment)
+        # Classify admission before any launch, from authenticated command
+        # authority only: an unknown marker must never reach a generic child,
+        # and a stale summary is already invalidated at this point.
+        composition = composition_dispatch_required(command.env)
         print(
             f"{_START_MARKER} publish_xcom={str(command.publish_xcom).lower()}",
             file=sys.stderr,
@@ -100,7 +105,12 @@ def execute_verified_pack_command(
                     composition_dispatcher,
                     argv=command.argv,
                     working_directory=command.working_directory,
+                    authority=command.env,
                     environment=environment,
+                    run_volume=CompositionRunVolume(
+                        evidence_path=files.evidence_path,
+                        stderr_path=files.stderr_path,
+                    ),
                 )
                 if composition
                 else _run_pack_subprocess(

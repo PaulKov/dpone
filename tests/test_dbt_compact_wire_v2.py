@@ -113,10 +113,16 @@ def verify_delivery(tmp_path, compiled):
             plan, plan_sha256=encoded.sha256
         )
         if composition:
+            sealed = projection.deployment["composition_supervisor"]
             assert command.env[RUNTIME_RELEASE_ADMISSION_ENV] == COMPOSITION_ADMISSION
-            _verify_composition_never_runs_generically(command, kwargs["env_vars"], state=state)
+            # Command authority mirrors the sealed deployment projection exactly.
+            assert command.env[COMPOSITION_SUPERVISOR_B64_ENV] == encode_composition_supervisor(sealed)
+            assert command.env[COMPOSITION_SUPERVISOR_B64_ENV] == kwargs["env_vars"][COMPOSITION_SUPERVISOR_B64_ENV]
+            _verify_composition_never_runs_generically(command, state=state)
+            _verify_pinned_supervisor_cannot_be_substituted(plan, digest, state=state, sealed=sealed)
         else:
             assert RUNTIME_RELEASE_ADMISSION_ENV not in command.env
+            assert COMPOSITION_SUPERVISOR_B64_ENV not in command.env
         if item["id"].startswith("dbt__"):
             assert command.argv[:3] == ("dpone", "dbt", "execute-pack")
             marker = (state / "worktree/dbt-project/models/project_marker.txt").read_text()
@@ -153,12 +159,19 @@ def verify_delivery(tmp_path, compiled):
     return Path(materialized.release_dir)
 
 
-def _verify_composition_never_runs_generically(command, env_vars, *, state):
-    """No worker root is wired yet, so v3 must fail closed instead of executing."""
+def _verify_composition_never_runs_generically(command, *, state):
+    """No worker root is wired yet, so v3 must fail closed instead of executing.
 
-    assert env_vars[COMPOSITION_SUPERVISOR_B64_ENV] == encode_composition_supervisor(COMPOSITION_SUPERVISOR)
+    The ambient pod environment is hostile here: it erases the marker and offers a
+    different valid supervisor. Only the pinned command authority may decide.
+    """
+
     with pytest.MonkeyPatch.context() as patched:
-        patched.setenv(COMPOSITION_SUPERVISOR_B64_ENV, env_vars[COMPOSITION_SUPERVISOR_B64_ENV])
+        patched.delenv(RUNTIME_RELEASE_ADMISSION_ENV, raising=False)
+        patched.setenv(
+            COMPOSITION_SUPERVISOR_B64_ENV,
+            encode_composition_supervisor({**COMPOSITION_SUPERVISOR, "child_uid_start": 1_500_000_000}),
+        )
         for attribute in ("Popen", "run"):
             patched.setattr(subprocess, attribute, lambda *a, **k: pytest.fail("generic child started for v3"))
         assert (
@@ -169,6 +182,26 @@ def _verify_composition_never_runs_generically(command, env_vars, *, state):
             )
             == 5
         )
+    summary = json.loads((state / "xcom/return.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "failed"
+
+
+def _verify_pinned_supervisor_cannot_be_substituted(plan, digest, *, state, sealed):
+    """A substituted or erased sealed capability must fail before any command."""
+
+    payload_path = state / "artifacts/payload" / plan.deployment.artifact_ref.removeprefix("cache://")
+    authenticated = payload_path.read_bytes()
+    substituted = json.loads(authenticated)
+    substituted["composition_supervisor"] = {**sealed, "child_uid_start": 1_500_000_000}
+    erased = json.loads(authenticated)
+    erased.pop("composition_supervisor")
+    for forgery in (substituted, erased):
+        payload_path.write_bytes(json.dumps(forgery).encode("utf-8"))
+        with pytest.raises(InitFetchError):
+            VerifiedPackLauncher(artifact_root=state / "artifacts", worktree_root=state / "worktree").prepare(
+                plan, plan_sha256=digest
+            )
+    payload_path.write_bytes(authenticated)
 
 
 @pytest.fixture(scope="module")

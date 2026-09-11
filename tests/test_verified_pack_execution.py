@@ -1,14 +1,17 @@
 """Public verified-runtime execution admission for authenticated v3 composition.
 
-Every composition test makes generic child startup explode, so a silent
-fallback to native-v2 or shell execution cannot produce a passing result.
+Composition authority comes only from the authenticated ``VerifiedPackCommand``
+environment. Every composition test makes generic child startup explode, so a
+silent fallback to native-v2 or shell execution cannot produce a passing result.
 """
 
 from __future__ import annotations
 
 import base64
 import json
+import os
 import subprocess
+import time
 from dataclasses import replace
 
 import pytest
@@ -34,21 +37,41 @@ SUPERVISOR = {
     "child_gid_start": 1_000_000_000,
     "child_identity_count": 1_000_000,
 }
+OTHER_SUPERVISOR = {**SUPERVISOR, "child_uid_start": 1_500_000_000, "child_gid_start": 1_500_000_000}
+PINNED_TRANSPORT = encode_composition_supervisor(SUPERVISOR)
 ORDINARY_ARGV = ("dpone", "run", "manifest.json", "--format", "json")
 SELECTOR_ARGV = (*ORDINARY_ARGV, "--selector", "orders")
 NATIVE_DBT_ARGV = ("dpone", "dbt", "execute-pack", "dbt/execution-pack.json", "--format", "json")
+EVIDENCE = b'{"kind":"gitops.airflow_runtime_evidence","status":"passed"}'
 
 
 class RecordingDispatcher:
-    """Injected worker seam recording every admitted composition request."""
+    """Injected worker seam recording every admitted composition request.
 
-    def __init__(self, *, status: int = 0, error: BaseException | None = None) -> None:
+    ``evidence`` mirrors a real worker root writing its own attempt evidence to
+    the run volume supplied by the request.
+    """
+
+    def __init__(
+        self,
+        *,
+        status: int = 0,
+        error: BaseException | None = None,
+        evidence: bytes | None = EVIDENCE,
+        evidence_mtime: float | None = None,
+    ) -> None:
         self.requests: list = []
         self._status = status
         self._error = error
+        self._evidence = evidence
+        self._evidence_mtime = evidence_mtime
 
     def run(self, request):
         self.requests.append(request)
+        if self._evidence is not None:
+            request.run_volume.evidence_path.write_bytes(self._evidence)
+            if self._evidence_mtime is not None:
+                os.utime(request.run_volume.evidence_path, (self._evidence_mtime, self._evidence_mtime))
         if self._error is not None:
             raise self._error
         return self._status
@@ -86,20 +109,24 @@ def denied_child(monkeypatch):
 
 
 @pytest.fixture
-def admitted_environment(monkeypatch):
-    monkeypatch.setenv(COMPOSITION_SUPERVISOR_B64_ENV, encode_composition_supervisor(SUPERVISOR))
+def clean_ambient(monkeypatch):
+    """Prove authority is not ambient: the pod environment carries no marker."""
+
     monkeypatch.setenv(CREDENTIAL_ENV, SENTINEL)
     monkeypatch.delenv(RUNTIME_RELEASE_ADMISSION_ENV, raising=False)
+    monkeypatch.delenv(COMPOSITION_SUPERVISOR_B64_ENV, raising=False)
 
 
-def admitted(command: VerifiedPackCommand, marker: str = COMPOSITION_ADMISSION) -> VerifiedPackCommand:
-    return replace(command, env={RUNTIME_RELEASE_ADMISSION_ENV: marker, CREDENTIAL_ENV: SENTINEL})
-
-
-def supervisor_value(payload: dict, *, canonical: bool = True) -> str:
-    if canonical:
-        return encode_composition_supervisor(payload)
-    return base64.b64encode(json.dumps(payload).encode("ascii")).decode("ascii")
+def admitted(
+    command: VerifiedPackCommand,
+    *,
+    marker: str = COMPOSITION_ADMISSION,
+    supervisor: str | None = PINNED_TRANSPORT,
+) -> VerifiedPackCommand:
+    env = {CREDENTIAL_ENV: SENTINEL, RUNTIME_RELEASE_ADMISSION_ENV: marker}
+    if supervisor is not None:
+        env[COMPOSITION_SUPERVISOR_B64_ENV] = supervisor
+    return replace(command, env=env)
 
 
 def leaked(run_volume) -> bool:
@@ -108,7 +135,15 @@ def leaked(run_volume) -> bool:
     return any(SENTINEL in path.read_text(encoding="utf-8", errors="replace") for path in files if path.is_file())
 
 
-def test_legacy_release_keeps_the_existing_generic_child(command, run_volume, monkeypatch):
+def evidence_payload(run_volume) -> bytes:
+    return (run_volume["run_output_dir"] / "runtime-evidence.json").read_bytes()
+
+
+def rejection_reason(run_volume) -> str:
+    return json.loads((run_volume["run_output_dir"] / "runtime-startup-error.json").read_text())["reason"]
+
+
+def test_legacy_release_keeps_the_existing_generic_child(command, run_volume, clean_ambient, monkeypatch):
     calls: list[dict] = []
 
     def record(argv, **kwargs):
@@ -126,9 +161,8 @@ def test_legacy_release_keeps_the_existing_generic_child(command, run_volume, mo
 
 
 @pytest.mark.parametrize("marker", ["", None])
-def test_absent_or_empty_marker_stays_on_the_legacy_path(command, run_volume, monkeypatch, marker):
+def test_absent_or_empty_marker_stays_on_the_legacy_path(command, run_volume, clean_ambient, monkeypatch, marker):
     monkeypatch.setattr(subprocess, "run", lambda argv, **kwargs: RecordedRun(0))
-    monkeypatch.delenv(RUNTIME_RELEASE_ADMISSION_ENV, raising=False)
     env = {} if marker is None else {RUNTIME_RELEASE_ADMISSION_ENV: marker}
     dispatcher = RecordingDispatcher()
 
@@ -136,6 +170,53 @@ def test_absent_or_empty_marker_stays_on_the_legacy_path(command, run_volume, mo
         execute_verified_pack_command(replace(command, env=env), composition_dispatcher=dispatcher, **run_volume) == 0
     )
     assert dispatcher.requests == []
+
+
+def test_ambient_marker_and_supervisor_cannot_forge_composition(command, run_volume, monkeypatch):
+    """A legacy v1/v2 command stays on its child path even with a perfect pod env."""
+
+    monkeypatch.setenv(RUNTIME_RELEASE_ADMISSION_ENV, COMPOSITION_ADMISSION)
+    monkeypatch.setenv(COMPOSITION_SUPERVISOR_B64_ENV, PINNED_TRANSPORT)
+    calls: list[list[str]] = []
+    monkeypatch.setattr(subprocess, "run", lambda argv, **kwargs: calls.append(argv) or RecordedRun(0))
+    dispatcher = RecordingDispatcher()
+
+    assert execute_verified_pack_command(command, composition_dispatcher=dispatcher, **run_volume) == 0
+    assert calls == [list(ORDINARY_ARGV)]
+    assert dispatcher.requests == []
+    summary = json.loads(run_volume["xcom_return_path"].read_text())
+    assert summary["status"] != "passed" or "composition" not in json.dumps(summary)
+
+
+@pytest.mark.parametrize("ambient", ["", "forged", COMPOSITION_ADMISSION])
+def test_ambient_marker_cannot_erase_or_replace_command_authority(
+    command, run_volume, clean_ambient, denied_child, monkeypatch, ambient
+):
+    monkeypatch.setenv(RUNTIME_RELEASE_ADMISSION_ENV, ambient)
+    monkeypatch.setenv(COMPOSITION_SUPERVISOR_B64_ENV, encode_composition_supervisor(OTHER_SUPERVISOR))
+    dispatcher = RecordingDispatcher()
+
+    assert execute_verified_pack_command(admitted(command), composition_dispatcher=dispatcher, **run_volume) == 0
+    request = dispatcher.requests[0]
+    assert request.supervisor.child_uid_start == SUPERVISOR["child_uid_start"]
+    assert request.env[COMPOSITION_SUPERVISOR_B64_ENV] == PINNED_TRANSPORT
+
+
+def test_ambient_supervisor_cannot_satisfy_missing_command_authority(
+    command, run_volume, clean_ambient, denied_child, monkeypatch
+):
+    monkeypatch.setenv(COMPOSITION_SUPERVISOR_B64_ENV, PINNED_TRANSPORT)
+    dispatcher = RecordingDispatcher()
+
+    status = execute_verified_pack_command(
+        admitted(command, supervisor=None),
+        composition_dispatcher=dispatcher,
+        **run_volume,
+    )
+
+    assert status == 5
+    assert dispatcher.requests == []
+    assert rejection_reason(run_volume) == "composition_supervisor_authority_missing"
 
 
 @pytest.mark.parametrize(
@@ -146,8 +227,8 @@ def test_absent_or_empty_marker_stays_on_the_legacy_path(command, run_volume, mo
         (NATIVE_DBT_ARGV, "native_dbt", "dbt/execution-pack.json", None),
     ],
 )
-def test_authenticated_marker_dispatches_typed_requests(
-    command, run_volume, admitted_environment, denied_child, argv, kind, verified_input, selector
+def test_authenticated_command_dispatches_typed_requests(
+    command, run_volume, clean_ambient, denied_child, argv, kind, verified_input, selector
 ):
     dispatcher = RecordingDispatcher(status=0)
 
@@ -164,19 +245,22 @@ def test_authenticated_marker_dispatches_typed_requests(
     assert request.working_directory == command.working_directory
     assert request.supervisor.persistent_volume_claim == SUPERVISOR["persistent_volume_claim"]
     assert request.supervisor.child_uid_stop == 1_001_000_000
+    assert request.run_volume.evidence_path == run_volume["run_output_dir"] / "runtime-evidence.json"
+    assert request.run_volume.stderr_path == run_volume["run_output_dir"] / "runtime-stderr.log"
     assert request.env[CREDENTIAL_ENV] == SENTINEL
     assert SENTINEL not in repr(request)
+    assert json.loads(run_volume["xcom_return_path"].read_text())["status"] == "passed"
 
 
 @pytest.mark.parametrize(("policy", "expected"), [("child", 4), ("xcom_gate", 0)])
 def test_dispatch_status_follows_the_existing_exit_policy(
-    command, run_volume, admitted_environment, denied_child, policy, expected
+    command, run_volume, clean_ambient, denied_child, policy, expected
 ):
     dispatched = replace(admitted(command), exit_code_policy=policy)
 
     status = execute_verified_pack_command(
         dispatched,
-        composition_dispatcher=RecordingDispatcher(status=4),
+        composition_dispatcher=RecordingDispatcher(status=4, evidence=None),
         **run_volume,
     )
 
@@ -184,17 +268,43 @@ def test_dispatch_status_follows_the_existing_exit_policy(
     assert json.loads(run_volume["xcom_return_path"].read_text())["status"] == "failed"
 
 
-def test_v3_never_starts_generic_or_native_child(command, run_volume, admitted_environment, denied_child):
+def test_success_without_current_attempt_evidence_cannot_publish_a_pass(
+    command, run_volume, clean_ambient, denied_child
+):
+    dispatcher = RecordingDispatcher(status=0, evidence=None)
+
+    assert execute_verified_pack_command(admitted(command), composition_dispatcher=dispatcher, **run_volume) == 5
+    assert rejection_reason(run_volume) == "composition_evidence_missing"
+    assert json.loads(run_volume["xcom_return_path"].read_text())["status"] == "failed"
+
+
+@pytest.mark.parametrize("payload", [b"", b"   ", b"[]", b"not json", b'{"a":1,"a":2}'])
+def test_success_with_invalid_evidence_cannot_publish_a_pass(command, run_volume, clean_ambient, denied_child, payload):
+    dispatcher = RecordingDispatcher(status=0, evidence=payload)
+
+    assert execute_verified_pack_command(admitted(command), composition_dispatcher=dispatcher, **run_volume) == 5
+    assert rejection_reason(run_volume) == "composition_evidence_invalid"
+
+
+def test_success_with_stale_evidence_cannot_publish_a_pass(command, run_volume, clean_ambient, denied_child):
+    dispatcher = RecordingDispatcher(status=0, evidence_mtime=time.time() - 3600)
+
+    assert execute_verified_pack_command(admitted(command), composition_dispatcher=dispatcher, **run_volume) == 5
+    assert rejection_reason(run_volume) == "composition_evidence_stale"
+    assert evidence_payload(run_volume) == EVIDENCE
+
+
+def test_failure_after_dispatch_preserves_worker_evidence(command, run_volume, clean_ambient, denied_child):
     dispatcher = RecordingDispatcher(error=RuntimeError(SENTINEL))
 
     assert execute_verified_pack_command(admitted(command), composition_dispatcher=dispatcher, **run_volume) == 5
     assert len(dispatcher.requests) == 1
+    assert evidence_payload(run_volume) == EVIDENCE
+    assert rejection_reason(run_volume) == "composition_dispatch_failed"
     assert not leaked(run_volume)
 
 
-def test_missing_dispatcher_rejects_instead_of_falling_back(
-    command, run_volume, admitted_environment, denied_child, capsys
-):
+def test_missing_dispatcher_rejects_instead_of_falling_back(command, run_volume, clean_ambient, denied_child, capsys):
     assert execute_verified_pack_command(admitted(command), **run_volume) == 5
     assert COMPOSITION_DISPATCH_REJECTED in capsys.readouterr().err
 
@@ -209,46 +319,22 @@ def test_missing_dispatcher_rejects_instead_of_falling_back(
         "dpone.release-set.v3",
     ],
 )
-def test_unknown_marker_rejects_before_dispatch(command, run_volume, admitted_environment, denied_child, marker):
+def test_unknown_marker_rejects_before_dispatch(command, run_volume, clean_ambient, denied_child, marker):
     dispatcher = RecordingDispatcher()
 
-    assert (
-        execute_verified_pack_command(admitted(command, marker), composition_dispatcher=dispatcher, **run_volume) == 5
+    status = execute_verified_pack_command(
+        admitted(command, marker=marker),
+        composition_dispatcher=dispatcher,
+        **run_volume,
     )
+
+    assert status == 5
     assert dispatcher.requests == []
-
-
-def test_ambient_unknown_marker_cannot_reach_a_legacy_child(command, run_volume, monkeypatch, denied_child):
-    monkeypatch.setenv(RUNTIME_RELEASE_ADMISSION_ENV, "forged")
-    dispatcher = RecordingDispatcher()
-
-    assert execute_verified_pack_command(command, composition_dispatcher=dispatcher, **run_volume) == 5
-    assert dispatcher.requests == []
-
-
-def test_ambient_marker_cannot_replace_verified_admission(
-    command, run_volume, admitted_environment, denied_child, monkeypatch
-):
-    monkeypatch.setenv(RUNTIME_RELEASE_ADMISSION_ENV, "forged")
-    dispatcher = RecordingDispatcher(status=0)
-
-    assert execute_verified_pack_command(admitted(command), composition_dispatcher=dispatcher, **run_volume) == 0
-    assert len(dispatcher.requests) == 1
-
-
-def test_missing_supervisor_authority_rejects_before_dispatch(
-    command, run_volume, admitted_environment, denied_child, monkeypatch
-):
-    monkeypatch.delenv(COMPOSITION_SUPERVISOR_B64_ENV)
-    dispatcher = RecordingDispatcher()
-
-    assert execute_verified_pack_command(admitted(command), composition_dispatcher=dispatcher, **run_volume) == 5
-    assert dispatcher.requests == []
-    assert not leaked(run_volume)
+    assert rejection_reason(run_volume) == "unknown_release_admission"
 
 
 @pytest.mark.parametrize(
-    "value",
+    "supervisor",
     [
         "",
         "   ",
@@ -256,35 +342,33 @@ def test_missing_supervisor_authority_rejects_before_dispatch(
         base64.b64encode(b"{").decode("ascii"),
         base64.b64encode(b'["dpone"]').decode("ascii"),
         base64.b64encode(json.dumps(SUPERVISOR).encode("ascii")).decode("ascii"),
-        base64.b64encode(json.dumps({**SUPERVISOR, "extra": 1}, separators=(",", ":")).encode("ascii")).decode("ascii"),
-        encode_composition_supervisor({key: value for key, value in SUPERVISOR.items() if key != "child_uid_start"}),
         encode_composition_supervisor({**SUPERVISOR, "child_identity_count": 999_999}),
         encode_composition_supervisor({**SUPERVISOR, "persistent_volume_claim": "Invalid_Claim"}),
         encode_composition_supervisor({**SUPERVISOR, "schema": "dpone.composition-supervisor.v2"}),
-        encode_composition_supervisor(SUPERVISOR).rstrip("="),
-        encode_composition_supervisor(SUPERVISOR)[:8] + "\n" + encode_composition_supervisor(SUPERVISOR)[8:],
+        PINNED_TRANSPORT.rstrip("="),
+        PINNED_TRANSPORT[:8] + "\n" + PINNED_TRANSPORT[8:],
         base64.b64encode(json.dumps({**SUPERVISOR, "pad": "x" * 8192}, separators=(",", ":")).encode()).decode("ascii"),
     ],
 )
-def test_malformed_supervisor_authority_rejects_before_dispatch(
-    command, run_volume, admitted_environment, denied_child, monkeypatch, value
+def test_malformed_command_supervisor_rejects_before_dispatch(
+    command, run_volume, clean_ambient, denied_child, supervisor
 ):
-    monkeypatch.setenv(COMPOSITION_SUPERVISOR_B64_ENV, value)
     dispatcher = RecordingDispatcher()
 
-    assert execute_verified_pack_command(admitted(command), composition_dispatcher=dispatcher, **run_volume) == 5
+    status = execute_verified_pack_command(
+        admitted(command, supervisor=supervisor),
+        composition_dispatcher=dispatcher,
+        **run_volume,
+    )
+
+    assert status == 5
     assert dispatcher.requests == []
+    assert rejection_reason(run_volume).startswith("composition_supervisor_authority_")
 
 
-def test_supervisor_authority_is_checked_without_a_wired_worker(
-    command, run_volume, admitted_environment, denied_child, monkeypatch
-):
-    monkeypatch.delenv(COMPOSITION_SUPERVISOR_B64_ENV)
-
-    assert execute_verified_pack_command(admitted(command), **run_volume) == 5
-
-    evidence = json.loads((run_volume["run_output_dir"] / "runtime-evidence.json").read_text())
-    assert evidence["reason"] == "composition_supervisor_authority_missing"
+def test_supervisor_authority_is_checked_without_a_wired_worker(command, run_volume, clean_ambient, denied_child):
+    assert execute_verified_pack_command(admitted(command, supervisor=None), **run_volume) == 5
+    assert rejection_reason(run_volume) == "composition_supervisor_authority_missing"
 
 
 @pytest.mark.parametrize(
@@ -303,28 +387,51 @@ def test_supervisor_authority_is_checked_without_a_wired_worker(
         ("dpone", "run", "", "--format", "json"),
     ],
 )
-def test_unsupported_command_shapes_reject_before_dispatch(
-    command, run_volume, admitted_environment, denied_child, argv
-):
+def test_unsupported_command_shapes_reject_before_dispatch(command, run_volume, clean_ambient, denied_child, argv):
     dispatcher = RecordingDispatcher()
 
-    assert (
-        execute_verified_pack_command(
-            admitted(replace(command, argv=argv)),
-            composition_dispatcher=dispatcher,
-            **run_volume,
-        )
-        == 5
+    status = execute_verified_pack_command(
+        admitted(replace(command, argv=argv)),
+        composition_dispatcher=dispatcher,
+        **run_volume,
     )
+
+    assert status == 5
     assert dispatcher.requests == []
 
 
+@pytest.mark.parametrize(
+    "verified_input",
+    [
+        "/etc/manifest.json",
+        "../manifest.json",
+        "runtime/../../manifest.json",
+        "runtime\\manifest.json",
+        "./manifest.json",
+    ],
+)
+def test_unsafe_verified_input_rejects_before_dispatch(
+    command, run_volume, clean_ambient, denied_child, verified_input
+):
+    dispatcher = RecordingDispatcher()
+
+    status = execute_verified_pack_command(
+        admitted(replace(command, argv=("dpone", "run", verified_input, "--format", "json"))),
+        composition_dispatcher=dispatcher,
+        **run_volume,
+    )
+
+    assert status == 5
+    assert dispatcher.requests == []
+    assert rejection_reason(run_volume) == "composition_command_path"
+
+
 def test_rejection_publishes_the_stable_code_without_environment_values(
-    command, run_volume, admitted_environment, denied_child, capsys
+    command, run_volume, clean_ambient, denied_child, capsys
 ):
     assert execute_verified_pack_command(admitted(command), **run_volume) == 5
 
-    evidence = json.loads((run_volume["run_output_dir"] / "runtime-evidence.json").read_text())
+    evidence = json.loads(evidence_payload(run_volume))
     assert evidence["error_code"] == COMPOSITION_DISPATCH_REJECTED
     assert evidence["reason"] == "composition_dispatcher_unavailable"
     logged = capsys.readouterr().err
