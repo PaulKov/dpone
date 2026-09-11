@@ -96,10 +96,12 @@ def test_v3_runtime_pod_has_exact_supervisor_boundary() -> None:
     assert _named(base["volumeMounts"], "dpone-composition-supervisor") == {
         "name": "dpone-composition-supervisor",
         "mountPath": "/var/lib/dpone/composition",
+        "readOnly": False,
     }
     assert _named(base["volumeMounts"], "dpone-composition-profiles") == {
         "name": "dpone-composition-profiles",
         "mountPath": "/dev/shm/dpone-composition",
+        "readOnly": False,
     }
     assert _named(base["volumeMounts"], "dpone-worktree")["readOnly"] is True
     assert all(
@@ -136,35 +138,10 @@ def test_v2_runtime_pod_retains_ordinary_provider_contract() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "mutate",
-    [
-        lambda pack, kwargs: pack["provider_execution"]["pod_spec"]["spec"].update(
-            volumes=[{"name": "dpone-composition-supervisor", "emptyDir": {}}]
-        ),
-        lambda pack, kwargs: pack["provider_execution"]["pod_spec"]["spec"]["containers"][0].update(
-            volumeMounts=[
-                {
-                    "name": "attacker",
-                    "mountPath": "/var/lib/dpone/composition",
-                }
-            ]
-        ),
-        lambda pack, kwargs: pack["provider_execution"]["pod_spec"]["spec"]["containers"][0].update(
-            securityContext={"privileged": True}
-        ),
-        lambda pack, kwargs: pack["provider_execution"]["pod_spec"]["spec"].update(
-            securityContext={"runAsUser": 1_000}
-        ),
-        lambda pack, kwargs: kwargs["env_vars"].update({COMPOSITION_SUPERVISOR_B64_ENV: "forged"}),
-    ],
-)
-def test_v3_runtime_pod_rejects_supervisor_override_surfaces(
-    mutate: Callable[[dict[str, Any], dict[str, Any]], object],
-) -> None:
+def test_public_operator_rejects_pack_supervisor_env_at_provider_env_guard() -> None:
     pack = _strict_pack()
     kwargs = deepcopy(pack["provider_execution"]["kpo_kwargs"])
-    mutate(pack, kwargs)
+    kwargs["env_vars"][COMPOSITION_SUPERVISOR_B64_ENV] = "forged"
 
     with pytest.raises(InitFetchProviderError) as raised:
         compose_init_fetch_operator_kwargs(
@@ -178,37 +155,93 @@ def test_v3_runtime_pod_rejects_supervisor_override_surfaces(
         )
 
     assert raised.value.code == "DPONE_INIT_FETCH_RESERVED_COLLISION"
+    assert str(raised.value) == (
+        "strict init-fetch rejects non-contract environment variables: DPONE_COMPOSITION_SUPERVISOR_B64"
+    )
 
 
 @pytest.mark.parametrize(
-    "mutate",
+    ("mutate", "message"),
     [
-        lambda pod: pod["spec"].update(securityContext={"runAsUser": 1_000}),
-        lambda pod: pod["spec"]["containers"][0].update(securityContext={"privileged": True}),
-        lambda pod: pod["spec"]["volumes"].append({"name": "dpone-composition-supervisor", "emptyDir": {}}),
-        lambda pod: pod["spec"]["containers"][0]["volumeMounts"].append(
-            {
-                "name": "attacker",
-                "mountPath": "/dev/shm/dpone-composition",
-            }
+        (
+            lambda pod: pod["spec"].update(securityContext={"runAsUser": 1_000}),
+            "supervisor pod cannot preconfigure pod security fields: securityContext",
         ),
-        lambda pod: pod["spec"]["containers"][0]["env"].append(
-            {"name": COMPOSITION_SUPERVISOR_B64_ENV, "value": "forged"}
+        (
+            lambda pod: pod["spec"]["containers"][0].update(securityContext={"privileged": True}),
+            "supervisor pod cannot preconfigure container security",
+        ),
+        (
+            lambda pod: pod["spec"]["volumes"].append({"name": "dpone-composition-supervisor", "emptyDir": {}}),
+            "supervisor pod contains a reserved volume collision",
+        ),
+        (
+            lambda pod: pod["spec"]["containers"][0]["volumeMounts"].append(
+                {
+                    "name": "attacker",
+                    "mountPath": "/dev/shm/dpone-composition",
+                }
+            ),
+            "supervisor pod contains a reserved mount collision",
+        ),
+        (
+            lambda pod: pod["spec"]["containers"][0]["env"].append(
+                {"name": COMPOSITION_SUPERVISOR_B64_ENV, "value": "forged"}
+            ),
+            "supervisor pod contains a reserved environment collision",
+        ),
+        (
+            lambda pod: pod["spec"]["containers"][0].pop("env"),
+            "supervisor pod container env must be a list",
+        ),
+        (
+            lambda pod: pod["spec"]["containers"][0].update(env={}),
+            "supervisor pod container env must be a list",
+        ),
+        (
+            lambda pod: pod["spec"]["initContainers"][0].pop("env"),
+            "supervisor pod container env must be a list",
+        ),
+        (
+            lambda pod: pod["spec"]["containers"][0].pop("volumeMounts"),
+            "supervisor pod container volumeMounts must be a list",
+        ),
+        (
+            lambda pod: pod["spec"]["containers"][0].update(volumeMounts={}),
+            "supervisor pod container volumeMounts must be a list",
+        ),
+        (
+            lambda pod: pod["spec"]["initContainers"][0].pop("volumeMounts"),
+            "supervisor pod container volumeMounts must be a list",
+        ),
+        (
+            lambda pod: pod["spec"].pop("volumes"),
+            "supervisor pod volumes must be a list",
+        ),
+        (
+            lambda pod: pod["spec"].update(volumes={}),
+            "supervisor pod volumes must be a list",
         ),
     ],
 )
-def test_supervisor_policy_rejects_colliding_materialized_pod(
+def test_exported_supervisor_policy_is_atomic_defense_in_depth(
     mutate: Callable[[dict[str, Any]], object],
+    message: str,
 ) -> None:
+    """Direct policy coverage protects future provider-owned Pod composers."""
+
     pod = _compose(_v2_payload())["full_pod_spec"]
     projection = init_fetch_context_from_payload(_v3_payload()).composition_supervisor
     assert projection is not None
     mutate(pod)
+    malformed_pod = deepcopy(pod)
 
     with pytest.raises(InitFetchProviderError) as raised:
         apply_composition_supervisor(pod, projection)
 
     assert raised.value.code == "DPONE_INIT_FETCH_RESERVED_COLLISION"
+    assert str(raised.value) == message
+    assert pod == malformed_pod
 
 
 @pytest.mark.parametrize(
@@ -229,3 +262,4 @@ def test_v3_runtime_pod_rejects_missing_or_invalid_supervisor_projection(
         init_fetch_context_from_payload(payload)
 
     assert raised.value.code == "DPONE_COMPOSITION_SUPERVISOR_INVALID"
+    assert str(raised.value) == "composition supervisor deployment capability is invalid"

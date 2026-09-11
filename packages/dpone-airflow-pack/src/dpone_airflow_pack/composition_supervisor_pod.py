@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from copy import deepcopy
 from typing import Any
 
 from dpone_airflow_pack.composition_supervisor_contract import (
@@ -66,11 +67,13 @@ def apply_composition_supervisor(
         or len(containers) != 1
         or not isinstance(containers[0], dict)
         or not isinstance(init_containers, list)
-        or not isinstance(volumes, list)
+        or any(not isinstance(container, dict) for container in init_containers)
     ):
         raise reserved_collision("supervisor pod topology is invalid")
+    if not isinstance(volumes, list):
+        raise reserved_collision("supervisor pod volumes must be a list")
     all_containers = [*containers, *init_containers]
-    if any(not isinstance(container, dict) or "securityContext" in container for container in all_containers):
+    if any("securityContext" in container for container in all_containers):
         raise reserved_collision("supervisor pod cannot preconfigure container security")
     reserved_volumes = {
         COMPOSITION_SUPERVISOR_VOLUME,
@@ -83,15 +86,30 @@ def apply_composition_supervisor(
         reserved_volumes=reserved_volumes,
     )
     base = containers[0]
-    base["securityContext"] = composition_supervisor_security_context()
-    base["env"].append(
-        {
-            "name": COMPOSITION_SUPERVISOR_B64_ENV,
-            "value": encode_composition_supervisor(projection.to_dict()),
-        }
-    )
-    base["volumeMounts"].extend(_supervisor_mounts())
-    volumes.extend(_supervisor_volumes(projection))
+    base_env = base.get("env")
+    base_mounts = base.get("volumeMounts")
+    if not isinstance(base_env, list):
+        raise reserved_collision("supervisor pod container env must be a list")
+    if not isinstance(base_mounts, list):
+        raise reserved_collision("supervisor pod container volumeMounts must be a list")
+    supervisor_env = {
+        "name": COMPOSITION_SUPERVISOR_B64_ENV,
+        "value": encode_composition_supervisor(projection.to_dict()),
+    }
+    replacement_base = deepcopy(base)
+    replacement_base["securityContext"] = composition_supervisor_security_context()
+    replacement_base["env"] = [*deepcopy(base_env), supervisor_env]
+    replacement_base["volumeMounts"] = [
+        *deepcopy(base_mounts),
+        *_supervisor_mounts(),
+    ]
+    replacement_spec = deepcopy(spec)
+    replacement_spec["containers"] = [replacement_base]
+    replacement_spec["volumes"] = [
+        *deepcopy(volumes),
+        *_supervisor_volumes(projection),
+    ]
+    pod["spec"] = replacement_spec
 
 
 def _reject_container_collisions(
@@ -103,30 +121,34 @@ def _reject_container_collisions(
     for container in containers:
         if not isinstance(container, dict):
             raise reserved_collision("supervisor pod topology is invalid")
-        mounts = container.get("volumeMounts", [])
-        env = container.get("env", [])
-        if not isinstance(mounts, list) or any(
+        mounts = container.get("volumeMounts")
+        env = container.get("env")
+        if not isinstance(mounts, list):
+            raise reserved_collision("supervisor pod container volumeMounts must be a list")
+        if any(
             not isinstance(mount, Mapping)
             or mount.get("name") in reserved_volumes
             or mount.get("mountPath") in reserved_paths
             for mount in mounts
         ):
             raise reserved_collision("supervisor pod contains a reserved mount collision")
-        if not isinstance(env, list) or any(
-            not isinstance(item, Mapping) or item.get("name") == COMPOSITION_SUPERVISOR_B64_ENV for item in env
-        ):
+        if not isinstance(env, list):
+            raise reserved_collision("supervisor pod container env must be a list")
+        if any(not isinstance(item, Mapping) or item.get("name") == COMPOSITION_SUPERVISOR_B64_ENV for item in env):
             raise reserved_collision("supervisor pod contains a reserved environment collision")
 
 
-def _supervisor_mounts() -> list[dict[str, str]]:
+def _supervisor_mounts() -> list[dict[str, object]]:
     return [
         {
             "name": COMPOSITION_SUPERVISOR_VOLUME,
             "mountPath": COMPOSITION_SUPERVISOR_ROOT,
+            "readOnly": False,
         },
         {
             "name": COMPOSITION_PROFILES_VOLUME,
             "mountPath": COMPOSITION_PROFILES_ROOT,
+            "readOnly": False,
         },
     ]
 

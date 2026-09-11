@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import cast
 
 from dpone_airflow_pack.connection_names import require_kubernetes_dns_label
 
@@ -67,12 +68,10 @@ def parse_composition_supervisor(
         )
     ):
         raise ValueError("composition_supervisor_invalid")
-    assert isinstance(uid_start, int)
-    assert isinstance(gid_start, int)
     return CompositionSupervisorProjection(
         persistent_volume_claim=claim,
-        child_uid_start=uid_start,
-        child_gid_start=gid_start,
+        child_uid_start=cast(int, uid_start),
+        child_gid_start=cast(int, gid_start),
         child_identity_count=count,
     )
 

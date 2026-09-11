@@ -9,7 +9,6 @@ from typing import Any
 
 from dpone_airflow_pack.composition_supervisor_pod import (
     apply_composition_supervisor,
-    composition_supervisor_security_context,
 )
 from dpone_airflow_pack.init_fetch_contract import (
     ConfigMapReference,
@@ -136,6 +135,8 @@ def compose_init_fetch_operator_kwargs(
             "if dag_run is defined and dag_run else '' }}"
         )
 
+    # Materialize init-fetch before adding the supervisor transport to operator
+    # env_vars: only the base process may receive supervisor authority.
     full_pod_spec = _strict_pod(
         projection.pod_spec,
         context=context,
@@ -427,7 +428,6 @@ __all__ = [
     "ARTIFACT_ROOT",
     "apply_composition_supervisor",
     "attach_init_fetch_context",
-    "composition_supervisor_security_context",
     "compose_init_fetch_operator_kwargs",
     "PLAN_B64_ENV",
     "PLAN_SHA256_ENV",
