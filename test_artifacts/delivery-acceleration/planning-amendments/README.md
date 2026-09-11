@@ -218,3 +218,10 @@ entrypoint/support and certification guide paths from completed DDA-05.
 It also preserves the exact pinned 0.77.0 and PostgreSQL upstream commits
 through reviewed linear imports; no foreign editing authority is granted.
 Historical specifications, contracts and evidence retain their original meaning.
+
+The final integration supplement in `dda-06-review-fixes.md` records the released
+PostgreSQL annotation ownership confirmation and a one-import correction under
+ADR0058. It supersedes the earlier exclusion based on active writers only for
+that exact public file. It also authorizes a whole-tree-verified replacement PR
+from pinned master because protected linear history prevents an ordinary update
+merge; PR25 and all historical receipts remain retained.

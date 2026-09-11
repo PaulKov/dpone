@@ -97,3 +97,64 @@ Publish the updated existing PR with exact source identity, independent review,
 upstream preservation and retained test evidence. Code readiness is separate
 from still UNVERIFIED live interoperability/performance and public SWITCH
 activation. This task does not merge PRs or publish releases.
+
+## Final integration supplement
+
+The two P2 corrections were independently approved at
+f5705f83249d79f5db944b4b7fa75ae95f428609: 60 independent regression cases
+and the integrator's 251-case focused run passed. Import conflict blobs were
+separately reviewed. Two integration constraints require the following bounded
+supplement; it supersedes conflicting earlier phase details only.
+
+**Annotation ownership.** The combined layer flow is 215 against the unchanged
+214 ceiling. Upstream verified-pack error normalization introduces one genuine
+runtime dependency; it must remain. The original MSSQL annotation reserve is
+already applied. Independent analysis found one remaining function-only import
+in src/dpone/runtime/sources/postgres_source_authority.py:
+ResolvedBindingConnection is used only by from_connection's parameter annotation,
+with postponed annotations. Its public blob is unchanged from d5 to fa20.
+
+The PostgreSQL migration owner confirmed no active writer or pending working-tree
+edit on that path and no conflict with this exact DDA-only import change. This
+supersedes the older exclusion based on then-active parallel writers. DDA-06 may
+move only this import under TYPE_CHECKING, adding that typing import as needed.
+Keep every runtime/dataclass model, verifier decision, SQL statement and error
+unchanged. Do not import the private migration prototype or alter its checkouts.
+Preserve the raw annotation and explicitly supplied canonical namespace for
+get_type_hints under ADR0058; test those supported introspection semantics in the
+existing DDA architecture-compatibility module and run existing PostgreSQL source
+authority tests unchanged. Independently review the implemented diff, rerun actual
+layer/fitness/type gates, and preserve the prior FAIL evidence. No threshold or
+baseline changes, incidental reexports or dataclass import hiding are authorized.
+This path is not among the 138 adopted upstream-only changed paths; all 138 still
+require exact pinned upstream mode/blob equality.
+
+**Linear reviewed-tree transfer.** Cherry-picked upstream history preserves
+content but not common ancestry. Actual merge-tree still reports a changelog
+conflict; regenerated dashboard values can share the same problem. Do not alter
+readable changelog structure or omit metrics merely to affect merge heuristics.
+
+After the sole integrator finishes code, regression/provenance tests, independent
+review and required static/docs checks, freeze and push a clean source H on the
+existing integration branch. Run its historical ownership audit at H, retaining
+its actual PASS or FAIL and reviewed import evidence. Keep every old branch,
+commit, PR and receipt available; do not rewrite or force-push.
+
+Create codex/dda-06-reviewed-delivery from pinned upstream fa20. Apply the exact
+binary/mode-aware diff fa20..H in that new branch, and require the staged tree to
+equal H's tree before committing. Record H in the new commit message. Require
+new commit parent == fa20 and whole-tree equality with H after committing, then
+publish a replacement PR immediately. This equality links the original ownership
+and independent review evidence to the new tree without pretending the historical
+lineage audit was run against different ancestry. Retain those source identities
+and comparisons through an evidence producer. Do not create a broader governance
+subsystem or weaken existing checks.
+
+Run the complete required CI population on the new PR head, including supported
+Python 3.11 and 3.12. Avoid duplicating the unchanged full suite locally when CI
+provides exact complete collection accounting; label the local run N/A with that
+reason. A concrete failure still requires appropriate local reproduction. Compute
+receipt applicability again from the actual new PR diff; do not carry forward an
+assumed PASS or N/A. Retain final provider artifacts outside the source tree when
+that avoids needless source-head churn. Mark PR25 as superseded and link the new
+PR, retaining its history. Do not merge either PR or publish a release.
