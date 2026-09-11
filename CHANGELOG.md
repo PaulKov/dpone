@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.77.1 - 2026-09-11
+
 ### Fixed
 
 - Honor PostgreSQL load strategies for internal-query artifacts. Default full
