@@ -110,7 +110,11 @@ def test_deployment_projection_violation_surfaces_mssql_mismatch_code() -> None:
     projection_b = _projection(environment="prod", host="sql-b.internal")
     deployment, index = _deployment_pair(projection_a)
     index["mssql_asset_outlet_projection"] = projection_b
-    violation = deployment_projection_violation(deployment, index)
+    violation = deployment_projection_violation(
+        deployment,
+        index,
+        release_schema="dpone.release-set.v2",
+    )
     assert violation is not None
     assert violation.code == PROJECTION_MISMATCH
 

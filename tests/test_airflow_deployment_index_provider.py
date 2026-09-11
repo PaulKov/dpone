@@ -151,6 +151,64 @@ def _v2_init_fetch_index_payload(runtime_delivery: Mapping[str, Any]) -> dict[st
     }
 
 
+def _supervisor_payload() -> dict[str, object]:
+    return {
+        "schema": "dpone.composition-supervisor.v1",
+        "persistent_volume_claim": "dpone-composition-supervisor",
+        "child_uid_start": 1_000_000_000,
+        "child_gid_start": 1_000_000_000,
+        "child_identity_count": 1_000_000,
+    }
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda value: value.update(persistent_volume_claim=" dpone-composition-supervisor"),
+        lambda value: value.pop("child_gid_start"),
+    ],
+)
+def test_public_provider_reader_rejects_malformed_v3_supervisor(
+    tmp_path: Path,
+    mutation: Callable[[dict[str, object]], object],
+) -> None:
+    index_path = tmp_path / "airflow-index.json"
+    payload = _v2_init_fetch_index_payload(_init_fetch_delivery())
+    payload["schema"] = "dpone.airflow-deployment-index.v3"
+    supervisor = _supervisor_payload()
+    mutation(supervisor)
+    payload["composition_supervisor"] = supervisor
+    index_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(AirflowDeploymentIndexError) as exc_info:
+        load_airflow_deployment_index(index_path, cache_root=tmp_path)
+
+    assert exc_info.value.code == "DPONE_COMPOSITION_SUPERVISOR_INVALID"
+
+
+@pytest.mark.parametrize(
+    "schema",
+    ["dpone.airflow-deployment-index.v1", "dpone.airflow-deployment-index.v2"],
+)
+def test_public_provider_reader_forbids_supervisor_on_v1_v2(
+    tmp_path: Path,
+    schema: str,
+) -> None:
+    index_path = tmp_path / "airflow-index.json"
+    if schema.endswith(".v1"):
+        _write_minimal_index(index_path)
+        payload = json.loads(index_path.read_bytes())
+    else:
+        payload = _v2_init_fetch_index_payload(_init_fetch_delivery())
+    payload["composition_supervisor"] = _supervisor_payload()
+    index_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(AirflowDeploymentIndexError) as exc_info:
+        load_airflow_deployment_index(index_path, cache_root=tmp_path)
+
+    assert exc_info.value.code == "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN"
+
+
 def _semantic_refresh_projection_descriptor() -> dict[str, object]:
     identity = SemanticRefreshDagProjectionIdentity(
         dag_projection_sha256="sha256:" + "1" * 64,

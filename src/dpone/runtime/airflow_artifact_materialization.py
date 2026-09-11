@@ -289,8 +289,10 @@ def _validate_remote_headers(
     deployment: Mapping[str, Any],
     index: Mapping[str, Any],
 ) -> None:
+    release_schema = release.get("schema")
     if (
-        release.get("schema")
+        not isinstance(release_schema, str)
+        or release_schema
         not in {
             "dpone.release-set.v1",
             "dpone.release-set.v2",
@@ -319,7 +321,7 @@ def _validate_remote_headers(
     violation = deployment_projection_violation(
         deployment,
         index,
-        release_schema=str(release.get("schema") or ""),
+        release_schema=release_schema,
     )
     if violation is not None:
         raise AirflowArtifactDeliveryError(violation.code, violation.message)

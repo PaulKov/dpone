@@ -6,7 +6,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-from dpone.contracts.airflow_deployment_projection import deployment_projection_violation
+from dpone.contracts.airflow_deployment_projection import (
+    deployment_projection_release_identity_violation,
+    deployment_projection_violation,
+)
 from dpone.runtime.deployment_cache_common import (
     DeploymentCacheError,
     open_regular_file,
@@ -194,7 +197,27 @@ class DeploymentCacheProjectionValidator:
             deployment_path=deployment_path,
             index_path=index_path,
         )
-        violation = deployment_projection_violation(deployment, index)
+        release_identity_violation = deployment_projection_release_identity_violation(
+            deployment,
+            index,
+        )
+        if release_identity_violation is not None:
+            raise DeploymentCacheError(
+                release_identity_violation.code,
+                release_identity_violation.message,
+                path=deployment_path.as_posix(),
+            )
+        release_id = str(deployment["release_ref"])
+        release_authority = self._integrity_verifier.verify_projection_authority(
+            index=index,
+            index_path=index_path,
+            release_id=release_id,
+        )
+        violation = deployment_projection_violation(
+            deployment,
+            index,
+            release_schema=release_authority.schema,
+        )
         if violation is not None:
             violation_path = (
                 index_path
@@ -202,12 +225,10 @@ class DeploymentCacheProjectionValidator:
                 else deployment_path
             )
             raise DeploymentCacheError(violation.code, violation.message, path=violation_path.as_posix())
-        release_id = str(deployment["release_ref"])
-        wire_contract = self._integrity_verifier.verify_details(
-            index=index, index_path=index_path, release_id=release_id
-        )
         return ValidatedDeploymentProjection(
-            deployment=deployment, airflow_index=index, dbt_runtime_wire_contract=wire_contract
+            deployment=deployment,
+            airflow_index=index,
+            dbt_runtime_wire_contract=release_authority.dbt_runtime_wire_contract,
         )
 
 

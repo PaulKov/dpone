@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from typing import Any
 
 import pytest
+from dpone_airflow_pack.mssql_asset_ref_codec import require_asset_ref_sha256
+from dpone_airflow_pack.mssql_outlet_projection_contract import compute_projection_sha256
 
 from dpone.contracts.airflow_deployment import deployment_id
 from dpone.contracts.airflow_deployment_projection import deployment_projection_violation
@@ -20,6 +23,76 @@ def valid_supervisor_payload() -> dict[str, object]:
         "child_gid_start": 1_000_000_000,
         "child_identity_count": 1_000_000,
     }
+
+
+def _valid_mssql_projection() -> dict[str, Any]:
+    asset_ref = {
+        "engine": "mssql",
+        "connection_ref": "writer",
+        "database": "DWH",
+        "schema": "dbo",
+        "table": "orders",
+    }
+    projection: dict[str, Any] = {
+        "schema": "dpone.mssql-asset-outlet-projection.v1",
+        "environment": "dev",
+        "binding_set_ref": "sha256:" + "b" * 64,
+        "connection_registry_ref": "sha256:" + "c" * 64,
+        "entries": [
+            {
+                "workload_ids": ["orders"],
+                "asset_ref": asset_ref,
+                "asset_ref_sha256": require_asset_ref_sha256(asset_ref),
+                "registry_connection_ref": "writer",
+                "resolved_binding": {"registry_connection_ref": "writer"},
+                "uri": "mssql://sql.internal:1433/DWH/dbo/orders",
+            }
+        ],
+    }
+    projection["projection_sha256"] = compute_projection_sha256(projection)
+    return projection
+
+
+def _projection_pair(
+    *,
+    deployment_supervisor: object = None,
+    index_supervisor: object = None,
+    with_mssql: bool = False,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    release_id = "sha256:" + "a" * 64
+    mirrored = {
+        "binding_set_ref": "sha256:" + "b" * 64,
+        "connection_registry_ref": "sha256:" + "c" * 64,
+        "credential_runtime_ref": "sha256:" + "d" * 64,
+        "runtime_image_digest": "sha256:" + "e" * 64,
+        "airflow_bundle_ref": "git:" + "f" * 40,
+        "runtime_artifact_delivery": {"mode": "local_preview"},
+    }
+    deployment: dict[str, Any] = {
+        "schema": "dpone.deployment-set.v3",
+        "deployment_id": "",
+        "deployment_type": "preview",
+        "runnable": False,
+        "environment": "dev",
+        "release_ref": release_id,
+        **mirrored,
+    }
+    index: dict[str, Any] = {
+        "schema": "dpone.airflow-deployment-index.v3",
+        "release_id": release_id,
+        **mirrored,
+    }
+    if deployment_supervisor is not None:
+        deployment["composition_supervisor"] = deployment_supervisor
+    if index_supervisor is not None:
+        index["composition_supervisor"] = index_supervisor
+    if with_mssql:
+        projection = _valid_mssql_projection()
+        deployment["mssql_asset_outlet_projection"] = projection
+        index["mssql_asset_outlet_projection"] = projection
+    deployment["deployment_id"] = deployment_id(deployment)
+    index["deployment_id"] = deployment["deployment_id"]
+    return deployment, index
 
 
 def test_v3_requires_complete_supervisor_projection() -> None:
@@ -104,23 +177,7 @@ def test_v1_v2_schema_preserves_absent_supervisor_projection(release_schema: str
 
 
 def test_release_v3_projection_requires_supervisor_across_shared_mirror_contract() -> None:
-    release_id = "sha256:" + "a" * 64
-    deployment = {
-        "schema": "dpone.deployment-set.v3",
-        "deployment_id": "",
-        "deployment_type": "preview",
-        "runnable": False,
-        "environment": "dev",
-        "release_ref": release_id,
-        "runtime_artifact_delivery": {"mode": "local_preview"},
-    }
-    deployment["deployment_id"] = deployment_id(deployment)
-    index = {
-        "schema": "dpone.airflow-deployment-index.v3",
-        "release_id": release_id,
-        "deployment_id": deployment["deployment_id"],
-        "runtime_artifact_delivery": deployment["runtime_artifact_delivery"],
-    }
+    deployment, index = _projection_pair(with_mssql=True)
 
     violation = deployment_projection_violation(
         deployment,
@@ -130,3 +187,54 @@ def test_release_v3_projection_requires_supervisor_across_shared_mirror_contract
 
     assert violation is not None
     assert violation.code == "DPONE_COMPOSITION_SUPERVISOR_REQUIRED"
+
+
+def test_shared_mirror_forbids_supervisor_on_non_composition_release() -> None:
+    supervisor = valid_supervisor_payload()
+    deployment, index = _projection_pair(
+        deployment_supervisor=supervisor,
+        index_supervisor=supervisor,
+        with_mssql=True,
+    )
+
+    violation = deployment_projection_violation(
+        deployment,
+        index,
+        release_schema="dpone.release-set.v2",
+    )
+
+    assert violation is not None
+    assert violation.code == "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN"
+
+
+def test_shared_mirror_rejects_malformed_supervisor() -> None:
+    malformed = valid_supervisor_payload()
+    malformed.pop("child_gid_start")
+    deployment, index = _projection_pair(
+        deployment_supervisor=malformed,
+        index_supervisor=malformed,
+    )
+
+    violation = deployment_projection_violation(
+        deployment,
+        index,
+        release_schema="dpone.release-set.v3",
+    )
+
+    assert violation is not None
+    assert violation.code == "DPONE_COMPOSITION_SUPERVISOR_INVALID"
+
+
+def test_shared_mirror_rejects_one_sided_supervisor() -> None:
+    deployment, index = _projection_pair(
+        deployment_supervisor=valid_supervisor_payload(),
+    )
+
+    violation = deployment_projection_violation(
+        deployment,
+        index,
+        release_schema="dpone.release-set.v3",
+    )
+
+    assert violation is not None
+    assert violation.code == "DPONE_COMPOSITION_SUPERVISOR_MISMATCH"

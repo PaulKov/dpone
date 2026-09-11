@@ -141,6 +141,7 @@ def _load_airflow_deployment_index(
             f"Expected schema {INDEX_SCHEMA_V1}, {INDEX_SCHEMA_V2}, or {INDEX_SCHEMA_V3}",
             path=path.as_posix(),
         )
+    composition_supervisor = _composition_supervisor_from_payload(payload, path=path)
     release = required_sha256(payload, "release_id", path)
     deployment = required_sha256(payload, "deployment_id", path)
     runtime_artifact_delivery = validate_runtime_artifact_delivery(payload, path=path)
@@ -223,7 +224,7 @@ def _load_airflow_deployment_index(
         schema=str(schema),
         runtime_image_ref=optional_text(payload.get("runtime_image_ref"), "runtime_image_ref", path),
         delivery_context=delivery_context,
-        composition_supervisor=_composition_supervisor_from_payload(payload, path=path),
+        composition_supervisor=composition_supervisor,
     )
 
 

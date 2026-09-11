@@ -47,7 +47,7 @@ def deployment_projection_violation(
     deployment: Mapping[str, Any],
     airflow_index: Mapping[str, Any],
     *,
-    release_schema: str | None = None,
+    release_schema: str,
 ) -> DeploymentProjectionViolation | None:
     """Return the first deterministic identity or mirror-contract violation."""
 
@@ -57,6 +57,25 @@ def deployment_projection_violation(
         return _violation("DPONE_DEPLOYMENT_ID_INVALID", "deployment identities must be sha256 digests")
     if declared_id != index_id:
         return _violation("DPONE_DEPLOYMENT_ID_MISMATCH", "deployment and index identities do not match")
+    release_violation = deployment_projection_release_identity_violation(
+        deployment,
+        airflow_index,
+    )
+    if release_violation is not None:
+        return release_violation
+    return _deployment_projection_content_violation(
+        deployment,
+        airflow_index,
+        release_schema=release_schema,
+    )
+
+
+def deployment_projection_release_identity_violation(
+    deployment: Mapping[str, Any],
+    airflow_index: Mapping[str, Any],
+) -> DeploymentProjectionViolation | None:
+    """Validate release pins before authenticated release bytes are available."""
+
     release_ref = deployment.get("release_ref")
     release_id = airflow_index.get("release_id")
     if release_ref is None and release_id is None:
@@ -65,6 +84,16 @@ def deployment_projection_violation(
         return _violation("DPONE_RELEASE_ID_INVALID", "deployment release identities must be sha256 digests")
     if release_ref != release_id:
         return _violation("DPONE_RELEASE_ID_MISMATCH", "deployment release_ref does not match index release_id")
+    return None
+
+
+def _deployment_projection_content_violation(
+    deployment: Mapping[str, Any],
+    airflow_index: Mapping[str, Any],
+    *,
+    release_schema: str,
+) -> DeploymentProjectionViolation | None:
+    declared_id = deployment.get("deployment_id")
     deployment_type = deployment.get("deployment_type")
     if deployment_type is not None and deployment_type not in {"preview", "environment"}:
         return _violation("DPONE_DEPLOYMENT_SCHEMA_INVALID", "deployment_type is invalid")
@@ -134,11 +163,11 @@ def _composition_supervisor_mirror_violation(
     deployment: Mapping[str, Any],
     airflow_index: Mapping[str, Any],
     *,
-    release_schema: str | None,
+    release_schema: str,
 ) -> DeploymentProjectionViolation | None:
     deployment_projection = deployment.get("composition_supervisor")
     index_projection = airflow_index.get("composition_supervisor")
-    if release_schema == "dpone.release-set.v3" and (deployment_projection is None or index_projection is None):
+    if release_schema == "dpone.release-set.v3" and deployment_projection is None and index_projection is None:
         return _violation(
             "DPONE_COMPOSITION_SUPERVISOR_REQUIRED",
             "release-set v3 requires composition supervisor in deployment and airflow index",
@@ -150,7 +179,7 @@ def _composition_supervisor_mirror_violation(
             "DPONE_COMPOSITION_SUPERVISOR_MISMATCH",
             "composition supervisor must mirror exactly between deployment and airflow index",
         )
-    if release_schema is not None and release_schema != "dpone.release-set.v3":
+    if release_schema != "dpone.release-set.v3":
         return _violation(
             "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN",
             "composition supervisor is forbidden for non-composition releases",
@@ -278,6 +307,7 @@ def is_versioned_airflow_bundle_ref(value: object) -> bool:
 
 __all__ = [
     "DeploymentProjectionViolation",
+    "deployment_projection_release_identity_violation",
     "deployment_projection_violation",
     "is_versioned_airflow_bundle_ref",
 ]
