@@ -5,6 +5,8 @@ import pickle
 from typing import get_type_hints
 
 from dpone.contracts.mssql_native_chunks import EncodedNativeFile
+from dpone.contracts.postgres_source_authority import PostgresSourceAuthority, SelectedPostgresSourceAuthority
+from dpone.contracts.runtime_connection import ResolvedBindingConnection
 from dpone.ports.native_delivery_observer import NativeDeliveryObserver
 from dpone.runtime import mssql_native_chunks, native_delivery_observations
 from dpone.runtime.sinks import mssql_native_prepared_insert, mssql_native_switch
@@ -13,6 +15,24 @@ from dpone.runtime.sinks.mssql_native_switch.executor import execute_native_swit
 from dpone.runtime.sinks.mssql_native_switch.planner import plan_native_switch
 from dpone.runtime.sinks.strategies.mssql.mssql_native_lineage import MssqlNativeLineageProjection
 from dpone.runtime.sinks.strategies.mssql.mssql_native_schema import ResolvedMssqlNativeSchema
+from dpone.runtime.sources import postgres_source_authority
+
+
+def test_postgres_authority_keeps_raw_connection_annotation_and_canonical_resolution():
+    verifier = postgres_source_authority.PostgresSourceAuthorityVerifier
+    constructor = verifier.from_connection
+    assert inspect.get_annotations(constructor, eval_str=False) == {
+        "connection": "ResolvedBindingConnection",
+        "return": "PostgresSourceAuthorityVerifier",
+    }
+    namespace = {**vars(postgres_source_authority), "ResolvedBindingConnection": ResolvedBindingConnection}
+    assert get_type_hints(constructor, globalns=namespace) == {
+        "connection": ResolvedBindingConnection,
+        "return": verifier,
+    }
+    fields = get_type_hints(verifier)
+    assert fields["authority"] is PostgresSourceAuthority
+    assert fields["_selected_by_route"] == dict[tuple[str, str], SelectedPostgresSourceAuthority]
 
 
 def test_recorder_keeps_raw_annotations_and_canonical_namespace_resolution():
