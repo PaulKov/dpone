@@ -8,11 +8,11 @@ and SQL text do not seed a database, observe a generation or reserve export byte
 See the [authority overview](nonproduction-composition-authority.md) for the
 complete campaign and its currently unavailable execution path.
 
-**Implementation status:** this page describes the approved isolated fixture
-candidate. The input and recipe modules are not present in the integrated branch
-at `dfccfad`. Independent correctness review passed, but architecture checks still
-block integration. The APIs below are candidate interfaces; they are not yet
-importable from the current checkout or an installed release.
+**Implementation status:** the input codec and canonical adapter recipes are
+integrated in this change. They produce deterministic seed SQL and complete
+transport-bound queries. Protected seeding, immutable generation observation,
+byte reservations and the qualification-to-execution handoff still require the
+campaign runtime; importing a recipe does not authorize those operations.
 
 ## Expected input, observed generation and export bound
 
@@ -30,16 +30,16 @@ replace recovery evidence.
 
 ## Canonical recipe APIs
 
-Runtime modules own each literal inventory once. Legacy tool/test wrappers adapt
+Adapter modules own each literal inventory once. Legacy tool/test wrappers adapt
 the immutable records to their existing DTO classes, lists and SQL producers.
-Runtime never imports a fixture tool or test module.
+Production modules never import a fixture tool or test module.
 
 | Module and API | Result |
 |---|---|
-| `dpone.runtime.nonproduction_bcp_fixture_recipe.bcp_fixture_columns(column_count)` | Tuple of `BcpFixtureColumn(name, mssql_type, insert_expression)` |
+| `dpone.adapters.nonproduction_bcp_fixture_recipe.bcp_fixture_columns(column_count)` | Tuple of `BcpFixtureColumn(name, mssql_type, insert_expression)` |
 | `render_bcp_finite_insert(source, row_count=...)` in that module | SQL text for the fixed 202-column MSSQL seed; no execution |
-| `dpone.runtime.nonproduction_postgres_fixture_recipe.postgres_fixture_columns()` | Tuple of 128 `PostgresFixtureColumn(name, pg_ddl, pg_type, seed_sql)` records |
-| `dpone.runtime.nonproduction_postgres_fixture_rows.postgres_seed_rows(seed_step)` | Two initial SQL-value vectors or one watermark vector |
+| `dpone.adapters.nonproduction_postgres_fixture_recipe.postgres_fixture_columns()` | Tuple of 128 `PostgresFixtureColumn(name, pg_ddl, pg_type, seed_sql)` records |
+| `dpone.adapters.nonproduction_postgres_fixture_rows.postgres_seed_rows(seed_step)` | Two initial SQL-value vectors or one watermark vector |
 
 `render_bcp_finite_insert` requires an exact MSSQL table
 `NonproductionPlanObject` and strict integer row count from 0 through 100000.
@@ -63,6 +63,26 @@ cumulative three-row dataset. The four serial/identity expressions explicitly
 retain 71, 72, 73 and 74. No sequence-consumption claim is inferred from them.
 Values remain SQL expressions; the API does not approximate their server results.
 
+## Pre-export bounds and repeat snapshots
+
+`render_bcp_fixture_bound_query(source, wire_contract_builder=...)` requires the
+composition root to inject the canonical runtime
+`build_mssql_bcp_native_contract`. It accounts for every fixed payload and length
+prefix, original variable-length bytes and NULL framing in the complete
+202-column source. Decimal/numeric payloads use the native 19-byte layout.
+
+`render_postgres_fixture_bound_query(source)` scans the complete PostgreSQL
+fixture and derives a conservative UTF-8 CSV byte bound. The caller must verify
+that exact schema, encoding and projection and retain the same immutable source
+generation through the scan and export. Neither query alone establishes source
+ownership or prevents concurrent writes.
+
+`require_fixture_transport_bound(records, max_rows=..., max_bytes=...)` rejects
+malformed observations and either exceeded limit before export. An observed zero
+is distinct from missing/NULL evidence. Seed counts cannot replace this scan.
+`postgres_snapshot_rows(row_count=...)` supplies deterministic prefixes of zero
+through three rows for empty and disappearing-row acceptance scenarios.
+
 ## Closed input original
 
 `dpone.contracts.nonproduction_fixture_input.NonproductionFixtureInput` uses
@@ -81,9 +101,9 @@ adds no signed authority family. Its exact required fields are:
 | `seed_steps` | Ordered `{work_item_id, seed_step}` references for this generation |
 
 The BCP implementation set is exactly
-`src/dpone/runtime/nonproduction_bcp_fixture_recipe.py`. The PostgreSQL set is
-exactly `src/dpone/runtime/nonproduction_postgres_fixture_recipe.py` and
-`src/dpone/runtime/nonproduction_postgres_fixture_rows.py`. Descriptors are sorted
+`src/dpone/adapters/nonproduction_bcp_fixture_recipe.py`. The PostgreSQL set is
+exactly `src/dpone/adapters/nonproduction_postgres_fixture_recipe.py` and
+`src/dpone/adapters/nonproduction_postgres_fixture_rows.py`. Descriptors are sorted
 by path and retain exact digest and byte size. The legacy recipe descriptor
 continues to name its existing producer path. A protected source-bundle reader
 must eventually acquire and verify all these originals.

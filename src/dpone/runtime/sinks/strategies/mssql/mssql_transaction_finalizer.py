@@ -99,7 +99,7 @@ class MssqlGenericTransactionFinalizer:
         if self._composition_fence is not None:
             try:
                 self._connector.begin()
-                self._composition_fence.require_current(self._connector)
+                self._composition_fence.require_current(self._connector, receipt=receipt)
             finally:
                 self._connector.rollback()
         return load_result_from_mssql_receipt(receipt, outcome=AtomicCommitOutcome.REPLAY_SUPPRESSED)
@@ -134,7 +134,9 @@ class MssqlGenericTransactionFinalizer:
             self._connector.execute_query("SET XACT_ABORT ON")
             self._connector.execute_query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
             composition_transaction = (
-                self._composition_fence.require_current(self._connector, operation)
+                self._composition_fence.require_current(
+                    self._connector, operation, mutation_plan_sha256=mutation_plan.digest
+                )
                 if self._composition_fence is not None
                 else None
             )
@@ -233,7 +235,10 @@ class MssqlGenericTransactionFinalizer:
             )
             if self._composition_fence is not None:
                 self._composition_fence.require_current(
-                    self._connector, operation, transaction_id=composition_transaction
+                    self._connector,
+                    operation,
+                    transaction_id=composition_transaction,
+                    mutation_plan_sha256=mutation_plan.digest,
                 )
             receipt = self._state.insert_receipt(
                 self._connector,
