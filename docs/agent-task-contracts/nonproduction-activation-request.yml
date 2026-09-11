@@ -1,0 +1,99 @@
+schema_version: 1
+task_id: DPONE-NONPRODUCTION-ACTIVATION-REQUEST
+title: Bind scoped activation requests to exact execution grants
+goal: Bind scoped activation requests to exact execution grants
+specification: docs/feature-specs/nonproduction-composition-authority.md
+base_commit: 0a340b20120a7ee5ac66b55c90a9dfff051c4a10
+integrator: root
+acceptance_criteria:
+- Implement only the new strict dpone.composition-activation-request.nonproduction.v1
+  full request plus mandatory execution_grant_sha256; no optional legacy field or
+  fake production-family decoding.
+- Reuse root-owned activation_request_fields structural decoder and existing base
+  validation, preserving every old request byte/hash/rejection behavior.
+- Canonical request digest is exact canonical UTF-8 SHA256 and covers grant; retain
+  runtime_context_sha256 meaning, existing physical guards and attempt/receipt shapes.
+- Require complete three-cell synthetic parent within64 workloads and exact canonical
+  resource partition. This is a pure contract, not physical enrollment or signature
+  authority.
+- Provide a pure comparison of exact execution grant hash, parent/deployment/activation
+  and full workload id/constituent/pack membership, bounded by grant limits; authentication/native-source/scope
+  reconstruction remain separate mandatory operations.
+- Cover strict shape, canonical bytes, altered/refingerprinted grant, phase/membership
+  mismatch, old reader rejection and original legacy fixtures; no public factory or
+  SQL dispatch changes.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python
+  - runtime
+  - state
+  - evidence
+  - documentation
+  migration_required: false
+owned_paths:
+- src/dpone/contracts/nonproduction_activation.py
+- tests/test_nonproduction_activation.py
+integrator_owned_paths: []
+read_only_paths:
+- docs
+- src/dpone/ports
+- src/dpone/runtime
+- src/dpone/adapters/composition_mssql_attempts.py
+- src/dpone/adapters/composition_mssql_store_queries.py
+- src/dpone/adapters/composition_mssql_schema.py
+- src/dpone/adapters/dbapi_lifecycle.py
+- tests/nonproduction_authority_helpers.py
+- tests/nonproduction_signature_helpers.py
+- pyproject.toml
+- uv.lock
+- src/dpone/contracts/composition_activation.py
+- src/dpone/contracts/composition_persistence.py
+- src/dpone/contracts/composition_attempt.py
+- src/dpone/contracts/composition_physical.py
+- src/dpone/contracts/nonproduction_scope.py
+- src/dpone/contracts/nonproduction_grants.py
+- src/dpone/contracts/nonproduction_authority.py
+forbidden_paths:
+- .git
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+shared_file_owner: root
+dependencies:
+- DPONE-NONPRODUCTION-GRANT-SIGNATURE
+required_checks:
+  focused:
+  - red-green owned component and relevant old boundary tests
+  broad:
+  - ruff and format owned files
+  - mypy owned files
+  - import rules
+  - layer metrics
+  - canonical module size
+  live:
+  - 'UNVERIFIED: concrete SQL trust extension and full campaign require later isolated
+    Linux qualification'
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- An authority change exceeds the separately approved nonproduction-composition-authority
+  amendment.
+- Another writer owns the same semantic contract.
+- A live check would access corporate or private systems.

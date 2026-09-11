@@ -1,0 +1,104 @@
+schema_version: 1
+task_id: DPONE-NONPRODUCTION-REGISTRATION-LIVE
+title: Observe protected registration on isolated SQL Server
+goal: Qualify the exact registration storage component with real SQL and bounded sanitized evidence
+specification: docs/feature-specs/nonproduction-composition-authority.md
+base_commit: 70ed730f91b4b6fc67e8edae7317cec952e11f0a
+integrator: root
+acceptance_criteria:
+- Implement the reviewed closed 18-case inventory across the two owned live modules. No case is
+  parametrized into an uncontrolled inventory. Require the exact isolated-runner opt-in, ownership
+  token and loopback participant; default collection skips all 18 cases.
+- Reuse OwnedDatabase, complete SQL draining/numeric failure helpers, TrustCase via composition,
+  current canonical storage fixtures and the real composition_control_transaction. Never duplicate
+  credential parsing or return raw DBAPI exceptions, originals or arbitrary log text.
+- Observe actual external installation and exact filtered-index/catalog normalization; full original
+  8 MiB public signature-bundle readback with byte lengths and independent Python/SQL hashes;
+  append-only/invalid direct DML; execution replay/rebind/two documentary candidates; qualification
+  once-consumption/no run rebind; complete campaign membership lower/higher limits including 64;
+  full paginated history and later-original corruption; historical/current trust and A-B-A revisions;
+  real ledger/service/revision/session preconditions; concurrent qualification uniqueness; concurrent
+  execution ceilings; partial-write rollback; lost ACK after real commit; failed commit and unavailable
+  reconciliation; missing/wrong/65th membership; installed schema drift; restricted provisioner
+  permissions; effective session-option rejection and restoration.
+- Use real independent SQL connections and bounded barriers for concurrency, never automatic mutation
+  retries. Observe durable state after both contenders complete. Swallowing an expected error inside
+  a committing context is forbidden; propagate failures so the caller rolls back the whole transaction.
+- Client-boundary faults run around actual SQL inserts or caller commit. Label lost ACK only when
+  real commit completed. Failed calls return no acknowledged receipt; subsequent independent reads
+  distinguish absence, durable exact originals and unresolved observation.
+- Use a separately provisioned restricted login for actual database/server token and no-bypass
+  permission observations. EXECUTE AS USER alone cannot establish server/bulk authority. Do not
+  accept file-not-found or unsupported syntax as a permission refusal. If actual bulk-path proof
+  needs a new container fixture capability, report the exact requirement rather than invent PASS.
+- Preserve actual ProductVersion, complete fixed case IDs, row/member counts, byte lengths/digests,
+  transaction states, fixed errors, connection/commit observations and owned cleanup status.
+  Sanitization and JUnit failure preservation are narrowly scoped to the new modules.
+- No runtime, schema, runner, workflow, fixture-root, dependency or budget changes. If live behavior
+  contradicts SQL assumptions, preserve FAIL with bounded diagnosis and report a concrete root fix.
+- No local SQL, existing environment, business fixture, PyPI or credentials outside the approved
+  fresh Linux synthetic runner. These tests certify storage only, not grant signatures, source reads,
+  ownership, budgets or current/provider/worker execution.
+public_contract_impact:
+  level: none
+  surfaces:
+  - documentation
+  - evidence
+  migration_required: false
+owned_paths:
+- tests/integration/composition/test_nonproduction_mssql_registration_live.py
+- tests/integration/composition/test_nonproduction_mssql_registration_recovery_live.py
+- tests/integration/composition/nonproduction_mssql_registration_live_support.py
+- tests/test_nonproduction_mssql_registration_live_support.py
+integrator_owned_paths: []
+read_only_paths:
+- src
+- docs
+- tests/integration/composition/mssql_store_live_support.py
+- tests/integration/composition/mssql_gate_live_provisioning.py
+- tests/integration/composition/nonproduction_mssql_trust_live_support.py
+- tests/nonproduction_authority_helpers.py
+- tests/nonproduction_signature_helpers.py
+- tests/test_nonproduction_mssql_registration.py
+- tests/test_nonproduction_registration.py
+- tools/composition_mssql_synthetic.py
+forbidden_paths:
+- .git
+- src
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- tests/conftest.py
+- docs
+shared_file_owner: root
+dependencies:
+- DPONE-NONPRODUCTION-REGISTRATION
+- DPONE-NONPRODUCTION-TRUST-LIVE
+required_checks:
+  focused:
+  - offline fixture ownership, exact inventory, failure sanitization and cleanup contracts
+  - exact opt-out collection of all 18 live cases
+  broad:
+  - owned Ruff and formatting
+  - explicit owned mypy
+  - canonical module size without warning debt
+  - fresh independent source and fixture review
+  live:
+  - root later executes all cases from exact clean committed source on the approved Linux runner
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Live behavior needs a production/schema or runner change.
+- A live check requires an existing environment, corporate/private systems or local SQL.
+- Another writer owns the same semantic contract.

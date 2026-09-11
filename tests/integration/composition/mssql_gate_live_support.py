@@ -111,6 +111,8 @@ class GateCase:
     def __init__(self, environment, record_property, *, diagnostics=None):
         self.environment, self.record_property = environment, record_property
         self.diagnostics = diagnostics or ControlDiagnostics()
+        self.record("check_catalog", environment.check_catalog())
+        self.record("check_catalog_context", environment.check_catalog_context())
         self.target, self.pins = environment.new_target()
         self.connections = []
         self.credentials = None
@@ -252,7 +254,7 @@ class GateCase:
 
     def gate_row(self):
         rows = self.sql(
-            f"SELECT login_sid,login_name,gate_state,disabled_evidence_sha256 FROM {self.table('login_gates')} WHERE attempt_sha256=?;",
+            f"SELECT login_sid,login_name,gate_state,disabled_evidence_sha256 FROM {self.table('login_gates')} WHERE operation_key=?;",
             self.attempt.attempt_sha256,
         )
         return rows[0] if rows else None
@@ -260,7 +262,7 @@ class GateCase:
     def no_issuance(self):
         assert self.gate_row() is None
         assert self.sql(
-            f"SELECT COUNT(*) FROM {self.table('issued_authorities')} WHERE attempt_sha256=?;",
+            f"SELECT COUNT(*) FROM {self.table('issued_authorities')} WHERE operation_key=?;",
             self.attempt.attempt_sha256,
         ) == ((0,),)
         assert self.sql(

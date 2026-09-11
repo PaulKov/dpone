@@ -7,8 +7,8 @@ must be verified against pinned protected authority before constructing them.
 from dataclasses import dataclass
 from uuid import UUID
 
-from dpone.contracts.airflow_deployment import canonical_fingerprint
 from dpone.contracts.composition_activation import CompositionAdmissionError, require_digest
+from dpone.contracts.composition_physical_identity import composition_physical_guard_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,13 +32,10 @@ class CompositionPhysicalDomain:
 
     @property
     def guard_id(self) -> str:
-        return canonical_fingerprint(
-            {
-                "schema": "dpone.composition-physical-domain.v1",
-                "connector": self.connector,
-                "service_id": self.service_id,
-                "physical_subject_sha256": self.physical_subject_sha256,
-            }
+        return composition_physical_guard_id(
+            connector=self.connector,
+            service_id=self.service_id,
+            physical_subject_sha256=self.physical_subject_sha256,
         )
 
 

@@ -12,6 +12,7 @@ import secrets
 from dataclasses import dataclass, field
 
 from dpone.adapters.composition_mssql_database_policy import require_database_policy
+from dpone.adapters.composition_mssql_gate_catalog import require_composition_mssql_gate_schema
 from dpone.adapters.composition_mssql_gate_schema import (
     GATE_READER,
     GATE_TRIGGER,
@@ -20,9 +21,9 @@ from dpone.adapters.composition_mssql_gate_schema import (
     monotonic_trigger_sql,
 )
 from dpone.adapters.composition_mssql_schema import require_control_schema
-from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.adapters.dbapi_lifecycle import row
 from dpone.contracts.composition_control import CompositionAdmissionError, CompositionAttemptIdentity
+from dpone.ports.composition_sql import CompositionSqlContext
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,8 +65,9 @@ class MssqlEnrollment:
     schemas: tuple[str, ...]
 
 
-def require_gate_policy(ledger: CompositionMssqlLedger, database: str) -> None:
+def require_gate_policy(ledger: CompositionSqlContext, database: str) -> None:
     """Inspect actual module bytes, reader identity and complete DMV privileges."""
+    require_composition_mssql_gate_schema(ledger.cursor, ledger.schema)
     cursor = ledger.cursor
     cursor.execute(
         "SELECT DB_NAME(), t.is_disabled, HASHBYTES('SHA2_256', CONVERT(varbinary(max), m.definition)), "
@@ -138,23 +140,23 @@ def require_gate_policy(ledger: CompositionMssqlLedger, database: str) -> None:
 
 
 def require_enrollments(
-    ledger: CompositionMssqlLedger, attempt: CompositionAttemptIdentity, service_id: str
+    ledger: CompositionSqlContext, attempt: CompositionAttemptIdentity, service_id: str
 ) -> tuple[MssqlEnrollment, ...]:
     """Check every selected MSSQL guard against current physical identity/policy."""
     ledger.cursor.execute(
-        "SELECT a.guard_id, e.database_name, e.database_id, LOWER(CONVERT(char(36), e.database_guid)), "
+        "SELECT TOP (8193) a.guard_id, e.database_name, e.database_id, LOWER(CONVERT(char(36), e.database_guid)), "
         "e.database_create_token, e.writer_role, d.database_id, LOWER(CONVERT(char(36), r.database_guid)), "
         "CONVERT(nvarchar(33), d.create_date, 126), d.is_trustworthy_on, d.is_db_chaining_on, d.containment, d.state, "
         "LOWER(CONVERT(char(36), g.service_id)), DB_ID(), d.owner_sid, SUSER_SID(ORIGINAL_LOGIN()) "
-        f"FROM {ledger.table('attempt_domains')} a JOIN {ledger.table('domains')} g ON a.guard_id=g.guard_id "
+        f"FROM {ledger.table('operation_domains')} a JOIN {ledger.table('domains')} g ON a.guard_id=g.guard_id "
         f"LEFT JOIN {ledger.table('mssql_enrollments')} e ON e.guard_id=a.guard_id "
         "LEFT JOIN sys.databases d ON d.name=e.database_name COLLATE DATABASE_DEFAULT "
         "LEFT JOIN sys.database_recovery_status r ON r.database_id=d.database_id "
-        "WHERE a.attempt_sha256=? AND g.connector='mssql' ORDER BY a.guard_id;",
+        "WHERE a.operation_key=? AND g.connector='mssql' ORDER BY a.guard_id;",
         attempt.attempt_sha256,
     )
     records = tuple(ledger.cursor.fetchall())
-    if not records:
+    if not 1 <= len(records) <= 8192:
         raise CompositionAdmissionError("login_no_mssql_scope")
     result = []
     for record in records:
@@ -190,12 +192,12 @@ def require_enrollments(
         require_control_schema(name)
         require_control_schema(role)
         ledger.cursor.execute(
-            f"SELECT schema_name FROM {ledger.table('mssql_managed_schemas')} WITH (HOLDLOCK) "
+            f"SELECT TOP (8193) schema_name FROM {ledger.table('mssql_managed_schemas')} WITH (HOLDLOCK) "
             "WHERE guard_id=? ORDER BY schema_name;",
             guard,
         )
         schemas = tuple(value[0] for value in ledger.cursor.fetchall())
-        if not schemas or len(set(schemas)) != len(schemas):
+        if not 1 <= len(schemas) <= 8192 or len(set(schemas)) != len(schemas):
             raise CompositionAdmissionError("login_managed_schemas")
         for schema in schemas:
             require_control_schema(schema)
@@ -205,7 +207,7 @@ def require_enrollments(
     return tuple(result)
 
 
-def _require_database_policy(ledger: CompositionMssqlLedger, enrollment: MssqlEnrollment) -> None:
+def _require_database_policy(ledger: CompositionSqlContext, enrollment: MssqlEnrollment) -> None:
     """Retain the existing helper while the catalog policy has a cohesive owner."""
     require_database_policy(
         ledger,
@@ -217,7 +219,7 @@ def _require_database_policy(ledger: CompositionMssqlLedger, enrollment: MssqlEn
 
 
 def create_login(
-    ledger: CompositionMssqlLedger, credentials: MssqlIssuedCredentials, enrollments: tuple[MssqlEnrollment, ...]
+    ledger: CompositionSqlContext, credentials: MssqlIssuedCredentials, enrollments: tuple[MssqlEnrollment, ...]
 ) -> None:
     """Issue only the already journaled principal, in the READY transaction."""
     ledger.cursor.execute(
@@ -243,7 +245,7 @@ def create_login(
         )
 
 
-def require_login(ledger: CompositionMssqlLedger, name: str, sid: bytes, *, disabled: bool) -> None:
+def require_login(ledger: CompositionSqlContext, name: str, sid: bytes, *, disabled: bool) -> None:
     """Exact immutable SQL login with no server-role or elevated grant fallback."""
     ledger.cursor.execute(
         "SELECT p.name, p.sid, p.type, p.is_disabled, "
@@ -259,7 +261,7 @@ def require_login(ledger: CompositionMssqlLedger, name: str, sid: bytes, *, disa
 
 
 def require_worker_users(
-    ledger: CompositionMssqlLedger, credentials: MssqlIssuedCredentials, enrollments: tuple[MssqlEnrollment, ...]
+    ledger: CompositionSqlContext, credentials: MssqlIssuedCredentials, enrollments: tuple[MssqlEnrollment, ...]
 ) -> None:
     """Read back the exact created users and single bounded role per database."""
     for enrollment in enrollments:

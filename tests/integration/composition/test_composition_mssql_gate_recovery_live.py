@@ -14,6 +14,7 @@ import pytest
 from tests.integration.composition.mssql_gate_live_outcomes import AcknowledgementLost, OutcomeProducer
 from tests.integration.composition.mssql_gate_live_provisioning import SqlFailure, execute
 from tests.integration.composition.mssql_gate_live_support import commit_factory, require_denied, wait_until
+from tests.integration.composition.mssql_store_live_support import invariant_fault, owner_key
 
 from dpone.contracts.composition_control import CompositionAdmissionError
 
@@ -117,7 +118,7 @@ def test_lost_journal_ack_never_creates_or_reissues_login(gate_case):
         case.gate.issue_once(case.attempt)
     assert case.gate_row() == original
     assert case.sql(
-        f"SELECT COUNT(*) FROM {case.table('proofs')} WHERE attempt_sha256=?;", case.attempt.attempt_sha256
+        f"SELECT COUNT(*) FROM {case.table('proofs')} WHERE operation_key=?;", case.attempt.attempt_sha256
     ) == ((0,),)
     case.record(
         "lost_journal_ack", {"issued_sid": original[0].hex(), "gate_state": original[2], "principal_created": False}
@@ -157,7 +158,7 @@ def test_connection_attempts_racing_close_cannot_reconnect(gate_case):
         locker_spid = execute(locker, "SELECT @@SPID;")[0][0]
         execute(
             locker,
-            f"SELECT login_sid FROM {case.table('login_gates')} WITH (XLOCK,HOLDLOCK,ROWLOCK) WHERE attempt_sha256=?;",
+            f"SELECT login_sid FROM {case.table('login_gates')} WITH (XLOCK,HOLDLOCK,ROWLOCK) WHERE operation_key=?;",
             case.attempt.attempt_sha256,
         )
         try:
@@ -278,15 +279,16 @@ def test_missing_terminal_proof_blocks_overlapping_reuse(gate_case):
         == "SUCCEEDED"
     )
     try:
-        case.sql(
-            f"DELETE FROM {case.table('proofs')} WHERE attempt_sha256=? AND kind='CLOSED_GATES' AND proof_sha256=?;",
-            case.attempt.attempt_sha256,
-            closed.proof_sha256,
-        )
+        with invariant_fault(case.environment.recover, case.environment.schema, "proofs"):
+            case.sql(
+                f"DELETE FROM {case.table('proofs')} WHERE operation_key=? AND kind='CLOSED_GATES' AND proof_sha256=?;",
+                case.attempt.attempt_sha256,
+                closed.proof_sha256,
+            )
         with pytest.raises(CompositionAdmissionError, match="terminal_proof_identity"):
             case.attempts.admit_once(replace(case.attempt, try_number=2))
         assert case.sql(
-            f"SELECT COUNT(*) FROM {case.table('attempts')} WHERE activation_id=?;", case.request.activation_id
+            f"SELECT COUNT(*) FROM {case.table('operations')} WHERE owner_key=?;", owner_key(case.request.activation_id)
         ) == ((1,),)
     finally:
         # Restore through fresh exact SID observations and the actual producer,
@@ -326,6 +328,6 @@ def test_real_commit_unknown_requires_explicit_reconciliation(gate_case):
     assert case.store.finalize_retirement(case.request).receipt.state == "RETIRED"
     assert case.target_sql("SELECT row_id,value FROM [managed].[rows];") == ((1, "actually committed"),)
     assert case.sql(
-        f"SELECT COUNT(*) FROM {case.table('proofs')} WHERE attempt_sha256=? AND kind='OUTCOME';",
+        f"SELECT COUNT(*) FROM {case.table('proofs')} WHERE operation_key=? AND kind='OUTCOME';",
         case.attempt.attempt_sha256,
     ) == ((2,),)

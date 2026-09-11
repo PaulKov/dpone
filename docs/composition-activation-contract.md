@@ -13,6 +13,16 @@ for artifact delivery, and [the approved specification](feature-specs/compositio
 for the full execution scope. A successful source read, plan, fake-adapter test,
 cache install or launcher prepare does not certify SQL execution.
 
+The separate [ClickHouse snapshot component](composition-clickhouse-snapshots.md)
+defines strict whole-snapshot intents and one-time EXCHANGE/recovery policy.
+Concrete ClickHouse gate, catalog, storage and worker qualification remain
+required before that component can participate in actual parent execution.
+
+The internal [scoped owner original](composition-scoped-execution-originals.md)
+describes complete retained reads and helper effects while preserving the
+activation request and attempt write projection. Its pure comparisons do not
+enable this coordinator or the current SQL store to admit scoped execution.
+
 ## Concrete SQL Server persistence
 
 `dpone.adapters.composition_mssql_store.MssqlCompositionActivationStore`
@@ -27,13 +37,22 @@ The platform installs the SQL from
 `dpone.adapters.composition_mssql_schema.render_composition_mssql_schema()`
 explicitly, then provisions and protects the authority and domain records.
 Reapplying the initial DDL fails rather than adopting existing tables. Runtime
-operations never create, repair or enroll their own authority. A matching schema
-version, eight table names and service UUID are structural prerequisites; the
-protected backend must separately verify database continuity, role permissions,
-exclusive enrollment and the installed writer gates before using this store.
+operations never create, repair or enroll their own authority. Each transaction
+requires schema version 2, the externally pinned service UUID and the complete
+eight-table catalog: original columns, keys, constraints, triggers and metadata
+visibility. Legacy writable table names reject admission. See the
+[shared SQL storage reference](composition-shared-sql-storage.md) for generated
+CHECK provenance and initial installation. The protected backend must separately
+verify database continuity, role permissions, exclusive enrollment and installed
+writer gates. The [schema-v2 component result](composition-shared-sql-storage.md#observed-sql-component-evidence)
+records all 50 SQL cases at the named source commit; complete worker
+qualification remains pending.
 
 The store uses one short transaction-owned application lock in the control
-database to serialize ledger changes. This lock is not a writer-session fence.
+database to serialize ledger changes. It also observes the actual SQL transaction
+identity at read, callback and commit boundaries; closing and reopening a
+transaction with the same lock does not preserve the original observation.
+This lock is not a writer-session fence.
 Requests retain canonical UTF-8 bytes and their original catalog observations.
 Each mutation closes its transaction connection and independently rereads the
 exact request, state, complete guard partition and epochs. A lost commit
@@ -50,10 +69,12 @@ retain ownership. A proof document's shape or caller-supplied digest grants no
 authority: trusted backend producers must create the actual observations and
 protected records.
 
-An unowned domain is not sufficient for successor admission. The store uses the
-historical activation partitions to find previous owners, then reopens their
-complete attempt/proof closure. Missing attempt partitions, missing proof bytes
-and terminal-state tampering reject reservation before any epoch is advanced.
+An unowned domain is not sufficient for successor admission. The store scans every
+owner and operation original independently of partition rows and current domain
+pointers. It validates complete original partitions before comparing guard
+intersection and reopening the relevant prior terminal-proof closure. Missing
+partitions, missing proof bytes and terminal-state tampering reject reservation
+before any epoch is advanced.
 
 Offline adapter tests use explicit DB-API doubles. The separate synthetic SQL
 component runner exercises real control transactions; neither is the full
@@ -139,12 +160,14 @@ and `junit.xml`, recording exact source, image, driver and server identity. All
 expected cases must execute without skips. A cleanup failure changes the result
 to FAIL. No raw driver diagnostics or credentials belong in these artifacts.
 
-The workflow runs two independent profiles, each in its own fresh container:
+The workflow runs four independent profiles, each in its own fresh container:
 
 | Profile | Required cases | Evidence scope |
 |---|---|---|
 | `store` (default) | 7 | Real ledger DDL, whole-parent transactions, conflicts, lost acknowledgements and retirement |
 | `gate` | 16 | Real issued credentials, target permissions and continuity, monotonic LOGON closure, races, in-flight transactions and explicit unknown recovery |
+| `trust` | 9 | Real append-only nonproduction trust, original bytes, revision races, schema integrity, lock/acknowledgement failures and bounded provisioner permissions |
+| `registration` | 18 | Exact grant originals and complete membership, historical trust, replay and concurrency, rollback/unknown acknowledgements, catalog/session enforcement and restricted-login permissions |
 
 The gate profile uses the actual closed-gate and quiescence producers. Its
 test-only outcome producer binds observed SQL and independent reconciliation;
@@ -152,7 +175,20 @@ it does not qualify the future native/transfer worker outcome producer. The
 runner rejects a missing, skipped, duplicate or foreign case, including results
 from the other profile. JUnit retains bounded numeric SQL error identifiers and
 fixed domain reasons for failure diagnosis; raw driver messages stay suppressed.
-Default non-live collection skips both profiles without opening a connection.
+The trust profile uses inert public policy documents as storage fixtures. It
+does not verify actual grant signatures, consume grants or authorize workers.
+Its provisioner case verifies database permissions through an impersonated
+database user; it does not qualify a separately authenticated network login.
+Select it with `--profile trust` in the same disposable command.
+The registration profile also uses inert unsigned storage fixtures. It requires
+the real 8 MiB bundle boundary, complete membership and historical-original audits,
+and explicit lost-acknowledgement recovery. Its restricted-login case uses actual
+server/database tokens. The runner creates an exact two-byte public integer file
+inside that new container; administrator SQL must independently read/hash it and
+successfully import it before a restricted principal's bulk-import refusal can
+serve as permission evidence. A missing file or unsupported operation is a failure,
+not a verified denial. Use `--profile registration` to select this inventory.
+Default non-live collection skips all profiles without opening a connection.
 
 This component's ClickHouse rows are synthetic ledger metadata. Route
 qualification and complete worker execution remain separate observations;

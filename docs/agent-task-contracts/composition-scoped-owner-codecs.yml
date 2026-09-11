@@ -1,0 +1,203 @@
+schema_version: 1
+task_id: DPONE-V3-SCOPED-OWNER-CODECS
+title: Pure scoped execution owner originals and exact legacy write projection
+goal: Implement the approved seven-file pure scoped execution owner codec prerequisite with unchanged
+  legacy originals and no runtime enablement.
+specification: docs/feature-specs/nonproduction-composition-authority.md
+base_commit: 9974bcde380db703f616addde080b2388578fddf
+integrator: root
+shared_file_owner: root
+acceptance_criteria:
+- APPROVED within the maintainer-approved nonproduction feature; the scoped owner reference and ADR0061
+  addendum define the contract. Only seven owned paths may change. Architecture regressions require reconciliation
+  before integration.
+- Implement exactly the fields, APIs, closed matrix, sorted unique bounds, 8 MiB canonical owner bytes,
+  fixed error reasons and recursive revalidation in docs/composition-scoped-execution-originals.md. Do
+  not infer missing contract choices.
+- Retain existing NP request R and original attempt A bytes, fields, hashes and validators; E is a new
+  mandatory full owner original with the unchanged actual execution owner key.
+- Bind every R resource exactly to its E claim and complete execution observation; use a total genuine
+  DbtRelationWrite bridge, never equate logical-write hashes directly to object subject hashes.
+- Retain exact full Q/E signed scope, participant directional sets and physical claim roles. Distinct
+  original phase observations may differ. Qualification-only effects remain owned without becoming execution
+  effects or permissions.
+- 'Enforce each exact R execution cell: sqlserver_dbt_v1 binds model/unit_test MSSQL table/view writes;
+  mssql_clickhouse_full_refresh_v1 binds transfer target ClickHouse table writes; postgres_mssql_full_refresh_v1
+  binds transfer target MSSQL table writes. Reject cross-cell kind/connector substitutions even with internally
+  rehashed originals. Other actual effects stay separate and require later source-derived proof.'
+- 'Strictly wrap the ten original DbtRelationWrite fields: validate a detached exact copy with existing
+  rules, reject any normalization/type mismatch, never mutate the supplied embedded original, and preserve
+  canonical from_bytes equality. Legitimate pre-embedding canonicalization remains allowed.'
+- Preserve sorted unique effect triples with multiple purposes per object/access allowed. Count every
+  edge toward the aggregate bound; derive access/guard unions without granting an undeclared direction.
+- Represent real MSSQL table/view, PostgreSQL table/enum/sequence and ClickHouse table objects. Do not
+  widen the frozen two-fixture plan grammar or manufacture unsupported native qualification originals.
+- Derive each full selected operation partition only from the complete revalidated envelope and its actual
+  workload effects after checking the unchanged original attempt write projection.
+- Embed only upstream qualification handoff facts, adjacent complete epochs and original source-seal associations;
+  no additional acquisitions, receipt authority, circular hash, lifecycle state, nullable scope, or fallback.
+- Reuse existing pure physical and original contracts plus frozen NonproductionPlanOriginal and NonproductionPlanEffect.
+  Preserve all read-only source pins and current capability closure.
+- Document what codecs cannot prove, including original acquisition, alias equality, full executable effects,
+  actual source sealing, finite bounds, signatures, current trust, counters, current worker, PG authorities,
+  terminal proofs and transfer.
+- No storage, schema, catalog, decoder dispatch, attempt adapter, proof issuer/verifier, factory, runner,
+  CLI, connector, service or public capability wiring. No live execution or SQL.
+- Keep each owned module at or below 350 canonical SLOC and within unchanged repository budgets. Stop
+  for a cohesive redesign if this is infeasible; no mechanical splits or metric exemptions.
+- Preserve meaningful RED output before implementation and final GREEN JUnit with exact case inventory,
+  byte/hash compatibility evidence, cold typing and all scoped static checks. Do not remove or weaken
+  existing scenarios.
+- 'Require the adopted known source-read minima: MSSQL-to-ClickHouse workloads read at least one retained
+  MSSQL table/view; PostgreSQL-to-MSSQL workloads read at least one retained PostgreSQL table. Check access
+  independently of purpose; native constant dbt models have no invented read minimum. Current generation/bounds/closure
+  remain future protected proof.'
+- Use only /tmp/dpone-composition-v3-scoped-owner at exact9974bcde380db703f616addde080b2388578fddf with
+  the independent offline environment /tmp/dpone-v3-scoped-owner-env. All7944 original tracked hashes
+  remain unchanged. You are not alone in the codebase; do not revert or edit other worktrees, and report
+  ownership conflict. No commit or push; root integrates.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - Explicit internal owner document schema dpone.composition-scoped-execution-owner.v1, unavailable to
+    public admission or storage until a separately approved migration.
+  - Pure canonical contract values and projection methods only; existing production, native-v2, NP request,
+    attempt and proof contracts remain unchanged.
+  migration_required: false
+owned_paths:
+- src/dpone/contracts/composition_scoped_execution_scope.py
+- src/dpone/contracts/composition_scoped_execution_handoff.py
+- src/dpone/contracts/composition_scoped_execution.py
+- tests/test_composition_scoped_execution_scope.py
+- tests/test_composition_scoped_execution_handoff.py
+- tests/test_composition_scoped_execution.py
+- tests/composition_scoped_execution_helpers.py
+integrator_owned_paths:
+- docs/adr/0061-shared-composition-physical-ownership.md
+- docs/composition-shared-ownership.md
+- docs/composition-shared-sql-storage.md
+- docs/composition-activation-contract.md
+- docs/feature-specs/nonproduction-composition-authority.md
+- docs/nonproduction-composition-authority.md
+- docs/nonproduction-qualification-plans.md
+- CHANGELOG.md
+- mkdocs.yml
+read_only_paths:
+- AGENTS.md
+- src/dpone/AGENTS.md
+- tests/AGENTS.md
+- docs/engineering-standards.md
+- docs/import-rules.md
+- docs/architecture.md
+- docs/feature-design-standard.md
+- src/dpone/contracts/nonproduction_plan_values.py
+- src/dpone/contracts/nonproduction_fixture_plan.py
+- src/dpone/contracts/nonproduction_qualification_plan.py
+- src/dpone/contracts/nonproduction_plan_pair.py
+- src/dpone/contracts/composition_ownership.py
+- src/dpone/contracts/composition_qualification_operation.py
+- src/dpone/contracts/composition_activation.py
+- src/dpone/contracts/nonproduction_activation.py
+- src/dpone/contracts/composition_attempt.py
+- src/dpone/contracts/composition_proof.py
+- src/dpone/contracts/composition_persistence.py
+- src/dpone/contracts/composition_physical_identity.py
+- src/dpone/contracts/nonproduction_scope.py
+- src/dpone/contracts/nonproduction_grants.py
+- src/dpone/contracts/dbt_relation_writes.py
+- src/dpone/contracts/dbt_workspace_activation.py
+- src/dpone/contracts/strict_json.py
+- src/dpone/adapters
+- src/dpone/services
+- src/dpone/ports
+- tests/nonproduction_plan_helpers.py
+- tests/test_nonproduction_plan_values.py
+- tests/test_nonproduction_plan_pair.py
+- tests/nonproduction_authority_helpers.py
+- tests/test_nonproduction_activation.py
+- tests/test_composition_ownership.py
+- tests/test_composition_qualification_operation.py
+- tests/test_composition_attempt_scope.py
+- tests/test_composition_proof.py
+- tests/test_dbt_relation_writes.py
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- tests/conftest.py
+- docs
+- tools
+- src/dpone/adapters
+- src/dpone/ports
+- src/dpone/services
+- src/dpone/runtime
+- src/dpone/manifest
+- src/dpone/cli
+- src/dpone/contracts/__init__.py
+- src/dpone/contracts/composition_control.py
+- src/dpone/contracts/nonproduction_plan_values.py
+- src/dpone/contracts/nonproduction_fixture_plan.py
+- src/dpone/contracts/nonproduction_qualification_plan.py
+- src/dpone/contracts/nonproduction_plan_pair.py
+- src/dpone/contracts/composition_persistence.py
+- docs/benchmarks/quality_budgets.yml
+- docs/module_size_baseline.json
+- docs/layer_metrics_baseline.json
+dependencies:
+- docs/composition-scoped-execution-originals.md
+- docs/adr/0061-shared-composition-physical-ownership.md
+- Exact dispatch base and immutable approved contract/prerequisite manifests retained in the implementation
+  evidence; all unowned tracked source originals remain read-only.
+required_checks:
+  focused:
+  - RED then GREEN all three new test modules with unchanged JUnit inventory and explicit boundary cases
+    from the paired Markdown contract.
+  - Run existing tests/test_nonproduction_activation.py tests/test_composition_ownership.py tests/test_composition_qualification_operation.py
+    tests/test_composition_qualification_invocation.py tests/test_composition_attempt_scope.py tests/test_composition_proof.py
+    tests/test_dbt_relation_writes.py tests/test_nonproduction_plan_values.py tests/test_nonproduction_plan_pair.py.
+  - Scoped Ruff check and Ruff format --check across all seven owned files.
+  - Cold explicit mypy --config-file mypy.ini --no-incremental across all seven owned files, with no broad-module
+    selection standing in for test-file typing.
+  - Exact hashes and bytes for legacy R/A/proof compatibility, unchanged read-only source pins, and frozen
+    plan values; explicit rejection of new owner wire by unchanged current adapters/readers.
+  - Canonical module analyzer on actual owned module paths; every file <=350 SLOC and unchanged canonical
+    graph/import checks. Report any FAIL separately and truthfully.
+  broad:
+  - Root runs tools/agent_policy/select_checks.py --base-ref origin/master on eventual integration and
+    preserves its exact required plan.
+  - Root runs required Ruff, formatting, mypy, import rules, architecture fitness, layer/module metrics
+    and complete nonlive tests on exact integrated source. No budget/baseline exemptions or masking failed
+    checks.
+  - Root validates documentation and strict MkDocs for its separately owned approved ADR/spec/reference
+    changes.
+  live:
+  - N/A for pure codecs. Do not run SQL, workers, credentials, source reads, routes, transfer or qualification.
+    Those later capabilities remain UNVERIFIED.
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
+- A required genuine native/helper effect cannot be represented or proved without changing a frozen plan/legacy
+  type or fabricating an original.
+- Any requirement would infer physical observation, proof authority, source bounds, current identity,
+  permission or successful transfer from a declared digest or codec result.
+- A read-only prerequisite hash changed or another writer overlaps a semantic contract; notify root before
+  continuing.
+- Cohesive implementation exceeds the 350 SLOC owned cap or grows existing graph debt; report exact metrics
+  and a concrete architecture alternative instead of changing baselines.

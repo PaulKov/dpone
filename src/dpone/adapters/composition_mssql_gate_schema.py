@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from hashlib import sha256
 
-from dpone.adapters.composition_mssql_schema import require_control_schema
+from dpone.adapters.composition_mssql_gate_layout import COMPOSITION_GATE_TABLES
+from dpone.adapters.composition_mssql_layout import CompositionTrigger
+from dpone.adapters.composition_mssql_schema import render_composition_table, require_control_schema
 
 GATE_TRIGGER = "dpone_composition_login_gate"
 GATE_READER = "dpone_gate_reader"
@@ -49,15 +51,15 @@ END;"""
 
 
 def monotonic_trigger_sql(control_schema: str) -> str:
-    """SID/name/attempt never change; closing is irreversible, including DELETE."""
+    """SID/name/operation never change; closing is irreversible, including DELETE."""
     schema = require_control_schema(control_schema)
     return f"""CREATE TRIGGER [{schema}].[composition_login_gate_monotonic]
 ON [{schema}].[composition_login_gates] AFTER UPDATE, DELETE AS
 BEGIN
     SET NOCOUNT ON;
     IF EXISTS (
-        SELECT 1 FROM deleted d LEFT JOIN inserted i ON i.attempt_sha256 = d.attempt_sha256
-        WHERE i.attempt_sha256 IS NULL OR i.login_sid <> d.login_sid OR i.login_name <> d.login_name
+        SELECT 1 FROM deleted d LEFT JOIN inserted i ON i.operation_key = d.operation_key
+        WHERE i.operation_key IS NULL OR i.login_sid <> d.login_sid OR i.login_name <> d.login_name
            OR DATALENGTH(i.login_name) <> DATALENGTH(d.login_name)
            OR (i.gate_state <> d.gate_state AND NOT (
                (d.gate_state = 'JOURNALED' AND i.gate_state IN ('READY', 'CLOSING')) OR
@@ -86,54 +88,26 @@ def render_composition_mssql_login_gate(*, control_database: str, control_schema
     """
     database = require_control_schema(control_database)
     schema = require_control_schema(control_schema)
-    return f"""USE [{database}];
-GO
-CREATE TABLE [{schema}].[composition_login_gates] (
-    attempt_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY
-        REFERENCES [{schema}].[composition_attempts](attempt_sha256),
-    login_sid binary(16) NOT NULL UNIQUE,
-    login_name nvarchar(128) COLLATE Latin1_General_100_BIN2 NOT NULL UNIQUE,
-    gate_state varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL
-        CHECK (gate_state IN ('JOURNALED', 'READY', 'CLOSING', 'CLOSED')),
-    disabled_evidence_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NULL,
-    CHECK (gate_state <> 'CLOSED' OR disabled_evidence_sha256 IS NOT NULL)
-);
-CREATE TABLE [{schema}].[composition_mssql_enrollments] (
-    guard_id varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY
-        REFERENCES [{schema}].[composition_domains](guard_id),
-    database_name nvarchar(128) COLLATE Latin1_General_100_BIN2 NOT NULL UNIQUE,
-    database_id int NOT NULL UNIQUE CHECK (database_id > 4),
-    database_guid uniqueidentifier NOT NULL,
-    database_create_token nvarchar(33) COLLATE Latin1_General_100_BIN2 NOT NULL,
-    writer_role nvarchar(128) COLLATE Latin1_General_100_BIN2 NOT NULL
-);
-CREATE TABLE [{schema}].[composition_mssql_managed_schemas] (
-    guard_id varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL
-        REFERENCES [{schema}].[composition_mssql_enrollments](guard_id),
-    schema_name nvarchar(128) COLLATE Latin1_General_100_BIN2 NOT NULL,
-    PRIMARY KEY (guard_id, schema_name)
-);
-CREATE TABLE [{schema}].[composition_mssql_gate_evidence] (
-    evidence_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
-    attempt_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL
-        REFERENCES [{schema}].[composition_attempts](attempt_sha256),
-    evidence_document varbinary(max) NOT NULL CHECK (DATALENGTH(evidence_document) BETWEEN 1 AND 8388608)
-);
-GO
-{monotonic_trigger_sql(schema)}
-GO
-CREATE TRIGGER [{schema}].[composition_mssql_enrollment_immutable]
-ON [{schema}].[composition_mssql_enrollments] AFTER UPDATE, DELETE AS
-BEGIN THROW 51000, 'DPONE_COMPOSITION_ENROLLMENT_IMMUTABLE', 1; END;
-GO
-CREATE TRIGGER [{schema}].[composition_mssql_schemas_immutable]
-ON [{schema}].[composition_mssql_managed_schemas] AFTER UPDATE, DELETE AS
-BEGIN THROW 51000, 'DPONE_COMPOSITION_ENROLLMENT_IMMUTABLE', 1; END;
-GO
-CREATE TRIGGER [{schema}].[composition_mssql_gate_evidence_immutable]
-ON [{schema}].[composition_mssql_gate_evidence] AFTER UPDATE, DELETE AS
-BEGIN THROW 51000, 'DPONE_COMPOSITION_EVIDENCE_IMMUTABLE', 1; END;
-GO
-{login_trigger_sql(database, schema)}
-GO
-"""
+    batches = [f"USE [{database}];", "SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON;"]
+    batches.extend(render_composition_table(table, schema) for table in COMPOSITION_GATE_TABLES)
+    batches.extend(gate_table_trigger(schema, table.name).definition for table in COMPOSITION_GATE_TABLES)
+    batches.append(login_trigger_sql(database, schema))
+    return "\nGO\n".join((*batches, ""))
+
+
+def gate_table_trigger(control_schema: str, table: str) -> CompositionTrigger:
+    """Keep immutable modules and UPDATE/DELETE event sets exact after migration."""
+    schema = require_control_schema(control_schema)
+    if table == "login_gates":
+        return CompositionTrigger(
+            "composition_login_gate_monotonic", monotonic_trigger_sql(schema), ("DELETE", "UPDATE")
+        )
+    module, reason = {
+        "mssql_enrollments": ("composition_mssql_enrollment_immutable", "ENROLLMENT"),
+        "mssql_managed_schemas": ("composition_mssql_schemas_immutable", "ENROLLMENT"),
+        "mssql_gate_evidence": ("composition_mssql_gate_evidence_immutable", "EVIDENCE"),
+    }[table]
+    definition = f"""CREATE TRIGGER [{schema}].[{module}]
+ON [{schema}].[composition_{table}] AFTER UPDATE, DELETE AS
+BEGIN THROW 51000, 'DPONE_COMPOSITION_{reason}_IMMUTABLE', 1; END;"""
+    return CompositionTrigger(module, definition, ("DELETE", "UPDATE"))

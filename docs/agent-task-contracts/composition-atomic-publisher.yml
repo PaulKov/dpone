@@ -1,0 +1,102 @@
+schema_version: 1
+task_id: DPONE-COMPOSITION-ATOMIC-PUBLISHER
+title: Protected whole-snapshot ClickHouse publication state machine
+goal: Implement the approved Atomic A/B snapshot publication policy and narrow injected
+  ports; concrete SQL storage, gate enforcement and sink wiring remain integrator
+  responsibilities.
+specification: docs/feature-specs/composition-activation-execution.md
+base_commit: 9720932521cf21a5488573ce7ff14d94bfc464cc
+integrator: root
+acceptance_criteria:
+- Immutable exact-byte intent identity binds parent/attempt/epochs, protected physical
+  pair, complete reconciled generation and closed ingest; reject unknown, changed
+  or incomplete data.
+- Four narrow injected capabilities reopen protected original authority, independent
+  fresh catalog, durable exact CAS state and no-retry single EXCHANGE dispatch.
+- Only acknowledged durable PREPARED to EXCHANGE_INTENT claim and exact independent
+  readback permit one dispatch; uncertainty or repetition never retries EXCHANGE.
+- After actual publisher closure and quiescence classify A/B as NOT_PUBLISHED and
+  B/A as PUBLISHED; altered, missing or unavailable pair/content is COMMIT_UNKNOWN
+  retaining ownership.
+- Recovery may drain exact retained ownership during RETIRING and never grants new
+  write authority.
+- Empty and vanished-row full snapshots preserve complete B semantics; no DROP/ALTER/RENAME/automatic
+  checkpoint or target deletion.
+- Meaningful fault, concurrency, tampering, pair and compatibility tests; no mock
+  result is a live pass; no budget or baseline changes.
+- Keep modules cohesive under actual budget; no generic plugin system or duplicate
+  native/semantic-refresh policies.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python
+  - runtime
+  - state
+  - evidence
+  - documentation
+  migration_required: false
+owned_paths:
+- src/dpone/contracts/composition_snapshot.py
+- src/dpone/ports/composition_snapshot.py
+- src/dpone/runtime/composition_snapshot.py
+- tests/test_composition_snapshot_contracts.py
+- tests/test_composition_snapshot_publisher.py
+- tests/composition_snapshot_helpers.py
+integrator_owned_paths: []
+read_only_paths:
+- docs
+- src/dpone/adapters
+- src/dpone/contracts/composition_attempt.py
+- src/dpone/contracts/composition_activation.py
+- src/dpone/contracts/strict_json.py
+- src/dpone/contracts/composition_proof.py
+- src/dpone/runtime/sinks/clickhouse_staged_load.py
+- src/dpone/runtime/sinks/clickhouse_sink.py
+- src/dpone/ports/sql_connection.py
+- tests/test_composition_attempt.py
+- tests/test_composition_mssql_attempts.py
+- pyproject.toml
+- uv.lock
+forbidden_paths:
+- .git
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- src/dpone/adapters
+shared_file_owner: root
+dependencies:
+- DPONE-COMPOSITION-ACTIVATION
+required_checks:
+  focused:
+  - red-green intent/attempt/identity/one-shot dispatch/recovery tests
+  broad:
+  - ruff and format owned paths
+  - mypy owned paths
+  - check-import-rules
+  - check-layer-metrics
+  - module size
+  live:
+  - 'SKIP: concrete owned Linux qualification is a later integrator task'
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- An authority change exceeds the separately approved nonproduction-composition-authority
+  amendment.
+- Another writer owns the same semantic contract.
+- A live check would access corporate or private systems.

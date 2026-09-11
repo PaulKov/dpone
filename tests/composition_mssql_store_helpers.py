@@ -1,10 +1,11 @@
 """Transactional DB-API fault model; this is explicitly not SQL Server proof."""
 
-from copy import deepcopy
 from dataclasses import replace
 
 from dpone.contracts.airflow_deployment import canonical_fingerprint
 from dpone.contracts.composition_activation import CompositionPhysicalResource, CompositionWorkloadAdmission
+from dpone.contracts.composition_ownership import CompositionOwnerReference
+from tests.composition_mssql_store_fault_model import FaultDatabase
 from tests.test_composition_activation_contract import digest, request
 
 SERVICE_ID = "20000000-0000-4000-8000-000000000001"
@@ -52,179 +53,16 @@ def domain_guard(connector, service_id, physical):
     )
 
 
-class Database:
-    """Committed data and injected failures independent of each connection's copy."""
+def owner_key(value):
+    """The execution's derived common owner key, never its activation UUID."""
+    return CompositionOwnerReference("execution", value.activation_id).owner_key
+
+
+class Database(FaultDatabase):
+    """Supply the stable mixed request to the separately owned SQL fault model."""
 
     def __init__(self, value=None):
-        self.request = value or mixed_request()
-        self.data = {
-            "authority": [(1, 1, SERVICE_ID)],
-            "tables": 8,
-            "activations": {},
-            "domains": {},
-            "activation_domains": {},
-            "attempts": {},
-            "attempt_domains": {},
-            "proofs": {},
-            "issued_authorities": {},
-        }
-        for resource in self.request.resources:
-            self.data["domains"][resource.guard_id] = (
-                resource.connector,
-                resource.service_id,
-                resource.physical_subject_sha256,
-                0,
-                None,
-            )
-        self.connections = []
-        self.statements = []
-        self.fail_commit = False
-        self.commit_applies = True
-        self.before_connect = None
-        self.fail_connect = None
-        self.fail_sql = None
-        self.lock_result = 0
-
-    def connect(self):
-        if self.before_connect:
-            self.before_connect(self)
-        if self.fail_connect:
-            raise RuntimeError(self.fail_connect)
-        connection = Connection(self)
-        self.connections.append(connection)
-        return connection
-
-
-class Connection:
-    def __init__(self, database):
-        self.database = database
-        self.data = deepcopy(database.data)
-        self.autocommit = True
-        self.closed = False
-        self.commits = 0
-        self.rollbacks = 0
-
-    def cursor(self):
-        assert not self.closed
-        return Cursor(self)
-
-    def commit(self):
-        self.commits += 1
-        if self.database.commit_applies:
-            self.database.data = deepcopy(self.data)
-        if self.database.fail_commit:
-            raise RuntimeError("driver password=synthetic-secret")
-
-    def rollback(self):
-        self.rollbacks += 1
-        self.data = deepcopy(self.database.data)
-
-    def close(self):
-        self.closed = True
-
-
-class Cursor:
-    def __init__(self, connection):
-        self.connection = connection
-        self.results = []
-        self.closed = False
-
-    def execute(self, sql, *parameters):
-        assert not self.closed and not self.connection.closed
-        assert self.connection.autocommit is False
-        normalized = " ".join(sql.split())
-        database = self.connection.database
-        database.statements.append((normalized, parameters))
-        if database.fail_sql and database.fail_sql in normalized:
-            raise RuntimeError("driver password=synthetic-secret")
-        data = self.connection.data
-        self.results = []
-        if normalized.startswith("SET XACT_ABORT"):
-            assert "SERIALIZABLE" in sql
-            assert "IF @@TRANCOUNT = 0 BEGIN TRANSACTION" in sql
-        elif "sp_getapplock" in sql:
-            assert "@LockOwner = N'Transaction'" in sql and parameters == ("dpone:composition-control:v1",)
-            self.results = [(database.lock_result,)]
-        elif "FROM [dpone_control].[composition_authority]" in sql:
-            self.results = data["authority"][:]
-        elif "FROM sys.tables" in sql:
-            self.results = [(data["tables"],)]
-        elif "SELECT request_sha256, request_document, state" in sql:
-            found = data["activations"].get(parameters[0])
-            self.results = [] if found is None else [found]
-        elif "SELECT guard_id, resource_document, fencing_epoch" in sql:
-            self.results = [
-                (guard, *value)
-                for (activation, guard), value in sorted(data["activation_domains"].items())
-                if activation == parameters[0]
-            ]
-        elif "SELECT connector, LOWER(CONVERT(char(36), service_id)), physical_subject_sha256" in sql:
-            found = data["domains"].get(parameters[0])
-            self.results = [] if found is None else [found]
-        elif normalized.startswith("INSERT INTO [dpone_control].[composition_activations]"):
-            activation, digest_value, document = parameters
-            assert activation not in data["activations"]
-            data["activations"][activation] = (digest_value, document, "PREPARED")
-        elif normalized.startswith("INSERT INTO [dpone_control].[composition_activation_domains]"):
-            activation, guard, document, epoch = parameters
-            assert (activation, guard) not in data["activation_domains"]
-            data["activation_domains"][activation, guard] = (document, epoch)
-        elif normalized.startswith("UPDATE [dpone_control].[composition_domains] SET fencing_epoch"):
-            next_epoch, activation, guard, epoch = parameters
-            assert "WHERE guard_id = ? AND fencing_epoch = ? AND owner_activation_id IS NULL" in sql
-            record = data["domains"][guard]
-            if record[3:] == (epoch, None):
-                data["domains"][guard] = (*record[:3], next_epoch, activation)
-                self.results = [(guard,)]
-        elif normalized.startswith("UPDATE [dpone_control].[composition_domains] SET owner_activation_id = NULL"):
-            guard, epoch, activation = parameters
-            assert "WHERE guard_id = ? AND fencing_epoch = ? AND owner_activation_id = ?" in sql
-            record = data["domains"][guard]
-            if record[3:] == (epoch, activation):
-                data["domains"][guard] = (*record[:3], epoch, None)
-                self.results = [(guard,)]
-        elif normalized.startswith("UPDATE [dpone_control].[composition_activations]"):
-            state, activation, digest_value, document, size, before = parameters
-            assert "request_document = ?" in sql and "DATALENGTH(request_document) = ?" in sql
-            if data["activations"][activation] == (digest_value, document, before) and size == len(document):
-                data["activations"][activation] = (digest_value, document, state)
-                self.results = [(state,)]
-        elif normalized.startswith("SELECT LOWER(CONVERT(char(36), activation_id))"):
-            self.results = [
-                (activation,) for activation, guard in sorted(data["activation_domains"]) if guard == parameters[0]
-            ]
-        elif normalized.startswith("SELECT TOP (1) a.attempt_sha256"):
-            for key, attempt in data["attempts"].items():
-                if any(guard == parameters[0] for guard, _ in data["attempt_domains"].get(key, ())):
-                    if attempt[4] not in {"SUCCEEDED", "FAILED"} or None in attempt[5:]:
-                        self.results = [(key,)]
-                        break
-        elif normalized.startswith("SELECT attempt_sha256, LOWER(CONVERT(char(36), activation_id))"):
-            self.results = [
-                (key, *attempt)
-                for key, attempt in sorted(data["attempts"].items())
-                if attempt[0] == parameters[0] or attempt[1] == parameters[1]
-            ]
-        elif normalized.startswith("SELECT guard_id, fencing_epoch FROM [dpone_control].[composition_attempt_domains]"):
-            self.results = list(data["attempt_domains"].get(parameters[0], ()))
-        elif normalized.startswith("SELECT connector, LOWER(CONVERT(char(36), service_id)), principal_id"):
-            self.results = list(data["issued_authorities"].get(parameters[0], ()))
-        elif normalized.startswith("SELECT activation_request_sha256, guard_epochs_sha256, proof_document"):
-            found = data["proofs"].get(parameters)
-            self.results = [] if found is None else [found]
-        else:
-            raise AssertionError(f"Unmodeled SQL: {normalized}")
-        return self
-
-    def fetchone(self):
-        return self.results.pop(0) if self.results else None
-
-    def fetchall(self):
-        rows, self.results = self.results, []
-        return rows
-
-    def close(self):
-        self.closed = True
+        super().__init__(value or mixed_request(), SERVICE_ID)
 
 
 def journal_attempt(database, *, workload_id="a_native", state="SUCCEEDED", extra_principal=False):
@@ -295,19 +133,78 @@ def journal_attempt(database, *, workload_id="a_native", state="SUCCEEDED", extr
         )
         hashes[kind] = proof.proof_sha256
         database.data["proofs"][attempt.attempt_sha256, kind, proof.proof_sha256] = (
-            request_value.request_sha256,
-            epoch_digest,
+            "execution",
             encode_attempt_proof(proof),
         )
-    database.data["attempts"][attempt.attempt_sha256] = (
-        request_value.activation_id,
+    database.data["operations"][attempt.attempt_sha256] = (
+        attempt.attempt_sha256,
+        "execution",
+        owner_key(request_value),
         request_value.request_sha256,
-        epoch_digest,
+        attempt.attempt_sha256,
         encode_attempt_identity(attempt),
         state,
         hashes["CLOSED_GATES"],
         hashes["QUIESCENCE"],
         hashes["OUTCOME"],
     )
-    database.data["attempt_domains"][attempt.attempt_sha256] = epochs
+    database.data["operation_domains"].extend(
+        (attempt.attempt_sha256, owner_key(request_value), guard, epoch) for guard, epoch in epochs
+    )
     return attempt
+
+
+def alter_proof_epoch(database, proof_key):
+    """Rehash canonical forged metadata so actual attempt binding must reject it."""
+    from dpone.contracts.composition_persistence import decode_attempt_proof, encode_attempt_proof
+
+    family, document = database.data["proofs"].pop(proof_key)
+    proof = replace(decode_attempt_proof(document, proof_key[2]), guard_epochs_sha256=digest("wrong"))
+    database.data["proofs"][*proof_key[:2], proof.proof_sha256] = (family, encode_attempt_proof(proof))
+    record = list(database.data["operations"][proof_key[0]])
+    record[7 + ("CLOSED_GATES", "QUIESCENCE", "OUTCOME").index(proof_key[1])] = proof.proof_sha256
+    database.data["operations"][proof_key[0]] = tuple(record)
+
+
+def damage_terminal_record(database, attempt, damage):
+    """Corrupt one explicit v2 field while preserving other stored originals."""
+    key = attempt.attempt_sha256
+    proof_key = next(iter(database.data["proofs"]))
+    if damage == "missing_proof":
+        del database.data["proofs"][proof_key]
+    elif damage == "proof_bytes":
+        family, document = database.data["proofs"][proof_key]
+        database.data["proofs"][proof_key] = (family, document + b" ")
+    elif damage == "proof_epoch":
+        alter_proof_epoch(database, proof_key)
+    elif damage == "missing_issuer":
+        del database.data["issued_authorities"][key]
+    elif damage == "foreign_issuer":
+        connector, service_id, principal = database.data["issued_authorities"][key][0]
+        database.data["issued_authorities"][key] = ((connector, service_id, principal[:-1] + "b"),)
+    elif damage == "partition":
+        database.data["operation_domains"] = [row for row in database.data["operation_domains"] if row[0] != key]
+    elif damage == "epoch":
+        row = database.data["operation_domains"][0]
+        database.data["operation_domains"][0] = (*row[:3], row[3] + 1)
+    else:
+        record = list(database.data["operations"][key])
+        record[{"parent": 3, "terminal_hash": 7}[damage]] = digest("wrong")
+        database.data["operations"][key] = tuple(record)
+
+
+def damage_authority(database, damage):
+    """Change exactly the catalog/enrollment precondition selected by the case."""
+    guard = database.request.resources[0].guard_id
+    if damage == "missing_domain":
+        guard = next(row.guard_id for row in database.request.resources if row.connector == "clickhouse")
+        del database.data["domains"][guard]
+    elif damage == "foreign_owner":
+        row = database.data["domains"][guard]
+        database.data["domains"][guard] = (*row[:3], 9, digest("foreign owner"))
+    elif damage == "authority":
+        database.data["authority"] = [(1, 2, "10000000-0000-4000-8000-000000000099")]
+    elif damage == "schema":
+        database.data["catalog"]["[dpone_control].[composition_owners]", "table"] = ()
+    else:
+        database.data["authority"] = [(1, 1, SERVICE_ID)]

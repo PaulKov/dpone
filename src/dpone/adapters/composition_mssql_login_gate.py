@@ -15,8 +15,8 @@ from dpone.adapters.composition_mssql_attempts import (
     ConnectionFactory,
     composition_control_transaction,
     read_attempt,
-    read_attempt_occurrence,
 )
+from dpone.adapters.composition_mssql_existing_operation import require_existing_execution_in
 from dpone.adapters.composition_mssql_gate_proofs import gate_proof, observe_quiescence, persist_gate_proof
 from dpone.adapters.composition_mssql_issuance import (
     MssqlIssuedCredentials,
@@ -45,16 +45,26 @@ class _Gate:
     disabled_evidence: str | None
 
 
-def _read_gate(ledger: CompositionMssqlLedger, attempt: CompositionAttemptIdentity) -> _Gate:
+def _read_gate(
+    ledger: CompositionMssqlLedger,
+    attempt: CompositionAttemptIdentity,
+    control_database: str,
+) -> _Gate:
+    transaction = ledger.require_transaction()
+    read_attempt(ledger, attempt)
+    ledger.require_transaction(transaction)
+    require_gate_policy(ledger, control_database)
+    ledger.require_transaction(transaction)
     ledger.cursor.execute(
-        f"SELECT login_sid, login_name, gate_state, disabled_evidence_sha256 FROM {ledger.table('login_gates')} "
-        "WITH (UPDLOCK, HOLDLOCK) WHERE attempt_sha256=?;",
+        f"SELECT TOP (2) login_sid, login_name, gate_state, disabled_evidence_sha256 FROM {ledger.table('login_gates')} "
+        "WITH (UPDLOCK, HOLDLOCK) WHERE operation_key=? AND operation_family='execution';",
         attempt.attempt_sha256,
     )
-    record = row(ledger.cursor)
-    if record is None:
+    records = tuple(tuple(value) for value in ledger.cursor.fetchall())
+    ledger.require_transaction(transaction)
+    if len(records) != 1 or len(records[0]) != 4:
         raise CompositionAdmissionError("login_gate_missing")
-    gate = _Gate(*record)
+    gate = _Gate(*records[0])
     if (
         type(gate.sid) is not bytes
         or len(gate.sid) != 16
@@ -63,13 +73,14 @@ def _read_gate(ledger: CompositionMssqlLedger, attempt: CompositionAttemptIdenti
     ):
         raise CompositionAdmissionError("login_gate_identity")
     ledger.cursor.execute(
-        "SELECT principal_id FROM " + ledger.table("issued_authorities") + " WITH (HOLDLOCK) "
-        "WHERE attempt_sha256=? AND connector='mssql' AND service_id="
-        f"(SELECT service_id FROM {ledger.table('authority')} WHERE singleton=1);",
+        "SELECT TOP (2) principal_id FROM " + ledger.table("issued_authorities") + " WITH (HOLDLOCK) "
+        "WHERE operation_key=? AND connector='mssql' AND service_id=?;",
         attempt.attempt_sha256,
+        ledger.expected_service_id,
     )
     if tuple(tuple(value) for value in ledger.cursor.fetchall()) != (("mssql-sid:" + gate.sid.hex(),),):
         raise CompositionAdmissionError("login_issued_identity")
+    ledger.require_transaction(transaction)
     return gate
 
 
@@ -110,22 +121,22 @@ class MssqlCompositionLoginGate:
                 require_gate_policy(ledger, self._database)
                 require_enrollments(ledger, attempt, self._service_id)
                 ledger.cursor.execute(
-                    f"SELECT attempt_sha256 FROM {ledger.table('login_gates')} WITH (UPDLOCK, HOLDLOCK) "
-                    "WHERE attempt_sha256=?;",
+                    f"SELECT TOP (2) operation_key FROM {ledger.table('login_gates')} WITH (UPDLOCK, HOLDLOCK) "
+                    "WHERE operation_key=?;",
                     attempt.attempt_sha256,
                 )
                 if row(ledger.cursor) is not None:
                     raise CompositionAdmissionError("login_issuance_replay")
                 journal_started = True
                 ledger.cursor.execute(
-                    f"INSERT INTO {ledger.table('login_gates')} (attempt_sha256, login_sid, login_name, gate_state) "
-                    "VALUES (?, ?, ?, 'JOURNALED');",
+                    f"INSERT INTO {ledger.table('login_gates')} (operation_key, operation_family, login_sid, login_name, gate_state) "
+                    "VALUES (?, 'execution', ?, ?, 'JOURNALED');",
                     attempt.attempt_sha256,
                     credentials.login_sid,
                     credentials.login_name,
                 )
                 ledger.cursor.execute(
-                    f"INSERT INTO {ledger.table('issued_authorities')} (attempt_sha256, connector, service_id, principal_id) "
+                    f"INSERT INTO {ledger.table('issued_authorities')} (operation_key, connector, service_id, principal_id) "
                     "VALUES (?, 'mssql', ?, ?);",
                     attempt.attempt_sha256,
                     self._service_id,
@@ -134,7 +145,6 @@ class MssqlCompositionLoginGate:
             with self._transaction() as ledger:
                 self._require_running(ledger, attempt)
                 self._require_gate(ledger, attempt, credentials, "JOURNALED")
-                require_gate_policy(ledger, self._database)
                 enrollments = require_enrollments(ledger, attempt, self._service_id)
                 create_login(ledger, credentials, enrollments)
                 require_worker_users(ledger, credentials, enrollments)
@@ -142,7 +152,6 @@ class MssqlCompositionLoginGate:
             with self._transaction() as ledger:
                 self._require_running(ledger, attempt)
                 self._require_gate(ledger, attempt, credentials, "READY")
-                require_gate_policy(ledger, self._database)
                 enrollments = require_enrollments(ledger, attempt, self._service_id)
                 require_worker_users(ledger, credentials, enrollments)
                 require_login(ledger, credentials.login_name, credentials.login_sid, disabled=False)
@@ -157,18 +166,24 @@ class MssqlCompositionLoginGate:
 
     @staticmethod
     def _require_running(ledger: CompositionMssqlLedger, attempt: CompositionAttemptIdentity) -> None:
-        read_attempt_occurrence(ledger, attempt).require_state("ACTIVE")
-        if read_attempt(ledger, attempt).state != "RUNNING":
+        occurrence, receipt = require_existing_execution_in(
+            ledger,
+            attempt,
+            expected_service_id=ledger.expected_service_id,
+            terminal_validator=ledger.terminal_validator,
+        )
+        occurrence.require_state("ACTIVE")
+        if receipt.state != "RUNNING":
             raise CompositionAdmissionError("login_attempt_state")
 
-    @staticmethod
     def _require_gate(
+        self,
         ledger: CompositionMssqlLedger,
         attempt: CompositionAttemptIdentity,
         credentials: MssqlIssuedCredentials,
         state: str,
     ) -> None:
-        gate = _read_gate(ledger, attempt)
+        gate = _read_gate(ledger, attempt, self._database)
         if (gate.sid, gate.name, gate.state) != (credentials.login_sid, credentials.login_name, state):
             raise CompositionAdmissionError("login_gate_readback")
 
@@ -179,7 +194,7 @@ class MssqlCompositionLoginGate:
         ledger.cursor.execute(
             "DECLARE @transition TABLE (gate_state varchar(16)); "
             f"UPDATE {ledger.table('login_gates')} SET gate_state=? OUTPUT inserted.gate_state INTO @transition "
-            "WHERE attempt_sha256=? AND gate_state=?; SELECT gate_state FROM @transition;",
+            "WHERE operation_key=? AND gate_state=?; SELECT gate_state FROM @transition;",
             following,
             attempt.attempt_sha256,
             previous,
@@ -195,15 +210,13 @@ class MssqlCompositionLoginGate:
         """
         attempt.__post_init__()
         with self._transaction() as ledger:
-            read_attempt(ledger, attempt)
-            gate = _read_gate(ledger, attempt)
+            gate = _read_gate(ledger, attempt, self._database)
             if gate.state in {"JOURNALED", "READY"}:
                 self._transition(ledger, attempt, gate.state, "CLOSING")
         with self._transaction() as ledger:
-            gate = _read_gate(ledger, attempt)
+            gate = _read_gate(ledger, attempt, self._database)
             if gate.state not in {"CLOSING", "CLOSED"}:
                 raise CompositionAdmissionError("login_gate_close_readback")
-            require_gate_policy(ledger, self._database)
             ledger.cursor.execute(
                 "DECLARE @name sysname=?, @sid binary(16)=?; "
                 "IF (SELECT COUNT(*) FROM sys.server_principals WHERE (name=@name OR sid=@sid))<>1 "
@@ -214,10 +227,9 @@ class MssqlCompositionLoginGate:
                 gate.sid,
             )
         with self._transaction() as ledger:
-            gate = _read_gate(ledger, attempt)
+            gate = _read_gate(ledger, attempt, self._database)
             if gate.state not in {"CLOSING", "CLOSED"}:
                 raise CompositionAdmissionError("login_gate_close_readback")
-            require_gate_policy(ledger, self._database)
             require_login(ledger, gate.name, gate.sid, disabled=True)
             evidence = self._evidence(attempt, gate, "CLOSED_GATES")
             proof = gate_proof(
@@ -226,7 +238,7 @@ class MssqlCompositionLoginGate:
             ledger.cursor.execute(
                 "DECLARE @transition TABLE (gate_state varchar(16)); "
                 f"UPDATE {ledger.table('login_gates')} SET gate_state='CLOSED', disabled_evidence_sha256=? "
-                "OUTPUT inserted.gate_state INTO @transition WHERE attempt_sha256=? AND gate_state IN ('CLOSING','CLOSED') "
+                "OUTPUT inserted.gate_state INTO @transition WHERE operation_key=? AND gate_state IN ('CLOSING','CLOSED') "
                 "AND (disabled_evidence_sha256 IS NULL OR disabled_evidence_sha256=?); SELECT gate_state FROM @transition;",
                 proof.evidence_sha256,
                 attempt.attempt_sha256,
@@ -236,7 +248,7 @@ class MssqlCompositionLoginGate:
                 raise CompositionAdmissionError("login_gate_closed_transition")
             persist_gate_proof(ledger, proof, evidence)
         with self._transaction() as ledger:
-            observed = _read_gate(ledger, attempt)
+            observed = _read_gate(ledger, attempt, self._database)
             if observed.state != "CLOSED" or observed.disabled_evidence != proof.evidence_sha256:
                 raise CompositionAdmissionError("login_gate_closed_readback")
             require_login(ledger, observed.name, observed.sid, disabled=True)
@@ -246,11 +258,9 @@ class MssqlCompositionLoginGate:
         """Produce SQL-only proof after the durable authentication barrier."""
         attempt.__post_init__()
         with self._transaction() as ledger:
-            read_attempt(ledger, attempt)
-            gate = _read_gate(ledger, attempt)
+            gate = _read_gate(ledger, attempt, self._database)
             if gate.state != "CLOSED" or gate.disabled_evidence is None:
                 raise CompositionAdmissionError("login_gate_not_closed")
-            require_gate_policy(ledger, self._database)
             require_login(ledger, gate.name, gate.sid, disabled=True)
             enrollments = require_enrollments(ledger, attempt, self._service_id)
             observe_quiescence(ledger, gate.sid, enrollments)

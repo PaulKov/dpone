@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 from dpone.adapters.composition_mssql_issuance import MssqlEnrollment
-from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.adapters.dbapi_lifecycle import row
 from dpone.contracts.airflow_deployment import canonical_fingerprint
 from dpone.contracts.composition_control import (
@@ -16,9 +15,10 @@ from dpone.contracts.composition_control import (
     composition_attempt_epoch_subject,
     encode_attempt_proof,
 )
+from dpone.ports.composition_sql import CompositionSqlContext
 
 
-def observe_quiescence(ledger: CompositionMssqlLedger, sid: bytes, enrollments: tuple[MssqlEnrollment, ...]) -> None:
+def observe_quiescence(ledger: CompositionSqlContext, sid: bytes, enrollments: tuple[MssqlEnrollment, ...]) -> None:
     """Require zero original-SID sessions, including incomplete authentication.
 
     Caller has already read the exact irreversible CLOSED gate, disabled login,
@@ -73,7 +73,7 @@ def gate_proof(
 
 
 def persist_gate_proof(
-    ledger: CompositionMssqlLedger, proof: CompositionAttemptProof, evidence: dict[str, object]
+    ledger: CompositionSqlContext, proof: CompositionAttemptProof, evidence: dict[str, object]
 ) -> None:
     """Create-or-compare exact observed bytes; never update previous evidence."""
     if (
@@ -85,15 +85,15 @@ def persist_gate_proof(
         raise CompositionAdmissionError("login_proof_evidence")
     document = json.dumps(evidence, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     ledger.cursor.execute(
-        f"SELECT evidence_document FROM {ledger.table('mssql_gate_evidence')} WITH (UPDLOCK, HOLDLOCK) "
-        "WHERE evidence_sha256=? AND attempt_sha256=?;",
+        f"SELECT TOP (2) CASE WHEN DATALENGTH(evidence_document) BETWEEN 1 AND 8388608 THEN evidence_document END FROM {ledger.table('mssql_gate_evidence')} WITH (UPDLOCK, HOLDLOCK) "
+        "WHERE evidence_sha256=? AND operation_key=?;",
         proof.evidence_sha256,
         proof.attempt_sha256,
     )
     observed = row(ledger.cursor)
     if observed is None:
         ledger.cursor.execute(
-            f"INSERT INTO {ledger.table('mssql_gate_evidence')} (evidence_sha256, attempt_sha256, evidence_document) "
+            f"INSERT INTO {ledger.table('mssql_gate_evidence')} (evidence_sha256, operation_key, evidence_document) "
             "VALUES (?, ?, ?);",
             proof.evidence_sha256,
             proof.attempt_sha256,
@@ -103,18 +103,18 @@ def persist_gate_proof(
         raise CompositionAdmissionError("login_evidence_readback")
     encoded = encode_attempt_proof(proof)
     ledger.cursor.execute(
-        f"SELECT activation_request_sha256, guard_epochs_sha256, proof_document FROM {ledger.table('proofs')} "
-        "WITH (UPDLOCK, HOLDLOCK) WHERE attempt_sha256=? AND kind=? AND proof_sha256=?;",
+        f"SELECT TOP (2) operation_family, CASE WHEN DATALENGTH(proof_document) BETWEEN 1 AND 8388608 THEN proof_document END FROM {ledger.table('proofs')} "
+        "WITH (UPDLOCK, HOLDLOCK) WHERE operation_key=? AND kind=? AND proof_sha256=?;",
         proof.attempt_sha256,
         proof.kind,
         proof.proof_sha256,
     )
     observed = row(ledger.cursor)
-    expected = (proof.activation_request_sha256, proof.guard_epochs_sha256, encoded)
+    expected = ("execution", encoded)
     if observed is None:
         ledger.cursor.execute(
-            f"INSERT INTO {ledger.table('proofs')} (attempt_sha256, kind, proof_sha256, activation_request_sha256, "
-            "guard_epochs_sha256, proof_document) VALUES (?, ?, ?, ?, ?, ?);",
+            f"INSERT INTO {ledger.table('proofs')} (operation_key, kind, proof_sha256, operation_family, "
+            "proof_document) VALUES (?, ?, ?, ?, ?);",
             proof.attempt_sha256,
             proof.kind,
             proof.proof_sha256,

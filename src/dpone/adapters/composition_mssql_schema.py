@@ -1,122 +1,85 @@
-"""External, additive SQL Server ledger DDL for composition occurrences.
+"""External, one-time schema-v2 installation for the shared composition ledger.
 
-An administrator reviews and executes this batch on a protected control database,
-then provisions the authority identity and every SQL Server/ClickHouse domain.
-It deliberately supplies no credentials, enrollment, permission policy or writer
-gate. Runtime adapters never execute it, repair it, or migrate native-v2 tables.
-Reapplying against existing tables fails instead of silently adopting them.
+An administrator installs this batch only in a fresh protected incarnation,
+then provisions the authority, physical enrollments and minimum permissions.
+Runtime neither executes it nor repairs or adopts an old schema. Execution
+wire documents and the native-v2 database are unaffected.
 """
 
 from __future__ import annotations
 
-import re
+from dpone.adapters.composition_mssql_invariants import composition_invariant_trigger_sql
+from dpone.adapters.composition_mssql_layout import (
+    COMPOSITION_MSSQL_LEDGER_LOCK as COMPOSITION_MSSQL_LEDGER_LOCK,
+)
+from dpone.adapters.composition_mssql_layout import (
+    COMPOSITION_MSSQL_SCHEMA_VERSION as COMPOSITION_MSSQL_SCHEMA_VERSION,
+)
+from dpone.adapters.composition_mssql_layout import COMPOSITION_TABLES, LEGACY_COMPOSITION_OBJECTS, CompositionTable
+from dpone.adapters.composition_mssql_layout import require_control_schema as require_control_schema
 
-COMPOSITION_MSSQL_SCHEMA_VERSION = 1
-COMPOSITION_MSSQL_LEDGER_LOCK = "dpone:composition-control:v1"
 
-
-def require_control_schema(value: str) -> str:
-    """Validate a bounded SQL identifier before interpolating any object name."""
-    if not isinstance(value, str) or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", value) is None:
-        raise ValueError("control_schema must be a simple SQL identifier of at most 128 characters")
-    return value
+def _columns(names: tuple[str, ...]) -> str:
+    return ", ".join(f"[{name}]" for name in names)
 
 
 def render_composition_mssql_schema(control_schema: str = "dpone_control") -> str:
-    """Render tables only; trusted provisioning must enroll and protect them.
+    """Render eight exact tables and immutable/transition trigger modules.
 
-    Documents are canonical UTF-8 bytes, never NVARCHAR encodings. Authority,
-    domain identity, historical requests, attempts and proofs are append-only
-    except for explicit state/ownership updates by protected controllers. Worker
-    principals must have no permission to write any of these tables.
+    The fixed global lock remains transaction-owned and shared by both owner
+    families. SQL constraints bind families and complete epoch associations;
+    runtime still reopens every original with its existing decoder and hash.
+    No authentication, gate, grant, automatic migration or writer is installed.
     """
     schema = require_control_schema(control_schema)
 
     def table(name: str) -> str:
         return f"[{schema}].[composition_{name}]"
 
-    return f"""SET XACT_ABORT ON;
-BEGIN TRANSACTION;
-IF SCHEMA_ID(N'{schema}') IS NULL EXEC(N'CREATE SCHEMA [{schema}]');
+    statements = [
+        "SET XACT_ABORT ON;",
+        "SET ANSI_NULLS ON;",
+        "SET QUOTED_IDENTIFIER ON;",
+        "BEGIN TRANSACTION;",
+        f"IF SCHEMA_ID(N'{schema}') IS NULL EXEC(N'CREATE SCHEMA [{schema}]');",
+    ]
+    for name in LEGACY_COMPOSITION_OBJECTS:
+        statements.append(
+            f"IF OBJECT_ID(N'{table(name)}') IS NOT NULL THROW 51000, 'DPONE_COMPOSITION_LEGACY_LAYOUT', 1;"
+        )
+    for definition in COMPOSITION_TABLES:
+        statements.append(render_composition_table(definition, schema))
+        module = composition_invariant_trigger_sql(schema, definition.name).replace("'", "''")
+        statements.append(f"EXEC(N'{module}');")
+    return "\n".join((*statements, "COMMIT TRANSACTION;", ""))
 
-CREATE TABLE {table("authority")} (
-    singleton tinyint NOT NULL PRIMARY KEY CHECK (singleton = 1),
-    schema_version int NOT NULL CHECK (schema_version = {COMPOSITION_MSSQL_SCHEMA_VERSION}),
-    service_id uniqueidentifier NOT NULL
-);
 
-CREATE TABLE {table("activations")} (
-    activation_id uniqueidentifier NOT NULL PRIMARY KEY,
-    request_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL UNIQUE,
-    request_document varbinary(max) NOT NULL CHECK (DATALENGTH(request_document) BETWEEN 1 AND 8388608),
-    state varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL
-        CHECK (state IN ('PREPARED', 'ACTIVE', 'RETIRING', 'RETIRED'))
-);
+def render_composition_table(definition: CompositionTable, schema: str) -> str:
+    """Render fixed internal metadata; lengths are catalog bytes, including Unicode."""
+    schema = require_control_schema(schema)
 
-CREATE TABLE {table("domains")} (
-    guard_id varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
-    connector varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL CHECK (connector IN ('mssql', 'clickhouse')),
-    service_id uniqueidentifier NOT NULL,
-    physical_subject_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL,
-    fencing_epoch bigint NOT NULL CHECK (fencing_epoch >= 0),
-    owner_activation_id uniqueidentifier NULL REFERENCES {table("activations")}(activation_id),
-    CHECK (owner_activation_id IS NULL OR fencing_epoch > 0),
-    UNIQUE (connector, service_id, physical_subject_sha256)
-);
+    def table(name: str) -> str:
+        return f"[{schema}].[composition_{name}]"
 
-CREATE TABLE {table("activation_domains")} (
-    activation_id uniqueidentifier NOT NULL REFERENCES {table("activations")}(activation_id),
-    guard_id varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES {table("domains")}(guard_id),
-    resource_document varbinary(max) NOT NULL CHECK (DATALENGTH(resource_document) BETWEEN 1 AND 8388608),
-    fencing_epoch bigint NOT NULL CHECK (fencing_epoch > 0),
-    PRIMARY KEY (activation_id, guard_id)
-);
-
-CREATE INDEX composition_activation_domains_guard
-    ON {table("activation_domains")} (guard_id, activation_id);
-
-CREATE TABLE {table("attempts")} (
-    attempt_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
-    activation_id uniqueidentifier NOT NULL REFERENCES {table("activations")}(activation_id),
-    activation_request_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL
-        REFERENCES {table("activations")}(request_sha256),
-    guard_epochs_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL,
-    attempt_document varbinary(max) NOT NULL CHECK (DATALENGTH(attempt_document) BETWEEN 1 AND 8388608),
-    state varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL
-        CHECK (state IN ('RUNNING', 'SUCCEEDED', 'FAILED', 'COMMIT_UNKNOWN')),
-    closed_gates_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NULL,
-    quiescence_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NULL,
-    outcome_evidence_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NULL,
-    CHECK (state IN ('RUNNING', 'COMMIT_UNKNOWN') OR (
-        closed_gates_sha256 IS NOT NULL AND quiescence_sha256 IS NOT NULL AND outcome_evidence_sha256 IS NOT NULL
-    ))
-);
-
-CREATE TABLE {table("attempt_domains")} (
-    attempt_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES {table("attempts")}(attempt_sha256),
-    guard_id varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES {table("domains")}(guard_id),
-    fencing_epoch bigint NOT NULL CHECK (fencing_epoch > 0),
-    PRIMARY KEY (attempt_sha256, guard_id)
-);
-
-CREATE TABLE {table("issued_authorities")} (
-    attempt_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES {table("attempts")}(attempt_sha256),
-    connector varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL CHECK (connector IN ('mssql', 'clickhouse')),
-    service_id uniqueidentifier NOT NULL,
-    principal_id varchar(128) COLLATE Latin1_General_100_BIN2 NOT NULL,
-    PRIMARY KEY (attempt_sha256, connector, service_id, principal_id),
-    UNIQUE (connector, service_id, principal_id)
-);
-
-CREATE TABLE {table("proofs")} (
-    attempt_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES {table("attempts")}(attempt_sha256),
-    kind varchar(16) COLLATE Latin1_General_100_BIN2 NOT NULL CHECK (kind IN ('CLOSED_GATES', 'QUIESCENCE', 'OUTCOME')),
-    proof_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL,
-    activation_request_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL
-        REFERENCES {table("activations")}(request_sha256),
-    guard_epochs_sha256 varchar(71) COLLATE Latin1_General_100_BIN2 NOT NULL,
-    proof_document varbinary(max) NOT NULL CHECK (DATALENGTH(proof_document) BETWEEN 1 AND 8388608),
-    PRIMARY KEY (attempt_sha256, kind, proof_sha256)
-);
-COMMIT TRANSACTION;
-"""
+    lines = []
+    for column in definition.columns:
+        size = (
+            f"({'max' if column.length == -1 else column.length // (2 if column.sql_type == 'nvarchar' else 1)})"
+            if column.sql_type in {"varchar", "nvarchar", "binary", "varbinary"}
+            else ""
+        )
+        collation = f" COLLATE {column.collation}" if column.collation else ""
+        lines.append(
+            f"    [{column.name}] {column.sql_type}{size}{collation} {'NULL' if column.nullable else 'NOT NULL'}"
+        )
+    for key in definition.keys:
+        kind = "PRIMARY KEY CLUSTERED" if key.primary else "UNIQUE NONCLUSTERED"
+        lines.append(f"    CONSTRAINT [{key.name}] {kind} ({_columns(key.columns)})")
+    for foreign in definition.foreign_keys:
+        lines.append(
+            f"    CONSTRAINT [{foreign.name}] FOREIGN KEY ({_columns(foreign.columns)}) "
+            f"REFERENCES {table(foreign.target)} ({_columns(foreign.target_columns)})"
+        )
+    for check in definition.checks:
+        lines.append(f"    CONSTRAINT [{check.name}] CHECK ({check.expression})")
+    return f"CREATE TABLE {table(definition.name)} (\n" + ",\n".join(lines) + "\n);"

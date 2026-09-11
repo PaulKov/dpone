@@ -94,6 +94,8 @@ verification are not activation approvals.
 | Composition cache installation rejected | Full source sidecars, integrity subject, unchanged sidecar, and complete DAG selection | Restore the exact complete parent or regenerate it; repeat source admission through `release-materialize` |
 | Unknown release schema in a consumer | Installed core/provider/runtime versions | Upgrade compatible readers first; never relabel v3 as v1/v2 |
 | Activation admission unavailable | Physical-target admission for the full union | Keep the current deployment and use the separately approved activation process when available |
+| SQL `control_schema_reference` or `login_gate_schema_reference` | Generated CHECK reference and the exact DDL producer | Follow the [controlled catalog capture procedure](composition-shared-sql-storage.md#catalog-reference-and-controlled-installation); retain failed capture evidence and rerun the new committed source after generation |
+| SQL `shared_transaction_identity` or trust `trust_ledger_lock` | Whether a callback closed, replaced or invalidated the protected transaction | Roll back the caller-owned transaction, retain uncertainty and recover from original records; reacquiring the same lock does not validate earlier observations |
 
 Diagnostics intentionally avoid source contents and credentials. Inspect your
 local producer reports and reviewed source declarations instead of adding raw

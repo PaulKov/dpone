@@ -195,17 +195,19 @@ def test_fixture_refuses_nonrunner_scope_without_connecting(invalid):
         OwnedDatabase.from_environment(env)
 
 
-def test_actual_pytest_child_skips_without_optin_and_cannot_pass(tmp_path):
+@pytest.mark.parametrize("profile", ["store", "registration"])
+def test_actual_pytest_child_skips_without_optin_and_cannot_pass(tmp_path, profile):
     """Exercise collection/plugin/JUnit wiring without any SQL or Docker I/O."""
     from tools.ci.assert_junit_executed import junit_cases
 
     env = dict(os.environ)
-    env.pop("DPONE_RUN_COMPOSITION_MSSQL_LIVE", None)
+    for flag in ("DPONE_RUN_COMPOSITION_MSSQL_LIVE", *runner.profiles.PROFILE_FLAGS):
+        env.pop(flag, None)
     with pytest.raises(runner.RunFailure, match="junit_incomplete_or_not_green"):
-        runner.execute_component(tmp_path, env)
+        runner.execute_component(tmp_path, env, profile)
     cases = junit_cases(tmp_path / "junit.xml")
-    assert len(cases) == len(runner.EXPECTED_TESTS)
-    assert {case.node_id for case in cases} == {f"{runner.TEST_CLASS}::{name}" for name in runner.EXPECTED_TESTS}
+    assert len(cases) == len(runner.expected_cases(profile))
+    assert {case.node_id for case in cases} == set(runner.expected_cases(profile))
     assert all(case.status == "skipped" for case in cases)
 
 
@@ -216,7 +218,7 @@ def test_output_under_checkout_is_refused_without_side_effects(monkeypatch, harn
     assert not calls and not output.exists()
 
 
-@pytest.mark.parametrize("profile,count", [("store", 7), ("gate", 16)])
+@pytest.mark.parametrize("profile,count", [("store", 7), ("gate", 16), ("trust", 9), ("registration", 18)])
 def test_profiles_have_closed_disjoint_case_inventories(tmp_path, profile, count):
     cases = runner.expected_cases(profile)
     assert len(cases) == len(set(cases)) == count
@@ -230,6 +232,84 @@ def test_profiles_have_closed_disjoint_case_inventories(tmp_path, profile, count
     other = "gate" if profile == "store" else "store"
     with pytest.raises(runner.RunFailure, match="junit_incomplete"):
         runner.validate_results(path, other)
+
+
+@pytest.mark.parametrize("profile,count", [("trust", 9), ("registration", 18)])
+def test_np_profile_selects_only_its_plugin_and_private_optin(monkeypatch, harness, profile, count):
+    calls, _, output = harness
+    original = runner.command
+    monkeypatch.setenv("DPONE_RUN_COMPOSITION_MSSQL_GATE_LIVE", "1")
+    monkeypatch.setenv("DPONE_RUN_COMPOSITION_MSSQL_TRUST_LIVE", "untrusted_ambient")
+    monkeypatch.setenv("DPONE_RUN_COMPOSITION_MSSQL_REGISTRATION_LIVE", "untrusted_ambient")
+    monkeypatch.setenv("DPONE_COMPOSITION_BULK_FIXTURE_PATH", "untrusted_ambient")
+
+    def command(args, **kwargs):
+        result = original(args, **kwargs)
+        if "pytest" in args:
+            path = Path(args[args.index("--junitxml") + 1])
+            cases = runner.expected_cases(profile)
+            suite = ET.Element("testsuite", tests=str(len(cases)), failures="0", errors="0", skipped="0")
+            for node in cases:
+                module, name = node.split("::")
+                ET.SubElement(suite, "testcase", classname=module, name=name)
+            ET.ElementTree(suite).write(path)
+        return result
+
+    monkeypatch.setattr(runner, "command", command)
+    assert runner.run(output, profile) == 0
+    args, env = next((args, env) for args, env in calls if "pytest" in args)
+    assert f"tests.integration.composition.nonproduction_mssql_{profile}_live_support" in args
+    assert f"tests/integration/composition/test_nonproduction_mssql_{profile}_live.py" in args
+    assert env[f"DPONE_RUN_COMPOSITION_MSSQL_{profile.upper()}_LIVE"] == "1"
+    for other in {"gate", "trust", "registration"} - {profile}:
+        assert f"DPONE_RUN_COMPOSITION_MSSQL_{other.upper()}_LIVE" not in env
+    if profile == "registration":
+        import hashlib
+
+        assert env["DPONE_COMPOSITION_BULK_FIXTURE_PATH"] == "/tmp/dpone-composition-registration-bulk.txt"
+        assert env["DPONE_COMPOSITION_BULK_FIXTURE_BYTES"] == "2"
+        assert env["DPONE_COMPOSITION_BULK_FIXTURE_SHA256"] == "sha256:" + hashlib.sha256(b"1\n").hexdigest()
+        assert sum(call[:2] == ["docker", "exec"] for call, _ in calls) == 1
+    else:
+        assert not any(name.startswith("DPONE_COMPOSITION_BULK_FIXTURE_") for name in env)
+        assert not any(call[:2] == ["docker", "exec"] for call, _ in calls)
+    report = json.loads((output / "summary.json").read_text())
+    assert report["profile"] == profile and report["totals"]["passed"] == count
+    assert report["component_scope"]["sql_server"] == "real_append_only_nonproduction_" + profile
+    assert report["component_scope"]["worker_execution"] == "UNVERIFIED"
+    assert report["component_scope"]["route_certification"] == "UNVERIFIED"
+    assert report["cleanup"] == "PASS"
+
+
+def test_actual_trust_child_collects_exact_cases_and_cannot_pass_without_optin(tmp_path):
+    from tools.ci.assert_junit_executed import junit_cases
+
+    env = dict(os.environ)
+    env.pop("DPONE_RUN_COMPOSITION_MSSQL_TRUST_LIVE", None)
+    env.pop("DPONE_RUN_COMPOSITION_MSSQL_LIVE", None)
+    with pytest.raises(runner.RunFailure, match="junit_incomplete_or_not_green"):
+        runner.execute_component(tmp_path, env, "trust")
+    cases = junit_cases(tmp_path / "junit.xml")
+    assert len(cases) == 9 and {case.node_id for case in cases} == set(runner.expected_cases("trust"))
+    assert all(case.status == "skipped" for case in cases)
+
+
+def test_bulk_fixture_failure_stops_registration_and_cleans_container(monkeypatch, harness):
+    calls, _, output = harness
+    original = runner.command
+
+    def fail_fixture(args, **kwargs):
+        result = original(args, **kwargs)
+        if args[:2] == ["docker", "exec"]:
+            return subprocess.CompletedProcess(args, 1, "", "private fixture failure")
+        return result
+
+    monkeypatch.setattr(runner, "command", fail_fixture)
+    assert runner.run(output, "registration") == 1
+    report = json.loads((output / "summary.json").read_text())
+    assert (report["status"], report["stage"], report["cleanup"]) == ("FAIL", "owned_bulk_fixture", "PASS")
+    assert not any("pytest" in args for args, _ in calls)
+    assert "private" not in (output / "summary.json").read_text()
 
 
 def test_gate_child_collects_only_exact_gate_cases_and_skips_without_optin(tmp_path):

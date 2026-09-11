@@ -25,6 +25,15 @@ from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 _MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
 
 
+def encode_physical_resource(resource: CompositionPhysicalResource) -> bytes:
+    """Retain the legacy observation and write partition as exact original bytes.
+
+    The caller validates the resource's own family. This shared serializer keeps
+    the existing SQL adapter encoding without tightening legacy service values.
+    """
+    return canonical_json_bytes(asdict(resource))
+
+
 def encode_activation_request(request: CompositionActivationRequest) -> bytes:
     """Return the canonical, detached bytes retained across catalog changes."""
     request.__post_init__()
@@ -55,25 +64,35 @@ def decode_activation_request(document: bytes, expected_sha256: str) -> Composit
             raise CompositionAdmissionError("persistence_shape")
         if body["schema"] != "dpone.composition-activation-request.v1":
             raise CompositionAdmissionError("persistence_schema")
-        if any(type(body[key]) is not list or len(body[key]) > 8192 for key in ("workloads", "resources")):
-            raise CompositionAdmissionError("persistence_closure")
-        request = CompositionActivationRequest(
-            context=CompositionOccurrenceContext(**body["context"]),
-            source_subject_sha256=body["source_subject_sha256"],
-            workloads=tuple(
-                CompositionWorkloadAdmission(**dict(row, write_subjects=tuple(row["write_subjects"])))
-                for row in body["workloads"]
-            ),
-            resources=tuple(
-                CompositionPhysicalResource(**dict(row, write_subjects=tuple(row["write_subjects"])))
-                for row in body["resources"]
-            ),
-        )
+        request = CompositionActivationRequest(**activation_request_fields(body))
         if request.request_sha256 != expected_sha256 or encode_activation_request(request) != document:
             raise CompositionAdmissionError("persistence_identity")
         return request
     except (ValueError, TypeError, KeyError, AttributeError, RecursionError, OverflowError):
         raise CompositionAdmissionError("persistence_readback") from None
+
+
+def activation_request_fields(body: dict[str, Any]) -> dict[str, Any]:
+    """Decode shared structural values after an explicit family checks its shape.
+
+    This helper neither selects a document family nor verifies its hash or
+    authority. Each closed reader must separately validate every outer member,
+    construct its own request type and compare its original canonical bytes.
+    """
+    if any(type(body[key]) is not list or len(body[key]) > 8192 for key in ("workloads", "resources")):
+        raise CompositionAdmissionError("persistence_closure")
+    return {
+        "context": CompositionOccurrenceContext(**body["context"]),
+        "source_subject_sha256": body["source_subject_sha256"],
+        "workloads": tuple(
+            CompositionWorkloadAdmission(**dict(row, write_subjects=tuple(row["write_subjects"])))
+            for row in body["workloads"]
+        ),
+        "resources": tuple(
+            CompositionPhysicalResource(**dict(row, write_subjects=tuple(row["write_subjects"])))
+            for row in body["resources"]
+        ),
+    }
 
 
 def encode_attempt_identity(attempt: CompositionAttemptIdentity) -> bytes:

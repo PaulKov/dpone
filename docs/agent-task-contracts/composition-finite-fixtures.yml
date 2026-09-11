@@ -1,0 +1,141 @@
+schema_version: 1
+task_id: DPONE-V3-FINITE-FIXTURE-PREREQUISITE
+title: Reusable finite fixture recipes and closed expected input originals
+goal: Implement the approved10-path recipe/input prerequisite, preserve legacy outputs and keep actual
+  generation/bounds/execution unavailable.
+specification: docs/feature-specs/nonproduction-composition-authority.md
+base_commit: 9974bcde380db703f616addde080b2388578fddf
+integrator: root
+shared_file_owner: root
+acceptance_criteria:
+- APPROVED within the maintainer-approved feature; exact docs/nonproduction-fixture-inputs.md is normative,
+  including FIN-1 and the complete independent API/type/error closure.
+- Own only the10 declared paths. Move each existing column inventory once to its canonical runtime owner;
+  do not duplicate literals, import tools/tests from runtime, or import runtime from contracts. Old producer
+  classes stay defined at their original paths.
+- Preserve all202 BCP and128 PG raw column values/order, existing list/DTO/signature/exports/mapper behavior,
+  legacy initial/watermark SQL bytes and exception propagation. Existing variable BCP count compare/slice/range
+  behavior including bool/negative inputs and PG str(row_id) remain unchanged.
+- Guarded BCP renderer uses fixed202 columns and strict source MSSQL table plus exact int row_count0..100000.
+  Five fixed decimal digits select1..N; convert the key expression to bigint BEFORE every unchanged existing
+  column expression. Isolate overflow-relevant2147/2148/100000 cases and kill removal of the early conversion.
+  Do not modify legacy seven-digit TOP/ROW_NUMBER renderer.
+- Fixed PG canonical rows return exactly two initial128-expression vectors or one watermark3 vector with
+  explicit71/72/73/74 serial/identity values; no fabricated nextval obligation. Guarded PG DDL/helper
+  resolution remains outside this pure slice.
+- Implement exact frozen NonproductionFixtureInput fields/API and dpone.nonproduction-fixture-input.v1
+  canonical1MiB codec. Parameters are immutable profile pairs; implementation descriptors have the exact
+  closed path set; seed_steps are generation-ordered immutable pairs, never sorted by ID.
+- Construction takes the fixture plan and closed seed originals before input/route/qualification/grant
+  hashes exist. Full readback revalidates the complete original grant-bound pair, exact route/input digest/size
+  and bounded predecessor source writers. Reject unsupported ancestor writers. Return the exact existing
+  selected route item only as documentary data.
+- Use exactly the reviewed8 new fixed reason tokens and preserve inherited subvalue/parser/complete-pair
+  errors and Python call-binding errors. Wrong schema/noncanonical shared parser ingress stays outward
+  document; do not alter shared helpers.
+- Capture explicit baseline producer inputs, full emitted SQL/event bytes and all-value immutable golden
+  digests BEFORE edits. Keep original/final evidence and complete test inventory. Do not regenerate changed
+  golden expectations from the new implementation.
+- Run meaningful RED/GREEN and mutant-isolation tests, unchanged tool/PG projection/codec/wire compatibility,
+  cold explicit10-file typing, Ruff/format and canonical size/import/graph observations. Every owned file<=350SLOC;
+  no compression, baseline/budget/exclusion changes.
+- Use only prepared isolated /tmp/dpone-composition-v3-finite-fixtures and /tmp/dpone-v3-finite-fixtures-env
+  with locked/no-sync/offline commands. All7942 unowned tracked originals remain exact; do not edit/revert
+  other worktrees. No commit/push/live/SQL/PyPI. Root integrates/docs/reviews.
+- No new authority, policy, clock, credentials, real generation, bound reservation, counter, seal/transfer,
+  adapter, public factory or CLI. Actual source closure/native-dbt finite bounds/full campaign remain
+  UNVERIFIED.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python_api
+  - evidence
+  migration_required: false
+owned_paths:
+- src/dpone/contracts/nonproduction_fixture_input.py
+- src/dpone/runtime/nonproduction_bcp_fixture_recipe.py
+- src/dpone/runtime/nonproduction_postgres_fixture_recipe.py
+- src/dpone/runtime/nonproduction_postgres_fixture_rows.py
+- tools/mssql_clickhouse_bcp_native_fixtures.py
+- tests/integration/postgres/postgres_mssql_wide_fixtures.py
+- tests/test_nonproduction_fixture_input.py
+- tests/test_nonproduction_bcp_fixture_recipe.py
+- tests/test_nonproduction_postgres_fixture_recipe.py
+- tests/test_nonproduction_fixture_legacy_compatibility.py
+integrator_owned_paths: []
+read_only_paths:
+- AGENTS.md
+- src/dpone/AGENTS.md
+- tests/AGENTS.md
+- docs
+- src/dpone/contracts/nonproduction_scope.py
+- src/dpone/contracts/nonproduction_plan_values.py
+- src/dpone/contracts/nonproduction_fixture_plan.py
+- src/dpone/contracts/nonproduction_qualification_plan.py
+- src/dpone/contracts/nonproduction_plan_pair.py
+- src/dpone/runtime/native_wire_models.py
+- src/dpone/runtime/support/postgres_mssql_projection_models.py
+- src/dpone/runtime/support/postgres_mssql_projection.py
+- src/dpone/runtime/connectors/bulk_text_codec.py
+- src/dpone/runtime/sources/strategies/postgres/postgres_file_export_mixin.py
+- tools/mssql_clickhouse_wide_type_certification.py
+- tools/mssql_clickhouse_bcp_native_type_certification.py
+- tests/nonproduction_plan_helpers.py
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- tests/conftest.py
+- docs
+- src/dpone/adapters
+- src/dpone/ports
+- src/dpone/services
+- src/dpone/contracts/nonproduction_scope.py
+- src/dpone/contracts/nonproduction_plan_values.py
+- src/dpone/contracts/nonproduction_fixture_plan.py
+- src/dpone/contracts/nonproduction_qualification_plan.py
+- src/dpone/contracts/nonproduction_plan_pair.py
+- tools/mssql_clickhouse_bcp_native_type_certification.py
+dependencies:
+- docs/nonproduction-fixture-inputs.md
+- docs/adr/0061-shared-composition-physical-ownership.md
+- Exact dispatch base and immutable approved contract/prerequisite manifests retained in the implementation
+  evidence; all unowned tracked source originals remain read-only.
+required_checks:
+  focused:
+  - RED/GREEN closed input/parser/type/route/reference/ancestor writer cases and isolation mutants.
+  - Canonical BCP full100000-key domain, fixed typed bigint SQL structure, whole202/128 inventories and
+    PG all-row vectors.
+  - Legacy exact original classes/list/exports/count/row_id/errors/SQL bytes from baseline, unchanged
+    existing source/type/projection/codec/wire suites.
+  - Ruff/format, cold explicit mypy all10ownedfiles, canonical size<=350 and import/graph/layer observations;
+    exact owned/read-only source freeze.
+  broad:
+  - Root change-aware full integrated gate and independent fresh source review before integration.
+  - Root updates developer/user reference, changelog/navigation and strict documentation checks.
+  live:
+  - 'N/A: pure SQL text/recipe/input only; all actual SQL/generation/closure/reservation/routes UNVERIFIED.'
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
+- Preserving exact old producer outputs or full input hash ordering is infeasible without changing an
+  unowned contract.
+- An actual backend observation, row/byte bound or permission would need to be fabricated.
+- A cohesive owned file exceeds350SLOC or prerequisites change; report exact evidence before expansion.

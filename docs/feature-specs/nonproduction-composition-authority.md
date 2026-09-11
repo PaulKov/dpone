@@ -57,6 +57,19 @@ Scope must not live only in `provenance`, which the release hash excludes.
 Existing `runtime_context_sha256` does not cover a later execution grant and
 retains its meaning. The new scoped request explicitly binds that grant.
 
+The initial signature adapter is closed to GitHub Artifact Attestations. External
+policy pins the existing runtime-artifact-trust-policy.v2 with non_production
+trust and mandatory attestations. Its signer identity is the canonical composite
+`https://github.com/{signer_workflow}@{signer_digest}`, including the independent
+40-hex workflow commit; this is not a claim about the certificate SAN spelling.
+The Actions issuer, root bytes/digest, repository, predicate and hosted-runner
+requirements must match the external policy. Reopen policy, revocation and clock
+after signature verification; changed trust, backwards time, expiry or stale roots
+reject. Cosign public-key claims remain unsupported by this adapter because key
+possession alone does not authenticate the separate issuer/identity labels.
+Authentication does not consume grants, establish physical enrollment or issue
+credentials; those protected operations remain mandatory.
+
 ## Scope, phases and limits
 
 Common signed claims require canonical source repository/commit, fixture and
@@ -78,6 +91,70 @@ per attempt. Effective limits are the minimum of policy, grant and workload
 limits. Enforce them before reads and while streaming. Source bytes and actual
 HTTP payload bytes remain separate measurements. These are campaign limits,
 not performance certification.
+
+The initial protected counter implementation uses environment/campaign/phase
+pools for distinct workload membership and attempt counts. Qualification export
+rows and source bytes additionally select the exact six-dimensional route;
+execution export rows and source bytes share the whole execution campaign pool.
+Each workload also obeys its lower signed ceiling. Neither grant UUID, policy
+digest, deployment nor activation creates a fresh campaign pool. Replacement
+grants therefore cannot reset consumption. Reservations and measured usage are
+separate: unresolved reservations remain charged, with no automatic refund.
+
+Execution registration charges the complete grant's distinct workload membership
+at once. Each later scheduler attempt has its own reservation; an execution grant
+is not limited to a single attempt across unrelated workloads. Campaign totals
+obey the current policy/grant minimum, while each workload also obeys its own
+lower cumulative attempt/row/byte ceilings. Complete membership obeys every
+workload's lower `max_workloads` in the current grant, as in the strict contract.
+A newly signed higher ceiling may admit additional use within the current pinned
+policy, retaining all earlier charges. It cannot enlarge an already issued
+attempt's reserved bound. A smaller replacement ceiling can block new admission.
+
+Original grant/phase registration bytes are immutable. An identical execution
+registration can be reopened as history without another membership charge or
+executor permit; changed originals under the same key reject. Qualification
+consumption remains one-time and its run cannot be rebound to another grant.
+Distinct documentary execution candidates may name the same activation; only
+the protected activation coordinator selects its single exact request. Recording
+a candidate cannot replace that occurrence or its authority.
+History remains readable after expiry/revocation against its original trust
+revision and registration time. New admission must verify current authority.
+Qualification work-item identities and any lower per-item limits require the
+original, independently reopened fixture/qualification plans. The
+[closed plan model](../nonproduction-qualification-plans.md) compares exact
+originals, profiles, declared source-generation order and full scope/owner
+subjects. It does not independently acquire originals, observe source generation
+or calculate a protected bound. Recording qualification consumption or parsing
+those plans cannot authorize seeding, source access or work-item/export
+reservation.
+
+The [finite fixture input contract](../nonproduction-fixture-inputs.md) binds the
+selected route's expected seed generation and canonical implementation originals.
+The [scoped execution original](../composition-scoped-execution-originals.md)
+binds the complete retained scope and its genuine legacy-write projection while
+preserving existing request and attempt bytes. Actual acquisition, generation,
+full terminal evidence and the protected handoff remain separate requirements.
+
+For the initial two export cells, source bytes retain the existing producer
+meaning: complete BCP-native file bytes including field framing for MSSQL, and
+COPY payload bytes before optional gzip after the existing typed source
+projection for PostgreSQL. Actual ClickHouse body payload bytes are measured
+separately at the sender; failed sends retain an incomplete observation and their
+reservation. A complete finite, immutable source-export bound is reserved before
+starting BCP or COPY, covering driver/process read-ahead. Bounded fixture keys,
+types, schema/query pins and actual closed source writers establish that bound;
+expected row counts or statistics alone do not. Unbounded generated dbt outputs
+remain unsupported until their source bound is independently established. No
+TOP/LIMIT clipping or truncating cast may manufacture a complete snapshot.
+
+Protected admission authenticates outside the global SQL transaction.
+It privately brackets verification with equal append-only trust revisions and
+original snapshots, then rechecks that revision, exact bytes, time and ownership
+inside the transaction that consumes the grant or reserves RUNNING and budgets.
+Authentication results supplied by a caller cannot replace those operations.
+The monotonic trust revision prevents an intervening policy change from being
+hidden by restoring old policy bytes.
 
 Only newly isolated, independently enrolled synthetic PostgreSQL, SQL Server
 and single-node ClickHouse participants qualify. No production reads, business
@@ -117,7 +194,35 @@ and authority family do not create independent locks for the same target.
 Qualification can be reread for deterministic compilation of the same intent
 inside its valid campaign; execution grants cannot migrate to another activation.
 
+### Shared protected ownership implementation
+
+The approved phase separation requires the shared schema-v2 owner/operation
+design in [ADR 0061](../adr/0061-shared-composition-physical-ownership.md) and the
+[detailed implementation contract](../composition-shared-ownership.md). Real
+qualification-run owners and execution-activation owners use the same physical
+domain rows and global control transaction. Their explicit internal journal
+identities add no external authority family and cannot substitute for a signed
+grant, independently reopened plan or actual runner invocation.
+
+All existing v3 prepare, active-read, attempt, issuance and retirement paths move
+to that common authority together. Execution wire bytes and physical guard IDs
+remain unchanged. The initial slice keeps qualification issuance, source sealing,
+handoff and public factories closed. Complete NP source claims are retained in a
+protected attachment bound to the exact request/grant, while old receipt shapes
+continue projecting their exact write partition. No path may release or issue
+against only that projection.
+
+A sealed qualification owns its domains through signing/compilation. The later
+explicit handoff verifies all closure, quiescence, outcome and source-seal originals,
+then atomically transfers complete ownership to the real execution PREPARED owner
+at new epochs. There is no temporary unowned interval. The unmerged v3 schema-v1
+layout is replaced only on newly isolated participants; native-v2 controls are
+untouched, and old component evidence does not qualify the new version.
+
 ## Implementation scope and rollout
+
+The implemented policy/scope/grant subset and its remaining runtime obligations
+are documented in the [contract reference](../nonproduction-composition-authority.md).
 
 Root owns shared schemas, dispatch, app factories, CLI/provider wiring, workflows,
 changelog and navigation. Narrow canonical contracts and shared structural

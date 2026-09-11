@@ -130,45 +130,9 @@ def test_batch_boundaries_preserve_exact_policy_definitions():
 
 @pytest.mark.parametrize("fail_permission", [None, "VIEW ANY DEFINITION"])
 def test_external_provisioning_keeps_server_grants_in_master_and_lifeline_in_control(monkeypatch, fail_permission):
-    environment = ProvisionedGate(SimpleNamespace(database="owned_control"))
-    connections, statements = [], []
+    from tests.test_composition_mssql_catalog_capture_provenance import check_provisioning_connections
 
-    def connect(*, database=None):
-        connection = SimpleNamespace(database=database or "owned_control", closed=False)
-        connection.close = lambda: setattr(connection, "closed", True)
-        connections.append(connection)
-        return connection
-
-    def observe(connection, statement, *_):
-        statements.append((connection.database, statement))
-        if statement.startswith("GRANT VIEW") and connection.database != "master":
-            raise SqlFailure(4621)
-        if fail_permission and statement == f"GRANT {fail_permission} TO [dpone_gate_reader];":
-            raise SqlFailure(229)
-        if "ON ALL SERVER" in statement:
-            assert connection.database == "master"
-        if "CREATE USER" in statement or statement.startswith("GRANT CONNECT"):
-            assert connection.database == "owned_control"
-        return (("sa", b"controller"),) if statement.startswith("SELECT ORIGINAL_LOGIN") else ()
-
-    monkeypatch.setattr(environment, "connect", connect)
-    monkeypatch.setattr(provisioning, "execute", observe)
-    if fail_permission:
-        with pytest.raises(SqlFailure) as failure:
-            environment.install()
-        assert failure.value.code == 229
-    else:
-        environment.install()
-    server_grants = [(database, sql) for database, sql in statements if sql.startswith("GRANT VIEW")]
-    permissions = ("VIEW SERVER STATE", "VIEW ANY DEFINITION", "VIEW SERVER PERFORMANCE STATE")
-    expected = permissions[:2] if fail_permission else permissions
-    assert server_grants == [("master", f"GRANT {permission} TO [dpone_gate_reader];") for permission in expected]
-    if not fail_permission:
-        assert ("master", login_trigger_sql("owned_control", environment.schema)) in statements
-    lifeline = environment.lifeline
-    assert lifeline is not None and lifeline.database == "owned_control" and not lifeline.closed
-    assert all(connection.closed for connection in connections if connection is not environment.lifeline)
-    environment.close()
+    check_provisioning_connections(monkeypatch, fail_permission)
 
 
 def test_policy_diagnostics_preserve_observed_nulls_and_hash_mismatch_without_sql_bodies(monkeypatch):

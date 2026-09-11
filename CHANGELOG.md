@@ -2,11 +2,75 @@
 
 ## Unreleased
 
+- Document the approved candidate for an internal scoped execution owner
+  original that retains all qualified reads and helper effects, binds genuine
+  legacy writes and compares exact
+  original grants, source-seal associations and adjacent epochs. Existing
+  request/attempt bytes remain unchanged; storage, transfer and scoped execution
+  remain unavailable. The isolated codec has not been integrated because its
+  architecture checks remain failing.
+- Document the approved candidate for canonical wide fixture inventories with
+  compatible legacy DTO and SQL wrappers, a strict finite BCP seed renderer and
+  a closed fixture input original that compares the selected route's complete
+  preceding source writers.
+  The isolated implementation has not been integrated because its architecture
+  checks remain failing. These descriptions do not establish actual seed
+  outcomes or export bounds.
+
+- Add bounded internal fixture/qualification plan originals with closed wide
+  fixture profiles, complete declared effect and source-generation ordering
+  checks, lower-limit validation and exact grant/owner/work-item comparisons.
+  These codecs provide no physical observation, reservation or execution
+  authority and preserve existing production/native-v2 identities.
+
+- Move internal composition execution storage to one schema-v2 ownership and
+  operation journal. Audit complete original scope, transaction continuity,
+  table metadata and retained gate proofs; preserve existing execution bytes,
+  hashes and replay identities. Historical retired reads permit a correctly
+  admitted successor while fresh issuance still requires ACTIVE/RUNNING.
+  Initial installation requires a new isolated ledger; no automatic adoption
+  or migration is provided. Generated SQL CHECK references pin controlled
+  original expressions, column bindings and database collation. Controlled
+  schema-v2 component evidence covers all 50 cases at the documented source
+  commit; complete qualification remains pending and public execution factories
+  stay closed.
+- Keep nonproduction trust reads and registrations in one observed SQL
+  transaction. Recheck the original trust revision around clock callbacks,
+  writes and successful returns without changing historical grant validity.
+  Preserve source readback observations even when a synthetic component run
+  fails; unavailable or changed source cannot produce passing certification.
+
+- Add strict internal qualification owner, complete physical-claim and operation
+  records, including replay identity for the actual invocation. Preserve existing
+  physical guard and execution document hashes. These structural values do not
+  enable protected ownership, qualification issuance or execution factories.
+
+- Add an isolated 18-case registration storage profile with exact case inventory,
+  bounded evidence and a runner-owned public bulk-permission fixture. Reuse one
+  closed profile configuration for plugin, opt-in and evidence selection.
+
+- Add immutable nonproduction grant registration and complete execution campaign
+  membership under the existing protected transaction. Preserve original bytes
+  and historical trust, reject qualification replay, and retain membership across
+  replacement grants. Registration does not authorize workers or reserve exports.
+- Reject missing or uncommittable SQL trust transactions before protected reads,
+  without calling transaction-owned lock inspection outside its valid context.
+
+- Add an isolated nine-case SQL trust profile to the disposable component runner.
+  Require exact source and case inventories, append-only revision observations
+  and owned-container cleanup. Storage fixtures do not establish signed grant
+  authority or full worker qualification.
+
 - Report exact sanitized SQL target catalog refusal reasons before writer
   issuance, preserving all existing policy predicates. Keep catalog policy in
   a separate adapter responsibility from login credentials and enrollment.
   Accept the pinned controller's exact `dbo` membership in fixed `db_owner`,
   while continuing to reject other elevated role members.
+- Add an injectable ClickHouse Atomic whole-snapshot publisher with exact durable
+  intent identities, one-time EXCHANGE claims and explicit UUID reconciliation.
+  Preserve empty and vanished-row snapshots, retain the previous target and
+  reject uncertain or repeated dispatch. Concrete protected adapters and live
+  worker qualification remain required before composition execution is enabled.
 
 - Correct SQL Server gate permission probes to use the server securable's NULL
   class, so valid controller and gate-reader privileges can be observed. Restore
@@ -17,6 +81,18 @@
   credentials, reconnect closure, transaction drain and unknown-outcome recovery.
   Its exact 16-case evidence is separate from the seven-case control-ledger
   profile and does not certify native or transfer worker execution.
+
+- Add strict nonproduction policy, complete synthetic scope and separate
+  qualification/execution grant contracts with exact canonical-byte identities
+  and minimum policy/grant/workload ceilings. Add an injectable authenticator
+  that verifies original grants through the existing GitHub attestation adapter
+  and refreshes external policy, revocation and time before accepting them.
+  Protected counters, physical enrollment and complete worker enforcement remain
+  required before scoped execution. Existing production/native-v2 authority
+  remains unchanged.
+  Add explicit grant-bound activation requests and a read-only SQL provider for
+  externally provisioned append-only trust revisions. Preserve old request
+  decoding and transaction behavior through shared structural/admission helpers.
 
 - Add concrete SQL Server persistence for complete composition occurrences and
   cross-connector guards, with independent commit readback and exact protected
