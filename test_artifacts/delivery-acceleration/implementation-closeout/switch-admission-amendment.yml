@@ -1,0 +1,72 @@
+schema_version: 1
+task_id: DDA-06-SWITCH-ADMISSION-OWNERSHIP
+title: Give pure SWITCH admission one canonical contract owner
+goal: Correct the DDA dependency boundary while preserving the reviewed algorithm and all parallel release source.
+specification: docs/feature-design-data-delivery-acceleration-v1.md
+base_commit: e98d070f4219cf340c8d9d8f266e47360174fd62
+integrator: root delivery acceleration integrator
+acceptance_criteria:
+  - This bounded internal refactor follows the maintainer's implementation-completion instruction; it changes no public contract or approved DDA behavior.
+  - Amend composition-integration-contract.yml only for the four named production paths, one existing test file, the DDA architecture decision, and this amendment.
+  - Move the pure plan_native_switch algorithm and temporal predicate unchanged into the existing native_mssql_switch contract module.
+  - Apply the pure-admission ownership principle documented in ADR0058 without editing that upstream ADR.
+  - Preserve the legacy planner signature, module identity, runtime-resolvable type annotations and package export through a thin delegating facade.
+  - Have catalog and executor use the canonical contract function; preserve metadata admission before content SQL and revalidation under transaction locks.
+  - Preserve sorted rejection reasons, frozen model identities, comparison ordering, authority checks, prepared verification, SQL order, errors and rollback semantics.
+  - Keep all 228 upstream-only paths mode/blob-identical to a2fe3a34f7c143625cea6d1b947c749ffc6d4dc9 and every other reviewed delivery production/test path unchanged.
+  - Retain the initial combined architecture failure; a diagnostic graph projection is not a passing gate.
+  - Require real canonical architecture fitness, focused regression and compatibility tests, import/layer/module/type/lint checks, final combined CI and fresh independent review.
+public_contract_impact:
+  level: none
+  surfaces: [internal pure admission ownership, existing Python import compatibility]
+  migration_required: false
+owned_paths:
+  - src/dpone/contracts/native_mssql_switch.py
+  - src/dpone/runtime/sinks/mssql_native_switch/planner.py
+  - src/dpone/runtime/sinks/mssql_native_switch/catalog.py
+  - src/dpone/runtime/sinks/mssql_native_switch/executor.py
+  - tests/test_mssql_native_partition_switch.py
+  - docs/adr/0062-isolated-mssql-switch-activation.md
+  - test_artifacts/delivery-acceleration/implementation-closeout/switch-admission-amendment.yml
+integrator_owned_paths: []
+read_only_paths:
+  - src/dpone/runtime/sinks/mssql_native_switch/__init__.py
+  - tests/test_mssql_native_partition_switch_catalog.py
+  - tests/test_mssql_native_partition_switch_recovery.py
+  - docs/adr/0058-verified-release-composition.md
+  - test_artifacts/delivery-acceleration/implementation-closeout/composition-integration-contract.yml
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - packages
+  - tools
+  - .github
+  - .github/workflows
+  - CHANGELOG.md
+  - mkdocs.yml
+  - docs/benchmarks/quality_budgets.yml
+  - docs/module_size_baseline.json
+  - docs/layer_metrics_baseline.json
+shared_file_owner: root delivery acceleration integrator
+dependencies: [DDA-06-COMPOSITION-INTEGRATION]
+required_checks:
+  focused:
+    - Red-green compatibility and admission regression tests plus unchanged catalog and recovery suites.
+  broad:
+    - Canonical fitness, types, lint, format, import, layer, module, generated metrics, documentation and complete final-head CI.
+  live:
+    - SKIP; no approved disposable environment and no new execution capability.
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.
+  - Another writer owns an amended path.
+  - An edit changes admission behavior, public signatures, transaction order or a non-amended source/test file.
+  - Any upstream-only path differs from its pinned input.
+  - A threshold, baseline or generated evidence is changed to manufacture a passing result.
+  - Live credentials, release publication or history rewriting would be required.

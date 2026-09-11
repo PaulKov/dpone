@@ -18,10 +18,15 @@ public native SWITCH rejection to remain before I/O.
 
 ## Decision
 
-Keep immutable feature-local models in `dpone.contracts.native_mssql_switch`,
-narrow SQL/transaction ports in `dpone.ports.native_mssql_switch`, and the catalog,
-planner and executor in `dpone.runtime.sinks.mssql_native_switch`. The catalog
-adapter is the deployment snapshot producer. A caller dictionary, table name or
+Keep immutable feature-local models and pure finite-partition admission in
+`dpone.contracts.native_mssql_switch`, narrow SQL/transaction ports in
+`dpone.ports.native_mssql_switch`, and the catalog and executor in
+`dpone.runtime.sinks.mssql_native_switch`. The existing runtime planner delegates
+to the canonical admission function and preserves its public signature and import
+identity. This follows the pure-admission ownership principle in
+[ADR 0058](0058-verified-release-composition.md): the contract validates frozen
+observations; adapters retain catalog acquisition and locked revalidation.
+The catalog adapter is the deployment snapshot producer. A caller dictionary, table name or
 copied ownership marker is not deployment authority.
 
 The initial adapter profile is SQL Server 2022, major 16, with one finite temporal

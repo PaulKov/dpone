@@ -13,6 +13,7 @@ from dpone.contracts.native_mssql_switch import (
     NativeSwitchObject,
     NativeSwitchRejected,
     NativeSwitchSnapshot,
+    plan_native_switch,
 )
 from dpone.runtime.sinks.mssql_native_switch.catalog_parse import parse_table
 from dpone.runtime.sinks.mssql_native_switch.catalog_sql import DATABASE_SQL, TABLE_SQL, TRANSACTION_SQL
@@ -129,8 +130,6 @@ class NativeSwitchCatalog:
         snapshot = NativeSwitchSnapshot(database, tables[0], tables[1], tables[2], 0, 0, 0)
         # Admission with empty observations validates interval/types/identities
         # before identifiers are used in data SQL or datetime values are adapted.
-        from dpone.runtime.sinks.mssql_native_switch.planner import plan_native_switch
-
         eligibility = plan_native_switch(snapshot, interval=interval, owner_binding=owner_binding)
         if eligibility.plan is None:
             raise NativeSwitchRejected(*eligibility.reasons)

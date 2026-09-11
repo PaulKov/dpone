@@ -2,9 +2,12 @@
 
 from dataclasses import replace
 from datetime import date
+from inspect import signature
+from typing import get_type_hints
 
 import pytest
 
+from dpone.contracts import native_mssql_switch as switch_contract
 from dpone.contracts.native_mssql_switch import (
     NativeSwitchBinding,
     NativeSwitchDatabase,
@@ -96,3 +99,35 @@ def test_rejects_ineligible_table(field, value, reason):
     snapshot, interval, binding = switch_case()
     snapshot = replace(snapshot, prepared=replace(snapshot.prepared, **{field: value}))
     assert reason in plan_native_switch(snapshot, interval=interval, owner_binding=binding).reasons
+
+
+def test_existing_planner_import_preserves_signature_identity_and_runtime_annotations():
+    """The canonical policy must not break introspection of the existing facade."""
+    canonical = switch_contract.plan_native_switch
+    assert plan_native_switch.__module__ == "dpone.runtime.sinks.mssql_native_switch.planner"
+    assert signature(plan_native_switch) == signature(canonical)
+    assert get_type_hints(plan_native_switch) == get_type_hints(canonical)
+
+
+@pytest.mark.parametrize(
+    "field,value,reasons",
+    [
+        ("prepared_rows", 0, ()),
+        ("prepared_rows", 3, ()),
+        ("prepared_rows", True, ("metadata_unknown",)),
+        ("prepared_rows", -1, ("metadata_unknown",)),
+        ("prepared_rows", 1.0, ("metadata_unknown",)),
+        ("prepared_outside_rows", 1, ("prepared_rows_outside_interval",)),
+        ("switch_out_rows", 1, ("switch_out_not_empty",)),
+        ("switch_out_rows", -1, ("metadata_unknown", "switch_out_not_empty")),
+    ],
+)
+def test_canonical_and_existing_admission_preserve_content_rejection(field, value, reasons):
+    """Malformed observations remain fail-closed through both import paths."""
+    snapshot, interval, binding = switch_case()
+    snapshot = replace(snapshot, **{field: value})
+    canonical = switch_contract.plan_native_switch(snapshot, interval=interval, owner_binding=binding)
+    existing = plan_native_switch(snapshot, interval=interval, owner_binding=binding)
+    assert canonical == existing
+    assert canonical.reasons == reasons
+    assert (canonical.plan is None) == bool(reasons)

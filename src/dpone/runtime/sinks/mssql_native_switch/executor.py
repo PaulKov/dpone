@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dpone.contracts.native_mssql_switch import NativeSwitchPlan, NativeSwitchRejected, NativeSwitchResult
+from dpone.contracts.native_mssql_switch import (
+    NativeSwitchPlan,
+    NativeSwitchRejected,
+    NativeSwitchResult,
+    plan_native_switch,
+)
 from dpone.runtime.sinks.mssql_native_switch.catalog import (
     NativeSwitchCatalog,
     count,
@@ -12,7 +17,6 @@ from dpone.runtime.sinks.mssql_native_switch.catalog import (
     qualified,
     quote,
 )
-from dpone.runtime.sinks.mssql_native_switch.planner import plan_native_switch
 
 if TYPE_CHECKING:
     from dpone.ports.native_mssql_switch import NativeSwitchTransaction
