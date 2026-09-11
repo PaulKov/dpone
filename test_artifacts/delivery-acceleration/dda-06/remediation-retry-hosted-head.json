@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "name": "remediation-retry-hosted-head",
+  "command": [
+    "gh",
+    "pr",
+    "view",
+    "25",
+    "--json",
+    "headRefOid,isDraft,url,statusCheckRollup"
+  ],
+  "source_before": {
+    "commit": "7c25ce910ff4e3a929b46aa01237840ae92ef512",
+    "tree": "c3989408e7e02562bbc1e18594dc0822f10bdbe1",
+    "source_sha256": "4f65e32604f905816bc478a024756e22a0ca3249dfd5a3ab5037d67cdeccb33e",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "status": "PASS",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "remediation-retry-hosted-head.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "7c25ce910ff4e3a929b46aa01237840ae92ef512",
+    "tree": "c3989408e7e02562bbc1e18594dc0822f10bdbe1",
+    "source_sha256": "4f65e32604f905816bc478a024756e22a0ca3249dfd5a3ab5037d67cdeccb33e",
+    "producer_sha256": "7b04efc0b928146599f1c288d0e9b7df80035890d0979148020668ad886f54d9",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 0,
+  "duration_seconds": 19.965,
+  "log_sha256": "8b2e1daeb351251488a787c0664c65278d884c656edc5d7b75a2846c88ffff9a"
+}

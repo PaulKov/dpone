@@ -1,0 +1,642 @@
+FFFFFFFFF...FFFFFFFFF..                                                  [100%]
+=================================== FAILURES ===================================
+______ test_exported_run_alias_preserves_relative_evidence[False-memory] _______
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser0')
+destination = 'memory', directory_alias = False
+
+    @pytest.mark.parametrize("destination", ["memory", "same_tree", "bundle"])
+    @pytest.mark.parametrize("directory_alias", [False, True])
+    def test_exported_run_alias_preserves_relative_evidence(tmp_path, destination, directory_alias):
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        (candidate.parent / "payload").mkdir()
+        candidate.rename(candidate.parent / "payload" / "run.json")
+        candidate.symlink_to("payload/run.json")
+        if directory_alias:
+            alias = tmp_path / "candidate-alias"
+            alias.symlink_to(candidate.parent, target_is_directory=True)
+            candidate = alias / candidate.name
+        root = tmp_path / "reports" if destination == "bundle" else tmp_path
+        root.mkdir(exist_ok=True)
+        output = None if destination == "memory" else root / "comparison.json"
+        result = compare(baseline, candidate, output=output)
+        retained = root / result["candidate"]["path"]
+        assert result["status"] == "PASS"  # Synthetic live-shape branch, not live certification.
+        assert result["workloads"][0]["candidate"]["envelope"]["path"] == result["candidate"]["path"]
+        assert content_sha256(retained.read_bytes()) == result["candidate"]["sha256"]
+>       assert (retained.parent / "fidelity.json").is_file()
+E       AssertionError: assert False
+E        +  where False = is_file()
+E        +    where is_file = (PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser0/c/payload') / 'fidelity.json').is_file
+E        +      where PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser0/c/payload') = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser0/c/payload/run.json').parent
+
+tests/test_mssql_native_delivery_benchmark.py:472: AssertionError
+_____ test_exported_run_alias_preserves_relative_evidence[False-same_tree] _____
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser1')
+destination = 'same_tree', directory_alias = False
+
+    @pytest.mark.parametrize("destination", ["memory", "same_tree", "bundle"])
+    @pytest.mark.parametrize("directory_alias", [False, True])
+    def test_exported_run_alias_preserves_relative_evidence(tmp_path, destination, directory_alias):
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        (candidate.parent / "payload").mkdir()
+        candidate.rename(candidate.parent / "payload" / "run.json")
+        candidate.symlink_to("payload/run.json")
+        if directory_alias:
+            alias = tmp_path / "candidate-alias"
+            alias.symlink_to(candidate.parent, target_is_directory=True)
+            candidate = alias / candidate.name
+        root = tmp_path / "reports" if destination == "bundle" else tmp_path
+        root.mkdir(exist_ok=True)
+        output = None if destination == "memory" else root / "comparison.json"
+        result = compare(baseline, candidate, output=output)
+        retained = root / result["candidate"]["path"]
+        assert result["status"] == "PASS"  # Synthetic live-shape branch, not live certification.
+        assert result["workloads"][0]["candidate"]["envelope"]["path"] == result["candidate"]["path"]
+        assert content_sha256(retained.read_bytes()) == result["candidate"]["sha256"]
+>       assert (retained.parent / "fidelity.json").is_file()
+E       AssertionError: assert False
+E        +  where False = is_file()
+E        +    where is_file = (PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser1/c/payload') / 'fidelity.json').is_file
+E        +      where PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser1/c/payload') = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser1/c/payload/run.json').parent
+
+tests/test_mssql_native_delivery_benchmark.py:472: AssertionError
+______ test_exported_run_alias_preserves_relative_evidence[False-bundle] _______
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser2')
+destination = 'bundle', directory_alias = False
+
+    @pytest.mark.parametrize("destination", ["memory", "same_tree", "bundle"])
+    @pytest.mark.parametrize("directory_alias", [False, True])
+    def test_exported_run_alias_preserves_relative_evidence(tmp_path, destination, directory_alias):
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        (candidate.parent / "payload").mkdir()
+        candidate.rename(candidate.parent / "payload" / "run.json")
+        candidate.symlink_to("payload/run.json")
+        if directory_alias:
+            alias = tmp_path / "candidate-alias"
+            alias.symlink_to(candidate.parent, target_is_directory=True)
+            candidate = alias / candidate.name
+        root = tmp_path / "reports" if destination == "bundle" else tmp_path
+        root.mkdir(exist_ok=True)
+        output = None if destination == "memory" else root / "comparison.json"
+        result = compare(baseline, candidate, output=output)
+        retained = root / result["candidate"]["path"]
+        assert result["status"] == "PASS"  # Synthetic live-shape branch, not live certification.
+        assert result["workloads"][0]["candidate"]["envelope"]["path"] == result["candidate"]["path"]
+        assert content_sha256(retained.read_bytes()) == result["candidate"]["sha256"]
+>       assert (retained.parent / "fidelity.json").is_file()
+E       AssertionError: assert False
+E        +  where False = is_file()
+E        +    where is_file = (PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser2/reports/native-delivery-evidence-6cc49bc7156f18a4ce773e867677bc935416481529d80e1ac08312c7f9288d25/payload') / 'fidelity.json').is_file
+E        +      where PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser2/reports/native-delivery-evidence-6cc49bc7156f18a4ce773e867677bc935416481529d80e1ac08312c7f9288d25/payload') = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run...r2/reports/native-delivery-evidence-6cc49bc7156f18a4ce773e867677bc935416481529d80e1ac08312c7f9288d25/payload/run.json').parent
+
+tests/test_mssql_native_delivery_benchmark.py:472: AssertionError
+_______ test_exported_run_alias_preserves_relative_evidence[True-memory] _______
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser3')
+destination = 'memory', directory_alias = True
+
+    @pytest.mark.parametrize("destination", ["memory", "same_tree", "bundle"])
+    @pytest.mark.parametrize("directory_alias", [False, True])
+    def test_exported_run_alias_preserves_relative_evidence(tmp_path, destination, directory_alias):
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        (candidate.parent / "payload").mkdir()
+        candidate.rename(candidate.parent / "payload" / "run.json")
+        candidate.symlink_to("payload/run.json")
+        if directory_alias:
+            alias = tmp_path / "candidate-alias"
+            alias.symlink_to(candidate.parent, target_is_directory=True)
+            candidate = alias / candidate.name
+        root = tmp_path / "reports" if destination == "bundle" else tmp_path
+        root.mkdir(exist_ok=True)
+        output = None if destination == "memory" else root / "comparison.json"
+        result = compare(baseline, candidate, output=output)
+        retained = root / result["candidate"]["path"]
+        assert result["status"] == "PASS"  # Synthetic live-shape branch, not live certification.
+        assert result["workloads"][0]["candidate"]["envelope"]["path"] == result["candidate"]["path"]
+        assert content_sha256(retained.read_bytes()) == result["candidate"]["sha256"]
+>       assert (retained.parent / "fidelity.json").is_file()
+E       AssertionError: assert False
+E        +  where False = is_file()
+E        +    where is_file = (PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser3/c/payload') / 'fidelity.json').is_file
+E        +      where PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser3/c/payload') = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser3/c/payload/run.json').parent
+
+tests/test_mssql_native_delivery_benchmark.py:472: AssertionError
+_____ test_exported_run_alias_preserves_relative_evidence[True-same_tree] ______
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser4')
+destination = 'same_tree', directory_alias = True
+
+    @pytest.mark.parametrize("destination", ["memory", "same_tree", "bundle"])
+    @pytest.mark.parametrize("directory_alias", [False, True])
+    def test_exported_run_alias_preserves_relative_evidence(tmp_path, destination, directory_alias):
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        (candidate.parent / "payload").mkdir()
+        candidate.rename(candidate.parent / "payload" / "run.json")
+        candidate.symlink_to("payload/run.json")
+        if directory_alias:
+            alias = tmp_path / "candidate-alias"
+            alias.symlink_to(candidate.parent, target_is_directory=True)
+            candidate = alias / candidate.name
+        root = tmp_path / "reports" if destination == "bundle" else tmp_path
+        root.mkdir(exist_ok=True)
+        output = None if destination == "memory" else root / "comparison.json"
+        result = compare(baseline, candidate, output=output)
+        retained = root / result["candidate"]["path"]
+        assert result["status"] == "PASS"  # Synthetic live-shape branch, not live certification.
+        assert result["workloads"][0]["candidate"]["envelope"]["path"] == result["candidate"]["path"]
+        assert content_sha256(retained.read_bytes()) == result["candidate"]["sha256"]
+>       assert (retained.parent / "fidelity.json").is_file()
+E       AssertionError: assert False
+E        +  where False = is_file()
+E        +    where is_file = (PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser4/c/payload') / 'fidelity.json').is_file
+E        +      where PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser4/c/payload') = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser4/c/payload/run.json').parent
+
+tests/test_mssql_native_delivery_benchmark.py:472: AssertionError
+_______ test_exported_run_alias_preserves_relative_evidence[True-bundle] _______
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser5')
+destination = 'bundle', directory_alias = True
+
+    @pytest.mark.parametrize("destination", ["memory", "same_tree", "bundle"])
+    @pytest.mark.parametrize("directory_alias", [False, True])
+    def test_exported_run_alias_preserves_relative_evidence(tmp_path, destination, directory_alias):
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        (candidate.parent / "payload").mkdir()
+        candidate.rename(candidate.parent / "payload" / "run.json")
+        candidate.symlink_to("payload/run.json")
+        if directory_alias:
+            alias = tmp_path / "candidate-alias"
+            alias.symlink_to(candidate.parent, target_is_directory=True)
+            candidate = alias / candidate.name
+        root = tmp_path / "reports" if destination == "bundle" else tmp_path
+        root.mkdir(exist_ok=True)
+        output = None if destination == "memory" else root / "comparison.json"
+        result = compare(baseline, candidate, output=output)
+        retained = root / result["candidate"]["path"]
+        assert result["status"] == "PASS"  # Synthetic live-shape branch, not live certification.
+        assert result["workloads"][0]["candidate"]["envelope"]["path"] == result["candidate"]["path"]
+        assert content_sha256(retained.read_bytes()) == result["candidate"]["sha256"]
+>       assert (retained.parent / "fidelity.json").is_file()
+E       AssertionError: assert False
+E        +  where False = is_file()
+E        +    where is_file = (PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser5/reports/native-delivery-evidence-1cf6b019a214b156d967c61a532dc8c61edb8bed83231884471e54a90635030f/payload') / 'fidelity.json').is_file
+E        +      where PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run_alias_preser5/reports/native-delivery-evidence-1cf6b019a214b156d967c61a532dc8c61edb8bed83231884471e54a90635030f/payload') = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_run...r5/reports/native-delivery-evidence-1cf6b019a214b156d967c61a532dc8c61edb8bed83231884471e54a90635030f/payload/run.json').parent
+
+tests/test_mssql_native_delivery_benchmark.py:472: AssertionError
+_________ test_exported_campaign_alias_preserves_relative_runs[memory] _________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_campaign_alias_p0')
+destination = 'memory'
+
+    @pytest.mark.parametrize("destination", ["memory", "same_tree", "bundle"])
+    def test_exported_campaign_alias_preserves_relative_runs(tmp_path, destination):
+        baseline = campaign(tmp_path / "b", [run_fixture(tmp_path / "b" / "case")], ["narrow"])
+        candidate = campaign(tmp_path / "c", [run_fixture(tmp_path / "c" / "case")], ["narrow"])
+        (candidate.parent / "payload").mkdir()
+        candidate.rename(candidate.parent / "payload" / "campaign.json")
+        candidate.symlink_to("payload/campaign.json")
+        root = tmp_path / "reports" if destination == "bundle" else tmp_path
+        root.mkdir(exist_ok=True)
+        output = None if destination == "memory" else root / "comparison.json"
+        result = compare(baseline, candidate, output=output)
+>       assert compare(root / result["baseline"]["path"], root / result["candidate"]["path"])["status"] == "UNVERIFIED"
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_delivery_benchmark.py:487: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/dpone/runtime/native_delivery_benchmark.py:247: in compare
+    after_ids, after, after_campaign = _campaign(store, candidate)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/dpone/runtime/native_delivery_benchmark.py:220: in _campaign
+    refs = [(store.reference(path.parent, ref), ref["status"]) for ref in payload["runs"]]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/dpone/runtime/native_delivery_benchmark_artifacts.py:73: in reference
+    resolved = (root / relative).resolve(strict=True)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/pathlib.py:1240: in resolve
+    s = self._flavour.realpath(self, strict=strict)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen posixpath>:427: in realpath
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = '/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_campaign_alias_p0/c/payload'
+rest = 'run.json', strict = True, seen = {}
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_campaign_alias_p0/c/payload/case'
+
+<frozen posixpath>:471: FileNotFoundError
+_______ test_exported_campaign_alias_preserves_relative_runs[same_tree] ________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_campaign_alias_p1')
+destination = 'same_tree'
+
+    @pytest.mark.parametrize("destination", ["memory", "same_tree", "bundle"])
+    def test_exported_campaign_alias_preserves_relative_runs(tmp_path, destination):
+        baseline = campaign(tmp_path / "b", [run_fixture(tmp_path / "b" / "case")], ["narrow"])
+        candidate = campaign(tmp_path / "c", [run_fixture(tmp_path / "c" / "case")], ["narrow"])
+        (candidate.parent / "payload").mkdir()
+        candidate.rename(candidate.parent / "payload" / "campaign.json")
+        candidate.symlink_to("payload/campaign.json")
+        root = tmp_path / "reports" if destination == "bundle" else tmp_path
+        root.mkdir(exist_ok=True)
+        output = None if destination == "memory" else root / "comparison.json"
+        result = compare(baseline, candidate, output=output)
+>       assert compare(root / result["baseline"]["path"], root / result["candidate"]["path"])["status"] == "UNVERIFIED"
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_delivery_benchmark.py:487: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/dpone/runtime/native_delivery_benchmark.py:247: in compare
+    after_ids, after, after_campaign = _campaign(store, candidate)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/dpone/runtime/native_delivery_benchmark.py:220: in _campaign
+    refs = [(store.reference(path.parent, ref), ref["status"]) for ref in payload["runs"]]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/dpone/runtime/native_delivery_benchmark_artifacts.py:73: in reference
+    resolved = (root / relative).resolve(strict=True)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/pathlib.py:1240: in resolve
+    s = self._flavour.realpath(self, strict=strict)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen posixpath>:427: in realpath
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = '/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_campaign_alias_p1/c/payload'
+rest = 'run.json', strict = True, seen = {}
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_campaign_alias_p1/c/payload/case'
+
+<frozen posixpath>:471: FileNotFoundError
+_________ test_exported_campaign_alias_preserves_relative_runs[bundle] _________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_campaign_alias_p2')
+destination = 'bundle'
+
+    @pytest.mark.parametrize("destination", ["memory", "same_tree", "bundle"])
+    def test_exported_campaign_alias_preserves_relative_runs(tmp_path, destination):
+        baseline = campaign(tmp_path / "b", [run_fixture(tmp_path / "b" / "case")], ["narrow"])
+        candidate = campaign(tmp_path / "c", [run_fixture(tmp_path / "c" / "case")], ["narrow"])
+        (candidate.parent / "payload").mkdir()
+        candidate.rename(candidate.parent / "payload" / "campaign.json")
+        candidate.symlink_to("payload/campaign.json")
+        root = tmp_path / "reports" if destination == "bundle" else tmp_path
+        root.mkdir(exist_ok=True)
+        output = None if destination == "memory" else root / "comparison.json"
+        result = compare(baseline, candidate, output=output)
+>       assert compare(root / result["baseline"]["path"], root / result["candidate"]["path"])["status"] == "UNVERIFIED"
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_delivery_benchmark.py:487: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/dpone/runtime/native_delivery_benchmark.py:247: in compare
+    after_ids, after, after_campaign = _campaign(store, candidate)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/dpone/runtime/native_delivery_benchmark.py:220: in _campaign
+    refs = [(store.reference(path.parent, ref), ref["status"]) for ref in payload["runs"]]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/dpone/runtime/native_delivery_benchmark_artifacts.py:73: in reference
+    resolved = (root / relative).resolve(strict=True)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../../.local/share/uv/python/cpython-3.12-macos-aarch64-none/lib/python3.12/pathlib.py:1240: in resolve
+    s = self._flavour.realpath(self, strict=strict)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<frozen posixpath>:427: in realpath
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = '/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_campaign_alias_p2/reports/native-delivery-evidence-d6a991608a72ca8852834300d5ccd3b250874016d377014f8288503527a4fc50/payload'
+rest = 'run.json', strict = True, seen = {}
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_exported_campaign_alias_p2/reports/native-delivery-evidence-d6a991608a72ca8852834300d5ccd3b250874016d377014f8288503527a4fc50/payload/case'
+
+<frozen posixpath>:471: FileNotFoundError
+___ test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>0] ____
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_malformed_or_inconsistent0')
+change = <function <lambda> at 0x108b40220>
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            lambda s: s["observations"][0].update(schema_version=999),
+            lambda s: s["observations"][0].update(schema_version=True),
+            lambda s: s["observations"][0].pop("metrics"),
+            lambda s: s["recorders"][0].update(status="UNVERIFIED", limitations=["observer_failed"]),
+            lambda s: s["limitations"].append("capacity_exceeded"),
+            lambda s: s["aggregates"][0]["work_seconds"].update(value=100),
+            lambda s: s.update(capacity=0),
+            lambda s: s["observations"].append(s["observations"][0]),
+            lambda s: s.update(unknown_field="unsupported"),
+        ],
+    )
+    def test_malformed_or_inconsistent_sidecar_never_authorizes_pass(tmp_path, change):
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+    
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        snapshot = diagnostic_snapshot()
+        change(snapshot)
+        ref = retain(candidate.parent, "observations.json", snapshot)
+        mutate(candidate, lambda run: run["samples"][1].update(observations=ref))
+>       with pytest.raises(BenchmarkInputError, match="invalid_observations"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'dpone.runtime.native_delivery_benchmark_artifacts.BenchmarkInputError'>
+
+tests/test_mssql_native_delivery_benchmark.py:540: Failed
+___ test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>1] ____
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_malformed_or_inconsistent1')
+change = <function <lambda> at 0x108b402c0>
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            lambda s: s["observations"][0].update(schema_version=999),
+            lambda s: s["observations"][0].update(schema_version=True),
+            lambda s: s["observations"][0].pop("metrics"),
+            lambda s: s["recorders"][0].update(status="UNVERIFIED", limitations=["observer_failed"]),
+            lambda s: s["limitations"].append("capacity_exceeded"),
+            lambda s: s["aggregates"][0]["work_seconds"].update(value=100),
+            lambda s: s.update(capacity=0),
+            lambda s: s["observations"].append(s["observations"][0]),
+            lambda s: s.update(unknown_field="unsupported"),
+        ],
+    )
+    def test_malformed_or_inconsistent_sidecar_never_authorizes_pass(tmp_path, change):
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+    
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        snapshot = diagnostic_snapshot()
+        change(snapshot)
+        ref = retain(candidate.parent, "observations.json", snapshot)
+        mutate(candidate, lambda run: run["samples"][1].update(observations=ref))
+>       with pytest.raises(BenchmarkInputError, match="invalid_observations"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'dpone.runtime.native_delivery_benchmark_artifacts.BenchmarkInputError'>
+
+tests/test_mssql_native_delivery_benchmark.py:540: Failed
+___ test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>2] ____
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_malformed_or_inconsistent2')
+change = <function <lambda> at 0x108b40360>
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            lambda s: s["observations"][0].update(schema_version=999),
+            lambda s: s["observations"][0].update(schema_version=True),
+            lambda s: s["observations"][0].pop("metrics"),
+            lambda s: s["recorders"][0].update(status="UNVERIFIED", limitations=["observer_failed"]),
+            lambda s: s["limitations"].append("capacity_exceeded"),
+            lambda s: s["aggregates"][0]["work_seconds"].update(value=100),
+            lambda s: s.update(capacity=0),
+            lambda s: s["observations"].append(s["observations"][0]),
+            lambda s: s.update(unknown_field="unsupported"),
+        ],
+    )
+    def test_malformed_or_inconsistent_sidecar_never_authorizes_pass(tmp_path, change):
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+    
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        snapshot = diagnostic_snapshot()
+        change(snapshot)
+        ref = retain(candidate.parent, "observations.json", snapshot)
+        mutate(candidate, lambda run: run["samples"][1].update(observations=ref))
+>       with pytest.raises(BenchmarkInputError, match="invalid_observations"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'dpone.runtime.native_delivery_benchmark_artifacts.BenchmarkInputError'>
+
+tests/test_mssql_native_delivery_benchmark.py:540: Failed
+___ test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>3] ____
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_malformed_or_inconsistent3')
+change = <function <lambda> at 0x108b40400>
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            lambda s: s["observations"][0].update(schema_version=999),
+            lambda s: s["observations"][0].update(schema_version=True),
+            lambda s: s["observations"][0].pop("metrics"),
+            lambda s: s["recorders"][0].update(status="UNVERIFIED", limitations=["observer_failed"]),
+            lambda s: s["limitations"].append("capacity_exceeded"),
+            lambda s: s["aggregates"][0]["work_seconds"].update(value=100),
+            lambda s: s.update(capacity=0),
+            lambda s: s["observations"].append(s["observations"][0]),
+            lambda s: s.update(unknown_field="unsupported"),
+        ],
+    )
+    def test_malformed_or_inconsistent_sidecar_never_authorizes_pass(tmp_path, change):
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+    
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        snapshot = diagnostic_snapshot()
+        change(snapshot)
+        ref = retain(candidate.parent, "observations.json", snapshot)
+        mutate(candidate, lambda run: run["samples"][1].update(observations=ref))
+>       with pytest.raises(BenchmarkInputError, match="invalid_observations"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'dpone.runtime.native_delivery_benchmark_artifacts.BenchmarkInputError'>
+
+tests/test_mssql_native_delivery_benchmark.py:540: Failed
+___ test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>4] ____
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_malformed_or_inconsistent4')
+change = <function <lambda> at 0x108b404a0>
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            lambda s: s["observations"][0].update(schema_version=999),
+            lambda s: s["observations"][0].update(schema_version=True),
+            lambda s: s["observations"][0].pop("metrics"),
+            lambda s: s["recorders"][0].update(status="UNVERIFIED", limitations=["observer_failed"]),
+            lambda s: s["limitations"].append("capacity_exceeded"),
+            lambda s: s["aggregates"][0]["work_seconds"].update(value=100),
+            lambda s: s.update(capacity=0),
+            lambda s: s["observations"].append(s["observations"][0]),
+            lambda s: s.update(unknown_field="unsupported"),
+        ],
+    )
+    def test_malformed_or_inconsistent_sidecar_never_authorizes_pass(tmp_path, change):
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+    
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        snapshot = diagnostic_snapshot()
+        change(snapshot)
+        ref = retain(candidate.parent, "observations.json", snapshot)
+        mutate(candidate, lambda run: run["samples"][1].update(observations=ref))
+>       with pytest.raises(BenchmarkInputError, match="invalid_observations"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'dpone.runtime.native_delivery_benchmark_artifacts.BenchmarkInputError'>
+
+tests/test_mssql_native_delivery_benchmark.py:540: Failed
+___ test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>5] ____
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_malformed_or_inconsistent5')
+change = <function <lambda> at 0x108b40540>
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            lambda s: s["observations"][0].update(schema_version=999),
+            lambda s: s["observations"][0].update(schema_version=True),
+            lambda s: s["observations"][0].pop("metrics"),
+            lambda s: s["recorders"][0].update(status="UNVERIFIED", limitations=["observer_failed"]),
+            lambda s: s["limitations"].append("capacity_exceeded"),
+            lambda s: s["aggregates"][0]["work_seconds"].update(value=100),
+            lambda s: s.update(capacity=0),
+            lambda s: s["observations"].append(s["observations"][0]),
+            lambda s: s.update(unknown_field="unsupported"),
+        ],
+    )
+    def test_malformed_or_inconsistent_sidecar_never_authorizes_pass(tmp_path, change):
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+    
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        snapshot = diagnostic_snapshot()
+        change(snapshot)
+        ref = retain(candidate.parent, "observations.json", snapshot)
+        mutate(candidate, lambda run: run["samples"][1].update(observations=ref))
+>       with pytest.raises(BenchmarkInputError, match="invalid_observations"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'dpone.runtime.native_delivery_benchmark_artifacts.BenchmarkInputError'>
+
+tests/test_mssql_native_delivery_benchmark.py:540: Failed
+___ test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>6] ____
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_malformed_or_inconsistent6')
+change = <function <lambda> at 0x108b405e0>
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            lambda s: s["observations"][0].update(schema_version=999),
+            lambda s: s["observations"][0].update(schema_version=True),
+            lambda s: s["observations"][0].pop("metrics"),
+            lambda s: s["recorders"][0].update(status="UNVERIFIED", limitations=["observer_failed"]),
+            lambda s: s["limitations"].append("capacity_exceeded"),
+            lambda s: s["aggregates"][0]["work_seconds"].update(value=100),
+            lambda s: s.update(capacity=0),
+            lambda s: s["observations"].append(s["observations"][0]),
+            lambda s: s.update(unknown_field="unsupported"),
+        ],
+    )
+    def test_malformed_or_inconsistent_sidecar_never_authorizes_pass(tmp_path, change):
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+    
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        snapshot = diagnostic_snapshot()
+        change(snapshot)
+        ref = retain(candidate.parent, "observations.json", snapshot)
+        mutate(candidate, lambda run: run["samples"][1].update(observations=ref))
+>       with pytest.raises(BenchmarkInputError, match="invalid_observations"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'dpone.runtime.native_delivery_benchmark_artifacts.BenchmarkInputError'>
+
+tests/test_mssql_native_delivery_benchmark.py:540: Failed
+___ test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>7] ____
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_malformed_or_inconsistent7')
+change = <function <lambda> at 0x108b40680>
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            lambda s: s["observations"][0].update(schema_version=999),
+            lambda s: s["observations"][0].update(schema_version=True),
+            lambda s: s["observations"][0].pop("metrics"),
+            lambda s: s["recorders"][0].update(status="UNVERIFIED", limitations=["observer_failed"]),
+            lambda s: s["limitations"].append("capacity_exceeded"),
+            lambda s: s["aggregates"][0]["work_seconds"].update(value=100),
+            lambda s: s.update(capacity=0),
+            lambda s: s["observations"].append(s["observations"][0]),
+            lambda s: s.update(unknown_field="unsupported"),
+        ],
+    )
+    def test_malformed_or_inconsistent_sidecar_never_authorizes_pass(tmp_path, change):
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+    
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        snapshot = diagnostic_snapshot()
+        change(snapshot)
+        ref = retain(candidate.parent, "observations.json", snapshot)
+        mutate(candidate, lambda run: run["samples"][1].update(observations=ref))
+>       with pytest.raises(BenchmarkInputError, match="invalid_observations"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'dpone.runtime.native_delivery_benchmark_artifacts.BenchmarkInputError'>
+
+tests/test_mssql_native_delivery_benchmark.py:540: Failed
+___ test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>8] ____
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3671/test_malformed_or_inconsistent8')
+change = <function <lambda> at 0x108b40720>
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            lambda s: s["observations"][0].update(schema_version=999),
+            lambda s: s["observations"][0].update(schema_version=True),
+            lambda s: s["observations"][0].pop("metrics"),
+            lambda s: s["recorders"][0].update(status="UNVERIFIED", limitations=["observer_failed"]),
+            lambda s: s["limitations"].append("capacity_exceeded"),
+            lambda s: s["aggregates"][0]["work_seconds"].update(value=100),
+            lambda s: s.update(capacity=0),
+            lambda s: s["observations"].append(s["observations"][0]),
+            lambda s: s.update(unknown_field="unsupported"),
+        ],
+    )
+    def test_malformed_or_inconsistent_sidecar_never_authorizes_pass(tmp_path, change):
+        from dpone.runtime.native_delivery_benchmark import BenchmarkInputError
+    
+        baseline = run_fixture(tmp_path / "b", execution="live")
+        candidate = run_fixture(tmp_path / "c", seconds=8, execution="live")
+        snapshot = diagnostic_snapshot()
+        change(snapshot)
+        ref = retain(candidate.parent, "observations.json", snapshot)
+        mutate(candidate, lambda run: run["samples"][1].update(observations=ref))
+>       with pytest.raises(BenchmarkInputError, match="invalid_observations"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'dpone.runtime.native_delivery_benchmark_artifacts.BenchmarkInputError'>
+
+tests/test_mssql_native_delivery_benchmark.py:540: Failed
+=========================== short test summary info ============================
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[False-memory]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[False-same_tree]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[False-bundle]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[True-memory]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[True-same_tree]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_exported_run_alias_preserves_relative_evidence[True-bundle]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_exported_campaign_alias_preserves_relative_runs[memory]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_exported_campaign_alias_preserves_relative_runs[same_tree]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_exported_campaign_alias_preserves_relative_runs[bundle]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>0]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>1]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>2]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>3]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>4]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>5]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>6]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>7]
+FAILED tests/test_mssql_native_delivery_benchmark.py::test_malformed_or_inconsistent_sidecar_never_authorizes_pass[<lambda>8]

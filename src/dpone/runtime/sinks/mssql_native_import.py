@@ -11,13 +11,17 @@ from dataclasses import asdict
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.mssql_native_chunks import EncodedNativeFile, NativeChunkPlan, NativeChunkReceipt
 from dpone.contracts.mssql_type_contract import normalize_mssql_physical_type
 from dpone.runtime.consumed_payload_evidence import ConsumedPayloadEvidence, canonical_source_provenance_sha256
 from dpone.runtime.file_artifacts import FileExportArtifact
+from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session
 from dpone.runtime.native_wire_models import stable_hash
+
+if TYPE_CHECKING:
+    from dpone.ports.native_delivery_observer import NativeDeliveryObserver
 
 
 class MssqlNativeChunkImporter:
@@ -34,8 +38,10 @@ class MssqlNativeChunkImporter:
         assert_lease: Callable[[Any], None],
         mutation_scope: Callable[..., Any],
         options_factory: Callable[..., Any],
+        observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
     ) -> None:
         self.connector = connector
+        self.observations = delivery_session(observer)
         self.database = database
         self.schema = schema
         self.columns = tuple(columns)
@@ -105,20 +111,28 @@ class MssqlNativeChunkImporter:
                 )
                 if options.file_format != "native" or options.error_file != str(rejects):
                     raise ValueError("mssql_native.native_options_required")
-                copied = (
-                    0
-                    if file.rows == 0
-                    else self.connector.bcp_import(
-                        self.schema, table, str(file.path), options=options, database=self.database
-                    )
-                )
+                copied = 0
+                if file.rows:
+                    with self.observations.recorder("importer").phase(
+                        "bcp",
+                        ordinal=file.ordinal,
+                        attempt_id=attempt_id,
+                        rows=file.rows,
+                        encoded_bytes=file.encoded_bytes,
+                    ):
+                        copied = self.connector.bcp_import(
+                            self.schema, table, str(file.path), options=options, database=self.database
+                        )
                 if type(copied) is not int or copied != file.rows:
                     raise ValueError("mssql_native.vendor_count_mismatch")
                 if rejects.exists() and rejects.stat().st_size:
                     raise ValueError("mssql_native.rejects_not_empty")
             if artifact.require_integrity_receipt() != integrity:
                 raise ValueError("mssql_native.file_identity_changed")
-            typed_sum = self._verify_contents(table, file.rows, file.typed_digest)
+            with self.observations.recorder("importer").phase(
+                "raw_verify", reason="import", ordinal=file.ordinal, attempt_id=attempt_id, rows=file.rows
+            ):
+                typed_sum = self._verify_contents(table, file.rows, file.typed_digest)
             self._assert_lease(lease)
             schema = tuple((column.name, dtype) for column, dtype in zip(self.columns, self._types, strict=True))
             evidence = ConsumedPayloadEvidence.empty().append_verified_file(

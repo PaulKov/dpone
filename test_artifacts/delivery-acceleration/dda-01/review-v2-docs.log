@@ -1,0 +1,6 @@
+ERROR: Docs check failed: 1 issue(s)
+Docs check failed: 1 issue(s), 818 files, 3272 links checked
+
+[docs/delivery-acceleration/observations.md]
+- L7 missing-file: index.md
+    Target file does not exist: /Users/paulkov007/.codex/worktrees/4d98/dpone-public/docs/delivery-acceleration/index.md

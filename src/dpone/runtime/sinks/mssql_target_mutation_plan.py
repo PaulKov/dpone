@@ -6,14 +6,17 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from dpone.contracts.mssql_object_name import MSSQLObjectName
-from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
 from dpone.runtime.sinks.mssql_target_catalog_fingerprint import (
     MssqlTargetCatalogExpectation,
     aggregate_expectations,
 )
+
+if TYPE_CHECKING:
+    from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
+
 
 MutationKind = Literal["schema_evolution", "physical_design"]
 MutationStatementType = Literal["target_ddl", "session_policy"]

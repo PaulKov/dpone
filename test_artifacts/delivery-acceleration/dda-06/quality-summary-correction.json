@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "source_before": "c1bff83ebc756c025dbfc53a0d7dfcf00009fae1",
+  "reviewed_gate_source": "b82e2098a642aff588f6a9c6b33d72292e25023a",
+  "receipt_sha256": {
+    "integrated-current-layers": "408c2c7c7b8d205d40c0924933edff9908d0723b48d1b1eb85abedac7c5437c2",
+    "integrated-current-architecture": "0d48cc58de669ee106f1de0651e04a97b622fa9eb2400b4329b57d809735d400"
+  },
+  "authority": "0b526c50597d734c675426762da149887cf5db60",
+  "replacements": 3,
+  "generated_block_before_sha256": "235461d5600ebd62579c8b7cc2c56774f3ac247d3c99bdedd4616ce369133607",
+  "generated_block_after_sha256": "235461d5600ebd62579c8b7cc2c56774f3ac247d3c99bdedd4616ce369133607",
+  "document_before_sha256": "1ec32afebc662321d105b01c3cbbb528c461bac897024167d14e8069a94d326d",
+  "document_after_sha256": "9bcd461c65b745e868f64979799b8b9e95bfc0b76cbd03acbffbcb689c2e2977",
+  "exact_replacements_only": true
+}

@@ -1,0 +1,79 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_real_producer_symlink_envelope_keeps_exported_proof_bundle ________
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3673/test_real_producer_symlink_env0')
+
+    def test_real_producer_symlink_envelope_keeps_exported_proof_bundle(tmp_path):
+        import shutil
+    
+        from tools.native_delivery_live_support.hermetic import produce_fixture
+    
+        from dpone.runtime.native_delivery_benchmark import compare
+    
+        original = tmp_path / "original"
+        original.mkdir()
+        produce_fixture(original)
+        alias = tmp_path / "alias"
+        shutil.copytree(original, alias)
+        (alias / "run.json").unlink()
+        (alias / "run.json").symlink_to(original / "run.json")
+        destination = tmp_path / "export"
+        destination.mkdir()
+>       report = compare(alias / "run.json", alias / "run.json", output=destination / "comparison.json")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_mssql_native_delivery_integration.py:335: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/dpone/runtime/native_delivery_benchmark.py:310: in compare
+    store.relativize(root, (baseline.parent, candidate.parent), retain=output is not None)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <dpone.runtime.native_delivery_benchmark_artifacts.BenchmarkArtifacts object at 0x10b5f6ba0>
+root = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3673/test_real_producer_symlink_env0/export')
+input_roots = (PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3673/test_real_produc...r/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3673/test_real_producer_symlink_env0/alias'))
+
+    def relativize(self, root: Path, input_roots: tuple[Path, Path], *, retain: bool) -> None:
+        """Keep references beneath the report, copying evidence only when needed."""
+        destinations = {}
+        for source in input_roots:
+            source = source.resolve()
+            if source.is_relative_to(root):
+                destinations[source] = source
+                continue
+            files = {str(p.relative_to(source)): data for p, data in self.bytes.items() if p.is_relative_to(source)}
+            files.update(
+                {
+                    str(alias.relative_to(source)): self.bytes[target]
+                    for alias, target in self.aliases.items()
+                    if alias.is_relative_to(source)
+                }
+            )
+            digest = content_sha256(canonical_json({name: content_sha256(data) for name, data in files.items()}))
+            destination = root / ("native-delivery-evidence-" + digest)
+            if retain:
+                if destination.exists() or destination.is_symlink():
+                    if destination.is_symlink() or not destination.is_dir():
+                        raise BenchmarkInputError("retained_bundle_conflict")
+                    for name, data in files.items():
+                        target = destination / name
+                        if target.resolve() != target.absolute() or target.read_bytes() != data:
+                            raise BenchmarkInputError("retained_bundle_conflict")
+                else:
+                    with tempfile.TemporaryDirectory(dir=root, prefix=".native-delivery-") as temporary:
+                        bundle = Path(temporary) / "bundle"
+                        bundle.mkdir()
+                        for name, data in files.items():
+                            target = bundle / name
+                            target.parent.mkdir(parents=True, exist_ok=True)
+                            target.write_bytes(data)
+                        os.rename(bundle, destination)
+            destinations[source] = destination
+        for reference, original in self.references:
+>           source = max((p for p in destinations if original.is_relative_to(p)), key=lambda p: len(p.parts))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: max() iterable argument is empty
+
+src/dpone/runtime/native_delivery_benchmark_artifacts.py:127: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_mssql_native_delivery_integration.py::test_real_producer_symlink_envelope_keeps_exported_proof_bundle

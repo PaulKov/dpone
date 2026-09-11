@@ -1,0 +1,12 @@
+{
+  "source_commit": "7c25ce910ff4e3a929b46aa01237840ae92ef512",
+  "observation_author": "coordinator read-only process observation",
+  "scope": "Exclusive full-suite slot only among DDA tasks; host is shared with unrelated task runs.",
+  "observed_other_work": [
+    "broad pytest in separate archived checkout",
+    "broad pytest in separate ec30 worktree",
+    "other focused PostgreSQL and metrics work"
+  ],
+  "action": "No other task processes, CPU limits, timeouts or tests changed. Continue own two-worker run and assess actual result.",
+  "limitation": "Run duration is not performance evidence."
+}

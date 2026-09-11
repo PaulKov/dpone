@@ -1,0 +1,39 @@
+{
+  "name": "module-size",
+  "command": [
+    "uv",
+    "run",
+    "dpone",
+    "docs",
+    "check-module-size",
+    "--baseline",
+    "docs/module_size_baseline.json",
+    "--base-ref",
+    "d5ad9aaecc900c24df421b160ed36b4cfc726e45",
+    "--head-ref",
+    "d8b09de644ab3bf72f9eee7b51cc8b8e38ca8a3c"
+  ],
+  "head": "d8b09de644ab3bf72f9eee7b51cc8b8e38ca8a3c",
+  "planning_dependency": "f3682940f8864563cde0e6b6ecee60f746b49020",
+  "source_before": {
+    "head": "d8b09de644ab3bf72f9eee7b51cc8b8e38ca8a3c",
+    "tree": "30ff7375be11a260fbb992eb799931a24871de3c",
+    "source_sha256": "a6f8717b4444510a6f26a63f54941f26219d8a6c02da8900b077291b22392eda",
+    "producer_sha256": "f18ac4a1b4eef923a81f38700f28fa0c598a34adcc23232dacdb044201d58707"
+  },
+  "source_after": {
+    "head": "d8b09de644ab3bf72f9eee7b51cc8b8e38ca8a3c",
+    "tree": "30ff7375be11a260fbb992eb799931a24871de3c",
+    "source_sha256": "a6f8717b4444510a6f26a63f54941f26219d8a6c02da8900b077291b22392eda",
+    "producer_sha256": "f18ac4a1b4eef923a81f38700f28fa0c598a34adcc23232dacdb044201d58707"
+  },
+  "source_unchanged": true,
+  "dirty": true,
+  "status": "PASS",
+  "reason": null,
+  "exit_code": 0,
+  "duration_seconds": 9.829,
+  "log": "module-size.log",
+  "execution": "hermetic",
+  "pytest_auto_workers": 2
+}

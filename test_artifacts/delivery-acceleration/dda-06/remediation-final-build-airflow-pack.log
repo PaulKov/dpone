@@ -1,0 +1,6 @@
+Building source distribution...
+warning: `build_system.requires = ["uv-build>=0.9.18,<0.12.0"]` does not contain the current uv version 0.12.10
+warning: Found license classifier `License :: OSI Approved :: Apache Software License`. License classifiers are ambiguous and deprecated per PEP 639; projects should use `project.license` and `project.license-files` instead.
+Building wheel from source distribution...
+Successfully built dist/dpone_airflow_pack-0.76.0.tar.gz
+Successfully built dist/dpone_airflow_pack-0.76.0-py3-none-any.whl

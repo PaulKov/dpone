@@ -1,0 +1,88 @@
+FF.....FF                                                                [100%]
+=================================== FAILURES ===================================
+_ test_integrated_fresh_delivery_keeps_four_raw_and_two_prepared_readbacks[rows0] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3582/test_integrated_fresh_delivery0')
+rows = []
+
+    @pytest.mark.parametrize("rows", [[], [(7,), (7,), (7,)]])
+    def test_integrated_fresh_delivery_keeps_four_raw_and_two_prepared_readbacks(tmp_path, rows):
+        preparer, config, payload, connector, context, closed = delivery_fixture(tmp_path, rows)
+        prepared = preparer.stage(config, payload)
+        preparer.reverify(prepared)
+        raw_counts = [count for table, count in connector.read_counts.items() if "dpone_native_prepared_" not in table]
+        prepared_counts = [count for table, count in connector.read_counts.items() if "dpone_native_prepared_" in table]
+        assert raw_counts == [4] * max(1, (len(rows) + 1) // 2)
+>       assert prepared_counts == [2]
+E       assert [3] == [2]
+E         
+E         At index 0 diff: 3 != 2
+E         Use -v to get more diff
+
+tests/test_mssql_native_delivery_integration.py:162: AssertionError
+_ test_integrated_fresh_delivery_keeps_four_raw_and_two_prepared_readbacks[rows1] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3582/test_integrated_fresh_delivery1')
+rows = [(7,), (7,), (7,)]
+
+    @pytest.mark.parametrize("rows", [[], [(7,), (7,), (7,)]])
+    def test_integrated_fresh_delivery_keeps_four_raw_and_two_prepared_readbacks(tmp_path, rows):
+        preparer, config, payload, connector, context, closed = delivery_fixture(tmp_path, rows)
+        prepared = preparer.stage(config, payload)
+        preparer.reverify(prepared)
+        raw_counts = [count for table, count in connector.read_counts.items() if "dpone_native_prepared_" not in table]
+        prepared_counts = [count for table, count in connector.read_counts.items() if "dpone_native_prepared_" in table]
+>       assert raw_counts == [4] * max(1, (len(rows) + 1) // 2)
+E       assert [4, 4, 4] == [4, 4]
+E         
+E         Left contains one more item: 4
+E         Use -v to get more diff
+
+tests/test_mssql_native_delivery_integration.py:161: AssertionError
+_ test_integrated_tamper_is_rejected_at_each_retained_boundary[tamper5-prepared_content_changed] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3582/test_integrated_tamper_is_reje5')
+tamper = ('prepared', 2, 'n'), code = 'prepared_content_changed'
+
+    @pytest.mark.parametrize(
+        "tamper,code",
+        [(("raw", boundary, "n"), "typed_digest_mismatch") for boundary in range(1, 5)]
+        + [
+            (("prepared", 1, "n"), "prepared_digest_mismatch"),
+            (("prepared", 2, "n"), "prepared_content_changed"),
+            (("prepared", 2, "__dpone__load_id"), "prepared_content_changed"),
+        ],
+    )
+    def test_integrated_tamper_is_rejected_at_each_retained_boundary(tmp_path, tamper, code):
+        preparer, config, payload, _connector, context, closed = delivery_fixture(tmp_path, [(7,)], tamper=tamper)
+>       with pytest.raises(ValueError, match=code):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mssql_native_delivery_integration.py:181: Failed
+_ test_integrated_tamper_is_rejected_at_each_retained_boundary[tamper6-prepared_content_changed] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3582/test_integrated_tamper_is_reje6')
+tamper = ('prepared', 2, '__dpone__load_id'), code = 'prepared_content_changed'
+
+    @pytest.mark.parametrize(
+        "tamper,code",
+        [(("raw", boundary, "n"), "typed_digest_mismatch") for boundary in range(1, 5)]
+        + [
+            (("prepared", 1, "n"), "prepared_digest_mismatch"),
+            (("prepared", 2, "n"), "prepared_content_changed"),
+            (("prepared", 2, "__dpone__load_id"), "prepared_content_changed"),
+        ],
+    )
+    def test_integrated_tamper_is_rejected_at_each_retained_boundary(tmp_path, tamper, code):
+        preparer, config, payload, _connector, context, closed = delivery_fixture(tmp_path, [(7,)], tamper=tamper)
+>       with pytest.raises(ValueError, match=code):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mssql_native_delivery_integration.py:181: Failed
+=========================== short test summary info ============================
+FAILED tests/test_mssql_native_delivery_integration.py::test_integrated_fresh_delivery_keeps_four_raw_and_two_prepared_readbacks[rows0]
+FAILED tests/test_mssql_native_delivery_integration.py::test_integrated_fresh_delivery_keeps_four_raw_and_two_prepared_readbacks[rows1]
+FAILED tests/test_mssql_native_delivery_integration.py::test_integrated_tamper_is_rejected_at_each_retained_boundary[tamper5-prepared_content_changed]
+FAILED tests/test_mssql_native_delivery_integration.py::test_integrated_tamper_is_rejected_at_each_retained_boundary[tamper6-prepared_content_changed]

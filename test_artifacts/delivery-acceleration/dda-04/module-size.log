@@ -1,0 +1,8 @@
+INFO: Module size check OK
+Module size check for src/dpone
+Status: OK
+Thresholds: warn>450 LOC, fail>600 LOC; warn>350 SLOC, fail>400 SLOC
+Tracked debt entries: 51
+Debt policy: ratchet-v2
+Git identity: base=d5ad9aaecc900c24df421b160ed36b4cfc726e45, head=d8b09de644ab3bf72f9eee7b51cc8b8e38ca8a3c
+No module-size issues.

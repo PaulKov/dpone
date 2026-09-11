@@ -1,0 +1,22 @@
+{
+  "head": "ad5c117f89c7df33f2bdc2e1aa42d671ca8e0f1b",
+  "python": "3.12.11 (main, Sep 18 2025, 19:41:45) [Clang 20.1.4 ]",
+  "platform": "Darwin",
+  "architecture": "arm64",
+  "uv": "uv 0.12.10 (3c979abda 2026-09-04 aarch64-apple-darwin)",
+  "packages": {
+    "dpone": "0.76.0",
+    "dpone-native-accel": "0.76.0",
+    "pytest": "9.0.3",
+    "pytest-xdist": "3.8.0",
+    "psycopg": "3.3.4",
+    "pyarrow": "23.0.1",
+    "dbt-core": "1.12.3",
+    "dbt-sqlserver": "1.11.1",
+    "mypy": "1.19.1",
+    "ruff": "0.15.6",
+    "mkdocs": "1.6.1"
+  },
+  "preparation": "uv sync --locked --all-extras",
+  "live_services": "SKIP: no approved disposable environment"
+}

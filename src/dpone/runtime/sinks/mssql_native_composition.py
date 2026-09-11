@@ -5,13 +5,17 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.adapters.mssql_native_capacity import require_native_target_capacity
 from dpone.adapters.mssql_native_guard import native_stage_writer_scope
 from dpone.runtime.mssql_native_capacity import require_native_spool_capacity
 from dpone.runtime.mssql_native_chunks import BoundedNativeChunks
+from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session
 from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+
+if TYPE_CHECKING:
+    from dpone.ports.native_delivery_observer import NativeDeliveryObserver
 from dpone.runtime.sinks.mssql_native_import import MssqlNativeChunkImporter
 from dpone.runtime.sinks.mssql_native_prepare import NativeStageContext
 
@@ -34,6 +38,7 @@ def compose_native_stage_context(
     cancelled: Any,
     required_target_headroom_bytes: int,
     interval: Any = None,
+    observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
 ) -> NativeStageContext:
     """Wire independently owned importer sessions and real capacity/owner checks.
 
@@ -45,6 +50,7 @@ def compose_native_stage_context(
     schema authorities, plus a row source invoked only after target-only recovery
     found no journal.
     """
+    observations = delivery_session(observer)
     encoder = MssqlNativeEncoder(wire_contract, max_row_bytes=limits.max_row_bytes)
 
     @contextmanager
@@ -55,6 +61,7 @@ def compose_native_stage_context(
                 raise ValueError("mssql_native.importer_database_mismatch")
             yield MssqlNativeChunkImporter(
                 connector,
+                observer=observations,
                 options_factory=bcp_options_factory,
                 database=database,
                 schema=schema,
@@ -113,7 +120,10 @@ def compose_native_stage_context(
     return NativeStageContext(
         plan=plan,
         wire_contract=wire_contract,
-        executor=BoundedNativeChunks(store=store, importer_factory=importer_factory, work_dir=work_dir, limits=limits),
+        executor=BoundedNativeChunks(
+            store=store, importer_factory=importer_factory, work_dir=work_dir, limits=limits, observer=observations
+        ),
+        observer=observations,
         lease=lease,
         row_source=row_source,
         verify_receipts=verify,

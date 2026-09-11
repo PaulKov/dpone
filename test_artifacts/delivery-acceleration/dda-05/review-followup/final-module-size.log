@@ -1,0 +1,7 @@
+INFO: Module size check OK
+Module size check for tools/native_delivery_live_support
+Status: OK
+Thresholds: warn>450 LOC, fail>600 LOC; warn>350 SLOC, fail>400 SLOC
+Tracked debt entries: 0
+Debt policy: none
+No module-size issues.

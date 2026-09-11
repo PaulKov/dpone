@@ -1,0 +1,5 @@
+Subject: 9aa2a0ef9600644f1789b9de1b84b9ab9ba1d033
+Command: ['uv', 'run', '--locked', '--no-sync', 'dpone', 'docs', 'check-import-rules']
+INFO: Import rules OK
+✅ Import rules OK: no architectural import violations found.
+Exit: 0; elapsed_seconds: 4.94

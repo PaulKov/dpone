@@ -1,0 +1,33 @@
+{
+  "name": "mkdocs",
+  "command": [
+    "uv",
+    "run",
+    "mkdocs",
+    "build",
+    "--strict"
+  ],
+  "head": "039fe201c9c24c9f95f1b2af55794c384b2299c5",
+  "planning_dependency": "f3682940f8864563cde0e6b6ecee60f746b49020",
+  "source_before": {
+    "head": "039fe201c9c24c9f95f1b2af55794c384b2299c5",
+    "tree": "5ce03985f9501d9e351ee7732b79b825d5879048",
+    "source_sha256": "9aa7ab446560064dd950e812d6117af5a98ae42aaab5f3c9a308c1fe63085997",
+    "producer_sha256": "f18ac4a1b4eef923a81f38700f28fa0c598a34adcc23232dacdb044201d58707"
+  },
+  "source_after": {
+    "head": "039fe201c9c24c9f95f1b2af55794c384b2299c5",
+    "tree": "5ce03985f9501d9e351ee7732b79b825d5879048",
+    "source_sha256": "9aa7ab446560064dd950e812d6117af5a98ae42aaab5f3c9a308c1fe63085997",
+    "producer_sha256": "f18ac4a1b4eef923a81f38700f28fa0c598a34adcc23232dacdb044201d58707"
+  },
+  "source_unchanged": true,
+  "dirty": true,
+  "status": "PASS",
+  "reason": null,
+  "exit_code": 0,
+  "duration_seconds": 12.841,
+  "log": "mkdocs.log",
+  "execution": "hermetic",
+  "pytest_auto_workers": 2
+}

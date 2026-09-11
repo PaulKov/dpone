@@ -1,0 +1,21 @@
+{
+  "python": "3.12.11 (main, Sep 18 2025, 19:41:45) [Clang 20.1.4 ]",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "versions": {
+    "pyarrow": "23.0.1",
+    "psycopg": "3.3.4",
+    "google-cloud-bigquery": "3.42.2",
+    "google-cloud-storage": "3.12.1",
+    "dbt-core": "1.12.3",
+    "dbt-sqlserver": "1.11.1",
+    "dpone-native-accel": "0.76.0",
+    "boto3": "1.43.23",
+    "pytest": "9.0.3",
+    "pytest-xdist": "3.8.0"
+  },
+  "helper_modules_loaded_by_catalog": {
+    "dpone.runtime.sinks.mssql_native_prepared_digests": false,
+    "dpone.runtime.sinks.mssql_native_prepared_insert": false
+  },
+  "head": "3f37418f898bcd60f475ede8fbd89ca5ad24c7a4"
+}

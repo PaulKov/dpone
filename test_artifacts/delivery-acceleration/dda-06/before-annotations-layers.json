@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "name": "before-annotations-layers",
+  "command": [
+    "uv",
+    "run",
+    "dpone",
+    "docs",
+    "check-layer-metrics",
+    "--baseline",
+    "docs/layer_metrics_baseline.json"
+  ],
+  "source_before": {
+    "commit": "496715411c566b0d18f09e48465457f3db87878c",
+    "tree": "85225454af2b7555243c6fc39b0fac9c44a32954",
+    "source_sha256": "59d8da7c91630dac355693ba3913b064ce50dd1e67375845607d0da7c74fd25f",
+    "producer_sha256": "809974b5600d40cbd7c99f5c168bb6432ec9a7edffec241c5814bb0b8b5ece4b",
+    "working_tree_dirty": ""
+  },
+  "status": "FAIL",
+  "reason": null,
+  "execution": "local",
+  "platform": "macOS-26.3.2-arm64-arm-64bit",
+  "python": "3.12.11",
+  "log": "before-annotations-layers.log",
+  "pytest_auto_workers": 2,
+  "source_after": {
+    "commit": "496715411c566b0d18f09e48465457f3db87878c",
+    "tree": "85225454af2b7555243c6fc39b0fac9c44a32954",
+    "source_sha256": "59d8da7c91630dac355693ba3913b064ce50dd1e67375845607d0da7c74fd25f",
+    "producer_sha256": "809974b5600d40cbd7c99f5c168bb6432ec9a7edffec241c5814bb0b8b5ece4b",
+    "working_tree_dirty": ""
+  },
+  "source_unchanged": true,
+  "exit_code": 2,
+  "duration_seconds": 18.545,
+  "log_sha256": "8b677bbcf60f90474fe949beaa7c25dd419727379302be3a68d8962bce35c5dc"
+}

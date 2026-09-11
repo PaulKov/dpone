@@ -1,0 +1,429 @@
+{
+  "source_commit": "1281b83e2900cacf5dcf9201e3909464d5f7b659",
+  "preparer_source_sha256": "fd7233b91cbff8fc2dded1cf5dc83f1514f488ac1b6e653b117cd0e74c9f46ef",
+  "test_source_sha256": "c2f3a96b350e638a10b9cd24998256031711fcd8700e22bbba07c98d052e20c6",
+  "status": "PASS",
+  "scope": "Fourteen current typed legacy projection outputs cross-checked with explicit native row bytes and a directly constructed multiset JSON envelope. Uses the unchanged native encoder; does not claim independent wire certification or validate a future implementation. No new helper exists or is invoked.",
+  "cases": [
+    {
+      "case_index": 0,
+      "dtype": "int",
+      "value_repr": "-2147483648",
+      "legacy": {
+        "business_digest": "cb3b7fb3b569074a4ff3ed2eaa9b0ef23c9c26b96681e3aad22025088c57fb24",
+        "full_digest": "c86cf58397744231edfde3b439c743c00f1be364ae232c1fffc05277279164e3",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "0400000080",
+            "0400000080",
+            "ff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 76558757057916552277496413571787268741276999007081146392744321015789010127051]",
+          "digest": "cb3b7fb3b569074a4ff3ed2eaa9b0ef23c9c26b96681e3aad22025088c57fb24"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "04000000800a00720075006e002700ea96ffffffffffffffff",
+            "04000000800a00720075006e002700ea96ffffffffffffffff",
+            "ff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 98627419791750725709510703159019604183696249895883817940078588333304543059629]",
+          "digest": "c86cf58397744231edfde3b439c743c00f1be364ae232c1fffc05277279164e3"
+        }
+      }
+    },
+    {
+      "case_index": 1,
+      "dtype": "bigint",
+      "value_repr": "9223372036854775807",
+      "legacy": {
+        "business_digest": "85cc1040f9278a79dd61edd758521e8d4fd41e6ab46afb32c97b28934a40a0aa",
+        "full_digest": "d87f298f9a2fbac11dde47f53a923564bb1be58bdcb8de4c94d6f6b1f3e835ed",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "08ffffffffffffff7f",
+            "08ffffffffffffff7f",
+            "ff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 94392399217798520987420821536765667099802760483547882411461143492957192267537]",
+          "digest": "85cc1040f9278a79dd61edd758521e8d4fd41e6ab46afb32c97b28934a40a0aa"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "08ffffffffffffff7f0a00720075006e002700ea96ffffffffffffffff",
+            "08ffffffffffffff7f0a00720075006e002700ea96ffffffffffffffff",
+            "ff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 4645312795381612855221836095239578215127160013560608054770744381174444369901]",
+          "digest": "d87f298f9a2fbac11dde47f53a923564bb1be58bdcb8de4c94d6f6b1f3e835ed"
+        }
+      }
+    },
+    {
+      "case_index": 2,
+      "dtype": "nvarchar(40)",
+      "value_repr": "\"O'Brien \u96ea \ud83d\ude00\"",
+      "legacy": {
+        "business_digest": "0d847956b3ef993ff9878813d6e0ad4a4f14ac3bdd73b0090d38d6b6daaa53aa",
+        "full_digest": "11efe97ca76e8b17759a55db467234f1eaefe44c3b1118476cf01ed434c03bfd",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "18004f00270042007200690065006e002000ea9620003dd800de",
+            "18004f00270042007200690065006e002000ea9620003dd800de",
+            "ffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 92658796009679346382800640173706714775891619789032747561017771651012268606421]",
+          "digest": "0d847956b3ef993ff9878813d6e0ad4a4f14ac3bdd73b0090d38d6b6daaa53aa"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "18004f00270042007200690065006e002000ea9620003dd800de0a00720075006e002700ea96ffffffffffffffff",
+            "18004f00270042007200690065006e002000ea9620003dd800de0a00720075006e002700ea96ffffffffffffffff",
+            "ffff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 75537450546783391318402189552325894654754552433099816586598010095354584534358]",
+          "digest": "11efe97ca76e8b17759a55db467234f1eaefe44c3b1118476cf01ed434c03bfd"
+        }
+      }
+    },
+    {
+      "case_index": 3,
+      "dtype": "nvarchar(40)",
+      "value_repr": "''",
+      "legacy": {
+        "business_digest": "9e310a1cdd3bc92d0a71877b8cb952c24ea5c8ffbae404f8824da191c37c3ea3",
+        "full_digest": "35356fb0f2446dd2f0203e99303c656fd391ca9b6783db9d9487520078748f1b",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "0000",
+            "0000",
+            "ffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 111927978851869721194132296718532358809138338731986734865016007920130126348617]",
+          "digest": "9e310a1cdd3bc92d0a71877b8cb952c24ea5c8ffbae404f8824da191c37c3ea3"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "00000a00720075006e002700ea96ffffffffffffffff",
+            "00000a00720075006e002700ea96ffffffffffffffff",
+            "ffff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 97059180484039169221175739283295988884759882836947939162566826587934532330786]",
+          "digest": "35356fb0f2446dd2f0203e99303c656fd391ca9b6783db9d9487520078748f1b"
+        }
+      }
+    },
+    {
+      "case_index": 4,
+      "dtype": "nvarchar(40)",
+      "value_repr": "'NULL\\x00'",
+      "legacy": {
+        "business_digest": "151dac96c67016b14c1684d56e69adb48cfef2d7ca6047917751c17bb47dbdcc",
+        "full_digest": "1f8a3834a01e20a5b07ea179734cb59a3163e19219845b54a307b20f85690914",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "0a004e0055004c004c000000",
+            "0a004e0055004c004c000000",
+            "ffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 75537357488858670171675734300575447231224466659020122366604281463949206264107]",
+          "digest": "151dac96c67016b14c1684d56e69adb48cfef2d7ca6047917751c17bb47dbdcc"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "0a004e0055004c004c0000000a00720075006e002700ea96ffffffffffffffff",
+            "0a004e0055004c004c0000000a00720075006e002700ea96ffffffffffffffff",
+            "ffff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 10517969602227433101996056009505634958298636753089341686008471389062187367972]",
+          "digest": "1f8a3834a01e20a5b07ea179734cb59a3163e19219845b54a307b20f85690914"
+        }
+      }
+    },
+    {
+      "case_index": 5,
+      "dtype": "varbinary(40)",
+      "value_repr": "b\"\\x00\\xff'\\x00\"",
+      "legacy": {
+        "business_digest": "ef1a7cc32e40fc9f2c38e76f648afd42d4894b3b91a3ed14a0c5940f19e16f6e",
+        "full_digest": "0b065c928fd6a7731e81be2df8d85b870e3d1cae402fbe22ea028babbd3b9fe9",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "040000ff2700",
+            "040000ff2700",
+            "ffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 82456789094376088791185399444273928640561074201247104495441154159034353227661]",
+          "digest": "ef1a7cc32e40fc9f2c38e76f648afd42d4894b3b91a3ed14a0c5940f19e16f6e"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "040000ff27000a00720075006e002700ea96ffffffffffffffff",
+            "040000ff27000a00720075006e002700ea96ffffffffffffffff",
+            "ffff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 93574578157926925000375609675695204545739330490410842278648074093272806123630]",
+          "digest": "0b065c928fd6a7731e81be2df8d85b870e3d1cae402fbe22ea028babbd3b9fe9"
+        }
+      }
+    },
+    {
+      "case_index": 6,
+      "dtype": "varbinary(40)",
+      "value_repr": "b''",
+      "legacy": {
+        "business_digest": "9e310a1cdd3bc92d0a71877b8cb952c24ea5c8ffbae404f8824da191c37c3ea3",
+        "full_digest": "35356fb0f2446dd2f0203e99303c656fd391ca9b6783db9d9487520078748f1b",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "0000",
+            "0000",
+            "ffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 111927978851869721194132296718532358809138338731986734865016007920130126348617]",
+          "digest": "9e310a1cdd3bc92d0a71877b8cb952c24ea5c8ffbae404f8824da191c37c3ea3"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "00000a00720075006e002700ea96ffffffffffffffff",
+            "00000a00720075006e002700ea96ffffffffffffffff",
+            "ffff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 97059180484039169221175739283295988884759882836947939162566826587934532330786]",
+          "digest": "35356fb0f2446dd2f0203e99303c656fd391ca9b6783db9d9487520078748f1b"
+        }
+      }
+    },
+    {
+      "case_index": 7,
+      "dtype": "decimal(38,9)",
+      "value_repr": "Decimal('-12345678901234567890123456789.123456789')",
+      "legacy": {
+        "business_digest": "46befe21e07a6df422177bcfb8d99349e0649368a0ae13b423be04acdd2eeb06",
+        "full_digest": "8989898ee97c837b829957ec0bcb73e8bca133008d863dc2aa37298190bd242d",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "13260900155fd8e4509049c4133302f0f6b04909",
+            "13260900155fd8e4509049c4133302f0f6b04909",
+            "ff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 12253503060507569570101065822967893685162819950866225604447922056835390395701]",
+          "digest": "46befe21e07a6df422177bcfb8d99349e0649368a0ae13b423be04acdd2eeb06"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "13260900155fd8e4509049c4133302f0f6b049090a00720075006e002700ea96ffffffffffffffff",
+            "13260900155fd8e4509049c4133302f0f6b049090a00720075006e002700ea96ffffffffffffffff",
+            "ff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 72229541554104572543210597846883851237951378034711376598209797936814492696709]",
+          "digest": "8989898ee97c837b829957ec0bcb73e8bca133008d863dc2aa37298190bd242d"
+        }
+      }
+    },
+    {
+      "case_index": 8,
+      "dtype": "date",
+      "value_repr": "datetime.date(1, 1, 1)",
+      "legacy": {
+        "business_digest": "2f6dd79b858a8a0704b661283a5c35ee55feb915c94829be8a0efb1f7cbda13f",
+        "full_digest": "74517772a37f80adea6b7539c4ebf9c2b99461c60271c59805b3e834e9b34ae6",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "03000000",
+            "03000000",
+            "ff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 102813472156770314628155792903966630653630455576242690650164620857057134071417]",
+          "digest": "2f6dd79b858a8a0704b661283a5c35ee55feb915c94829be8a0efb1f7cbda13f"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "030000000a00720075006e002700ea96ffffffffffffffff",
+            "030000000a00720075006e002700ea96ffffffffffffffff",
+            "ff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 114496017583713195337909350520349340898476396705709762931342232844533172046827]",
+          "digest": "74517772a37f80adea6b7539c4ebf9c2b99461c60271c59805b3e834e9b34ae6"
+        }
+      }
+    },
+    {
+      "case_index": 9,
+      "dtype": "time(7)",
+      "value_repr": "_MssqlTime(23, 59, 59, 999999)",
+      "legacy": {
+        "business_digest": "0c21f9b0386e561c2c7c02e7e3d0088c0f40f87740c24da2b422e287ee673838",
+        "full_digest": "ab16a2a90e79066ddaeb675ce941f58d5c30aea392c140290a0aad6b9f46de73",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "05ffbf692ac9",
+            "05ffbf692ac9",
+            "ff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 102380216876613298964224924975931973964865834333107819072722641578924529358431]",
+          "digest": "0c21f9b0386e561c2c7c02e7e3d0088c0f40f87740c24da2b422e287ee673838"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "05ffbf692ac90a00720075006e002700ea96ffffffffffffffff",
+            "05ffbf692ac90a00720075006e002700ea96ffffffffffffffff",
+            "ff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 92343168282000045643776696468360364102723303177118051518693788124366183034473]",
+          "digest": "ab16a2a90e79066ddaeb675ce941f58d5c30aea392c140290a0aad6b9f46de73"
+        }
+      }
+    },
+    {
+      "case_index": 10,
+      "dtype": "datetime2(7)",
+      "value_repr": "_MssqlDateTime2(9999, 12, 31, 23, 59, 59, 999999)",
+      "legacy": {
+        "business_digest": "c35da03b7eadf27954db5b717d59d94ac332af7ca30c57093242a5b6169d9f21",
+        "full_digest": "2c71c6de0b78fd2cf234069497c90dd224086538b7b532f46ba48e26f19f7a40",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "08ffbf692ac9dab937",
+            "08ffbf692ac9dab937",
+            "ff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 93778679627099521122440083933738207794771693301362402439451408371239429926041]",
+          "digest": "c35da03b7eadf27954db5b717d59d94ac332af7ca30c57093242a5b6169d9f21"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "08ffbf692ac9dab9370a00720075006e002700ea96ffffffffffffffff",
+            "08ffbf692ac9dab9370a00720075006e002700ea96ffffffffffffffff",
+            "ff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 28349183223291722484549324376021290748124468202332426370707272020037777732997]",
+          "digest": "2c71c6de0b78fd2cf234069497c90dd224086538b7b532f46ba48e26f19f7a40"
+        }
+      }
+    },
+    {
+      "case_index": 11,
+      "dtype": "datetimeoffset(7)",
+      "value_repr": "datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(seconds=50400)))",
+      "legacy": {
+        "business_digest": "734831586f4be7e5e7efa22686f37fcb25e1aff8ef3b1db497e99a59a119759b",
+        "full_digest": "2c7dcc3ed9619d437a0fe6b1845056975facc26fa58c22f609d4b5f7c9cfd46b",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "0a0010acd1531f490b4803",
+            "0a0010acd1531f490b4803",
+            "ff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 104483689886330789564044852924448502425177903943517614637446678039029101023757]",
+          "digest": "734831586f4be7e5e7efa22686f37fcb25e1aff8ef3b1db497e99a59a119759b"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "0a0010acd1531f490b48030a00720075006e002700ea96ffffffffffffffff",
+            "0a0010acd1531f490b48030a00720075006e002700ea96ffffffffffffffff",
+            "ff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 652818676745269715973876466648930330929768515109630317465622735293702865245]",
+          "digest": "2c7dcc3ed9619d437a0fe6b1845056975facc26fa58c22f609d4b5f7c9cfd46b"
+        }
+      }
+    },
+    {
+      "case_index": 12,
+      "dtype": "uniqueidentifier",
+      "value_repr": "UUID('00112233-4455-6677-8899-aabbccddeeff')",
+      "legacy": {
+        "business_digest": "9342ade4be9735212bcb7313c878664ce41dab2ece1bbbad05475b2e3b44b86c",
+        "full_digest": "145617c61366a59f0e116c7b42fb669e471da49c02c586673b7ed83b944908e1",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "1033221100554477668899aabbccddeeff",
+            "1033221100554477668899aabbccddeeff",
+            "ff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 99778488204968109915775467383654773972762771415317756002110605256872249613417]",
+          "digest": "9342ade4be9735212bcb7313c878664ce41dab2ece1bbbad05475b2e3b44b86c"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "1033221100554477668899aabbccddeeff0a00720075006e002700ea96ffffffffffffffff",
+            "1033221100554477668899aabbccddeeff0a00720075006e002700ea96ffffffffffffffff",
+            "ff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 7229161964489187844798238794365550264678334224822860813538917521545369048065]",
+          "digest": "145617c61366a59f0e116c7b42fb669e471da49c02c586673b7ed83b944908e1"
+        }
+      }
+    },
+    {
+      "case_index": 13,
+      "dtype": "float",
+      "value_repr": "0.125",
+      "legacy": {
+        "business_digest": "20723197bd1dd8169f54571d8ec718dcd7380431d56ffd49dbcc77c2aa671039",
+        "full_digest": "0d2697f995db9463b112ec55219c0dea7efe5619e07f0a973bfb1d9c8afdb3dc",
+        "rows": 3
+      },
+      "projections": {
+        "business": {
+          "row_bytes_hex": [
+            "08000000000000c03f",
+            "08000000000000c03f",
+            "ff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 87424162349258052951836560670270090844263478460562404467281939646126126817233]",
+          "digest": "20723197bd1dd8169f54571d8ec718dcd7380431d56ffd49dbcc77c2aa671039"
+        },
+        "full": {
+          "row_bytes_hex": [
+            "08000000000000c03f0a00720075006e002700ea96ffffffffffffffff",
+            "08000000000000c03f0a00720075006e002700ea96ffffffffffffffff",
+            "ff0a00720075006e002700ea96ffffffffffffffff"
+          ],
+          "envelope_utf8": "[\"mssql-native-sha256-sum-v1\", 3, 104890035469923757887651179447471907373001597533452667403588868372238031991933]",
+          "digest": "0d2697f995db9463b112ec55219c0dea7efe5619e07f0a973bfb1d9c8afdb3dc"
+        }
+      }
+    }
+  ]
+}

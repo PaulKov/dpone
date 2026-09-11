@@ -1,0 +1,39 @@
+{
+  "name": "focused-current",
+  "command": [
+    "uv",
+    "run",
+    "--locked",
+    "--no-sync",
+    "pytest",
+    "tests/test_mssql_native_partition_switch.py",
+    "tests/test_mssql_native_partition_switch_catalog.py",
+    "tests/test_mssql_native_partition_switch_recovery.py",
+    "tests/test_runtime_partition_replace_native_contracts.py",
+    "test_artifacts/delivery-acceleration/dda-04/test_check_evidence.py",
+    "-q"
+  ],
+  "head": "e0fbad8b62f9b432fbba42c14af646ca3960919b",
+  "planning_dependency": "f3682940f8864563cde0e6b6ecee60f746b49020",
+  "source_before": {
+    "head": "e0fbad8b62f9b432fbba42c14af646ca3960919b",
+    "tree": "92126b2bd4deaf3eb1c60e792051264e0a9ec032",
+    "source_sha256": "9aa7ab446560064dd950e812d6117af5a98ae42aaab5f3c9a308c1fe63085997",
+    "producer_sha256": "f18ac4a1b4eef923a81f38700f28fa0c598a34adcc23232dacdb044201d58707"
+  },
+  "source_after": {
+    "head": "e0fbad8b62f9b432fbba42c14af646ca3960919b",
+    "tree": "92126b2bd4deaf3eb1c60e792051264e0a9ec032",
+    "source_sha256": "9aa7ab446560064dd950e812d6117af5a98ae42aaab5f3c9a308c1fe63085997",
+    "producer_sha256": "f18ac4a1b4eef923a81f38700f28fa0c598a34adcc23232dacdb044201d58707"
+  },
+  "source_unchanged": true,
+  "dirty": true,
+  "status": "PASS",
+  "reason": null,
+  "exit_code": 0,
+  "duration_seconds": 21.409,
+  "log": "focused-current.log",
+  "execution": "hermetic",
+  "pytest_auto_workers": 2
+}

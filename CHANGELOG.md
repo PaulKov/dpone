@@ -2,8 +2,23 @@
 
 ## Unreleased
 
+### Changed
+
+- Reduce bounded native MSSQL preparation to one metadata-bearing INSERT and one
+  dual-digest iterator; preserve all four raw checks and the independent prepared
+  prepublication check. Reuse frame sizes without removing native-file validation.
+- Add optional bounded phase observations and offline benchmark comparison with
+  explicit missing-evidence results. Existing manifests, bytes, journals and
+  recovery remain compatible. SQL Server partition SWITCH is an isolated,
+  unregistered component; public native SWITCH remains rejected before I/O.
+  See [delivery acceleration](docs/delivery-acceleration/index.md). Live fidelity
+  and measured performance remain unverified.
+
 ### Fixed
 
+- Keep the delivery benchmark launch compatible with the pinned baseline's
+  canonical limit model. Require the final report verdict in both live delivery
+  tests, including identity failures detected after successful component proofs.
 - Honor PostgreSQL load strategies for internal-query artifacts. Default full
   refresh preserves existing target identity and constraints; explicit exchange
   uses one sink-owned transaction without destructive post-rollback compensation.
