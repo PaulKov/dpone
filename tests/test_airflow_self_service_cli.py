@@ -28,6 +28,7 @@ from dpone.manifest.confined_mutations import ConfinedReplaceOutcome
 from dpone.readiness import airflow_loader_migration as airflow_loader_migration_module
 from dpone.readiness.airflow_live_preflight import LivePreflightContext
 from dpone.readiness.airflow_self_service_composition import build_airflow_self_service_service
+from dpone.readiness.airflow_self_service_deployment import build_deployment_result
 from dpone.readiness.airflow_self_service_models import SelfServiceResult
 from dpone.readiness.airflow_self_service_templates import airflow_loader_template
 from dpone.security_redaction import REDACTION_TOKEN
@@ -2422,6 +2423,75 @@ def test_airflow_build_forbids_composition_supervisor_for_v1_release(
     assert code == 1
     assert stderr == ""
     assert json.loads(stdout)["errors"][0]["code"] == "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN"
+    assert not (tmp_path / ".dpone-cache" / "deployments").exists()
+
+
+def test_airflow_build_facade_forwards_composition_supervisor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _run_cli(["init", "project", "--airflow", "--format", "json"], capsys)
+    release_id = _write_airflow_build_release(tmp_path)
+    runtime_image_digest = "sha256:" + "b" * 64
+
+    result = build_deployment_result(
+        root=tmp_path,
+        release_id=release_id,
+        environment="dev",
+        trust_tier="non_production",
+        runtime_image_ref=f"registry.example/dpone-runtime@{runtime_image_digest}",
+        runtime_image_digest=runtime_image_digest,
+        artifact_registry_ref="dpone-dev-artifacts",
+        registry_config_ref={
+            "kind": "kubernetes_config_map",
+            "name": "dpone-artifact-registry",
+            "key": "registry.json",
+            "sha256": "sha256:" + "c" * 64,
+        },
+        airflow_bundle_ref="git:" + "7" * 40,
+        composition_supervisor={
+            "schema": "dpone.composition-supervisor.v1",
+            "persistent_volume_claim": "dpone-composition-supervisor",
+            "child_uid_start": 1_000_000_000,
+            "child_gid_start": 1_000_000_000,
+            "child_identity_count": 1_000_000,
+        },
+    )
+
+    assert result.errors[0]["code"] == "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN"
+    assert not (tmp_path / ".dpone-cache" / "deployments").exists()
+
+
+def test_airflow_build_with_supervisor_preserves_partial_config_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    release_id = _write_airflow_build_release(tmp_path)
+    runtime_image_digest = "sha256:" + "b" * 64
+    args = [
+        "airflow",
+        "build",
+        "--release-id",
+        release_id,
+        "--environment",
+        "dev",
+        *_strict_airflow_build_args(runtime_image_digest),
+        *_composition_supervisor_args(),
+        "--format",
+        "json",
+    ]
+    option_index = args.index("--registry-config-map-name")
+    del args[option_index : option_index + 2]
+
+    code, stdout, stderr = _run_cli(args, capsys)
+
+    assert code == 2
+    assert stderr == ""
+    assert json.loads(stdout)["errors"][0]["code"] == "DPONE_DEPLOYMENT_CONFIG_REF_INVALID"
     assert not (tmp_path / ".dpone-cache" / "deployments").exists()
 
 

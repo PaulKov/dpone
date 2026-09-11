@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from dpone.contracts.airflow_deployment import deployment_id, is_canonical_sha256_digest
+from dpone.contracts.composition_supervisor import CompositionSupervisorProjection
 
 _MIRRORED_FIELDS = (
     "binding_set_ref",
@@ -17,6 +18,7 @@ _MIRRORED_FIELDS = (
     "airflow_bundle_ref",
     "runtime_artifact_delivery",
     "dev_evidence_delivery",
+    "composition_supervisor",
     "mssql_asset_outlet_projection",
 )
 _DELIVERY_MODES = frozenset({"local_preview", "init_fetch", "shared_pvc", "embedded_bundle", "csi_volume", "inline"})
@@ -44,6 +46,8 @@ class DeploymentProjectionViolation:
 def deployment_projection_violation(
     deployment: Mapping[str, Any],
     airflow_index: Mapping[str, Any],
+    *,
+    release_schema: str | None = None,
 ) -> DeploymentProjectionViolation | None:
     """Return the first deterministic identity or mirror-contract violation."""
 
@@ -103,19 +107,80 @@ def deployment_projection_violation(
     projection_violation = _mssql_outlet_projection_mirror_violation(deployment, airflow_index)
     if projection_violation is not None:
         return projection_violation
+    supervisor_violation = _composition_supervisor_mirror_violation(
+        deployment,
+        airflow_index,
+        release_schema=release_schema,
+    )
+    if supervisor_violation is not None:
+        return supervisor_violation
     if deployment_id(deployment) != declared_id:
         return _violation(
             "DPONE_DEPLOYMENT_FINGERPRINT_MISMATCH",
             "deployment content does not match its content-addressed identity",
         )
     for field in _MIRRORED_FIELDS:
-        if field == "mssql_asset_outlet_projection":
+        if field in {"composition_supervisor", "mssql_asset_outlet_projection"}:
             continue
         if deployment.get(field) != airflow_index.get(field):
             return _violation(
                 "DPONE_DEPLOYMENT_INDEX_MIRROR_MISMATCH",
                 f"deployment field {field} does not match the Airflow index",
             )
+    return None
+
+
+def _composition_supervisor_mirror_violation(
+    deployment: Mapping[str, Any],
+    airflow_index: Mapping[str, Any],
+    *,
+    release_schema: str | None,
+) -> DeploymentProjectionViolation | None:
+    deployment_projection = deployment.get("composition_supervisor")
+    index_projection = airflow_index.get("composition_supervisor")
+    if release_schema == "dpone.release-set.v3" and (deployment_projection is None or index_projection is None):
+        return _violation(
+            "DPONE_COMPOSITION_SUPERVISOR_REQUIRED",
+            "release-set v3 requires composition supervisor in deployment and airflow index",
+        )
+    if deployment_projection is None and index_projection is None:
+        return None
+    if deployment_projection is None or index_projection is None or deployment_projection != index_projection:
+        return _violation(
+            "DPONE_COMPOSITION_SUPERVISOR_MISMATCH",
+            "composition supervisor must mirror exactly between deployment and airflow index",
+        )
+    if release_schema is not None and release_schema != "dpone.release-set.v3":
+        return _violation(
+            "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN",
+            "composition supervisor is forbidden for non-composition releases",
+        )
+    if (
+        deployment.get("schema") != "dpone.deployment-set.v3"
+        or airflow_index.get("schema") != "dpone.airflow-deployment-index.v3"
+    ):
+        return _violation(
+            "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN",
+            "composition supervisor is forbidden on v1/v2 deployment wires",
+        )
+    if not isinstance(deployment_projection, Mapping) or not isinstance(index_projection, Mapping):
+        return _violation(
+            "DPONE_COMPOSITION_SUPERVISOR_INVALID",
+            "composition supervisor deployment capability is invalid",
+        )
+    try:
+        deployment_value = CompositionSupervisorProjection.from_mapping(deployment_projection)
+        index_value = CompositionSupervisorProjection.from_mapping(index_projection)
+    except ValueError:
+        return _violation(
+            "DPONE_COMPOSITION_SUPERVISOR_INVALID",
+            "composition supervisor deployment capability is invalid",
+        )
+    if deployment_value != index_value:
+        return _violation(
+            "DPONE_COMPOSITION_SUPERVISOR_MISMATCH",
+            "composition supervisor must mirror exactly between deployment and airflow index",
+        )
     return None
 
 

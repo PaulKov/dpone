@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from dpone.contracts.airflow_deployment_projection import deployment_projection_violation
-from dpone.contracts.composition_supervisor import CompositionSupervisorProjection
 from dpone.runtime.deployment_cache_common import (
     DeploymentCacheError,
     open_regular_file,
@@ -196,12 +194,6 @@ class DeploymentCacheProjectionValidator:
             deployment_path=deployment_path,
             index_path=index_path,
         )
-        _validate_supervisor_projection_mirror(
-            deployment,
-            index,
-            deployment_path=deployment_path,
-            index_path=index_path,
-        )
         violation = deployment_projection_violation(deployment, index)
         if violation is not None:
             violation_path = (
@@ -276,50 +268,6 @@ def _validate_headers(
             "deployment and airflow index schema wires do not match",
             path=index_path.as_posix(),
         )
-
-
-def _validate_supervisor_projection_mirror(
-    deployment: Mapping[str, Any],
-    index: Mapping[str, Any],
-    *,
-    deployment_path: Path | None = None,
-    index_path: Path | None = None,
-) -> None:
-    """Validate an optional v3-only supervisor capability on both documents."""
-
-    deployment_projection = deployment.get("composition_supervisor")
-    index_projection = index.get("composition_supervisor")
-    if deployment_projection is None and index_projection is None:
-        return
-    if deployment_projection is None or index_projection is None or deployment_projection != index_projection:
-        raise DeploymentCacheError(
-            "DPONE_COMPOSITION_SUPERVISOR_MISMATCH",
-            "composition supervisor must mirror exactly between deployment and airflow index",
-            path=index_path.as_posix() if index_path is not None else None,
-        )
-    if (
-        deployment.get("schema") != "dpone.deployment-set.v3"
-        or index.get("schema") != "dpone.airflow-deployment-index.v3"
-    ):
-        raise DeploymentCacheError(
-            "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN",
-            "composition supervisor is forbidden on v1/v2 deployment wires",
-            path=deployment_path.as_posix() if deployment_path is not None else None,
-        )
-    if not isinstance(deployment_projection, Mapping):
-        raise DeploymentCacheError(
-            "DPONE_COMPOSITION_SUPERVISOR_INVALID",
-            "composition supervisor deployment capability is invalid",
-            path=deployment_path.as_posix() if deployment_path is not None else None,
-        )
-    try:
-        CompositionSupervisorProjection.from_mapping(deployment_projection)
-    except ValueError as exc:
-        raise DeploymentCacheError(
-            "DPONE_COMPOSITION_SUPERVISOR_INVALID",
-            "composition supervisor deployment capability is invalid",
-            path=deployment_path.as_posix() if deployment_path is not None else None,
-        ) from exc
 
 
 def _require_regular_file(path: Path, *, missing_code: str, invalid_code: str, label: str) -> None:

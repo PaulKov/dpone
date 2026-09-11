@@ -115,11 +115,17 @@ def test_deployment_projection_violation_surfaces_mssql_mismatch_code() -> None:
     assert violation.code == PROJECTION_MISMATCH
 
 
-def test_v3_wire_requires_projection_v2_stays_exact() -> None:
+def test_v3_wire_requires_one_v3_capability_and_v2_stays_exact() -> None:
     v2 = get_gitops_schema_contract("dpone.airflow-deployment-index.v2")
     v3 = get_gitops_schema_contract("dpone.airflow-deployment-index.v3")
     assert "mssql_asset_outlet_projection" not in v2.schema["properties"]
-    assert "mssql_asset_outlet_projection" in v3.schema["required"]
+    assert {"composition_supervisor", "mssql_asset_outlet_projection"} <= set(v3.schema["properties"])
+    assert {
+        "anyOf": [
+            {"required": ["composition_supervisor"]},
+            {"required": ["mssql_asset_outlet_projection"]},
+        ]
+    } in v3.schema["allOf"]
 
 
 def test_old_v2_exact_mapping_rejects_mssql_projection_field() -> None:

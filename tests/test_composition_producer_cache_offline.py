@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from dpone_airflow_pack.deployment_index_contract import load_airflow_deployment_index
 
 from dpone.app.release_composition import (
     build_composition_source_reader,
@@ -51,6 +52,13 @@ MAX_SOURCE_BYTES = 1_000_000
 ACTIVATION_ID = "10000000-0000-4000-8000-000000000001"
 OFFLINE_EVIDENCE = canonical_fingerprint({"test_double": "NOT_LIVE_CERTIFICATION"})
 CELLS = frozenset({"sqlserver_dbt_v1", "mssql_clickhouse_full_refresh_v1", "postgres_mssql_full_refresh_v1"})
+SUPERVISOR = {
+    "schema": "dpone.composition-supervisor.v1",
+    "persistent_volume_claim": "dpone-composition-supervisor",
+    "child_uid_start": 1_000_000_000,
+    "child_gid_start": 1_000_000_000,
+    "child_identity_count": 1_000_000,
+}
 
 
 def _full_refresh_snapshot():
@@ -185,6 +193,61 @@ def producer_composition(tmp_path, monkeypatch):
     return Path(installed.release_dir), installed.release_id
 
 
+def test_supervised_composition_without_mssql_outlets_uses_v3_wire(tmp_path, monkeypatch):
+    native = _native_release(tmp_path, monkeypatch)
+    ordinary = ordinary_root(tmp_path)
+    service = build_release_composition_service()
+    inventory = service.inventory(ordinary, xcom_sidecar_image=native_helpers.SIDECAR)
+    request = ReleaseCompositionRequest(
+        native_root=Path(native.release_dir),
+        expected_release_id=native.release_id,
+        standalone_root=ordinary,
+        expected_inventory_sha256=inventory["inventory_sha256"],
+        output_dir=tmp_path / "composed",
+        xcom_sidecar_image=native_helpers.SIDECAR,
+    )
+    report = service.compose(request)
+    assert report.passed, report.blockers
+    installed = materialize_compact_pack_release(
+        pack_root=request.output_dir,
+        cache_root=tmp_path / ".dpone-cache",
+        xcom_sidecar_image=native_helpers.SIDECAR,
+    )
+    assert installed.passed, installed.blockers
+    _write_environment(tmp_path)
+
+    projection = AirflowDeploymentProjectionService(root=tmp_path).materialize(
+        release_id=installed.release_id,
+        environment="prod",
+        trust_tier="non_production",
+        runtime_image_ref=native_helpers.IMAGE,
+        runtime_image_digest=native_helpers.IMAGE.split("@")[-1],
+        artifact_registry_ref="synthetic-artifacts",
+        registry_config_ref=_config_map_ref("registry", "1"),
+        trust_policy_ref=_config_map_ref("policy", "2"),
+        airflow_bundle_ref="git:" + "d" * 40,
+        composition_supervisor=SUPERVISOR,
+    )
+
+    assert projection.deployment["schema"] == "dpone.deployment-set.v3"
+    assert projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v3"
+    assert "mssql_asset_outlet_projection" not in projection.deployment
+    assert "mssql_asset_outlet_projection" not in projection.airflow_index
+    loaded_index = load_airflow_deployment_index(
+        projection.deployment_dir / "airflow-index.json",
+        cache_root=tmp_path / ".dpone-cache",
+    )
+    assert loaded_index.composition_supervisor == SUPERVISOR
+    jsonschema = pytest.importorskip("jsonschema")
+    for filename, schema_filename in (
+        ("deployment.json", "deployment-set-v3.schema.json"),
+        ("airflow-index.json", "airflow-deployment-index-v3.schema.json"),
+    ):
+        payload = json.loads((projection.deployment_dir / filename).read_bytes())
+        schema = json.loads((Path("docs/schemas/gitops") / schema_filename).read_bytes())
+        jsonschema.Draft202012Validator(schema).validate(payload)
+
+
 class OfflineBackend:
     """Fake enrolled MSSQL and ClickHouse; NOT a SQL capability or live proof."""
 
@@ -315,7 +378,10 @@ def test_real_producer_to_v3_cache_with_explicit_offline_admission(producer_comp
         registry_config_ref=_config_map_ref("registry", "1"),
         trust_policy_ref=_config_map_ref("policy", "2"),
         airflow_bundle_ref="git:" + "d" * 40,
+        composition_supervisor=SUPERVISOR,
     )
+    assert projection.deployment["schema"] == "dpone.deployment-set.v3"
+    assert projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v3"
     cache, events = tmp_path / ".dpone-cache", []
     backend = OfflineBackend(events)
     store = OfflineProtectedStore(cache, events)

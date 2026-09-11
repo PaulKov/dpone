@@ -108,7 +108,7 @@ class AirflowDeploymentProjectionService:
         composition_supervisor: Mapping[str, object] | None = None,
         semantic_refresh_sidecars: SemanticRefreshDagSidecarFactory | None = None,
     ) -> AirflowDeploymentProjection:
-        """Materialize a strict executable v2 environment projection."""
+        """Materialize a strict executable v2 or supervised v3 projection."""
 
         environment = normalize_environment_segment(environment)
         require_digest("release_id", release_id)
@@ -180,6 +180,7 @@ class AirflowDeploymentProjectionService:
             pack_payloads=pack_payloads,
         )
         deployment, deployment_bytes, airflow_index = build_environment_deployment_documents(
+            release_schema=inputs.release_schema,
             environment=environment,
             release_id=release_id,
             trust_tier=normalized_trust_tier,
