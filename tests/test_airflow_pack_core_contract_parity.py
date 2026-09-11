@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 
@@ -40,6 +41,43 @@ def test_run_identity_public_constants_match_core() -> None:
     assert pack_run_identity.AIRFLOW_RUN_IDENTITY_SCHEMA == CORE_RUN_IDENTITY_SCHEMA
     assert pack_run_identity.AIRFLOW_RUN_IDENTITY_ENV == CORE_RUN_IDENTITY_ENV
     assert pack_run_identity.MAX_AIRFLOW_RUN_IDENTITY_BYTES == CORE_MAX_RUN_IDENTITY_BYTES
+
+
+def test_supervisor_transport_is_canonical_and_separate_from_run_identity(
+    tmp_path: Path,
+) -> None:
+    digest = "sha256:" + ("a" * 64)
+    projection = {
+        "schema": "dpone.composition-supervisor.v1",
+        "persistent_volume_claim": "dpone-composition-supervisor",
+        "child_uid_start": 1_000_000_000,
+        "child_gid_start": 1_100_000_000,
+        "child_identity_count": 1_000_000,
+    }
+    index = AirflowDeploymentIndex(
+        path=tmp_path / "index.json",
+        cache_root=tmp_path,
+        release_id=digest,
+        deployment_id=digest,
+        dag_specs=(),
+        workload_packs=(),
+        binding_set_ref=digest,
+        connection_registry_ref=digest,
+        credential_runtime_ref=digest,
+        runtime_image_digest=digest,
+        composition_supervisor=projection,
+    )
+
+    run_context = pack_run_identity.build_task_group_run_identity_context(index)
+    encoded = pack_run_identity.encode_composition_supervisor(projection)
+
+    assert "composition_supervisor" not in run_context
+    assert base64.b64decode(encoded, validate=True) == json.dumps(
+        projection,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("ascii")
 
 
 def test_deployment_identity_public_constants_match_core() -> None:
