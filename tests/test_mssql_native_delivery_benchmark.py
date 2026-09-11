@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from dpone.contracts.mssql_native_chunks import NativeChunkLimits
-from dpone.runtime.native_delivery_benchmark import compare, content_sha256
+from dpone.runtime.native_delivery_benchmark import canonical_json, compare, content_sha256
 
 
 def metric(value, unit="seconds"):
@@ -43,6 +43,9 @@ def run_fixture(root, *, commit="a" * 40, seconds=10, execution="hermetic"):
         status="PASS",
         limitations=[],
     )
+    envelope["configuration"]["sha256"] = content_sha256(canonical_json(envelope["configuration"]["limits"]))
+    environment = envelope["environment"]
+    environment["sha256"] = content_sha256(canonical_json({k: v for k, v in environment.items() if k != "sha256"}))
 
     def receipt(sample_id, scope):
         ids = (

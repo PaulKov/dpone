@@ -1,0 +1,76 @@
+schema_version: 1
+task_id: DDA-06-BENCHMARK-FIXES
+title: Correct retained benchmark identity and cross-subject comparability
+goal: Resolve both independently reproduced PR34 P2 defects and retain release 0.77.1 unchanged.
+specification: docs/feature-design-data-delivery-acceleration-v1.md
+base_commit: fa16c23c137c76fc4b218cd729820b987b698418
+integrator: root delivery acceleration integrator
+acceptance_criteria:
+  - Follow planning-amendments/dda-06-benchmark-review-fixes.md; root is the sole source writer.
+  - Validate normalized configuration and complete environment digests before accepting receipts.
+  - Reuse one canonical comparison projection that masks only an existing dpone version value.
+  - Preserve per-subject full identity, baseline run/inspect/help imports and all third-party drift checks.
+  - Retain red/green regressions, independent review, unchanged quality gates and exact-head CI evidence.
+  - Preserve upstream a1aadcaf and all old source/evidence history; use an exact-tree successor when required by linear history.
+public_contract_impact:
+  level: compatible
+  surfaces: [diagnostic artifacts, Python comparison, documentation]
+  migration_required: false
+owned_paths:
+  - src/dpone/contracts/native_delivery_observations.py
+  - src/dpone/runtime/native_delivery_benchmark.py
+  - tools/native_delivery_live_support/validation.py
+  - tests/test_mssql_native_delivery_benchmark.py
+  - tests/test_native_delivery_benchmark_identity.py
+  - tests/test_native_delivery_live_benchmark.py
+  - tests/test_native_delivery_baseline_compatibility.py
+  - docs/delivery-acceleration/certification.md
+  - docs/delivery-acceleration/observations.md
+  - docs/delivery-acceleration/operations.md
+  - test_artifacts/delivery-acceleration/planning-amendments/dda-06-benchmark-review-fixes.md
+  - test_artifacts/delivery-acceleration/planning-amendments/dda-06-benchmark-review-fixes.yml
+integrator_owned_paths:
+  - CHANGELOG.md
+  - docs/quality-metrics.md
+read_only_paths:
+  - AGENTS.md
+  - src/dpone/AGENTS.md
+  - tests/AGENTS.md
+  - docs/AGENTS.md
+  - docs/benchmarks/quality_budgets.yml
+  - tools/native_delivery_live_support/runner.py
+  - tools/native_delivery_live_support/execution.py
+  - tools/native_delivery_live_support/artifacts.py
+  - src/dpone/runtime/native_delivery_benchmark_artifacts.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - docs/quality-metrics.md
+  - mkdocs.yml
+  - .github/workflows
+  - src/dpone/schema
+  - tests/conftest.py
+shared_file_owner: root delivery acceleration integrator
+dependencies: []
+required_checks:
+  focused:
+    - uv run pytest tests/test_native_delivery_benchmark_identity.py tests/test_mssql_native_delivery_benchmark.py tests/test_native_delivery_live_benchmark.py tests/test_native_delivery_baseline_compatibility.py tests/test_native_delivery_live_entrypoints.py tests/test_native_delivery_live_recovery_boundaries.py -q
+  broad:
+    - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
+    - Required static, architecture, metrics and documentation checks from AGENTS.md, with complete final-head supported-Python CI.
+  live:
+    - SKIP; no approved disposable live environment.
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.
+  - A production edit requires broader public-contract change than the approved correction.
+  - A parallel writer owns an affected source path.
+  - An upstream-only blob differs from pinned input, outside the explicitly resolved changelog.
+  - Do not weaken thresholds, rewrite history, mutate prior evidence or merge/release/run live checks.
