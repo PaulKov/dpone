@@ -637,3 +637,12 @@ nav:
       - ADR 0060: adr/0060-nonproduction-composition-authority.md
       - ADR 0061: adr/0061-shared-composition-physical-ownership.md
       - ADR 0062: adr/0062-isolated-mssql-switch-activation.md
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/PaulKov/dpone
+      name: dpone on GitHub
+
+copyright: Copyright &copy; 2026 PaulKov. Licensed under Apache-2.0.
