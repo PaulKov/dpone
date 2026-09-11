@@ -6,7 +6,10 @@ and corruption attacks. Root ownership is simulated because developer machines
 and CI runners are unprivileged.
 """
 
+import errno
 import json
+import os
+import stat
 from hashlib import sha256
 from multiprocessing import get_context
 from pathlib import Path
@@ -24,7 +27,7 @@ from dpone.adapters.composition_child_identity_allocator import (
 from dpone.contracts.composition_dbt_outcome import DbtCaptureError
 from dpone.contracts.composition_supervisor import CompositionSupervisorProjection
 from tests.composition_mssql_gate_helpers import attempt
-from tests.composition_supervisor_simulation import install_supervisor_simulation, supervisor_simulation
+from tests.composition_supervisor_simulation import actual_fstat, install_supervisor_simulation, supervisor_simulation
 
 UID_START = 1_000_000_000
 GID_START = 1_100_000_000
@@ -297,6 +300,158 @@ def test_allocation_requires_the_root_supervisor(root, monkeypatch):
     with pytest.raises(DbtCaptureError, match="supervisor_boundary"):
         allocator_for(root).allocate(attempt())
     assert list(root.iterdir()) == []
+
+
+def final_names(root):
+    return sorted(path.name for path in (root / "identities").iterdir())
+
+
+def expected_names(identity):
+    return sorted([f"uid-{identity.uid}.json", f"gid-{identity.gid}.json", f"{identity.uid}-{identity.gid}.json"])
+
+
+def first_candidate(count=1024):
+    return CompositionChildIdentity(
+        UID_START + candidate("uid", attempt().attempt_sha256, count),
+        GID_START + candidate("gid", attempt().attempt_sha256, count),
+    )
+
+
+def test_interrupted_record_write_never_publishes_a_tombstone(root, monkeypatch):
+    actual_write = os.write
+
+    def failing_write(descriptor, data):
+        if b"composition-child-identity" in bytes(data):
+            raise OSError(errno.ENOSPC, "No space left on device")
+        return actual_write(descriptor, data)
+
+    monkeypatch.setattr(os, "write", failing_write)
+    with pytest.raises(DbtCaptureError, match="child_identity_write"):
+        allocator_for(root).allocate(attempt())
+    monkeypatch.undo()
+    supervisor_simulation(monkeypatch)
+    assert final_names(root) == []
+    assert list((root / "attempts").iterdir()) == []
+    identity = allocator_for(root).allocate(attempt())
+    assert identity == first_candidate()
+    assert final_names(root) == expected_names(identity)
+    assert allocator_for(root).read(identity.uid).attempt_sha256 == attempt().attempt_sha256
+
+
+def test_interrupted_record_fsync_never_publishes_a_tombstone(root, monkeypatch):
+    actual_fsync = os.fsync
+
+    def failing_fsync(descriptor):
+        if stat.S_ISREG(actual_fstat(descriptor).st_mode):
+            raise OSError(errno.EIO, "sync failed")
+        return actual_fsync(descriptor)
+
+    monkeypatch.setattr(os, "fsync", failing_fsync)
+    with pytest.raises(DbtCaptureError, match="child_identity_write"):
+        allocator_for(root).allocate(attempt())
+    monkeypatch.undo()
+    supervisor_simulation(monkeypatch)
+    assert final_names(root) == []
+    assert list((root / "attempts").iterdir()) == []
+    identity = allocator_for(root).allocate(attempt())
+    assert identity == first_candidate()
+    assert json.loads((root / "attempts" / f"{hex_digest()}.json").read_bytes())["uid"] == identity.uid
+
+
+def test_publication_conflict_fails_closed_without_partial_records(root, monkeypatch):
+    actual_link = os.link
+    raced: list[str] = []
+
+    def racing_link(source, target, **arguments):
+        if not raced:
+            raced.append(target)
+            raise FileExistsError(errno.EEXIST, "File exists")
+        return actual_link(source, target, **arguments)
+
+    monkeypatch.setattr(os, "link", racing_link)
+    with pytest.raises(DbtCaptureError, match="child_identity_conflict"):
+        allocator_for(root).allocate(attempt())
+    assert raced
+    assert final_names(root) == []
+    assert list((root / "attempts").iterdir()) == []
+
+
+def test_partial_publication_leaves_only_complete_records(root, monkeypatch):
+    actual_link = os.link
+    claimed: list[str] = []
+
+    def failing_link(source, target, **arguments):
+        claimed.append(target)
+        if len(claimed) == 2:
+            raise FileExistsError(errno.EEXIST, "File exists")
+        return actual_link(source, target, **arguments)
+
+    monkeypatch.setattr(os, "link", failing_link)
+    with pytest.raises(DbtCaptureError, match="child_identity_conflict"):
+        allocator_for(root).allocate(attempt())
+    monkeypatch.undo()
+    supervisor_simulation(monkeypatch)
+    published = final_names(root)
+    assert published == [f"uid-{first_candidate().uid}.json"]
+    assert (
+        CompositionChildIdentityRecord.from_bytes((root / "identities" / published[0]).read_bytes()).attempt_sha256
+        == attempt().attempt_sha256
+    )
+    assert list((root / "attempts").iterdir()) == []
+    with pytest.raises(DbtCaptureError, match="child_identity_replay"):
+        allocator_for(root).allocate(attempt())
+    assert allocator_for(root).allocate(attempt(2)).uid != first_candidate().uid
+
+
+def test_publication_failure_reports_a_durable_store_error(root, monkeypatch):
+    def failing_link(source, target, **arguments):
+        raise OSError(errno.EIO, "link failed")
+
+    monkeypatch.setattr(os, "link", failing_link)
+    with pytest.raises(DbtCaptureError, match="child_identity_publish"):
+        allocator_for(root).allocate(attempt())
+    assert final_names(root) == []
+
+
+def test_leftover_staging_artifacts_never_gate_allocation(root):
+    identities = root / "identities"
+    identities.mkdir(mode=0o700)
+    for name in (f".staging-{hex_digest()}", ".staging-" + "f" * 64):
+        artifact = identities / name
+        artifact.write_bytes(b'{"schema":"dpone.composition-child-identity.v1"')
+        artifact.chmod(0o400)
+    identity = allocator_for(root).allocate(attempt())
+    assert identity == first_candidate()
+    # This attempt's own staging name is cleared; an unrelated artifact is inert
+    # and is never reclaimed by allocation.
+    assert set(final_names(root)) == {*expected_names(identity), ".staging-" + "f" * 64}
+    assert allocator_for(root).read(identity.uid).attempt_sha256 == attempt().attempt_sha256
+
+
+def test_unreadable_candidate_record_reports_a_record_error(root, monkeypatch):
+    allocator = allocator_for(root)
+    uid = first_candidate().uid
+    occupy(root, f"uid-{uid}.json", CompositionChildIdentityRecord(FOREIGN, uid, GID_START))
+    size = len(CompositionChildIdentityRecord(FOREIGN, uid, GID_START).to_bytes())
+    actual_read = os.read
+
+    def failing_read(descriptor, count):
+        value = actual_fstat(descriptor)
+        if stat.S_ISREG(value.st_mode) and value.st_size == size:
+            raise OSError(errno.EIO, "read failed")
+        return actual_read(descriptor, count)
+
+    monkeypatch.setattr(os, "read", failing_read)
+    with pytest.raises(DbtCaptureError, match="child_identity_record"):
+        allocator.allocate(attempt())
+
+
+def test_directory_masquerading_as_a_record_rejects(root):
+    uid = first_candidate().uid
+    (root / "identities").mkdir(mode=0o700)
+    (root / "identities" / f"uid-{uid}.json").mkdir(mode=0o700)
+    with pytest.raises(DbtCaptureError, match="child_identity_record"):
+        allocator_for(root).allocate(attempt())
 
 
 def test_concurrent_threads_never_share_a_reserved_slot(root):

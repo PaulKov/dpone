@@ -10,21 +10,22 @@ simulated: exclusive creation, no-follow opens, modes, advisory locks and
 
 import os
 
-_ACTUAL_FSTAT = os.fstat
+#: Unpatched ``os.fstat``, so simulations and tests can observe real metadata.
+actual_fstat = os.fstat
 _OWNERS: dict[tuple[int, int], tuple[int, int]] = {}
 
 
 def simulated_fchown(descriptor, uid, gid):
     """Record the requested ownership instead of requiring real privilege."""
 
-    value = _ACTUAL_FSTAT(descriptor)
+    value = actual_fstat(descriptor)
     _OWNERS[(value.st_dev, value.st_ino)] = (uid, gid)
 
 
 def simulated_fstat(descriptor):
     """Report recorded ownership, defaulting to the provisioned root owner."""
 
-    value = _ACTUAL_FSTAT(descriptor)
+    value = actual_fstat(descriptor)
     uid, gid = _OWNERS.get((value.st_dev, value.st_ino), (0, 0))
     # Developer temporary roots are private; simulate the world-traversable
     # ancestry a provisioned supervisor mount has, without relaxing the exact

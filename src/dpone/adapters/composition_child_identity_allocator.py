@@ -7,12 +7,19 @@ lock, immutable canonical tombstones are ``fsync``ed together with their parent
 directories before the identity is returned, and nothing in this module edits,
 repairs, deletes or reclaims an existing record.
 
+A tombstone is never created in place. Canonical bytes are first written, synced
+and verified under a dotted staging name that matches no candidate name, and
+every final name is then claimed by an atomic hard link. A tombstone that exists
+is therefore always complete, and an interrupted write can leave at most an inert
+staging artifact instead of an empty record that would poison a probe slot
+forever.
+
 Ordering is chosen so that every interruption fails closed. The UID and GID
-claims are written first, so a crash can never release a reserved identity to a
-later attempt; the attempt tombstone is written last, so its presence proves the
-complete reservation is durable. An attempt that finds any record of its own is
-rejected instead of receiving a second identity, because a repeated executor for
-one attempt is unrecoverable. Reclaiming abandoned identities is a separate
+claims are published first, so a crash can never release a reserved identity to
+a later attempt; the attempt tombstone is published last, so its presence proves
+the complete reservation is durable. An attempt that finds any record of its own
+is rejected instead of receiving a second identity, because a repeated executor
+for one attempt is unrecoverable. Reclaiming abandoned identities is a separate
 reviewed operation after the parent is ``RETIRED``.
 """
 
@@ -25,7 +32,7 @@ import stat
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from errno import EACCES, EAGAIN
+from errno import EACCES, EAGAIN, EIO
 from hashlib import sha256
 from pathlib import Path
 from time import monotonic, sleep
@@ -47,6 +54,7 @@ MAX_IDENTITY_PROBES = 4096
 _ATTEMPTS = "attempts"
 _IDENTITIES = "identities"
 _LOCK_NAME = "allocation.lock"
+_STAGING_PREFIX = ".staging-"
 _LOCK_FLAGS = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC
 _CREATE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
 _LOCK_TIMEOUT_SECONDS = 60.0
@@ -107,7 +115,14 @@ class CompositionChildIdentityRecord:
 
 
 class CompositionChildIdentityAllocator:
-    """Allocate one permanent child identity per attempt under an exclusive lock."""
+    """Allocate one permanent child identity per attempt under an exclusive lock.
+
+    Production composition roots must construct this through
+    :meth:`from_projection`, so the reserved range can only come from the
+    approved deployment supervisor capability. The explicit range constructor
+    stays available for tests and offline tooling; it is not an authority to
+    invent, widen or transpose a range.
+    """
 
     def __init__(self, root: Path, *, uid_start: int, gid_start: int, count: int) -> None:
         if (
@@ -153,11 +168,17 @@ class CompositionChildIdentityAllocator:
                 raise DbtCaptureError("capture_child_identity_conflict")
             identity = self._probe(identities, digest)
             record = CompositionChildIdentityRecord(digest, identity.uid, identity.gid).to_bytes()
-            _create(identities, f"uid-{identity.uid}.json", record)
-            _create(identities, f"gid-{identity.gid}.json", record)
-            _create(identities, f"{identity.uid}-{identity.gid}.json", record)
-            _create(attempts, f"{name}.json", record)
-            return identity
+            with _staged(identities, name, record) as staging:
+                for final in (
+                    f"uid-{identity.uid}.json",
+                    f"gid-{identity.gid}.json",
+                    f"{identity.uid}-{identity.gid}.json",
+                ):
+                    _publish(identities, staging, identities, final)
+                _sync(identities)
+                _publish(identities, staging, attempts, f"{name}.json")
+                _sync(attempts)
+        return identity
 
     def read(self, uid: int) -> CompositionChildIdentityRecord:
         """Return the immutable owner record of one reserved child UID."""
@@ -251,6 +272,8 @@ def _read_record(parent: int, name: str) -> CompositionChildIdentityRecord | Non
             if not chunk:
                 break
             raw += chunk
+    except OSError:
+        raise DbtCaptureError("capture_child_identity_record") from None
     finally:
         os.close(descriptor)
     if len(raw) > _MAX_RECORD_BYTES:
@@ -258,13 +281,33 @@ def _read_record(parent: int, name: str) -> CompositionChildIdentityRecord | Non
     return CompositionChildIdentityRecord.from_bytes(raw)
 
 
-def _create(parent: int, name: str, raw: bytes) -> None:
-    """Create one immutable record and durably persist it with its directory."""
+@contextmanager
+def _staged(parent: int, name: str, raw: bytes) -> Iterator[str]:
+    """Provide one durable, verified, non-authoritative source for publication.
 
+    A final tombstone name is only ever created by linking these already durable
+    bytes, so an interrupted or failing write can never publish an empty or
+    partial immutable record that would poison a probe slot forever. The staging
+    name is dotted, so it matches no candidate name, is never parsed as
+    authority, and never gates deterministic probing if a crash leaves it behind.
+    """
+
+    staging = _STAGING_PREFIX + name
     try:
-        descriptor = os.open(name, _CREATE_FLAGS, 0o400, dir_fd=parent)
-    except FileExistsError:
-        raise DbtCaptureError("capture_child_identity_conflict") from None
+        _materialize(parent, staging, raw)
+        yield staging
+    finally:
+        _discard(parent, staging)
+
+
+def _materialize(parent: int, staging: str, raw: bytes) -> None:
+    """Write, sync and verify the staged record before it can be published."""
+
+    _discard(parent, staging)
+    try:
+        descriptor = os.open(staging, _CREATE_FLAGS, 0o400, dir_fd=parent)
+    except OSError:
+        raise DbtCaptureError("capture_child_identity_write") from None
     try:
         os.fchown(descriptor, 0, 0)
         os.fchmod(descriptor, 0o400)
@@ -272,12 +315,60 @@ def _create(parent: int, name: str, raw: bytes) -> None:
         while pending:
             written = os.write(descriptor, pending)
             if written <= 0:
-                raise OSError
+                raise OSError(EIO, "short record write")
             pending = pending[written:]
         os.fsync(descriptor)
+        info = os.fstat(descriptor)
+    except OSError:
+        raise DbtCaptureError("capture_child_identity_write") from None
     finally:
         os.close(descriptor)
-    os.fsync(parent)
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or info.st_nlink != 1
+        or info.st_size != len(raw)
+        or info.st_uid != 0
+        or info.st_mode & 0o222
+    ):
+        raise DbtCaptureError("capture_child_identity_write")
+
+
+def _publish(source: int, staging: str, target: int, name: str) -> None:
+    """Claim one final immutable name atomically, never replacing a winner.
+
+    Both record directories belong to the one supervisor mount. A split or
+    cross-device layout cannot be published atomically and is reported as a
+    durable-store failure rather than silently copied.
+    """
+
+    try:
+        os.link(staging, name, src_dir_fd=source, dst_dir_fd=target, follow_symlinks=False)
+    except FileExistsError:
+        raise DbtCaptureError("capture_child_identity_conflict") from None
+    except OSError:
+        raise DbtCaptureError("capture_child_identity_publish") from None
+
+
+def _discard(parent: int, staging: str) -> None:
+    """Remove one staging artifact; final tombstones are never removed here.
+
+    A staging artifact carries no authority, so an unremovable leftover is inert
+    and must not turn an otherwise complete allocation into a failure.
+    """
+
+    try:
+        os.unlink(staging, dir_fd=parent)
+    except OSError:
+        return
+
+
+def _sync(descriptor: int) -> None:
+    """Persist one directory entry, reporting an accurate durability failure."""
+
+    try:
+        os.fsync(descriptor)
+    except OSError:
+        raise DbtCaptureError("capture_child_identity_publish") from None
 
 
 def _subdirectory(parent: int, name: str) -> int:
