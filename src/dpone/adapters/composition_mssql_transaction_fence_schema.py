@@ -173,7 +173,7 @@ def require_transaction_fence_schema(cursor: SqlControlCursor, control_schema: s
     schema = require_control_schema(control_schema)
     inspect_composition_table(cursor, schema, BINDING_TABLE, {}, {}, binding_trigger(schema))
     cursor.execute(
-        "SELECT TOP (2) p.type,CONVERT(int,m.uses_ansi_nulls),CONVERT(int,m.uses_quoted_identifier),"
+        "SELECT TOP (2) RTRIM(p.type),CONVERT(int,m.uses_ansi_nulls),CONVERT(int,m.uses_quoted_identifier),"
         "m.execute_as_principal_id,HASHBYTES('SHA2_256',m.definition),"
         "CONVERT(int,p.is_auto_executed),CONVERT(int,p.is_execution_replicated),"
         "p.principal_id,s.principal_id FROM sys.procedures p JOIN sys.sql_modules m ON m.object_id=p.object_id "
