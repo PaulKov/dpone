@@ -21,7 +21,6 @@ from dpone.adapters.nonproduction_mssql_registration_schema import (
     require_nonproduction_registration_insert_options,
 )
 from dpone.adapters.nonproduction_mssql_trust import MssqlNonproductionTrustProvider, NonproductionTrustRevision
-from dpone.contracts.nonproduction_authority import utc_timestamp
 from dpone.contracts.nonproduction_grants import (
     NonproductionExecutionGrant,
 )
@@ -249,9 +248,7 @@ class MssqlNonproductionRegistrationStore:
         record = NonproductionGrantRegistration(originals, row[15], row[16])
         if _values(record) != row or originals.grant.scope.environment_id != current.environment_id:
             raise NonproductionAuthorityError("registration_identity")
-        instant = utc_timestamp(record.registered_at)
-        if instant > now or record.trust_revision > current.revision:
-            raise NonproductionAuthorityError("registration_history")
+        instant = record.require_historical_boundary(observed_at=now, maximum_revision=current.revision)
         historical = self._historical(boundary, record.trust_revision)
         originals.require_policy(
             historical.snapshot.policy_bytes,

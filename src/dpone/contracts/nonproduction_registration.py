@@ -174,6 +174,17 @@ class NonproductionGrantRegistration:
             grant.not_before, grant.expires_at, grant.limits.max_validity_seconds, now=utc_timestamp(self.registered_at)
         )
 
+    def require_historical_boundary(self, *, observed_at: datetime, maximum_revision: int) -> datetime:
+        """Compare an already constructed record with independently observed ceilings.
+
+        The caller must still reopen historical policy and retain its transaction.
+        This neither authenticates current/historical trust nor authorizes execution.
+        """
+        instant = utc_timestamp(self.registered_at)
+        if instant > observed_at or self.trust_revision > maximum_revision:
+            raise NonproductionAuthorityError("registration_history")
+        return instant
+
 
 def workload_document(workload_id: str) -> bytes:
     """Stable complete-campaign member; pack or grant replacement cannot reset it."""

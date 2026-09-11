@@ -1,0 +1,93 @@
+schema_version: 1
+task_id: DPONE-V3-REGISTRATION-HISTORY-POLICY
+title: Own the complete registration historical-boundary comparison
+goal: Keep pure historical registration policy in its existing model while preserving protected SQL observation
+  order
+specification: docs/feature-specs/nonproduction-composition-authority.md
+base_commit: 1cf081038d79337a73bc0578eca7a61c0fbcd988
+integrator: root
+shared_file_owner: root
+acceptance_criteria:
+- APPROVED internal refactor. Add NonproductionGrantRegistration.require_historical_boundary(*, observed_at,
+  maximum_revision), preserving exact timestamp parsing and future-time OR future-revision rejection.
+  Migrate only the existing SQL decoder block.
+- Preserve complete original construction/row/environment comparisons, timestamp errors and predicate
+  order before independent historical trust SQL.
+- No self revalidation, new validity policy or extra clock/trust call; current/historical protected observations
+  and all wire/state/exception contracts stay unchanged.
+- Two existing production paths and one new test only; 7948 unowned originals unchanged, <=350 canonical
+  SLOC each.
+- RED/GREEN independent time/revision cases, precise predicate mutations and unchanged registration/trust
+  compatibility; scoped static and graph evidence with architecture FAIL.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python_api
+  migration_required: false
+owned_paths:
+- src/dpone/contracts/nonproduction_registration.py
+- src/dpone/adapters/nonproduction_mssql_registration.py
+- tests/test_nonproduction_registration_history_boundary.py
+integrator_owned_paths: []
+read_only_paths:
+- AGENTS.md
+- src/dpone/AGENTS.md
+- tests/AGENTS.md
+- docs
+- src/dpone/contracts/nonproduction_authority.py
+- src/dpone/contracts/nonproduction_scope.py
+- src/dpone/adapters/nonproduction_mssql_registration_boundary.py
+- src/dpone/adapters/nonproduction_mssql_trust.py
+- tests/test_nonproduction_registration.py
+- tests/test_nonproduction_mssql_registration.py
+- tests/test_nonproduction_mssql_trust.py
+- tests/test_nonproduction_mssql_trust_continuity.py
+- tests/test_nonproduction_mssql_registration_continuity.py
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- tests/conftest.py
+- docs
+- src/dpone/runtime
+- src/dpone/ports
+- src/dpone/services
+- tools
+dependencies:
+- docs/nonproduction-composition-authority.md
+- docs/composition-shared-sql-storage.md
+- Exact approved contract, independent source model and immutable implementation/review evidence remain
+  retained; this helper compares previously reconstructed documentary history and grants no authority.
+required_checks:
+  focused:
+  - RED/GREEN time and revision boundary, exact failures, independently recorded historical-read order
+    and two predicate-omission mutants.
+  - Unchanged registration/store/boundary/trust/continuity suites.
+  - Scoped Ruff/format, cold explicit three-file mypy, canonical imports/size/graph/layer and exact source/original
+    freeze.
+  broad:
+  - Root fresh independent review and integrated required gates on exact committed source.
+  live:
+  - N/A to writer; root owns authorized disposable CI SQL component validation.
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
+- Exact original parse/comparison/error/effect order cannot be preserved.
+- Unexpected actual graph growth or approved contract contradiction.

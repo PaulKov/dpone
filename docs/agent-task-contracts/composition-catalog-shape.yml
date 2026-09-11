@@ -1,0 +1,88 @@
+schema_version: 1
+task_id: DPONE-V3-MSSQL-CATALOG-SHAPE
+title: Consolidate the complete validated MSSQL catalog type pipeline
+goal: Reuse one existing type owner across canonical rendering and full fresh/ALTER catalog construction
+specification: docs/feature-specs/composition-activation-execution.md
+base_commit: dfccfadcd6942af3418dec695a35c0d8d40e092d
+integrator: root
+shared_file_owner: root
+acceptance_criteria:
+- APPROVED internal refactor. Add validated_mssql_catalog_type_shape(dtype) in the existing catalog type
+  owner and reuse its complete normalization/shape pipeline in canonical rendering, fresh column construction
+  and ALTER replacement.
+- Preserve all declared exports, raw parser behavior, full metadata/evidence and effect ordering; no new
+  production module or facade.
+- Exactly two existing production paths and one new test; all other 7944 tracked originals unchanged.
+- RED/GREEN expected type/error/evidence vectors and unchanged four compatibility suites; all owned files
+  <=350 canonical SLOC.
+- Measure graph and retain overall architecture FAIL; no budgets, baselines or exclusions changed.
+- Preserve every declared __all__ export and canonical class location. Remove only two unused incidental
+  model-local import bindings (normalizer and raw shape parser), whose canonical paths remain supported;
+  external use of the undeclared bindings is UNVERIFIED. The existing raw parser stays unchanged.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python_api
+  migration_required: false
+owned_paths:
+- src/dpone/runtime/sinks/mssql_target_catalog_types.py
+- src/dpone/runtime/sinks/mssql_target_catalog_model.py
+- tests/test_mssql_catalog_type_projection.py
+integrator_owned_paths: []
+read_only_paths:
+- AGENTS.md
+- src/dpone/AGENTS.md
+- tests/AGENTS.md
+- docs
+- src/dpone/contracts
+- tests/test_mssql_schema_preplan.py
+- tests/test_mssql_generic_transaction_governance.py
+- tests/test_postgres_mssql_projection_contract.py
+- tests/test_mssql_native_projection.py
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- tests/conftest.py
+- docs
+- src/dpone/contracts
+- src/dpone/adapters
+- src/dpone/ports
+- tools
+dependencies:
+- docs/architecture.md
+- docs/engineering-standards.md
+- Exact approved contract, design model, implementation and independent-review freezes are retained in
+  the task evidence; the source model is not SQL certification.
+required_checks:
+  focused:
+  - RED/GREEN independently expected type, errors, full/schema evidence and class identity vectors.
+  - New test plus the four unchanged catalog/projection/governance compatibility suites.
+  - Scoped Ruff/format, cold explicit three-file mypy, canonical size/import/graph/layer, source and prerequisite
+    freeze.
+  broad:
+  - Root integrated change-aware broad gate and fresh independent review.
+  live:
+  - 'N/A: pure internal catalog refactor; no SQL or other live work.'
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
+- Declared exports, metadata/evidence, raw parser, error or effect ordering cannot be preserved.
+- Actual graph grows beyond approved projection.
