@@ -23,6 +23,40 @@ describes complete retained reads and helper effects while preserving the
 activation request and attempt write projection. Its pure comparisons do not
 enable this coordinator or the current SQL store to admit scoped execution.
 
+## Worker integration components
+
+The current implementation includes sealed deployment inputs and protected
+connection construction, independent physical enrollment readers, and a parent
+worker lifecycle. The worker admits once, issues credentials once, executes,
+closes access, observes quiescence and business outcome, and persists the exact
+terminal receipt. Missing evidence retains blocking ownership.
+
+The shared dbt service selects either native-v2 admission or parent admission.
+The parent branch rechecks the actual preflight manifest before build. Its
+issued profile renderer replaces ambient credentials; the protected Linux
+capture requires a separate child UID and durable supervisor records. A dbt
+exit code or a writable local result file is not a parent outcome proof.
+
+For PostgreSQL-to-MSSQL transfers, the target transaction and target-atomic state
+share the target database. The protected composition control database is a
+**separate database on the same SQL Server instance**. The platform installs
+`render_composition_mssql_transaction_fence(control_database=..., control_schema=...)`
+from `dpone.adapters.composition_mssql_transaction_fence_schema` as external SQL
+batches. The issued worker receives only EXECUTE on `composition_require_transfer`
+in the control database. It receives no controller role or ledger table access.
+The procedure holds the shared control lock inside the actual target transaction.
+The binding includes the complete operation, exact target, mutation plan, parent
+attempt, issued SID and retained epochs; a receipt replay must match that binding.
+
+The ClickHouse transport accepts only typed generation creation, Native insert
+and snapshot exchange requests. Its SQL dispatch journal claims before network
+I/O, retains complete response observations and prevents closure while a claim
+is unresolved. A lost claim acknowledgement never permits a resend. See the
+[dispatch closure decision](adr/0063-clickhouse-composition-dispatch-closure.md)
+for the required protected supervisor and network boundary. These components do
+not yet establish a successful provider-to-worker campaign or enable public
+activation by themselves.
+
 ## Concrete SQL Server persistence
 
 `dpone.adapters.composition_mssql_store.MssqlCompositionActivationStore`

@@ -18,6 +18,16 @@ EXPECTED_TESTS = (
     "test_unresolved_attempt_blocks_retirement[COMMIT_UNKNOWN]",
 )
 GATE_CASES = {
+    "tests.integration.composition.test_composition_mssql_transfer_fence_live": (
+        "test_transfer_exact_binding_commits_actual_target_rows",
+        "test_transfer_foreign_operation_and_receipt_cannot_mutate",
+        "test_transfer_server_rejects_foreign_binding_digest_and_bytes",
+        "test_transfer_server_rejects_stale_domain_epoch",
+        "test_transfer_server_rejects_retiring_parent",
+        "test_transfer_closed_gate_denies_existing_worker_transaction",
+        "test_transfer_worker_has_only_control_procedure_permission",
+        "test_transfer_public_permission_drift_prevents_ready_gate",
+    ),
     "tests.integration.composition.test_composition_mssql_gate_live": (
         "test_installed_gate_policy_and_reader_permissions",
         "test_issued_principal_has_only_managed_writer_scope",
@@ -95,7 +105,16 @@ def _cases(groups):
 
 _PROFILES = {
     "store": ComponentProfile(
-        _cases({TEST_CLASS: EXPECTED_TESTS}),
+        _cases(
+            {
+                TEST_CLASS: EXPECTED_TESTS,
+                "tests.integration.composition.test_composition_dispatch_schema_live": (
+                    "test_dispatch_catalog_and_append_only_closure",
+                    "test_dispatch_catalog_drift_is_rejected",
+                    "test_dispatch_claim_terminal_and_closure_order",
+                ),
+            }
+        ),
         "tests.integration.composition.mssql_store_live_support",
         None,
         "real_dbapi_control_ledger",

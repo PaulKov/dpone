@@ -9,6 +9,7 @@ from dpone.runtime.dbt_preflight import MAX_DBT_PREFLIGHT_MANIFEST_BYTES
 
 if TYPE_CHECKING:
     from dpone.contracts.dbt_runtime import AirflowAttemptCorrelation, AirflowRunIdentity, DbtExecutionPack
+    from dpone.ports.composition_dbt import CompositionDbtBuildAuthority
     from dpone.ports.dbt_publishing import DbtRunResultsReader
     from dpone.ports.dbt_workspace_attempt import (
         DbtWorkspaceAttemptAdmissionPort,
@@ -28,7 +29,11 @@ class DbtWorkspaceAttemptLifecycle:
         run_results_reader: DbtRunResultsReader,
         request_factory: DbtWorkspaceAttemptRequestFactoryPort | None,
         admission: DbtWorkspaceAttemptAdmissionPort | None,
+        composition_attempt: CompositionDbtBuildAuthority | None = None,
     ) -> None:
+        if composition_attempt is not None and (request_factory is not None or admission is not None):
+            raise ValueError("dbt execution must use exactly one parent or native workspace authority")
+        self._composition_attempt = composition_attempt
         self._run_results_reader = run_results_reader
         self._request_factory = request_factory
         self._admission = admission
@@ -41,7 +46,24 @@ class DbtWorkspaceAttemptLifecycle:
         run_identity: AirflowRunIdentity,
         airflow_attempt: AirflowAttemptCorrelation,
     ) -> DbtWorkspaceAttemptRequest | None:
-        """Admit V2 immediately before mutation; V1 remains unchanged."""
+        """Verify parent authority or admit native V2 immediately before mutation.
+
+        Parent terminalization belongs to its enclosing worker. Returning no
+        native request prevents duplicate native receipts for that execution.
+        """
+
+        if self._composition_attempt is not None:
+            self._composition_attempt.verify_before_build(
+                pack=pack,
+                manifest=self._run_results_reader.read(
+                    output_paths.preflight_target / "manifest.json",
+                    root=output_paths.root,
+                    max_bytes=MAX_DBT_PREFLIGHT_MANIFEST_BYTES,
+                ),
+                run_identity=run_identity,
+                airflow_attempt=airflow_attempt,
+            )
+            return None
 
         if pack.schema != DBT_EXECUTION_PACK_SCHEMA_V2:
             return None
