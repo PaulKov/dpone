@@ -4,6 +4,11 @@
 
 ### Changed
 
+- Add composition execution integration: reopen sealed parent inputs, select
+  parent admission in the shared dbt engine, use issued-only dbt credentials,
+  and fence generic MSSQL target transactions and receipt replay. Public
+  activation remains closed until protected construction and the complete live
+  worker campaign are verified.
 - Reduce bounded native MSSQL preparation to one metadata-bearing INSERT and one
   dual-digest iterator; preserve all four raw checks and the independent prepared
   prepublication check. Reuse frame sizes without removing native-file validation.

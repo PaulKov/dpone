@@ -13,6 +13,7 @@ if TYPE_CHECKING:
         CompositionPhysicalResource,
         CompositionSourceSnapshot,
     )
+    from dpone.contracts.runtime_connection import ResolvedBindingConnection
 from pathlib import Path
 from typing import Protocol
 
@@ -32,6 +33,14 @@ class CompositionActivationInputs(Protocol):
         deployment_id: str,
         previous_deployment_id: str | None,
     ) -> CompositionOccurrenceContext: ...
+
+
+class CompositionRuntimeInputs(CompositionActivationInputs, Protocol):
+    """Resolve connections only within an independently reopened parent context."""
+
+    def resolve_connection(
+        self, context: CompositionOccurrenceContext, connection_ref: str
+    ) -> ResolvedBindingConnection: ...
 
 
 class CompositionPhysicalAdmission(Protocol):

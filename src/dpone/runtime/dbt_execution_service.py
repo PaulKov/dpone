@@ -47,7 +47,7 @@ from dpone.runtime.dbt_execution_policy import (
     runtime_failure_code,
     validate_dbt_toolchain,
 )
-from dpone.runtime.dbt_preflight import DbtRuntimePreflight
+from dpone.runtime.dbt_preflight import MAX_DBT_PREFLIGHT_MANIFEST_BYTES, DbtRuntimePreflight
 from dpone.runtime.dbt_run_results import (
     MAX_DBT_RUN_RESULTS_BYTES,
     ParsedDbtRunResults,
@@ -60,6 +60,7 @@ from dpone.runtime.dbt_sqlserver_project_policy import (
 from dpone.runtime.dbt_workspace_attempt_lifecycle import DbtWorkspaceAttemptLifecycle
 
 if TYPE_CHECKING:
+    from dpone.ports.composition_dbt import CompositionDbtBuildAuthority
     from dpone.ports.dbt_workspace_attempt import (
         DbtWorkspaceAttemptAdmissionPort,
         DbtWorkspaceAttemptRequest,
@@ -84,8 +85,14 @@ class DbtExecutionService:
         evidence_writer: DbtExecutionEvidenceWriter,
         workspace_attempt_factory: DbtWorkspaceAttemptRequestFactoryPort | None = None,
         workspace_attempt_admission: DbtWorkspaceAttemptAdmissionPort | None = None,
+        composition_attempt: CompositionDbtBuildAuthority | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
+        if composition_attempt is not None and (
+            workspace_attempt_factory is not None or workspace_attempt_admission is not None
+        ):
+            raise ValueError("dbt execution must use exactly one parent or native workspace authority")
+        self._composition_attempt = composition_attempt
         self._command_runner = command_runner
         self._toolchain_inspector = toolchain_inspector
         self._profile_renderer = profile_renderer
@@ -169,12 +176,24 @@ class DbtExecutionService:
                     preflight_status = "failed"
                     raise
                 preflight_status = "passed"
-                workspace_attempt = self._workspace_attempts.admit(
-                    validated_pack,
-                    output_paths=output_paths,
-                    run_identity=validated_identity,
-                    airflow_attempt=validated_attempt,
-                )
+                if self._composition_attempt is None:
+                    workspace_attempt = self._workspace_attempts.admit(
+                        validated_pack,
+                        output_paths=output_paths,
+                        run_identity=validated_identity,
+                        airflow_attempt=validated_attempt,
+                    )
+                else:
+                    self._composition_attempt.verify_before_build(
+                        pack=validated_pack,
+                        manifest=self._run_results_reader.read(
+                            output_paths.preflight_target / "manifest.json",
+                            root=output_paths.root,
+                            max_bytes=MAX_DBT_PREFLIGHT_MANIFEST_BYTES,
+                        ),
+                        run_identity=validated_identity,
+                        airflow_attempt=validated_attempt,
+                    )
                 prepare_dbt_build_output_paths(output_paths)
                 discard_previous_dbt_run_results(
                     output_paths.attempt,
