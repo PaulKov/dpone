@@ -57,6 +57,38 @@ The registry pins `composition_service_id` to the observed server UUID and
 Credentials, endpoint aliases, engine versions and catalog timestamps do not
 change the physical guard identity.
 
+## Concrete private namespace and principal policy
+
+The first protected Linux deployment uses two pinned Docker containers.
+ClickHouse owns a private network namespace and listens only on
+`127.0.0.1:8123`. The dispatcher shares that exact network namespace, while
+retaining separate process and mount namespaces. No host ports are published.
+Workers reach only the dispatcher's constrained frontend; they receive neither
+ClickHouse credentials nor access to Docker or the private namespace.
+
+The protected supervisor independently reopens the immutable SQL enrollment and
+actual container, image, boot, process, namespace, mount, configuration and
+listener identities. Incomplete observations or drift prevent issuance and
+closure. Repeated healthy observations retain identical stable facts; timestamps
+and changing query counters are not enrollment identity.
+
+ClickHouse `HOST LOCAL` recognizes every address local to its network namespace,
+not just loopback. Loopback-only server listeners and the absence of forwarding
+or proxy paths therefore establish the isolation boundary. An explicit protected
+local-namespace observation selects `enable_local` and `observe_local`; the
+catalog must contain no IP entries and exactly the hostname `localhost`, with
+no regular-expression or LIKE hosts. Disabled principals have no allowed hosts.
+Existing exact-IP mode continues rejecting loopback. There is no inferred mode,
+IP-to-LOCAL fallback or caller-selected local policy. The immutable gate original
+retains the policy and enrollment digest, while its issuance key remains the
+same across policies, so changing policy cannot issue a second principal.
+
+The bounded HTTP adapter accepts numeric IP endpoints; `localhost` maps to
+`127.0.0.1`. Other hostnames require a separately implemented bounded resolver.
+It verifies TLS certificates, complete response framing and exact catalog types,
+and rejects truncated or overflowed results. No hidden DNS, redirect or retry
+extends the dispatch deadline.
+
 ## Consequences and validation
 
 Normal synchronous execution can close without restarting the service.

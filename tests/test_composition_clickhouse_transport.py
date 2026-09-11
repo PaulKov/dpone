@@ -39,6 +39,18 @@ def server():
         def do_POST(self):
             body = self.rfile.read(int(self.headers["Content-Length"]))
             requests.append((self.path, dict(self.headers), body))
+            if behavior.get("disconnect"):
+                self.close_connection = True
+                return
+            if "header_entered" in behavior:
+                behavior["header_entered"].set()
+                assert behavior["header_release"].wait(3)
+            if "raw_response" in behavior:
+                response = behavior["raw_response"]
+                self.wfile.write(response(self.path) if callable(response) else response)
+                self.wfile.flush()
+                self.close_connection = True
+                return
             self.send_response(behavior["status"])
             if behavior.get("query_id", "echo") != "absent":
                 self.send_header(
@@ -58,6 +70,8 @@ def server():
                 self.send_header("X-ClickHouse-Exception-Code", behavior["error"])
             if behavior["status"] == 302:
                 self.send_header("Location", "/redirect-target")
+            for name, value in behavior.get("extra_headers", []):
+                self.send_header(name, value)
             self.end_headers()
             if "response_entered" in behavior:
                 behavior["response_entered"].set()
@@ -70,7 +84,7 @@ def server():
             pass
 
     http = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = Thread(target=http.serve_forever, daemon=True)
+    thread = Thread(target=lambda: http.serve_forever(poll_interval=0.02), daemon=True)
     thread.start()
     try:
         yield f"http://127.0.0.1:{http.server_port}", requests, behavior
@@ -259,6 +273,9 @@ def test_partial_socket_send_reports_only_accepted_bytes_without_retry(monkeypat
     class Connection:
         sock = PartialSocket()
 
+        def connect(self):
+            pass
+
         def putrequest(self, *args, **kwargs):
             pass
 
@@ -273,7 +290,7 @@ def test_partial_socket_send_reports_only_accepted_bytes_without_retry(monkeypat
 
     journal = Journal()
     client = transport("http://127.0.0.1", journal)
-    monkeypatch.setattr(client, "_connection", Connection)
+    monkeypatch.setattr(client._http, "_connection", Connection)
     with pytest.raises(ClickHouseDispatchTransportError) as result:
         client.execute(insert(), payload=b"native")
     assert calls == [b"native", b"tive"]
@@ -289,3 +306,90 @@ def test_response_requires_exact_query_attribution(server, query_id):
     with pytest.raises(ClickHouseDispatchTransportError):
         transport(endpoint).execute(create())
     assert len(requests) == 1
+
+
+@pytest.mark.parametrize("chunked", [b"0\r\n", b"0\n\r\n", b"0\r\nX-ClickHouse-Exception-Code: 1\r\n\r\n"])
+def test_incomplete_or_uninspected_chunk_terminator_never_acknowledges(server, chunked):
+    endpoint, _, behavior = server
+    behavior["chunked"] = chunked
+    with pytest.raises(ClickHouseDispatchTransportError):
+        transport(endpoint).execute(create())
+
+
+@pytest.mark.parametrize("ending", [b"", b"\n", b"\r"])
+def test_truncated_header_block_never_acknowledges(server, ending):
+    endpoint, _, behavior = server
+
+    def response(path):
+        query_id = parse_qs(urlsplit(path).query)["query_id"][0]
+        return f"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nX-ClickHouse-Query-Id: {query_id}\r\n".encode() + ending
+
+    behavior["raw_response"] = response
+    with pytest.raises(ClickHouseDispatchTransportError):
+        transport(endpoint).execute(create())
+
+
+@pytest.mark.parametrize("localhost", [False, True])
+def test_numeric_endpoint_performs_no_dns_resolution(server, monkeypatch, localhost):
+    import socket
+
+    endpoint, requests, _ = server
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("DNS resolution is forbidden")
+
+    monkeypatch.setattr(socket, "getaddrinfo", forbidden)
+    if localhost:
+        endpoint = endpoint.replace("127.0.0.1", "localhost")
+    assert transport(endpoint).execute(create()).response_body_bytes == 0
+    assert len(requests) == 1
+
+
+@pytest.mark.parametrize(
+    "endpoint", ["https://example.com", "http://127.0.0.1.nip.io", "https://localhost.example.com"]
+)
+def test_hostname_endpoint_cannot_enter_unbounded_resolution(endpoint):
+    with pytest.raises(CompositionAdmissionError):
+        transport(endpoint)
+
+
+def test_tls_profile_keeps_certificate_and_pinned_ip_verification():
+    import ssl
+
+    context = transport("https://127.0.0.1")._http._context
+    assert context is not None and context.verify_mode == ssl.CERT_REQUIRED and context.check_hostname
+
+
+@pytest.mark.parametrize("raw", [b"1\r\nxXX0\r\n\r\n", b"1\r\nx\r\n0;ignored=extension\r\n\r\n"])
+def test_noncanonical_chunk_boundaries_reject(server, raw):
+    endpoint, _, behavior = server
+    behavior["chunked"] = raw
+    with pytest.raises(ClickHouseDispatchTransportError):
+        transport(endpoint).execute(create())
+
+
+@pytest.mark.parametrize(
+    "malformed", [b"MalformedHeader", b"Bad Header: value", b": empty-name", b"Bad\x00Name: value"]
+)
+def test_malformed_header_cannot_hide_server_exception(server, malformed):
+    endpoint, _, behavior = server
+
+    def response(path):
+        query_id = parse_qs(urlsplit(path).query)["query_id"][0]
+        return (
+            f"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nX-ClickHouse-Query-Id: {query_id}\r\n".encode()
+            + malformed
+            + b"\r\nX-ClickHouse-Exception-Code: 241\r\n\r\n"
+        )
+
+    behavior["raw_response"] = response
+    with pytest.raises(ClickHouseDispatchTransportError):
+        transport(endpoint).execute(create())
+
+
+@pytest.mark.parametrize("endpoint", ["http://127.0.0.1:0", "https://127.0.0.1:0"])
+def test_explicit_zero_port_rejected_before_dispatch(endpoint):
+    journal = Journal()
+    with pytest.raises(CompositionAdmissionError):
+        transport(endpoint, journal)
+    assert journal.claims == []

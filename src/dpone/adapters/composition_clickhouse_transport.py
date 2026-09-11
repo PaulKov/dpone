@@ -8,18 +8,12 @@ Acknowledgement is transport evidence, not catalog outcome or writer quiescence.
 
 from __future__ import annotations
 
-import base64
-import http.client
-import math
-import socket
-import ssl
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from hashlib import sha256
-from threading import Timer
 from typing import Protocol
-from urllib.parse import urlencode, urlsplit
 
+from dpone.adapters.composition_clickhouse_http import BoundedClickHouseHttp, ClickHouseHttpError, clickhouse_http_path
+from dpone.adapters.composition_clickhouse_http import ClickHouseTransportCredentials as ClickHouseTransportCredentials
 from dpone.contracts.composition_clickhouse_dispatch import (
     MAX_DISPATCH_PAYLOAD_BYTES,
     ClickHouseDispatch,
@@ -41,24 +35,6 @@ class ClickHouseDispatchJournal(Protocol):
     """
 
     def claim_once(self, dispatch: ClickHouseDispatch) -> None: ...
-
-
-@dataclass(frozen=True, slots=True)
-class ClickHouseTransportCredentials:
-    """Protected gateway's sole-writer material; never put in URLs or evidence."""
-
-    username: str = field(repr=False)
-    password: str = field(repr=False)
-
-    def __post_init__(self) -> None:
-        if (
-            type(self.username) is not str
-            or not 1 <= len(self.username) <= 128
-            or any(value in self.username for value in (":", "\r", "\n", "\x00"))
-            or type(self.password) is not str
-            or not 1 <= len(self.password) <= 4096
-        ):
-            raise CompositionAdmissionError("clickhouse_transport_credentials")
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,48 +97,15 @@ class ClickHouseDispatchTransport:
         max_response_bytes: int = 64 * 1024,
         ca_file: str | None = None,
     ) -> None:
-        try:
-            parsed = urlsplit(endpoint)
-            valid = (
-                type(endpoint) is str
-                and parsed.scheme in {"https", "http"}
-                and bool(parsed.hostname)
-                and parsed.path in {"", "/"}
-                and not parsed.query
-                and not parsed.fragment
-                and parsed.username is None
-                and parsed.password is None
-                and (parsed.scheme == "https" or parsed.hostname in {"localhost", "127.0.0.1", "::1"})
-                and not any(character.isspace() or ord(character) < 32 for character in endpoint)
-            )
-            port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        except (ValueError, TypeError, AttributeError):
-            valid, port = False, 0
-        if not valid or not 1 <= port <= 65535:
-            raise CompositionAdmissionError("clickhouse_transport_endpoint")
-        if (
-            type(timeout_seconds) not in {int, float}
-            or not math.isfinite(timeout_seconds)
-            or not 0 < timeout_seconds <= 3600
-            or type(max_payload_bytes) is not int
-            or not 1 <= max_payload_bytes <= MAX_DISPATCH_PAYLOAD_BYTES
-            or type(max_response_bytes) is not int
-            or not 1 <= max_response_bytes <= 1024 * 1024
-            or (parsed.scheme == "http" and ca_file is not None)
-        ):
-            raise CompositionAdmissionError("clickhouse_transport_limits")
-        if type(credentials) is not ClickHouseTransportCredentials:
-            raise CompositionAdmissionError("clickhouse_transport_credentials")
-        credentials.__post_init__()
-        self._host, self._port, self._scheme = parsed.hostname or "", port, parsed.scheme
-        self._context = ssl.create_default_context(cafile=ca_file) if parsed.scheme == "https" else None
-        self._authorization = (
-            "Basic " + base64.b64encode(f"{credentials.username}:{credentials.password}".encode()).decode()
+        self._http = BoundedClickHouseHttp(
+            endpoint=endpoint,
+            credentials=credentials,
+            timeout_seconds=timeout_seconds,
+            max_payload_bytes=max_payload_bytes,
+            max_response_bytes=max_response_bytes,
+            ca_file=ca_file,
         )
-        self._journal = journal
-        self._timeout = float(timeout_seconds)
-        self._max_payload = max_payload_bytes
-        self._max_response = max_response_bytes
+        self._journal, self._max_payload = journal, max_payload_bytes
 
     def execute(self, dispatch: ClickHouseDispatch, *, payload: bytes = b"") -> ClickHouseDispatchObservation:
         """Validate originals, claim once, send once, drain a complete response.
@@ -185,124 +128,22 @@ class ClickHouseDispatchTransport:
                 raise CompositionAdmissionError("clickhouse_dispatch_payload_identity")
         elif payload:
             raise CompositionAdmissionError("clickhouse_dispatch_unexpected_payload")
-        path = "/?" + urlencode(
-            {
-                "query": _statement(dispatch),
-                "query_id": dispatch.query_id,
-                "wait_end_of_query": "1",
-                "async_insert": "0",
-                "wait_for_async_insert": "1",
-                "send_progress_in_http_headers": "0",
-                "enable_http_compression": "0",
-            }
-        )
-        if len(path) > 1024 * 1024:
-            raise CompositionAdmissionError("clickhouse_dispatch_uri_budget")
+        path = clickhouse_http_path(query_id=dispatch.query_id, statement=_statement(dispatch))
         self._journal.claim_once(dispatch)
-        deadline = time.monotonic() + self._timeout
-        connection = self._connection()
-        sent = 0
-        timer: Timer | None = None
         try:
-            connection.putrequest("POST", path, skip_accept_encoding=True)
-            for key, value in {
-                "Authorization": self._authorization,
-                "Content-Type": "application/octet-stream",
-                "Content-Length": str(len(payload)),
-                "Connection": "close",
-                "Accept-Encoding": "identity",
-            }.items():
-                connection.putheader(key, value)
-            connection.endheaders()
-            assert connection.sock is not None
-            transport_socket = connection.sock
-            timer = Timer(max(0, deadline - time.monotonic()), _expire, args=(transport_socket,))
-            timer.daemon = True
-            timer.start()
-            while sent < len(payload):
-                self._remaining(connection, deadline)
-                assert connection.sock is not None
-                count = connection.sock.send(memoryview(payload)[sent : sent + 64 * 1024])
-                if count <= 0:
-                    raise OSError
-                sent += count
-            self._remaining(connection, deadline)
-            response = connection.getresponse()
-            try:
-                body, framing = self._response(response, transport_socket, deadline)
-                if response.headers.get_all("X-ClickHouse-Query-Id", []) != [dispatch.query_id]:
-                    raise ValueError
-            finally:
-                response.close()
-            return ClickHouseDispatchObservation(
-                dispatch_hash,
-                dispatch.claim_key,
-                dispatch.query_id,
-                sent,
-                len(body),
-                "sha256:" + sha256(body).hexdigest(),
-                framing,
-            )
-        except Exception:
-            raise ClickHouseDispatchTransportError(dispatch_sha256=dispatch_hash, request_body_bytes=sent) from None
-        finally:
-            if timer is not None:
-                timer.cancel()
-            connection.close()
-
-    def _connection(self) -> http.client.HTTPConnection:
-        if self._scheme == "https":
-            return http.client.HTTPSConnection(self._host, self._port, timeout=self._timeout, context=self._context)
-        return http.client.HTTPConnection(self._host, self._port, timeout=self._timeout)
-
-    @staticmethod
-    def _remaining(connection: http.client.HTTPConnection, deadline: float) -> None:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0 or connection.sock is None:
-            raise TimeoutError
-        connection.sock.settimeout(remaining)
-
-    def _response(
-        self, response: http.client.HTTPResponse, transport_socket: socket.socket, deadline: float
-    ) -> tuple[bytes, str]:
-        lengths = response.headers.get_all("Content-Length", [])
-        transfers = response.headers.get_all("Transfer-Encoding", [])
-        if response.headers.get("Content-Encoding", "identity").lower() != "identity":
-            raise ValueError
-        if transfers == ["chunked"] and not lengths:
-            framing = "chunked"
-        elif len(lengths) == 1 and not transfers and lengths[0].isascii() and lengths[0].isdigit():
-            framing = "content-length"
-            if int(lengths[0]) > self._max_response:
-                raise ValueError
-        else:
-            raise ValueError
-        body = bytearray()
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise TimeoutError
-            # Keep the actual socket after HTTPConnection detaches it for a
-            # Connection:close response; the watchdog also bounds slow headers.
-            if not response.isclosed():
-                transport_socket.settimeout(remaining)
-            chunk = response.read1(min(64 * 1024, self._max_response + 1 - len(body)))
-            if not chunk:
-                break
-            body.extend(chunk)
-            if len(body) > self._max_response:
-                raise ValueError
-        if framing == "content-length" and len(body) != int(lengths[0]):
-            raise ValueError
-        errors = response.headers.get_all("X-ClickHouse-Exception-Code", [])
-        if response.status != 200 or body or any(value != "0" for value in errors) or time.monotonic() >= deadline:
-            raise ValueError
-        return bytes(body), framing
-
-
-def _expire(transport_socket: socket.socket) -> None:
-    """Interrupt a slow partial header/chunk/body at the absolute deadline."""
-    try:
-        transport_socket.shutdown(socket.SHUT_RDWR)
-    except OSError:
-        pass
+            observed = self._http.request(path=path, payload=payload, query_id=dispatch.query_id)
+            if observed.body:
+                raise ClickHouseHttpError(observed.request_body_bytes)
+        except ClickHouseHttpError as error:
+            raise ClickHouseDispatchTransportError(
+                dispatch_sha256=dispatch_hash, request_body_bytes=error.request_body_bytes
+            ) from None
+        return ClickHouseDispatchObservation(
+            dispatch_hash,
+            dispatch.claim_key,
+            dispatch.query_id,
+            observed.request_body_bytes,
+            len(observed.body),
+            "sha256:" + sha256(observed.body).hexdigest(),
+            observed.framing,
+        )

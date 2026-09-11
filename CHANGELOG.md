@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-## 0.79.0 - 2026-09-11
-
 ### Changed
 
 - Add composition execution integration: reopen sealed parent inputs, select
@@ -18,6 +16,15 @@
 - Integrate canonical finite fixture recipes and complete pre-export bound
   queries, preserving legacy fixture outputs. Source sealing and campaign budget
   authority remain separate requirements.
+- Add per-attempt ClickHouse principal gates and complete bounded administrator
+  HTTP responses, with explicit private-namespace LOCAL policy and immutable
+  gate originals. Actual supervisor enrollment and end-to-end execution remain
+  required before public activation.
+
+## 0.79.0 - 2026-09-11
+
+### Changed
+
 - Reduce bounded native MSSQL preparation to one metadata-bearing INSERT and one
   dual-digest iterator; preserve all four raw checks and the independent prepared
   prepublication check. Reuse frame sizes without removing native-file validation.

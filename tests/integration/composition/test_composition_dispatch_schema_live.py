@@ -1,11 +1,13 @@
 """Actual SQL journal DDL and invariants; no ClickHouse execution certification."""
 
-from contextlib import closing
+from contextlib import closing, contextmanager
 from hashlib import sha256
 from uuid import uuid4
 
 import pytest
 from tests.integration.composition import mssql_store_live_support as support
+from tests.integration.composition.mssql_gate_live_provisioning import ControlDiagnostics
+from tests.integration.composition.mssql_gate_live_support import observation_document
 
 from dpone.adapters.composition_clickhouse_dispatch_schema import (
     render_clickhouse_dispatch_schema,
@@ -19,12 +21,12 @@ pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql]
 sql_case = support.sql_case
 
 
-def test_dispatch_catalog_and_append_only_closure(sql_case):
+def test_dispatch_catalog_and_append_only_closure(sql_case, record_property):
     """Exercise actual module metadata, global lock, original hashes and immutability."""
     case = sql_case
     case.install()
     case.sql(render_clickhouse_dispatch_schema(case.schema))
-    with composition_control_transaction(case.database.connect, case.schema, case.service_id) as ledger:
+    with observed_transaction(case, "catalog", record_property) as ledger:
         require_clickhouse_dispatch_schema(ledger.cursor, case.schema)
     gate = str(uuid4())
     original = b'{"component":"closure"}'
@@ -37,19 +39,24 @@ def test_dispatch_catalog_and_append_only_closure(sql_case):
         with pytest.raises(support.SqlFailure) as refused:
             support.execute(connection, statement, gate, "CLOSING", digest, original)
         assert refused.value.code == 51000
-    with composition_control_transaction(case.database.connect, case.schema, case.service_id) as ledger:
+    with observed_transaction(case, "closing_insert", record_property) as ledger:
         ledger.cursor.execute(statement, gate, "CLOSING", digest, original)
     assert case.sql(f"SELECT phase,evidence_document FROM {case.table('ch_dispatch_closures')}") == (
         ("CLOSING", original),
     )
-    for mutation in (
-        f"DELETE FROM {case.table('ch_dispatch_closures')}",
-        f"UPDATE {case.table('ch_dispatch_closures')} SET phase='CLOSING'",
+    for stage, mutation in (
+        ("deny_delete", f"DELETE FROM {case.table('ch_dispatch_closures')}"),
+        ("deny_update", f"UPDATE {case.table('ch_dispatch_closures')} SET phase='CLOSING'"),
     ):
-        reject_invariant(case, mutation)
-    for phase, evidence_hash in (("INVALID", digest), ("CLOSED", "sha256:" + "0" * 64)):
-        reject_invariant(case, statement, gate, phase, evidence_hash, original)
-    with composition_control_transaction(case.database.connect, case.schema, case.service_id) as ledger:
+        reject_invariant(case, mutation, stage=stage, record_property=record_property)
+    for stage, phase, evidence_hash in (
+        ("deny_phase", "INVALID", digest),
+        ("deny_hash", "CLOSED", "sha256:" + "0" * 64),
+    ):
+        reject_invariant(
+            case, statement, gate, phase, evidence_hash, original, stage=stage, record_property=record_property
+        )
+    with observed_transaction(case, "closed_insert", record_property) as ledger:
         ledger.cursor.execute(statement, gate, "CLOSED", digest, original)
     assert case.sql(f"SELECT phase FROM {case.table('ch_dispatch_closures')} ORDER BY phase") == (
         ("CLOSED",),
@@ -57,30 +64,79 @@ def test_dispatch_catalog_and_append_only_closure(sql_case):
     )
 
 
-def test_dispatch_catalog_drift_is_rejected(sql_case):
+def test_dispatch_catalog_drift_is_rejected(sql_case, record_property):
     case = sql_case
     case.install()
     case.sql(render_clickhouse_dispatch_schema(case.schema))
     case.sql(f"DISABLE TRIGGER [{case.schema}].[composition_ch_dispatches_invariant] ON {case.table('ch_dispatches')}")
     with pytest.raises(CompositionAdmissionError):
-        with composition_control_transaction(case.database.connect, case.schema, case.service_id) as ledger:
+        with observed_transaction(case, "catalog_drift", record_property) as ledger:
             require_clickhouse_dispatch_schema(ledger.cursor, case.schema)
 
 
-def reject_invariant(case, statement, *parameters, codes=(51000,)):
-    """An unrelated SQL error must never satisfy an invariant-rejection test."""
+_STAGES = frozenset(
+    {
+        "catalog",
+        "closing_insert",
+        "closed_insert",
+        "catalog_drift",
+        "claim_insert",
+        "terminal_and_closed_insert",
+        "deny_delete",
+        "deny_update",
+        "deny_phase",
+        "deny_hash",
+        "deny_duplicate_claim",
+        "deny_unresolved_close",
+        "deny_late_claim",
+    }
+)
+
+
+@contextmanager
+def observed_transaction(case, stage, record_property):
+    """Record bounded numeric driver diagnostics before transaction sanitization.
+
+    Reuse the established SQL observer: no SQL bodies, parameters, exception
+    text, login names or credentials enter artifacts. Fixed stage names locate
+    failures during begin, execute, fetch or commit without changing execution.
+    """
+    if stage not in _STAGES:
+        raise ValueError("dispatch_diagnostic_stage")
+    diagnostics = ControlDiagnostics()
+    factory = diagnostics.factory(case.database.connect, scope="attempt")
+    try:
+        with composition_control_transaction(factory, case.schema, case.service_id) as ledger:
+            yield ledger
+    finally:
+        record_property("dpone.dispatch." + stage, observation_document(diagnostics.snapshot()))
+
+
+def reject_invariant(case, statement, *parameters, stage, record_property, codes=(51000,)):
+    """Assert the exact refusal outside the production transaction sanitizer."""
+    observed_code = None
     with pytest.raises(CompositionAdmissionError, match="expected_sql_invariant"):
-        with composition_control_transaction(case.database.connect, case.schema, case.service_id) as ledger:
+        with observed_transaction(case, stage, record_property) as ledger:
             try:
                 ledger.cursor.execute(statement, *parameters)
                 support.drain_results(ledger.cursor)
             except Exception as error:
-                assert support.failure(error).code in codes
+                observed_code = support.failure(error).code
+                record_property(
+                    "dpone.dispatch.refusal_" + stage,
+                    observation_document(
+                        {
+                            "selected_code": observed_code,
+                            "expected_codes": list(codes),
+                        }
+                    ),
+                )
                 raise CompositionAdmissionError("expected_sql_invariant") from None
-            raise AssertionError("invariant accepted the forbidden mutation")
+            raise CompositionAdmissionError("forbidden_mutation_accepted")
+    assert observed_code in codes, (stage, observed_code, codes)
 
 
-def test_dispatch_claim_terminal_and_closure_order(sql_case):
+def test_dispatch_claim_terminal_and_closure_order(sql_case, record_property):
     case = sql_case
     case.install()
     case.sql(render_clickhouse_dispatch_schema(case.schema))
@@ -115,22 +171,35 @@ def test_dispatch_claim_terminal_and_closure_order(sql_case):
         "(dispatch_sha256,claim_key,operation_key,gate_id,query_id,dispatch_document) VALUES (?,?,?,?,?,?)"
     )
     values = (digest, support.digest("claim"), attempt.attempt_sha256, gate, "component-query", original)
-    with composition_control_transaction(case.database.connect, case.schema, case.service_id) as ledger:
+    with observed_transaction(case, "claim_insert", record_property) as ledger:
         ledger.cursor.execute(claim, *values)
-    reject_invariant(case, claim, *values, codes=(2601, 2627))
+    reject_invariant(
+        case, claim, *values, codes=(2601, 2627), stage="deny_duplicate_claim", record_property=record_property
+    )
     closure = (
         f"INSERT INTO {case.table('ch_dispatch_closures')} "
         "(gate_id,phase,evidence_sha256,evidence_document) VALUES (?,?,?,?)"
     )
-    with composition_control_transaction(case.database.connect, case.schema, case.service_id) as ledger:
+    with observed_transaction(case, "closing_insert", record_property) as ledger:
         ledger.cursor.execute(closure, gate, "CLOSING", digest, original)
-    reject_invariant(case, closure, gate, "CLOSED", digest, original)
+    reject_invariant(
+        case, closure, gate, "CLOSED", digest, original, stage="deny_unresolved_close", record_property=record_property
+    )
     another = b'{"component":"late"}'
     late_digest = "sha256:" + sha256(another).hexdigest()
     reject_invariant(
-        case, claim, late_digest, support.digest("late"), attempt.attempt_sha256, gate, "late-query", another
+        case,
+        claim,
+        late_digest,
+        support.digest("late"),
+        attempt.attempt_sha256,
+        gate,
+        "late-query",
+        another,
+        stage="deny_late_claim",
+        record_property=record_property,
     )
-    with composition_control_transaction(case.database.connect, case.schema, case.service_id) as ledger:
+    with observed_transaction(case, "terminal_and_closed_insert", record_property) as ledger:
         ledger.cursor.execute(
             f"INSERT INTO {case.table('ch_dispatch_terminals')} "
             "(dispatch_sha256,terminal_sha256,terminal_document) VALUES (?,?,?)",
