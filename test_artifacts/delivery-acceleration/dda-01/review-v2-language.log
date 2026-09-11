@@ -1,0 +1,39 @@
+Subject: 9aa2a0ef9600644f1789b9de1b84b9ab9ba1d033
+Command: ['uv', 'run', '--locked', '--no-sync', 'pytest', 'tests/test_docs_language_contracts.py', '-q', '-rA']
+................................                                         [100%]
+==================================== PASSES ====================================
+=========================== short test summary info ============================
+PASSED tests/test_docs_language_contracts.py::test_docs_markdown_files_do_not_contain_cyrillic_text
+PASSED tests/test_docs_language_contracts.py::test_airflow_provider_python_examples_use_deployment_scoped_cached_refs
+PASSED tests/test_docs_language_contracts.py::test_airflow_scheduler_loader_examples_fail_closed_without_external_io
+PASSED tests/test_docs_language_contracts.py::test_airflow_provider_cache_migration_guide_covers_safe_upgrade_and_rollback
+PASSED tests/test_docs_language_contracts.py::test_airflow_self_service_architecture_docs_are_in_mkdocs_nav
+PASSED tests/test_docs_language_contracts.py::test_route_certification_docs_separate_connector_and_route_claims
+PASSED tests/test_docs_language_contracts.py::test_first_airflow_dag_docs_have_copy_paste_golden_path
+PASSED tests/test_docs_language_contracts.py::test_first_airflow_dag_labels_optional_platform_gated_sample
+PASSED tests/test_docs_language_contracts.py::test_airflow_docs_distinguish_preview_rehearsal_canary_and_certification_lanes
+PASSED tests/test_docs_language_contracts.py::test_first_airflow_dag_docs_state_truthful_fifth_command_boundary
+PASSED tests/test_docs_language_contracts.py::test_airflow_docs_keep_preview_v1_separate_from_executable_v2
+PASSED tests/test_docs_language_contracts.py::test_first_airflow_dag_labels_json_as_abridged_and_links_generated_reference
+PASSED tests/test_docs_language_contracts.py::test_self_service_evidence_docs_match_unverified_exit_contract
+PASSED tests/test_docs_language_contracts.py::test_source_sink_guides_use_canonical_run_and_quality_contracts
+PASSED tests/test_docs_language_contracts.py::test_managed_ux_uses_canonical_runtime_quality_gates
+PASSED tests/test_docs_language_contracts.py::test_acceptance_examples_use_top_level_quality_policy
+PASSED tests/test_docs_language_contracts.py::test_route_lifecycle_docs_distinguish_staged_and_legacy_finalization
+PASSED tests/test_docs_language_contracts.py::test_clickhouse_to_mssql_does_not_recommend_unimplemented_not_null_gate
+PASSED tests/test_docs_language_contracts.py::test_load_governance_documents_quality_failure_and_recovery_contract
+PASSED tests/test_docs_language_contracts.py::test_first_airflow_dag_diagnostics_link_out_without_legacy_manifest_detour
+PASSED tests/test_docs_language_contracts.py::test_airflow_cache_publish_runbook_is_exact_and_scope_bound
+PASSED tests/test_docs_language_contracts.py::test_airflow_cache_protected_ci_publish_example_matches_cli_contract
+PASSED tests/test_docs_language_contracts.py::test_airflow_pipeline_glossary_defines_core_nouns
+PASSED tests/test_docs_language_contracts.py::test_airflow_ux_p2_route_framing_contracts
+PASSED tests/test_docs_language_contracts.py::test_first_airflow_dag_what_to_commit_guides_beginners
+PASSED tests/test_docs_language_contracts.py::test_advanced_airflow_pages_carry_beginner_disclaimer
+PASSED tests/test_docs_language_contracts.py::test_mkdocs_nav_discloses_airflow_advanced_away_from_beginners
+PASSED tests/test_docs_language_contracts.py::test_domain_first_ci_compares_before_promoting_candidate_baseline
+PASSED tests/test_docs_language_contracts.py::test_wide_cert_guides_expose_self_service_golden_path
+PASSED tests/test_docs_language_contracts.py::test_wide_cert_landing_batch_examples_exist
+PASSED tests/test_docs_language_contracts.py::test_examples_gallery_lists_mysql_wide_cert_routes
+PASSED tests/test_docs_language_contracts.py::test_examples_gallery_lists_mssql_wide_cert_routes
+
+Exit: 0; elapsed_seconds: 2.28

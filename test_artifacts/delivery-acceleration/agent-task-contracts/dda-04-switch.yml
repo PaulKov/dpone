@@ -1,0 +1,166 @@
+schema_version: 1
+task_id: DDA-04
+title: Isolated SQL Server partition SWITCH component
+goal: Build an unregistered, fail-closed SWITCH planner/catalog adapter/transaction executor for one eligible physical
+  partition.
+specification: docs/feature-design-data-delivery-acceleration-v1.md
+base_commit: d5ad9aaecc900c24df421b160ed36b4cfc726e45
+integrator: DDA-06 delivery acceleration integrator
+acceptance_criteria:
+- Implement only the spec's finite one-partition same-database temporal RANGE RIGHT profile; derive its authority
+  from the authored interval, including empty input, not staging distinct values.
+- Catalog snapshots bind database/object/owner, exact boundaries, columns/types/nullability/collation, indexes/constraints/partition/storage
+  layout; unsupported or unknown metadata fails eligibility.
+- Reject partial/unbounded windows, cross-database layouts, foreign/nonempty switch-out tables, out-of-window prepared
+  rows, unsupported dependencies and catalog drift.
+- Revalidate under caller-owned target transaction authority, count replaced rows, then switch old out/new in. Never
+  open/commit/rollback a transaction, emit a target receipt or perform cleanup in the executor.
+- Failure after the first SWITCH propagates for whole-transaction rollback; never fall back to DELETE+INSERT after
+  mutation. Tests cover lost ACK and receipt-first recovery when prepared content was switched away.
+- Existing public native SWITCH rejection before I/O remains unchanged; no schema/policy/registry/composition activation,
+  no production DDL or environment changes.
+- Document owned prepared/switch-out prerequisites and retention, stable eligibility reasons, future activation
+  requirements and an ADR decision note for DDA-06.
+- Deliver synthetic transaction/catalog tests and integration fixtures or fixture requirements for DDA-05; no live-performance
+  claim.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - unregistered internal partition component
+  - documentation
+  migration_required: false
+owned_paths:
+- src/dpone/contracts/native_mssql_switch.py
+- src/dpone/ports/native_mssql_switch.py
+- src/dpone/runtime/sinks/mssql_native_switch
+- tests/test_mssql_native_partition_switch.py
+- tests/test_mssql_native_partition_switch_recovery.py
+- tests/test_mssql_native_partition_switch_catalog.py
+- docs/delivery-acceleration/partition-switch.md
+- test_artifacts/delivery-acceleration/dda-04
+integrator_owned_paths: []
+read_only_paths:
+- AGENTS.md
+- docs/AGENTS.md
+- docs/feature-design-standard.md
+- docs/engineering-standards.md
+- docs/import-rules.md
+- docs/agent-development.md
+- docs/testing/index.md
+- docs/documentation-standard.md
+- docs/benchmarks/quality_budgets.yml
+- docs/feature-design-data-delivery-acceleration-v1.md
+- docs/data-delivery-acceleration-tasks.md
+- tests/test_runtime_partition_replace_native_contracts.py
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- src/dpone/schema
+- src/dpone/config/mssql_strategy_contract_policies.py
+- src/dpone/manifest/mssql_native_policy.py
+- tests/conftest.py
+- tests/integration/conftest.py
+- src/dpone/contracts/native_delivery_observations.py
+- src/dpone/ports/native_delivery_observer.py
+- src/dpone/runtime/native_delivery_observations.py
+- src/dpone/runtime/native_delivery_benchmark.py
+- tools/native_delivery_benchmark.py
+- tests/test_mssql_native_delivery_observations.py
+- tests/test_mssql_native_delivery_benchmark.py
+- docs/delivery-acceleration/observations.md
+- src/dpone/runtime/sinks/mssql_native_prepared_digests.py
+- src/dpone/runtime/sinks/mssql_native_prepared_insert.py
+- tests/test_mssql_native_integrity_readbacks.py
+- tests/test_mssql_native_metadata_insert.py
+- tests/test_mssql_native_metadata_insert_parity.py
+- docs/delivery-acceleration/preparation.md
+- src/dpone/runtime/mssql_native_sized_frames.py
+- src/dpone/runtime/mssql_native_chunks_files.py
+- tests/test_mssql_native_chunks_files.py
+- tests/test_mssql_native_sized_frames.py
+- docs/delivery-acceleration/frames.md
+- tools/native_delivery_live_benchmark.py
+- tools/native_delivery_live_support
+- tests/integration/mssql/test_clickhouse_mssql_bounded_native_delivery_integration.py
+- tests/integration/mssql/test_clickhouse_mssql_partition_switch_integration.py
+- tests/integration/mssql/clickhouse_mssql_delivery_support.py
+- tests/test_native_delivery_live_benchmark.py
+- docs/delivery-acceleration/certification.md
+- src/dpone/runtime/mssql_native_chunks.py
+- src/dpone/runtime/mssql_native_chunks_observations.py
+- src/dpone/runtime/mssql_native_runtime.py
+- src/dpone/runtime/sinks/mssql_native_prepare.py
+- src/dpone/runtime/sinks/mssql_native_composition.py
+- src/dpone/runtime/sinks/mssql_native_import.py
+- src/dpone/runtime/sinks/mssql_native_staged_load.py
+- src/dpone/runtime/sinks/strategies/mssql/mssql_native_staging.py
+- src/dpone/runtime/sinks/strategies/mssql/mssql_transaction_finalizer.py
+- tests/test_mssql_native_chunks_execution.py
+- tests/test_mssql_native_staged_prepare.py
+- tests/test_mssql_native_staged_finalizer.py
+- tests/test_mssql_native_staged_recovery.py
+- tests/test_mssql_native_staged_verification.py
+- tests/test_mssql_native_staged_import.py
+- tests/test_mssql_native_runtime.py
+- tests/test_mssql_native_composition.py
+- tests/test_mssql_native_delivery_integration.py
+- docs/delivery-acceleration/index.md
+- docs/delivery-acceleration/operations.md
+- docs/mssql-native-transport.md
+- docs/feature-design-clickhouse-mssql-bounded-native-v1.md
+- docs/feature-design-data-delivery-acceleration-v1.md
+- docs/data-delivery-acceleration-tasks.md
+- docs/architecture.md
+- docs/adr
+- docs/adr-index.md
+- test_artifacts/delivery-acceleration/dda-01
+- test_artifacts/delivery-acceleration/dda-02
+- test_artifacts/delivery-acceleration/dda-03
+- test_artifacts/delivery-acceleration/dda-05
+- test_artifacts/delivery-acceleration/dda-06
+- test_artifacts/delivery-acceleration/measurement
+shared_file_owner: DDA-06 delivery acceleration integrator
+dependencies: []
+required_checks:
+  focused:
+  - uv run pytest tests/test_mssql_native_partition_switch.py tests/test_mssql_native_partition_switch_recovery.py
+    tests/test_mssql_native_partition_switch_catalog.py tests/test_runtime_partition_replace_native_contracts.py
+    -q
+  broad:
+  - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
+  - uv run ruff check .
+  - uv run ruff format --check .
+  - uv run mypy --config-file mypy.ini
+  - uv run dpone docs check-import-rules
+  - uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json
+  - Run dpone docs check-module-size with the exact merge-base/head recipe from AGENTS.md; do not weaken budgets.
+  - PYTEST_XDIST_AUTO_NUM_WORKERS=2 uv run pytest -m 'not integration_live' -n auto --dist loadfile
+  - uv run dpone docs check-docs
+  - uv run dpone docs check-generated-references
+  - uv run pytest tests/test_docs_language_contracts.py -q
+  - uv run mkdocs build --strict
+  live:
+  - SKIP unless the maintainer explicitly approves the disposable environment; implement applicable live tests without
+    running services by default.
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
+- Do not broaden scope, activate native SWITCH, alter source snapshot semantics, rewrite history or publish a release.
