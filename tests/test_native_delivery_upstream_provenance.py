@@ -12,6 +12,10 @@ SPEC = importlib.util.spec_from_file_location("dda_ownership", AUDIT_PATH)
 assert SPEC is not None and SPEC.loader is not None
 audit = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(audit)
+TRANSFER_SPEC = importlib.util.spec_from_file_location("dda_transfer", AUDIT_PATH.with_name("record_tree_transfer.py"))
+assert TRANSFER_SPEC is not None and TRANSFER_SPEC.loader is not None
+transfer = importlib.util.module_from_spec(TRANSFER_SPEC)
+TRANSFER_SPEC.loader.exec_module(transfer)
 
 
 @pytest.fixture
@@ -85,3 +89,20 @@ def test_final_preservation_rejects_mode_only_change(history):
     audit.git("update-index", "--chmod=+x", "foreign.py")
     audit.git("commit", "-qm", "unapproved executable mode")
     assert audit.upstream_preservation(base, upstream, integration, "HEAD")["violations"] == ["foreign.py"]
+
+
+@pytest.mark.parametrize("mutation", [None, "tree", "parent", "provenance"])
+def test_transfer_proves_whole_tree_parent_and_source_provenance(history, monkeypatch, mutation):
+    _, upstream, integration, source, _ = history
+    monkeypatch.setattr(transfer, "BASE", upstream)
+    parent = integration if mutation == "parent" else upstream
+    audit.git("checkout", "-qb", transfer.BRANCH, parent)
+    audit.git("read-tree", "--reset", "-u", source)
+    if mutation == "tree":
+        Path("foreign.py").write_text("Unreviewed transfer\n")
+        audit.git("add", "foreign.py")
+    expected_staged = "FAIL" if mutation in {"tree", "parent"} else "PASS"
+    assert transfer.observe_transfer(source, "staged")["status"] == expected_staged
+    message = "Missing provenance" if mutation == "provenance" else f"Reviewed-source: {source}"
+    audit.git("commit", "-qm", message)
+    assert transfer.observe_transfer(source, "committed")["status"] == ("FAIL" if mutation else "PASS")
