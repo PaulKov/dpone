@@ -1,0 +1,169 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+_ test_unknown_old_target_cannot_gain_an_operation_receipt[partition_replace] __
+
+strategy = 'partition_replace'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    def test_unknown_old_target_cannot_gain_an_operation_receipt(strategy):
+        class PhantomReceipt(HermeticRouteSession):
+            def snapshot(self):
+                value = super().snapshot()
+                if self.case == "unknown_commit":
+                    value = replace(value, receipt_observed="b" * 64 if self.queries else None)
+                return value
+    
+            def run(self):
+                if self.fault == "unknown_commit":
+                    self.clock.source_acquired()
+                    self.queries += 1
+                    self.events += (self.fault,)
+                    self.known = False
+                    raise RuntimeError("unknown outcome with receipt-only publication")
+                super().run()
+    
+>       assert recovery_results(PhantomReceipt, strategy)["receipt_first_recovery"] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:206: AssertionError
+____ test_unknown_old_target_cannot_gain_an_operation_receipt[full_refresh] ____
+
+strategy = 'full_refresh'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    def test_unknown_old_target_cannot_gain_an_operation_receipt(strategy):
+        class PhantomReceipt(HermeticRouteSession):
+            def snapshot(self):
+                value = super().snapshot()
+                if self.case == "unknown_commit":
+                    value = replace(value, receipt_observed="b" * 64 if self.queries else None)
+                return value
+    
+            def run(self):
+                if self.fault == "unknown_commit":
+                    self.clock.source_acquired()
+                    self.queries += 1
+                    self.events += (self.fault,)
+                    self.known = False
+                    raise RuntimeError("unknown outcome with receipt-only publication")
+                super().run()
+    
+>       assert recovery_results(PhantomReceipt, strategy)["receipt_first_recovery"] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:206: AssertionError
+__ test_retained_failure_preserves_metadata_mismatch[before_commit-rollback] ___
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3690/test_retained_failure_preserve0')
+fault = 'before_commit', check_id = 'rollback'
+
+    @pytest.mark.parametrize(
+        "fault,check_id",
+        [("before_commit", "rollback"), ("after_eof", "source_free_resume"),
+         ("lost_ack", "receipt_first_recovery"), ("unknown_commit", "receipt_first_recovery")],
+    )
+    def test_retained_failure_preserves_metadata_mismatch(tmp_path, fault, check_id):
+        class BadMetadata(HermeticRouteSession):
+            def snapshot(self):
+                value = super().snapshot()
+                return replace(value, metadata_observed="f" * 64) if self.fault == fault and self.queries else value
+    
+        result = produce_fixture(tmp_path, SessionFactory(BadMetadata))
+        proof = read_artifact(tmp_path, result["recovery_receipt"])
+        failed = next(item for item in proof["checks"] if item["id"] == check_id)
+>       assert failed["status"] == "FAIL" and failed["expected"] != failed["observed"]
+E       AssertionError: assert ('FAIL' == 'FAIL'
+E         
+E           FAIL and True != True)
+
+tests/test_native_delivery_live_recovery_boundaries.py:223: AssertionError
+_ test_retained_failure_preserves_metadata_mismatch[after_eof-source_free_resume] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3690/test_retained_failure_preserve1')
+fault = 'after_eof', check_id = 'source_free_resume'
+
+    @pytest.mark.parametrize(
+        "fault,check_id",
+        [("before_commit", "rollback"), ("after_eof", "source_free_resume"),
+         ("lost_ack", "receipt_first_recovery"), ("unknown_commit", "receipt_first_recovery")],
+    )
+    def test_retained_failure_preserves_metadata_mismatch(tmp_path, fault, check_id):
+        class BadMetadata(HermeticRouteSession):
+            def snapshot(self):
+                value = super().snapshot()
+                return replace(value, metadata_observed="f" * 64) if self.fault == fault and self.queries else value
+    
+        result = produce_fixture(tmp_path, SessionFactory(BadMetadata))
+        proof = read_artifact(tmp_path, result["recovery_receipt"])
+        failed = next(item for item in proof["checks"] if item["id"] == check_id)
+>       assert failed["status"] == "FAIL" and failed["expected"] != failed["observed"]
+E       AssertionError: assert ('FAIL' == 'FAIL'
+E         
+E           FAIL and True != True)
+
+tests/test_native_delivery_live_recovery_boundaries.py:223: AssertionError
+_ test_retained_failure_preserves_metadata_mismatch[lost_ack-receipt_first_recovery] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3690/test_retained_failure_preserve2')
+fault = 'lost_ack', check_id = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize(
+        "fault,check_id",
+        [("before_commit", "rollback"), ("after_eof", "source_free_resume"),
+         ("lost_ack", "receipt_first_recovery"), ("unknown_commit", "receipt_first_recovery")],
+    )
+    def test_retained_failure_preserves_metadata_mismatch(tmp_path, fault, check_id):
+        class BadMetadata(HermeticRouteSession):
+            def snapshot(self):
+                value = super().snapshot()
+                return replace(value, metadata_observed="f" * 64) if self.fault == fault and self.queries else value
+    
+        result = produce_fixture(tmp_path, SessionFactory(BadMetadata))
+        proof = read_artifact(tmp_path, result["recovery_receipt"])
+        failed = next(item for item in proof["checks"] if item["id"] == check_id)
+        assert failed["status"] == "FAIL" and failed["expected"] != failed["observed"]
+>       assert "a" * 64 in json.dumps(failed["expected"]) and "f" * 64 in json.dumps(failed["observed"])
+E       assert (('a' * 64) in '{"known_commit": true, "unknown_blocks_replay": true}')
+E        +  where '{"known_commit": true, "unknown_blocks_replay": true}' = <function dumps at 0x1021f0ae0>({'known_commit': True, 'unknown_blocks_replay': True})
+E        +    where <function dumps at 0x1021f0ae0> = json.dumps
+
+tests/test_native_delivery_live_recovery_boundaries.py:224: AssertionError
+_ test_retained_failure_preserves_metadata_mismatch[unknown_commit-receipt_first_recovery] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3690/test_retained_failure_preserve3')
+fault = 'unknown_commit', check_id = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize(
+        "fault,check_id",
+        [("before_commit", "rollback"), ("after_eof", "source_free_resume"),
+         ("lost_ack", "receipt_first_recovery"), ("unknown_commit", "receipt_first_recovery")],
+    )
+    def test_retained_failure_preserves_metadata_mismatch(tmp_path, fault, check_id):
+        class BadMetadata(HermeticRouteSession):
+            def snapshot(self):
+                value = super().snapshot()
+                return replace(value, metadata_observed="f" * 64) if self.fault == fault and self.queries else value
+    
+        result = produce_fixture(tmp_path, SessionFactory(BadMetadata))
+        proof = read_artifact(tmp_path, result["recovery_receipt"])
+        failed = next(item for item in proof["checks"] if item["id"] == check_id)
+        assert failed["status"] == "FAIL" and failed["expected"] != failed["observed"]
+>       assert "a" * 64 in json.dumps(failed["expected"]) and "f" * 64 in json.dumps(failed["observed"])
+E       assert (('a' * 64) in '{"known_commit": true, "unknown_blocks_replay": true}')
+E        +  where '{"known_commit": true, "unknown_blocks_replay": true}' = <function dumps at 0x1021f0ae0>({'known_commit': True, 'unknown_blocks_replay': True})
+E        +    where <function dumps at 0x1021f0ae0> = json.dumps
+
+tests/test_native_delivery_live_recovery_boundaries.py:224: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_unknown_old_target_cannot_gain_an_operation_receipt[partition_replace]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_unknown_old_target_cannot_gain_an_operation_receipt[full_refresh]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_retained_failure_preserves_metadata_mismatch[before_commit-rollback]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_retained_failure_preserves_metadata_mismatch[after_eof-source_free_resume]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_retained_failure_preserves_metadata_mismatch[lost_ack-receipt_first_recovery]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_retained_failure_preserves_metadata_mismatch[unknown_commit-receipt_first_recovery]

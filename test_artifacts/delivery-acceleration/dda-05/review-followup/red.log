@@ -1,0 +1,1157 @@
+FFFFFFFFFFFFFFFFFFFFFFFFFF.....F                                         [100%]
+=================================== FAILURES ===================================
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-partial_rows-receipt_first_recovery-partition_replace] _
+
+strategy = 'partition_replace', fault = 'unknown_commit'
+mutation = 'partial_rows', expected = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-partial_rows-receipt_first_recovery-full_refresh] _
+
+strategy = 'full_refresh', fault = 'unknown_commit', mutation = 'partial_rows'
+expected = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-complete-receipt_first_recovery-partition_replace] _
+
+strategy = 'partition_replace', fault = 'unknown_commit', mutation = 'complete'
+expected = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-complete-receipt_first_recovery-full_refresh] _
+
+strategy = 'full_refresh', fault = 'unknown_commit', mutation = 'complete'
+expected = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-publications-receipt_first_recovery-partition_replace] _
+
+strategy = 'partition_replace', fault = 'unknown_commit'
+mutation = 'publications', expected = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-publications-receipt_first_recovery-full_refresh] _
+
+strategy = 'full_refresh', fault = 'unknown_commit', mutation = 'publications'
+expected = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[before_commit-complete-rollback-partition_replace] _
+
+strategy = 'partition_replace', fault = 'before_commit', mutation = 'complete'
+expected = 'rollback'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[before_commit-complete-rollback-full_refresh] _
+
+strategy = 'full_refresh', fault = 'before_commit', mutation = 'complete'
+expected = 'rollback'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-complete-source_free_resume-partition_replace] _
+
+strategy = 'partition_replace', fault = 'after_eof', mutation = 'complete'
+expected = 'source_free_resume'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-complete-source_free_resume-full_refresh] _
+
+strategy = 'full_refresh', fault = 'after_eof', mutation = 'complete'
+expected = 'source_free_resume'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-outside-source_free_resume-partition_replace] _
+
+strategy = 'partition_replace', fault = 'after_eof', mutation = 'outside'
+expected = 'source_free_resume'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-outside-source_free_resume-full_refresh] _
+
+strategy = 'full_refresh', fault = 'after_eof', mutation = 'outside'
+expected = 'source_free_resume'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-publications-source_free_resume-partition_replace] _
+
+strategy = 'partition_replace', fault = 'after_eof', mutation = 'publications'
+expected = 'source_free_resume'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-publications-source_free_resume-full_refresh] _
+
+strategy = 'full_refresh', fault = 'after_eof', mutation = 'publications'
+expected = 'source_free_resume'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[lost_ack-partial_rows-receipt_first_recovery-partition_replace] _
+
+strategy = 'partition_replace', fault = 'lost_ack', mutation = 'partial_rows'
+expected = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[lost_ack-partial_rows-receipt_first_recovery-full_refresh] _
+
+strategy = 'full_refresh', fault = 'lost_ack', mutation = 'partial_rows'
+expected = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[lost_ack-outside-receipt_first_recovery-partition_replace] _
+
+strategy = 'partition_replace', fault = 'lost_ack', mutation = 'outside'
+expected = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_recovery_cannot_hide_an_invalid_initial_boundary[lost_ack-outside-receipt_first_recovery-full_refresh] _
+
+strategy = 'full_refresh', fault = 'lost_ack', mutation = 'outside'
+expected = 'receipt_first_recovery'
+
+    @pytest.mark.parametrize("strategy", ["partition_replace", "full_refresh"])
+    @pytest.mark.parametrize(
+        "fault,mutation,expected",
+        [
+            ("unknown_commit", "partial_rows", "receipt_first_recovery"),
+            ("unknown_commit", "complete", "receipt_first_recovery"),
+            ("unknown_commit", "publications", "receipt_first_recovery"),
+            ("before_commit", "complete", "rollback"),
+            ("after_eof", "complete", "source_free_resume"),
+            ("after_eof", "outside", "source_free_resume"),
+            ("after_eof", "publications", "source_free_resume"),
+            ("lost_ack", "partial_rows", "receipt_first_recovery"),
+            ("lost_ack", "outside", "receipt_first_recovery"),
+        ],
+    )
+    def test_recovery_cannot_hide_an_invalid_initial_boundary(strategy, fault, mutation, expected):
+        class BrokenBoundary(HermeticRouteSession):
+            def run(self):
+                try:
+                    super().run()
+                finally:
+                    if self.fault == fault:
+                        if mutation == "partial_rows":
+                            self.rows.pop()
+                        elif mutation == "outside":
+                            self.outside[0]["outside"] = "corrupt"
+                        elif mutation == "complete":
+                            self.complete = True
+                        else:
+                            self.publications += 1
+    
+            def recover(self, *, source_allowed):
+                if self.fault == fault and fault in {"after_eof", "lost_ack"}:
+                    self.outside = [{"outside": "unchanged"}]
+                    if fault == "after_eof":
+                        self.publications = 0
+                    else:
+                        self.rows = list(self.dataset.generate())
+                super().recover(source_allowed=source_allowed)
+    
+>       assert recovery_results(BrokenBoundary, strategy)[expected] == "FAIL"
+E       AssertionError: assert 'PASS' == 'FAIL'
+E         
+E         - FAIL
+E         + PASS
+
+tests/test_native_delivery_live_recovery_boundaries.py:69: AssertionError
+_ test_ordinary_delivery_requires_one_source_query_and_one_publication[queries-0-type-fidelity] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3675/test_ordinary_delivery_require0')
+phase = 'type-fidelity', counter = 'queries', value = 0
+
+    @pytest.mark.parametrize("phase", ["type-fidelity", "trial-"])
+    @pytest.mark.parametrize("counter,value", [("queries", 0), ("queries", 2), ("publications", 0), ("publications", 2)])
+    def test_ordinary_delivery_requires_one_source_query_and_one_publication(tmp_path, phase, counter, value):
+        class InvalidCount(HermeticRouteSession):
+            def run(self):
+                super().run()
+                if self.case.startswith(phase):
+                    setattr(self, counter, value)
+    
+        result = produce_fixture(tmp_path, SessionFactory(InvalidCount))
+>       assert result["status"] == "FAIL"
+E       AssertionError: assert 'UNVERIFIED' == 'FAIL'
+E         
+E         - FAIL
+E         + UNVERIFIED
+
+tests/test_native_delivery_live_recovery_boundaries.py:82: AssertionError
+_ test_ordinary_delivery_requires_one_source_query_and_one_publication[queries-0-trial-] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3675/test_ordinary_delivery_require1')
+phase = 'trial-', counter = 'queries', value = 0
+
+    @pytest.mark.parametrize("phase", ["type-fidelity", "trial-"])
+    @pytest.mark.parametrize("counter,value", [("queries", 0), ("queries", 2), ("publications", 0), ("publications", 2)])
+    def test_ordinary_delivery_requires_one_source_query_and_one_publication(tmp_path, phase, counter, value):
+        class InvalidCount(HermeticRouteSession):
+            def run(self):
+                super().run()
+                if self.case.startswith(phase):
+                    setattr(self, counter, value)
+    
+        result = produce_fixture(tmp_path, SessionFactory(InvalidCount))
+>       assert result["status"] == "FAIL"
+E       AssertionError: assert 'UNVERIFIED' == 'FAIL'
+E         
+E         - FAIL
+E         + UNVERIFIED
+
+tests/test_native_delivery_live_recovery_boundaries.py:82: AssertionError
+_ test_ordinary_delivery_requires_one_source_query_and_one_publication[queries-2-type-fidelity] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3675/test_ordinary_delivery_require2')
+phase = 'type-fidelity', counter = 'queries', value = 2
+
+    @pytest.mark.parametrize("phase", ["type-fidelity", "trial-"])
+    @pytest.mark.parametrize("counter,value", [("queries", 0), ("queries", 2), ("publications", 0), ("publications", 2)])
+    def test_ordinary_delivery_requires_one_source_query_and_one_publication(tmp_path, phase, counter, value):
+        class InvalidCount(HermeticRouteSession):
+            def run(self):
+                super().run()
+                if self.case.startswith(phase):
+                    setattr(self, counter, value)
+    
+        result = produce_fixture(tmp_path, SessionFactory(InvalidCount))
+>       assert result["status"] == "FAIL"
+E       AssertionError: assert 'UNVERIFIED' == 'FAIL'
+E         
+E         - FAIL
+E         + UNVERIFIED
+
+tests/test_native_delivery_live_recovery_boundaries.py:82: AssertionError
+_ test_ordinary_delivery_requires_one_source_query_and_one_publication[queries-2-trial-] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3675/test_ordinary_delivery_require3')
+phase = 'trial-', counter = 'queries', value = 2
+
+    @pytest.mark.parametrize("phase", ["type-fidelity", "trial-"])
+    @pytest.mark.parametrize("counter,value", [("queries", 0), ("queries", 2), ("publications", 0), ("publications", 2)])
+    def test_ordinary_delivery_requires_one_source_query_and_one_publication(tmp_path, phase, counter, value):
+        class InvalidCount(HermeticRouteSession):
+            def run(self):
+                super().run()
+                if self.case.startswith(phase):
+                    setattr(self, counter, value)
+    
+        result = produce_fixture(tmp_path, SessionFactory(InvalidCount))
+>       assert result["status"] == "FAIL"
+E       AssertionError: assert 'UNVERIFIED' == 'FAIL'
+E         
+E         - FAIL
+E         + UNVERIFIED
+
+tests/test_native_delivery_live_recovery_boundaries.py:82: AssertionError
+_ test_ordinary_delivery_requires_one_source_query_and_one_publication[publications-0-type-fidelity] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3675/test_ordinary_delivery_require4')
+phase = 'type-fidelity', counter = 'publications', value = 0
+
+    @pytest.mark.parametrize("phase", ["type-fidelity", "trial-"])
+    @pytest.mark.parametrize("counter,value", [("queries", 0), ("queries", 2), ("publications", 0), ("publications", 2)])
+    def test_ordinary_delivery_requires_one_source_query_and_one_publication(tmp_path, phase, counter, value):
+        class InvalidCount(HermeticRouteSession):
+            def run(self):
+                super().run()
+                if self.case.startswith(phase):
+                    setattr(self, counter, value)
+    
+        result = produce_fixture(tmp_path, SessionFactory(InvalidCount))
+>       assert result["status"] == "FAIL"
+E       AssertionError: assert 'UNVERIFIED' == 'FAIL'
+E         
+E         - FAIL
+E         + UNVERIFIED
+
+tests/test_native_delivery_live_recovery_boundaries.py:82: AssertionError
+_ test_ordinary_delivery_requires_one_source_query_and_one_publication[publications-0-trial-] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3675/test_ordinary_delivery_require5')
+phase = 'trial-', counter = 'publications', value = 0
+
+    @pytest.mark.parametrize("phase", ["type-fidelity", "trial-"])
+    @pytest.mark.parametrize("counter,value", [("queries", 0), ("queries", 2), ("publications", 0), ("publications", 2)])
+    def test_ordinary_delivery_requires_one_source_query_and_one_publication(tmp_path, phase, counter, value):
+        class InvalidCount(HermeticRouteSession):
+            def run(self):
+                super().run()
+                if self.case.startswith(phase):
+                    setattr(self, counter, value)
+    
+        result = produce_fixture(tmp_path, SessionFactory(InvalidCount))
+>       assert result["status"] == "FAIL"
+E       AssertionError: assert 'UNVERIFIED' == 'FAIL'
+E         
+E         - FAIL
+E         + UNVERIFIED
+
+tests/test_native_delivery_live_recovery_boundaries.py:82: AssertionError
+_ test_ordinary_delivery_requires_one_source_query_and_one_publication[publications-2-type-fidelity] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3675/test_ordinary_delivery_require6')
+phase = 'type-fidelity', counter = 'publications', value = 2
+
+    @pytest.mark.parametrize("phase", ["type-fidelity", "trial-"])
+    @pytest.mark.parametrize("counter,value", [("queries", 0), ("queries", 2), ("publications", 0), ("publications", 2)])
+    def test_ordinary_delivery_requires_one_source_query_and_one_publication(tmp_path, phase, counter, value):
+        class InvalidCount(HermeticRouteSession):
+            def run(self):
+                super().run()
+                if self.case.startswith(phase):
+                    setattr(self, counter, value)
+    
+        result = produce_fixture(tmp_path, SessionFactory(InvalidCount))
+>       assert result["status"] == "FAIL"
+E       AssertionError: assert 'UNVERIFIED' == 'FAIL'
+E         
+E         - FAIL
+E         + UNVERIFIED
+
+tests/test_native_delivery_live_recovery_boundaries.py:82: AssertionError
+_ test_ordinary_delivery_requires_one_source_query_and_one_publication[publications-2-trial-] _
+
+tmp_path = PosixPath('/private/var/folders/vv/w85gvsm12bq9pwx1f1z3q3440000gp/T/pytest-of-paulkov007/pytest-3675/test_ordinary_delivery_require7')
+phase = 'trial-', counter = 'publications', value = 2
+
+    @pytest.mark.parametrize("phase", ["type-fidelity", "trial-"])
+    @pytest.mark.parametrize("counter,value", [("queries", 0), ("queries", 2), ("publications", 0), ("publications", 2)])
+    def test_ordinary_delivery_requires_one_source_query_and_one_publication(tmp_path, phase, counter, value):
+        class InvalidCount(HermeticRouteSession):
+            def run(self):
+                super().run()
+                if self.case.startswith(phase):
+                    setattr(self, counter, value)
+    
+        result = produce_fixture(tmp_path, SessionFactory(InvalidCount))
+>       assert result["status"] == "FAIL"
+E       AssertionError: assert 'UNVERIFIED' == 'FAIL'
+E         
+E         - FAIL
+E         + UNVERIFIED
+
+tests/test_native_delivery_live_recovery_boundaries.py:82: AssertionError
+__________ test_recovery_observations_accept_single_use_row_iterators __________
+
+    def test_recovery_observations_accept_single_use_row_iterators():
+        class IteratorRows(HermeticRouteSession):
+            def snapshot(self):
+                return replace(super().snapshot(), rows=iter(self.rows), outside_rows=iter(self.outside))
+    
+>       assert set(recovery_results(IteratorRows).values()) == {"PASS"}
+E       AssertionError: assert {'FAIL', 'PASS'} == {'PASS'}
+E         
+E         Extra items in the left set:
+E         'FAIL'
+E         Use -v to get more diff
+
+tests/test_native_delivery_live_recovery_boundaries.py:131: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-partial_rows-receipt_first_recovery-partition_replace]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-partial_rows-receipt_first_recovery-full_refresh]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-complete-receipt_first_recovery-partition_replace]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-complete-receipt_first_recovery-full_refresh]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-publications-receipt_first_recovery-partition_replace]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[unknown_commit-publications-receipt_first_recovery-full_refresh]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[before_commit-complete-rollback-partition_replace]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[before_commit-complete-rollback-full_refresh]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-complete-source_free_resume-partition_replace]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-complete-source_free_resume-full_refresh]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-outside-source_free_resume-partition_replace]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-outside-source_free_resume-full_refresh]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-publications-source_free_resume-partition_replace]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[after_eof-publications-source_free_resume-full_refresh]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[lost_ack-partial_rows-receipt_first_recovery-partition_replace]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[lost_ack-partial_rows-receipt_first_recovery-full_refresh]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[lost_ack-outside-receipt_first_recovery-partition_replace]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_cannot_hide_an_invalid_initial_boundary[lost_ack-outside-receipt_first_recovery-full_refresh]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_ordinary_delivery_requires_one_source_query_and_one_publication[queries-0-type-fidelity]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_ordinary_delivery_requires_one_source_query_and_one_publication[queries-0-trial-]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_ordinary_delivery_requires_one_source_query_and_one_publication[queries-2-type-fidelity]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_ordinary_delivery_requires_one_source_query_and_one_publication[queries-2-trial-]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_ordinary_delivery_requires_one_source_query_and_one_publication[publications-0-type-fidelity]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_ordinary_delivery_requires_one_source_query_and_one_publication[publications-0-trial-]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_ordinary_delivery_requires_one_source_query_and_one_publication[publications-2-type-fidelity]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_ordinary_delivery_requires_one_source_query_and_one_publication[publications-2-trial-]
+FAILED tests/test_native_delivery_live_recovery_boundaries.py::test_recovery_observations_accept_single_use_row_iterators

@@ -1,0 +1,34 @@
+{
+  "checked_source_commit": "33b7ad30cdb12a0f1804bb1b72570504133f4342",
+  "note": "Byte hashes for copied execution and independent review records; the review transcript is not a machine test receipt. Original files were not modified.",
+  "files": {
+    "final-broad.log": {
+      "bytes": 24011,
+      "sha256": "9306c2fa188523050b9e8ee6f8a3d396533a4919ef20276d0df9ae15c7d93aeb"
+    },
+    "final-broad-run.json": {
+      "bytes": 1091,
+      "sha256": "d880c3c6b0c673e0aaab6badff821f2e191b9bf6ab9bd3624cf65f857ceafcd3"
+    },
+    "independent-probes.json": {
+      "bytes": 3061,
+      "sha256": "a0ef78ac3f41b7743252acebaa79a6fb425ec14bf8af7f84ae56fe9bb7f87666"
+    },
+    "independent-docs-audit.json": {
+      "bytes": 1453,
+      "sha256": "bbfaed84ac96d55773ebec6055fdebc75d159396ef5a3202e1b9b0dfdf89e380"
+    },
+    "independent-reviews.md": {
+      "bytes": 4855,
+      "sha256": "1cfd1f1af99aa826cbbd9211b5f6bd82316f20fec149db10c12c6fff07249679"
+    },
+    "final-source-module-size.log": {
+      "bytes": 318,
+      "sha256": "2170ff4574970590f8a6b7c4137948b86eb89dab8bac38adea6427684bbab3be"
+    },
+    "final-live-absence.log": {
+      "bytes": 299,
+      "sha256": "a7b1c3bef52f8bc0909e819ac5742945440c407c7781429c610eee70a13f0efd"
+    }
+  }
+}
