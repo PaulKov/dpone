@@ -380,6 +380,10 @@ The root agent is the sole integrator and shared-file writer. Explorer, architec
 test/certification and docs/UX agents are read-only. A fresh-context reviewer checks
 the final implementation before integration. No merge or release is authorized.
 
+The follow-up [data-delivery acceleration specification](feature-design-data-delivery-acceleration-v1.md)
+preserves this route contract while defining bounded preparation/producer
+optimizations and [independent implementation tasks](data-delivery-acceleration-tasks.md).
+
 ## Approval checklist
 
 - [x] Actual route and missing capabilities traced against the named base.

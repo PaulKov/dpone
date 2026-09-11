@@ -1,0 +1,11 @@
+{
+  "run_url": "https://github.com/PaulKov/dpone/actions/runs/34502223609",
+  "head_sha": "ad5c117f89c7df33f2bdc2e1aa42d671ca8e0f1b",
+  "job_url": "https://github.com/PaulKov/dpone/actions/runs/34502223609/job/102959006457",
+  "job_id": 102959006457,
+  "status": "FAIL",
+  "command": "uv run dpone docs update-dev-metrics --check",
+  "diagnostic": "Quality metrics docs are outdated (docs/quality-metrics.md). Run: dpone docs update-dev-metrics",
+  "job_log_sha256": "2091bc258899d992578756ebb959406c61feda9a98e324277efdbe371af0813c",
+  "remaining_action": "Shared generated metrics update belongs to DDA-06 integrator; no shared paths changed here. New-head CI remains separate."
+}
