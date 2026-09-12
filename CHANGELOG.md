@@ -37,7 +37,6 @@
   gate originals. Live supervisor enrollment and the three-cell worker campaign
   remain `UNVERIFIED`.
 
->>>>>>> 8e7558a (docs: state shipped public composition activation)
 ## 0.79.0 - 2026-09-11
 
 ### Changed
