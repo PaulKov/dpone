@@ -54,7 +54,7 @@ class CompositionNativeDbtDispatcher:
 
     def __init__(
         self,
-        executor: CompositionNativeDbtExecutor,
+        executor: CompositionNativeDbtExecutor | None,
         *,
         supervisor: CompositionSupervisorProjection,
         execute_pack: ExecutePack = execute_dbt_pack,
