@@ -144,6 +144,9 @@ class ClickHouseAtomicSnapshotPublisher:
     def _require_current(self, intent: SnapshotPublicationIntent, *, recovery: bool) -> None:
         occurrence = self._authority.require_current(intent, recovery=recovery)
         intent.require_parent_scope(occurrence, recovery=recovery)
+        require_enrollment = getattr(self._authority, "require_enrollment", None)
+        if require_enrollment is not None:
+            require_enrollment(intent, recovery=recovery)
 
     def _inspect(self, intent: SnapshotPublicationIntent) -> SnapshotCatalogObservation:
         observation = self._catalog.inspect(intent)
