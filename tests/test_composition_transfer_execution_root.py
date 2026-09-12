@@ -330,6 +330,7 @@ def test_issued_overlay_never_copies_ambient_secrets(runtime):
         (CompositionTransferObservation(False, False, False, True, True), "FAILED"),
         (CompositionTransferObservation(True, False, True, False, False), "COMMIT_UNKNOWN"),
         (CompositionTransferObservation(False, False, False, True, False), "COMMIT_UNKNOWN"),
+        (CompositionTransferObservation(True, True, True, True, True), "COMMIT_UNKNOWN"),
     ],
 )
 def test_transfer_outcome_classifies_only_from_independent_evidence(runtime, observed, state):

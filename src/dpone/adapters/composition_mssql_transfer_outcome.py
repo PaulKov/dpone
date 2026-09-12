@@ -14,8 +14,8 @@ from hashlib import sha256
 from typing import Any
 
 from dpone.adapters.composition_mssql_execution_evidence import persist_execution_proof
-from dpone.contracts.composition_activation import CompositionAdmissionError
-from dpone.contracts.composition_persistence import (
+from dpone.contracts.composition_control import (
+    CompositionAdmissionError,
     CompositionAttemptIdentity,
     CompositionAttemptProof,
     CompositionProofAuthority,
@@ -46,9 +46,11 @@ class CompositionTransferObservation:
 
     @property
     def state(self) -> str:
-        if self.receipt_matches and self.row_evidence and self.content_evidence:
+        succeeded = self.receipt_matches and self.row_evidence and self.content_evidence
+        failed = self.rollback_protected and self.no_mutation
+        if succeeded and not failed:
             return "SUCCEEDED"
-        if self.rollback_protected and self.no_mutation:
+        if failed and not succeeded:
             return "FAILED"
         return "COMMIT_UNKNOWN"
 

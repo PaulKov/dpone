@@ -8,9 +8,9 @@ and outcome decision belongs to the injected parent execution root.
 
 The dispatcher exists so that an authenticated composition workload can never
 degrade into a generic child. Only the exact verified native dbt argv reaches the
-bootstrap. The ordinary transfer cells are refused with a fixed sanitized reason
-until their own parent roots are installed, because a supervised workload without
-its worker must block rather than run unprotected.
+bootstrap. Ordinary and ClickHouse pack-exec stay on the ordinary dispatcher;
+a missing ordinary worker is refused with a fixed sanitized reason instead of
+running unprotected.
 
 The run volume is the caller's evidence contract: a status is published only
 together with the worker's own execution evidence, and a status that disagrees

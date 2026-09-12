@@ -19,19 +19,17 @@ from dpone.adapters.composition_mssql_ownership import (
     iter_shared_owners_in,
 )
 from dpone.adapters.composition_mssql_transaction import require_shared_transaction_in
-from dpone.contracts.composition_activation import (
+from dpone.contracts.composition_control import (
     CompositionActivationOccurrence,
     CompositionActivationReceipt,
     CompositionActivationRequest,
     CompositionAdmissionError,
-    require_digest,
-)
-from dpone.contracts.composition_persistence import (
     CompositionAttemptIdentity,
     CompositionAttemptReceipt,
     decode_attempt_identity,
     encode_activation_request,
     require_composition_attempt_scope,
+    require_digest,
 )
 from dpone.contracts.composition_qualification_operation import (
     CompositionQualificationOperation,

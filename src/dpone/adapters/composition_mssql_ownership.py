@@ -13,14 +13,15 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from dpone.adapters.composition_mssql_transaction import require_shared_transaction_in
-from dpone.contracts.composition_activation import (
+from dpone.contracts.composition_control import (
     CompositionActivationRequest,
     CompositionAdmissionError,
     CompositionPhysicalResource,
+    decode_activation_request,
+    encode_physical_resource,
     require_digest,
 )
 from dpone.contracts.composition_ownership import CompositionOwnerReference, CompositionPhysicalClaim
-from dpone.contracts.composition_persistence import decode_activation_request, encode_physical_resource
 from dpone.contracts.composition_qualification_operation import CompositionQualificationOwner
 from dpone.contracts.strict_json import canonical_json_bytes
 

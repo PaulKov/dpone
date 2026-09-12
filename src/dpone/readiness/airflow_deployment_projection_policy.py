@@ -16,6 +16,10 @@ from dpone.contracts.airflow_deployment import (
 from dpone.contracts.airflow_deployment_projection import (
     is_versioned_airflow_bundle_ref,
 )
+from dpone.contracts.composition_supervisor import (
+    CompositionSupervisorProjection,
+    supervisor_projection_for_release,
+)
 from dpone.contracts.runtime_artifact_delivery import (
     is_pinned_artifact_registry_ref,
     is_safe_artifact_registry_logical_ref,
@@ -25,10 +29,12 @@ from dpone.readiness.airflow_connection_runtime_registry import runtime_connecti
 from dpone.readiness.airflow_deployment_artifacts import (
     bytes_descriptor,
     digest_dir,
+    json_bytes,
 )
 from dpone.readiness.airflow_deployment_projection_errors import (
     AirflowDeploymentProjectionError,
 )
+from dpone.readiness.airflow_deployment_projection_models import compute_deployment_id
 
 _RUNTIME_CONNECTION_SNAPSHOT_FILES = {
     "binding_set": "binding-set.json",
@@ -217,6 +223,59 @@ def confined_cache_root(
     return resolved
 
 
+def supervisor_projection(
+    *,
+    release_schema: str,
+    value: Mapping[str, object] | None,
+) -> CompositionSupervisorProjection | None:
+    """Require the capability for v3 and forbid it on native v1/v2 releases."""
+
+    try:
+        return supervisor_projection_for_release(release_schema=release_schema, value=value)
+    except ValueError as exc:
+        reason = str(exc)
+        if reason == "composition_supervisor_required":
+            code = "DPONE_COMPOSITION_SUPERVISOR_REQUIRED"
+            message = "composition release requires a complete supervisor deployment capability"
+        elif reason == "composition_supervisor_forbidden":
+            code = "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN"
+            message = "native v1/v2 and ordinary releases cannot carry a composition supervisor capability"
+        else:
+            code = "DPONE_COMPOSITION_SUPERVISOR_INVALID"
+            message = "composition supervisor deployment capability is invalid"
+        raise AirflowDeploymentProjectionError(code, message) from exc
+
+
+def seal_composition_supervisor_projection(
+    *,
+    deployment: dict[str, Any],
+    airflow_index: dict[str, Any],
+    projection: CompositionSupervisorProjection,
+) -> bytes:
+    """Mirror the capability and reseal deployment identity and descriptor."""
+
+    if (
+        deployment.get("schema") != "dpone.deployment-set.v3"
+        or airflow_index.get("schema") != "dpone.airflow-deployment-index.v3"
+    ):
+        raise AirflowDeploymentProjectionError(
+            "DPONE_COMPOSITION_SUPERVISOR_INVALID",
+            "composition supervisor requires the v3 deployment wire pair",
+        )
+    projection_payload = projection.to_dict()
+    deployment["composition_supervisor"] = projection_payload
+    deployment_id = compute_deployment_id(deployment)
+    deployment["deployment_id"] = deployment_id
+    deployment_bytes = json_bytes(deployment)
+    airflow_index["deployment_id"] = deployment_id
+    airflow_index["composition_supervisor"] = projection.to_dict()
+    airflow_index["deployment"] = bytes_descriptor(
+        artifact_ref=(f"cache://deployments/{deployment['environment']}/{digest_dir(deployment_id)}/deployment.json"),
+        payload=deployment_bytes,
+    )
+    return deployment_bytes
+
+
 __all__ = [
     "confined_cache_root",
     "dev_evidence_delivery",
@@ -228,5 +287,7 @@ __all__ = [
     "require_versioned_airflow_bundle_ref",
     "runtime_connection_descriptors",
     "runtime_connection_fingerprints",
+    "seal_composition_supervisor_projection",
+    "supervisor_projection",
     "workload_projection_inventory",
 ]

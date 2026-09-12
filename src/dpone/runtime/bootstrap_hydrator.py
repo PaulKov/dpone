@@ -13,7 +13,6 @@ from dataclasses import replace
 from typing import Any
 
 from dpone.config.postgres_xmin_execution import require_postgres_xmin_execution_route
-from dpone.contracts.runtime_connection import ResolvedBindingConnection
 from dpone.ports.runtime_hydrator import RuntimeBindings
 from dpone.runtime.bootstrap_config import mapping_or_empty
 from dpone.runtime.bootstrap_load_identity import build_load_identity_service
@@ -28,7 +27,11 @@ from dpone.runtime.bootstrap_postgres_source_authority import (
 )
 from dpone.runtime.bootstrap_sources_sinks import RuntimeEndpointFactory
 from dpone.runtime.bootstrap_state import RuntimeStateBootstrap
-from dpone.runtime.credentials.authority import canonical_runtime_endpoint_type, resolve_runtime_connections
+from dpone.runtime.credentials.authority import (
+    ResolvedBindingConnection,
+    canonical_runtime_endpoint_type,
+    resolve_runtime_connections,
+)
 from dpone.runtime.credentials.runtime_context import RuntimeConnectionContextLoader
 from dpone.runtime.errors import RuntimeConfigurationError
 from dpone.runtime.internal_query_capability import InternalQueryCapabilityIssuer

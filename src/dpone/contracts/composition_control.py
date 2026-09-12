@@ -20,6 +20,7 @@ from dpone.contracts.composition_execution import (
     composition_generated_transfer_cell,
     composition_transfer_cell,
 )
+from dpone.contracts.composition_identity import require_digest
 from dpone.contracts.composition_persistence import (
     CompositionAttemptIdentity,
     CompositionAttemptProof,
@@ -32,10 +33,18 @@ from dpone.contracts.composition_persistence import (
     encode_activation_request,
     encode_attempt_identity,
     encode_attempt_proof,
+    encode_physical_resource,
     require_composition_attempt_admission,
     require_composition_attempt_scope,
 )
 from dpone.contracts.composition_physical import CompositionDomainObservation, CompositionPhysicalDomain
+from dpone.contracts.composition_snapshot import (
+    SnapshotCatalogObservation,
+    SnapshotPublicationIntent,
+    SnapshotPublicationRecord,
+    SnapshotPublisherClosure,
+    classify_snapshot,
+)
 from dpone.contracts.composition_sources import CompositionSourceSnapshot
 from dpone.contracts.dbt_relation_writes import DbtRelationWrite
 from dpone.contracts.dbt_workspace_activation import dbt_relation_write_subject
@@ -61,12 +70,19 @@ __all__ = [
     "encode_activation_request",
     "encode_attempt_identity",
     "encode_attempt_proof",
+    "encode_physical_resource",
+    "require_digest",
     "CompositionExecutionPlan",
     "composition_generated_transfer_cell",
     "composition_transfer_cell",
     "CompositionDomainObservation",
     "CompositionPhysicalDomain",
     "CompositionSourceSnapshot",
+    "SnapshotCatalogObservation",
+    "SnapshotPublicationIntent",
+    "SnapshotPublicationRecord",
+    "SnapshotPublisherClosure",
+    "classify_snapshot",
     "DbtRelationWrite",
     "dbt_relation_write_subject",
 ]

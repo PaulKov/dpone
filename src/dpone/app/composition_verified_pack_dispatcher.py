@@ -130,6 +130,8 @@ def _native_executor(
 
     try:
         parent = _parent_context(command)
+        if parent.get("context") is None:
+            return None
         factory = capabilities.factory(SQLSERVER_DBT_V1)
         seams = _materialization_seams(parent)
         if seams is None or not callable(factory):
@@ -151,6 +153,8 @@ def _ordinary_executor(
     del request
     try:
         parent = _parent_context(command, manifest=manifest)
+        if parent.get("context") is None:
+            return None
         factory = capabilities.factory(cell)
         if not callable(factory):
             return None

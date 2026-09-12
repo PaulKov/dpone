@@ -10,13 +10,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
-from dpone.contracts.composition_snapshot import (
+from dpone.contracts.composition_control import (
+    CompositionAdmissionError,
     SnapshotCatalogObservation,
     SnapshotPublicationIntent,
     SnapshotPublicationRecord,
     SnapshotPublisherClosure,
     classify_snapshot,
+    require_digest,
 )
 
 if TYPE_CHECKING:

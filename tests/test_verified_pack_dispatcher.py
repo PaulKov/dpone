@@ -9,6 +9,7 @@ so a missing dispatcher cannot silently fall back to native-v2 or shell.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import subprocess
 from dataclasses import replace
@@ -135,6 +136,64 @@ def test_missing_parent_context_rejects_as_native_worker_unavailable(command, ru
     assert rejection_reason(run_volume) == "composition_native_worker_unavailable"
 
 
+def test_missing_occurrence_context_does_not_construct_ordinary_root(
+    command, run_volume, clean_ambient, denied_child, monkeypatch
+):
+    from dpone.app import composition_verified_pack_dispatcher as module
+    from dpone.app.composition_verified_pack_dispatcher import compose_verified_pack_dispatcher
+
+    constructed: list[str] = []
+    parent = parent_authority()
+    parent["context"] = None
+    (command.working_directory / "manifest.json").write_text(
+        json.dumps(
+            {
+                "name": "b_ordinary",
+                "source": {
+                    "type": "postgres",
+                    "connection_ref": "pg-source",
+                    "table": {"database": "sales", "schema": "public", "name": "orders"},
+                },
+                "sink": {
+                    "type": "mssql",
+                    "connection_ref": "mssql-sink",
+                    "table": {"database": "warehouse", "schema": "dbo", "name": "orders"},
+                    "strategy": {"mode": "full_refresh"},
+                },
+                "state": {
+                    "type": "mssql",
+                    "atomicity": "target_atomic",
+                    "provisioning": "external",
+                    "connection_ref": "mssql-state",
+                },
+            }
+        )
+    )
+
+    def factory(cell: str):
+        def build(*, dependencies: object) -> object:
+            constructed.append(cell)
+            return object()
+
+        return build
+
+    monkeypatch.setattr(module, "_parent_context", lambda *_args, **_kwargs: parent)
+    monkeypatch.setattr(
+        module, "build_installed_execution_capabilities", lambda: type("Caps", (), {"factory": factory})()
+    )
+
+    admitted_command = admitted(replace(command, argv=ORDINARY_ARGV))
+    status = execute_verified_pack_command(
+        admitted_command,
+        composition_dispatcher=compose_verified_pack_dispatcher(admitted_command),
+        **run_volume,
+    )
+
+    assert constructed == []
+    assert status == 5
+    assert rejection_reason(run_volume) == "composition_ordinary_worker_unavailable"
+
+
 def test_ordinary_transfer_stays_ordinary_worker_unavailable(command, run_volume, clean_ambient, denied_child):
     from dpone.app.composition_verified_pack_dispatcher import compose_verified_pack_dispatcher
 
@@ -173,6 +232,30 @@ def test_parent_context_installs_dbt_root_via_sqlserver_dbt_v1(command, clean_am
 
     assert type(dispatcher._native._executor) is CompositionDbtExecutionRoot
     assert observed
+
+
+def test_missing_occurrence_context_is_native_worker_unavailable(
+    command, run_volume, clean_ambient, denied_child, monkeypatch
+):
+    from dpone.app import composition_verified_pack_dispatcher as module
+    from dpone.app.composition_verified_pack_dispatcher import compose_verified_pack_dispatcher
+
+    parent = parent_authority()
+    parent["context"] = None
+    monkeypatch.setattr(module, "_parent_context", lambda *_args, **_kwargs: parent)
+
+    admitted_command = admitted(command)
+    dispatcher = compose_verified_pack_dispatcher(admitted_command)
+
+    assert dispatcher._native._executor is None
+    status = execute_verified_pack_command(
+        admitted_command,
+        composition_dispatcher=dispatcher,
+        **run_volume,
+    )
+
+    assert status == 5
+    assert rejection_reason(run_volume) == "composition_native_worker_unavailable"
 
 
 def test_missing_sqlserver_dbt_factory_is_native_worker_unavailable(

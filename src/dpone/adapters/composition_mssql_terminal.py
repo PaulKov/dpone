@@ -18,18 +18,16 @@ from dpone.adapters.composition_mssql_historical_gate import (
     require_historical_mssql_gate,
 )
 from dpone.adapters.composition_mssql_transaction import require_shared_transaction_in
-from dpone.contracts.composition_activation import (
+from dpone.contracts.composition_control import (
     CompositionActivationOccurrence,
     CompositionAdmissionError,
-    require_digest,
-)
-from dpone.contracts.composition_persistence import (
     CompositionAttemptIdentity,
     CompositionAttemptProof,
     CompositionAttemptReceipt,
     CompositionProofAuthority,
     decode_attempt_proof,
     require_composition_attempt_scope,
+    require_digest,
 )
 
 if TYPE_CHECKING:

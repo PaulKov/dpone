@@ -19,9 +19,14 @@
   `dpone.app.composition_activation.build_composition_activation_coordinator`
   and the cache-sync/desired-state authority path. Native-v2 behavior is
   unchanged. Authenticated v3 pack-exec reaches the native dbt parent worker
-  when parent context exists; ordinary and ClickHouse pack-exec fail closed
-  with `composition_ordinary_worker_unavailable`. A skipped live check is
-  never `PASS`.
+  when parent context exists; a missing occurrence context fail-closes as
+  `composition_native_worker_unavailable` before the dbt root is composed.
+  Ordinary and ClickHouse pack-exec fail closed with
+  `composition_ordinary_worker_unavailable` and do not construct a worker
+  root when occurrence context is missing. A skipped live check is never
+  `PASS`.
+- Treat transfer observations that carry both a success triple and rollback
+  protection as `COMMIT_UNKNOWN` instead of `SUCCEEDED`.
 - Add composition execution integration: reopen sealed parent inputs, select
   parent admission in the shared dbt engine, use issued-only dbt credentials,
   and fence generic MSSQL target transactions and receipt replay.
