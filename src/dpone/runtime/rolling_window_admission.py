@@ -47,7 +47,7 @@ _UNSUPPORTED_OPTIONS = (
 )
 
 
-def validate_window_admission(load_config: Any) -> None:
+def validate_window_admission(load_config: Any, *, runtime_bindings: Any | None = None) -> None:
     """Validate before factories or source I/O; preserve legacy policy authority.
 
     The first window implementation supplies intrinsic staging reconciliation and
@@ -55,6 +55,9 @@ def validate_window_admission(load_config: Any) -> None:
     processor's configurable quality, hook, repair or change-capture pipeline.
     Those combinations therefore fail explicitly instead of losing checks.
     """
+    for field in ("postgres_mssql_correctness_activation", "postgres_mssql_correctness_runtime"):
+        if getattr(runtime_bindings, field, None) is not None:
+            _unsupported("postgres_mssql_correctness")
     strategy = getattr(load_config, "load_strategy", "replace")
     if getattr(strategy, "value", strategy) != "replace":
         _unsupported("load_strategy")

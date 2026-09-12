@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+defaults:
+  name: orders_postgres_mssql_r1
+  source:
+    type: postgres
+    connection_id: postgres_orders
+    options:
+      columns:
+        order_id: bigint
+        amount: numeric(18,2)
+      batch_size: 100000
+      export_format: csv
+      compress_export: false
+  sink:
+    type: mssql
+    connection_id: mssql_dwh
+    table: {schema: dbo, name: orders}
+    staging: {schema: staging}
+    strategy:
+      mode: full_refresh
+      unique_key: [order_id]
+    options: {bulk: {mode: bcp}}
+  state:
+    type: mssql
+    connection_id: mssql_dwh
+    reuse: sink
+    atomicity: target_atomic
+    provisioning: external
+
+schemas:
+  public:
+    tables: [orders]

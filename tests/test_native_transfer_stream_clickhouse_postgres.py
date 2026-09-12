@@ -114,7 +114,7 @@ def test_postgres_copy_to_stream_returns_zero_file_byte_stream() -> None:
         def cursor(self):
             return self.cursor_obj
 
-    connector = PostgresConnector.__new__(PostgresConnector)
+    connector = PostgresConnector(host="localhost", port=5432, database="test", user="test", password="")
     connector._connection = FakeConnection()
 
     artifact = connector.copy_to_stream(

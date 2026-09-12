@@ -51,3 +51,32 @@ reclassify an incomplete attempt as successful.
 Release readiness still requires fresh normal source checks, merge identity,
 packaging and both source/archive hygiene reports on the eventual release commit.
 This archival index grants no release or live-certification approval.
+
+## Historical agent receipt amendment
+
+The append-only
+[`agent-pr-receipt-retention-v1.json`](agent-pr-receipt-retention-v1.json)
+records six additional files from one historical `agent-pr-receipt` artifact.
+The files were removed from the current checkout because the changed-path list
+uses Git's NUL-delimited wire format, which is intentionally unsupported by the
+generic public-clean text scanner. No LF projection or scanner exception was
+created.
+
+Retrieve all six files together from the pinned source commit or from the
+verified complete external archive. Validate every path, Git blob, mode, size,
+and SHA-256 against the append-only record before interpreting the receipt. Do
+not combine a current checkout copy with files from another run or commit. The
+original NUL framing is evidence content and must not be normalized.
+
+The amendment has status `N/A`: it is a location and integrity record, not a new
+receipt, test execution, privacy clearance, or release result. The earlier
+35-file `index.json` remains unchanged and retains its separate authority.
+Current-tree candidate scanning can proceed without the duplicate files, but
+reachable-history scanning remains `UNVERIFIED` because the original Git blob is
+preserved intentionally.
+
+If the six-file record or the selected recovery source cannot be verified, stop
+and report `UNVERIFIED`. Restore the complete six-file set from the pinned commit
+into a new directory outside the checkout for diagnosis; never rewrite the
+historical Git object, edit the append-only record, or reconstruct a partial
+artifact from current files.

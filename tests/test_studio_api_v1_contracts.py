@@ -903,3 +903,43 @@ def test_studio_rejects_unknown_route_method_media_type_and_string_boolean() -> 
     assert wrong_method.value.code == 405
     assert media_type.value.code == 415
     assert boolean.value.code == 422
+
+
+def test_studio_non_mssql_plan_correctness_section_accepts_null() -> None:
+    server, thread, base_url = _server()
+    try:
+        spec = _get_json(base_url, "/openapi.json")
+        draft = _post_json(
+            base_url,
+            "/api/v1/manifests/draft",
+            {
+                "source_type": "postgres",
+                "sink_type": "postgres",
+                "strategy": "full_refresh",
+                "source_connection": "postgres_oltp",
+                "sink_connection": "postgres_dwh",
+                "source_schema": "public",
+                "source_table": "orders",
+                "target_schema": "landing",
+                "target_table": "orders",
+            },
+        )
+        plan = _post_json(base_url, "/api/v1/plans", {"manifest_yaml": draft["manifest_yaml"]})
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert "postgres_mssql_correctness" in plan
+    assert plan["postgres_mssql_correctness"] is None
+    response_schema = spec["components"]["schemas"]["PlanResponse"]
+    assert "postgres_mssql_correctness" not in response_schema["required"]
+    section_schema = {
+        **response_schema["properties"]["postgres_mssql_correctness"],
+        "components": spec["components"],
+    }
+    validate_json(plan["postgres_mssql_correctness"], section_schema)
+    validate_json({"activation_status": "blocked"}, section_schema)
+    for invalid in (False, 0, "not a section", []):
+        with pytest.raises(ValidationError):
+            validate_json(invalid, section_schema)

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from dpone.integration_matrix_behavior import _mock_kafka_events
-from dpone.integration_matrix_constants import MatrixRow
 from dpone.integration_matrix_counts import (
     _delete_id_range,
     _insert_id_range,
@@ -12,6 +13,9 @@ from dpone.integration_matrix_counts import (
     _update_id_range,
 )
 from dpone.integration_matrix_wide import _mock_row
+
+if TYPE_CHECKING:
+    from dpone.integration_matrix_constants import MatrixRow
 
 
 def _source_snapshot_sample_rows(

@@ -1,0 +1,311 @@
+{
+  "domain": "dpone-r1-schema-contract-v3",
+  "items": [
+    {
+      "tag": "text",
+      "value": "dpone-mssql-r1-v3-schema-1"
+    },
+    {
+      "tag": "text",
+      "value": "dpone_authority"
+    },
+    {
+      "items": [
+        {
+          "domain": "dpone-r1-schema-object-inventory-entry-v3",
+          "items": [
+            {
+              "tag": "text",
+              "value": "table"
+            },
+            {
+              "tag": "text",
+              "value": "dpone_authority"
+            },
+            {
+              "tag": "text",
+              "value": "dpone_effect_receipt_v3"
+            },
+            {
+              "tag": "int",
+              "value": 71
+            },
+            {
+              "byte": 34,
+              "role": "D2",
+              "tag": "synthetic_digest"
+            },
+            {
+              "items": [
+                {
+                  "domain": "dpone-r1-schema-column-v3",
+                  "items": [
+                    {
+                      "tag": "int",
+                      "value": 1
+                    },
+                    {
+                      "tag": "text",
+                      "value": "receipt_id"
+                    },
+                    {
+                      "tag": "text",
+                      "value": "uniqueidentifier"
+                    },
+                    {
+                      "tag": "int",
+                      "value": 16
+                    },
+                    {
+                      "tag": "int",
+                      "value": 0
+                    },
+                    {
+                      "tag": "int",
+                      "value": 0
+                    },
+                    {
+                      "tag": "bool",
+                      "value": false
+                    },
+                    {
+                      "tag": "null"
+                    },
+                    {
+                      "tag": "bool",
+                      "value": false
+                    },
+                    {
+                      "tag": "bool",
+                      "value": false
+                    }
+                  ],
+                  "tag": "frame"
+                }
+              ],
+              "tag": "tuple"
+            },
+            {
+              "items": [
+                {
+                  "domain": "dpone-r1-schema-constraint-v3",
+                  "items": [
+                    {
+                      "tag": "text",
+                      "value": "pk_receipt"
+                    },
+                    {
+                      "tag": "text",
+                      "value": "primary_key"
+                    },
+                    {
+                      "items": [
+                        {
+                          "tag": "text",
+                          "value": "receipt_id"
+                        }
+                      ],
+                      "tag": "tuple"
+                    },
+                    {
+                      "tag": "null"
+                    },
+                    {
+                      "byte": 17,
+                      "role": "D1",
+                      "tag": "synthetic_digest"
+                    },
+                    {
+                      "tag": "bool",
+                      "value": true
+                    },
+                    {
+                      "tag": "bool",
+                      "value": true
+                    }
+                  ],
+                  "tag": "frame"
+                }
+              ],
+              "tag": "tuple"
+            },
+            {
+              "items": [],
+              "tag": "tuple"
+            },
+            {
+              "items": [],
+              "tag": "tuple"
+            },
+            {
+              "items": [],
+              "tag": "tuple"
+            },
+            {
+              "items": [],
+              "tag": "tuple"
+            }
+          ],
+          "tag": "frame"
+        },
+        {
+          "domain": "dpone-r1-schema-object-inventory-entry-v3",
+          "items": [
+            {
+              "tag": "text",
+              "value": "procedure"
+            },
+            {
+              "tag": "text",
+              "value": "dpone_authority"
+            },
+            {
+              "tag": "text",
+              "value": "consume_effect_v3"
+            },
+            {
+              "tag": "int",
+              "value": 72
+            },
+            {
+              "byte": 34,
+              "role": "D2",
+              "tag": "synthetic_digest"
+            },
+            {
+              "items": [],
+              "tag": "tuple"
+            },
+            {
+              "items": [],
+              "tag": "tuple"
+            },
+            {
+              "items": [],
+              "tag": "tuple"
+            },
+            {
+              "items": [
+                {
+                  "domain": "dpone-r1-schema-procedure-parameter-v3",
+                  "items": [
+                    {
+                      "tag": "int",
+                      "value": 1
+                    },
+                    {
+                      "tag": "text",
+                      "value": "effect_key"
+                    },
+                    {
+                      "tag": "text",
+                      "value": "varbinary"
+                    },
+                    {
+                      "tag": "int",
+                      "value": 32
+                    },
+                    {
+                      "tag": "int",
+                      "value": 0
+                    },
+                    {
+                      "tag": "int",
+                      "value": 0
+                    },
+                    {
+                      "tag": "text",
+                      "value": "input"
+                    }
+                  ],
+                  "tag": "frame"
+                }
+              ],
+              "tag": "tuple"
+            },
+            {
+              "items": [],
+              "tag": "tuple"
+            },
+            {
+              "items": [],
+              "tag": "tuple"
+            }
+          ],
+          "tag": "frame"
+        }
+      ],
+      "tag": "tuple"
+    },
+    {
+      "items": [
+        {
+          "domain": "dpone-r1-schema-permission-entry-v3",
+          "items": [
+            {
+              "tag": "text",
+              "value": "dpone_runtime"
+            },
+            {
+              "tag": "null"
+            },
+            {
+              "tag": "text",
+              "value": "object"
+            },
+            {
+              "tag": "text",
+              "value": "dpone_authority"
+            },
+            {
+              "tag": "text",
+              "value": "consume_effect_v3"
+            },
+            {
+              "tag": "null"
+            },
+            {
+              "tag": "text",
+              "value": "EXECUTE"
+            },
+            {
+              "tag": "text",
+              "value": "grant"
+            },
+            {
+              "tag": "bool",
+              "value": false
+            }
+          ],
+          "tag": "frame"
+        }
+      ],
+      "tag": "tuple"
+    },
+    {
+      "items": [
+        {
+          "domain": "dpone-r1-schema-supported-codec-entry-v3",
+          "items": [
+            {
+              "tag": "text",
+              "value": "dpone.mssql-effect-request"
+            },
+            {
+              "tag": "text",
+              "value": "v3"
+            },
+            {
+              "byte": 17,
+              "role": "D1",
+              "tag": "synthetic_digest"
+            }
+          ],
+          "tag": "frame"
+        }
+      ],
+      "tag": "tuple"
+    }
+  ],
+  "tag": "frame"
+}

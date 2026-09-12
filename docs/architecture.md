@@ -16,7 +16,7 @@ dpone is now organized as a production batch ELT runtime with explicit contracts
 The main runtime path is:
 
 1. Parse and normalize manifests in `dpone.manifest.*` and `dpone.dag.*`.
-2. Hydrate runtime objects through `dpone.runtime.bootstrap.DefaultRuntimeHydrator`.
+2. Request runtime hydration through `dpone.ports.runtime_hydrator`; `dpone.app.runtime_bootstrap` composes the default implementations.
 3. Extract source data into explicit artifacts.
 4. Enforce runtime data contracts and quarantine bad rows before staging.
 5. Plan schema evolution, target type compatibility and physical DDL before target writes.
@@ -83,7 +83,7 @@ flowchart LR
     Ports["dpone.ports"]
     Adapters["dpone.adapters"]
     App["dpone.app.context"]
-    Bootstrap["dpone.runtime.bootstrap"]
+    Bootstrap["dpone.app.runtime_bootstrap"]
     Runtime["dpone.runtime.*"]
     Shims["Compatibility shims\n(dpone.source / dpone.sink /\ndpone.lib.* / dpone.core.*)"]
 
@@ -1118,10 +1118,12 @@ See also: [Import rules](import-rules.md).
 - In **metadata-only mode** it stays fully pure (no runtime objects).
 - In **execution mode** it requests runtime bindings through the `dpone.ports.runtime_hydrator` port.
 
-Runtime creation moved to `dpone.runtime.bootstrap`:
+Runtime defaults are composed by `dpone.app.runtime_bootstrap`, requested lazily through the runtime ports:
 
 - `DefaultRuntimeHydrator` creates sources/sinks/logger/state storages.
 - `DefaultProcessRunner` executes `ETLProcess` through `ETLProcessor`.
+
+`dpone.runtime.bootstrap` remains a compatibility entry point: importing it requests registration through those same ports and preserves the exported implementation classes. Metadata-only paths do not load platform catalogs or optional vendor SDKs.
 
 This means `dpone.dag/*` and `dpone.manifest/*` contain **no direct imports from `dpone.runtime.*`**, while runtime execution remains available through lazy port registration.
 

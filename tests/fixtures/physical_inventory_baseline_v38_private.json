@@ -1,0 +1,169 @@
+{
+  "constructor_fields": [
+    "descriptor_version",
+    "engine_profile",
+    "session_profile",
+    "expected_schema_contract",
+    "ordered_resource_declarations",
+    "ordered_tables",
+    "ordered_procedures",
+    "ordered_binding_module_templates",
+    "ordered_migration_probes"
+  ],
+  "descriptor_digest": "c6060e6d76114e41a2b44debe607f07ab391eafe0ed4bd00a2c7442a0d6bb87c",
+  "errors": {
+    "ordered_binding_module_templates/duplicate": {
+      "message": "physical binding inventory identity/order is invalid",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_binding_module_templates/empty": {
+      "message": "physical binding inventory identity/order is invalid",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_binding_module_templates/list": {
+      "message": "binding must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_binding_module_templates/tuple_subclass": {
+      "message": "binding must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_binding_module_templates/wrong_member": {
+      "message": "binding must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_migration_probes/duplicate": {
+      "message": "migration probes must be a nonempty canonical set",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_migration_probes/empty": {
+      "message": "migration probes must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_migration_probes/list": {
+      "message": "migration probes must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_migration_probes/tuple_subclass": {
+      "message": "migration probes must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_migration_probes/wrong_member": {
+      "message": "migration probes must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_procedures/duplicate": {
+      "message": "physical procedure inventory identity/order is invalid",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_procedures/empty": {
+      "message": "physical procedure inventory identity/order is invalid",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_procedures/list": {
+      "message": "procedure must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_procedures/tuple_subclass": {
+      "message": "procedure must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_procedures/wrong_member": {
+      "message": "procedure must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_resource_declarations/duplicate": {
+      "message": "resource declarations must be a nonempty canonical set",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_resource_declarations/empty": {
+      "message": "resource declarations must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_resource_declarations/list": {
+      "message": "resource declarations must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_resource_declarations/tuple_subclass": {
+      "message": "resource declarations must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_resource_declarations/wrong_member": {
+      "message": "resource declarations must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_tables/duplicate": {
+      "message": "physical table inventory identity/order is invalid",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_tables/empty": {
+      "message": "physical table inventory identity/order is invalid",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_tables/list": {
+      "message": "table must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_tables/tuple_subclass": {
+      "message": "table must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    },
+    "ordered_tables/wrong_member": {
+      "message": "table must be an exact typed tuple",
+      "type": "MssqlR1V3ContractError"
+    }
+  },
+  "procedure_names": [
+    "dpone_provision_registration_v3",
+    "dpone_rotate_registration_v3",
+    "dpone_import_generation_authority_set_v3",
+    "dpone_probe_control_effect_v3",
+    "dpone_attest_schema_v3",
+    "dpone_admit_operation_v3",
+    "dpone_seal_effect_v3",
+    "dpone_take_over_sealed_v3",
+    "dpone_probe_pre_source_v3",
+    "dpone_open_stage_v3",
+    "dpone_renew_stage_v3",
+    "dpone_begin_stage_chunk_v3",
+    "dpone_complete_stage_chunk_v3",
+    "dpone_observe_stage_v3",
+    "dpone_observe_stage_chunk_v3",
+    "dpone_scan_stage_v3",
+    "dpone_seal_stage_v3",
+    "dpone_recover_expired_open_v3",
+    "dpone_probe_open_recovery_v3",
+    "dpone_admit_writer_v3",
+    "dpone_resolve_admit_authority_set_v3",
+    "dpone_append_effect_receipt_v3",
+    "dpone_write_xmin_checkpoint_v3",
+    "dpone_consume_stage_set_v3",
+    "dpone_consume_authority_set_v3",
+    "dpone_advance_operation_and_head_v3",
+    "dpone_prove_candidate_effect_v3",
+    "dpone_probe_effect_v3",
+    "dpone_probe_registration_v3"
+  ],
+  "table_names": [
+    "dpone_authority_contract_v3",
+    "dpone_target_registration_v3",
+    "dpone_active_registration_head_v3",
+    "dpone_target_generation_head_v3",
+    "dpone_writer_operation_v3",
+    "dpone_sealed_effect_v3",
+    "dpone_staging_artifact_v3",
+    "dpone_staging_chunk_v3",
+    "dpone_generation_authority_issuance_v3",
+    "dpone_generation_authority_ref_v3",
+    "dpone_generation_authority_consumption_v3",
+    "dpone_provider_install_receipt_v3",
+    "dpone_control_receipt_v3",
+    "dpone_open_stage_recovery_receipt_v3",
+    "dpone_open_stage_recovery_artifact_v3",
+    "dpone_effect_receipt_v3",
+    "dpone_batch_effect_receipt_v3",
+    "dpone_xmin_effect_receipt_v3",
+    "dpone_target_row_hash_v3",
+    "dpone_xmin_checkpoint_v3"
+  ]
+}

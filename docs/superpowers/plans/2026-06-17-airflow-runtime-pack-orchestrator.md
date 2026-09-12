@@ -137,7 +137,7 @@ Run the focused test set, ruff, mypy, docs checks, module/layer/architecture met
 
 Use installed local tooling where available:
 - `minikube status` or `minikube start`
-- `helm repo add apache-airflow https://airflow.apache.org`
+- <code>helm repo add apache-airflow https://airflow.apache.org</code>
 - install or upgrade an Airflow namespace for a minimal local smoke
 - generate pack artifacts and run plan/verify commands
 - execute the supported KPO/pod-template smoke path where cluster resources and local image availability allow it

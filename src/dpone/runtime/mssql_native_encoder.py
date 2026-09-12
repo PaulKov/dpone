@@ -8,11 +8,13 @@ bytes include native field prefixes and can be concatenated without row markers.
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.runtime.mssql_native_encoder_values import encode_native_value, native_value_size
-from dpone.runtime.native_wire_models import SourceNativeWireContract
 from dpone.runtime.native_wire_mssql import validate_mssql_native_contract
+
+if TYPE_CHECKING:
+    from dpone.runtime.native_wire_models import SourceNativeWireContract
 
 
 class MssqlNativeEncoder:

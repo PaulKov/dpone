@@ -72,3 +72,31 @@ class AppContext:
         from .dbt_publish_composition import build_dbt_release_materializer
 
         return build_dbt_release_materializer()
+
+    def build_postgres_mssql_correctness_route_resolver(self):
+        """Compose the local planning resolver from a platform-owned catalog."""
+
+        path = self.settings.postgres_mssql_correctness_catalog_path
+        if path is None:
+            return None
+        from collections.abc import Mapping
+
+        from dpone.adapters.postgres_mssql_correctness_profile import (
+            MappingPostgresMssqlCorrectnessCatalog,
+            UnverifiedPostgresMssqlCorrectnessEvidence,
+        )
+        from dpone.contracts import ETLConfigurationError
+        from dpone.readiness.postgres_mssql_correctness_profile import PostgresMssqlCorrectnessProfileResolver
+        from dpone.readiness.postgres_mssql_correctness_route import PostgresMssqlCorrectnessRouteResolver
+
+        if not self.fs.exists(path):
+            raise ETLConfigurationError("DPONE_POSTGRES_MSSQL_PROFILE_CATALOG_INVALID")
+        payload = self.yaml.load(self.fs.read_text(path, encoding="utf-8"))
+        if not isinstance(payload, Mapping):
+            raise ETLConfigurationError("DPONE_POSTGRES_MSSQL_PROFILE_CATALOG_INVALID")
+        catalog = MappingPostgresMssqlCorrectnessCatalog(payload)
+        profile_resolver = PostgresMssqlCorrectnessProfileResolver(
+            catalog,
+            UnverifiedPostgresMssqlCorrectnessEvidence(implementation_available=False),
+        )
+        return PostgresMssqlCorrectnessRouteResolver(selector=catalog, resolver=profile_resolver)

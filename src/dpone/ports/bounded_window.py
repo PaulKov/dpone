@@ -5,17 +5,18 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator, Sequence
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
-from dpone.contracts.bounded_window import (
-    ChunkReceipt,
-    PublicationStatus,
-    WindowChunk,
-    WindowLease,
-    WindowPlan,
-    WindowRecord,
-    WindowResult,
-)
+if TYPE_CHECKING:
+    from dpone.contracts.bounded_window import (
+        ChunkReceipt,
+        PublicationStatus,
+        WindowChunk,
+        WindowLease,
+        WindowPlan,
+        WindowRecord,
+        WindowResult,
+    )
 
 
 class WindowSource(Protocol):

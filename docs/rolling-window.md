@@ -233,3 +233,8 @@ explains selection and JUnit receipts.
 
 Return to [Load strategies](load-strategies.md) or
 [Adaptive native transfer](native-transfer-industrial-runtime.md).
+
+
+## PostgreSQL-to-MSSQL correctness authority
+
+The window executor cannot enforce a prebound PostgreSQL-to-MSSQL correctness activation or runtime. Combining either with a rolling window fails with `rolling_window_unsupported_policy: postgres_mssql_correctness` before a custom runtime factory or source/target I/O. Keep that authority on its supported ETL route; an absent or `None` binding leaves normal window execution unchanged.

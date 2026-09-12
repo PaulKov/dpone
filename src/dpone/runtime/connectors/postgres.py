@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import hashlib
+import hashlib as hashlib
 import time
 from collections.abc import Iterable, Iterator
+from threading import Lock as _ConnectionLock
 from typing import Any
 
 import psycopg
@@ -37,16 +38,62 @@ class PostgresConnector(AbstractConnector):
         self.application_name = application_name
         self.autocommit = autocommit
         self._connection: psycopg.Connection[dict[str, Any]] | None = None
+        self._connection_lock = _ConnectionLock()
+        self._quarantined = False
 
     @property
     def connection(self):
-        if not self._connection:
+        """Publish one connection only while the connector remains reusable."""
+        while True:
+            with self._connection_lock:
+                if self._quarantined:
+                    raise RuntimeError("postgres_connector.quarantined")
+                if self._connection is not None:
+                    return self._connection
             conninfo = (
                 f"host={self.host} port={self.port} dbname={self.database} "
                 f"user={self.user} password={self.password} application_name={self.application_name}"
             )
-            self._connection = psycopg.connect(conninfo=conninfo, row_factory=dict_row, autocommit=self.autocommit)
-        return self._connection
+            candidate = psycopg.connect(conninfo=conninfo, row_factory=dict_row, autocommit=self.autocommit)
+            with self._connection_lock:
+                quarantined = self._quarantined
+                if not quarantined and self._connection is None:
+                    self._connection = candidate
+                    return candidate
+            if quarantined:
+                self._close_quarantined(candidate)
+                raise RuntimeError("postgres_connector.quarantined")
+            candidate.close()
+
+    def quarantine(self) -> None:
+        """Atomically revoke reuse and detach before closing a physical handle."""
+        with self._connection_lock:
+            self._quarantined = True
+            current, self._connection = self._connection, None
+        self._close_quarantined(current)
+
+    def quarantine_if_current(self, connection: Any) -> bool:
+        """Fence the exact current session without touching a replacement."""
+        with self._connection_lock:
+            if connection is None or connection is not self._connection:
+                return False
+            self._quarantined = True
+            self._connection = None
+        self._close_quarantined(connection)
+        return True
+
+    @staticmethod
+    def _close_quarantined(connection: Any) -> None:
+        """Contain ordinary close failures after revocation; preserve control flow."""
+        if connection is None:
+            return
+        try:
+            connection.close()
+        except Exception:
+            pass
+        except BaseException as primary:
+            primary.__cause__ = primary.__context__ = None
+            raise
 
     def clone_for_partition(self, partition_index: int) -> PostgresConnector:
         """Create an isolated connection for one parallel partition worker."""
@@ -197,120 +244,19 @@ class PostgresConnector(AbstractConnector):
         logger=None,
         params: tuple[object, ...] = (),
     ) -> dict[str, Any]:
-        """
-        Выполняет COPY TO STDOUT с записью в файл.
+        """Export COPY bytes, preserving the primary failure across file close."""
+        from dpone.runtime.connectors.postgres_copy_stream import PostgresCopyFileExporter
 
-        Args:
-            query_sql: SELECT запрос для экспорта
-            output_path: Путь к выходному файлу
-            format: Формат COPY (CSV или BINARY)
-            compress: Использовать gzip сжатие
-            compress_level: Уровень сжатия gzip (0-9)
-            buffer_size: Размер буфера для записи (байты)
-            logger: Логгер для прогресса
-        """
-        import gzip
-
-        from psycopg import sql
-
-        format_upper = format.upper().replace("-", "_")
-        export_sql: Any
-
-        if isinstance(query_sql, sql.Composable | sql.Composed):
-            if format_upper == "CSV":
-                export_sql = sql.Composed(
-                    [sql.SQL("COPY ("), query_sql, sql.SQL(") TO STDOUT WITH (FORMAT CSV, FORCE_QUOTE *)")]
-                )
-            elif format_upper == "MSSQL_DELIMITED":
-                export_sql = sql.Composed(
-                    [
-                        sql.SQL("COPY ("),
-                        query_sql,
-                        sql.SQL(
-                            ") TO STDOUT WITH (FORMAT CSV, DELIMITER E'\\t', QUOTE E'\\x1f', ESCAPE E'\\x1f', NULL '')"
-                        ),
-                    ]
-                )
-            else:
-                export_sql = sql.Composed(
-                    [sql.SQL("COPY ("), query_sql, sql.SQL(") TO STDOUT WITH (FORMAT "), sql.SQL(format), sql.SQL(")")]
-                )
-        else:
-            if format_upper == "CSV":
-                export_sql = f"COPY ({query_sql}) TO STDOUT WITH (FORMAT CSV, FORCE_QUOTE *)"
-            elif format_upper == "MSSQL_DELIMITED":
-                export_sql = (
-                    f"COPY ({query_sql}) TO STDOUT WITH "
-                    "(FORMAT CSV, DELIMITER E'\\t', QUOTE E'\\x1f', ESCAPE E'\\x1f', NULL '')"
-                )
-            else:
-                export_sql = f"COPY ({query_sql}) TO STDOUT WITH (FORMAT {format})"
-
-        start_time = time.time()
-        total_bytes = 0
-        copy_read_count = 0
-        rows_exported = 0 if format_upper == "MSSQL_DELIMITED" else None
-        output_digest = hashlib.sha256() if rows_exported is not None and not compress else None
-
-        output_file: Any
-        if compress:
-            output_file = gzip.open(output_path, "wb", compresslevel=compress_level)
-        else:
-            output_file = open(output_path, "wb", buffering=buffer_size)
-
-        try:
-            with self.connection.cursor() as cursor:
-                with cursor.copy(export_sql, params) as copy:
-                    while True:
-                        chunk = copy.read()
-                        if not chunk:
-                            break
-                        copy_read_count += 1
-                        chunk_bytes = len(chunk)
-                        total_bytes += chunk_bytes
-
-                        payload = chunk.tobytes() if isinstance(chunk, memoryview) else bytes(chunk)
-                        output_file.write(payload)
-                        if rows_exported is not None:
-                            # BulkTextCodec removes literal row terminators
-                            # from fields, and PostgreSQL COPY terminates every
-                            # MSSQL-delimited record with one newline.
-                            rows_exported += payload.count(b"\n")
-                        if output_digest is not None:
-                            output_digest.update(payload)
-
-                        # Логируем прогресс каждые 100MB
-                        if logger and total_bytes // (100 * 1024 * 1024) > (total_bytes - chunk_bytes) // (
-                            100 * 1024 * 1024
-                        ):
-                            elapsed = time.time() - start_time
-                            throughput_mbps = (total_bytes / 1024 / 1024) / elapsed if elapsed > 0 else 0
-                            logger.log_etl_progress(
-                                "POSTGRES_COPY_PROGRESS",
-                                {
-                                    "Bytes Read": f"{total_bytes / 1024 / 1024:.1f}MB",
-                                    "COPY Reads": copy_read_count,
-                                    "Elapsed": f"{elapsed:.1f}s",
-                                    "Throughput": f"{throughput_mbps:.1f}MB/s",
-                                },
-                            )
-        finally:
-            output_file.close()
-
-        elapsed_total = time.time() - start_time
-        throughput_final = (total_bytes / 1024 / 1024) / elapsed_total if elapsed_total > 0 else 0
-
-        return {
-            "total_bytes": total_bytes,
-            "copy_read_count": copy_read_count,
-            # Deprecated compatibility alias.  A psycopg COPY read is not a
-            # logical/backfill chunk and must never be presented as one.
-            "chunk_count": copy_read_count,
-            "elapsed": elapsed_total,
-            "throughput": throughput_final,
-            "rows_exported": rows_exported,
-            "sha256": output_digest.hexdigest() if output_digest is not None else None,
-        }
+        return PostgresCopyFileExporter(self.connection).export(
+            query_sql,
+            output_path,
+            format=format,
+            compress=compress,
+            compress_level=compress_level,
+            buffer_size=buffer_size,
+            logger=logger,
+            params=params,
+        )
 
     def copy_to_stream(
         self,
@@ -330,9 +276,11 @@ class PostgresConnector(AbstractConnector):
         )
 
     def close(self) -> None:
-        if self._connection:
-            self._connection.close()
-            self._connection = None
+        """Detach atomically; closing a retired handle cannot remove its replacement."""
+        with self._connection_lock:
+            current, self._connection = self._connection, None
+        if current is not None:
+            current.close()
 
     def build_select_query(
         self,

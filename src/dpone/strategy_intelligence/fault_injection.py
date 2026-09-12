@@ -9,14 +9,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from dpone.runtime.lineage.partition_checkpoint import PartitionCheckpoint
 from dpone.strategy_intelligence.resume_certification import (
     NativeTransferResumeCertificationRequest,
     NativeTransferResumeCertificationResult,
     NativeTransferResumeCertificationService,
 )
+
+if TYPE_CHECKING:
+    from dpone.runtime.lineage.partition_checkpoint import PartitionCheckpoint
 
 
 class FaultInjectionStage(StrEnum):

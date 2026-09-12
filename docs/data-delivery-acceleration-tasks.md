@@ -303,7 +303,17 @@ original bytes, failures, skips, node IDs and hashes remain preserved at commit
 complete DDA evidence subtree. Only 35 duplicate copies were relocated from the
 current checkout; original audits and Git history were not rewritten.
 
+A later append-only amendment relocates the six files of one historical
+`agent-pr-receipt` artifact from the current checkout as a separate all-or-nothing
+set. Its changed-path list retains the original NUL-delimited Git wire format in
+the pinned commit and complete archive; no LF projection is published. The
+amendment record has status `N/A`, does not change any DDA execution result, and
+does not make reachable-history privacy scanning a pass. Current-tree candidate
+scanning can proceed after the duplicate copies are removed; reachable-history
+privacy scanning remains explicitly `UNVERIFIED`.
+
 Use the [historical evidence location index and recovery guide](https://github.com/PaulKov/dpone/blob/master/test_artifacts/delivery-acceleration/hygiene-retention/README.md)
 to recover the complete original context before following historical relative
-links or verifying receipt hashes. The index is not new execution evidence or a
-release-readiness result; fresh checks apply to the eventual release commit.
+links or verifying receipt hashes. The original index and the append-only
+six-file record are location and integrity evidence, not new execution or
+release-readiness results; fresh checks apply to the eventual release commit.

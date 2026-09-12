@@ -136,16 +136,21 @@ class SelectedPostgresSourceAuthority:
     version: int = 1
 
     @property
-    def authority_sha256(self) -> str:
-        """Hash only this route's signed authority, not unrelated pins."""
+    def authority_document_utf8(self) -> bytes:
+        """Return the byte-exact signed-authority preimage for this relation."""
 
-        encoded = json.dumps(
+        return json.dumps(
             self.to_document(),
             ensure_ascii=False,
             separators=(",", ":"),
             sort_keys=True,
         ).encode("utf-8")
-        return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+    @property
+    def authority_sha256(self) -> str:
+        """Hash only this route's signed authority, not unrelated pins."""
+
+        return "sha256:" + hashlib.sha256(self.authority_document_utf8).hexdigest()
 
     def to_document(self) -> dict[str, Any]:
         document: dict[str, Any] = {

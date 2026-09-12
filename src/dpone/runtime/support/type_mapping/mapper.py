@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 
 from dpone.runtime.support.type_mapping.dialects import _BigQueryDialect, _PostgresDialect
-from dpone.runtime.support.type_mapping.models import CanonicalType
 from dpone.runtime.support.type_mapping.parsers import _ClickHouseTypeParser, _PgTypeParser, _PythonTypeParser
+
+if TYPE_CHECKING:
+    from dpone.runtime.support.type_mapping.models import CanonicalType
 
 # Already-BigQuery type names (optionally parameterized) must not be re-parsed as Postgres.
 _BQ_NATIVE_TYPE = re.compile(

@@ -1,0 +1,68 @@
+{
+  "download_manifest": {
+    "git_blob": "0a0b569abf11e8d526047450a34b8f5fbb628215",
+    "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/download.json",
+    "sha256": "e9ea9e06d09bf9a9d742a8b519d42430bb022b9066c927aa99fa5aacda5f801d",
+    "size_bytes": 1431
+  },
+  "limitations": [
+    "Reachable-history privacy scan remains UNVERIFIED.",
+    "This record is not execution or release evidence."
+  ],
+  "original_retention": {
+    "archive_sha256": "b4c1d695b5aae8a61d23755142514adb0527d81b69397a253a79e76005028832",
+    "files": 796,
+    "inventory_sha256": "42264395c79af082c108261b566ff7f1a6e42df8f7d263c271c2dcac4f2f497b"
+  },
+  "producer_sha256": "f3c1d2c6fa26b0e0848f15bde29c5d29916ee53f08fbe81ffd864d5afa6b815c",
+  "retained_files": [
+    {
+      "git_blob": "6aed59df5f6d337c488cd657065c80685873211e",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/agent_audit_manifest.json",
+      "sha256": "5586482c52d7d07dd1cc09ca3007604ec5f1cfb60d0911b784ced27b220190bd",
+      "size_bytes": 67354
+    },
+    {
+      "git_blob": "cdd0e5072428eecd95de5037eb2489103bb1c775",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/agent_pr_receipt.json",
+      "sha256": "897e685b74f8fbf70f0ced6089fc007b1973570c935157625070e150df96d1de",
+      "size_bytes": 154640
+    },
+    {
+      "git_blob": "ef733464442aec062bea482a4bbb11c08eab05a8",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-body.md",
+      "sha256": "2738d3f28fdf9cb9dba0ad03951425863bcc4f604c86b5f9653f77b6908aa906",
+      "size_bytes": 2734
+    },
+    {
+      "git_blob": "f6ad629e0f69a76dc0c8a63c7e5e6f742a6542a6",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-changed-paths.txt",
+      "sha256": "446c054414bc56e3de6f66c4c50c595cdf5fea71e6476834a669472c1fec0506",
+      "size_bytes": 51237
+    },
+    {
+      "git_blob": "4a0264a42075cc0d564a62e1f02bad8647dc1622",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-head-sha.txt",
+      "sha256": "d25c7b29af7ab46b91fd967f0687396a222ba547f487977ea7bc441246b0b7aa",
+      "size_bytes": 41
+    },
+    {
+      "git_blob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "mode": "100644",
+      "path": "test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-receipt-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "size_bytes": 2
+    }
+  ],
+  "retrieval": "Recover all six files together from the pinned source commit or verified complete external archive.",
+  "schema": "dpone.public-clean-historical-receipt-retention.v1",
+  "scope": "Historical location and integrity only; no execution, privacy, release, or live certification",
+  "source_commit": "6a69861832ffc3dea86fb05d0dd882645399f21a",
+  "source_tree": "ea2153662106bbd58b27e3ca963425796145fdc9",
+  "status": "N/A"
+}

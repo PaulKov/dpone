@@ -13,6 +13,7 @@ from typing import Any
 
 from dpone.config.postgres_xmin_execution import require_postgres_xmin_execution_route
 from dpone.ports.runtime_hydrator import RuntimeBindings
+from dpone.runtime import bootstrap_postgres_source_authority as postgres_source_bootstrap
 from dpone.runtime.bootstrap_config import mapping_or_empty
 from dpone.runtime.bootstrap_load_identity import build_load_identity_service
 from dpone.runtime.bootstrap_mssql_authority import (
@@ -22,6 +23,7 @@ from dpone.runtime.bootstrap_mssql_authority import (
 )
 from dpone.runtime.bootstrap_postgres_source_authority import (
     bind_postgres_source_authority,
+    build_postgres_mssql_source_schema_runtime,
     preflight_postgres_source_authority,
 )
 from dpone.runtime.bootstrap_sources_sinks import RuntimeEndpointFactory
@@ -49,12 +51,20 @@ class DefaultRuntimeHydrator:
         connection_context_loader: RuntimeConnectionContextLoader | None = None,
         mssql_database_authority_verifier_factory: Callable[..., Any] | None = None,
         postgres_source_authority_verifier_factory: Callable[..., Any] | None = None,
+        postgres_mssql_correctness_route_resolver: Any | None = None,
+        postgres_mssql_correctness_route_resolver_provider: Callable[[], Any | None] | None = None,
+        postgres_mssql_correctness_runtime_factory: Any | None = None,
+        postgres_mssql_source_schema_runtime_factory: Any | None = None,
     ) -> None:
         self._state_bootstrap = state_bootstrap or RuntimeStateBootstrap()
         self._endpoint_factory = endpoint_factory
         self._connection_context_loader = connection_context_loader or RuntimeConnectionContextLoader()
         self._mssql_database_authority_verifier_factory = mssql_database_authority_verifier_factory
         self._postgres_source_authority_verifier_factory = postgres_source_authority_verifier_factory
+        self._postgres_mssql_correctness_route_resolver = postgres_mssql_correctness_route_resolver
+        self._postgres_mssql_correctness_route_resolver_provider = postgres_mssql_correctness_route_resolver_provider
+        self._postgres_mssql_correctness_runtime_factory = postgres_mssql_correctness_runtime_factory
+        self._postgres_mssql_source_schema_runtime_factory = postgres_mssql_source_schema_runtime_factory
 
     def build(
         self,
@@ -75,6 +85,25 @@ class DefaultRuntimeHydrator:
             load_config=load_config,
             context=context,
         )
+        postgres_mssql_correctness_activation = self._resolve_postgres_mssql_correctness(
+            config=runtime_config,
+            load_config=load_config,
+            connections=connections,
+            source_cfg=source_cfg,
+            sink_cfg=sink_cfg,
+        )
+        if (
+            postgres_mssql_correctness_activation is not None
+            and self._postgres_mssql_correctness_runtime_factory is None
+        ):
+            raise RuntimeConfigurationError("DPONE_POSTGRES_MSSQL_PROFILE_WEAKER_THAN_REQUIRED")
+        if (
+            postgres_mssql_correctness_activation is not None
+            and self._postgres_mssql_source_schema_runtime_factory is None
+        ):
+            error = RuntimeConfigurationError("DPONE_POSTGRES_MSSQL_SOURCE_SCHEMA_AUTHORITY_RUNTIME_REQUIRED")
+            setattr(error, "code", "DPONE_POSTGRES_MSSQL_SOURCE_SCHEMA_AUTHORITY_RUNTIME_REQUIRED")
+            raise error
         apply_connection_database_defaults(load_config=load_config, connections=connections)
         bind_source_materialization_location(load_config=load_config, connections=connections)
         runtime_storage_policy = RuntimeStoragePolicy.from_sources(
@@ -86,6 +115,13 @@ class DefaultRuntimeHydrator:
             state_config=state_cfg,
             load_config=load_config,
             verifier_factory=self._postgres_source_authority_verifier_factory,
+        )
+        source_schema_runtime = build_postgres_mssql_source_schema_runtime(
+            postgres_mssql_correctness_activation,
+            self._postgres_mssql_source_schema_runtime_factory,
+            connections,
+            load_config,
+            source_authority_verifier,
         )
         database_authority_verifier = preflight_target_atomic_database_authority(
             connections=connections,
@@ -132,6 +168,14 @@ class DefaultRuntimeHydrator:
             connections=connections,
             database_authority_verifier=database_authority_verifier,
         )
+        postgres_mssql_correctness_runtime = postgres_source_bootstrap.build_postgres_mssql_correctness_runtime(
+            factory=self._postgres_mssql_correctness_runtime_factory,
+            activation=postgres_mssql_correctness_activation,
+            load_config=load_config,
+            connections=connections,
+            sink_obj=sink_obj,
+            state_bindings=state_bindings,
+        )
         source_state_storage = (
             state_bindings.kafka_offset_state_storage
             if (source_cfg or {}).get("type") == "kafka"
@@ -154,6 +198,10 @@ class DefaultRuntimeHydrator:
         bind_postgres_source_authority(
             source_obj=source_obj,
             verifier=source_authority_verifier,
+        )
+        postgres_source_bootstrap.bind_postgres_mssql_source_schema_runtime(
+            source_obj=source_obj,
+            runtime=source_schema_runtime,
         )
         _bind_internal_query_capability(
             source_obj=source_obj,
@@ -184,7 +232,32 @@ class DefaultRuntimeHydrator:
                 audit_storage=getattr(state_bindings, "load_audit_storage", None),
                 etl_logger=etl_logger,
             ),
+            postgres_mssql_correctness_activation=postgres_mssql_correctness_activation,
+            postgres_mssql_correctness_runtime=postgres_mssql_correctness_runtime,
             credential_resolution_receipts=connections.receipts,
+        )
+
+    def _resolve_postgres_mssql_correctness(
+        self,
+        *,
+        config: Mapping[str, Any],
+        load_config: LoadConfig,
+        connections: Any,
+        source_cfg: Mapping[str, Any],
+        sink_cfg: Mapping[str, Any],
+    ) -> Any | None:
+        resolver = self._postgres_mssql_correctness_route_resolver
+        if resolver is None and self._postgres_mssql_correctness_route_resolver_provider is not None:
+            resolver = self._postgres_mssql_correctness_route_resolver_provider()
+        if resolver is None:
+            return None
+        strategy = getattr(load_config.load_strategy, "value", load_config.load_strategy)
+        return resolver.require_runtime_activatable(
+            source_type=_resolved_endpoint_type(connections.source, source_cfg),
+            sink_type=_resolved_endpoint_type(connections.sink, sink_cfg),
+            strategy=str(strategy),
+            load_config=load_config,
+            raw_config=config,
         )
 
     @staticmethod

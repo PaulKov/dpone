@@ -34,6 +34,10 @@ class RuntimeBindings:
     load_identity_service: Any = None
     credential_resolution_receipts: tuple[Mapping[str, Any], ...] = ()
 
+    postgres_mssql_correctness_activation: Any = None
+
+    postgres_mssql_correctness_runtime: Any = None
+
 
 class RuntimeHydrator(Protocol):
     """Builds runtime objects for a parsed ETL config."""
@@ -48,7 +52,7 @@ class RuntimeHydrator(Protocol):
 
 
 _RUNTIME_HYDRATOR: RuntimeHydrator | None = None
-_DEFAULT_RUNTIME_BOOTSTRAP = "dpone.runtime.bootstrap"
+_DEFAULT_RUNTIME_BOOTSTRAP = "dpone.app.runtime_bootstrap"
 
 
 def register_runtime_hydrator(hydrator: RuntimeHydrator) -> None:
@@ -78,7 +82,7 @@ def ensure_runtime_hydrator() -> RuntimeHydrator:
     hydrator = get_runtime_hydrator()
     if hydrator is None:
         raise RuntimeConfigurationError(
-            "Runtime hydrator is not registered. Import dpone.runtime.bootstrap "
+            "Runtime hydrator is not registered. Import dpone.app.runtime_bootstrap "
             "or register a custom RuntimeHydrator via dpone.ports.runtime_hydrator."
         )
     return hydrator

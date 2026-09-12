@@ -27,6 +27,7 @@ from dpone.runtime.normalization.load_package import (
     NestedPackageStagedMutation,
     require_nested_package_abort,
 )
+from dpone.runtime.postgres_mssql_r1_execution import r1_execution_from_load_config
 from dpone.runtime.sinks.load_payload import LoadPayload
 
 if TYPE_CHECKING:
@@ -122,6 +123,7 @@ class ExtractedPayloadLoadService:
                 "target_mutation_plan",
                 None,
             ),
+            postgres_mssql_r1_execution=r1_execution_from_load_config(load_config),
             extraction_lifecycle=extraction_lifecycle,
             owned_payload_scope=owned_payload_scope,
         )

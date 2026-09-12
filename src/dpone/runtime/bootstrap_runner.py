@@ -79,7 +79,7 @@ class DefaultProcessRunner:
                 )
             from dpone.runtime.rolling_window_admission import validate_window_admission
 
-            validate_window_admission(process.config.load_config)
+            validate_window_admission(process.config.load_config, runtime_bindings=process.config)
             result = self._window_runtime_factory(process.config).run(
                 process.config.load_config, owner=run_context.run_id
             )
@@ -206,6 +206,9 @@ def _processor(
     options = {}
     if mssql_transaction_admission_service is not None:
         options["mssql_transaction_admission_service"] = mssql_transaction_admission_service
+    postgres_mssql_correctness_runtime = getattr(bindings, "postgres_mssql_correctness_runtime", None)
+    if postgres_mssql_correctness_runtime is not None:
+        options["postgres_mssql_correctness_runtime"] = postgres_mssql_correctness_runtime
     return ETLProcessor(
         source=bindings.source_obj,
         sink=bindings.sink_obj,

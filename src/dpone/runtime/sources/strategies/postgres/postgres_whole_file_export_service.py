@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import tempfile
 from collections.abc import Callable, Sequence
@@ -12,6 +13,9 @@ from dpone.runtime.file_artifacts import CompletedFileWrite, FileExportArtifact
 from dpone.runtime.owned_file_scope import OwnedFileScope
 from dpone.runtime.sources.strategies.postgres.postgres_mssql_source_value_guard import (
     PostgresMssqlSourceValueGuard,
+)
+from dpone.runtime.sources.strategies.postgres.postgres_prepared_source_boundary import (
+    PreparedPostgresSourceBoundary,
 )
 from dpone.runtime.sources.strategies.postgres.postgres_snapshot_failure import (
     rollback_preserving_primary,
@@ -43,6 +47,7 @@ class PostgresWholeFileExportService:
         load_config: Any,
         *,
         snapshot_lease: PostgresRepeatableReadSnapshotLease | None = None,
+        prepared_boundary: PreparedPostgresSourceBoundary | None = None,
         relation_schema: Sequence[tuple[str, str]] | None = None,
         query_params: tuple[object, ...] = (),
         after_copy: Callable[[], None] | None = None,
@@ -54,6 +59,7 @@ class PostgresWholeFileExportService:
             schema,
             load_config,
             snapshot_lease=snapshot_lease,
+            prepared_boundary=prepared_boundary,
             schema_contract=None,
             relation_schema=relation_schema,
             query_params=query_params,
@@ -105,6 +111,7 @@ class PostgresWholeFileExportService:
         load_config: Any,
         *,
         snapshot_lease: PostgresRepeatableReadSnapshotLease | None,
+        prepared_boundary: PreparedPostgresSourceBoundary | None = None,
         schema_contract: SchemaContract | None,
         relation_schema: Sequence[tuple[str, str]] | None,
         query_params: tuple[object, ...] = (),
@@ -112,6 +119,10 @@ class PostgresWholeFileExportService:
     ) -> FileExportArtifact:
         strategy = self._strategy
         params = query_params if isinstance(query_params, tuple) else tuple(query_params)
+        if prepared_boundary is not None and type(prepared_boundary) is not PreparedPostgresSourceBoundary:
+            raise TypeError("postgres_file_export.prepared_boundary_required")
+        if prepared_boundary is not None and snapshot_lease is not None:
+            raise TypeError("postgres_file_export.ambiguous_snapshot_authority")
         if snapshot_lease is not None:
             if not isinstance(snapshot_lease, PostgresRepeatableReadSnapshotLease):
                 raise TypeError("postgres_file_export.snapshot_lease_required")
@@ -120,10 +131,17 @@ class PostgresWholeFileExportService:
         export_format, compress_export = strategy._effective_postgres_file_wire(load_config)
         suffix, format_name, copy_format = _wire_file_shape(export_format, compress_export)
         owned_files = OwnedFileScope()
-        owns_transaction = snapshot_lease is None
-        lifecycle = snapshot_lease.lifecycle if snapshot_lease is not None else strategy._new_extraction_lifecycle()
+        owns_transaction = snapshot_lease is None and prepared_boundary is None
+        lifecycle = None
         transaction_open = False
         try:
+            lifecycle = (
+                prepared_boundary.lifecycle_for_copy()
+                if prepared_boundary is not None
+                else snapshot_lease.lifecycle
+                if snapshot_lease is not None
+                else strategy._new_extraction_lifecycle()
+            )
             if owns_transaction:
                 snapshot_lease = strategy._begin_repeatable_read_snapshot(lifecycle)
                 transaction_open = True
@@ -163,6 +181,8 @@ class PostgresWholeFileExportService:
                 format_name=format_name,
                 bulk_text_codec=bulk_text_codec,
             )
+            if prepared_boundary is not None:
+                prepared_boundary.require_active_for_copy(strategy.connector)
             compress_level = int(os.environ.get("DPONE_EXPORT_GZIP_LEVEL", "1"))
             buffer_size = int(os.environ.get("DPONE_EXPORT_BUFFER_SIZE", str(16 * 1024 * 1024)))
             strategy.logger.log_etl_progress(
@@ -175,6 +195,8 @@ class PostgresWholeFileExportService:
                     "Mode": "whole",
                 },
             )
+            if prepared_boundary is not None:
+                prepared_boundary.require_active_for_copy(strategy.connector)
             try:
                 stats = strategy.connector.copy_to_file(
                     query_sql=select_sql,
@@ -186,6 +208,9 @@ class PostgresWholeFileExportService:
                     logger=strategy.logger,
                     params=params,
                 )
+            except (asyncio.CancelledError, KeyboardInterrupt, SystemExit, GeneratorExit) as cancellation:
+                cancellation.__cause__ = cancellation.__context__ = None
+                raise
             except BaseException as primary:
                 translated = copy_guard.translated_error(primary) if copy_guard is not None else None
                 if translated is not None:
@@ -197,6 +222,8 @@ class PostgresWholeFileExportService:
             )
             if after_copy is not None:
                 after_copy()
+            if prepared_boundary is not None:
+                prepared_boundary.require_active_for_copy(strategy.connector)
             streamed_rows = (
                 int(stats["rows_exported"])
                 if format_name == "mssql-delimited" and stats.get("rows_exported") is not None
@@ -234,18 +261,26 @@ class PostgresWholeFileExportService:
                 load_config,
                 schema_contract=schema_contract,
             )
+            if prepared_boundary is not None:
+                prepared_boundary.require_active_for_copy(strategy.connector)
             if owns_transaction:
                 lifecycle.complete()
             artifact.bind_extraction_lifecycle(lifecycle)
-            if owns_transaction:
+            if prepared_boundary is not None:
+                prepared_boundary.complete(artifact)
+            elif owns_transaction:
                 strategy.connector.commit_transaction()
                 transaction_open = False
             owned_files.transfer(tmp_file_path)
             return artifact
         except BaseException as primary:
-            if transaction_open:
-                rollback_preserving_primary(strategy.connector, primary)
-            owned_files.cleanup()
+            try:
+                if prepared_boundary is not None:
+                    prepared_boundary.abort_preserving(primary)
+                elif transaction_open:
+                    rollback_preserving_primary(strategy.connector, primary)
+            finally:
+                owned_files.cleanup()
             raise
 
 

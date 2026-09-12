@@ -32,7 +32,7 @@ class ProcessRunner(Protocol):
 
 
 _PROCESS_RUNNER: ProcessRunner | None = None
-_DEFAULT_RUNTIME_BOOTSTRAP = "dpone.runtime.bootstrap"
+_DEFAULT_RUNTIME_BOOTSTRAP = "dpone.app.runtime_bootstrap"
 
 
 def register_process_runner(runner: ProcessRunner) -> None:
@@ -53,7 +53,7 @@ def ensure_process_runner() -> ProcessRunner:
     runner = get_process_runner()
     if runner is None:
         raise ETLProcessError(
-            "Process runner is not registered. Import dpone.runtime.bootstrap or "
+            "Process runner is not registered. Import dpone.app.runtime_bootstrap or "
             "register a custom ProcessRunner via dpone.ports.process_runner."
         )
     return runner

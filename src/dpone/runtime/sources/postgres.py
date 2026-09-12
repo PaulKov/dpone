@@ -66,6 +66,7 @@ class PostgresSource(AbstractSource):
             source_dialect="postgres"
         )
         self._postgres_source_authority_verifier: Any | None = None
+        self._postgres_mssql_source_schema_runtime: Any | None = None
 
         self._full_extract = PostgresFullExtractStrategy(
             connector=self.connector,
@@ -150,6 +151,20 @@ class PostgresSource(AbstractSource):
             if strategy is not None:
                 strategy.bind_postgres_source_authority(verifier)
 
+    def bind_postgres_mssql_source_schema_runtime(self, runtime: Any) -> None:
+        """Retain the capability validated by the runtime composition root.
+
+        Exact bundle and verifier admission belongs to bootstrap composition;
+        this injection seam preserves identity and prevents conflicting rebinding.
+        """
+
+        if not callable(getattr(runtime, "prepare_boundary", None)):
+            raise ValueError("postgres_mssql_source_schema_runtime.prepare_boundary_required")
+        current = self._postgres_mssql_source_schema_runtime
+        if current is not None and current is not runtime:
+            raise ValueError("postgres_mssql_source_schema_runtime.already_bound")
+        self._postgres_mssql_source_schema_runtime = runtime
+
     def build_xmin_initial_handoff_source(self, state_storage: Any) -> Any:
         """Build a dedicated XMin authority while backfill uses generic state."""
 
@@ -195,6 +210,13 @@ class PostgresSource(AbstractSource):
     def prepare_mssql_source_boundary(self, load_config: LoadConfig) -> Any:
         """Open the strategy-owned post-admission RR authority boundary."""
 
+        runtime = self._postgres_mssql_source_schema_runtime
+        if runtime is not None:
+            return runtime.prepare_boundary(
+                connector=self.connector,
+                lifecycle=self._full_extract._new_extraction_lifecycle(),
+                load_config=load_config,
+            )
         strategy = self._resolve_strategy(load_config)
         prepare = getattr(strategy, "prepare_mssql_source_boundary", None)
         if not callable(prepare):

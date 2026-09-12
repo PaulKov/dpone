@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.gitops.airflow_artifact_index import GitOpsAirflowArtifactContent
 from dpone.gitops.airflow_pack_models import (
@@ -12,7 +12,9 @@ from dpone.gitops.airflow_pack_models import (
     GitOpsAirflowPackStep,
     airflow_pack_issue,
 )
-from dpone.gitops.models import GitOpsIssue
+
+if TYPE_CHECKING:
+    from dpone.gitops.models import GitOpsIssue
 
 
 @dataclass(frozen=True, slots=True)

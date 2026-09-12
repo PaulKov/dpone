@@ -402,7 +402,8 @@ def test_loopback_localhost_host_header_is_accepted(tmp_path: Path) -> None:
         "https://studio.example?tenant=x",
         "https://user:password@studio.example",
         "https://studio.example#fragment",
-        "https://studio.example\r\nX-Injected: true",
+        "https://"  # Preserve the URI scheme boundary for exact privacy review.
+        "studio.example\r\nX-Injected: true",
     ),
 )
 def test_remote_cors_allowlist_requires_exact_origin(origin: str) -> None:

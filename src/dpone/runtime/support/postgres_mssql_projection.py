@@ -16,13 +16,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from dpone.contracts.incremental_snapshot import MSSQL_TEXT_KEY_COLLATION
 from dpone.contracts.mssql_type_contract import normalize_mssql_physical_type
 from dpone.contracts.postgres_mssql_type_policy import (
     PostgresMssqlContractOptions,
     declared_postgres_mssql_contract_blockers,
     is_textual_mssql_target,
 )
+from dpone.runtime.incremental_snapshot import MSSQL_TEXT_KEY_COLLATION
 from dpone.runtime.sink_dialect import is_mssql_dialect
 from dpone.runtime.support.mssql_lossless_projection import (
     MssqlLosslessProjectionError,
