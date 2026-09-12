@@ -9,12 +9,13 @@ changing policy here.
 Ordering is a security property, not an implementation detail:
 
 1. reopen the ACTIVE parent occurrence and derive the exact attempt identity;
-2. reserve the attempt atomically, then issue one-time ClickHouse credentials;
+2. reserve the attempt atomically, then issue one-time ingest credentials;
 3. require the exact supervisor enrollment original before dispatch;
-4. create the generation, insert the bound Native payload, then require the
-   same enrollment original before snapshot publication;
-5. close dispatch admission before principal closure, persist OUTCOME proof
-   and seal the attempt.
+4. bind those issued credentials to ingest transport, journal CREATE/INSERT
+   (claim → send → record_completed), then close ingest and prove quiescence;
+5. require enrollment again, issue a distinct publisher principal, and publish
+   through that publisher journal/transport;
+6. persist OUTCOME proof from the publisher record and seal the attempt.
 
 Malformed HTTP, a partial response, unknown publication, missing
 reconciliation or supervisor drift never become success: the independent
@@ -29,6 +30,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
 
+from dpone.adapters.composition_clickhouse_http import ClickHouseTransportCredentials
 from dpone.adapters.composition_clickhouse_principal import IssuedClickHouseCredentials
 from dpone.adapters.composition_clickhouse_transport import ClickHouseDispatchTransportError
 from dpone.contracts.airflow_correlation import AirflowAttemptCorrelation
@@ -82,13 +84,15 @@ class CompositionClickHouseExecutionDependencies:
     read_active: Callable[[], CompositionActivationOccurrence]
     attempts: Any
     gate: Any
+    publisher_gate: Any
     publisher: Any
-    transport: Any
+    bind_transport: Callable[[ClickHouseTransportCredentials, Any], Any] | None
     read_source: Callable[[CompositionAttemptIdentity], Sequence[tuple[object, ...]]]
     require_enrollment: Callable[[CompositionAttemptIdentity, str], Any]
     outcome_observer: Any
     target: SnapshotTarget
     expected_service_id: str
+    attach_publisher_transport: Callable[..., None] | None = None
 
 
 class CompositionClickHouseExecutionRoot:
@@ -130,26 +134,72 @@ class CompositionClickHouseExecutionRoot:
                 raise CompositionAdmissionError("worker_issued_identity")
             self._deps.require_enrollment(attempt, "dispatch")
             rows = tuple(self._deps.read_source(attempt))
-            self._ingest(request, attempt, rows)
+            journal = self._journal(self._deps.gate, attempt, credentials.user_id)
+            transport = self._bind_transport(credentials, journal)
+            self._ingest(request, attempt, rows, transport, journal)
+            self._close_purpose(self._deps.gate, attempt)
             self._deps.require_enrollment(attempt, "publication")
+            publisher_gate = self._deps.publisher_gate
+            if publisher_gate is None:
+                raise CompositionAdmissionError("clickhouse_publisher_gate")
+            publisher_credentials = publisher_gate.issue_once(attempt)
+            if type(publisher_credentials) is not IssuedClickHouseCredentials:
+                raise CompositionAdmissionError("worker_issued_identity")
+            publisher_journal = self._journal(publisher_gate, attempt, publisher_credentials.user_id)
+            publisher_transport = self._bind_transport(publisher_credentials, publisher_journal)
+            attach = self._deps.attach_publisher_transport
+            if attach is not None:
+                attach(publisher_transport, publisher_journal)
             prepared = self._deps.publisher.prepare(attempt, request.generation_ref)
             published = self._deps.publisher.publish(prepared.intent.intent_sha256)
             return CompositionClickHouseResult(rows, published.state)
         except (ClickHouseDispatchTransportError, CompositionAdmissionError):
             return CompositionClickHouseResult((), "COMMIT_UNKNOWN")
 
+    def _journal(self, gate: Any, attempt: CompositionAttemptIdentity, user_id: str) -> Any:
+        journal = getattr(gate, "journal", None)
+        if not callable(journal):
+            raise CompositionAdmissionError("clickhouse_dispatch_journal")
+        return journal(attempt, user_id)
+
+    def _bind_transport(self, credentials: IssuedClickHouseCredentials, journal: Any) -> Any:
+        bind = self._deps.bind_transport
+        if not callable(bind):
+            raise CompositionAdmissionError("clickhouse_transport_binding")
+        return bind(ClickHouseTransportCredentials(credentials.username, credentials.password), journal)
+
+    def _close_purpose(self, gate: Any, attempt: CompositionAttemptIdentity) -> None:
+        close = getattr(gate, "close", None)
+        prove = getattr(gate, "prove_quiescence", None)
+        if not callable(close) or not callable(prove):
+            raise CompositionAdmissionError("clickhouse_ingest_close")
+        closed = close(attempt)
+        if getattr(closed, "kind", None) != "CLOSED_GATES":
+            raise CompositionAdmissionError("clickhouse_ingest_close")
+        quiet = prove(attempt)
+        if getattr(quiet, "kind", None) != "QUIESCENCE":
+            raise CompositionAdmissionError("clickhouse_ingest_quiescence")
+
     def _ingest(
         self,
         request: CompositionClickHouseExecutionRequest,
         attempt: CompositionAttemptIdentity,
         rows: tuple[tuple[object, ...], ...],
+        transport: Any,
+        journal: Any,
     ) -> None:
         target = self._deps.target
-        self._send(CreateGenerationDispatch(attempt, target, request.generation_uuid, request.columns))
+        self._send(
+            transport,
+            journal,
+            CreateGenerationDispatch(attempt, target, request.generation_uuid, request.columns),
+        )
         if not rows:
             return
         payload = _native_payload(request.columns, rows)
         self._send(
+            transport,
+            journal,
             InsertGenerationDispatch(
                 attempt,
                 target,
@@ -162,8 +212,18 @@ class CompositionClickHouseExecutionRoot:
             payload,
         )
 
-    def _send(self, dispatch: CreateGenerationDispatch | InsertGenerationDispatch, payload: bytes = b"") -> None:
-        self._deps.transport.execute(dispatch, payload=payload)
+    def _send(
+        self,
+        transport: Any,
+        journal: Any,
+        dispatch: CreateGenerationDispatch | InsertGenerationDispatch,
+        payload: bytes = b"",
+    ) -> None:
+        observation = transport.execute(dispatch, payload=payload)
+        record = getattr(journal, "record_completed", None)
+        if not callable(record):
+            raise CompositionAdmissionError("clickhouse_dispatch_journal")
+        record(dispatch, observation)
 
 
 def build_composition_clickhouse_attempt(

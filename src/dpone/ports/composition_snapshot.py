@@ -16,6 +16,7 @@ if TYPE_CHECKING:
         SnapshotPublicationIntent,
         SnapshotPublicationRecord,
         SnapshotPublisherClosure,
+        SnapshotTarget,
     )
 from typing import Protocol
 
@@ -45,6 +46,13 @@ class SnapshotPublicationAuthority(Protocol):
         Recheck actual issued-user UUIDs, gate state, endpoint/version, exclusive
         writer policy and source/generation evidence. A stale process cannot
         authorize itself by copying an occurrence or receipt.
+        """
+
+    def require_enrollment(self, attempt: CompositionAttemptIdentity, target: SnapshotTarget) -> None:
+        """Reopen the exact supervisor enrollment original for this attempt/target.
+
+        A missing hook is a rejection. Digest-only permits and no-op getattr
+        skips are not authority.
         """
 
     def close_publisher(self, intent: SnapshotPublicationIntent) -> SnapshotPublisherClosure:
