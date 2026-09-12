@@ -166,6 +166,12 @@ def test_composition_docs_state_shipped_pack_exec_reachability() -> None:
     assert "`sqlserver_dbt_v1`" in contract
     assert "parent context" in contract
 
+    operations = (DOCS / "release-composition-operations.md").read_text(encoding="utf-8")
+    assert "Default public composition activation is unavailable" not in operations
+    assert "guides/composition-supervisor-kubernetes.md" in operations
+    assert "`composition_ordinary_worker_unavailable`" in operations
+    assert "`UNVERIFIED`" in operations
+
 
 def test_composition_supervisor_guide_documents_commit_unknown_and_tombstones() -> None:
     text = _guide()
