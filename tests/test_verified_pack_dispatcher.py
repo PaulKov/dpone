@@ -194,6 +194,137 @@ def test_missing_occurrence_context_does_not_construct_ordinary_root(
     assert rejection_reason(run_volume) == "composition_ordinary_worker_unavailable"
 
 
+def test_parent_and_cache_plan_installs_transfer_root(command, clean_ambient, monkeypatch):
+    from dpone.app import composition_verified_pack_dispatcher as module
+    from dpone.app.composition_transfer_execution import CompositionTransferExecutionRoot
+    from dpone.app.composition_verified_pack_dispatcher import compose_verified_pack_dispatcher
+    from tests.test_verified_pack_execution import ORDINARY_ARGV
+
+    parent = parent_authority()
+    parent["resolver"] = type("Resolver", (), {"resolve": staticmethod(lambda _ref: object())})()
+    constructed: list[object] = []
+
+    class Caps:
+        def factory(self, cell: str):
+            del cell
+
+            def build(*, dependencies: object) -> object:
+                constructed.append(dependencies)
+                return CompositionTransferExecutionRoot(dependencies)
+
+            return build
+
+    monkeypatch.setattr(module, "_parent_context", lambda *_args, **_kwargs: parent)
+    monkeypatch.setattr(module, "build_installed_execution_capabilities", Caps)
+    monkeypatch.setattr(
+        "dpone.app.composition_pack_execution_dispatcher.cache_root_from_environment",
+        lambda _env: command.working_directory,
+    )
+    monkeypatch.setattr(
+        "dpone.app.composition_pack_execution_dispatcher.reopen_composition_plan",
+        lambda *_args, **_kwargs: type(
+            "Plan",
+            (),
+            {"sources": type("Sources", (), {"subject_sha256": "sha256:" + "a" * 64})()},
+        )(),
+    )
+    (command.working_directory / "manifest.json").write_text(
+        json.dumps(
+            {
+                "name": "b_ordinary",
+                "source": {
+                    "type": "postgres",
+                    "connection_ref": "pg-source",
+                    "table": {"database": "sales", "schema": "public", "name": "orders"},
+                },
+                "sink": {
+                    "type": "mssql",
+                    "connection_ref": "mssql-sink",
+                    "table": {"database": "warehouse", "schema": "dbo", "name": "orders"},
+                    "strategy": {"mode": "full_refresh"},
+                },
+                "state": {
+                    "type": "mssql",
+                    "atomicity": "target_atomic",
+                    "provisioning": "external",
+                    "connection_ref": "mssql-state",
+                },
+            }
+        )
+    )
+
+    dispatcher = compose_verified_pack_dispatcher(admitted(replace(command, argv=ORDINARY_ARGV)))
+    request = type(
+        "Request",
+        (),
+        {"env": {**admitted(command).env, "DPONE_CACHE_ROOT": str(command.working_directory)}},
+    )()
+    root = dispatcher._ordinary_root(
+        request,
+        "postgres_mssql_full_refresh_v1",
+        json.loads((command.working_directory / "manifest.json").read_text()),
+    )
+
+    assert type(root) is CompositionTransferExecutionRoot
+    assert constructed
+
+
+def test_missing_cache_plan_does_not_construct_ordinary_root(
+    command, run_volume, clean_ambient, denied_child, monkeypatch
+):
+    from dpone.app import composition_verified_pack_dispatcher as module
+    from dpone.app.composition_verified_pack_dispatcher import compose_verified_pack_dispatcher
+
+    constructed: list[str] = []
+    parent = parent_authority()
+    parent["resolver"] = type("Resolver", (), {"resolve": staticmethod(lambda _ref: object())})()
+
+    class Caps:
+        def factory(self, cell: str):
+            def build(*, dependencies: object) -> object:
+                constructed.append(cell)
+                return object()
+
+            return build
+
+    (command.working_directory / "manifest.json").write_text(
+        json.dumps(
+            {
+                "name": "b_ordinary",
+                "source": {
+                    "type": "postgres",
+                    "connection_ref": "pg-source",
+                    "table": {"database": "sales", "schema": "public", "name": "orders"},
+                },
+                "sink": {
+                    "type": "mssql",
+                    "connection_ref": "mssql-sink",
+                    "table": {"database": "warehouse", "schema": "dbo", "name": "orders"},
+                    "strategy": {"mode": "full_refresh"},
+                },
+                "state": {
+                    "type": "mssql",
+                    "atomicity": "target_atomic",
+                    "provisioning": "external",
+                    "connection_ref": "mssql-state",
+                },
+            }
+        )
+    )
+    monkeypatch.setattr(module, "_parent_context", lambda *_args, **_kwargs: parent)
+    monkeypatch.setattr(module, "build_installed_execution_capabilities", Caps)
+    admitted_command = admitted(replace(command, argv=ORDINARY_ARGV))
+    status = execute_verified_pack_command(
+        admitted_command,
+        composition_dispatcher=compose_verified_pack_dispatcher(admitted_command),
+        **run_volume,
+    )
+
+    assert [cell for cell in constructed if cell != "sqlserver_dbt_v1"] == []
+    assert status == 5
+    assert rejection_reason(run_volume) == "composition_ordinary_worker_unavailable"
+
+
 def test_ordinary_transfer_stays_ordinary_worker_unavailable(command, run_volume, clean_ambient, denied_child):
     from dpone.app.composition_verified_pack_dispatcher import compose_verified_pack_dispatcher
 

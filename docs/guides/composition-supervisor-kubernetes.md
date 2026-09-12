@@ -193,12 +193,23 @@ the [Airflow provider](../airflow-pack-provider.md), then trigger the exact DAG
 IDs from the parent inventory. Native DAG order does not create
 cross-constituent dependencies.
 
-Shipped pack-exec is not ready as a three-cell trigger campaign. Only
+Shipped pack-exec is not ready as a three-cell trigger campaign.
 `sqlserver_dbt_v1` can reach `CompositionDbtExecutionRoot` when parent context
-exists. `postgres_mssql_full_refresh_v1` and `mssql_clickhouse_full_refresh_v1`
-fail closed at pack-exec with `composition_ordinary_worker_unavailable`. Native
+exists. `postgres_mssql_full_refresh_v1` can reach
+`CompositionTransferExecutionRoot` when parent context exists and
+`DPONE_CACHE_ROOT` (or `DPONE_SCHEDULER_CACHE_ROOT`) reopens the sealed parent
+plan. `mssql_clickhouse_full_refresh_v1` can reach
+`CompositionClickHouseExecutionRoot` when that parent context, cache plan,
+sealed snapshot sidecar, and enrolled supervisor/HTTP collaborators compose.
+The composed catalog inspects both names over closed ClickHouse HTTP and
+hashes the response bytes; it does not invent typed B content. Pack-exec
+refuses login and ingest until an independent transfer observer or typed
+catalog classification exists, so a composed root is not a mutation permit.
+Missing any of those originals fail-closes with
+`composition_ordinary_worker_unavailable` before login issuance. Native
 pack-exec without parent context fails closed with
-`composition_native_worker_unavailable`.
+`composition_native_worker_unavailable`. Ordinary pack-exec without that cache
+plan also fail-closes.
 
 ```bash
 : "${DPONE_COMPOSITION_DAG_ID:?set one DAG id from the composed parent}"
@@ -233,7 +244,7 @@ not appear in tickets, XCom, or committed fixtures. See
 |---|---|---|
 | `composition_supervisor_authority_missing` | Verified command lacks `DPONE_COMPOSITION_SUPERVISOR_B64` | Rebuild with the complete supervisor group; do not patch the pod env |
 | `composition_native_worker_unavailable` | Native pack-exec has no parent context or no `sqlserver_dbt_v1` factory | Do not treat this as worker execution; restore parent context or the native factory |
-| `composition_ordinary_worker_unavailable` | Ordinary or ClickHouse pack-exec constructed a root and fail-closed | Expected today for `postgres_mssql_full_refresh_v1` and `mssql_clickhouse_full_refresh_v1`; do not retry as if a worker ran |
+| `composition_ordinary_worker_unavailable` | Ordinary or ClickHouse pack-exec missing parent context, `DPONE_CACHE_ROOT`, a matching sealed plan, the ClickHouse snapshot sidecar, or enrolled supervisor/HTTP collaborators | Restore the shared release cache, sealed snapshot, and parent identity; do not retry as if a worker ran |
 | `DPONE_COMPOSITION_SUPERVISOR_REQUIRED` | v3 deployment omitted the sealed supervisor object | Rebuild and promote the exact projection |
 | Duplicate RUNNING admission | The original executor still owns the attempt | Inspect that attempt; do not start a second worker |
 | Durable `COMMIT_UNKNOWN` | SQL or publication outcome is unproven | Close gates, prove quiescence, then reconcile; do not replay mutation |

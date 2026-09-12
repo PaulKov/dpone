@@ -22,24 +22,19 @@ from typing import Any
 from dpone.adapters.composition_mssql_store import MssqlCompositionActivationStore
 from dpone.adapters.dbt_runtime import build_hvac_kubernetes_vault_kv_v2_reader
 from dpone.app.composition_authority_connections import CompositionAuthorityConnections
-from dpone.app.composition_clickhouse_execution_factory import (
-    build_composition_clickhouse_execution_dependencies,
-)
 from dpone.app.composition_dbt_execution import CompositionDbtExecutionRoot
 from dpone.app.composition_dbt_execution_factory import (
     CompositionDbtControlAuthority,
     build_composition_dbt_execution_dependencies,
 )
 from dpone.app.composition_execution_cells import (
-    MSSQL_CLICKHOUSE_FULL_REFRESH_V1,
-    POSTGRES_MSSQL_FULL_REFRESH_V1,
     SQLSERVER_DBT_V1,
     build_installed_execution_capabilities,
 )
 from dpone.app.composition_materialization_seams import bind_composition_materialization_seams
-from dpone.app.composition_pack_execution_dispatcher import CompositionPackExecutionDispatcher
-from dpone.app.composition_transfer_execution_factory import (
-    build_composition_transfer_execution_dependencies,
+from dpone.app.composition_pack_execution_dispatcher import (
+    CompositionPackExecutionDispatcher,
+    compose_pack_execution_root,
 )
 from dpone.contracts.composition_activation import CompositionAdmissionError, CompositionOccurrenceContext
 from dpone.contracts.composition_execution_authority import supervisor_from_transport
@@ -148,25 +143,21 @@ def _ordinary_executor(
     manifest: Mapping[str, Any],
     capabilities: Any,
 ) -> Any | None:
-    """Compose an ordinary or ClickHouse root when parent context exists."""
+    """Compose an ordinary root when parent context and the sealed plan exist."""
 
-    del request
     try:
         parent = _parent_context(command, manifest=manifest)
         if parent.get("context") is None:
             return None
-        factory = capabilities.factory(cell)
-        if not callable(factory):
-            return None
-        if cell == POSTGRES_MSSQL_FULL_REFRESH_V1:
-            factory(dependencies=_transfer_dependencies(parent, manifest))
-        elif cell == MSSQL_CLICKHOUSE_FULL_REFRESH_V1:
-            factory(dependencies=_clickhouse_dependencies(parent, manifest))
-        else:
-            raise CompositionAdmissionError("execution_capability")
+        return compose_pack_execution_root(
+            request=request,
+            cell=cell,
+            manifest=manifest,
+            capabilities=capabilities,
+            parent=parent,
+        )
     except _PARENT_ERRORS:
         return None
-    return None
 
 
 def _compose_supervised_root(
@@ -321,57 +312,6 @@ def _occurrence_context(identity: Any, runtime: Any) -> Any | None:
         )
     except CompositionAdmissionError:
         return None
-
-
-def _transfer_dependencies(parent: Mapping[str, Any], manifest: Mapping[str, Any]) -> Any:
-    state = manifest.get("state")
-    if not isinstance(state, Mapping) or not isinstance(state.get("connection_ref"), str):
-        raise CompositionAdmissionError("external_target_atomic_state_required")
-    resolver = parent["resolver"]
-    return build_composition_transfer_execution_dependencies(
-        control=parent["control"],
-        read_active=parent["read_active"],
-        sink_target=parent["target"],
-        state_target=resolver.resolve(str(state["connection_ref"])),
-        read_plan=_reject_transfer_plan,
-        verify_operation=_reject_transfer_operation,
-    )
-
-
-def _clickhouse_dependencies(parent: Mapping[str, Any], manifest: Mapping[str, Any]) -> Any:
-    del manifest
-    return build_composition_clickhouse_execution_dependencies(
-        control=parent["control"],
-        read_active=parent["read_active"],
-        gate=None,
-        publisher_gate=None,
-        publisher=None,
-        bind_transport=_reject_clickhouse_transport,
-        read_source=_reject_clickhouse_source,
-        require_enrollment=_reject_clickhouse_enrollment,
-        outcome_observer=None,
-        target=parent["target"],
-    )
-
-
-def _reject_transfer_plan(_attempt: Any) -> Any:
-    raise CompositionAdmissionError("transfer_source_plan")
-
-
-def _reject_transfer_operation(*_args: Any) -> None:
-    raise CompositionAdmissionError("transfer_operation")
-
-
-def _reject_clickhouse_transport(*_args: Any) -> Any:
-    raise CompositionAdmissionError("clickhouse_transport_binding")
-
-
-def _reject_clickhouse_source(*_args: Any) -> Any:
-    raise CompositionAdmissionError("clickhouse_source_payload")
-
-
-def _reject_clickhouse_enrollment(*_args: Any) -> Any:
-    raise CompositionAdmissionError("clickhouse_enrollment")
 
 
 def _merged_environment(command: VerifiedPackCommand) -> dict[str, str]:

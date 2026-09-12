@@ -21,10 +21,19 @@
   unchanged. Authenticated v3 pack-exec reaches the native dbt parent worker
   when parent context exists; a missing occurrence context fail-closes as
   `composition_native_worker_unavailable` before the dbt root is composed.
-  Ordinary and ClickHouse pack-exec fail closed with
-  `composition_ordinary_worker_unavailable` and do not construct a worker
-  root when occurrence context is missing. A skipped live check is never
-  `PASS`.
+  Ordinary pack-exec reaches `CompositionTransferExecutionRoot` when parent
+  context exists and `DPONE_CACHE_ROOT` (or `DPONE_SCHEDULER_CACHE_ROOT`)
+  reopens the sealed parent plan; missing cache, a drifted source subject,
+  or a missing occurrence context fail-closes as
+  `composition_ordinary_worker_unavailable` before login issuance.
+  ClickHouse pack-exec reaches `CompositionClickHouseExecutionRoot` when that
+  plan, the sealed snapshot sidecar, and enrolled supervisor/HTTP collaborators
+  compose; missing originals fail-close with the same reason before login.
+  ClickHouse catalog inspect issues closed HTTP `system.*` reads and hashes the
+  actual response bytes; it does not copy sealed generation content, schema, or
+  physical digests. Pack-exec composes ordinary and ClickHouse roots but does
+  not start login or ingest until independent transfer observation or typed
+  catalog classification exists. A skipped live check is never `PASS`.
 - Treat transfer observations that carry both a success triple and rollback
   protection as `COMMIT_UNKNOWN` instead of `SUCCEEDED`.
 - Add composition execution integration: reopen sealed parent inputs, select

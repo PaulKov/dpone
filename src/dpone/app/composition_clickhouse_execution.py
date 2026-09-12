@@ -93,6 +93,7 @@ class CompositionClickHouseExecutionDependencies:
     target: SnapshotTarget
     expected_service_id: str
     attach_publisher_transport: Callable[..., None] | None = None
+    can_classify_publication: bool = False
 
 
 class CompositionClickHouseExecutionRoot:
@@ -100,6 +101,11 @@ class CompositionClickHouseExecutionRoot:
 
     def __init__(self, dependencies: CompositionClickHouseExecutionDependencies) -> None:
         self._deps = dependencies
+
+    def can_execute_attempt(self) -> bool:
+        """Refuse ingest when catalog cannot independently classify publication."""
+
+        return bool(self._deps.can_classify_publication)
 
     def execute(self, request: CompositionClickHouseExecutionRequest) -> CompositionClickHouseResult:
         """Run admission, enrolled dispatch, atomic publication and seal once."""
@@ -132,6 +138,8 @@ class CompositionClickHouseExecutionRoot:
         try:
             if type(credentials) is not IssuedClickHouseCredentials:
                 raise CompositionAdmissionError("worker_issued_identity")
+            if not self.can_execute_attempt():
+                raise CompositionAdmissionError("snapshot_catalog_shape")
             self._deps.require_enrollment(attempt, "dispatch")
             rows = tuple(self._deps.read_source(attempt))
             journal = self._journal(self._deps.gate, attempt, credentials.user_id)

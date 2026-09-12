@@ -77,6 +77,11 @@ class CompositionMssqlTransferOutcomeObserver:
         self._observe = observe
         self._persist = persist
 
+    def can_prove_outcome(self) -> bool:
+        """The default unknown observer cannot seal SUCCEEDED or proven FAILED."""
+
+        return bool(getattr(self._observe, "proves_outcome", False))
+
     def observe(self, attempt: CompositionAttemptIdentity) -> CompositionAttemptProof:
         attempt.__post_init__()
         try:

@@ -91,6 +91,12 @@ class CompositionTransferExecutionRoot:
     def __init__(self, dependencies: CompositionTransferExecutionDependencies) -> None:
         self._deps = dependencies
 
+    def can_execute_attempt(self) -> bool:
+        """Refuse login when independent receipt/row/content observation is absent."""
+
+        prove = getattr(self._deps.outcome_observer, "can_prove_outcome", None)
+        return callable(prove) and bool(prove())
+
     def execute(self, request: CompositionTransferExecutionRequest) -> CompositionTransferResult:
         """Run the complete admission, fenced load and seal sequence once."""
 

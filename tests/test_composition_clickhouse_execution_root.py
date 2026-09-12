@@ -461,6 +461,7 @@ def runtime(monkeypatch) -> ClickHouseRuntime:
         outcome_observer=_Outcome(ledger, store),
         target=prepared.target,
         expected_service_id=SERVICE,
+        can_classify_publication=True,
     )
     return ClickHouseRuntime(
         CompositionClickHouseExecutionRoot(dependencies),

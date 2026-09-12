@@ -197,6 +197,25 @@ class SupervisorEnrollmentReader:
         return value
 
 
+def read_service_enrollment(context: CompositionMssqlLedger, service_id: str) -> ClickHouseSupervisorEnrollment:
+    """Reopen the exclusive supervisor enrollment original for one CH service."""
+
+    require(isinstance(context, CompositionMssqlLedger), "sql_context")
+    require_uuid(service_id)
+    require_clickhouse_supervisor_schema(context.cursor, context.schema)
+    context.cursor.execute(
+        "SELECT TOP (2) enrollment_sha256,"
+        "CASE WHEN DATALENGTH(enrollment_document) BETWEEN 1 AND 65536 THEN enrollment_document END "
+        f"FROM {context.table('ch_supervisor_enrollments')} WITH (HOLDLOCK) WHERE service_id=?;",
+        service_id,
+    )
+    rows = tuple(tuple(row) for row in context.cursor.fetchall())
+    require(len(rows) == 1 and len(rows[0]) == 2 and type(rows[0][1]) is bytes, "enrollment_missing")
+    value = ClickHouseSupervisorEnrollment(str(rows[0][0]), rows[0][1])
+    require(value.body["service_id"] == service_id, "enrollment_subject")
+    return value
+
+
 def require_attempt_enrollment_original(
     context: CompositionMssqlLedger,
     enrollment_sha256: str,

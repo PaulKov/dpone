@@ -246,6 +246,9 @@ class Catalog:
         self.value = observation(value)
         self.error = False
 
+    def can_classify_publication(self) -> bool:
+        return True
+
     def inspect(self, intent):
         if self.error:
             raise RuntimeError("secret catalog unavailable")

@@ -160,7 +160,11 @@ def test_composition_docs_state_shipped_pack_exec_reachability() -> None:
     assert stale_ready == []
 
     assert "installed roots apply these checks when pack-exec reaches them" in contract
-    assert "ordinary/ClickHouse pack-exec still fail-closes" in contract
+    assert "`CompositionClickHouseExecutionRoot`" in contract
+    assert "`CompositionTransferExecutionRoot`" in dag_trigger
+    assert "`CompositionClickHouseExecutionRoot`" in dag_trigger
+    assert "DPONE_CACHE_ROOT" in dag_trigger
+    assert "sealed snapshot" in dag_trigger.lower()
     assert "The installed workers apply these checks" not in contract
     assert "`composition_ordinary_worker_unavailable`" in contract
     assert "`sqlserver_dbt_v1`" in contract
