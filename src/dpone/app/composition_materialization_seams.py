@@ -38,21 +38,46 @@ def build_composition_materialization_seams(
         return connection, pin
 
     def require_target(connection: Any, attempt: Any, write: Any, pin: Any) -> None:
-        del connection, attempt
+        del attempt
+        if connection is None or not callable(getattr(connection, "cursor", None)):
+            raise CompositionAdmissionError("materialization_target")
         if target is None:
             raise CompositionAdmissionError("materialization_target")
         if mssql_target_pin(target, write) != pin:
             raise CompositionAdmissionError("materialization_database_pin")
-        if require_target_service is not None:
-            if expected_service_id is None or context is None:
-                raise CompositionAdmissionError("materialization_target")
+        if require_target_service is None or expected_service_id is None or context is None:
+            raise CompositionAdmissionError("materialization_target")
+        try:
             require_target_service(target, expected_service_id, context)
+        except CompositionAdmissionError as exc:
+            if exc.reason in {"materialization_target", "target_service_pin"}:
+                raise
+            raise CompositionAdmissionError("target_service_pin") from None
 
     return {
         "open_target": open_target,
         "require_target": require_target,
         "observe_undispatched_closure": observe_undispatched_closure,
     }
+
+
+def bind_composition_materialization_seams(
+    *,
+    require_target_service: RequireTargetService | None,
+    target: Any | None = None,
+    expected_service_id: str | None = None,
+    context: Any | None = None,
+) -> Mapping[str, Any]:
+    """Return activation-owned openers that cannot omit target-service authority."""
+
+    if require_target_service is None:
+        raise CompositionAdmissionError("materialization_target")
+    return build_composition_materialization_seams(
+        target=target,
+        expected_service_id=expected_service_id,
+        context=context,
+        require_target_service=require_target_service,
+    )
 
 
 def observe_undispatched_closure(ledger: Any, attempt: Any) -> bytes:
@@ -94,4 +119,8 @@ def observe_undispatched_closure(ledger: Any, attempt: Any) -> bytes:
         raise DbtCaptureError("capture_undispatched_closure") from None
 
 
-__all__ = ["build_composition_materialization_seams", "observe_undispatched_closure"]
+__all__ = [
+    "bind_composition_materialization_seams",
+    "build_composition_materialization_seams",
+    "observe_undispatched_closure",
+]

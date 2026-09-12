@@ -152,3 +152,71 @@ def test_ordinary_transfer_stays_ordinary_worker_unavailable(command, run_volume
 def test_library_omitting_dispatcher_still_reports_unavailable(command, run_volume, clean_ambient, denied_child):
     assert execute_verified_pack_command(admitted(command), **run_volume) == 5
     assert rejection_reason(run_volume) == "composition_dispatcher_unavailable"
+
+
+def test_parent_context_installs_dbt_root_via_sqlserver_dbt_v1(command, clean_ambient, monkeypatch):
+    from dpone.app import composition_execution_cells as cells
+    from dpone.app import composition_verified_pack_dispatcher as module
+    from dpone.app.composition_dbt_execution import CompositionDbtExecutionRoot
+    from dpone.app.composition_verified_pack_dispatcher import compose_verified_pack_dispatcher
+
+    observed: list[object] = []
+    real = cells.build_sqlserver_dbt_execution_root
+    monkeypatch.setattr(
+        cells,
+        "build_sqlserver_dbt_execution_root",
+        lambda **kwargs: observed.append(kwargs) or real(**kwargs),
+    )
+    monkeypatch.setattr(module, "_parent_context", lambda *_args, **_kwargs: parent_authority())
+
+    dispatcher = compose_verified_pack_dispatcher(admitted(command))
+
+    assert type(dispatcher._native._executor) is CompositionDbtExecutionRoot
+    assert observed
+
+
+def test_missing_sqlserver_dbt_factory_is_native_worker_unavailable(
+    command, run_volume, clean_ambient, denied_child, monkeypatch
+):
+    from dpone.app import composition_verified_pack_dispatcher as module
+    from dpone.app.composition_execution_cells import SQLSERVER_DBT_V1, build_installed_execution_capabilities
+    from dpone.app.composition_verified_pack_dispatcher import compose_verified_pack_dispatcher
+    from dpone.contracts.composition_activation import CompositionAdmissionError
+
+    real = build_installed_execution_capabilities()
+
+    class MissingNative:
+        def factory(self, cell: str):
+            if cell == SQLSERVER_DBT_V1:
+                raise CompositionAdmissionError("complete_execution_capability_unavailable")
+            return real.factory(cell)
+
+    monkeypatch.setattr(module, "_parent_context", lambda *_args, **_kwargs: parent_authority())
+    monkeypatch.setattr(module, "build_installed_execution_capabilities", lambda: MissingNative())
+
+    admitted_command = admitted(command)
+    status = execute_verified_pack_command(
+        admitted_command,
+        composition_dispatcher=compose_verified_pack_dispatcher(admitted_command),
+        **run_volume,
+    )
+
+    assert status == 5
+    assert rejection_reason(run_volume) == "composition_native_worker_unavailable"
+
+
+def parent_authority() -> dict[str, object]:
+    from dpone.app.composition_dbt_execution_factory import CompositionDbtControlAuthority
+    from tests.test_composition_authority_connections import CONTEXT
+
+    return {
+        "control": CompositionDbtControlAuthority(
+            connection_factory=lambda: (_ for _ in ()).throw(AssertionError("no control sql")),
+            expected_service_id="3f2c1b7a-5d4e-4a91-8b26-0c7d9e1f2a34",
+            control_database="DponeControl",
+        ),
+        "target": object(),
+        "read_active": lambda: None,
+        "require_target_service": lambda *_args, **_kwargs: None,
+        "context": CONTEXT,
+    }

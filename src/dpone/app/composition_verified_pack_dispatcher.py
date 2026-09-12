@@ -21,6 +21,7 @@ from typing import Any
 
 from dpone.adapters.composition_mssql_store import MssqlCompositionActivationStore
 from dpone.adapters.dbt_runtime import build_hvac_kubernetes_vault_kv_v2_reader
+from dpone.app.composition_authority_connections import CompositionAuthorityConnections
 from dpone.app.composition_clickhouse_execution_factory import (
     build_composition_clickhouse_execution_dependencies,
 )
@@ -35,12 +36,12 @@ from dpone.app.composition_execution_cells import (
     SQLSERVER_DBT_V1,
     build_installed_execution_capabilities,
 )
-from dpone.app.composition_materialization_seams import build_composition_materialization_seams
+from dpone.app.composition_materialization_seams import bind_composition_materialization_seams
 from dpone.app.composition_pack_execution_dispatcher import CompositionPackExecutionDispatcher
 from dpone.app.composition_transfer_execution_factory import (
     build_composition_transfer_execution_dependencies,
 )
-from dpone.contracts.composition_activation import CompositionAdmissionError
+from dpone.contracts.composition_activation import CompositionAdmissionError, CompositionOccurrenceContext
 from dpone.contracts.composition_execution_authority import supervisor_from_transport
 from dpone.contracts.dbt_contract_validation import DbtPublishingError
 from dpone.contracts.dbt_runtime import (
@@ -215,12 +216,19 @@ def _parent_context(
         control_schema=control.control_schema,
     )
     activation_id = identity.activation_id
+    connections = CompositionAuthorityConnections(
+        inputs=_PackResolverInputs(context.resolver),
+        authority_connection_ref=authority_ref,
+        control_schema=control.control_schema,
+    )
     return {
         "control": control,
         "target": target,
         "resolver": context.resolver,
         "read_active": lambda: _read_active(store, activation_id),
         "manifest": manifest,
+        "require_target_service": connections.require_mssql_target_service,
+        "context": _occurrence_context(identity, context),
     }
 
 
@@ -274,11 +282,40 @@ def _materialization_seams(parent: Mapping[str, Any]) -> Mapping[str, Any] | Non
     """Return production openers from the activation factory's seam builders."""
 
     try:
-        return build_composition_materialization_seams(
+        return bind_composition_materialization_seams(
+            require_target_service=parent.get("require_target_service"),
             target=parent["target"],
             expected_service_id=parent["control"].expected_service_id,
+            context=parent.get("context"),
         )
     except _PARENT_ERRORS:
+        return None
+
+
+class _PackResolverInputs:
+    def __init__(self, resolver: Any) -> None:
+        self._resolver = resolver
+
+    def resolve_connection(self, context: Any, connection_ref: str) -> Any:
+        del context
+        return self._resolver.resolve(connection_ref)
+
+
+def _occurrence_context(identity: Any, runtime: Any) -> Any | None:
+    digest = getattr(runtime, "authority_subject_sha256", None)
+    environment = getattr(runtime, "environment", None)
+    if not isinstance(digest, str) or not isinstance(environment, str):
+        return None
+    try:
+        return CompositionOccurrenceContext(
+            identity.activation_id,
+            environment,
+            identity.release_id,
+            identity.deployment_id,
+            None,
+            digest,
+        )
+    except CompositionAdmissionError:
         return None
 
 

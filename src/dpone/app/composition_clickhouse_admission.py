@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from dpone.adapters.composition_clickhouse_enrollment import clickhouse_physical_domain
+from dpone.adapters.composition_clickhouse_supervisor_enrollment import ClickHouseSupervisorEnrollment
 from dpone.adapters.composition_clickhouse_supervisor_schema import require_clickhouse_supervisor_schema
 from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.adapters.dbapi_lifecycle import close, rollback
@@ -45,13 +47,22 @@ def require_protected_clickhouse_enrollment(
         if rows != ((domain.connector, domain.service_id, domain.physical_subject_sha256),):
             raise CompositionAdmissionError("clickhouse_enrollment")
         cursor.execute(
-            "SELECT TOP (2) LOWER(CONVERT(char(36),service_id)) "
+            "SELECT TOP (2) LOWER(CONVERT(char(36),service_id)),LOWER(CONVERT(char(36),database_uuid)),"
+            "enrollment_sha256,"
+            "CASE WHEN DATALENGTH(enrollment_document) BETWEEN 1 AND 65536 THEN enrollment_document END "
             f"FROM {ledger.table('ch_supervisor_enrollments')} WITH (HOLDLOCK) "
             "WHERE service_id=?;",
             domain.service_id,
         )
         enrollments = tuple(tuple(row) for row in cursor.fetchall())
-        if not enrollments or any(row != (domain.service_id,) for row in enrollments):
+        if len(enrollments) != 1 or len(enrollments[0]) != 4 or type(enrollments[0][3]) is not bytes:
+            raise CompositionAdmissionError("clickhouse_enrollment")
+        service_id, database_uuid, enrollment_sha256, document = enrollments[0]
+        original = ClickHouseSupervisorEnrollment(enrollment_sha256, document)
+        body = original.body
+        if (body["service_id"], body["database_uuid"]) != (service_id, database_uuid):
+            raise CompositionAdmissionError("clickhouse_enrollment")
+        if clickhouse_physical_domain(body["service_id"], body["database_uuid"]) != domain:
             raise CompositionAdmissionError("clickhouse_enrollment")
         ledger.require_transaction(transaction)
     except CompositionAdmissionError as exc:
