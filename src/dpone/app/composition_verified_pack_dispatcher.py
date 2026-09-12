@@ -2,15 +2,15 @@
 
 The CLI stays a facade: admission is read from the authenticated command
 environment, then this module either returns ``None`` for legacy workloads or
-always returns a ``CompositionVerifiedDispatcher``. Authenticated v3 therefore
-cannot degrade to generic ``Popen`` or native-v2.
+always returns a ``CompositionPackExecutionDispatcher``. Authenticated v3
+therefore cannot degrade to generic ``Popen`` or native-v2.
 
 When activation identity, workspace authority, control, target and
 ``read_active`` can be resolved from the verified command plus already-projected
 identity env, this cell wraps the real ``CompositionDbtExecutionRoot``.
 Materialization openers and the undispatched-closure observer are occurrence
-authority owned by the activation factory. This cell does not invent a second
-SQL opener; it fail-closes with a missing executor instead.
+authority owned by the activation factory. Missing parent context or a missing
+cell factory fail-closes instead of inventing a second SQL opener.
 """
 
 from __future__ import annotations
@@ -21,10 +21,24 @@ from typing import Any
 
 from dpone.adapters.composition_mssql_store import MssqlCompositionActivationStore
 from dpone.adapters.dbt_runtime import build_hvac_kubernetes_vault_kv_v2_reader
+from dpone.app.composition_clickhouse_execution_factory import (
+    build_composition_clickhouse_execution_dependencies,
+)
 from dpone.app.composition_dbt_execution import CompositionDbtExecutionRoot
 from dpone.app.composition_dbt_execution_factory import (
     CompositionDbtControlAuthority,
     build_composition_dbt_execution_dependencies,
+)
+from dpone.app.composition_execution_cells import (
+    MSSQL_CLICKHOUSE_FULL_REFRESH_V1,
+    POSTGRES_MSSQL_FULL_REFRESH_V1,
+    SQLSERVER_DBT_V1,
+    build_installed_execution_capabilities,
+)
+from dpone.app.composition_materialization_seams import build_composition_materialization_seams
+from dpone.app.composition_pack_execution_dispatcher import CompositionPackExecutionDispatcher
+from dpone.app.composition_transfer_execution_factory import (
+    build_composition_transfer_execution_dependencies,
 )
 from dpone.contracts.composition_activation import CompositionAdmissionError
 from dpone.contracts.composition_execution_authority import supervisor_from_transport
@@ -41,7 +55,6 @@ from dpone.ports.composition_dbt import CompositionNativeDbtExecutor
 from dpone.runtime.composition_native_dbt_dispatch import (
     NATIVE_WORKER_UNAVAILABLE,
     ORDINARY_WORKER_UNAVAILABLE,
-    CompositionNativeDbtDispatcher,
 )
 from dpone.runtime.composition_verified_dispatch import (
     COMPOSITION_SUPERVISOR_B64_ENV,
@@ -57,6 +70,15 @@ from dpone.runtime.dbt_execution_pack_reader import execution_pack_payload
 from dpone.runtime.verified_pack_launcher import VerifiedPackCommand
 
 _NATIVE_DBT_PREFIX = ("dpone", "dbt", "execute-pack")
+_PARENT_ERRORS = (
+    CompositionAdmissionError,
+    CompositionDispatchRejection,
+    DbtPublishingError,
+    OSError,
+    RuntimeConnectionAuthorityError,
+    TypeError,
+    ValueError,
+)
 
 
 class _UnavailableCompositionDispatcher:
@@ -87,34 +109,89 @@ def _admitted_dispatcher(command: VerifiedPackCommand) -> CompositionVerifiedDis
         supervisor = supervisor_from_transport(command.env.get(COMPOSITION_SUPERVISOR_B64_ENV))
     except ValueError:
         return _UnavailableCompositionDispatcher()
-    return CompositionNativeDbtDispatcher(_native_executor(command, supervisor), supervisor=supervisor)
+    capabilities = build_installed_execution_capabilities()
+    return CompositionPackExecutionDispatcher(
+        supervisor=supervisor,
+        capabilities=capabilities,
+        native_executor=_native_executor(command, supervisor, capabilities),
+        ordinary_root=lambda request, cell, manifest: _ordinary_executor(
+            command, request, cell, manifest, capabilities
+        ),
+    )
 
 
-def _native_executor(command: VerifiedPackCommand, supervisor: Any) -> CompositionNativeDbtExecutor | None:
+def _native_executor(
+    command: VerifiedPackCommand,
+    supervisor: Any,
+    capabilities: Any,
+) -> CompositionNativeDbtExecutor | None:
     """Compose the supervised root, or omit it so dispatch fail-closes."""
 
-    seams = _materialization_seams()
-    if seams is None:
-        return None
     try:
-        return _compose_supervised_root(command, supervisor, seams)
-    except (
-        CompositionAdmissionError,
-        CompositionDispatchRejection,
-        DbtPublishingError,
-        OSError,
-        RuntimeConnectionAuthorityError,
-        TypeError,
-        ValueError,
-    ):
+        parent = _parent_context(command)
+        factory = capabilities.factory(SQLSERVER_DBT_V1)
+        seams = _materialization_seams(parent)
+        if seams is None or not callable(factory):
+            return None
+        return _compose_supervised_root(command, supervisor, seams, parent, factory)
+    except _PARENT_ERRORS:
         return None
+
+
+def _ordinary_executor(
+    command: VerifiedPackCommand,
+    request: CompositionDispatchRequest,
+    cell: str,
+    manifest: Mapping[str, Any],
+    capabilities: Any,
+) -> Any | None:
+    """Compose an ordinary or ClickHouse root when parent context exists."""
+
+    del request
+    try:
+        parent = _parent_context(command, manifest=manifest)
+        factory = capabilities.factory(cell)
+        if not callable(factory):
+            return None
+        if cell == POSTGRES_MSSQL_FULL_REFRESH_V1:
+            factory(dependencies=_transfer_dependencies(parent, manifest))
+        elif cell == MSSQL_CLICKHOUSE_FULL_REFRESH_V1:
+            factory(dependencies=_clickhouse_dependencies(parent, manifest))
+        else:
+            raise CompositionAdmissionError("execution_capability")
+    except _PARENT_ERRORS:
+        return None
+    return None
 
 
 def _compose_supervised_root(
     command: VerifiedPackCommand,
     supervisor: Any,
     seams: Mapping[str, Any],
+    parent: Mapping[str, Any],
+    factory: Any,
 ) -> CompositionDbtExecutionRoot:
+    dependencies = build_composition_dbt_execution_dependencies(
+        supervisor=supervisor,
+        control=parent["control"],
+        read_active=parent["read_active"],
+        target=parent["target"],
+        open_materialization_target=seams["open_target"],
+        require_materialization_target=seams["require_target"],
+        observe_undispatched_closure=seams["observe_undispatched_closure"],
+    )
+    root = factory(dependencies=dependencies)
+    if type(root) is not CompositionDbtExecutionRoot:
+        raise CompositionAdmissionError("execution_capability")
+    del command
+    return root
+
+
+def _parent_context(
+    command: VerifiedPackCommand,
+    *,
+    manifest: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     environment = _merged_environment(command)
     identity = parse_airflow_deployment_identity_json(
         _preferred(command.env, environment, AIRFLOW_DEPLOYMENT_IDENTITY_ENV)
@@ -127,7 +204,7 @@ def _compose_supervised_root(
     ).load(environment)
     if context is None:
         raise CompositionAdmissionError("control_connection")
-    pack_connection_ref = _pack_connection_ref(command)
+    pack_connection_ref = _pack_connection_ref(command, manifest)
     if authority_ref == pack_connection_ref:
         raise CompositionAdmissionError("control_connection")
     control = _control_authority(context.resolver.resolve(authority_ref))
@@ -138,16 +215,13 @@ def _compose_supervised_root(
         control_schema=control.control_schema,
     )
     activation_id = identity.activation_id
-    dependencies = build_composition_dbt_execution_dependencies(
-        supervisor=supervisor,
-        control=control,
-        read_active=lambda: _read_active(store, activation_id),
-        target=target,
-        open_materialization_target=seams["open_target"],
-        require_materialization_target=seams["require_target"],
-        observe_undispatched_closure=seams["observe_undispatched_closure"],
-    )
-    return CompositionDbtExecutionRoot(dependencies)
+    return {
+        "control": control,
+        "target": target,
+        "resolver": context.resolver,
+        "read_active": lambda: _read_active(store, activation_id),
+        "manifest": manifest,
+    }
 
 
 def _control_authority(resolved: Any) -> CompositionDbtControlAuthority:
@@ -178,7 +252,12 @@ def _read_active(store: MssqlCompositionActivationStore, activation_id: str) -> 
     return occurrence.require_state("ACTIVE")
 
 
-def _pack_connection_ref(command: VerifiedPackCommand) -> str:
+def _pack_connection_ref(command: VerifiedPackCommand, manifest: Mapping[str, Any] | None) -> str:
+    if manifest is not None:
+        sink = manifest.get("sink")
+        if isinstance(sink, Mapping) and isinstance(sink.get("connection_ref"), str):
+            return str(sink["connection_ref"])
+        raise CompositionAdmissionError("execution_capability")
     if command.argv[:3] != _NATIVE_DBT_PREFIX or len(command.argv) < 4:
         raise CompositionAdmissionError("execution_capability")
     pack = DbtExecutionPack.from_mapping(
@@ -191,15 +270,67 @@ def _pack_connection_ref(command: VerifiedPackCommand) -> str:
     return pack.profile.connection_ref
 
 
-def _materialization_seams() -> Mapping[str, Any] | None:
-    """Return production openers only when the activation factory can supply them.
+def _materialization_seams(parent: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """Return production openers from the activation factory's seam builders."""
 
-    Opening SQL from a guessed target session would invent a second
-    materialization stack. Task 8 owns that public factory; until it is
-    available this cell fail-closes.
-    """
+    try:
+        return build_composition_materialization_seams(
+            target=parent["target"],
+            expected_service_id=parent["control"].expected_service_id,
+        )
+    except _PARENT_ERRORS:
+        return None
 
-    return None
+
+def _transfer_dependencies(parent: Mapping[str, Any], manifest: Mapping[str, Any]) -> Any:
+    state = manifest.get("state")
+    if not isinstance(state, Mapping) or not isinstance(state.get("connection_ref"), str):
+        raise CompositionAdmissionError("external_target_atomic_state_required")
+    resolver = parent["resolver"]
+    return build_composition_transfer_execution_dependencies(
+        control=parent["control"],
+        read_active=parent["read_active"],
+        sink_target=parent["target"],
+        state_target=resolver.resolve(str(state["connection_ref"])),
+        read_plan=_reject_transfer_plan,
+        verify_operation=_reject_transfer_operation,
+    )
+
+
+def _clickhouse_dependencies(parent: Mapping[str, Any], manifest: Mapping[str, Any]) -> Any:
+    del manifest
+    return build_composition_clickhouse_execution_dependencies(
+        control=parent["control"],
+        read_active=parent["read_active"],
+        gate=None,
+        publisher_gate=None,
+        publisher=None,
+        bind_transport=_reject_clickhouse_transport,
+        read_source=_reject_clickhouse_source,
+        require_enrollment=_reject_clickhouse_enrollment,
+        outcome_observer=None,
+        target=parent["target"],
+    )
+
+
+def _reject_transfer_plan(_attempt: Any) -> Any:
+    raise CompositionAdmissionError("transfer_source_plan")
+
+
+def _reject_transfer_operation(*_args: Any) -> None:
+    raise CompositionAdmissionError("transfer_operation")
+
+
+def _reject_clickhouse_transport(*_args: Any) -> Any:
+    raise CompositionAdmissionError("clickhouse_transport_binding")
+
+
+def _reject_clickhouse_source(*_args: Any) -> Any:
+    raise CompositionAdmissionError("clickhouse_source_payload")
+
+
+def _reject_clickhouse_enrollment(*_args: Any) -> Any:
+    raise CompositionAdmissionError("clickhouse_enrollment")
 
 
 def _merged_environment(command: VerifiedPackCommand) -> dict[str, str]:
