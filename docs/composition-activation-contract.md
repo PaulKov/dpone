@@ -288,7 +288,11 @@ Production callers use
 cache_root, authority_connection_ref, control_schema="dpone_control")`. That
 factory installs callable roots for `sqlserver_dbt_v1`,
 `postgres_mssql_full_refresh_v1`, and `mssql_clickhouse_full_refresh_v1`. It
-does not pass a v3 parent to the native-only coordinator.
+does not pass a v3 parent to the native-only coordinator. At DAG trigger, only
+`sqlserver_dbt_v1` can reach a worker root when parent context exists;
+ordinary and ClickHouse cells fail closed at pack-exec with
+`composition_ordinary_worker_unavailable`. That three-cell trigger campaign
+is not ready.
 
 Application integrators that construct
 `dpone.services.composition_activation_coordinator.CompositionActivationCoordinator`
@@ -370,8 +374,7 @@ attempts across native and ordinary workloads.
 
 A terminal receipt requires independent closed-gate, server-quiescence and durable
 outcome evidence. A closed gate or exited process does not resolve an unknown SQL
-commit. No TTL may release its resource ownership. The installed workers apply
-these checks; a missing live observation remains `UNVERIFIED`, not a pass.
+commit. No TTL may release its resource ownership. The installed roots apply these checks when pack-exec reaches them; ordinary/ClickHouse pack-exec still fail-closes. A missing live observation remains `UNVERIFIED`, not a pass.
 
 ## Downstream CI and recovery acceptance
 
@@ -405,7 +408,10 @@ retrying EXCHANGE can exchange the tables back. Close and drain stage writers
 before exposing that UUID as the target. Deployment rollback does not undo SQL.
 
 Current live acceptance remains `UNVERIFIED` until the isolated Linux x86-64
-campaign retains provider-to-worker evidence for every installed cell. Offline
+campaign retains provider-to-worker evidence for every installed cell. That
+campaign is not ready: shipped pack-exec reaches `sqlserver_dbt_v1` only when
+parent context exists; ordinary/ClickHouse pack-exec still fail-closes with
+`composition_ordinary_worker_unavailable`. Offline
 tests and SQL component profiles are not that campaign and are not route
 certification.
 

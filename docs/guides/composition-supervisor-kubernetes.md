@@ -29,8 +29,10 @@ flowchart LR
 
 The three installed execution cells are `sqlserver_dbt_v1`,
 `postgres_mssql_full_refresh_v1`, and `mssql_clickhouse_full_refresh_v1`.
-Offline tests prove fail-closed admission, fencing, and evidence shape. They
-are not route certification.
+Installation does not make the three-cell trigger campaign ready; shipped
+pack-exec reachability is stated under DAG triggering. Offline tests prove
+fail-closed admission, fencing, and evidence shape. They are not route
+certification.
 
 A skipped, billed, or unavailable live campaign is `UNVERIFIED`, never `PASS`.
 Do not claim Batch ETL, or any stronger route grade, from a narrow smoke table
@@ -191,6 +193,13 @@ the [Airflow provider](../airflow-pack-provider.md), then trigger the exact DAG
 IDs from the parent inventory. Native DAG order does not create
 cross-constituent dependencies.
 
+Shipped pack-exec is not ready as a three-cell trigger campaign. Only
+`sqlserver_dbt_v1` can reach `CompositionDbtExecutionRoot` when parent context
+exists. `postgres_mssql_full_refresh_v1` and `mssql_clickhouse_full_refresh_v1`
+fail closed at pack-exec with `composition_ordinary_worker_unavailable`. Native
+pack-exec without parent context fails closed with
+`composition_native_worker_unavailable`.
+
 ```bash
 : "${DPONE_COMPOSITION_DAG_ID:?set one DAG id from the composed parent}"
 
@@ -223,6 +232,8 @@ not appear in tickets, XCom, or committed fixtures. See
 | Observation | Meaning | Safe action |
 |---|---|---|
 | `composition_supervisor_authority_missing` | Verified command lacks `DPONE_COMPOSITION_SUPERVISOR_B64` | Rebuild with the complete supervisor group; do not patch the pod env |
+| `composition_native_worker_unavailable` | Native pack-exec has no parent context or no `sqlserver_dbt_v1` factory | Do not treat this as worker execution; restore parent context or the native factory |
+| `composition_ordinary_worker_unavailable` | Ordinary or ClickHouse pack-exec constructed a root and fail-closed | Expected today for `postgres_mssql_full_refresh_v1` and `mssql_clickhouse_full_refresh_v1`; do not retry as if a worker ran |
 | `DPONE_COMPOSITION_SUPERVISOR_REQUIRED` | v3 deployment omitted the sealed supervisor object | Rebuild and promote the exact projection |
 | Duplicate RUNNING admission | The original executor still owns the attempt | Inspect that attempt; do not start a second worker |
 | Durable `COMMIT_UNKNOWN` | SQL or publication outcome is unproven | Close gates, prove quiescence, then reconcile; do not replay mutation |

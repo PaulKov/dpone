@@ -115,10 +115,56 @@ def test_composition_supervisor_docs_example_cache_sync_authority() -> None:
     assert "--workspace-authority-connection-ref" in cli
 
 
+def _section(text: str, heading: str) -> str:
+    start = text.index(heading)
+    rest = text[start + len(heading) :]
+    next_heading = rest.find("\n## ")
+    return heading + (rest if next_heading < 0 else rest[:next_heading])
+
+
 def test_composition_supervisor_guide_names_all_three_cells() -> None:
     text = _guide()
     missing = [cell for cell in _CELLS if f"`{cell}`" not in text]
     assert missing == []
+
+
+def test_composition_docs_state_shipped_pack_exec_reachability() -> None:
+    guide = _guide()
+    contract = (DOCS / "composition-activation-contract.md").read_text(encoding="utf-8")
+    dag_trigger = _section(guide, "## DAG triggering")
+    diagnosis = _section(guide, "## Blocked retry diagnosis")
+    live_status = _section(guide, "## Live status")
+
+    assert "`sqlserver_dbt_v1`" in dag_trigger
+    assert "`CompositionDbtExecutionRoot`" in dag_trigger
+    assert "parent context" in dag_trigger
+    assert "`composition_ordinary_worker_unavailable`" in dag_trigger
+    assert "`postgres_mssql_full_refresh_v1`" in dag_trigger
+    assert "`mssql_clickhouse_full_refresh_v1`" in dag_trigger
+    assert "fail closed" in dag_trigger.lower() or "fail-closes" in dag_trigger.lower()
+    assert "three-cell trigger campaign" in dag_trigger.lower()
+    assert "not ready" in dag_trigger.lower() or "is not ready" in dag_trigger.lower()
+
+    assert "| `composition_native_worker_unavailable`" in diagnosis
+    assert "| `composition_ordinary_worker_unavailable`" in diagnosis
+
+    assert "`UNVERIFIED`" in live_status
+    assert "never PASS" in live_status or "never `PASS`" in live_status
+    ready_claims = (
+        "three-cell trigger campaign is ready",
+        "three-cell trigger campaign as ready",
+        "ready three-cell trigger campaign",
+    )
+    combined = "\n".join((guide, contract)).lower()
+    stale_ready = [claim for claim in ready_claims if claim in combined]
+    assert stale_ready == []
+
+    assert "installed roots apply these checks when pack-exec reaches them" in contract
+    assert "ordinary/ClickHouse pack-exec still fail-closes" in contract
+    assert "The installed workers apply these checks" not in contract
+    assert "`composition_ordinary_worker_unavailable`" in contract
+    assert "`sqlserver_dbt_v1`" in contract
+    assert "parent context" in contract
 
 
 def test_composition_supervisor_guide_documents_commit_unknown_and_tombstones() -> None:
