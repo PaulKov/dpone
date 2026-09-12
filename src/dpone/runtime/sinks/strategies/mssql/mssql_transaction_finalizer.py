@@ -10,6 +10,7 @@ from dpone.contracts.mssql_transaction_governance import (
     MssqlGenericCommitReceipt,
     MssqlTransactionAdmission,
 )
+from dpone.ports.composition_mssql_transaction import CompositionMssqlTransactionFence
 from dpone.runtime.extraction_lifecycle import ExtractionLifecycleReceipt
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 from dpone.runtime.sinks.mssql_receipt_projection import load_result_from_mssql_receipt
@@ -80,7 +81,9 @@ class MssqlGenericTransactionFinalizer:
         target_identity_assertion: Any = assert_mssql_physical_target_identity,
         catalog_revalidator: Any = assert_target_catalog_expectations,
         target_contract_validator: Any | None = None,
+        composition_fence: CompositionMssqlTransactionFence | None = None,
     ) -> None:
+        self._composition_fence = composition_fence
         self._strategy = strategy
         self._connector = strategy.connector
         self._state = transaction_state or MssqlGenericTransactionState.from_state_storage(state_storage)
@@ -93,6 +96,12 @@ class MssqlGenericTransactionFinalizer:
     def replay_result(self, receipt: MssqlGenericCommitReceipt) -> LoadResult:
         """Project a durable receipt without repeating any business DML."""
 
+        if self._composition_fence is not None:
+            try:
+                self._connector.begin()
+                self._composition_fence.require_current(self._connector, receipt=receipt)
+            finally:
+                self._connector.rollback()
         return load_result_from_mssql_receipt(receipt, outcome=AtomicCommitOutcome.REPLAY_SUPPRESSED)
 
     def finalize(
@@ -124,6 +133,13 @@ class MssqlGenericTransactionFinalizer:
             transaction_started = True
             self._connector.execute_query("SET XACT_ABORT ON")
             self._connector.execute_query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+            composition_transaction = (
+                self._composition_fence.require_current(
+                    self._connector, operation, mutation_plan_sha256=mutation_plan.digest
+                )
+                if self._composition_fence is not None
+                else None
+            )
             acquire_mutation_locks(
                 self._connector,
                 load_config,
@@ -160,7 +176,10 @@ class MssqlGenericTransactionFinalizer:
                 except Exception:
                     self._close_target()
                 transaction_started = False
-                return _with_target_fence_evidence(self.replay_result(concurrent), fence_evidence)
+                return _with_target_fence_evidence(
+                    load_result_from_mssql_receipt(concurrent, outcome=AtomicCommitOutcome.REPLAY_SUPPRESSED),
+                    fence_evidence,
+                )
             self._catalog_revalidator(
                 self._strategy,
                 load_config,
@@ -214,6 +233,13 @@ class MssqlGenericTransactionFinalizer:
                 operation,
                 require_unexpired_lease=False,
             )
+            if self._composition_fence is not None:
+                self._composition_fence.require_current(
+                    self._connector,
+                    operation,
+                    transaction_id=composition_transaction,
+                    mutation_plan_sha256=mutation_plan.digest,
+                )
             receipt = self._state.insert_receipt(
                 self._connector,
                 operation,

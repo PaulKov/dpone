@@ -9,11 +9,12 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
-from dpone.contracts.dbt_publishing import DbtExecutionPack, DbtPublishingError
+from dpone.contracts.dbt_publishing import DbtPublishingError
 from dpone.contracts.dbt_toolchain import DBT_SQLSERVER_1_12_CERTIFIED
 from dpone.runtime.dbt_execution_failures import dbt_failure_code, runtime_failure_code
 
 if TYPE_CHECKING:
+    from dpone.contracts.dbt_runtime import DbtExecutionPack
     from dpone.ports.dbt_publishing import DbtInstalledToolchain
 
 _DIRECTORY_FLAGS = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
