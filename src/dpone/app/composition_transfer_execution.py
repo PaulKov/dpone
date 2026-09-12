@@ -155,8 +155,8 @@ class CompositionTransferExecutionRoot:
         from dpone.runtime.etl.mssql_transaction_admission import MssqlTransactionAdmissionService
 
         write = transfer_relation_write(
-            project_path=str(request.manifest.get("name") or "composition-transfer"),
-            workflow_id=attempt.workload_id,
+            project_path=attempt.constituent_id,
+            workflow_id=request.airflow_attempt.dag_id,
             workload_id=attempt.workload_id,
             manifest=request.manifest,
         )

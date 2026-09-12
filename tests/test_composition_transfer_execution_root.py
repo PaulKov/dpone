@@ -437,6 +437,40 @@ def test_missing_composition_fence_is_rejected_when_registrar_returns_none(runti
         )
 
 
+def test_admission_write_matches_ordinary_plan_owner(runtime):
+    from dpone.contracts.dbt_relation_writes import transfer_relation_write
+    from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
+    from tests.test_mssql_composition_transaction_fence import binding
+
+    captured: list[Any] = []
+
+    def bind(_attempt_id, _operation, write, _mutation_plan_sha256):
+        captured.append(write)
+        return None
+
+    request = replace(
+        runtime.request,
+        airflow_attempt=replace(runtime.request.airflow_attempt, dag_id="ordinary_dag"),
+    )
+    attempt = _attempt(runtime)
+    runtime.root._deps = replace(runtime.root._deps, operation_registrar=bind)
+    service = runtime.root._admission(request, attempt, SimpleNamespace(_strategy_map={}))
+    original = binding()
+    service._operation_registrar(
+        MssqlTransactionAdmission(operation=original.operation),
+        original.mutation_plan_sha256,
+    )
+    assert attempt.constituent_id == "standalone"
+    assert captured == [
+        transfer_relation_write(
+            project_path="standalone",
+            workflow_id=request.airflow_attempt.dag_id,
+            workload_id=attempt.workload_id,
+            manifest=request.manifest,
+        )
+    ]
+
+
 def test_strict_issued_overlay_is_used_to_build_sink(monkeypatch):
     from dpone.runtime.bootstrap_hydrator import DefaultRuntimeHydrator
 
