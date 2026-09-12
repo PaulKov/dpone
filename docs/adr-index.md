@@ -72,3 +72,25 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0061: Qualification and execution share one physical ownership journal (Accepted)](adr/0061-shared-composition-physical-ownership.md)
 
 - [ADR 0062: SQL Server SWITCH has an explicit activation boundary (Accepted for isolated component)](adr/0062-isolated-mssql-switch-activation.md)
+
+## Historical PG-to-MSSQL source decisions
+
+These source-local numbers and acceptance statuses are historical. They do not replace public ADRs or waive current migration gates.
+
+- [Source ADR 0056: PostgreSQL Batch/XMin effects use target-local versioned authority (Accepted)](adr/source-history/0056-mssql-same-database-target-authority-v2.md)
+- [Source ADR 0057: R1 physical descriptor uses a bounded clustering exception (Accepted)](adr/source-history/0057-r1-physical-descriptor-clustering-exception.md)
+- [Source ADR 0058: R1 provider security uses a bounded clustering exception (Accepted)](adr/source-history/0058-r1-provider-security-clustering-exception.md)
+- [Source ADR 0065: R1 provider installation admits one binding pack per target database (Accepted)](adr/source-history/0065-r1-provider-single-binding-install-authority.md)
+- [Source ADR 0066: R1 type and target authority uses a bounded clustering exception (Accepted)](adr/source-history/0066-r1-type-target-authority-clustering-exception.md)
+- [Source ADR 0067: Security V2 runtime EXECUTE repair uses a bounded clustering exception (Accepted)](adr/source-history/0067-r1-provider-security-runtime-execute-clustering-exception.md)
+- [Source ADR 0068: PostgreSQL selected-relation schema authority is source-owned (Accepted)](adr/source-history/0068-postgres-selected-relation-schema-authority.md)
+- [Source ADR 0069: PostgreSQL source-schema authority may use eight bounded inward layer edges (Accepted)](adr/source-history/0069-postgres-source-schema-layer-flow-exception.md)
+- [Source ADR 0070: R1 provider Binding V2 uses a bounded clustering exception (Accepted)](adr/source-history/0070-r1-provider-binding-v2-clustering-exception.md)
+
+- [Source ADR 0071: R1 provider attestation foundation](adr/source-history/0071-r1-provider-attestation-foundation.md)
+
+## Current private migration decision
+
+- [ADR 0072: Internal Binding ownership](adr/0072-internal-binding-ownership.md) — current private migration ownership and versioned evidence layout.
+
+- [ADR 0073: Typed contract and runtime ownership](adr/0073-typed-contract-runtime-ownership.md) — scalar decoding, receipt projection, physical inventory and runtime validation boundaries.

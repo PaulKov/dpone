@@ -1,0 +1,147 @@
+# Status: APPROVED by the maintainer on 2026-09-11.
+schema_version: 1
+task_id: PUBLIC-CLEAN-HISTORICAL-AGENT-RECEIPT-RETENTION-V1
+title: Append-only retention for historical agent receipt evidence
+goal: Remove one unsupported duplicate historical artifact from the current tree
+  without rewriting history, weakening the scanner, or misrepresenting retained
+  evidence as a current execution result.
+specification: docs/feature-design-public-clean-migration-v1.md
+base_commit: a54281906040f7e8d21e52071820c8b5f9d9608d
+integrator: parent-integrator
+
+acceptance_criteria:
+  - Preserve the six original files byte-for-byte in immutable Git history and
+    the verified complete external DDA archive before deleting current-tree copies.
+  - Keep the existing hygiene-retention/index.json, download.json, and
+    review-fixes-ownership.log byte-identical.
+  - Add one append-only dpone.public-clean-historical-receipt-retention.v1 record
+    with status N/A; never claim execution, privacy, release, or live success.
+  - Bind exact source commit/tree, paths, modes, sizes, Git blobs, SHA-256 values,
+    download-manifest digest, archive/inventory digests, and producer identity.
+  - Reject malformed, duplicate-key, non-finite, incomplete, mutated, symlinked,
+    pre-existing-output, partial-write, or private-locator inputs without a
+    successful record.
+  - Delete only the six bound current-tree artifact files after successful
+    producer verification; do not add an LF projection or generic NUL exception.
+  - Preserve ordinary strict UTF-8-without-NUL candidate scanning and report
+    reachable-history scanning as UNVERIFIED.
+  - Cover all positive, negative, boundary, mutation, atomicity, and false-status
+    cases with RED before GREEN.
+  - Run focused host and offline Linux Docker tests, then complete candidate,
+    history, and worktree scans independently.
+  - Preserve no-push, no-PR, no-release, no-provider-activation, and no-live
+    authority.
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - historical-evidence-retention
+    - repository-tooling
+  migration_required: false
+
+owned_paths:
+  - tests/agent_policy/test_public_clean_historical_agent_receipt_retention.py
+  - test_artifacts/delivery-acceleration/hygiene-retention/agent-pr-receipt-retention-v1.json
+
+integrator_owned_paths:
+  - docs/feature-design-public-clean-migration-v1.md
+  - docs/public-clean-migration.md
+  - docs/data-delivery-acceleration-tasks.md
+  - test_artifacts/agent-policy/public-clean-historical-agent-receipt-retention-v1.yml
+  - test_artifacts/delivery-acceleration/hygiene-retention/README.md
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/agent_audit_manifest.json
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/agent_pr_receipt.json
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-body.md
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-changed-paths.txt
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-head-sha.txt
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-receipt-exit-code.txt
+
+read_only_paths:
+  - test_artifacts/delivery-acceleration/hygiene-retention/index.json
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/download.json
+  - test_artifacts/delivery-acceleration/dda-06/review-fixes-ownership.log
+  - .github/workflows/agent-pr-receipt.yml
+  - tools/agent_policy/public_clean_policy.py
+  - tools/agent_policy/public_clean_gate.py
+
+forbidden_paths:
+  - src
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/feature-design-public-clean-migration-v1.md
+  - docs/public-clean-migration.md
+  - docs/data-delivery-acceleration-tasks.md
+  - test_artifacts/agent-policy/public-clean-historical-agent-receipt-retention-v1.yml
+  - test_artifacts/delivery-acceleration/hygiene-retention/README.md
+  - test_artifacts/delivery-acceleration/hygiene-retention/index.json
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/agent_audit_manifest.json
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/agent_pr_receipt.json
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-body.md
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-changed-paths.txt
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-head-sha.txt
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/agent-pr-receipt/pr-receipt-exit-code.txt
+  - test_artifacts/delivery-acceleration/dda-06/remediation-ci-7c25ce9/download.json
+  - test_artifacts/delivery-acceleration/dda-06/review-fixes-ownership.log
+
+shared_file_owner: parent-integrator
+
+dependencies:
+  - Maintainer approved append-only retention on 2026-09-11.
+  - The exact six source blobs and complete external archive remain available.
+  - The private producer receives independent review before execution.
+
+required_checks:
+  focused:
+    - uv run python tools/agent_policy/task_contract.py
+      test_artifacts/agent-policy/public-clean-historical-agent-receipt-retention-v1.yml
+    - uv run pytest
+      tests/agent_policy/test_public_clean_historical_agent_receipt_retention.py -q
+    - uv run pytest -k
+      "path_evidence or pr_receipt_source_archive or merge_receipt or workflow_governance"
+      -q
+    - Offline Linux Docker run of the same focused tests against the exact candidate.
+  broad:
+    - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
+    - uv run ruff check .
+    - uv run ruff format --check .
+    - uv run mypy --config-file mypy.ini
+    - uv run dpone docs check-import-rules
+    - uv run dpone docs check-layer-metrics
+      --baseline docs/layer_metrics_baseline.json
+    - uv run dpone docs check-module-size
+      --baseline docs/module_size_baseline.json
+      --base-ref origin/master --head-ref HEAD
+    - uv run dpone docs check-docs
+    - uv run pytest tests/test_docs_language_contracts.py -q
+    - uv run mkdocs build --strict
+    - uv run pytest -m "not integration_live" -n auto --dist loadfile
+  live: []
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.
+  - The six source files, original Git objects, or external archive are unavailable.
+  - Existing retention authority or download evidence would need modification.
+  - A private locator, policy value, raw finding, or credential would enter public output.
+  - Candidate, history, or worktree evidence would be combined into one PASS.
+  - A live check, publication, push, PR, release, or provider activation is required.

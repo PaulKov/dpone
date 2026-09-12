@@ -453,11 +453,11 @@ def test_live_fixture_exceptions_are_redacted_without_chaining():
 
     @redacted_live
     def unsafe():
-        raise RuntimeError("secret://user:password@host")
+        raise RuntimeError("private live fixture failure detail")
 
     with pytest.raises(pytest.fail.Exception) as error:
         unsafe()
-    assert "secret" not in str(error.value)
+    assert "private live fixture" not in str(error.value)
     assert error.value.__context__ is None
 
 

@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+### Added
+
+- Add internal PostgreSQL-to-MSSQL typed source authority, prepared-source
+  lifecycle, receipt and Binding V2 compiler contracts. Maintainer documentation
+  explains the activation boundary and ownership model; these components do not
+  activate a provider or certify a production route.
+
+- Add a local public-clean migration privacy gate with injected private policy,
+  bounded history/index/worktree and archive inspection, explicit content review,
+  and exact candidate-to-commit verification. Private receipts omit raw commit
+  messages and identities; discovery does not authorize transfer or publication.
+  Overlapping host matchers share one exact occurrence without weakening host
+  allowances or duplicate-review rejection.
+
+### Fixed
+
+- Load readiness helpers on first use so Doctor import probes avoid unrelated
+  planning initialization. Preserve public exports, module attributes and static
+  types; existing probe deadlines remain unchanged.
+
+- Reuse a bounded Git batch reader during public-clean tree scans to avoid
+  thousands of child-process launches while retaining exact object validation,
+  scan deadlines and fail-closed cleanup.
+
+- Recover internal committed effects observed at an advanced operation epoch after
+  validating the complete canonical proof and exact original effect identity.
+  Recovery returns the receipt without retry; noncommit and wire contracts remain
+  unchanged.
+
+- Reject internal Batch receipts whose target counters are not nonnegative SQL
+  bigint values or whose final count contradicts the sealed quality evidence.
+  Canonical bytes of valid receipts remain unchanged.
+
 ## 0.79.0 - 2026-09-11
 
 ### Changed

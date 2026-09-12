@@ -62,6 +62,22 @@ class PostgresFullExtractStrategy(PostgresBaseStrategy):
     def get_state(self, load_config) -> Any | None:
         return None
 
+    def fetch_schema_projection(self, load_config: Any) -> Any:
+        """Reuse the exact prepared projection without another catalog read."""
+
+        prepared = prepared_postgres_source_boundary(load_config)
+        if prepared is not None:
+            prepared.require_active(self.connector)
+            return prepared.schema_projection
+        return super().fetch_schema_projection(load_config)
+
+    def abort_mssql_source_boundary(self, load_config: Any) -> None:
+        """Release a prepared boundary that never transferred to extraction."""
+
+        prepared = prepared_postgres_source_boundary(load_config)
+        if prepared is not None:
+            prepared.abort_if_active()
+
     def prepare_mssql_source_boundary(
         self,
         load_config: Any,
@@ -91,8 +107,8 @@ class PostgresFullExtractStrategy(PostgresBaseStrategy):
     def extract(self, load_config, last_state: Any | None) -> ExtractResult:
         prepared = prepared_postgres_source_boundary(load_config)
         if prepared is not None:
-            prepared.require_active(self.connector)
             try:
+                prepared.require_active(self.connector)
                 return self._extract_with_projection(
                     load_config,
                     snapshot_lease=prepared.snapshot_lease,
@@ -135,6 +151,7 @@ class PostgresFullExtractStrategy(PostgresBaseStrategy):
         projection: Any | None,
         prepared_boundary: PreparedPostgresSourceBoundary | None,
     ) -> ExtractResult:
+        governed = prepared_boundary is not None and prepared_boundary.source_schema_authority is not None
         projection = projection or self.fetch_schema_projection(load_config)
         schema = list(projection.projected_schema)
 
@@ -148,6 +165,7 @@ class PostgresFullExtractStrategy(PostgresBaseStrategy):
             load_config.source_table,
             [column for column, _ in schema],
             predicate if resolved_portable_scope is None else None,
+            **({"only_relation": True} if governed else {}),
         )
         query_params: tuple[object, ...] = ()
         if resolved_portable_scope is not None:
@@ -179,6 +197,7 @@ class PostgresFullExtractStrategy(PostgresBaseStrategy):
             )
         else:
             # FAST PATH: Binary COPY export/import (для разных БД/серверов)
+            export_authority: dict[str, Any] = {"prepared_boundary": prepared_boundary} if governed else {}
             artifact = self._export_to_file(
                 query,
                 schema,
@@ -186,10 +205,15 @@ class PostgresFullExtractStrategy(PostgresBaseStrategy):
                 batch_size=load_config.batch_size,
                 relation_schema=projection.relation_schema,
                 query_params=query_params,
-                snapshot_lease=snapshot_lease,
+                snapshot_lease=None if governed else snapshot_lease,
+                **export_authority,
             )
 
-        if snapshot_lease is not None and isinstance(artifact, FileExportArtifact):
+        if governed:
+            assert prepared_boundary is not None
+            prepared_boundary.require_completed()
+
+        if not governed and snapshot_lease is not None and isinstance(artifact, FileExportArtifact):
             if prepared_boundary is not None:
                 prepared_boundary.complete()
             else:

@@ -25,9 +25,9 @@ def test_mssql_canonical_uri_uses_authority_port_and_encoding() -> None:
         "assortment planning",
         "supply/forecast",
         database="dwh_example",
-        authority=MssqlAssetAuthority(host="sql-prod.internal", port=1433),
+        authority=MssqlAssetAuthority(host="fixture01.invalid", port=1433),
     )
-    assert uri == ("mssql://sql-prod.internal:1433/dwh_example/assortment%20planning/supply%2Fforecast")
+    assert uri == ("mssql://fixture01.invalid:1433/dwh_example/assortment%20planning/supply%2Fforecast")
     assert is_aip60_mssql_asset_uri(uri)
 
 
@@ -37,9 +37,9 @@ def test_mssql_named_instance_canonical_uri() -> None:
         "dbo",
         "orders",
         database="DWH",
-        authority=MssqlAssetAuthority(host="sql-prod.internal", port=1433, instance="MSSQL01"),
+        authority=MssqlAssetAuthority(host="fixture01.invalid", port=1433, instance="MSSQL01"),
     )
-    assert uri == "mssql://sql-prod.internal:1433/mssql01/DWH/dbo/orders"
+    assert uri == "mssql://fixture01.invalid:1433/mssql01/DWH/dbo/orders"
     assert is_aip60_mssql_asset_uri(uri)
 
 
@@ -66,9 +66,9 @@ def test_compact_declared_uri_is_invalid() -> None:
 def test_declared_uri_normalizes_default_port() -> None:
     # Host that looks like a server name is accepted; missing port is filled.
     # connection_ref-shaped hosts are discouraged by registry policy, not by URL syntax.
-    resolution = canonicalize_declared_mssql_uri("mssql://sql-prod.internal/dwh_example/dbo/orders")
+    resolution = canonicalize_declared_mssql_uri("mssql://fixture01.invalid/dwh_example/dbo/orders")
     assert resolution.ok
-    assert resolution.uri == "mssql://sql-prod.internal:1433/dwh_example/dbo/orders"
+    assert resolution.uri == "mssql://fixture01.invalid:1433/dwh_example/dbo/orders"
 
 
 def test_mssql_canonical_uri_requires_authority_and_database() -> None:
@@ -85,7 +85,7 @@ def test_mssql_canonical_uri_requires_authority_and_database() -> None:
         "mssql",
         "assortment_planning",
         "example_forecast",
-        authority=MssqlAssetAuthority(host="sql-prod.internal"),
+        authority=MssqlAssetAuthority(host="fixture01.invalid"),
     )
     assert missing_database.uri is None
     assert missing_database.issues[0].code == MSSQL_ASSET_URI_INVALID
@@ -119,7 +119,7 @@ def test_registry_asset_authority_and_database_indexes_accept_aliases(endpoint_t
                 "type": endpoint_type,
                 "connection": {
                     "asset_authority": {
-                        "host": "sql-prod.internal",
+                        "host": "fixture01.invalid",
                         "port": 1433,
                     },
                     "database": "DWH",
@@ -131,7 +131,7 @@ def test_registry_asset_authority_and_database_indexes_accept_aliases(endpoint_t
     }
 
     assert load_mssql_asset_authority_index(registry) == {
-        "mssql_example": MssqlAssetAuthority(host="sql-prod.internal", port=1433)
+        "mssql_example": MssqlAssetAuthority(host="fixture01.invalid", port=1433)
     }
     assert load_mssql_default_database_index(registry) == {"mssql_example": "DWH"}
 
@@ -669,10 +669,10 @@ def test_explicit_uri_registry_host_allowed(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "uri",
     [
-        "mssql://sql-prod.internal:abc/dwh_example/dbo/orders",
-        "mssql://sql-prod.internal:65536/dwh_example/dbo/orders",
-        "mssql://sql-prod.internal:1433/dwh_example/dbo/orders?x=1",
-        "mssql://sql-prod.internal:1433/dwh_example/dbo/orders#frag",
+        "mssql://fixture01.invalid:abc/dwh_example/dbo/orders",
+        "mssql://fixture01.invalid:65536/dwh_example/dbo/orders",
+        "mssql://fixture01.invalid:1433/dwh_example/dbo/orders?x=1",
+        "mssql://fixture01.invalid:1433/dwh_example/dbo/orders#frag",
     ],
 )
 def test_malformed_declared_mssql_uri_is_structured_blocker(uri: str) -> None:
@@ -685,4 +685,4 @@ def test_malformed_declared_mssql_uri_is_structured_blocker(uri: str) -> None:
 def test_hostname_normalizer_strips_and_lowercases() -> None:
     from dpone.gitops.airflow_asset_uri import normalize_hostname
 
-    assert normalize_hostname(" SQL-Prod.Internal. ") == "sql-prod.internal"
+    assert normalize_hostname(" FIXTure01.Invalid. ") == "fixture01.invalid"

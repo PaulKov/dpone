@@ -271,7 +271,14 @@ class PostgresBaseStrategy(PostgresExtractionLifecycleMixin, PostgresFileExportM
         return data_type
 
     @staticmethod
-    def format_select_query(schema: str, table: str, columns: list[str], predicate: str | None = None):
+    def format_select_query(
+        schema: str,
+        table: str,
+        columns: list[str],
+        predicate: str | None = None,
+        *,
+        only_relation: bool = False,
+    ):
         """
         Формирует SELECT запрос для PostgreSQL используя psycopg.sql.
 
@@ -284,8 +291,10 @@ class PostgresBaseStrategy(PostgresExtractionLifecycleMixin, PostgresFileExportM
         Returns:
             psycopg.sql.Composed объект
         """
-        base = sql.SQL("SELECT {} FROM {}.{}").format(
+        relation_keyword = sql.SQL("ONLY ") if only_relation else sql.SQL("")
+        base = sql.SQL("SELECT {} FROM {}{}.{}").format(
             sql.SQL(", ").join(sql.Identifier(col) for col in columns) if columns else sql.SQL("*"),
+            relation_keyword,
             sql.Identifier(schema),
             sql.Identifier(table),
         )

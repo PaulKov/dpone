@@ -57,6 +57,7 @@ class ETLProcessor(ProcessorPayloadMixin):
         extracted_payload_load_service: Any | None = None,
         route_capability_orchestrator: Any | None = None,
         mssql_transaction_admission_service: Any | None = None,
+        postgres_mssql_correctness_runtime: Any | None = None,
         run_state_tracker_cls: type[RunStateTracker] = RunStateTracker,
     ):
         self.source = source
@@ -105,6 +106,7 @@ class ETLProcessor(ProcessorPayloadMixin):
             payload_load_service=self.payload_load_service,
             source_extraction_lifecycle_service=source_extraction_lifecycle_service,
             mssql_transaction_admission_service=mssql_transaction_admission_service,
+            postgres_mssql_correctness_runtime=postgres_mssql_correctness_runtime,
             route_capability_orchestrator=route_capability_orchestrator,
         )
         self.source_extraction_lifecycle_service = self._runtime.source_extraction_lifecycle_service
@@ -211,6 +213,7 @@ class ETLProcessor(ProcessorPayloadMixin):
                     self.source,
                     self.logger,
                 )
+                self._runtime.require_execution_context(effective_config)
 
                 load_result, reconciliation_metrics = self._load_extracted_payload(
                     effective_config,

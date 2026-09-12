@@ -32,23 +32,23 @@ _CREDENTIAL_URI = "postgresql://runtime-user:runtime-password@db.internal/dwh"
     ("uri", "secret", "expected"),
     [
         (
-            "redis://:empty-user-secret@cache.internal/0",
-            "empty-user-secret",
+            "redis://:xvqzx-qzxv-zxvqzx@cache.internal/0",
+            "xvqzx-qzxv-zxvqzx",
             f"redis://{REDACTION_TOKEN}@cache.internal/0",
         ),
         (
-            "https://token-only-secret@api.internal/path",
-            "token-only-secret",
+            "https://vqzxv-zxvq-xvqzxv@api.internal/path",
+            "vqzxv-zxvq-xvqzxv",
             f"https://{REDACTION_TOKEN}@api.internal/path",
         ),
         (
-            "postgresql://user%40example.com:percent%3Asecret@[2001:db8::1]/dwh",
-            "percent%3Asecret",
+            "postgresql://user%40example.com:zxvqzxv%3Avqzxvq@[2001:db8::1]/dwh",
+            "zxvqzxv%3Avqzxvq",
             f"postgresql://{REDACTION_TOKEN}@[2001:db8::1]/dwh",
         ),
         (
-            "custom://malformed-user:malformed-secret@@host.internal/path",
-            "malformed-secret",
+            "custom://malformed-user:qzxvqzxvq-xvqzxv@@host.internal/path",
+            "qzxvqzxvq-xvqzxv",
             f"custom://{REDACTION_TOKEN}@host.internal/path",
         ),
     ],

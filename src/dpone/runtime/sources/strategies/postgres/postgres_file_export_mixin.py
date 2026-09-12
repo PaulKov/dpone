@@ -61,6 +61,7 @@ class PostgresFileExportMixin(PostgresBatchedExportMixin, PostgresPartitionExpor
         batch_size: int,
         *,
         snapshot_lease: PostgresRepeatableReadSnapshotLease | None = None,
+        prepared_boundary: Any | None = None,
         relation_schema: list[tuple[str, str]] | tuple[tuple[str, str], ...] | None = None,
         query_params: tuple[object, ...] = (),
         after_copy: Callable[[], None] | None = None,
@@ -88,6 +89,13 @@ class PostgresFileExportMixin(PostgresBatchedExportMixin, PostgresPartitionExpor
         batch_commit_mode = options.get("batch_commit_mode", "separate")
         if wire_policy is not None:
             batch_commit_mode = wire_policy.batch_commit_mode
+        if prepared_boundary is not None and (partition_candidate or batch_commit_mode != "whole"):
+            from dpone.runtime.errors import RuntimeConfigurationError
+
+            code = "DPONE_POSTGRES_MSSQL_SOURCE_SCHEMA_AUTHORITY_EXPORT_PROFILE_UNSUPPORTED"
+            error = RuntimeConfigurationError(code)
+            setattr(error, "code", code)
+            raise error
         if partition_candidate:
             if snapshot_lease is None:
                 lifecycle = self._new_extraction_lifecycle()
@@ -144,6 +152,7 @@ class PostgresFileExportMixin(PostgresBatchedExportMixin, PostgresPartitionExpor
                 schema,
                 load_config,
                 snapshot_lease=snapshot_lease,
+                prepared_boundary=prepared_boundary,
                 relation_schema=relation_schema,
                 query_params=query_params,
                 after_copy=after_copy,
@@ -158,6 +167,7 @@ class PostgresFileExportMixin(PostgresBatchedExportMixin, PostgresPartitionExpor
         load_config,
         *,
         snapshot_lease: PostgresRepeatableReadSnapshotLease | None = None,
+        prepared_boundary: Any | None = None,
         relation_schema: list[tuple[str, str]] | tuple[tuple[str, str], ...] | None = None,
         query_params: tuple[object, ...] = (),
         after_copy: Callable[[], None] | None = None,
@@ -169,6 +179,7 @@ class PostgresFileExportMixin(PostgresBatchedExportMixin, PostgresPartitionExpor
             schema,
             load_config,
             snapshot_lease=snapshot_lease,
+            prepared_boundary=prepared_boundary,
             relation_schema=relation_schema,
             query_params=query_params,
             after_copy=after_copy,

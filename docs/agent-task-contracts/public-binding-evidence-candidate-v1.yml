@@ -1,0 +1,91 @@
+# UNBOUND TEMPLATE: no current execution grant or certification.
+# Zero counts and empty arrays below are placeholders, never measured outcomes.
+schema_version: 1
+task_id: PUBLIC-BINDING-EVIDENCE-CANDIDATE-V1
+title: Unbound public binding evidence candidate template
+goal: Template only. Bind a genuine approved public lineage before execution; zero
+  counts are unbound placeholders, not observed outcomes.
+specification: docs/feature-design-postgres-mssql-r1-v3-provider-binding-contract-v2.md
+base_commit: 3977ca2d04ca5dbcf3338d7c31faff8a1199549e
+integrator: dpone-maintainers
+acceptance_criteria:
+- All authority fields come from independently verified current public commits and
+  actual test outcomes.
+- Missing authority remains invalid; historical source reports and synthetic fixture
+  histories cannot supply it.
+- Preserve exact lineage, parent adjacency, changed-path, last-touch, protocol dependency
+  and create-only output checks.
+- The complete version4 protocol dependency tuple must be committed and bound before
+  evidence generation.
+public_contract_impact:
+  level: none
+  surfaces: []
+  migration_required: false
+owned_paths:
+- tests/test_postgres_mssql_r1_v3_binding_evidence_protocol.py
+integrator_owned_paths:
+- docs/agent-task-contracts/public-binding-evidence-candidate-v1.yml
+read_only_paths:
+- src/dpone/contracts
+- tests/support/postgres_mssql_r1_v3_binding_v2_evidence.py
+- docs/schemas/evidence/postgres-mssql-r1-v3-binding-v2-layout-4.schema.json
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- docs/agent-task-contracts/public-binding-evidence-candidate-v1.yml
+shared_file_owner: dpone-maintainers
+dependencies:
+- BINDING_V2_CONTRACT_VERSION=dpone-binding-v2-evidence-authority-2
+- BINDING_V2_PHASE=green
+- BINDING_V2_APPROVED_SPECIFICATION_COMMIT=UNBOUND_REQUIRES_GENUINE_PUBLIC_EVIDENCE
+- BINDING_V2_INTEGRATION_BASE_COMMIT=3977ca2d04ca5dbcf3338d7c31faff8a1199549e
+- BINDING_V2_RED_TASK_CONTRACT_COMMIT=UNBOUND_REQUIRES_GENUINE_PUBLIC_EVIDENCE
+- BINDING_V2_RED_TEST_AUTHORITY_COMMIT=UNBOUND_REQUIRES_GENUINE_PUBLIC_EVIDENCE
+- BINDING_V2_EVIDENCE_PROTOCOL_COMMIT=UNBOUND_REQUIRES_GENUINE_PUBLIC_EVIDENCE
+- BINDING_V2_CASE_REGISTRY_SHA256=UNBOUND_REQUIRES_GENUINE_PUBLIC_EVIDENCE
+- BINDING_V2_CASE_COUNT=0
+- BINDING_V2_INCLUDED_PHASE_PAIR_COUNT=0
+- BINDING_V2_EXCLUDED_PHASE_PAIR_COUNT=0
+- BINDING_V2_ORDERED_NODEIDS_SHA256=UNBOUND_REQUIRES_GENUINE_PUBLIC_EVIDENCE
+- BINDING_V2_COLLECTED_NODE_COUNT=0
+- BINDING_V2_EXPECTED_RED_OUTCOME_COUNTS={"passed":0,"failed":0,"skipped":0,"xfailed":0,"xpassed":0,"errors":0}
+- BINDING_V2_EXPECTED_RED_FAILING_NODEIDS=[]
+- BINDING_V2_EXPECTED_RED_DIAGNOSTIC_CLASSES=[]
+- BINDING_V2_BEHAVIORAL_HARNESS_TREE_SHA256=UNBOUND_REQUIRES_GENUINE_PUBLIC_EVIDENCE
+- BINDING_V2_EVIDENCE_PROTOCOL_TREE_SHA256=UNBOUND_REQUIRES_GENUINE_PUBLIC_EVIDENCE
+- BINDING_V2_FOCUSED_PYTEST_ARGS=[]
+- BINDING_V2_DETERMINISTIC_RED_PIN_COMMIT=UNBOUND_REQUIRES_GENUINE_PUBLIC_EVIDENCE
+- BINDING_V2_RED_EVIDENCE_COMMIT=UNBOUND_REQUIRES_GENUINE_PUBLIC_EVIDENCE
+- BINDING_V2_RED_EVIDENCE_ARTIFACT_SHA256=UNBOUND_REQUIRES_GENUINE_PUBLIC_EVIDENCE
+- BINDING_V2_PRODUCTION_PATH_TUPLE=[]
+required_checks:
+  focused:
+  - uv run pytest tests/test_postgres_mssql_r1_v3_binding_evidence_protocol.py tests/test_binding_evidence_synthetic_fixtures_v1.py
+    -q
+  broad:
+  - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
+  live: []
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Any authority field remains unbound.
+- A proposed field is synthetic or copied from historical private evidence.
+- Required edit falls outside owned_paths.
+- Current approved public lineage does not satisfy the producer.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.

@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/evidence/postgres-mssql-r1-v3-provider-attestation-v2.schema.json",
+  "title": "PostgreSQL to MSSQL R1 V3 Provider Attestation V2 evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "evidence_kind",
+    "exact_commit",
+    "parent_commit",
+    "generated_at",
+    "specification_path",
+    "specification_sha256",
+    "specification_status",
+    "specification_approval_commit",
+    "evidence_specification_path",
+    "evidence_specification_sha256",
+    "evidence_specification_status",
+    "evidence_specification_approval_commit",
+    "red_task_contract_path",
+    "red_task_authority_commit",
+    "red_task_authority_sha256",
+    "red_assets_commit",
+    "red_task_measurement_commit",
+    "red_task_measurement_sha256",
+    "evidence_task_contract_path",
+    "evidence_task_contract_commit",
+    "evidence_task_contract_sha256",
+    "evidence_protocol_red_commit",
+    "evidence_protocol_commit",
+    "schema_sha256",
+    "case_registry_sha256",
+    "producer_commit",
+    "producer_sha256",
+    "evidence_meta_test_sha256",
+    "evidence_protocol_tree_sha256",
+    "test_tree_sha256",
+    "ordered_nodeids",
+    "partition_node_counts",
+    "node_count",
+    "outcome_counts",
+    "failing_nodeids",
+    "diagnostics_by_nodeid",
+    "case_results",
+    "executed_case_ids_sha256",
+    "case_count",
+    "implementation_status",
+    "certification_status",
+    "activation_status",
+    "live_gate_status",
+    "live_behavior_status",
+    "architecture_metrics",
+    "architecture_subject_commit",
+    "architecture_normalized_output",
+    "architecture_normalized_output_sha256"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "dpone-postgres-mssql-r1-v3-provider-attestation-v2-evidence-1"
+    },
+    "evidence_kind": {
+      "enum": ["red", "green"]
+    },
+    "exact_commit": { "$ref": "#/$defs/git_sha" },
+    "parent_commit": { "$ref": "#/$defs/git_sha" },
+    "generated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "specification_path": {
+      "const": "docs/feature-design-postgres-mssql-r1-v3-provider-attestation-foundation-v2.md"
+    },
+    "specification_sha256": { "$ref": "#/$defs/sha256" },
+    "specification_status": { "const": "approved" },
+    "specification_approval_commit": { "$ref": "#/$defs/git_sha" },
+    "evidence_specification_path": {
+      "const": "docs/feature-design-postgres-mssql-r1-v3-provider-attestation-evidence-v1.md"
+    },
+    "evidence_specification_sha256": { "$ref": "#/$defs/sha256" },
+    "evidence_specification_status": { "const": "approved" },
+    "evidence_specification_approval_commit": { "$ref": "#/$defs/git_sha" },
+    "red_task_contract_path": {
+      "const": "docs/agent-task-contracts/postgres-mssql-r1-v3-provider-attestation-v2-red.yml"
+    },
+    "red_task_authority_commit": { "$ref": "#/$defs/git_sha" },
+    "red_task_authority_sha256": { "$ref": "#/$defs/sha256" },
+    "red_assets_commit": { "$ref": "#/$defs/git_sha" },
+    "red_task_measurement_commit": { "$ref": "#/$defs/git_sha" },
+    "red_task_measurement_sha256": { "$ref": "#/$defs/sha256" },
+    "evidence_task_contract_path": {
+      "const": "docs/agent-task-contracts/postgres-mssql-r1-v3-provider-attestation-v2-evidence.yml"
+    },
+    "evidence_task_contract_commit": { "$ref": "#/$defs/git_sha" },
+    "evidence_task_contract_sha256": { "$ref": "#/$defs/sha256" },
+    "evidence_protocol_red_commit": { "$ref": "#/$defs/git_sha" },
+    "evidence_protocol_commit": { "$ref": "#/$defs/git_sha" },
+    "schema_sha256": { "$ref": "#/$defs/sha256" },
+    "case_registry_sha256": { "$ref": "#/$defs/sha256" },
+    "producer_commit": { "$ref": "#/$defs/git_sha" },
+    "producer_sha256": { "$ref": "#/$defs/sha256" },
+    "evidence_meta_test_sha256": { "$ref": "#/$defs/sha256" },
+    "evidence_protocol_tree_sha256": { "$ref": "#/$defs/sha256" },
+    "test_tree_sha256": { "$ref": "#/$defs/sha256" },
+    "ordered_nodeids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "partition_node_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonical_abi",
+        "query_arms",
+        "stable_schema",
+        "stable_catalog",
+        "mutation_bounds_compatibility"
+      ],
+      "properties": {
+        "canonical_abi": { "$ref": "#/$defs/count" },
+        "query_arms": { "$ref": "#/$defs/count" },
+        "stable_schema": { "$ref": "#/$defs/count" },
+        "stable_catalog": { "$ref": "#/$defs/count" },
+        "mutation_bounds_compatibility": { "$ref": "#/$defs/count" }
+      }
+    },
+    "node_count": { "$ref": "#/$defs/count" },
+    "outcome_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "failed", "skipped", "errors", "total"],
+      "properties": {
+        "passed": { "$ref": "#/$defs/count" },
+        "failed": { "$ref": "#/$defs/count" },
+        "skipped": { "$ref": "#/$defs/count" },
+        "errors": { "$ref": "#/$defs/count" },
+        "total": { "$ref": "#/$defs/count" }
+      }
+    },
+    "failing_nodeids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "diagnostics_by_nodeid": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "case_results": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "nodeid",
+          "pytest_outcome",
+          "observed_behavior",
+          "reason",
+          "diagnostic_class"
+        ],
+        "properties": {
+          "case_id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)*$" },
+          "nodeid": { "type": "string", "minLength": 1 },
+          "pytest_outcome": { "enum": ["pass", "fail"] },
+          "observed_behavior": { "enum": ["accept", "reject", "not_observed"] },
+          "reason": {
+            "type": ["string", "null"],
+            "enum": [
+              null,
+              "attestation_domain_invalid",
+              "attestation_bounds_exceeded",
+              "attestation_registry_mismatch",
+              "attestation_result_arm_mismatch",
+              "attestation_projection_mismatch",
+              "attestation_authority_splice",
+              "attestation_schema_inventory_mismatch",
+              "attestation_permission_closure_mismatch",
+              "attestation_certificate_mismatch",
+              "attestation_binding_inventory_mismatch",
+              "attestation_target_identity_mismatch"
+            ]
+          },
+          "diagnostic_class": {
+            "type": ["string", "null"],
+            "enum": [null, "missing_behavior"]
+          }
+        }
+      }
+    },
+    "executed_case_ids_sha256": { "$ref": "#/$defs/sha256" },
+    "case_count": { "$ref": "#/$defs/count" },
+    "implementation_status": { "enum": ["absent", "implemented"] },
+    "certification_status": { "enum": ["unverified", "local_pass"] },
+    "activation_status": { "const": "blocked" },
+    "live_gate_status": { "const": "n_a" },
+    "live_behavior_status": { "const": "unverified" },
+    "architecture_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_exit",
+        "avg_clustering",
+        "cross_layer_ratio",
+        "max_module_ce",
+        "class_finding_count",
+        "issue_count"
+      ],
+      "properties": {
+        "raw_exit": { "$ref": "#/$defs/count" },
+        "avg_clustering": { "type": "number" },
+        "cross_layer_ratio": { "type": "number" },
+        "max_module_ce": { "$ref": "#/$defs/count" },
+        "class_finding_count": { "$ref": "#/$defs/count" },
+        "issue_count": { "$ref": "#/$defs/count" }
+      }
+    },
+    "architecture_subject_commit": { "$ref": "#/$defs/git_sha" },
+    "architecture_normalized_output": { "type": "string", "minLength": 2 },
+    "architecture_normalized_output_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "git_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

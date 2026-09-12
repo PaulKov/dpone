@@ -38,6 +38,10 @@ from dpone.commands.plan_native_render import (
     render_snapshot_optimization_md,
     render_snapshot_optimization_text,
 )
+from dpone.commands.plan_postgres_mssql_render import (
+    render_postgres_mssql_correctness_md,
+    render_postgres_mssql_correctness_text,
+)
 from dpone.readiness.managed import ExecutionPlanService
 
 
@@ -71,6 +75,7 @@ def _render_text(payload: dict) -> str:
     lines.extend(_render_native_execution_text(payload.get("native_transfer_execution") or {}))
     lines.extend(_render_native_transport_text(payload.get("native_transfer_transport") or {}))
     lines.extend(_render_native_route_decision_text(payload.get("native_transfer_route_decision") or {}))
+    lines.extend(render_postgres_mssql_correctness_text(payload.get("postgres_mssql_correctness") or {}))
     lines.extend(render_columnar_fast_path_text(payload.get("columnar_fast_path") or {}))
     lines.extend(render_native_bulk_wire_text(payload.get("native_transfer_bulk_wire") or {}))
     lines.extend(render_snapshot_optimization_text(payload.get("native_transfer_snapshot_optimization") or {}))
@@ -143,6 +148,10 @@ def _render_md(payload: dict) -> str:
     if route_decision:
         lines.extend(["", "## Native transfer route decision", ""])
         lines.extend(_render_native_route_decision_md(route_decision))
+    correctness = payload.get("postgres_mssql_correctness") or {}
+    if correctness:
+        lines.extend(["", "## PostgreSQL to MSSQL correctness", ""])
+        lines.extend(render_postgres_mssql_correctness_md(correctness))
     columnar_fast_path = payload.get("columnar_fast_path") or {}
     if columnar_fast_path:
         lines.extend(["", "## Columnar fast path", ""])
@@ -336,8 +345,10 @@ def _render_source_impact_md(items: list[dict]) -> list[str]:
 
 
 def cmd_plan(args: argparse.Namespace, *, ctx: object, logger: logging.Logger) -> int:
-    del ctx, logger
-    payload = ExecutionPlanService().plan_manifest(
+    del logger
+    resolver_factory = getattr(ctx, "build_postgres_mssql_correctness_route_resolver", None)
+    correctness = resolver_factory() if callable(resolver_factory) else None
+    payload = ExecutionPlanService(postgres_mssql_correctness=correctness).plan_manifest(
         args.path,
         selector=args.selector,
         apply_safe_schema=bool(args.apply_safe_schema),
@@ -349,7 +360,8 @@ def cmd_plan(args: argparse.Namespace, *, ctx: object, logger: logging.Logger) -
         write_text(_render_md(payload))
     else:
         write_text(_render_text(payload))
-    return 0
+    correctness_decision = payload.get("postgres_mssql_correctness") or {}
+    return 1 if correctness_decision.get("selected") is True and correctness_decision.get("blockers") else 0
 
 
 def register_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:

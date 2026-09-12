@@ -1,0 +1,532 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dpone.dev/schemas/evidence/postgres-mssql-r1-v3-binding-v2-layout-4.schema.json",
+  "title": "PostgreSQL to MSSQL R1 V3 Binding V2 evidence, internal layout 3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_kind",
+    "producer_contract_version",
+    "phase",
+    "subject_commit",
+    "task_authority_path",
+    "task_authority_sha256",
+    "approved_specification_commit",
+    "integration_base_commit",
+    "red_task_contract_commit",
+    "red_test_authority_commit",
+    "evidence_protocol_commit",
+    "deterministic_red_pin_commit",
+    "red_evidence_commit",
+    "green_task_contract_commit",
+    "implementation_commit",
+    "final_evidence_commit",
+    "producer_sha256",
+    "schema_sha256",
+    "registry_sha256",
+    "ordered_nodeids_sha256",
+    "behavioral_harness_tree_sha256",
+    "evidence_protocol_tree_sha256",
+    "input_vector_sha256",
+    "collection_probe",
+    "behavior_probe",
+    "case_results",
+    "behavioral_status",
+    "certification_status",
+    "adapter_layer",
+    "red_evidence_artifact_sha256",
+    "production_path_tuple"
+  ],
+  "properties": {
+    "record_kind": {
+      "const": "binding_contract_evidence"
+    },
+    "producer_contract_version": {
+      "const": "dpone-postgres-mssql-r1-v3-binding-v2-evidence-4"
+    },
+    "phase": {
+      "enum": [
+        "red",
+        "candidate"
+      ]
+    },
+    "subject_commit": {
+      "$ref": "#/$defs/git_sha"
+    },
+    "task_authority_path": {
+      "enum": [
+        "docs/agent-task-contracts/public-binding-evidence-red-v1.yml",
+        "docs/agent-task-contracts/public-binding-evidence-candidate-v1.yml"
+      ]
+    },
+    "task_authority_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "approved_specification_commit": {
+      "$ref": "#/$defs/git_sha"
+    },
+    "integration_base_commit": {
+      "const": "3977ca2d04ca5dbcf3338d7c31faff8a1199549e"
+    },
+    "red_task_contract_commit": {
+      "$ref": "#/$defs/git_sha"
+    },
+    "red_test_authority_commit": {
+      "$ref": "#/$defs/git_sha"
+    },
+    "evidence_protocol_commit": {
+      "$ref": "#/$defs/git_sha"
+    },
+    "deterministic_red_pin_commit": {
+      "$ref": "#/$defs/git_sha"
+    },
+    "red_evidence_commit": {
+      "$ref": "#/$defs/nullable_git_sha"
+    },
+    "green_task_contract_commit": {
+      "$ref": "#/$defs/nullable_git_sha"
+    },
+    "implementation_commit": {
+      "$ref": "#/$defs/nullable_git_sha"
+    },
+    "final_evidence_commit": {
+      "type": "null"
+    },
+    "producer_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "schema_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "registry_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "ordered_nodeids_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "behavioral_harness_tree_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evidence_protocol_tree_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "input_vector_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "collection_probe": {
+      "$ref": "#/$defs/probe"
+    },
+    "behavior_probe": {
+      "$ref": "#/$defs/probe"
+    },
+    "case_results": {
+      "type": "array",
+      "minItems": 246,
+      "maxItems": 246,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/case_result"
+      }
+    },
+    "behavioral_status": {
+      "enum": [
+        "RED",
+        "PASS"
+      ]
+    },
+    "certification_status": {
+      "const": "UNVERIFIED"
+    },
+    "adapter_layer": {
+      "enum": [
+        "pure",
+        "mocked",
+        "vendor_live"
+      ]
+    },
+    "red_evidence_artifact_sha256": {
+      "$ref": "#/$defs/nullable_sha256"
+    },
+    "production_path_tuple": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "src/dpone/contracts/mssql_r1_v3_binding_modules.py"
+            },
+            {
+              "const": "src/dpone/contracts/mssql_r1_v3_binding_permissions.py"
+            },
+            {
+              "const": "src/dpone/contracts/mssql_r1_v3_binding_pack.py"
+            },
+            {
+              "const": "src/dpone/contracts/mssql_r1_v3_binding_validation.py"
+            }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "phase": {
+            "const": "red"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "task_authority_path": {
+            "const": "docs/agent-task-contracts/public-binding-evidence-red-v1.yml"
+          },
+          "red_evidence_commit": {
+            "type": "null"
+          },
+          "green_task_contract_commit": {
+            "type": "null"
+          },
+          "implementation_commit": {
+            "type": "null"
+          },
+          "red_evidence_artifact_sha256": {
+            "type": "null"
+          },
+          "production_path_tuple": {
+            "type": "null"
+          },
+          "behavioral_status": {
+            "const": "RED"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "task_authority_path": {
+            "const": "docs/agent-task-contracts/public-binding-evidence-candidate-v1.yml"
+          },
+          "red_evidence_commit": {
+            "$ref": "#/$defs/git_sha"
+          },
+          "green_task_contract_commit": {
+            "$ref": "#/$defs/git_sha"
+          },
+          "implementation_commit": {
+            "$ref": "#/$defs/git_sha"
+          },
+          "red_evidence_artifact_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "production_path_tuple": {
+            "type": "array"
+          },
+          "behavioral_status": {
+            "const": "PASS"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "git_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullable_git_sha": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/git_sha"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullable_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pytest_args": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "outcome_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "passed",
+        "failed",
+        "skipped",
+        "xfailed",
+        "xpassed",
+        "errors"
+      ],
+      "properties": {
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "xfailed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "xpassed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeid",
+        "phase",
+        "outcome",
+        "diagnostic_class"
+      ],
+      "properties": {
+        "nodeid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase": {
+          "enum": [
+            "setup",
+            "call",
+            "teardown"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "passed",
+            "failed",
+            "skipped",
+            "xfailed",
+            "xpassed"
+          ]
+        },
+        "diagnostic_class": {
+          "enum": [
+            "none",
+            "assertion_failure",
+            "unexpected_exception"
+          ]
+        }
+      }
+    },
+    "semantic_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "nodeid",
+        "observed_class"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nodeid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_class": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "sha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "input_vector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeid",
+        "inputs"
+      ],
+      "properties": {
+        "nodeid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/input"
+          }
+        }
+      }
+    },
+    "import_origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_name",
+        "checkout_relative_path"
+      ],
+      "properties": {
+        "module_name": {
+          "type": "string",
+          "pattern": "^dpone(?:\\.|$)"
+        },
+        "checkout_relative_path": {
+          "type": "string",
+          "pattern": "^(src|packages)/"
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probe_kind",
+        "pytest_args",
+        "exit_code",
+        "ordered_nodeids",
+        "reports",
+        "semantic_observations",
+        "input_vectors",
+        "outcome_counts",
+        "import_origins"
+      ],
+      "properties": {
+        "probe_kind": {
+          "enum": [
+            "collection",
+            "behavior"
+          ]
+        },
+        "pytest_args": {
+          "$ref": "#/$defs/pytest_args"
+        },
+        "exit_code": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ordered_nodeids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/report"
+          }
+        },
+        "semantic_observations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/semantic_observation"
+          }
+        },
+        "input_vectors": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/input_vector"
+          }
+        },
+        "outcome_counts": {
+          "$ref": "#/$defs/outcome_counts"
+        },
+        "import_origins": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/import_origin"
+          }
+        }
+      }
+    },
+    "case_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "nodeid",
+        "status",
+        "observed_class"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nodeid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "observed_class": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

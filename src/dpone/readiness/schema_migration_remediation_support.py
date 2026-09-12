@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dpone.readiness.migration_control import MigrationPack
+if TYPE_CHECKING:
+    from dpone.readiness.migration_control import MigrationPack
 
 REMEDIATION_PLAN_SCHEMA = "dpone.schema_migration_remediation_plan.v1"
 REMEDIATION_RUN_SCHEMA = "dpone.schema_migration_remediation_run.v1"

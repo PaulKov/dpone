@@ -4,27 +4,62 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
+from dpone.config.load_config import ROUTE_IDENTITY_V1_ENDPOINT_TYPES_OPTION
+from dpone.config.load_strategy import LoadStrategy
 from dpone.config.reconciliation import reconciliation_policy_from_options
 from dpone.contracts.api_sources import get_api_source_defaults
 from dpone.contracts.incremental_snapshot import KeySnapshotReconciliationPolicy
 from dpone.contracts.mssql_object_name import MSSQLObjectName
 from dpone.contracts.sink_dialect import is_mssql_dialect
 from dpone.dag.errors import DagConfigurationError
+from dpone.dag.parse_trace import (
+    LoadConfigParseTracer,
+    record_load_fields,
+    record_runtime_contract_fields,
+)
 
 
-class LoadConfigParseTracer(Protocol):
-    def record(
-        self,
-        *,
-        kind: str,
-        target: str,
-        value: object,
-        sources: tuple[str, ...],
-        operation: str,
-        details: dict[str, object] | None = None,
-    ) -> None: ...
+def inject_endpoint_identity_options(
+    options: dict[str, Any],
+    source_type: object,
+    sink_type: object,
+    canonical_source_type: str,
+    canonical_sink_type: str,
+) -> None:
+    """Install canonical runtime types and the minimal legacy identity projection."""
+
+    authored_source = str(source_type)
+    authored_sink = str(sink_type)
+    options.pop(ROUTE_IDENTITY_V1_ENDPOINT_TYPES_OPTION, None)
+    options["source_type"] = canonical_source_type
+    options["sink_type"] = canonical_sink_type
+    if authored_source != canonical_source_type or authored_sink != canonical_sink_type:
+        options[ROUTE_IDENTITY_V1_ENDPOINT_TYPES_OPTION] = {
+            "source_type": authored_source,
+            "sink_type": authored_sink,
+        }
+
+
+def resolve_partition_contract(
+    *,
+    strategy_config: Mapping[str, Any],
+    source_options: Mapping[str, Any],
+    load_strategy: LoadStrategy,
+) -> Any:
+    """Materialize the partition authority selected by ``strategy.mode: auto``."""
+
+    authored = strategy_config.get("partition")
+    if authored is not None:
+        return authored
+    requested = str(strategy_config.get("mode") or LoadStrategy.FULL_REFRESH.value).strip().lower()
+    column = source_options.get("partition_column")
+    if requested == "auto" and load_strategy is LoadStrategy.PARTITION_REPLACE and isinstance(column, str):
+        normalized = column.strip()
+        if normalized:
+            return {"column": normalized, "values_from_staging": True}
+    return {}
 
 
 def derive_api_source(
@@ -58,58 +93,6 @@ def derive_api_source(
             details={"source_type": "api", "resource": resource},
         )
     return source_schema, source_table
-
-
-def record_load_fields(
-    *,
-    parse_tracer: LoadConfigParseTracer,
-    source_options: dict[str, Any],
-    sink_options: dict[str, Any],
-    strategy_cfg: dict[str, Any],
-    sink_custom_predicate: Any,
-) -> None:
-    parse_tracer.record(
-        kind="load_config.field",
-        target="load_config.unique_key",
-        value=source_options.get("unique_key"),
-        sources=("source.options.unique_key",),
-        operation="copy" if "unique_key" in source_options else "default",
-    )
-    parse_tracer.record(
-        kind="load_config.field",
-        target="load_config.custom_predicate",
-        value=sink_custom_predicate,
-        sources=("sink.strategy.custom_predicate",),
-        operation="copy" if "custom_predicate" in strategy_cfg else "default",
-    )
-    parse_tracer.record(
-        kind="load_config.field",
-        target="load_config.batch_size",
-        value=source_options.get("batch_size", 10000),
-        sources=("source.options.batch_size",),
-        operation="default" if "batch_size" not in source_options else "copy",
-    )
-    parse_tracer.record(
-        kind="load_config.field",
-        target="load_config.log_sample_rows",
-        value=sink_options.get("log_sample_rows", 5),
-        sources=("sink.options.log_sample_rows",),
-        operation="default" if "log_sample_rows" not in sink_options else "copy",
-    )
-    parse_tracer.record(
-        kind="load_config.field",
-        target="load_config.export_format",
-        value=source_options.get("export_format", "csv"),
-        sources=("source.options.export_format",),
-        operation="default" if "export_format" not in source_options else "copy",
-    )
-    parse_tracer.record(
-        kind="load_config.field",
-        target="load_config.compress_export",
-        value=source_options.get("compress_export", False),
-        sources=("source.options.compress_export",),
-        operation="default" if "compress_export" not in source_options else "copy",
-    )
 
 
 def resolve_batch_size(
@@ -259,33 +242,6 @@ def inject_runtime_contract_options(
     return reconciliation_policy_from_options(reconciliation_options) if reconciliation_options is not None else None
 
 
-def record_runtime_contract_fields(
-    *,
-    config: Mapping[str, Any],
-    reconciliation: bool,
-    tech_schema: Any,
-    parse_tracer: LoadConfigParseTracer | None,
-) -> None:
-    """Record canonical top-level contract fields at their parse boundary."""
-
-    if not parse_tracer:
-        return
-    parse_tracer.record(
-        kind="load_config.field",
-        target="load_config.reconciliation",
-        value=reconciliation,
-        sources=("reconciliation",),
-        operation="default" if "reconciliation" not in config else "copy",
-    )
-    parse_tracer.record(
-        kind="load_config.field",
-        target="load_config.tech_schema",
-        value=tech_schema,
-        sources=("tech_schema",),
-        operation="default" if "tech_schema" not in config else "copy",
-    )
-
-
 def normalize_mssql_schema_label(
     *,
     dialect: object,
@@ -372,6 +328,9 @@ def _unique_key_fingerprint(value: object) -> tuple[str, ...]:
 
 
 __all__ = [
+    "LoadConfigParseTracer",
+    "inject_endpoint_identity_options",
+    "resolve_partition_contract",
     "derive_api_source",
     "inject_manifest_context_options",
     "inject_runtime_contract_options",

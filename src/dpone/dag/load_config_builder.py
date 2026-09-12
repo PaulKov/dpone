@@ -22,21 +22,20 @@ from dpone.dag.errors import DagConfigurationError
 from dpone.dag.export_format_validation import validate_export_format_for_sink
 from dpone.dag.load_config_builder_support import (
     derive_api_source,
+    inject_endpoint_identity_options,
     inject_manifest_context_options,
     inject_runtime_contract_options,
     is_mssql,
     merge_load_options,
     normalize_mssql_schema_label,
     optional_text,
-    record_load_fields,
-    record_runtime_contract_fields,
     resolve_batch_size,
     resolve_connection_identity,
+    resolve_partition_contract,
     resolve_unique_key,
 )
-from dpone.dag.load_config_endpoint_identity import inject_endpoint_identity_options
-from dpone.dag.load_config_partition_contract import resolve_partition_contract
 from dpone.dag.load_config_scope import resolve_load_scopes
+from dpone.dag.parse_trace import record_load_fields, record_runtime_contract_fields
 from dpone.strategy_intelligence.compiler import StrategyAutoCompiler
 
 if TYPE_CHECKING:  # pragma: no cover

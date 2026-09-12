@@ -66,6 +66,23 @@ These rules are intentionally pragmatic:
 - they protect the most valuable boundaries now;
 - they still allow some transitional dependencies while refactoring continues.
 
+## Readiness package initialization
+
+`dpone.readiness` resolves public helpers and compatibility module attributes on
+first access through the existing lazy-export mechanism. Importing a diagnostic
+leaf such as `dpone.readiness.python_import_health` does not initialize managed
+planning or route evaluation. Doctor keeps its existing probe deadlines.
+
+Import helpers normally, for example `from dpone.readiness import CDCConfig`.
+The exported object, defining module, pickle identity and static type remain
+unchanged. Explicit `TYPE_CHECKING` re-exports preserve editor and type-checker
+support. First-use import errors propagate normally and can be retried; failed
+imports are not cached as successful exports.
+
+When changing this facade, run `tests/test_readiness_package_import.py` and the
+Doctor import integration/startup-control tests. Check fresh-process isolation,
+export order, object identity, static types and concurrent first access.
+
 ## How to run the checks
 
 ### Pytest

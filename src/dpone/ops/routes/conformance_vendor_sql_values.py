@@ -6,9 +6,10 @@ import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dpone.ops.routes.conformance_models import RouteConformanceColumn
+if TYPE_CHECKING:
+    from dpone.ops.routes.conformance_models import RouteConformanceColumn
 
 
 def executemany_insert(

@@ -1,0 +1,119 @@
+# Historical task requirements: postgres-mssql-r1-v3-physical-descriptor-contract-v1
+
+**Archived historical execution record — not a current task grant.** The complete original YAML and its source identities remain in private provenance. Every requirement below belongs to that original record. Recorded APPROVED/PASS/FAIL states do not authorize a new execution or certify a current source. A current task needs a separately reviewed, genuinely bound authority chain.
+
+- Recorded requirement **schema_version**: 1
+- Recorded requirement **task_id**: DPONE-POSTGRES-MSSQL-R1-V3-PHYSICAL-DESCRIPTOR-CONTRACT-V1
+- Recorded requirement **title**: Implement the SQL-free MSSQL R1 physical descriptor algebra
+- Recorded requirement **goal**: Provide strict immutable models for a complete 19-table, 29-procedure and six-binding-module schema-2 physical descriptor without rendering or installing SQL.
+- Recorded requirement **specification**: docs/feature-design-postgres-mssql-r1-v3-physical-descriptor-contract-v1.md
+- Historical authority/requirement record **base_commit**: source record 042
+- Recorded requirement **integrator**: Codex
+- Recorded requirement **acceptance_criteria / entry 1**: The aggregate descriptor accepts only version dpone-mssql-r1-v3-physical-schema-2, the exact two managed schemas, 19 ordered physical table wrappers, 29 ordered shared-procedure wrappers, six ordered binding-module kinds and a nonempty canonical migration-probe set.
+- Recorded requirement **acceptance_criteria / entry 2**: Physical wrappers reuse MssqlR1PortableSchemaObjectV3 and MssqlR1SchemaContractV3 as the sole column, constraint, index, trigger, property, parameter, result, permission, codec and shared-signer authority; no second portable schema model is introduced.
+- Recorded requirement **acceptance_criteria / entry 3**: All physical-only leaves use exact types and reject raw enum strings, bool/int substitution, missing digests, unknown/trailing canonical fields, case-fold coordinate collisions and invalid physical bounds.
+- Recorded requirement **acceptance_criteria / entry 4**: Table descriptors add only definition bytes/digest, lifecycle, mutation policy and lock coordinate to the exact portable table object.
+- Recorded requirement **acceptance_criteria / entry 5**: Procedure and binding-module descriptors add only definition bytes/digest, projection grammar, read/write resources, ordered lock plan, transition, replay comparator, derived execute principals, binding-only signer and stable errors to the exact portable module authority.
+- Recorded requirement **acceptance_criteria / entry 6**: Every non-scan shared procedure uses exactly_one fixed result cardinality with the exact five-column prefix; dpone_scan_stage_v3 alone uses zero_or_many stage_scan_template. No-result, zero-or-one, fixed zero-or-many, output parameters and extra result sets are rejected.
+- Recorded requirement **acceptance_criteria / entry 7**: Environment principals are exactly provisioner/runtime/loader/observer; execute sets are derived and equal the parent 6/25/0/8 matrix. Shared signers remain the schema-2 attestor/stage_owner mapping; binding_scoped is a distinct binding-module signer only.
+- Recorded requirement **acceptance_criteria / entry 8**: Definition validation proves canonical bytes and digest binding only: module definitions use module_definition_digest and table DDL uses the approved table-DDL domain hash. SQL semantic reproduction remains outside this task.
+- Recorded requirement **acceptance_criteria / entry 9**: Shared procedure wrapper definition digests equal their portable module_definition_digest; a coherent independently valid mismatch is rejected.
+- Recorded requirement **acceptance_criteria / entry 10**: Every resource/access/lock/transition/replay/migration reference resolves to a canonical resource declaration. The closed resource-access matrix, application/row/table lock shape, global rank/subrank/phase, singleton/set selectors and acquire/assert-held semantics reject widening or unbound coordinates.
+- Recorded requirement **acceptance_criteria / entry 11**: Request authority binds an exact schema-2 supported codec: shared procedures use request_payload/request_digest/projection_json INPUT parameters and a closed request-json grammar; binding templates use a sealed request-digest reference; every remaining scalar input has an exact typed value-source binding.
+- Recorded requirement **acceptance_criteria / entry 12**: Fixed results bind nonempty outcome variants and ordinal-canonical nullable-column shapes. Transition applicability and replay policies have exact matching outcome/path coverage under authority-specific path rules, and every admitted outcome/path has an explicit all/any replay-proof formula over typed coordinate/literal/existence comparisons.
+- Recorded requirement **acceptance_criteria / entry 13**: Execution semantics represent ordered multi-resource transitions with an exact create/cas/append state-change matrix and executable revision equations binding exact owner/current/expected/requested-candidate/committed-candidate coordinates; empty transitions and complete allowed execution-path sets are closed per self_contained/read_only/binding-only caller_uow authority. Every binding template uses caller_uow and no shared procedure may use it. Binding mutate/hash templates require writes, while batch/xmin quality templates require empty writes and nonempty reads.
+- Recorded requirement **acceptance_criteria / entry 14**: Resource/request/result/parameter/session fields carry exact scalar kind, value cardinality and nullability. UUID/UTC literals reuse exact canonical parsers; adjacent and ordered-set comparison semantics are closed. Instance selectors match typed key fields and cover one/zero-or-one/one-or-more/exact-request-set boundaries.
+- Recorded requirement **acceptance_criteria / entry 15**: Fresh coherent proof is anchored by row_exists/row_absent for its exact declared resource and complete instance key under a byte-identical lock selector; field comparisons are supplemental. Descendant proof requires exact receipt row_exists, and row_absent can never satisfy it.
+- Recorded requirement **acceptance_criteria / entry 16**: Every resource-bearing replay operand requires an exact ordered_read_set READ edge whose declaration permits READ; deletion or resource substitution fails validation.
+- Recorded requirement **acceptance_criteria / entry 17**: All comparisons inside one replay clause are conjunctive in tuple order. Every nullable coordinate participating in equal/not_equal has a byte-identical is_not_null guard in that clause, so SQL three-valued logic is never implicit replay authority.
+- Recorded requirement **acceptance_criteria / entry 18**: Migration probes use closed observation/disposition variants, require a decision before any mutation and can represent install/replay/coexist/block. Exact parent-matrix probe coverage remains the concrete descriptor task.
+- Recorded requirement **acceptance_criteria / entry 19**: The error-number union is exactly 51001 through 51012 and every physical condition has a closed outcome/retry/probe/redaction classification.
+- Recorded requirement **acceptance_criteria / entry 20**: Canonical decode reruns all validation and requires byte-identical re-encoding.
+- Recorded requirement **acceptance_criteria / entry 21**: A full synthetic 19/29/6 fixture round-trips. An explicit mutation registry covers every dataclass field, enum/union branch, reference, identity order and case-fold collision; each mutation fails stably or changes the aggregate digest.
+- Recorded requirement **acceptance_criteria / entry 22**: Source-sensitive coordinate validation is aggregate-aware: session_binding resolves only to a declared non-null scalar session field; predecessor/candidate resource fields resolve to the exact transition owner and are rejected without one.
+- Recorded requirement **acceptance_criteria / entry 23**: Every invalid aggregate construction path raises MssqlR1V3ContractError; undeclared lock resources and malformed revision candidates cannot leak KeyError, AttributeError or other raw implementation exceptions.
+- Recorded requirement **acceptance_criteria / entry 24**: Imports name canonical defining modules directly. Pass-through re-exports, wildcard-derived __all__ values and noqa:F401 re-export tunnels are forbidden; every module exports only its owned symbols.
+- Recorded requirement **acceptance_criteria / entry 25**: Every new production module remains at or below the module-size warning threshold so the exact baseline check introduces no unbaselined warning debt.
+- Recorded requirement **acceptance_criteria / entry 26**: Architecture fitness is measured repository-wide and its hard-limit failure remains visible. ADR 0057 permits only this activation-blocked descriptor candidate at avg_clustering <=0.18963409316899685; cross-layer ratio must remain <=0.3050300945829751, descriptor-subgraph Ce <=11, repository max module Ce <=24, class findings absent, and no metric-only facade/re-export/duplicate validation is allowed. Production promotion remains blocked until remediation removes the exception.
+- Recorded requirement **acceptance_criteria / entry 27**: No concrete production descriptor data, SQL text renderer, pyodbc/catalog I/O, port, adapter, runtime, manifest, CLI or activation change is introduced.
+- Recorded requirement **public_contract_impact / level**: none
+- Recorded requirement **public_contract_impact / surfaces / entry 1**: Internal unreleased R1 V3 physical descriptor contracts
+- Recorded requirement **public_contract_impact / migration_required**: false
+- Recorded requirement **owned_paths / entry 1**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_enums.py
+- Recorded requirement **owned_paths / entry 2**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_primitives.py
+- Recorded requirement **owned_paths / entry 3**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_profiles.py
+- Recorded requirement **owned_paths / entry 4**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_definitions.py
+- Recorded requirement **owned_paths / entry 5**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_resources.py
+- Recorded requirement **owned_paths / entry 6**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_coordinates.py
+- Recorded requirement **owned_paths / entry 7**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_locks.py
+- Recorded requirement **owned_paths / entry 8**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_requests.py
+- Recorded requirement **owned_paths / entry 9**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_transitions.py
+- Recorded requirement **owned_paths / entry 10**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_replay.py
+- Recorded requirement **owned_paths / entry 11**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_errors.py
+- Recorded requirement **owned_paths / entry 12**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_relations.py
+- Recorded requirement **owned_paths / entry 13**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_execution.py
+- Recorded requirement **owned_paths / entry 14**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_execution_validation.py
+- Recorded requirement **owned_paths / entry 15**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_procedures.py
+- Recorded requirement **owned_paths / entry 16**: src/dpone/contracts/mssql_r1_v3_physical_schema_descriptor.py
+- Recorded requirement **owned_paths / entry 17**: tests/test_postgres_mssql_r1_v3_physical_descriptor_contract.py
+- Recorded requirement **integrator_owned_paths / entry 1**: docs/feature-design-postgres-mssql-r1-v3-physical-schema-v1.md
+- Recorded requirement **integrator_owned_paths / entry 2**: docs/adr/0056-mssql-same-database-target-authority-v2.md
+- Recorded requirement **integrator_owned_paths / entry 3**: src/dpone/contracts/__init__.py
+- Recorded requirement **read_only_paths / entry 1**: src/dpone/contracts/mssql_r1_v3_codec.py
+- Recorded requirement **read_only_paths / entry 2**: src/dpone/contracts/mssql_r1_v3_identity.py
+- Recorded requirement **read_only_paths / entry 3**: src/dpone/contracts/mssql_r1_v3_schema_primitives.py
+- Recorded requirement **read_only_paths / entry 4**: src/dpone/contracts/mssql_r1_v3_schema_relations.py
+- Recorded requirement **read_only_paths / entry 5**: src/dpone/contracts/mssql_r1_v3_schema_modules.py
+- Recorded requirement **read_only_paths / entry 6**: src/dpone/contracts/mssql_r1_v3_schema_attestation.py
+- Recorded requirement **read_only_paths / entry 7**: src/dpone/contracts/mssql_r1_v3_schema_security.py
+- Recorded requirement **read_only_paths / entry 8**: src/dpone/contracts/mssql_r1_v3_schema_inventory.py
+- Recorded requirement **read_only_paths / entry 9**: docs/feature-design-postgres-mssql-r1-v3-physical-descriptor-contract-v1.md
+- Recorded requirement **forbidden_paths / entry 1**: pyproject.toml
+- Recorded requirement **forbidden_paths / entry 2**: uv.lock
+- Recorded requirement **forbidden_paths / entry 3**: CHANGELOG.md
+- Recorded requirement **forbidden_paths / entry 4**: mkdocs.yml
+- Recorded requirement **forbidden_paths / entry 5**: .github/workflows
+- Recorded requirement **forbidden_paths / entry 6**: src/dpone/ports
+- Recorded requirement **forbidden_paths / entry 7**: src/dpone/adapters
+- Recorded requirement **forbidden_paths / entry 8**: src/dpone/runtime
+- Recorded requirement **forbidden_paths / entry 9**: src/dpone/app
+- Recorded requirement **forbidden_paths / entry 10**: src/dpone/commands
+- Recorded requirement **forbidden_paths / entry 11**: src/dpone/schema
+- Recorded requirement **forbidden_paths / entry 12**: src/dpone/contracts/__init__.py
+- Recorded requirement **forbidden_paths / entry 13**: docs/feature-design-postgres-mssql-r1-v3-physical-schema-v1.md
+- Recorded requirement **forbidden_paths / entry 14**: docs/adr/0056-mssql-same-database-target-authority-v2.md
+- Recorded requirement **forbidden_paths / entry 15**: tests/conftest.py
+- Recorded requirement **shared_file_owner**: Codex
+- Recorded requirement **dependencies / entry 1**: fe8ee3125
+- Recorded requirement **dependencies / entry 2**: DPONE-POSTGRES-MSSQL-R1-V3-SCHEMA-CONTRACT-V2
+- Historical requirement description **required_checks / focused / entry 1**: uv run pytest tests/test_postgres_mssql_r1_v3_physical_descriptor_contract.py -q
+- Historical requirement description **required_checks / focused / entry 2**: uv run pytest tests/test_postgres_mssql_r1_v3_schema_contract_v2.py tests/test_postgres_mssql_r1_v3_contracts.py -q
+- Historical requirement description **required_checks / broad / entry 1**: uv run ruff check src/dpone/contracts/mssql_r1_v3_physical_descriptor_*.py src/dpone/contracts/mssql_r1_v3_physical_schema_descriptor.py tests/test_postgres_mssql_r1_v3_physical_descriptor_contract.py
+- Historical requirement description **required_checks / broad / entry 2**: uv run ruff format --check src/dpone/contracts/mssql_r1_v3_physical_descriptor_*.py src/dpone/contracts/mssql_r1_v3_physical_schema_descriptor.py tests/test_postgres_mssql_r1_v3_physical_descriptor_contract.py
+- Historical requirement description **required_checks / broad / entry 3**: uv run mypy --config-file mypy.ini src/dpone/contracts/mssql_r1_v3_physical_descriptor_*.py src/dpone/contracts/mssql_r1_v3_physical_schema_descriptor.py
+- Historical requirement description **required_checks / broad / entry 4**: uv run dpone docs check-import-rules
+- Historical requirement description **required_checks / broad / entry 5**: uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json
+- Historical requirement description **required_checks / broad / entry 6**: uv run dpone docs check-architecture-fitness --format json  # expected visible FAIL above global 0.182 budget; retain artifact
+- Historical requirement description **required_checks / broad / entry 7**: uv run python -c "import json,subprocess,sys; p=subprocess.run(['dpone','docs','check-architecture-fitness','--format','json'],capture_output=True,text=True); d=json.loads(p.stdout); issues=d.get('issues',[]); visible_fail=p.returncode==1 and len(issues)==1 and (issues[0].get('severity'),issues[0].get('code'),issues[0].get('module'),issues[0].get('threshold'))==('error','avg_clustering_too_high',None,0.182); metrics=d['avg_clustering']<=0.18963409316899685 and d['cross_layer_ratio']<=0.3050300945829751 and d['max_module_ce']<=24 and not d.get('class_findings'); ok=visible_fail and metrics; print(json.dumps({'exception':'ADR-0057','global_budget':0.182,'visible_global_fail':visible_fail,'exception_ceiling':0.18963409316899685,'head':d,'exception_conformance':ok},sort_keys=True)); sys.exit(0 if ok else 1)"
+- Historical requirement description **required_checks / broad / entry 8**: uv run python -c "import json,sys; from pathlib import Path; from dpone.metrics.import_graph import collect_internal_deps; from dpone.metrics.loc import iter_py_files; package=Path('src/dpone'); deps=collect_internal_deps(package,module_files=list(iter_py_files(package)),package_name='dpone'); prefix='dpone.contracts.mssql_r1_v3_physical_'; feature={name:sorted(targets) for name,targets in deps.items() if name.startswith(prefix)}; maximum=max((len(targets) for targets in feature.values()),default=0); ok=len(feature)==16 and maximum<=11; print(json.dumps({'exception':'ADR-0057-descriptor-subgraph-ce','module_count':len(feature),'max_ce':maximum,'ceiling':11,'adjacency':feature,'conforms':ok},sort_keys=True)); sys.exit(0 if ok else 1)"
+- Historical requirement description **required_checks / broad / entry 9**: Historical module-size validation requirement using `docs/module_size_baseline.json`; original base authority: source record 042; examined the then-current HEAD. The archived command is retired and is not executable current authority. The required output format was JSON. Retain the expected ancestry FAIL artifact.
+- Historical requirement description **required_checks / broad / entry 10**: Historical inherited module-size exception verifier using original base authority source record 042: parse JSON issues from the module-size command using `docs/module_size_baseline.json` and then-current HEAD; require raw exit 2, exactly 52 issues: 51 messages equal to `baseline_commit is unavailable or not an ancestor of base` and one message starting `Module shrank; deterministic ratchet update required:` for `src/dpone/services/readiness.py`; require every issue outside the owned prefixes `src/dpone/contracts/mssql_r1_v3_physical_descriptor_` and `src/dpone/contracts/mssql_r1_v3_physical_schema_descriptor.py`. Record exception `ADR-0057-inherited-module-size-51-ancestry-1-ratchet`, raw exit, issue count, ancestry count, ratchet count and only-exact-inherited-set result. The historical wrapper returned zero only when all these conditions held, otherwise one. This is an archived exception algorithm, not an executable current authority.
+- Historical requirement description **required_checks / broad / entry 11**: uv run dpone docs check-module-size --package src/dpone/contracts --no-baseline
+- Recorded required_checks / live: empty list.
+- Recorded requirement **required_outputs / entry 1**: implementation
+- Recorded requirement **required_outputs / entry 2**: tests
+- Recorded requirement **required_outputs / entry 3**: documentation_impact
+- Recorded requirement **required_outputs / entry 4**: completion_report
+- Recorded requirement **completion_statuses / allowed / entry 1**: PASS
+- Recorded requirement **completion_statuses / allowed / entry 2**: FAIL
+- Recorded requirement **completion_statuses / allowed / entry 3**: SKIP
+- Recorded requirement **completion_statuses / allowed / entry 4**: N/A
+- Recorded requirement **completion_statuses / allowed / entry 5**: UNVERIFIED
+- Recorded requirement **stop_conditions / entry 1**: Required edit falls outside owned_paths.
+- Recorded requirement **stop_conditions / entry 2**: Approved specification is missing or contradicted.
+- Recorded requirement **stop_conditions / entry 3**: Any complete descriptor invariant requires guessing beyond the approved algebra.
+- Recorded requirement **stop_conditions / entry 4**: Concrete production inventory or SQL would be required.
+- Recorded requirement **stop_conditions / entry 5**: Public-contract impact is larger than declared.
+- Recorded requirement **stop_conditions / entry 6**: A live check requires unapproved credentials or environment.
+- Recorded requirement **stop_conditions / entry 7**: A metric-only facade, pass-through re-export, duplicate validator, untyped projection or unrelated refactor would be required to alter clustering.
+- Recorded requirement **stop_conditions / entry 8**: Another writer owns the same semantic contract.

@@ -1,0 +1,4187 @@
+{
+  "contract_version": "dpone-postgres-mssql-r1-v3-binding-v2-case-registry-1",
+  "cases": [
+    {
+      "case_id": "reader:01:02",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_02",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "02",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-02",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:02]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:03",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_03",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "03",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-03",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:03]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:04",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_04",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "04",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-04",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:04]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:05",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_05",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "05",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-05",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:05]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:06",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_06",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "06",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-06",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:06]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:07",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_07",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "07",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-07",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:07]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:08",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_08",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "08",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-08",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:08]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:09",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_09",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "09",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-09",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:09]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:10",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:11",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:12",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:13",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:14",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:15",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:16",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:17",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:18",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:19",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:20",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:01:21",
+      "coverage": [
+        "reader.phase_01",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "01",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-01-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:01:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:03",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_03",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "03",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-03",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:03]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:04",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_04",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "04",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-04",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:04]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:05",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_05",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "05",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-05",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:05]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:06",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_06",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "06",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-06",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:06]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:07",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_07",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "07",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-07",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:07]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:08",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_08",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "08",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-08",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:08]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:09",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_09",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "09",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-09",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:09]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:10",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:11",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:12",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:13",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:14",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:15",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:16",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:17",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:18",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:19",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:20",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:02:21",
+      "coverage": [
+        "reader.phase_02",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "02",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-02-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:02:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:04",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_04",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "04",
+      "expected_class": "invariant_preserved",
+      "fixture_id": "mutually-exclusive-domain-version",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:04]",
+      "status": "excluded"
+    },
+    {
+      "case_id": "reader:03:05",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_05",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "05",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-05",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:05]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:06",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_06",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "06",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-06",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:06]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:07",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_07",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "07",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-07",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:07]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:08",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_08",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "08",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-08",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:08]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:09",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_09",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "09",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-09",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:09]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:10",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:11",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:12",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:13",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:14",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:15",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:16",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:17",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:18",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:19",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:20",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:03:21",
+      "coverage": [
+        "reader.phase_03",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "03",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-03-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:03:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:05",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_05",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "05",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-05",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:05]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:06",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_06",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "06",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-06",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:06]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:07",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_07",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "07",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-07",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:07]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:08",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_08",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "08",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-08",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:08]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:09",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_09",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "09",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-09",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:09]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:10",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:11",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:12",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:13",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:14",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:15",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:16",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:17",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:18",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:19",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:20",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:04:21",
+      "coverage": [
+        "reader.phase_04",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "04",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-04-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:04:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:06",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_06",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "06",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-06",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:06]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:07",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_07",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "07",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-07",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:07]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:08",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_08",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "08",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-08",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:08]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:09",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_09",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "09",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-09",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:09]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:10",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:11",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:12",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:13",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:14",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:15",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:16",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:17",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:18",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:19",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:20",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:05:21",
+      "coverage": [
+        "reader.phase_05",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "05",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-05-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:05:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:07",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_07",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "07",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-07",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:07]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:08",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_08",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "08",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-08",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:08]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:09",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_09",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "09",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-09",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:09]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:10",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:11",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:12",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:13",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:14",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:15",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:16",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:17",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:18",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:19",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:20",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:06:21",
+      "coverage": [
+        "reader.phase_06",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "06",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-06-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:06:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:08",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_08",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "08",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-08",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:08]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:09",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_09",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "09",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-09",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:09]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:10",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:11",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:12",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:13",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:14",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:15",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:16",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:17",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:18",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:19",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:20",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:07:21",
+      "coverage": [
+        "reader.phase_07",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "07",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-07-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:07:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:09",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_09",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "09",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-09",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:09]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:10",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:11",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:12",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:13",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:14",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:15",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:16",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:17",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:18",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:19",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:20",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:08:21",
+      "coverage": [
+        "reader.phase_08",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "08",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-08-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:08:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:10",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:11",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:12",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:13",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:14",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:15",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:16",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:17",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:18",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:19",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:20",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:09:21",
+      "coverage": [
+        "reader.phase_09",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "09",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-09-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:09:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:10:11",
+      "coverage": [
+        "reader.phase_10",
+        "reader.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "10",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-10-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:10:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:10:12",
+      "coverage": [
+        "reader.phase_10",
+        "reader.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "10",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-10-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:10:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:10:13",
+      "coverage": [
+        "reader.phase_10",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "10",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-10-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:10:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:10:14",
+      "coverage": [
+        "reader.phase_10",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "10",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-10-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:10:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:10:15",
+      "coverage": [
+        "reader.phase_10",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "10",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-10-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:10:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:10:16",
+      "coverage": [
+        "reader.phase_10",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "10",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-10-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:10:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:10:17",
+      "coverage": [
+        "reader.phase_10",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "10",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-10-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:10:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:10:18",
+      "coverage": [
+        "reader.phase_10",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "10",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-10-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:10:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:10:19",
+      "coverage": [
+        "reader.phase_10",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "10",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-10-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:10:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:10:20",
+      "coverage": [
+        "reader.phase_10",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "10",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-10-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:10:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:10:21",
+      "coverage": [
+        "reader.phase_10",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "10",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-10-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:10:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:11:12",
+      "coverage": [
+        "reader.phase_11",
+        "reader.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "11",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-11-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:11:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:11:13",
+      "coverage": [
+        "reader.phase_11",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "11",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-11-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:11:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:11:14",
+      "coverage": [
+        "reader.phase_11",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "11",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-11-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:11:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:11:15",
+      "coverage": [
+        "reader.phase_11",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "11",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-11-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:11:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:11:16",
+      "coverage": [
+        "reader.phase_11",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "11",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-11-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:11:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:11:17",
+      "coverage": [
+        "reader.phase_11",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "11",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-11-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:11:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:11:18",
+      "coverage": [
+        "reader.phase_11",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "11",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-11-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:11:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:11:19",
+      "coverage": [
+        "reader.phase_11",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "11",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-11-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:11:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:11:20",
+      "coverage": [
+        "reader.phase_11",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "11",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-11-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:11:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:11:21",
+      "coverage": [
+        "reader.phase_11",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "11",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-11-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:11:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:12:13",
+      "coverage": [
+        "reader.phase_12",
+        "reader.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "12",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-12-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:12:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:12:14",
+      "coverage": [
+        "reader.phase_12",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "12",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-12-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:12:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:12:15",
+      "coverage": [
+        "reader.phase_12",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "12",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-12-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:12:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:12:16",
+      "coverage": [
+        "reader.phase_12",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "12",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-12-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:12:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:12:17",
+      "coverage": [
+        "reader.phase_12",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "12",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-12-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:12:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:12:18",
+      "coverage": [
+        "reader.phase_12",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "12",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-12-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:12:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:12:19",
+      "coverage": [
+        "reader.phase_12",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "12",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-12-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:12:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:12:20",
+      "coverage": [
+        "reader.phase_12",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "12",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-12-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:12:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:12:21",
+      "coverage": [
+        "reader.phase_12",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "12",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-12-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:12:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:13:14",
+      "coverage": [
+        "reader.phase_13",
+        "reader.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "13",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-13-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:13:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:13:15",
+      "coverage": [
+        "reader.phase_13",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "13",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-13-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:13:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:13:16",
+      "coverage": [
+        "reader.phase_13",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "13",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-13-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:13:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:13:17",
+      "coverage": [
+        "reader.phase_13",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "13",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-13-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:13:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:13:18",
+      "coverage": [
+        "reader.phase_13",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "13",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-13-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:13:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:13:19",
+      "coverage": [
+        "reader.phase_13",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "13",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-13-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:13:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:13:20",
+      "coverage": [
+        "reader.phase_13",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "13",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-13-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:13:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:13:21",
+      "coverage": [
+        "reader.phase_13",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "13",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-13-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:13:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:14:15",
+      "coverage": [
+        "reader.phase_14",
+        "reader.phase_15",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "14",
+      "later_phase": "15",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-14-15",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:14:15]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:14:16",
+      "coverage": [
+        "reader.phase_14",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "14",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-14-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:14:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:14:17",
+      "coverage": [
+        "reader.phase_14",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "14",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-14-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:14:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:14:18",
+      "coverage": [
+        "reader.phase_14",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "14",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-14-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:14:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:14:19",
+      "coverage": [
+        "reader.phase_14",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "14",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-14-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:14:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:14:20",
+      "coverage": [
+        "reader.phase_14",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "14",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-14-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:14:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:14:21",
+      "coverage": [
+        "reader.phase_14",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "14",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-14-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:14:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:15:16",
+      "coverage": [
+        "reader.phase_15",
+        "reader.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "15",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-15-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:15:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:15:17",
+      "coverage": [
+        "reader.phase_15",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "15",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-15-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:15:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:15:18",
+      "coverage": [
+        "reader.phase_15",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "15",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-15-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:15:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:15:19",
+      "coverage": [
+        "reader.phase_15",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "15",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-15-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:15:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:15:20",
+      "coverage": [
+        "reader.phase_15",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "15",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-15-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:15:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:15:21",
+      "coverage": [
+        "reader.phase_15",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "15",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-15-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:15:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:16:17",
+      "coverage": [
+        "reader.phase_16",
+        "reader.phase_17",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "16",
+      "later_phase": "17",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-16-17",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:16:17]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:16:18",
+      "coverage": [
+        "reader.phase_16",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "16",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-16-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:16:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:16:19",
+      "coverage": [
+        "reader.phase_16",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "16",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-16-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:16:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:16:20",
+      "coverage": [
+        "reader.phase_16",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "16",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-16-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:16:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:16:21",
+      "coverage": [
+        "reader.phase_16",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "16",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-16-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:16:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:17:18",
+      "coverage": [
+        "reader.phase_17",
+        "reader.phase_18",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "17",
+      "later_phase": "18",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-17-18",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:17:18]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:17:19",
+      "coverage": [
+        "reader.phase_17",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "17",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-17-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:17:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:17:20",
+      "coverage": [
+        "reader.phase_17",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "17",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-17-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:17:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:17:21",
+      "coverage": [
+        "reader.phase_17",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "17",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-17-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:17:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:18:19",
+      "coverage": [
+        "reader.phase_18",
+        "reader.phase_19",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "18",
+      "later_phase": "19",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-18-19",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:18:19]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:18:20",
+      "coverage": [
+        "reader.phase_18",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "18",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-18-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:18:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:18:21",
+      "coverage": [
+        "reader.phase_18",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "18",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-18-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:18:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:19:20",
+      "coverage": [
+        "reader.phase_19",
+        "reader.phase_20",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "19",
+      "later_phase": "20",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-19-20",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:19:20]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:19:21",
+      "coverage": [
+        "reader.phase_19",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "19",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-19-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:19:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "reader:20:21",
+      "coverage": [
+        "reader.phase_20",
+        "reader.phase_21",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "reader",
+      "earlier_phase": "20",
+      "later_phase": "21",
+      "expected_class": "typed_rejection",
+      "fixture_id": "reader-phase-20-21",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[reader:20:21]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:01:02",
+      "coverage": [
+        "factory.phase_01",
+        "factory.phase_02",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "01",
+      "later_phase": "02",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-01-02",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:01:02]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:01:07",
+      "coverage": [
+        "factory.phase_01",
+        "factory.phase_07",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "01",
+      "later_phase": "07",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-01-07",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:01:07]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:01:10",
+      "coverage": [
+        "factory.phase_01",
+        "factory.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "01",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-01-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:01:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:01:11",
+      "coverage": [
+        "factory.phase_01",
+        "factory.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "01",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-01-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:01:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:01:12",
+      "coverage": [
+        "factory.phase_01",
+        "factory.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "01",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-01-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:01:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:01:13",
+      "coverage": [
+        "factory.phase_01",
+        "factory.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "01",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-01-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:01:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:01:14",
+      "coverage": [
+        "factory.phase_01",
+        "factory.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "01",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-01-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:01:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:01:16",
+      "coverage": [
+        "factory.phase_01",
+        "factory.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "01",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-01-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:01:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:02:07",
+      "coverage": [
+        "factory.phase_02",
+        "factory.phase_07",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "02",
+      "later_phase": "07",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-02-07",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:02:07]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:02:10",
+      "coverage": [
+        "factory.phase_02",
+        "factory.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "02",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-02-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:02:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:02:11",
+      "coverage": [
+        "factory.phase_02",
+        "factory.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "02",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-02-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:02:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:02:12",
+      "coverage": [
+        "factory.phase_02",
+        "factory.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "02",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-02-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:02:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:02:13",
+      "coverage": [
+        "factory.phase_02",
+        "factory.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "02",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-02-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:02:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:02:14",
+      "coverage": [
+        "factory.phase_02",
+        "factory.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "02",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-02-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:02:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:02:16",
+      "coverage": [
+        "factory.phase_02",
+        "factory.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "02",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-02-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:02:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:07:10",
+      "coverage": [
+        "factory.phase_07",
+        "factory.phase_10",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "07",
+      "later_phase": "10",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-07-10",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:07:10]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:07:11",
+      "coverage": [
+        "factory.phase_07",
+        "factory.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "07",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-07-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:07:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:07:12",
+      "coverage": [
+        "factory.phase_07",
+        "factory.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "07",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-07-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:07:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:07:13",
+      "coverage": [
+        "factory.phase_07",
+        "factory.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "07",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-07-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:07:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:07:14",
+      "coverage": [
+        "factory.phase_07",
+        "factory.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "07",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-07-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:07:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:07:16",
+      "coverage": [
+        "factory.phase_07",
+        "factory.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "07",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-07-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:07:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:10:11",
+      "coverage": [
+        "factory.phase_10",
+        "factory.phase_11",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "10",
+      "later_phase": "11",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-10-11",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:10:11]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:10:12",
+      "coverage": [
+        "factory.phase_10",
+        "factory.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "10",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-10-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:10:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:10:13",
+      "coverage": [
+        "factory.phase_10",
+        "factory.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "10",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-10-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:10:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:10:14",
+      "coverage": [
+        "factory.phase_10",
+        "factory.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "10",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-10-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:10:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:10:16",
+      "coverage": [
+        "factory.phase_10",
+        "factory.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "10",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-10-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:10:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:11:12",
+      "coverage": [
+        "factory.phase_11",
+        "factory.phase_12",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "11",
+      "later_phase": "12",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-11-12",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:11:12]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:11:13",
+      "coverage": [
+        "factory.phase_11",
+        "factory.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "11",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-11-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:11:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:11:14",
+      "coverage": [
+        "factory.phase_11",
+        "factory.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "11",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-11-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:11:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:11:16",
+      "coverage": [
+        "factory.phase_11",
+        "factory.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "11",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-11-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:11:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:12:13",
+      "coverage": [
+        "factory.phase_12",
+        "factory.phase_13",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "12",
+      "later_phase": "13",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-12-13",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:12:13]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:12:14",
+      "coverage": [
+        "factory.phase_12",
+        "factory.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "12",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-12-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:12:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:12:16",
+      "coverage": [
+        "factory.phase_12",
+        "factory.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "12",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-12-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:12:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:13:14",
+      "coverage": [
+        "factory.phase_13",
+        "factory.phase_14",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "13",
+      "later_phase": "14",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-13-14",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:13:14]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:13:16",
+      "coverage": [
+        "factory.phase_13",
+        "factory.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "13",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-13-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:13:16]",
+      "status": "constructible"
+    },
+    {
+      "case_id": "factory:14:16",
+      "coverage": [
+        "factory.phase_14",
+        "factory.phase_16",
+        "earlier_wins",
+        "delete_earlier_selects_later",
+        "delete_later_selects_earlier"
+      ],
+      "entrypoint": "factory",
+      "earlier_phase": "14",
+      "later_phase": "16",
+      "expected_class": "typed_rejection",
+      "fixture_id": "factory-phase-14-16",
+      "nodeid": "tests/test_postgres_mssql_r1_v3_binding_semantic_inventory.py::test_binding_phase_pair[factory:14:16]",
+      "status": "constructible"
+    }
+  ]
+}

@@ -7,11 +7,6 @@ from typing import TYPE_CHECKING, Any
 
 from psycopg import sql
 
-from dpone.contracts.postgres_source_authority import (
-    PostgresSourceAuthority,
-    SelectedPostgresSourceAuthority,
-    ascii_case_alias,
-)
 from dpone.contracts.source_physical_identity import SourcePhysicalIdentity
 from dpone.runtime.sources.postgres_source_authority_observation import (
     PostgresSourceAuthorityVerificationError,
@@ -19,6 +14,11 @@ from dpone.runtime.sources.postgres_source_authority_observation import (
     read_postgres_identity_observation,
     read_postgres_timeline_authority,
     timeline_id,
+)
+from dpone.runtime.sources.postgres_source_authority_types import (
+    PostgresSourceAuthority,
+    SelectedPostgresSourceAuthority,
+    ascii_case_alias,
 )
 from dpone.runtime.sources.strategies.postgres.postgres_snapshot_lease import (
     PostgresRepeatableReadSnapshotLease,
@@ -92,6 +92,11 @@ class PostgresSourceAuthorityVerifier:
         load_config.source_schema = identity.schema
         load_config.source_table = identity.relation
         return identity
+
+    def select_for(self, load_config: Any) -> SelectedPostgresSourceAuthority:
+        """Return the exact selected authority without performing source I/O."""
+
+        return self._select(load_config)
 
     def _select(self, load_config: Any) -> SelectedPostgresSourceAuthority:
         authored = (

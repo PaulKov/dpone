@@ -34,6 +34,7 @@ class LoadPayload:
     mssql_target_mutation_plan: MssqlTargetMutationPlan | None = None
     extraction_lifecycle: ExtractionLifecycleAuthority | None = None
     owned_payload_scope: OwnedPayloadScope | None = None
+    postgres_mssql_r1_execution: Any | None = None
 
     def __post_init__(self) -> None:
         """Register every transformed source view with the top-level owner."""

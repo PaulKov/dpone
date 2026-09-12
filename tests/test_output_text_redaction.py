@@ -33,29 +33,29 @@ def test_legacy_text_output_import_reexports_canonical_command_port() -> None:
 
 
 def test_console_output_redacts_assignments_flags_and_authorization(capsys) -> None:
-    write_text('password="db-pass" token: abc --client-secret cli-secret Authorization: Bearer bearer-value\n')
+    write_text('password="zx-qzxv" token: xvq --client-secret qzx-qzxvqz Authorization: Bearer vqzxvq-xvqzx\n')
 
     output = capsys.readouterr().out
 
-    assert "db-pass" not in output
-    assert "abc" not in output
-    assert "cli-secret" not in output
-    assert "bearer-value" not in output
+    assert "zx-qzxv" not in output
+    assert "xvq" not in output
+    assert "qzx-qzxvqz" not in output
+    assert "vqzxvq-xvqzx" not in output
     assert output.count(REDACTION_TOKEN) == 4
 
 
 def test_console_output_redacts_uri_credentials_private_keys_and_secret_refs(capsys) -> None:
     write_line(
-        "uri=postgresql://dpone:runtime-password@db.internal/dwh "
-        "secret_ref: pg-source\n"
-        "-----BEGIN PRIVATE KEY-----\nprivate-material\n-----END PRIVATE KEY-----"
+        "uri=postgresql://dpone:qzxvqzx-qzxvqzxv@db.internal/dwh "
+        "secret_ref: zx-qzxvqz\n"
+        "-----BEGIN PRIVATE KEY-----\nvqzxvqz-vqzxvqzx\n-----END PRIVATE KEY-----"
     )
 
     output = capsys.readouterr().out
 
-    assert "runtime-password" not in output
-    assert "pg-source" not in output
-    assert "private-material" not in output
+    assert "qzxvqzx-qzxvqzxv" not in output
+    assert "zx-qzxvqz" not in output
+    assert "vqzxvqz-vqzxvqzx" not in output
     assert output.count(REDACTION_TOKEN) == 3
 
 
@@ -148,33 +148,33 @@ def test_redact_absolute_paths_preserves_conjunctions_between_multiple_paths(
 
 def test_redact_text_hides_uri_userinfo_secret_queries_and_fragments() -> None:
     text = redact_text(
-        "postgresql://token-only@[2001:db8::1]/dwh?sslmode=require "
-        "postgresql://:empty-password@db.example.test/dwh "
-        "https://user%40tenant:p%40ssword@example.test/private "
-        "https://s3.example.test/object?X-Amz-Credential=aws-id&X-Amz-Signature=aws-signature&region=eu "
-        "https://blob.example.test/object?sv=1&sig=azure-signature&sp=r "
-        "https://storage.example.test/object?GoogleAccessId=gcs-id&X-Goog-Signature=gcs-signature "
-        "https://api.example.test/items?password=db-pass&api_key=api-secret&token=opaque"
-        "&access_token=access-secret&key=key-secret&view=compact "
-        "https://docs.example.test/runbook#private-fragment"
+        "postgresql://qzxvq-xvqz@[2001:db8::1]/dwh?sslmode=require "
+        "postgresql://:qzxvq-xvqzxvqz@db.example.test/dwh "
+        "https://qzxv%40vqzxvq:v%40vqzxvq@example.test/private "
+        "https://s3.example.test/object?X-Amz-Credential=xvq-xv&X-Amz-Signature=xvq-xvqzxvqzx&region=eu "
+        "https://blob.example.test/object?sv=1&sig=vqzxv-zxvqzxvqz&sp=r "
+        "https://storage.example.test/object?GoogleAccessId=vqz-vq&X-Goog-Signature=vqz-vqzxvqzxv "
+        "https://api.example.test/items?password=zx-qzxv&api_key=zxv-zxvqzx&token=qzxvqz"
+        "&access_token=zxvqzx-qzxvqz&key=xvq-xvqzxv&view=compact "
+        "https://docs.example.test/runbook#xvqzxvq-xvqzxvqz"
     )
 
     for secret in (
-        "token-only",
-        "empty-password",
-        "user%40tenant",
-        "p%40ssword",
-        "aws-id",
-        "aws-signature",
-        "azure-signature",
-        "gcs-id",
-        "gcs-signature",
-        "db-pass",
-        "api-secret",
-        "opaque",
-        "access-secret",
-        "key-secret",
-        "private-fragment",
+        "qzxvq-xvqz",
+        "qzxvq-xvqzxvqz",
+        "qzxv%40vqzxvq",
+        "v%40vqzxvq",
+        "xvq-xv",
+        "xvq-xvqzxvqzx",
+        "vqzxv-zxvqzxvqz",
+        "vqz-vq",
+        "vqz-vqzxvqzxv",
+        "zx-qzxv",
+        "zxv-zxvqzx",
+        "qzxvqz",
+        "zxvqzx-qzxvqz",
+        "xvq-xvqzxv",
+        "xvqzxvq-xvqzxvqz",
     ):
         assert secret not in text
     assert "postgresql://[REDACTED]@[2001:db8::1]/dwh?sslmode=require" in text

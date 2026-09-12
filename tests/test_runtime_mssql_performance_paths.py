@@ -218,7 +218,7 @@ def test_postgres_copy_to_file_supports_bcp_friendly_mssql_delimited_export(tmp_
         def cursor(self):
             return self.cursor_obj
 
-    connector = PostgresConnector.__new__(PostgresConnector)
+    connector = PostgresConnector(host="localhost", port=5432, database="test", user="test", password="")
     connector._connection = FakeConnection()
 
     output_path = tmp_path / "orders.bcp"

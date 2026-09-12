@@ -1,0 +1,159 @@
+# Historical task requirements: postgres-mssql-r1-source-schema-authority-v1
+
+**Archived historical execution record — not a current task grant.** The complete original YAML and its source identities remain in private provenance. Every requirement below belongs to that original record. Recorded APPROVED/PASS/FAIL states do not authorize a new execution or certify a current source. A current task needs a separately reviewed, genuinely bound authority chain.
+
+- Recorded requirement **schema_version**: 1
+- Recorded requirement **task_id**: DPONE-POSTGRES-MSSQL-R1-SOURCE-SCHEMA-AUTHORITY-V1
+- Recorded requirement **title**: SUPERSEDED — PostgreSQL R1 selected-relation schema authority V1
+- Recorded requirement **goal**: Historical rejected implementation task only. Do not execute; a new path-scoped task must be issued after the corrective source-schema specification is reapproved.
+- Recorded requirement **specification**: docs/feature-design-postgres-mssql-r1-source-schema-authority-v1.md
+- Historical authority/requirement record **base_commit**: source record 025
+- Recorded requirement **integrator**: Codex
+- Recorded requirement **acceptance_criteria / entry 1**: SUPERSEDED: candidate source record 011 and evidence head source record 012 were rejected. This task does not authorize further production or evidence changes.
+- Recorded requirement **acceptance_criteria / entry 2**: Commit source record 029 is only the production-code and quality comparison baseline. Current task base source record 025 is the exact maintainer-reapproved source-schema specification and import-plan commit pinned in dependencies. Every upstream implementation identity named by the approved specification is preserved.
+- Recorded requirement **acceptance_criteria / entry 3**: SelectedPostgresSourceAuthority exposes authority_document_utf8 as the exact existing UTF-8 JSON digest preimage; authority_sha256 remains byte-identical for every previously accepted authority, including NFD relation identifiers.
+- Recorded requirement **acceptance_criteria / entry 4**: PostgresMssqlSelectedRelationSchemaAuthorityV1 and its exact immutable leaves implement the approved domains, field order, strict runtime types, bool/int separation, canonical round-trip, 32-byte digests, relation/source/type-policy/reference anti-splice checks and complete 1..1024 live-user-column closure.
+- Recorded requirement **acceptance_criteria / entry 5**: R1 admits only ordinary permanent relations with relhassubclass=false, approved base scalar types, no generated columns, and exact NFC/trim-equal business column names; dropped/system columns are excluded while physical attnum gaps remain visible.
+- Recorded requirement **acceptance_criteria / entry 6**: The generic verified-relation scope starts from an initially idle physical PostgreSQL session, begins REPEATABLE READ READ ONLY, sets the local lock timeout, locks TABLE ONLY with ACCESS SHARE before the first snapshot-establishing query, and proves the exact relation OID, snapshot token, backend/session identity, virtualtransaction and granted AccessShareLock.
+- Recorded requirement **acceptance_criteria / entry 7**: Scope revalidation repeats the exact snapshot, virtualtransaction and lock proof before schema/business reads; out-of-band commit, rollback or replacement transaction cannot reproduce or reuse the authority.
+- Recorded requirement **acceptance_criteria / entry 8**: PostgresVerifiedRelationSnapshotScopeV1 solely owns the read-only transaction through schema issuance, COPY completion and FileExportArtifact integrity sealing. Its complete, abort and close terminals are idempotent; cleanup failure quarantines the physical connection, preserves any primary exception and exposes only the closed redacted terminal receipt.
+- Recorded requirement **acceptance_criteria / entry 9**: The schema observer uses the exact approved relation-profile and ordered pg_attribute query shapes and parameters. Permission/SQLSTATE/cancellation/error translation follows the closed reason vocabulary; caller cancellation is not confused with PostgreSQL SQLSTATE 57014.
+- Recorded requirement **acceptance_criteria / entry 10**: The route issuer embeds the exact approved PostgresMssqlTypePolicyAuthorityV1 and issues shapes and source references only from the same observed rows; caller-spliced leaves, policies, OIDs, ordinals, names and canonical bytes reject.
+- Recorded requirement **acceptance_criteria / entry 11**: The pure compatibility adapter renders the exact specification-owned PostgreSQL declared-type and MSSQL stage/target tokens from embedded shapes, preserves omitted temporal typmods, and constructs every specified SourceColumnProvenance, PostgresMssqlColumnProjection, PostgresMssqlSchemaProjection and PostgresFetchedSchema field without consulting load_config or a legacy mapper.
+- Recorded requirement **acceptance_criteria / entry 12**: PostgresMssqlSourceSchemaRuntimeV1 is an explicitly injected exact bundle. DefaultRuntimeHydrator accepts a source-schema runtime factory, verifies that its verifier is the same object returned by preflight, and fails before source-object/business-row I/O when the factory or exact bundle is missing or wrong.
+- Recorded requirement **acceptance_criteria / entry 13**: The default application composition does not register the new factory. The route, Batch/XMin/WAL modes and downstream Binding V2 remain activation-blocked. No CLI, manifest, top-level Python export or public default changes.
+- Recorded requirement **acceptance_criteria / entry 14**: PostgresSource prepares the boundary only from the bound bundle and carries an owning PostgresVerifiedRelationSnapshotScopeV1 rather than a bare lease. Existing verifier preflight, verify_snapshot and legacy lease paths retain compatibility.
+- Recorded requirement **acceptance_criteria / entry 15**: The certified child supports only whole-file, non-partitioned prepared extraction. Partition/batched requests and a bare lease fail with the approved stable RuntimeConfigurationError codes before business-row I/O; no silent fallback exists.
+- Recorded requirement **acceptance_criteria / entry 16**: PostgresFullExtractStrategy renders SELECT ... FROM ONLY <quoted schema>.<quoted relation> through an additive keyword-only only_relation flag whose default preserves every legacy caller. The scoped whole-file service revalidates the scope after local rendering and immediately before COPY.
+- Recorded requirement **acceptance_criteria / entry 17**: PreparedPostgresSourceBoundary.complete accepts only the exact FileExportArtifact with a valid integrity receipt and row count before releasing the scope. Every exception or cancellation aborts and closes through the scope-owned lifecycle.
+- Recorded requirement **acceptance_criteria / entry 18**: A named semantic mutation registry proves must_reject versus valid_distinct behavior for every aggregate/leaf field, relation/policy/reference splice, ordering/bounds/domain/version mutation and selected-source preimage case.
+- Recorded requirement **acceptance_criteria / entry 19**: The create-only evidence producer has the exact one-line JSON, exit-code, permission, no-clobber, fsync, rerun, stale/mocked/skipped/error and schema-validation semantics from the approved specification. Evidence is exact-commit-bound; live PostgreSQL evidence remains UNVERIFIED unless an approved real environment is provided.
+- Recorded requirement **acceptance_criteria / entry 20**: Every new or materially changed production module stays within repository module-size and architecture budgets; no policy is added to compatibility namespaces and no unrelated refactor is included.
+- Recorded requirement **acceptance_criteria / entry 21**: The exact production-graph base is avg_clustering 0.19137170217275384 (a pre-existing raw FAIL versus 0.182), cross_layer_ratio 0.3000000000000000, max_module_ce 24 and zero class findings. Candidate acceptance requires no value to worsen, no class finding and no new forbidden edge, cycle or facade; the inherited raw FAIL remains visible.
+- Recorded requirement **acceptance_criteria / entry 22**: The raw commit-aware module-size base contains 52 inherited ancestry/debt findings and no owned source-schema production path. Candidate acceptance requires no candidate-only finding, every new production module below 300 SLOC and every touched existing owned production module at or below 350 SLOC; inherited FAIL is not relabeled PASS.
+- Recorded requirement **acceptance_criteria / entry 23**: Red-green evidence is generated by exact capture-red/finalize subcommands: immutable RedCaptureV1 contains only base/spec/red facts; FinalRedGreenRecordV1 adds candidate facts; nested PytestProbeEvidenceV1 records compare deterministic nodeids, per-phase outcomes, closed counts, reason IDs and sorted checkout-relative import origins while raw transcripts are discarded; isolated replay forces exact checkout source roots and verifies every dpone module origin; evidence_harness_tree_sha256 freezes tests, producer and JSON Schema.
+- Recorded requirement **acceptance_criteria / entry 24**: The implementation-fit import plan is exact: generic observation imports only selected-source authority; snapshot and route observation depend inward on it; projection does not import postgres_schema_metadata or type-target enums and receives the fetched-schema constructor from runtime composition; aggregate/model helpers own codec and policy exactness; issuer does not import type authority/enums; only prepared boundary imports the exact snapshot/models while adapted source/base/file/full/whole modules do not import concrete source-schema runtime/snapshot/models beyond that boundary.
+- Recorded requirement **public_contract_impact / level**: none
+- Recorded requirement **public_contract_impact / surfaces / entry 1**: Internal unreleased activation-blocked PostgreSQL to MSSQL R1 source-schema authority and prepared-extraction seam
+- Recorded requirement **public_contract_impact / migration_required**: false
+- Recorded requirement **owned_paths / entry 1**: src/dpone/contracts/postgres_source_authority.py
+- Recorded requirement **owned_paths / entry 2**: src/dpone/contracts/postgres_mssql_type_authority.py
+- Recorded requirement **owned_paths / entry 3**: src/dpone/contracts/postgres_mssql_source_schema_models.py
+- Recorded requirement **owned_paths / entry 4**: src/dpone/contracts/postgres_mssql_source_schema_authority.py
+- Recorded requirement **owned_paths / entry 5**: src/dpone/ports/postgres_mssql_source_schema_runtime.py
+- Recorded requirement **owned_paths / entry 6**: src/dpone/runtime/postgres_mssql_source_schema_runtime.py
+- Recorded requirement **owned_paths / entry 7**: src/dpone/runtime/bootstrap_postgres_source_authority.py
+- Recorded requirement **owned_paths / entry 8**: src/dpone/runtime/bootstrap_hydrator.py
+- Recorded requirement **owned_paths / entry 9**: src/dpone/runtime/connectors/postgres.py
+- Recorded requirement **owned_paths / entry 10**: src/dpone/runtime/sources/postgres.py
+- Recorded requirement **owned_paths / entry 11**: src/dpone/runtime/sources/postgres_source_authority.py
+- Recorded requirement **owned_paths / entry 12**: src/dpone/runtime/sources/postgres_verified_relation_snapshot.py
+- Recorded requirement **owned_paths / entry 13**: src/dpone/runtime/sources/postgres_verified_relation_observation.py
+- Recorded requirement **owned_paths / entry 14**: src/dpone/runtime/sources/postgres_mssql_source_schema_observation.py
+- Recorded requirement **owned_paths / entry 15**: src/dpone/runtime/sources/postgres_mssql_source_schema_issuer.py
+- Recorded requirement **owned_paths / entry 16**: src/dpone/runtime/sources/postgres_mssql_source_schema_projection.py
+- Recorded requirement **owned_paths / entry 17**: src/dpone/runtime/sources/strategies/postgres/postgres_prepared_source_boundary.py
+- Recorded requirement **owned_paths / entry 18**: src/dpone/runtime/sources/strategies/postgres/postgres_full_extract.py
+- Recorded requirement **owned_paths / entry 19**: src/dpone/runtime/sources/strategies/postgres/postgres_base_strategy.py
+- Recorded requirement **owned_paths / entry 20**: src/dpone/runtime/sources/strategies/postgres/postgres_file_export_mixin.py
+- Recorded requirement **owned_paths / entry 21**: src/dpone/runtime/sources/strategies/postgres/postgres_whole_file_export_service.py
+- Recorded requirement **owned_paths / entry 22**: src/dpone/runtime/sources/strategies/postgres/postgres_snapshot_failure.py
+- Recorded requirement **owned_paths / entry 23**: tests/test_postgres_mssql_r1_source_schema_authority_contract.py
+- Recorded requirement **owned_paths / entry 24**: tests/test_postgres_mssql_r1_source_schema_authority_mutation.py
+- Recorded requirement **owned_paths / entry 25**: tests/test_postgres_mssql_r1_source_schema_runtime.py
+- Recorded requirement **owned_paths / entry 26**: tests/test_postgres_mssql_prepared_source_boundary.py
+- Recorded requirement **owned_paths / entry 27**: tests/test_runtime_connection_composition_root.py
+- Recorded requirement **owned_paths / entry 28**: tests/test_postgres_mssql_r1_wiring.py
+- Recorded requirement **owned_paths / entry 29**: tests/integration/postgres/test_postgres_mssql_r1_source_schema_authority_live.py
+- Recorded requirement **owned_paths / entry 30**: tests/support/postgres_mssql_r1_source_schema_authority_v1_evidence.py
+- Recorded requirement **owned_paths / entry 31**: docs/schemas/evidence/postgres-mssql-r1-source-schema-authority-v1.schema.json
+- Recorded requirement **owned_paths / entry 32**: test_artifacts/postgres-mssql-r1-v3/source-schema-authority-v1
+- Recorded requirement **integrator_owned_paths / entry 1**: docs/feature-design-postgres-mssql-r1-source-schema-authority-v1.md
+- Recorded requirement **integrator_owned_paths / entry 2**: docs/feature-design-postgres-mssql-r1-v3-provider-binding-contract-v2.md
+- Recorded requirement **integrator_owned_paths / entry 3**: docs/feature-design-postgres-mssql-r1-v3-provider-contract-v1.md
+- Recorded requirement **integrator_owned_paths / entry 4**: docs/adr/0068-postgres-selected-relation-schema-authority.md
+- Recorded requirement **integrator_owned_paths / entry 5**: docs/adr-index.md
+- Recorded requirement **integrator_owned_paths / entry 6**: docs/developer-postgres-mssql-r1-v3-provider-implementation.md
+- Recorded requirement **integrator_owned_paths / entry 7**: docs/agent-task-contracts/postgres-mssql-r1-source-schema-authority-v1.yml
+- Recorded requirement **integrator_owned_paths / entry 8**: docs/postgres-mssql-r1/source-schema-authority-maintainer.md
+- Recorded requirement **integrator_owned_paths / entry 9**: CHANGELOG.md
+- Recorded requirement **read_only_paths / entry 1**: docs/feature-design-postgres-mssql-r1-correctness-v1.md
+- Recorded requirement **read_only_paths / entry 2**: docs/feature-design-postgres-mssql-r1-v3-type-target-authority-v1.md
+- Recorded requirement **read_only_paths / entry 3**: docs/engineering-standards.md
+- Recorded requirement **read_only_paths / entry 4**: docs/import-rules.md
+- Recorded requirement **read_only_paths / entry 5**: docs/testing
+- Recorded requirement **read_only_paths / entry 6**: src/dpone/app/runtime_bootstrap.py
+- Recorded requirement **read_only_paths / entry 7**: src/dpone/contracts/mssql_r1_v3_*.py
+- Recorded requirement **read_only_paths / entry 8**: tests/test_postgres_source_authority.py
+- Recorded requirement **read_only_paths / entry 9**: tests/test_postgres_snapshot_retry.py
+- Recorded requirement **read_only_paths / entry 10**: tests/test_extraction_lifecycle.py
+- Recorded requirement **forbidden_paths / entry 1**: pyproject.toml
+- Recorded requirement **forbidden_paths / entry 2**: uv.lock
+- Recorded requirement **forbidden_paths / entry 3**: mkdocs.yml
+- Recorded requirement **forbidden_paths / entry 4**: .github/workflows
+- Recorded requirement **forbidden_paths / entry 5**: src/dpone/app/runtime_bootstrap.py
+- Recorded requirement **forbidden_paths / entry 6**: src/dpone/contracts/__init__.py
+- Recorded requirement **forbidden_paths / entry 7**: src/dpone/commands
+- Recorded requirement **forbidden_paths / entry 8**: src/dpone/schema
+- Recorded requirement **forbidden_paths / entry 9**: src/dpone/adapters
+- Recorded requirement **forbidden_paths / entry 10**: tests/conftest.py
+- Recorded requirement **forbidden_paths / entry 11**: docs/feature-design-postgres-mssql-r1-source-schema-authority-v1.md
+- Recorded requirement **forbidden_paths / entry 12**: docs/feature-design-postgres-mssql-r1-v3-provider-binding-contract-v2.md
+- Recorded requirement **forbidden_paths / entry 13**: docs/feature-design-postgres-mssql-r1-v3-provider-contract-v1.md
+- Recorded requirement **forbidden_paths / entry 14**: docs/adr
+- Recorded requirement **forbidden_paths / entry 15**: docs/adr-index.md
+- Recorded requirement **forbidden_paths / entry 16**: docs/developer-postgres-mssql-r1-v3-provider-implementation.md
+- Recorded requirement **forbidden_paths / entry 17**: docs/agent-task-contracts/postgres-mssql-r1-source-schema-authority-v1.yml
+- Recorded requirement **forbidden_paths / entry 18**: docs/postgres-mssql-r1/source-schema-authority-maintainer.md
+- Recorded requirement **forbidden_paths / entry 19**: CHANGELOG.md
+- Recorded requirement **shared_file_owner**: Codex
+- Recorded requirement **dependencies / entry 1**: source record 030
+- Recorded requirement **dependencies / entry 2**: source record 031
+- Recorded requirement **dependencies / entry 3**: source record 002
+- Recorded requirement **dependencies / entry 4**: source record 032
+- Recorded requirement **dependencies / entry 5**: source record 029
+- Recorded requirement **dependencies / entry 6**: source record 033
+- Recorded requirement **dependencies / entry 7**: source record 034
+- Recorded requirement **dependencies / entry 8**: source record 035
+- Recorded requirement **dependencies / entry 9**: source record 036
+- Recorded requirement **dependencies / entry 10**: source record 037
+- Recorded requirement **dependencies / entry 11**: source record 038
+- Recorded requirement **dependencies / entry 12**: source record 039
+- Recorded requirement **dependencies / entry 13**: source record 040
+- Recorded requirement **dependencies / entry 14**: source record 041
+- Recorded requirement **dependencies / entry 15**: source record 025
+- Recorded requirement **dependencies / entry 16**: ADR-0068
+- Historical requirement description **required_checks / focused / entry 1**: uv run pytest tests/test_postgres_mssql_r1_source_schema_authority_contract.py tests/test_postgres_mssql_r1_source_schema_authority_mutation.py tests/test_postgres_mssql_r1_source_schema_runtime.py tests/test_postgres_mssql_prepared_source_boundary.py tests/test_runtime_connection_composition_root.py tests/test_postgres_mssql_r1_wiring.py -q -ra --strict-markers
+- Historical requirement description **required_checks / focused / entry 2**: uv run pytest tests/test_postgres_source_authority.py tests/test_postgres_snapshot_retry.py -q -ra --strict-markers
+- Historical requirement description **required_checks / focused / entry 3**: uv run pytest tests/test_extraction_lifecycle.py -q
+- Historical requirement description **required_checks / focused / entry 4**: uv run python tests/support/postgres_mssql_r1_source_schema_authority_v1_evidence.py --help
+- Historical requirement description **required_checks / broad / entry 1**: uv run ruff check src/dpone/contracts/postgres_source_authority.py src/dpone/contracts/postgres_mssql_type_authority.py src/dpone/contracts/postgres_mssql_source_schema_models.py src/dpone/contracts/postgres_mssql_source_schema_authority.py src/dpone/ports/postgres_mssql_source_schema_runtime.py src/dpone/runtime/postgres_mssql_source_schema_runtime.py src/dpone/runtime/bootstrap_postgres_source_authority.py src/dpone/runtime/bootstrap_hydrator.py src/dpone/runtime/connectors/postgres.py src/dpone/runtime/sources/postgres.py src/dpone/runtime/sources/postgres_source_authority.py src/dpone/runtime/sources/postgres_verified_relation_snapshot.py src/dpone/runtime/sources/postgres_verified_relation_observation.py src/dpone/runtime/sources/postgres_mssql_source_schema_observation.py src/dpone/runtime/sources/postgres_mssql_source_schema_issuer.py src/dpone/runtime/sources/postgres_mssql_source_schema_projection.py src/dpone/runtime/sources/strategies/postgres/postgres_prepared_source_boundary.py src/dpone/runtime/sources/strategies/postgres/postgres_full_extract.py src/dpone/runtime/sources/strategies/postgres/postgres_base_strategy.py src/dpone/runtime/sources/strategies/postgres/postgres_file_export_mixin.py src/dpone/runtime/sources/strategies/postgres/postgres_whole_file_export_service.py src/dpone/runtime/sources/strategies/postgres/postgres_snapshot_failure.py tests/test_postgres_mssql_r1_source_schema_authority_contract.py tests/test_postgres_mssql_r1_source_schema_authority_mutation.py tests/test_postgres_mssql_r1_source_schema_runtime.py tests/test_postgres_mssql_prepared_source_boundary.py tests/test_runtime_connection_composition_root.py tests/test_postgres_mssql_r1_wiring.py tests/integration/postgres/test_postgres_mssql_r1_source_schema_authority_live.py tests/support/postgres_mssql_r1_source_schema_authority_v1_evidence.py
+- Historical requirement description **required_checks / broad / entry 2**: uv run ruff format --check src/dpone/contracts/postgres_source_authority.py src/dpone/contracts/postgres_mssql_type_authority.py src/dpone/contracts/postgres_mssql_source_schema_models.py src/dpone/contracts/postgres_mssql_source_schema_authority.py src/dpone/ports/postgres_mssql_source_schema_runtime.py src/dpone/runtime/postgres_mssql_source_schema_runtime.py src/dpone/runtime/bootstrap_postgres_source_authority.py src/dpone/runtime/bootstrap_hydrator.py src/dpone/runtime/connectors/postgres.py src/dpone/runtime/sources/postgres.py src/dpone/runtime/sources/postgres_source_authority.py src/dpone/runtime/sources/postgres_verified_relation_snapshot.py src/dpone/runtime/sources/postgres_verified_relation_observation.py src/dpone/runtime/sources/postgres_mssql_source_schema_observation.py src/dpone/runtime/sources/postgres_mssql_source_schema_issuer.py src/dpone/runtime/sources/postgres_mssql_source_schema_projection.py src/dpone/runtime/sources/strategies/postgres/postgres_prepared_source_boundary.py src/dpone/runtime/sources/strategies/postgres/postgres_full_extract.py src/dpone/runtime/sources/strategies/postgres/postgres_base_strategy.py src/dpone/runtime/sources/strategies/postgres/postgres_file_export_mixin.py src/dpone/runtime/sources/strategies/postgres/postgres_whole_file_export_service.py src/dpone/runtime/sources/strategies/postgres/postgres_snapshot_failure.py tests/test_postgres_mssql_r1_source_schema_authority_contract.py tests/test_postgres_mssql_r1_source_schema_authority_mutation.py tests/test_postgres_mssql_r1_source_schema_runtime.py tests/test_postgres_mssql_prepared_source_boundary.py tests/test_runtime_connection_composition_root.py tests/test_postgres_mssql_r1_wiring.py tests/integration/postgres/test_postgres_mssql_r1_source_schema_authority_live.py tests/support/postgres_mssql_r1_source_schema_authority_v1_evidence.py
+- Historical requirement description **required_checks / broad / entry 3**: uv run mypy --config-file mypy.ini src/dpone/contracts/postgres_source_authority.py src/dpone/contracts/postgres_mssql_type_authority.py src/dpone/contracts/postgres_mssql_source_schema_models.py src/dpone/contracts/postgres_mssql_source_schema_authority.py src/dpone/ports/postgres_mssql_source_schema_runtime.py src/dpone/runtime/postgres_mssql_source_schema_runtime.py src/dpone/runtime/bootstrap_postgres_source_authority.py src/dpone/runtime/bootstrap_hydrator.py src/dpone/runtime/connectors/postgres.py src/dpone/runtime/sources/postgres.py src/dpone/runtime/sources/postgres_source_authority.py src/dpone/runtime/sources/postgres_verified_relation_snapshot.py src/dpone/runtime/sources/postgres_verified_relation_observation.py src/dpone/runtime/sources/postgres_mssql_source_schema_observation.py src/dpone/runtime/sources/postgres_mssql_source_schema_issuer.py src/dpone/runtime/sources/postgres_mssql_source_schema_projection.py src/dpone/runtime/sources/strategies/postgres/postgres_prepared_source_boundary.py src/dpone/runtime/sources/strategies/postgres/postgres_full_extract.py src/dpone/runtime/sources/strategies/postgres/postgres_base_strategy.py src/dpone/runtime/sources/strategies/postgres/postgres_file_export_mixin.py src/dpone/runtime/sources/strategies/postgres/postgres_whole_file_export_service.py src/dpone/runtime/sources/strategies/postgres/postgres_snapshot_failure.py
+- Historical requirement description **required_checks / broad / entry 4**: uv run dpone docs check-import-rules
+- Historical requirement description **required_checks / broad / entry 5**: uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json
+- Historical requirement description **required_checks / broad / entry 6**: Historical module-size validation requirement using `docs/module_size_baseline.json`; original base authority: source record 029; examined the then-current HEAD. The archived command is retired and is not executable current authority.
+- Historical requirement description **required_checks / broad / entry 7**: uv run dpone docs check-architecture-fitness --format json
+- Historical requirement description **required_checks / broad / entry 8**: uv run pytest -m 'not integration_live' -n auto --dist loadfile
+- Historical requirement description **required_checks / live / entry 1**: uv run pytest tests/integration/postgres/test_postgres_mssql_r1_source_schema_authority_live.py -m integration_live -q
+- Recorded requirement **required_outputs / entry 1**: implementation
+- Recorded requirement **required_outputs / entry 2**: tests
+- Recorded requirement **required_outputs / entry 3**: documentation_impact
+- Recorded requirement **required_outputs / entry 4**: completion_report
+- Recorded requirement **completion_statuses / allowed / entry 1**: PASS
+- Recorded requirement **completion_statuses / allowed / entry 2**: FAIL
+- Recorded requirement **completion_statuses / allowed / entry 3**: SKIP
+- Recorded requirement **completion_statuses / allowed / entry 4**: N/A
+- Recorded requirement **completion_statuses / allowed / entry 5**: UNVERIFIED
+- Recorded requirement **stop_conditions / entry 1**: This task is superseded; stop before any edit and request the post-amendment replacement task contract.
+- Recorded requirement **stop_conditions / entry 2**: Required edit falls outside owned_paths.
+- Recorded requirement **stop_conditions / entry 3**: Approved specification is missing or contradicted.
+- Recorded requirement **stop_conditions / entry 4**: The exact base differs from source record 025 or the approved specification/ADR is missing or contradicted.
+- Recorded requirement **stop_conditions / entry 5**: A source-schema field, SQL query shape, failure reason, lifecycle transition or composition default would need to be guessed beyond the approved specification.
+- Recorded requirement **stop_conditions / entry 6**: A public CLI, manifest, top-level export, adapter, provider Binding, Batch/XMin/WAL capability or route activation change would be required.
+- Recorded requirement **stop_conditions / entry 7**: A partitioned/batched certified fallback, bare-lease handoff, default factory, policy reconstruction or second schema authority would be required.
+- Recorded requirement **stop_conditions / entry 8**: A change to app composition, shared exports, schemas/registries, unrelated strategies, dependencies, workflows or shared fixtures would be required.
+- Recorded requirement **stop_conditions / entry 9**: A new architecture/module-size regression or unrelated cleanup would be required.
+- Recorded requirement **stop_conditions / entry 10**: Public-contract impact is larger than declared.
+- Recorded requirement **stop_conditions / entry 11**: A live check requires unapproved credentials or environment.
+- Recorded requirement **stop_conditions / entry 12**: Another writer owns the same semantic contract.

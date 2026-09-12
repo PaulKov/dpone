@@ -83,16 +83,16 @@ def test_reader_and_sync_options_preserve_explicit_python_none_semantics(tmp_pat
 
 def test_uri_redaction_removes_userinfo_and_sensitive_query_values() -> None:
     uri = (
-        "https://alice:private-password@storage.example/release/pack.json"
-        "?region=eu&token=private-token&X-Amz-Signature=private-signature"
+        "https://vqzxv:zxvqzxv-zxvqzxvq@storage.example/release/pack.json"
+        "?region=eu&token=xvqzxvq-xvqzx&X-Amz-Signature=qzxvqzx-qzxvqzxvq"
     )
 
     redacted = redact_artifact_uri(uri)
 
-    assert "alice" not in redacted
-    assert "private-password" not in redacted
-    assert "private-token" not in redacted
-    assert "private-signature" not in redacted
+    assert "vqzxv" not in redacted
+    assert "zxvqzxv-zxvqzxvq" not in redacted
+    assert "xvqzxvq-xvqzx" not in redacted
+    assert "qzxvqzx-qzxvqzxvq" not in redacted
     assert "region=[REDACTED]" in redacted
     assert "%5BREDACTED%5D@storage.example" in redacted
     assert redacted.count("[REDACTED]") == 3
@@ -109,13 +109,13 @@ def test_uri_redaction_removes_bare_query_component_and_fragment() -> None:
 
 
 def test_uri_redaction_fails_safe_for_malformed_authority() -> None:
-    uri = "https://alice:private-password@[invalid]/pack.json?token=private-token"
+    uri = "https://xvqzx:qzxvqzx-qzxvqzxv@[invalid]/pack.json?token=zxvqzxv-zxvqz"
 
     redacted = redact_artifact_uri(uri)
 
-    assert "alice" not in redacted
-    assert "private-password" not in redacted
-    assert "private-token" not in redacted
+    assert "xvqzx" not in redacted
+    assert "qzxvqzx-qzxvqzxv" not in redacted
+    assert "zxvqzxv-zxvqz" not in redacted
     assert "%5BREDACTED%5D@[invalid]" in redacted
     assert "token=[REDACTED]" in redacted
 

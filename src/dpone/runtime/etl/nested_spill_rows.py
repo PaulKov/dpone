@@ -7,9 +7,12 @@ import json
 from collections.abc import Iterator, Mapping, Sequence
 from datetime import date, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dpone.runtime.normalization.semantic_spill import read_semantic_rows
-from dpone.runtime.normalization.spill import SpilledNormalizationResult
+
+if TYPE_CHECKING:
+    from dpone.runtime.normalization.spill import SpilledNormalizationResult
 
 
 def spilled_rows(

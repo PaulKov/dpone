@@ -1,0 +1,118 @@
+# Historical task requirements: postgres-mssql-r1-v3-type-target-authority-v1
+
+**Archived historical execution record — not a current task grant.** The complete original YAML and its source identities remain in private provenance. Every requirement below belongs to that original record. Recorded APPROVED/PASS/FAIL states do not authorize a new execution or certify a current source. A current task needs a separately reviewed, genuinely bound authority chain.
+
+- Recorded requirement **schema_version**: 1
+- Recorded requirement **task_id**: DPONE-POSTGRES-MSSQL-R1-V3-TYPE-TARGET-AUTHORITY-V1
+- Recorded requirement **title**: Implement pure R1 canonical type and registered-target authority
+- Recorded requirement **goal**: Implement the SQL-free, activation-blocked canonical PostgreSQL-to-MSSQL type policy, registered-target catalog and current-registration admission authority approved for R1 V3.
+- Recorded requirement **specification**: docs/feature-design-postgres-mssql-r1-v3-type-target-authority-v1.md
+- Historical authority/requirement record **base_commit**: source record 051
+- Recorded requirement **integrator**: Codex
+- Recorded requirement **acceptance_criteria / entry 1**: Integrator amendment 2026-09-05: the closed inventory requires a cohesive test-support registry so executable field, enum, optional-arm and cross-authority cases remain below module-size budgets. The support path below is authorized before creation and contains no production policy.
+- Recorded requirement **acceptance_criteria / entry 2**: Integrator amendment 2026-09-05: exact review requires one closed executable mutation inventory for every canonical dataclass field, enum member, optional arm and cross-authority reference. The authority-inventory test path below is therefore in scope; this does not widen production or public-contract scope.
+- Recorded requirement **acceptance_criteria / entry 3**: Integrator amendment 2026-09-05: fresh review requires splitting structural mutation checks from semantic boundary/enum/rotation coverage and removing runpy-based private test-helper coupling. The additional test-only paths below are therefore in scope; this does not widen production or public-contract scope.
+- Recorded requirement **acceptance_criteria / entry 4**: Integrator amendment 2026-09-05: commit 52baf8393 improperly added four production paths in the implementation commit itself. This amendment explicitly accepts those four paths into the cumulative review scope without treating the earlier ownership violation as compliant; the complete diff from the approved base must receive fresh review before integration.
+- Recorded requirement **acceptance_criteria / entry 5**: All new models are frozen slotted dataclasses with exact V1 domains, strict canonical decode/re-encode, derived SHA-256 identities, closed enums and stable MssqlR1TypeTargetAuthorityError reason/recovery classification.
+- Recorded requirement **acceptance_criteria / entry 6**: Source and target scalar shapes implement the exact approved facet/OID/typmod/storage matrix and reject bool-as-int, subclasses, unsupported types, lossy mappings, malformed canonical bytes and unknown/trailing fields.
+- Recorded requirement **acceptance_criteria / entry 7**: Type decisions are derived from exact source-shape bytes; policy ordering uses the complete canonical-byte tie-breaker, one decision is reused by all columns with one exact shape, and no unused or missing decision is admitted.
+- Recorded requirement **acceptance_criteria / entry 8**: Value admission implements exact decimal/float/temporal/Unicode/binary limits without rounding or silent fallback; all sixteen approved Ryu byte vectors and numeric edge grammars are covered hermetically.
+- Recorded requirement **acceptance_criteria / entry 9**: Registered target catalogs close over exact ordered columns, one exact ascending scalar primary key, complete secondary-index definitions and the empty closed feature profile. Defaults, managed columns, triggers, FKs, CHECKs, indexed views, encryption and unsupported object features reject.
+- Recorded requirement **acceptance_criteria / entry 10**: Rotation-stable target authority contains every stable registration field and excludes attempt metadata. Source and target column refs are constructed only from admitted policy/catalog aggregates and bind their owning digest.
+- Recorded requirement **acceptance_criteria / entry 11**: Current-registration admission consumes persisted canonical registration payload and verification receipt, not the original signed command. Payload, policy, receipt, head, descriptor probe, security, lock, trusted SQL Server instant, physical identity and catalog anti-splice checks are repeated by validate_against_authorities.
+- Recorded requirement **acceptance_criteria / entry 12**: The exact probe digest preimage is SHA256 of the selected dpone_probe_registration_v3 MssqlR1PhysicalProcedureDescriptorV1 canonical bytes. Caller/environment/local time is never accepted as authority.
+- Recorded requirement **acceptance_criteria / entry 13**: Registration rotation evidence is a separate transition contract and cannot substitute for current admission. The pure implementation imports no provisioner or adapter and claims no live catalog or SQL persistence evidence.
+- Recorded requirement **acceptance_criteria / entry 14**: Every production module is cohesive and at most 350 SLOC. Existing mapper behavior, manifests, CLI, public exports and runtime activation remain unchanged.
+- Recorded requirement **acceptance_criteria / entry 15**: Red-green evidence is explicit: the focused new tests fail before production modules exist and pass after implementation. Existing type-mapping and R1 V3 contract regressions remain green.
+- Recorded requirement **public_contract_impact / level**: none
+- Recorded requirement **public_contract_impact / surfaces / entry 1**: Internal unreleased activation-blocked PostgreSQL-to-MSSQL R1 V3 contracts
+- Recorded requirement **public_contract_impact / migration_required**: false
+- Recorded requirement **owned_paths / entry 1**: src/dpone/contracts/postgres_mssql_type_target_enums.py
+- Recorded requirement **owned_paths / entry 2**: src/dpone/contracts/postgres_mssql_type_target_shapes.py
+- Recorded requirement **owned_paths / entry 3**: src/dpone/contracts/postgres_mssql_type_authority.py
+- Recorded requirement **owned_paths / entry 4**: src/dpone/contracts/postgres_mssql_type_derivation.py
+- Recorded requirement **owned_paths / entry 5**: src/dpone/contracts/postgres_mssql_value_admission.py
+- Recorded requirement **owned_paths / entry 6**: src/dpone/contracts/mssql_r1_v3_registered_target_catalog.py
+- Recorded requirement **owned_paths / entry 7**: src/dpone/contracts/mssql_r1_v3_registered_target_catalog_items.py
+- Recorded requirement **owned_paths / entry 8**: src/dpone/contracts/mssql_r1_v3_verified_target_authority.py
+- Recorded requirement **owned_paths / entry 9**: src/dpone/contracts/mssql_r1_v3_verified_target_validation.py
+- Recorded requirement **owned_paths / entry 10**: src/dpone/contracts/mssql_r1_v3_registration_rotation.py
+- Recorded requirement **owned_paths / entry 11**: tests/postgres_mssql_r1_v3_type_target_test_support.py
+- Recorded requirement **owned_paths / entry 12**: tests/postgres_mssql_r1_v3_authority_inventory_support.py
+- Recorded requirement **owned_paths / entry 13**: tests/test_postgres_mssql_r1_v3_type_target_authority_contract.py
+- Recorded requirement **owned_paths / entry 14**: tests/test_postgres_mssql_r1_v3_registered_target_catalog_contract.py
+- Recorded requirement **owned_paths / entry 15**: tests/test_postgres_mssql_r1_v3_verified_target_authority_contract.py
+- Recorded requirement **owned_paths / entry 16**: tests/test_postgres_mssql_r1_v3_type_target_mutation_contract.py
+- Recorded requirement **owned_paths / entry 17**: tests/test_postgres_mssql_r1_v3_authority_inventory_contract.py
+- Recorded requirement **owned_paths / entry 18**: tests/test_postgres_mssql_r1_v3_registered_target_mutation_contract.py
+- Recorded requirement **owned_paths / entry 19**: tests/test_postgres_mssql_r1_v3_registration_rotation_contract.py
+- Recorded requirement **owned_paths / entry 20**: tests/test_postgres_mssql_r1_v3_verified_target_mutation_contract.py
+- Recorded requirement **owned_paths / entry 21**: tests/test_postgres_mssql_r1_v3_provider_security_contract.py
+- Recorded requirement **integrator_owned_paths / entry 1**: docs/feature-design-postgres-mssql-r1-v3-type-target-authority-v1.md
+- Recorded requirement **integrator_owned_paths / entry 2**: docs/adr
+- Recorded requirement **integrator_owned_paths / entry 3**: docs/adr-index.md
+- Recorded requirement **integrator_owned_paths / entry 4**: docs/developer-postgres-mssql-r1-v3-provider-implementation.md
+- Recorded requirement **integrator_owned_paths / entry 5**: docs/agent-task-contracts/postgres-mssql-r1-v3-type-target-authority-v1.yml
+- Recorded requirement **read_only_paths / entry 1**: docs/feature-design-postgres-mssql-r1-v3-physical-descriptor-contract-v1.md
+- Recorded requirement **read_only_paths / entry 2**: docs/feature-design-postgres-mssql-r1-v3-provider-security-authority-amendment-v2.md
+- Recorded requirement **read_only_paths / entry 3**: src/dpone/contracts/mssql_r1_v3_codec.py
+- Recorded requirement **read_only_paths / entry 4**: src/dpone/contracts/mssql_r1_v3_identity.py
+- Recorded requirement **read_only_paths / entry 5**: src/dpone/contracts/mssql_r1_v3_registration.py
+- Recorded requirement **read_only_paths / entry 6**: src/dpone/contracts/mssql_r1_v3_physical_descriptor_*.py
+- Recorded requirement **read_only_paths / entry 7**: src/dpone/contracts/mssql_r1_v3_physical_schema_descriptor.py
+- Recorded requirement **read_only_paths / entry 8**: src/dpone/contracts/mssql_r1_v3_provider_security_*.py
+- Recorded requirement **read_only_paths / entry 9**: src/dpone/contracts/postgres_mssql_type_mapping.py
+- Recorded requirement **read_only_paths / entry 10**: src/dpone/contracts/postgres_mssql_type_policy.py
+- Recorded requirement **forbidden_paths / entry 1**: pyproject.toml
+- Recorded requirement **forbidden_paths / entry 2**: uv.lock
+- Recorded requirement **forbidden_paths / entry 3**: CHANGELOG.md
+- Recorded requirement **forbidden_paths / entry 4**: mkdocs.yml
+- Recorded requirement **forbidden_paths / entry 5**: .github/workflows
+- Recorded requirement **forbidden_paths / entry 6**: src/dpone/contracts/__init__.py
+- Recorded requirement **forbidden_paths / entry 7**: src/dpone/ports
+- Recorded requirement **forbidden_paths / entry 8**: src/dpone/adapters
+- Recorded requirement **forbidden_paths / entry 9**: src/dpone/runtime
+- Recorded requirement **forbidden_paths / entry 10**: src/dpone/services
+- Recorded requirement **forbidden_paths / entry 11**: src/dpone/app
+- Recorded requirement **forbidden_paths / entry 12**: src/dpone/commands
+- Recorded requirement **forbidden_paths / entry 13**: src/dpone/schema
+- Recorded requirement **forbidden_paths / entry 14**: tests/conftest.py
+- Recorded requirement **forbidden_paths / entry 15**: docs/adr
+- Recorded requirement **forbidden_paths / entry 16**: docs/adr-index.md
+- Recorded requirement **forbidden_paths / entry 17**: docs/developer-postgres-mssql-r1-v3-provider-implementation.md
+- Recorded requirement **forbidden_paths / entry 18**: docs/agent-task-contracts/postgres-mssql-r1-v3-type-target-authority-v1.yml
+- Recorded requirement **forbidden_paths / entry 19**: docs/feature-design-postgres-mssql-r1-v3-type-target-authority-v1.md
+- Recorded requirement **shared_file_owner**: Codex
+- Recorded requirement **dependencies / entry 1**: source record 051
+- Recorded requirement **dependencies / entry 2**: source record 052
+- Recorded requirement **dependencies / entry 3**: source record 001
+- Recorded requirement **dependencies / entry 4**: source record 053
+- Historical requirement description **required_checks / focused / entry 1**: .venv/bin/pytest tests/test_postgres_mssql_r1_v3_type_target_authority_contract.py tests/test_postgres_mssql_r1_v3_type_target_mutation_contract.py tests/test_postgres_mssql_r1_v3_authority_inventory_contract.py tests/test_postgres_mssql_r1_v3_registered_target_catalog_contract.py tests/test_postgres_mssql_r1_v3_registered_target_mutation_contract.py tests/test_postgres_mssql_r1_v3_verified_target_authority_contract.py tests/test_postgres_mssql_r1_v3_verified_target_mutation_contract.py tests/test_postgres_mssql_r1_v3_registration_rotation_contract.py -q
+- Historical requirement description **required_checks / focused / entry 2**: .venv/bin/pytest tests/test_postgres_mssql_type_mapping.py tests/test_postgres_mssql_r1_v3_contracts.py -q
+- Historical requirement description **required_checks / broad / entry 1**: .venv/bin/python tools/agent_policy/select_checks.py --base-ref origin/master
+- Historical requirement description **required_checks / broad / entry 2**: .venv/bin/ruff check src/dpone/contracts/postgres_mssql_type_*.py src/dpone/contracts/mssql_r1_v3_registered_target_catalog*.py src/dpone/contracts/mssql_r1_v3_verified_target_*.py src/dpone/contracts/mssql_r1_v3_registration_rotation.py tests/postgres_mssql_r1_v3_type_target_test_support.py tests/postgres_mssql_r1_v3_authority_inventory_support.py tests/test_postgres_mssql_r1_v3_*target*contract.py tests/test_postgres_mssql_r1_v3_authority_inventory_contract.py tests/test_postgres_mssql_r1_v3_registration_rotation_contract.py tests/test_postgres_mssql_r1_v3_provider_security_contract.py
+- Historical requirement description **required_checks / broad / entry 3**: .venv/bin/ruff format --check src/dpone/contracts/postgres_mssql_type_*.py src/dpone/contracts/mssql_r1_v3_registered_target_catalog*.py src/dpone/contracts/mssql_r1_v3_verified_target_*.py src/dpone/contracts/mssql_r1_v3_registration_rotation.py tests/postgres_mssql_r1_v3_type_target_test_support.py tests/postgres_mssql_r1_v3_authority_inventory_support.py tests/test_postgres_mssql_r1_v3_*target*contract.py tests/test_postgres_mssql_r1_v3_authority_inventory_contract.py tests/test_postgres_mssql_r1_v3_registration_rotation_contract.py tests/test_postgres_mssql_r1_v3_provider_security_contract.py
+- Historical requirement description **required_checks / broad / entry 4**: .venv/bin/mypy --config-file mypy.ini src/dpone/contracts/postgres_mssql_type_*.py src/dpone/contracts/mssql_r1_v3_registered_target_catalog*.py src/dpone/contracts/mssql_r1_v3_verified_target_*.py src/dpone/contracts/mssql_r1_v3_registration_rotation.py
+- Historical requirement description **required_checks / broad / entry 5**: .venv/bin/dpone docs check-import-rules
+- Historical requirement description **required_checks / broad / entry 6**: .venv/bin/dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json
+- Historical requirement description **required_checks / broad / entry 7**: .venv/bin/dpone docs check-module-size --package src/dpone/contracts --no-baseline
+- Historical requirement description **required_checks / broad / entry 8**: .venv/bin/dpone docs check-architecture-fitness --format json  # retain the visible repository-level result and record the exact candidate metrics
+- Historical requirement description **required_checks / broad / entry 9**: .venv/bin/pytest -m 'not integration_live' -n auto --dist loadfile
+- Recorded required_checks / live: empty list.
+- Recorded requirement **required_outputs / entry 1**: implementation
+- Recorded requirement **required_outputs / entry 2**: tests
+- Recorded requirement **required_outputs / entry 3**: documentation_impact
+- Recorded requirement **required_outputs / entry 4**: completion_report
+- Recorded requirement **completion_statuses / allowed / entry 1**: PASS
+- Recorded requirement **completion_statuses / allowed / entry 2**: FAIL
+- Recorded requirement **completion_statuses / allowed / entry 3**: SKIP
+- Recorded requirement **completion_statuses / allowed / entry 4**: N/A
+- Recorded requirement **completion_statuses / allowed / entry 5**: UNVERIFIED
+- Recorded requirement **stop_conditions / entry 1**: Required edit falls outside owned_paths.
+- Recorded requirement **stop_conditions / entry 2**: Approved specification is missing or contradicted.
+- Recorded requirement **stop_conditions / entry 3**: Implementation requires SQL, I/O, adapters, ports, renderer, binding, migration, CLI, manifest, public exports or activation changes.
+- Recorded requirement **stop_conditions / entry 4**: A live catalog, persistence or time-source claim would need to be fabricated.
+- Recorded requirement **stop_conditions / entry 5**: A reverse contracts-to-adapter dependency, facade-only module, duplicate upstream authority or production module above 350 SLOC would be required.
+- Recorded requirement **stop_conditions / entry 6**: Public-contract impact is larger than declared.
+- Recorded requirement **stop_conditions / entry 7**: A live check requires unapproved credentials or environment.
+- Recorded requirement **stop_conditions / entry 8**: Another writer owns the same semantic contract.

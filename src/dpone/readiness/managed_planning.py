@@ -15,7 +15,9 @@ if TYPE_CHECKING:
 
 from dpone.manifest.loader import ManifestLoaderRouter
 from dpone.readiness import managed_native_transfer_plan as native_transfer_plan
+from dpone.readiness import managed_planning_r1 as r1_planning
 from dpone.readiness import managed_planning_snapshot as snapshot_planning
+from dpone.readiness.managed_bulk_path import managed_bulk_path
 from dpone.readiness.managed_native_projection import (
     native_transfer_bulk_wire,
     native_transfer_route_decision,
@@ -35,6 +37,10 @@ from dpone.readiness.managed_utils import (
 )
 from dpone.readiness.mssql_native_planning import project_mssql_native
 from dpone.readiness.physical_design import PhysicalDesignOptions, PhysicalDesignPlanner
+from dpone.readiness.postgres_mssql_correctness_route import (
+    PostgresMssqlCorrectnessRouteResolver,
+    postgres_mssql_correctness_plan,
+)
 from dpone.readiness.resolved_process_route import resolve_process_route
 from dpone.readiness.schema_contracts import SchemaContract
 from dpone.runtime.partitioning_options import PartitioningOptionsResolver
@@ -47,6 +53,13 @@ from dpone.type_system import TypeInferenceOptions, TypeInferenceService
 
 class ExecutionPlanService:
     """Builds dry-run execution plans from manifests without touching targets."""
+
+    def __init__(
+        self,
+        *,
+        postgres_mssql_correctness: PostgresMssqlCorrectnessRouteResolver | None = None,
+    ) -> None:
+        self._postgres_mssql_correctness = postgres_mssql_correctness
 
     def plan_manifest(
         self,
@@ -89,6 +102,12 @@ class ExecutionPlanService:
         postgres_mssql_wire = (
             normalize_postgres_mssql_wire(lc).to_dict() if source_type == "postgres" and sink_type == "mssql" else None
         )
+        postgres_mssql_correctness = postgres_mssql_correctness_plan(
+            spec,
+            self._postgres_mssql_correctness,
+            source_type=source_type,
+            sink_type=sink_type,
+        )
         typed_snapshot_route = snapshot_planning.is_postgres_xmin_key_snapshot_mssql(
             raw,
             source_type,
@@ -122,8 +141,9 @@ class ExecutionPlanService:
                 "merge_policy": lc.merge_policy,
                 "mssql_contract": mssql_strategy_contract,
             },
-            "bulk_path": self._bulk_path(raw, source_type, sink_type, lc.export_format),
+            "bulk_path": managed_bulk_path(raw, source_type, sink_type, lc.export_format),
             "postgres_mssql_wire": postgres_mssql_wire,
+            "postgres_mssql_correctness": postgres_mssql_correctness,
             "columnar_fast_path": native_transfer_plan.columnar_fast_path_plan(
                 raw,
                 source_type=source_type,
@@ -162,37 +182,13 @@ class ExecutionPlanService:
         plan["warnings"] = plan_warnings(plan)
         if explain_strategy:
             plan["strategy_intelligence"] = lc.options.get("strategy_intelligence", {})
+        plan = r1_planning.cohere_selected_r1_plan(
+            plan,
+            correctness=postgres_mssql_correctness,
+            unique_key=tuple(_list_option(lc.unique_key)),
+        )
         project_mssql_native(plan, lc)
         return _redact(plan)
-
-    def _bulk_path(self, raw: Mapping[str, Any], source: str, sink: str, export_format: str) -> str:
-        if source == "postgres" and sink == "mssql":
-            return "postgres_copy_to_mssql_bcp"
-        if source == "mssql" and sink == "clickhouse":
-            if native_transfer_plan.requests_object_storage_pull(raw):
-                return "mssql_parquet_object_storage_to_clickhouse_pull"
-            bulk_wire = native_transfer_bulk_wire(raw, source, sink)
-            if (
-                str(bulk_wire.get("selected_route")) == "typed_binary_bcp_native"
-                and str(bulk_wire.get("input_format")) == "Native"
-            ):
-                return "mssql_bcp_native_to_clickhouse_native"
-            return {
-                "typed_raw_direct": "mssql_bcp_queryout_to_clickhouse_typed_wire",
-                "typed_binary_bcp_native": "mssql_bcp_native_to_clickhouse_rowbinary",
-                "driver": "mssql_driver_to_clickhouse_python",
-            }.get(str(bulk_wire.get("selected_route")), "mssql_bcp_queryout_to_clickhouse_direct_tsv")
-        if sink == "kafka":
-            return "producer_batch"
-        if source == "kafka":
-            return "bounded_kafka_batch"
-        if sink == "mssql":
-            return "mssql_bcp_import"
-        if sink == "clickhouse":
-            return "clickhouse_native_or_http_bulk"
-        if export_format == "binary":
-            return "native_binary_export"
-        return "streaming_rows"
 
     def _schema_evolution(self, raw: Mapping[str, Any], *, apply_safe_schema: bool) -> dict[str, Any]:
         sink_options = raw.get("sink", {}).get("options", {}) if isinstance(raw.get("sink"), Mapping) else {}

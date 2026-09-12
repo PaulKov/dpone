@@ -12,8 +12,8 @@ from dpone_airflow_pack.mssql_asset_uri_codec import (
 
 
 def test_three_and_four_segment_shapes_round_trip() -> None:
-    three = "mssql://sql-prod.internal:1433/DWH/dbo/orders"
-    four = "mssql://sql-prod.internal:1433/prod01/DWH/dbo/orders"
+    three = "mssql://fixture01.invalid:1433/DWH/dbo/orders"
+    four = "mssql://fixture01.invalid:1433/prod01/DWH/dbo/orders"
     assert require_canonical_mssql_asset_uri(three) == three
     assert require_canonical_mssql_asset_uri(four) == four
     parsed_four = parse_mssql_asset_uri(four)
@@ -23,25 +23,25 @@ def test_three_and_four_segment_shapes_round_trip() -> None:
 
 def test_named_instance_is_lowercased_in_canonical_form() -> None:
     uri = canonicalize_mssql_asset_uri_parts(
-        host="SQL-Prod.Internal",
+        host="FIXTure01.Invalid",
         port=1433,
         instance="PROD01",
         database="DWH",
         schema="dbo",
         table="orders",
     )
-    assert uri == "mssql://sql-prod.internal:1433/prod01/DWH/dbo/orders"
+    assert uri == "mssql://fixture01.invalid:1433/prod01/DWH/dbo/orders"
 
 
 def test_closed_form_requires_explicit_port_and_rejects_userinfo() -> None:
     with pytest.raises(ValueError, match="explicit port"):
-        parse_mssql_asset_uri("mssql://sql-prod.internal/DWH/dbo/orders", require_explicit_port=True)
+        parse_mssql_asset_uri("mssql://fixture01.invalid/DWH/dbo/orders", require_explicit_port=True)
     with pytest.raises(ValueError, match="credentials"):
-        parse_mssql_asset_uri("mssql://user:pass@sql-prod.internal:1433/DWH/dbo/orders")
+        parse_mssql_asset_uri("mssql://user:pass@fixture01.invalid:1433/DWH/dbo/orders")
     with pytest.raises(ValueError, match="query or fragment"):
-        parse_mssql_asset_uri("mssql://sql-prod.internal:1433/DWH/dbo/orders?x=1")
+        parse_mssql_asset_uri("mssql://fixture01.invalid:1433/DWH/dbo/orders?x=1")
 
 
 def test_canonicalize_parse_equality_is_required_for_closed_uri() -> None:
     with pytest.raises(ValueError, match="closed canonical"):
-        require_canonical_mssql_asset_uri("mssql://SQL-Prod.Internal:1433/DWH/dbo/orders")
+        require_canonical_mssql_asset_uri("mssql://FIXTure01.Invalid:1433/DWH/dbo/orders")

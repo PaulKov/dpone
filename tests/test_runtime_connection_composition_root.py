@@ -30,6 +30,7 @@ from dpone.runtime.credentials.runtime_context import (
     RuntimeConnectionContext,
     RuntimeConnectionContextLoader,
 )
+from tests.test_postgres_mssql_r1_source_schema_semantic_inventory import bind_behavior_scenario
 from tests.test_runtime_connection_context_loader import (
     _replace_plan_descriptor,
     _runtime_context,
@@ -770,3 +771,66 @@ class _RecordingResolvedEndpointFactory:
         self.source_connection = connection
         self._events.append("source")
         return "source"
+
+
+def _source_schema_default_behavior(_modules: dict[str, Any]) -> dict[str, bool]:
+    import dpone
+    from dpone.app.runtime_bootstrap import build_default_runtime_hydrator
+    from dpone.runtime.errors import RuntimeConfigurationError
+
+    forbidden_public_symbols = {
+        "PostgresMssqlSelectedRelationSchemaAuthorityV1",
+        "PostgresMssqlSourceSchemaRuntime",
+        "PostgresMssqlSourceSchemaRuntimeV1",
+        "PreparedPostgresSourceBoundary",
+    }
+    declared_public = set(getattr(dpone, "__all__", ()))
+    lazy_public = set(getattr(dpone, "_EXPORTS", ()))
+    loaded_public = set(vars(dpone))
+    app_hydrator = build_default_runtime_hydrator()
+
+    events: list[str] = []
+
+    class Resolver:
+        def require_runtime_activatable(self, **_kwargs: Any) -> object:
+            return object()
+
+    class CorrectnessRuntimeFactory:
+        def build(self, **_kwargs: Any) -> object:
+            return object()
+
+    config = {
+        "runtime": {"compatibility": {"legacy_runtime_connections": "explicit_only"}},
+        "source": {"type": "postgres", "connection_id": "source-main", "connection_type": "params"},
+        "sink": {"type": "mssql", "connection_id": "sink-main", "connection_type": "params"},
+        "state": {"type": "disabled"},
+    }
+    error = None
+    try:
+        DefaultRuntimeHydrator(
+            state_bootstrap=_StateBootstrap(events),
+            endpoint_factory=_EndpointFactory(events),
+            connection_context_loader=_ContextLoader(None),
+            postgres_mssql_correctness_route_resolver=Resolver(),
+            postgres_mssql_correctness_runtime_factory=CorrectnessRuntimeFactory(),
+            postgres_mssql_source_schema_runtime_factory=None,
+        ).build(config=config, load_config=_load_config())
+    except RuntimeConfigurationError as exc:
+        error = exc
+    except TypeError:
+        pytest.fail("source-schema runtime factory injection is absent", pytrace=False)
+    return {
+        "factory_absent": getattr(error, "code", str(error))
+        == "DPONE_POSTGRES_MSSQL_SOURCE_SCHEMA_AUTHORITY_RUNTIME_REQUIRED",
+        "app_composition_unregistered": getattr(
+            app_hydrator,
+            "_postgres_mssql_source_schema_runtime_factory",
+            None,
+        )
+        is None,
+        "failure_before_source_object": "source" not in events,
+        "no_public_export": forbidden_public_symbols.isdisjoint(declared_public | lazy_public | loaded_public),
+    }
+
+
+bind_behavior_scenario("runtime.default-activation-blocked", _source_schema_default_behavior)

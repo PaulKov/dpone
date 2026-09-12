@@ -8,10 +8,12 @@ from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from queue import Queue
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
-from dpone.runtime.connectors.api.config import ConcurrencyConfig
 from dpone.runtime.connectors.api.rate_limit import ThreadSafeRateLimiter
+
+if TYPE_CHECKING:
+    from dpone.runtime.connectors.api.config import ConcurrencyConfig
 
 T = TypeVar("T")
 R = TypeVar("R")

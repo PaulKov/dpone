@@ -8,7 +8,7 @@ from typing import Any
 def studio_openapi_response_schemas(
     object_schema: dict[str, Any],
 ) -> dict[str, Any]:
-    plan_sections = {
+    plan_sections: dict[str, Any] = {
         name: {"$ref": "#/components/schemas/PlanSection"}
         for name in (
             "staging",
@@ -31,6 +31,9 @@ def studio_openapi_response_schemas(
             "quality",
             "strategy_intelligence",
         )
+    }
+    plan_sections["postgres_mssql_correctness"] = {
+        "oneOf": [{"type": "null"}, {"$ref": "#/components/schemas/PlanSection"}]
     }
     return {
         "PipelineExplainResponse": {

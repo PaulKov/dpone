@@ -24,6 +24,7 @@ from dpone.runtime.etl.result_metrics import (
     staged_quality_gate_report,
 )
 from dpone.runtime.etl.source_extraction_lifecycle import SourceExtractionLifecycleService
+from dpone.runtime.postgres_mssql_r1_execution import require_postgres_mssql_r1_execution
 from dpone.runtime.runtime_throughput import enrich_run_result_with_throughput
 from dpone.security_redaction import redact_public_context, redact_public_text
 
@@ -53,6 +54,7 @@ class ProcessorRuntimeServices:
         source_extraction_lifecycle_service: Any | None = None,
         mssql_transaction_admission_service: Any | None = None,
         route_capability_orchestrator: Any | None = None,
+        postgres_mssql_correctness_runtime: Any | None = None,
     ) -> None:
         self.source = source
         self.sink = sink
@@ -61,8 +63,13 @@ class ProcessorRuntimeServices:
         self.source_extraction_lifecycle_service = (
             source_extraction_lifecycle_service or SourceExtractionLifecycleService()
         )
+        if postgres_mssql_correctness_runtime is not None and mssql_transaction_admission_service is not None:
+            raise RuntimeError("postgres_mssql_r1.legacy_admission_conflict")
+        self.postgres_mssql_correctness_runtime = postgres_mssql_correctness_runtime
         self.mssql_transaction_admission_service = (
-            mssql_transaction_admission_service or MssqlTransactionAdmissionService()
+            None
+            if postgres_mssql_correctness_runtime is not None
+            else mssql_transaction_admission_service or MssqlTransactionAdmissionService()
         )
         self.route_capability_orchestrator = route_capability_orchestrator
 
@@ -74,6 +81,22 @@ class ProcessorRuntimeServices:
         load_record: Any,
         dag_id: str | None,
     ) -> Any:
+        if self.postgres_mssql_correctness_runtime is not None:
+            prepared = self.postgres_mssql_correctness_runtime.prepare_admission(
+                load_config,
+                source=self.source,
+                sink=self.sink,
+                run_context=run_context,
+                load_record=load_record,
+                dag_id=dag_id,
+            )
+            require_postgres_mssql_r1_execution(
+                prepared,
+                expected=self.postgres_mssql_correctness_runtime,
+            )
+            return prepared
+        if self.mssql_transaction_admission_service is None:  # construction invariant
+            raise RuntimeError("postgres_mssql_r1.admission_service_missing")
         return self.mssql_transaction_admission_service.prepare(
             load_config,
             source=self.source,
@@ -84,19 +107,37 @@ class ProcessorRuntimeServices:
         )
 
     def replay_result(self, load_config: Any) -> Any | None:
+        self.require_execution_context(load_config)
+        if self.postgres_mssql_correctness_runtime is not None:
+            return self.postgres_mssql_correctness_runtime.replay_result(load_config)
+        if self.mssql_transaction_admission_service is None:  # construction invariant
+            raise RuntimeError("postgres_mssql_r1.admission_service_missing")
         return self.mssql_transaction_admission_service.replay_result(load_config)
 
+    def require_execution_context(self, load_config: Any) -> None:
+        """Re-prove that config enrichment did not lose or replace R1 authority."""
+
+        if self.postgres_mssql_correctness_runtime is not None:
+            require_postgres_mssql_r1_execution(
+                load_config,
+                expected=self.postgres_mssql_correctness_runtime,
+            )
+
     def preflight_before_extract(self, load_config: Any, load_record: Any) -> None:
+        self.require_execution_context(load_config)
         self.source_extraction_lifecycle_service.assert_supported(self.source, load_config)
+        self.require_execution_context(load_config)
         preflight = getattr(self.sink, "preflight_before_extract", None)
         if callable(preflight):
             preflight(load_config=load_config, load_record=load_record)
+        self.require_execution_context(load_config)
         schema_evolution = getattr(self.payload_load_service, "schema_evolution_service", None)
         schema_preflight = getattr(schema_evolution, "preflight_before_extract", None)
         if callable(schema_preflight):
             schema_preflight(load_config=load_config, source=self.source, sink=self.sink)
 
     def prepare_route_capabilities(self, load_config: Any, load_record: Any) -> Any | None:
+        self.require_execution_context(load_config)
         if self.route_capability_orchestrator is None:
             return None
         return self.route_capability_orchestrator.prepare(
@@ -113,6 +154,7 @@ class ProcessorRuntimeServices:
         return {"summary": summary} if summary is not None else None
 
     def load_incremental_state(self, load_config: Any) -> Any:
+        self.require_execution_context(load_config)
         return self.source_state_service.load_for_extract(self.source, load_config)
 
     def extract(
@@ -123,6 +165,7 @@ class ProcessorRuntimeServices:
         route_context: Any | None,
     ) -> Any:
         def invoke() -> Any:
+            self.require_execution_context(load_config)
             if route_context is None:
                 return self.source.extract(load_config, incremental_state)
             return route_context.extract(

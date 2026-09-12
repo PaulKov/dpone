@@ -58,6 +58,8 @@ class ETLProcessConfig:
     partition_checkpoint_store: Any | None = None
     load_identity_service: Any | None = None
     credential_resolution_receipts: tuple[dict[str, Any], ...] = ()
+    postgres_mssql_correctness_activation: Any | None = None
+    postgres_mssql_correctness_runtime: Any | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -81,6 +83,12 @@ class ETLProcessConfig:
         self.xmin_handoff_state_storage = getattr(bindings, "xmin_handoff_state_storage", None)
         self.partition_checkpoint_store = bindings.partition_checkpoint_store
         self.load_identity_service = getattr(bindings, "load_identity_service", None)
+        self.postgres_mssql_correctness_activation = getattr(
+            bindings,
+            "postgres_mssql_correctness_activation",
+            None,
+        )
+        self.postgres_mssql_correctness_runtime = getattr(bindings, "postgres_mssql_correctness_runtime", None)
         self.credential_resolution_receipts = tuple(
             dict(receipt) for receipt in bindings.credential_resolution_receipts
         )

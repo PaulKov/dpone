@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
 from dpone.runtime.extraction_lifecycle import ExtractionLifecycleStateError
+from dpone.runtime.postgres_mssql_r1_execution import PostgresMssqlR1ExecutionError
 from dpone.runtime.sinks.mssql_transaction_requirement import require_generic_transaction_state
 from dpone.runtime.sinks.strategies.mssql.mssql_initial_typed_staging import (
     is_direct_xmin_initial_staging_candidate,
@@ -43,6 +44,8 @@ class MssqlStagingConsumer:
         self._strategy = strategy
 
     def consume(self, load_config: Any, payload: Any, handler: Any) -> LoadResult:
+        if getattr(payload, "postgres_mssql_r1_execution", None) is not None:
+            raise PostgresMssqlR1ExecutionError("legacy_dispatch_forbidden")
         admission = getattr(payload, "mssql_transaction_admission", None)
         state_storage = require_generic_transaction_state(load_config, self._strategy.state_storage)
         if not isinstance(admission, MssqlTransactionAdmission):

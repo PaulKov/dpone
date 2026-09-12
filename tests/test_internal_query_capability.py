@@ -199,7 +199,10 @@ def test_strict_equal_alias_cross_dialect_fails_before_endpoint_hydration() -> N
     assert endpoints.events == []
 
 
-def test_legacy_equal_alias_cross_dialect_binds_explicit_file_fallback() -> None:
+def test_legacy_equal_alias_cross_dialect_binds_explicit_file_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    from dpone.runtime.credentials import authority_resolution
+
+    monkeypatch.setattr(authority_resolution, "_legacy_warning_emitted", False)
     source = _Source(_Connector())
     target_connector = _Connector()
     endpoints = _EndpointFactory(source, _Sink(target_connector))

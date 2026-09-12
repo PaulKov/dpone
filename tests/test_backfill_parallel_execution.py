@@ -67,6 +67,7 @@ from dpone.contracts.portable_scope_binding import (
     PortableScopeColumnContract,
     bind_portable_scope,
 )
+from tests.support.process_liveness import pid_is_running as _pid_is_running
 
 
 def _append_event(path: str, **event: object) -> None:
@@ -1579,6 +1580,7 @@ def test_native_exit_terminates_the_entire_peer_process_group(tmp_path: Path) ->
             heartbeat_interval_seconds=0.05,
             shutdown_timeout_seconds=0.2,
         )
+        assert descendant_pid_path.is_file(), summary.errors
         descendant_pid = int(descendant_pid_path.read_text(encoding="utf-8"))
         assert not _pid_is_running(descendant_pid)
         assert summary.lanes
@@ -1632,14 +1634,6 @@ def test_native_exit_cleans_descendants_before_receipt_probe(tmp_path: Path) -> 
         if descendant_pid is not None:
             with suppress(ProcessLookupError):
                 os.kill(descendant_pid, signal.SIGKILL)
-
-
-def _pid_is_running(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    return True
 
 
 def test_corrupt_child_frame_runs_receipt_recovery_instead_of_escaping(tmp_path: Path) -> None:

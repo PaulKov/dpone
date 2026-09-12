@@ -484,7 +484,11 @@ nav:
       - DAG debugging: dag-debugging.md
   - Developer docs:
       - Developer guide: developers.md
+      - PostgreSQL to MSSQL internal provider implementation: developer-postgres-mssql-r1-v3-provider-implementation.md
+      - PostgreSQL to MSSQL internal Binding V2 maintainer: postgres-mssql-r1/binding-v2-maintainer.md
       - Agent-assisted development: agent-development.md
+      - Public-clean migration: public-clean-migration.md
+      - Feature design - public-clean migration: feature-design-public-clean-migration-v1.md
       - Agent governance: agent-governance.md
       - Agent PR merge-receipt runbook: agent-pr-merge-receipt-runbook.md
       - Agent task contracts: agent-task-contracts.md

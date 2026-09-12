@@ -1,0 +1,65 @@
+# UNBOUND until RED-assets and evidence-protocol commits exist.
+schema_version: 1
+task_id: POSTGRES-MSSQL-R1-V3-PROVIDER-ATTESTATION-V2-EVIDENCE
+title: Provider Attestation V2 evidence protocol
+goal: Own the create-only evidence schema, producer and meta-test. Frozen RED
+  assets are read-only. Retained artifacts require a clean exact-commit checkout.
+specification: docs/feature-design-postgres-mssql-r1-v3-provider-attestation-evidence-v1.md
+base_commit: UNBOUND_REQUIRES_PRIVACY_CLEARANCE
+integrator: dpone-maintainers
+acceptance_criteria:
+- Schema and producer are create-only and path-safe.
+- Meta-test covers closed enums, digest shape, equations, observation properties
+  and forbidden pytest exits.
+- Live remains N/A; activation remains blocked.
+public_contract_impact:
+  level: none
+  surfaces: []
+  migration_required: false
+owned_paths:
+- docs/schemas/evidence/postgres-mssql-r1-v3-provider-attestation-v2.schema.json
+- tools/evidence/postgres_mssql_r1_v3_provider_attestation_v2_evidence.py
+- tests/test_postgres_mssql_r1_v3_provider_attestation_v2_evidence.py
+integrator_owned_paths:
+- docs/agent-task-contracts/postgres-mssql-r1-v3-provider-attestation-v2-evidence.yml
+read_only_paths:
+- tests/support/postgres_mssql_r1_v3_provider_attestation_v2_fixtures.py
+- tests/support/postgres_mssql_r1_v3_provider_attestation_v2_oracle.py
+- tests/support/postgres_mssql_r1_v3_provider_attestation_v2_red_probe.py
+- tests/test_postgres_mssql_r1_v3_provider_attestation_v2_abi.py
+- tests/test_postgres_mssql_r1_v3_provider_attestation_v2_query_results.py
+- tests/test_postgres_mssql_r1_v3_provider_attestation_v2_stable_schema.py
+- tests/test_postgres_mssql_r1_v3_provider_attestation_v2_stable_catalog.py
+- tests/test_postgres_mssql_r1_v3_provider_attestation_v2_mutations.py
+- docs/schemas/evidence/postgres-mssql-r1-v3-provider-attestation-v2-cases.json
+- src/dpone/contracts
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+shared_file_owner: dpone-maintainers
+dependencies: []
+required_checks:
+  focused:
+  - uv run pytest tests/test_postgres_mssql_r1_v3_provider_attestation_v2_evidence.py -q
+  broad:
+  - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
+  live: []
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Frozen RED assets are modified.
+- A generated artifact is hand-edited.

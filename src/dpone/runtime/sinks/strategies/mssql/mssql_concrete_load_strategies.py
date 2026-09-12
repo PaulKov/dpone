@@ -9,6 +9,7 @@ from dpone.config.mssql_strategy_contract import normalize_mssql_load_strategy
 from dpone.contracts.portable_scope_resolution import resolve_bound_portable_scope
 from dpone.runtime.artifact_models import StagingTableArtifact
 from dpone.runtime.incremental_snapshot import IncrementalSnapshotEnvelope
+from dpone.runtime.postgres_mssql_r1_execution import require_r1_execution_method
 from dpone.runtime.sinks.load_payload import LoadPayload
 from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.merge_policy import (
@@ -25,6 +26,13 @@ from dpone.runtime.sinks.strategies.mssql.mssql_strategy_base import MSSQLStrate
 
 class MSSQLFullRefreshStrategy(MSSQLStrategyBase):
     def load(self, load_config: Any, payload: LoadPayload) -> LoadResult:
+        execution = payload.postgres_mssql_r1_execution
+        if execution is not None:
+            return require_r1_execution_method(execution, "load_batch")(
+                strategy=self,
+                load_config=load_config,
+                payload=payload,
+            )
         contract = normalize_mssql_load_strategy(load_config)
         assert contract.full_refresh is not None
 
@@ -90,6 +98,13 @@ class MSSQLIncrementAppendStrategy(MSSQLStrategyBase):
 
 class MSSQLIncrementMergeStrategy(MSSQLStrategyBase):
     def load(self, load_config: Any, payload: LoadPayload) -> LoadResult:
+        execution = payload.postgres_mssql_r1_execution
+        if execution is not None:
+            return require_r1_execution_method(execution, "load_xmin")(
+                strategy=self,
+                load_config=load_config,
+                payload=payload,
+            )
         if isinstance(payload.artifact, IncrementalSnapshotEnvelope):
             from dpone.runtime.sinks.strategies.mssql.mssql_snapshot_finalizer import (
                 MssqlSnapshotFinalizer,

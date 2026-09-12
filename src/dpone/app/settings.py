@@ -23,6 +23,7 @@ class Settings:
     project_dir: Path
     manifest_dir: Path
     sources_registry_paths: tuple[Path, ...]
+    postgres_mssql_correctness_catalog_path: Path | None = None
 
     @staticmethod
     def _detect_repo_root(start: Path) -> Path:
@@ -60,9 +61,18 @@ class Settings:
                     p = project_dir / p
                 paths.append(p)
 
+        correctness_catalog_raw = os.getenv("DPONE_POSTGRES_MSSQL_CORRECTNESS_CATALOG", "").strip()
+        correctness_catalog_path: Path | None = None
+        if correctness_catalog_raw:
+            correctness_catalog_path = Path(correctness_catalog_raw)
+            if not correctness_catalog_path.is_absolute():
+                correctness_catalog_path = project_dir / correctness_catalog_path
+            correctness_catalog_path = correctness_catalog_path.resolve()
+
         return cls(
             repo_root=repo_root,
             project_dir=project_dir,
             manifest_dir=manifest_dir,
             sources_registry_paths=tuple(paths),
+            postgres_mssql_correctness_catalog_path=correctness_catalog_path,
         )

@@ -1,0 +1,106 @@
+# Status: APPROVED; current-master preservation and local Docker scope reaffirmed by maintainer.
+schema_version: 1
+task_id: PUBLIC-CLEAN-CAPACITY-V1
+title: Bounded complete-tree gate capacity amendment
+goal: Support reviewed full-tree finding capacity without weakening coverage or failure
+  semantics.
+specification: docs/feature-design-public-clean-migration-v1.md
+base_commit: 3977ca2d04ca5dbcf3338d7c31faff8a1199549e
+integrator: parent-integrator
+acceptance_criteria:
+- Approve the private capacity amendment and this scoped contract before implementation.
+- Support at most 100000 findings and exact-occurrence exceptions, with 64 MiB review
+  and receipt limits.
+- Preserve the independent 10000 protected-ticket position limit and all other existing
+  bounds.
+- Use linear exact-key review matching preserving duplicate and repeated-exception
+  rejection and original remaining order.
+- Validate boundary, maximum-byte inputs, <=2 GiB peak RSS and <900 seconds on the
+  named environment.
+- Run complete candidate, history and worktree scans separately; no diagnostic fragments
+  imply clearance.
+- Obtain fresh implementation reviews; preserve existing broad FAIL evidence.
+- User additionally requires local Docker tests and comprehensive corner-case regression
+  coverage, 2026-09-09.
+- Preserve upstream 0.74.34, 0.74.35 and 0.74.36 behavior on current master.
+- Coalesce overlapping unapproved-host observations at the existing exact occurrence
+  key while preserving longer unknown matches and duplicate-review rejection.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - repository-tooling
+  migration_required: false
+owned_paths:
+- tools/agent_policy/public_clean_gate.py
+- tools/agent_policy/public_clean_policy.py
+- tools/agent_policy/public_clean_candidate.py
+- tools/agent_policy/public_clean_history.py
+- tools/agent_policy/public_clean_worktree.py
+- tools/agent_policy/public_clean_archives.py
+- tools/agent_policy/public_clean_receipts.py
+- tests/test_public_clean_gate.py
+- tests/test_public_clean_gate_failures.py
+- docs/feature-design-public-clean-migration-v1.md
+- docs/public-clean-migration.md
+- test_artifacts/agent-policy/public-clean-migration-v1.yml
+- tools/agent_policy/public_clean_limits.py
+- tests/test_public_clean_capacity.py
+integrator_owned_paths:
+- mkdocs.yml
+- CHANGELOG.md
+read_only_paths:
+- tools/agent_policy/tenant_hygiene.py
+- docs/agent-development.md
+- docs/source-sink/postgres-to-mssql.md
+forbidden_paths:
+- src
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+shared_file_owner: parent-integrator
+dependencies:
+- 'APPROVED: maintainer approved the capacity amendment and this scoped contract.'
+required_checks:
+  focused:
+  - uv run pytest tests/test_public_clean_gate.py tests/test_public_clean_gate_failures.py
+    tests/test_public_clean_capacity.py -q
+  - 'Docker: isolated Python 3.12.11 Linux container; all local gate tests, no network
+    during tests.'
+  broad:
+  - uv run python tools/agent_policy/select_checks.py --base-ref origin/master
+  - uv run ruff check .
+  - uv run ruff format --check .
+  - uv run mypy --config-file mypy.ini
+  - uv run dpone docs check-import-rules
+  - uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json
+  - uv run dpone docs check-module-size --baseline docs/module_size_baseline.json
+    --base-ref 3977ca2d04ca5dbcf3338d7c31faff8a1199549e --head-ref HEAD
+  - uv run pytest -m "not integration_live" -n auto --dist loadfile
+  - uv run dpone docs check-docs
+  - uv run pytest tests/test_docs_language_contracts.py -q
+  - uv run mkdocs build --strict
+  live: []
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Specification or task approval is missing.
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
+- Private input cannot be inspected without disclosure.
+- Source mutation or private object import would be required.
+- Live credentials or publication authority would be required.

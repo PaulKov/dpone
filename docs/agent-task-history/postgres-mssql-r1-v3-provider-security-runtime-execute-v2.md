@@ -1,0 +1,94 @@
+# Historical task requirements: postgres-mssql-r1-v3-provider-security-runtime-execute-v2
+
+**Archived historical execution record — not a current task grant.** The complete original YAML and its source identities remain in private provenance. Every requirement below belongs to that original record. Recorded APPROVED/PASS/FAIL states do not authorize a new execution or certify a current source. A current task needs a separately reviewed, genuinely bound authority chain.
+
+- Recorded requirement **schema_version**: 1
+- Recorded requirement **task_id**: DPONE-POSTGRES-MSSQL-R1-V3-SECURITY-RUNTIME-EXECUTE-V2
+- Recorded requirement **title**: Correct Security V2 binding-path admission for runtime EXECUTE
+- Recorded requirement **goal**: Align the implemented Security V2 permission closure with its approved complete binding-pack authority by admitting only exact runtime direct object-level EXECUTE paths alongside exact binding-signer target/row-hash DML paths.
+- Recorded requirement **specification**: docs/feature-design-postgres-mssql-r1-v3-provider-security-authority-amendment-v2.md
+- Historical authority/requirement record **base_commit**: source record 006
+- Recorded requirement **integrator**: Codex
+- Recorded requirement **acceptance_criteria / entry 1**: This is an isolated correctness repair of the approved Security V2 contract; no canonical domain, version literal, field layout, profile digest or public surface changes.
+- Recorded requirement **acceptance_criteria / entry 2**: MssqlR1PermissionClosurePolicyV1 accepts a binding path only when its beneficiary is either the exact binding-signer instance arm or the exact runtime environment-principal arm and its origin is exact direct authority.
+- Recorded requirement **acceptance_criteria / entry 3**: A binding-signer path is exact GRANT without grant option, targets one exact object scope with descendants, and uses only SELECT, INSERT, UPDATE or DELETE.
+- Recorded requirement **acceptance_criteria / entry 4**: A runtime path is exact GRANT EXECUTE without grant option on one exact object in dpone_authority with descendants.
+- Recorded requirement **acceptance_criteria / entry 5**: Every other environment role, shared signer, role/PUBLIC origin, database/schema/column target, widened grant option, DENY, wrong permission or malformed coordinate rejects before complete set equality.
+- Recorded requirement **acceptance_criteria / entry 6**: Complete permission closure remains canonical exact set equality over shared plus binding paths and all observed managed-principal paths.
+- Recorded requirement **acceptance_criteria / entry 7**: Red evidence proves the exact runtime EXECUTE case fails at the base commit before production code changes; final focused evidence covers positive and closed negative branches.
+- Recorded requirement **acceptance_criteria / entry 8**: Binding-specific derivation, six-module completeness, target/row-hash coordinate ownership and one-to-one access projection remain owned by Binding V2 and are not guessed in Security.
+- Recorded requirement **acceptance_criteria / entry 9**: Live SQL Server behavior, Binding V2, Migration V2, Renderer V2 and activation remain UNVERIFIED/blocked.
+- Recorded requirement **public_contract_impact / level**: none
+- Recorded requirement **public_contract_impact / surfaces / entry 1**: Internal unreleased activation-blocked MSSQL R1 V3 Security V2 permission closure
+- Recorded requirement **public_contract_impact / migration_required**: false
+- Recorded requirement **owned_paths / entry 1**: src/dpone/contracts/mssql_r1_v3_provider_security_binding_paths.py
+- Recorded requirement **owned_paths / entry 2**: src/dpone/contracts/mssql_r1_v3_provider_security_permissions.py
+- Recorded requirement **owned_paths / entry 3**: tests/test_postgres_mssql_r1_v3_provider_security_runtime_execute_contract.py
+- Recorded requirement **integrator_owned_paths / entry 1**: docs/agent-task-contracts/postgres-mssql-r1-v3-provider-security-runtime-execute-v2.yml
+- Recorded requirement **integrator_owned_paths / entry 2**: docs/developer-postgres-mssql-r1-v3-provider-implementation.md
+- Recorded requirement **integrator_owned_paths / entry 3**: docs/adr/0067-r1-provider-security-runtime-execute-clustering-exception.md
+- Recorded requirement **integrator_owned_paths / entry 4**: docs/adr-index.md
+- Recorded requirement **read_only_paths / entry 1**: docs/feature-design-postgres-mssql-r1-v3-provider-security-authority-amendment-v2.md
+- Recorded requirement **read_only_paths / entry 2**: docs/adr/0065-r1-provider-single-binding-install-authority.md
+- Recorded requirement **read_only_paths / entry 3**: src/dpone/contracts/mssql_r1_v3_provider_security_principals.py
+- Recorded requirement **read_only_paths / entry 4**: src/dpone/contracts/mssql_r1_v3_provider_security_profile.py
+- Recorded requirement **read_only_paths / entry 5**: src/dpone/contracts/mssql_r1_v3_provider_security_enums.py
+- Recorded requirement **read_only_paths / entry 6**: src/dpone/contracts/mssql_r1_v3_schema_security.py
+- Recorded requirement **read_only_paths / entry 7**: tests/test_postgres_mssql_r1_v3_provider_security_contract.py
+- Recorded requirement **forbidden_paths / entry 1**: docs/agent-task-contracts/postgres-mssql-r1-v3-provider-security-runtime-execute-v2.yml
+- Recorded requirement **forbidden_paths / entry 2**: docs/developer-postgres-mssql-r1-v3-provider-implementation.md
+- Recorded requirement **forbidden_paths / entry 3**: pyproject.toml
+- Recorded requirement **forbidden_paths / entry 4**: uv.lock
+- Recorded requirement **forbidden_paths / entry 5**: CHANGELOG.md
+- Recorded requirement **forbidden_paths / entry 6**: mkdocs.yml
+- Recorded requirement **forbidden_paths / entry 7**: .github/workflows
+- Recorded requirement **forbidden_paths / entry 8**: src/dpone/contracts/__init__.py
+- Recorded requirement **forbidden_paths / entry 9**: src/dpone/contracts/mssql_r1_v3_binding_*.py
+- Recorded requirement **forbidden_paths / entry 10**: src/dpone/contracts/mssql_r1_v3_provider_migration_*.py
+- Recorded requirement **forbidden_paths / entry 11**: src/dpone/contracts/mssql_r1_v3_provider_renderer_*.py
+- Recorded requirement **forbidden_paths / entry 12**: src/dpone/ports
+- Recorded requirement **forbidden_paths / entry 13**: src/dpone/adapters
+- Recorded requirement **forbidden_paths / entry 14**: src/dpone/runtime
+- Recorded requirement **forbidden_paths / entry 15**: src/dpone/services
+- Recorded requirement **forbidden_paths / entry 16**: src/dpone/app
+- Recorded requirement **forbidden_paths / entry 17**: src/dpone/commands
+- Recorded requirement **forbidden_paths / entry 18**: src/dpone/schema
+- Recorded requirement **forbidden_paths / entry 19**: tests/conftest.py
+- Recorded requirement **forbidden_paths / entry 20**: tests/integration
+- Recorded requirement **forbidden_paths / entry 21**: docs/adr
+- Recorded requirement **forbidden_paths / entry 22**: docs/adr-index.md
+- Recorded requirement **shared_file_owner**: Codex
+- Recorded requirement **dependencies / entry 1**: source record 001
+- Recorded requirement **dependencies / entry 2**: DPONE-POSTGRES-MSSQL-R1-V3-PROVIDER-SECURITY-AUTHORITY-AMENDMENT-V2
+- Historical requirement description **required_checks / focused / entry 1**: uv run pytest tests/test_postgres_mssql_r1_v3_provider_security_runtime_execute_contract.py -q
+- Historical requirement description **required_checks / focused / entry 2**: uv run pytest tests/test_postgres_mssql_r1_v3_provider_security_contract.py -q
+- Historical requirement description **required_checks / broad / entry 1**: uv run ruff check src/dpone/contracts/mssql_r1_v3_provider_security_binding_paths.py src/dpone/contracts/mssql_r1_v3_provider_security_permissions.py tests/test_postgres_mssql_r1_v3_provider_security_runtime_execute_contract.py
+- Historical requirement description **required_checks / broad / entry 2**: uv run ruff format --check src/dpone/contracts/mssql_r1_v3_provider_security_binding_paths.py src/dpone/contracts/mssql_r1_v3_provider_security_permissions.py tests/test_postgres_mssql_r1_v3_provider_security_runtime_execute_contract.py
+- Historical requirement description **required_checks / broad / entry 3**: uv run mypy --config-file mypy.ini src/dpone/contracts/mssql_r1_v3_provider_security_binding_paths.py src/dpone/contracts/mssql_r1_v3_provider_security_permissions.py
+- Historical requirement description **required_checks / broad / entry 4**: uv run dpone docs check-import-rules
+- Historical requirement description **required_checks / broad / entry 5**: uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json
+- Historical requirement description **required_checks / broad / entry 6**: Historical module-size validation requirement using `docs/module_size_baseline.json`; original base authority: source record 006; examined the then-current HEAD. The archived command is retired and is not executable current authority.
+- Historical requirement description **required_checks / broad / entry 7**: uv run dpone docs check-architecture-fitness --format json
+- Historical requirement description **required_checks / broad / entry 8**: uv run dpone docs check-docs
+- Historical requirement description **required_checks / broad / entry 9**: uv run dpone docs check-generated-references
+- Historical requirement description **required_checks / broad / entry 10**: uv run pytest tests/test_docs_language_contracts.py -q
+- Historical requirement description **required_checks / broad / entry 11**: uv run mkdocs build --strict
+- Historical requirement description **required_checks / broad / entry 12**: uv run pytest -m 'not integration_live' -n auto --dist loadfile
+- Recorded required_checks / live: empty list.
+- Recorded requirement **required_outputs / entry 1**: implementation
+- Recorded requirement **required_outputs / entry 2**: tests
+- Recorded requirement **required_outputs / entry 3**: documentation_impact
+- Recorded requirement **required_outputs / entry 4**: completion_report
+- Recorded requirement **completion_statuses / allowed / entry 1**: PASS
+- Recorded requirement **completion_statuses / allowed / entry 2**: FAIL
+- Recorded requirement **completion_statuses / allowed / entry 3**: SKIP
+- Recorded requirement **completion_statuses / allowed / entry 4**: N/A
+- Recorded requirement **completion_statuses / allowed / entry 5**: UNVERIFIED
+- Recorded requirement **stop_conditions / entry 1**: Required edit falls outside owned_paths.
+- Recorded requirement **stop_conditions / entry 2**: Approved specification is missing or contradicted.
+- Recorded requirement **stop_conditions / entry 3**: The correction would change canonical bytes or require a Security V3 persisted domain.
+- Recorded requirement **stop_conditions / entry 4**: Binding-specific access projection or module inventory would need to be guessed.
+- Recorded requirement **stop_conditions / entry 5**: Public-contract impact is larger than declared.
+- Recorded requirement **stop_conditions / entry 6**: A live check requires unapproved credentials or environment.
+- Recorded requirement **stop_conditions / entry 7**: Another writer owns the same semantic contract.
+- Recorded requirement **stop_conditions / entry 8**: Any owned production module exceeds 350 SLOC or the exact candidate lacks a separately reviewed bounded architecture decision.

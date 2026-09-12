@@ -8,6 +8,7 @@ web of repeated cross-layer imports.
 from dpone.contracts.incremental_snapshot import (
     DELTA_HASH_COLUMN,
     KEY_HASH_COLUMN,
+    MSSQL_TEXT_KEY_COLLATION,
     DeltaSnapshotReceipt,
     IncrementalSnapshotEnvelope,
     KeySnapshotReceipt,
@@ -32,6 +33,7 @@ __all__ = [
     "DeltaSnapshotReceipt",
     "IncrementalSnapshotEnvelope",
     "KEY_HASH_COLUMN",
+    "MSSQL_TEXT_KEY_COLLATION",
     "KeySnapshotReceipt",
     "KeySnapshotReconciliationPolicy",
     "SnapshotReconciliationError",

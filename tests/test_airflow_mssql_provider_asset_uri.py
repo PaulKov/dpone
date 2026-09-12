@@ -53,10 +53,10 @@ def _asset_uri(asset: object) -> str:
 @pytest.mark.parametrize(
     "uri",
     [
-        "mssql://sql-prod.internal:1433/dwh_example/dbo/orders",
-        "mssql://sql-prod.internal:1444/dwh_example/dbo/orders",
-        "mssql://sql-prod.internal:1433/MSSQL01/dwh_example/dbo/orders",
-        "mssql://sql-prod.internal:1433/dwh_example/assortment%20planning/supply%2Fforecast",
+        "mssql://fixture01.invalid:1433/dwh_example/dbo/orders",
+        "mssql://fixture01.invalid:1444/dwh_example/dbo/orders",
+        "mssql://fixture01.invalid:1433/MSSQL01/dwh_example/dbo/orders",
+        "mssql://fixture01.invalid:1433/dwh_example/assortment%20planning/supply%2Fforecast",
     ],
 )
 def test_microsoft_mssql_provider_accepts_canonical_uris(uri: str) -> None:
@@ -82,6 +82,6 @@ def test_microsoft_mssql_provider_flags_compact_uris(uri: str) -> None:
 
 
 def test_producer_consumer_equality_on_canonical_form() -> None:
-    producer = "mssql://sql-prod.internal:1433/dwh_example/dbo/orders"
-    consumer = "mssql://sql-prod.internal:1433/dwh_example/dbo/orders"
+    producer = "mssql://fixture01.invalid:1433/dwh_example/dbo/orders"
+    consumer = "mssql://fixture01.invalid:1433/dwh_example/dbo/orders"
     assert _asset_uri(_asset(producer)) == _asset_uri(_asset(consumer))

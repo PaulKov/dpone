@@ -8,20 +8,20 @@ def test_redact_mapping_removes_secret_keys_and_sanitizes_sensitive_messages() -
         "backend": "mssql",
         "resolver": "vault_kv",
         "note": "Vault resolver selected",
-        "password": "must-not-leak",
-        "api_key": "api-key-must-not-leak",
-        "aws_access_key_id": "access-key-must-not-leak",
-        "message": "driver failed with api_token=must-not-leak and password = also-must-not-leak",
+        "password": "zxvq-xvq-xvqz",
+        "api_key": "zxv-zxv-zxvq-xvq-xvqz",
+        "aws_access_key_id": "qzxvqz-vqz-vqzx-qzx-qzxv",
+        "message": "driver failed with api_token=zxvq-xvq-xvqz and password = xvqz-vqzx-qzx-qzxv",
         "nested": {
-            "lease_id": "lease-must-not-leak",
-            "connection_string": "Server=tcp://host;Password=must-not-leak",
-            "message": "vault response included secret=deep-must-not-leak",
+            "lease_id": "lease-zxvq-xvq-xvqz",
+            "connection_string": "Server=tcp://host;Password=zxvq-xvq-xvqz",
+            "message": "vault response included secret=vqzx-qzxv-zxv-zxvq",
         },
         "events": [
-            {"stage": "read", "message": "jwt=list-must-not-leak"},
-            {"stage": "connect", "message": "driver emitted api_key=api-key-list-must-not-leak"},
-            "aws_access_key_id=access-key-list-must-not-leak",
-            "token=string-list-must-not-leak",
+            {"stage": "read", "message": "jwt=qzxv-zxvq-xvq-xvqz"},
+            {"stage": "connect", "message": "driver emitted api_key=xvq-xvq-xvqz-vqzx-qzx-qzxv"},
+            "aws_access_key_id=zxvqzx-qzx-qzxv-zxvq-xvq-xvqz",
+            "token=vqzxvq-xvqz-vqzx-qzx-qzxv",
             "plain status",
         ],
     }
@@ -49,15 +49,15 @@ def test_redact_mapping_removes_secret_keys_and_sanitizes_sensitive_messages() -
         "details redacted; check runtime adapter diagnostics and safe sample configuration.",
         "plain status",
     ]
-    assert "must-not-leak" not in serialized
-    assert "also-must-not-leak" not in serialized
-    assert "deep-must-not-leak" not in serialized
-    assert "list-must-not-leak" not in serialized
-    assert "api-key-must-not-leak" not in serialized
-    assert "access-key-must-not-leak" not in serialized
-    assert "api-key-list-must-not-leak" not in serialized
-    assert "access-key-list-must-not-leak" not in serialized
-    assert "string-list-must-not-leak" not in serialized
+    assert "zxvq-xvq-xvqz" not in serialized
+    assert "xvqz-vqzx-qzx-qzxv" not in serialized
+    assert "vqzx-qzxv-zxv-zxvq" not in serialized
+    assert "qzxv-zxvq-xvq-xvqz" not in serialized
+    assert "zxv-zxv-zxvq-xvq-xvqz" not in serialized
+    assert "qzxvqz-vqz-vqzx-qzx-qzxv" not in serialized
+    assert "xvq-xvq-xvqz-vqzx-qzx-qzxv" not in serialized
+    assert "zxvqzx-qzx-qzxv-zxvq-xvq-xvqz" not in serialized
+    assert "vqzxvq-xvqz-vqzx-qzx-qzxv" not in serialized
 
 
 def test_contains_sensitive_assignment_preserves_safe_resolver_text() -> None:
