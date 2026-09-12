@@ -1217,15 +1217,22 @@ troubleshooting. Production workspace activation remains separately gated.
 Use [release composition](release-composition.md) to deliver one complete native
 workspace and independently authored ordinary transfer packs in an explicit
 `dpone.release-set.v3` parent. Native v2 authority and bytes remain intact. Upgrade
-all readers before using v3. Composition activation is unavailable until physical
-admission covers every constituent; see the
-[contracts](release-composition-reference.md) and
-[migration and recovery guide](release-composition-operations.md).
+all readers before using v3. A v3 deployment requires the sealed
+`dpone.composition-supervisor.v1` capability and
+`--workspace-authority-connection-ref` (or the desired-state authority field)
+during cache-sync. v1/v2 releases reject a supervisor object. See the
+[contracts](release-composition-reference.md),
+[migration and recovery guide](release-composition-operations.md), and
+[Kubernetes supervisor operations](guides/composition-supervisor-kubernetes.md).
 
 The [parent activation contract](composition-activation-contract.md) adds a
 separate full-composition coordinator without changing native-v2 authority.
-Default activation remains unavailable pending protected backend/worker
-integration and actual downstream evidence.
+The public factory
+`dpone.app.composition_activation.build_composition_activation_coordinator`
+installs `sqlserver_dbt_v1`, `postgres_mssql_full_refresh_v1`, and
+`mssql_clickhouse_full_refresh_v1`. Offline tests are not route certification.
+Live three-cell execution remains `UNVERIFIED` until the isolated campaign
+retains evidence. A skipped live check is never `PASS`.
 
 ## PostgreSQL strategy-preserving refresh correction
 
