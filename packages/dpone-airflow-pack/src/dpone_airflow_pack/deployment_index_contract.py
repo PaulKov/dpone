@@ -19,6 +19,9 @@ from dpone_airflow_pack.cache_artifact_contract import (
     read_confined_cache_file_with_identity,
     resolve_cache_artifact,
 )
+from dpone_airflow_pack.composition_supervisor_contract import (
+    parse_composition_supervisor,
+)
 from dpone_airflow_pack.deployment_index_artifacts import (
     AirflowIndexArtifact,
     _is_canonical_sha256_digest,
@@ -76,6 +79,7 @@ class AirflowDeploymentIndex:
     schema: str = INDEX_SCHEMA_V1
     runtime_image_ref: str | None = None
     delivery_context: InitFetchDeliveryContext | None = None
+    composition_supervisor: Mapping[str, object] | None = None
 
 
 def load_airflow_deployment_index(
@@ -139,6 +143,7 @@ def _load_airflow_deployment_index(
             f"Expected schema {INDEX_SCHEMA_V1}, {INDEX_SCHEMA_V2}, or {INDEX_SCHEMA_V3}",
             path=path.as_posix(),
         )
+    composition_supervisor = _composition_supervisor_from_payload(payload, path=path)
     release = required_sha256(payload, "release_id", path)
     deployment = required_sha256(payload, "deployment_id", path)
     runtime_artifact_delivery = validate_runtime_artifact_delivery(payload, path=path)
@@ -221,6 +226,39 @@ def _load_airflow_deployment_index(
         schema=str(schema),
         runtime_image_ref=optional_text(payload.get("runtime_image_ref"), "runtime_image_ref", path),
         delivery_context=delivery_context,
+        composition_supervisor=composition_supervisor,
+    )
+
+
+def _composition_supervisor_from_payload(
+    payload: Mapping[str, Any],
+    *,
+    path: Path,
+) -> Mapping[str, object] | None:
+    value = payload.get("composition_supervisor")
+    schema = payload.get("schema")
+    if value is None:
+        return None
+    if schema != INDEX_SCHEMA_V3:
+        raise AirflowDeploymentIndexError(
+            "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN",
+            "composition supervisor is forbidden on v1/v2 deployment indexes",
+            path=path.as_posix(),
+        )
+    try:
+        projection = parse_composition_supervisor(value)
+    except ValueError as exc:
+        raise _invalid_composition_supervisor(path) from exc
+    if projection is None:
+        raise _invalid_composition_supervisor(path)
+    return projection.to_dict()
+
+
+def _invalid_composition_supervisor(path: Path) -> AirflowDeploymentIndexError:
+    return AirflowDeploymentIndexError(
+        "DPONE_COMPOSITION_SUPERVISOR_INVALID",
+        "composition supervisor deployment capability is invalid",
+        path=path.as_posix(),
     )
 
 

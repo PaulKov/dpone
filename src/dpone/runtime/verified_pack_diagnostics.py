@@ -42,12 +42,20 @@ def service_file_stage(stage: str, service_path: str) -> Iterator[None]:
 
 
 def diagnostic_message(diagnostic: dict[str, Any]) -> str:
-    """Render the bounded diagnostic fields for either CLI or container logs."""
+    """Render the bounded diagnostic fields for either CLI or container logs.
 
+    The diagnostic keeps its own stable code, so an admission rejection is not
+    reported as an OS failure. A fixed sanitized ``reason`` token is rendered
+    when the producer supplies one; free text and values never appear.
+    """
+
+    code = diagnostic.get("error_code")
+    reason = diagnostic.get("reason")
     return (
-        f"{PACK_EXEC_FAILED}: stage={diagnostic['stage']} "
+        f"{code if isinstance(code, str) and code else PACK_EXEC_FAILED}: stage={diagnostic['stage']} "
         f"exception_type={diagnostic['exception_type']} errno={diagnostic['errno']} "
         f"service_path={diagnostic['service_path']}"
+        + (f" reason={reason}" if isinstance(reason, str) and reason else "")
     )
 
 

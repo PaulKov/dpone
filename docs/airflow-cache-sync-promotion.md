@@ -6,6 +6,11 @@
 
 [Back to cache sync and recovery overview](airflow-cache-sync.md) · **Next likely task:** [verify and recover cache state](airflow-cache-sync-recovery.md).
 
+For a `dpone.release-set.v3` parent, also follow
+[Kubernetes composition supervision](guides/composition-supervisor-kubernetes.md).
+v3 promotion requires `--workspace-authority-connection-ref` (or the matching
+desired-state authority field). Omitting it fails closed.
+
 ## Promote
 
 ### Remote desired-state pull
@@ -182,6 +187,23 @@ dpone airflow cache-sync \
   --promoted-by ci://your-platform/dpone-airflow \
   --allowed-promoter ci://your-platform/dpone-airflow \
   --expected-current-deployment-id "${DPONE_REVIEWED_CURRENT_DEPLOYMENT_ID}" \
+  --confirm-promote
+```
+
+A v3 composition or native workspace wire also requires the protected control
+binding. The flag is a logical connection alias, never a secret:
+
+```bash
+: "${DPONE_WORKSPACE_AUTHORITY_CONNECTION_REF:?set the sealed control connection alias}"
+
+dpone airflow cache-sync \
+  --cache-root "${DPONE_SCHEDULER_CACHE_ROOT}" \
+  --deployment-dir "${DPONE_SCHEDULER_CACHE_ROOT}/deployments/prod/${DPONE_NEXT_DEPLOYMENT_DIR}" \
+  --environment prod \
+  --promoted-by ci://your-platform/dpone-airflow \
+  --allowed-promoter ci://your-platform/dpone-airflow \
+  --expected-current-deployment-id "${DPONE_REVIEWED_CURRENT_DEPLOYMENT_ID}" \
+  --workspace-authority-connection-ref "${DPONE_WORKSPACE_AUTHORITY_CONNECTION_REF}" \
   --confirm-promote
 ```
 

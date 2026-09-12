@@ -316,7 +316,7 @@ def _validate_remote_headers(
             "DPONE_DEPLOYMENT_ENVIRONMENT_MISMATCH",
             "remote deployment environment does not match the request",
         )
-    violation = deployment_projection_violation(deployment, index)
+    violation = deployment_projection_violation(deployment, index, release_schema=str(release["schema"]))
     if violation is not None:
         raise AirflowArtifactDeliveryError(violation.code, violation.message)
     if deployment.get("deployment_id") != request.deployment_id or deployment.get("release_ref") != request.release_id:

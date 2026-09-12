@@ -2,12 +2,9 @@
 
 Wire decision
 -------------
-``dpone.deployment-set.v3`` / ``dpone.airflow-deployment-index.v3`` are the
-closed readers for MSSQL outlet projections. v2 stays exact without
-``mssql_asset_outlet_projection`` so older providers that reject unknown
-fields via ``exact_mapping`` are not silently broken by an additive v2 field.
-
-Producers emit v3 only when a projection is present; otherwise they keep v2.
+The v3 pair carries either the mandatory supervisor capability of a
+``dpone.release-set.v3`` composition, an MSSQL outlet projection for a legacy
+release, or both. The v2 pair stays exact when neither v3 capability is needed.
 """
 
 from __future__ import annotations
@@ -39,6 +36,42 @@ from dpone.gitops.schema_runtime_connection_context import (
 )
 
 
+def composition_supervisor_schema() -> dict[str, object]:
+    """Return the closed non-secret Kubernetes supervisor capability."""
+
+    return {
+        "type": "object",
+        "required": [
+            "schema",
+            "persistent_volume_claim",
+            "child_uid_start",
+            "child_gid_start",
+            "child_identity_count",
+        ],
+        "additionalProperties": False,
+        "properties": {
+            "schema": {"const": "dpone.composition-supervisor.v1"},
+            "persistent_volume_claim": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+            },
+            "child_uid_start": {"type": "integer", "minimum": 1_000_000, "maximum": 2_146_483_647},
+            "child_gid_start": {"type": "integer", "minimum": 1_000_000, "maximum": 2_146_483_647},
+            "child_identity_count": {"type": "integer", "minimum": 1_000_000},
+        },
+    }
+
+
+_V3_CAPABILITY_GUARD = {
+    "anyOf": [
+        {"required": ["composition_supervisor"]},
+        {"required": ["mssql_asset_outlet_projection"]},
+    ]
+}
+
+
 def deployment_set_v3_contract() -> GitOpsSchemaContract:
     result = documented_contract(
         name="deployment-set-v3",
@@ -63,7 +96,6 @@ def deployment_set_v3_contract() -> GitOpsSchemaContract:
             "airflow_bundle_ref",
             "runtime_artifact_delivery",
             "workloads",
-            "mssql_asset_outlet_projection",
         ),
         properties={
             "schema": {"const": "dpone.deployment-set.v3"},
@@ -85,6 +117,7 @@ def deployment_set_v3_contract() -> GitOpsSchemaContract:
             "runtime_artifact_delivery": runtime_artifact_delivery_schema(strict_init_fetch=True),
             "dev_evidence_delivery": dev_evidence_delivery_schema(),
             "workloads": deployment_workload_inventory_v2_schema(),
+            "composition_supervisor": composition_supervisor_schema(),
             **MSSQL_OUTLET_PROJECTION_PROPERTY,
         },
         defs=deployment_set_v2_defs(),
@@ -93,6 +126,7 @@ def deployment_set_v3_contract() -> GitOpsSchemaContract:
     result.schema["allOf"] = [
         *trust_tier_mirror_guards(),
         dev_evidence_non_production_guard(),
+        _V3_CAPABILITY_GUARD,
     ]
     return result
 
@@ -121,7 +155,6 @@ def airflow_deployment_index_v3_contract() -> GitOpsSchemaContract:
             "runtime_artifact_delivery",
             "release",
             "deployment",
-            "mssql_asset_outlet_projection",
         ),
         properties={
             "schema": {"const": "dpone.airflow-deployment-index.v3"},
@@ -132,6 +165,7 @@ def airflow_deployment_index_v3_contract() -> GitOpsSchemaContract:
             "workload_packs": {"$ref": "#/$defs/workloadArtifacts"},
             "runtime_payloads": {"$ref": "#/$defs/runtimePayloads"},
             "semantic_refresh_dag_projections": {"$ref": "#/$defs/semanticRefreshDagProjections"},
+            "composition_supervisor": composition_supervisor_schema(),
             **MSSQL_OUTLET_PROJECTION_PROPERTY,
             "binding_set_ref": {"$ref": "#/$defs/identity"},
             "connection_registry_ref": {"$ref": "#/$defs/identity"},
@@ -153,11 +187,13 @@ def airflow_deployment_index_v3_contract() -> GitOpsSchemaContract:
     result.schema["allOf"] = [
         *trust_tier_mirror_guards(),
         dev_evidence_non_production_guard(),
+        _V3_CAPABILITY_GUARD,
     ]
     return result
 
 
 __all__ = [
     "airflow_deployment_index_v3_contract",
+    "composition_supervisor_schema",
     "deployment_set_v3_contract",
 ]

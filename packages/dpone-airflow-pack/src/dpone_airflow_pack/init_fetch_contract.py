@@ -11,10 +11,14 @@ import base64
 import hashlib
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from dpone_airflow_pack.composition_supervisor_contract import (
+    CompositionSupervisorProjection,
+    parse_composition_supervisor,
+)
 from dpone_airflow_pack.deployment_index_errors import AirflowDeploymentIndexError
 
 AIRFLOW_INDEX_SCHEMA_V2 = "dpone.airflow-deployment-index.v2"
@@ -186,6 +190,7 @@ class InitFetchDeliveryContext:
     runtime_image_dbt_ref: str | None = None
     runtime_image_dbt_digest: str | None = None
     mssql_asset_uri_by_ref: Mapping[str, str] | None = None
+    composition_supervisor: CompositionSupervisorProjection | None = None
 
     def workload_pack(self, workload_id: str) -> ExactWorkloadPack:
         for workload in self.workload_packs:
@@ -344,7 +349,18 @@ def init_fetch_context_from_payload(
         init_fetch_context_from_payload as parse,
     )
 
-    return parse(payload, path=path)
+    context = parse(payload, path=path)
+    try:
+        projection = parse_composition_supervisor(payload.get("composition_supervisor"))
+    except ValueError as exc:
+        raise _contract_error(
+            "DPONE_COMPOSITION_SUPERVISOR_INVALID",
+            "composition supervisor deployment capability is invalid",
+            path=path.as_posix() if path is not None else None,
+        ) from exc
+    if projection is None:
+        return context
+    return replace(context, composition_supervisor=projection)
 
 
 def _contract_error(
@@ -366,6 +382,7 @@ __all__ = [
     "AIRFLOW_INDEX_SCHEMA_V2",
     "AIRFLOW_INDEX_SCHEMA_V3",
     "ConfigMapReference",
+    "CompositionSupervisorProjection",
     "DevEvidenceDelivery",
     "EncodedInitFetchPlan",
     "ExactArtifact",

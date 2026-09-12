@@ -10,13 +10,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
-from dpone.contracts.composition_snapshot import (
+from dpone.contracts.composition_control import (
+    CompositionAdmissionError,
     SnapshotCatalogObservation,
     SnapshotPublicationIntent,
     SnapshotPublicationRecord,
     SnapshotPublisherClosure,
     classify_snapshot,
+    require_digest,
 )
 
 if TYPE_CHECKING:
@@ -144,6 +145,11 @@ class ClickHouseAtomicSnapshotPublisher:
     def _require_current(self, intent: SnapshotPublicationIntent, *, recovery: bool) -> None:
         occurrence = self._authority.require_current(intent, recovery=recovery)
         intent.require_parent_scope(occurrence, recovery=recovery)
+        try:
+            require_enrollment = self._authority.require_enrollment
+        except AttributeError:
+            raise CompositionAdmissionError("snapshot_enrollment_missing") from None
+        require_enrollment(intent.attempt, intent.target)
 
     def _inspect(self, intent: SnapshotPublicationIntent) -> SnapshotCatalogObservation:
         observation = self._catalog.inspect(intent)

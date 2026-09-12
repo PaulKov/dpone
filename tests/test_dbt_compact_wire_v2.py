@@ -3,6 +3,7 @@
 import base64
 import json
 import shutil
+import subprocess
 from copy import deepcopy
 from pathlib import Path, PurePosixPath
 
@@ -10,20 +11,31 @@ import pytest
 from dpone_airflow_pack.init_fetch_contract import init_fetch_context_from_payload
 from dpone_airflow_pack.init_fetch_pod import compose_init_fetch_operator_kwargs
 from dpone_airflow_pack.pack_task_runtime import runtime_operator_kwargs
+from dpone_airflow_pack.run_identity import COMPOSITION_SUPERVISOR_B64_ENV, encode_composition_supervisor
 
 from dpone.contracts.airflow_deployment import release_id
+from dpone.contracts.release_composition import COMPOSITION_ADMISSION
 from dpone.readiness.airflow_compact_pack_release import materialize_compact_pack_release
 from dpone.readiness.airflow_deployment_projection import AirflowDeploymentProjectionService
 from dpone.runtime.airflow_runtime_connection_inventory import runtime_connection_publication_files
 from dpone.runtime.init_fetch_contract import InitFetchError
 from dpone.runtime.runtime_init_fetch_plan_codec import decode_runtime_init_fetch_plan
 from dpone.runtime.runtime_init_fetch_service import RuntimeInitFetchExecutor
-from dpone.runtime.verified_pack_launcher import VerifiedPackLauncher
+from dpone.runtime.verified_pack_execution import execute_verified_pack_command
+from dpone.runtime.verified_pack_launcher import RUNTIME_RELEASE_ADMISSION_ENV, VerifiedPackLauncher
 from dpone.services.dbt_release_integrity import DbtReleaseIntegrityService
 from tests.dbt_compact_wire_v2_helpers import IMAGE, PROJECTS, SIDECAR, prepare_projects, workspace_service
 from tests.test_airflow_runtime_init_fetch_cli import RecordingRegistry
 from tests.test_dbt_airflow_release_e2e import _config_map_ref, _write_environment
 from tests.test_dbt_versioned_runtime_launcher import _prepared_bundle
+
+COMPOSITION_SUPERVISOR = {
+    "schema": "dpone.composition-supervisor.v1",
+    "persistent_volume_claim": "dpone-composition-supervisor",
+    "child_uid_start": 1_000_000_000,
+    "child_gid_start": 1_000_000_000,
+    "child_identity_count": 1_000_000,
+}
 
 
 def test_workspace_compact_projection_fetch_and_verified_launcher(tmp_path):
@@ -38,13 +50,14 @@ def test_workspace_compact_projection_fetch_and_verified_launcher(tmp_path):
 
 def verify_delivery(tmp_path, compiled):
     original = json.loads((compiled / "release-set.json").read_bytes())
+    composition = original.get("schema") == "dpone.release-set.v3"
     cache = tmp_path / ".dpone-cache"
     materialized = materialize_compact_pack_release(pack_root=compiled, cache_root=cache, xcom_sidecar_image=SIDECAR)
     assert materialized.passed, materialized.blockers
     release = json.loads((Path(materialized.release_dir) / "release-set.json").read_bytes())
     preserved = (
         ("producer", "constituents", "promotion")
-        if original.get("schema") == "dpone.release-set.v3"
+        if composition
         else ("producer", "selection_authority", "selection_fingerprint", "provenance")
     )
     for key in preserved:
@@ -61,6 +74,7 @@ def verify_delivery(tmp_path, compiled):
         registry_config_ref=_config_map_ref("registry", "1"),
         trust_policy_ref=_config_map_ref("policy", "2"),
         airflow_bundle_ref="git:" + "d" * 40,
+        composition_supervisor=COMPOSITION_SUPERVISOR if composition else None,
     )
     context = init_fetch_context_from_payload(projection.airflow_index)
     objects = {
@@ -98,6 +112,17 @@ def verify_delivery(tmp_path, compiled):
         command = VerifiedPackLauncher(artifact_root=state / "artifacts", worktree_root=state / "worktree").prepare(
             plan, plan_sha256=encoded.sha256
         )
+        if composition:
+            sealed = projection.deployment["composition_supervisor"]
+            assert command.env[RUNTIME_RELEASE_ADMISSION_ENV] == COMPOSITION_ADMISSION
+            # Command authority mirrors the sealed deployment projection exactly.
+            assert command.env[COMPOSITION_SUPERVISOR_B64_ENV] == encode_composition_supervisor(sealed)
+            assert command.env[COMPOSITION_SUPERVISOR_B64_ENV] == kwargs["env_vars"][COMPOSITION_SUPERVISOR_B64_ENV]
+            _verify_composition_never_runs_generically(command, state=state)
+            _verify_pinned_supervisor_cannot_be_substituted(plan, digest, state=state, sealed=sealed)
+        else:
+            assert RUNTIME_RELEASE_ADMISSION_ENV not in command.env
+            assert COMPOSITION_SUPERVISOR_B64_ENV not in command.env
         if item["id"].startswith("dbt__"):
             assert command.argv[:3] == ("dpone", "dbt", "execute-pack")
             marker = (state / "worktree/dbt-project/models/project_marker.txt").read_text()
@@ -132,6 +157,51 @@ def verify_delivery(tmp_path, compiled):
             assert "SENSITIVE_SENTINEL" not in str(failure.value)
     assert prepared_projects == set(PROJECTS)
     return Path(materialized.release_dir)
+
+
+def _verify_composition_never_runs_generically(command, *, state):
+    """No worker root is wired yet, so v3 must fail closed instead of executing.
+
+    The ambient pod environment is hostile here: it erases the marker and offers a
+    different valid supervisor. Only the pinned command authority may decide.
+    """
+
+    with pytest.MonkeyPatch.context() as patched:
+        patched.delenv(RUNTIME_RELEASE_ADMISSION_ENV, raising=False)
+        patched.setenv(
+            COMPOSITION_SUPERVISOR_B64_ENV,
+            encode_composition_supervisor({**COMPOSITION_SUPERVISOR, "child_uid_start": 1_500_000_000}),
+        )
+        for attribute in ("Popen", "run"):
+            patched.setattr(subprocess, attribute, lambda *a, **k: pytest.fail("generic child started for v3"))
+        assert (
+            execute_verified_pack_command(
+                command,
+                run_output_dir=state / "run",
+                xcom_return_path=state / "xcom/return.json",
+            )
+            == 5
+        )
+    summary = json.loads((state / "xcom/return.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "failed"
+
+
+def _verify_pinned_supervisor_cannot_be_substituted(plan, digest, *, state, sealed):
+    """A substituted or erased sealed capability must fail before any command."""
+
+    payload_path = state / "artifacts/payload" / plan.deployment.artifact_ref.removeprefix("cache://")
+    authenticated = payload_path.read_bytes()
+    substituted = json.loads(authenticated)
+    substituted["composition_supervisor"] = {**sealed, "child_uid_start": 1_500_000_000}
+    erased = json.loads(authenticated)
+    erased.pop("composition_supervisor")
+    for forgery in (substituted, erased):
+        payload_path.write_bytes(json.dumps(forgery).encode("utf-8"))
+        with pytest.raises(InitFetchError):
+            VerifiedPackLauncher(artifact_root=state / "artifacts", worktree_root=state / "worktree").prepare(
+                plan, plan_sha256=digest
+            )
+    payload_path.write_bytes(authenticated)
 
 
 @pytest.fixture(scope="module")

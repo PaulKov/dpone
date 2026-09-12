@@ -13,18 +13,20 @@ patch verification or strip source fields before planning and cache activation.
 """
 
 import json
+import shutil
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 import yaml
+from dpone_airflow_pack.deployment_index_contract import load_airflow_deployment_index
 
 from dpone.app.release_composition import (
     build_composition_source_reader,
     build_release_composition_service,
 )
-from dpone.contracts.airflow_deployment import canonical_fingerprint
+from dpone.contracts.airflow_deployment import canonical_fingerprint, deployment_id
 from dpone.contracts.composition_activation import (
     CompositionActivationOccurrence,
     CompositionActivationReceipt,
@@ -37,7 +39,11 @@ from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
 from dpone.gitops.workload_catalog_models import GitOpsWorkloadDefinition
 from dpone.manifest.composition_execution_plan import plan_composition_execution
 from dpone.readiness.airflow_compact_pack_release import materialize_compact_pack_release
-from dpone.readiness.airflow_deployment_projection import AirflowDeploymentProjectionService
+from dpone.readiness.airflow_deployment_artifacts import bytes_descriptor, digest_dir, json_bytes
+from dpone.readiness.airflow_deployment_projection import (
+    AirflowDeploymentProjection,
+    AirflowDeploymentProjectionService,
+)
 from dpone.runtime.deployment_cache_common import DeploymentCacheError
 from dpone.runtime.deployment_cache_materializer import DeploymentCacheMaterializer
 from dpone.services.composition_activation_coordinator import CompositionActivationCoordinator
@@ -51,6 +57,13 @@ MAX_SOURCE_BYTES = 1_000_000
 ACTIVATION_ID = "10000000-0000-4000-8000-000000000001"
 OFFLINE_EVIDENCE = canonical_fingerprint({"test_double": "NOT_LIVE_CERTIFICATION"})
 CELLS = frozenset({"sqlserver_dbt_v1", "mssql_clickhouse_full_refresh_v1", "postgres_mssql_full_refresh_v1"})
+SUPERVISOR = {
+    "schema": "dpone.composition-supervisor.v1",
+    "persistent_volume_claim": "dpone-composition-supervisor",
+    "child_uid_start": 1_000_000_000,
+    "child_gid_start": 1_000_000_000,
+    "child_identity_count": 1_000_000,
+}
 
 
 def _full_refresh_snapshot():
@@ -185,6 +198,61 @@ def producer_composition(tmp_path, monkeypatch):
     return Path(installed.release_dir), installed.release_id
 
 
+def test_supervised_composition_without_mssql_outlets_uses_v3_wire(tmp_path, monkeypatch):
+    native = _native_release(tmp_path, monkeypatch)
+    ordinary = ordinary_root(tmp_path)
+    service = build_release_composition_service()
+    inventory = service.inventory(ordinary, xcom_sidecar_image=native_helpers.SIDECAR)
+    request = ReleaseCompositionRequest(
+        native_root=Path(native.release_dir),
+        expected_release_id=native.release_id,
+        standalone_root=ordinary,
+        expected_inventory_sha256=inventory["inventory_sha256"],
+        output_dir=tmp_path / "composed",
+        xcom_sidecar_image=native_helpers.SIDECAR,
+    )
+    report = service.compose(request)
+    assert report.passed, report.blockers
+    installed = materialize_compact_pack_release(
+        pack_root=request.output_dir,
+        cache_root=tmp_path / ".dpone-cache",
+        xcom_sidecar_image=native_helpers.SIDECAR,
+    )
+    assert installed.passed, installed.blockers
+    _write_environment(tmp_path)
+
+    projection = AirflowDeploymentProjectionService(root=tmp_path).materialize(
+        release_id=installed.release_id,
+        environment="prod",
+        trust_tier="non_production",
+        runtime_image_ref=native_helpers.IMAGE,
+        runtime_image_digest=native_helpers.IMAGE.split("@")[-1],
+        artifact_registry_ref="synthetic-artifacts",
+        registry_config_ref=_config_map_ref("registry", "1"),
+        trust_policy_ref=_config_map_ref("policy", "2"),
+        airflow_bundle_ref="git:" + "d" * 40,
+        composition_supervisor=SUPERVISOR,
+    )
+
+    assert projection.deployment["schema"] == "dpone.deployment-set.v3"
+    assert projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v3"
+    assert "mssql_asset_outlet_projection" not in projection.deployment
+    assert "mssql_asset_outlet_projection" not in projection.airflow_index
+    loaded_index = load_airflow_deployment_index(
+        projection.deployment_dir / "airflow-index.json",
+        cache_root=tmp_path / ".dpone-cache",
+    )
+    assert loaded_index.composition_supervisor == SUPERVISOR
+    jsonschema = pytest.importorskip("jsonschema")
+    for filename, schema_filename in (
+        ("deployment.json", "deployment-set-v3.schema.json"),
+        ("airflow-index.json", "airflow-deployment-index-v3.schema.json"),
+    ):
+        payload = json.loads((projection.deployment_dir / filename).read_bytes())
+        schema = json.loads((Path("docs/schemas/gitops") / schema_filename).read_bytes())
+        jsonschema.Draft202012Validator(schema).validate(payload)
+
+
 class OfflineBackend:
     """Fake enrolled MSSQL and ClickHouse; NOT a SQL capability or live proof."""
 
@@ -280,6 +348,88 @@ class OfflineProtectedStore:
         raise AssertionError("retirement is outside this offline test")
 
 
+def _supervised_projection(producer_composition, tmp_path) -> AirflowDeploymentProjection:
+    _, release_id = producer_composition
+    _write_environment(tmp_path)
+    environment = tmp_path / "environments/prod/binding-set.yaml"
+    bindings = yaml.safe_load(environment.read_bytes())
+    bindings["bindings"].update({name: {"connection_ref": name} for name in ("ordinary_reader", "ordinary_writer")})
+    environment.write_text(yaml.safe_dump(bindings, sort_keys=False))
+    registry_path = tmp_path / "platform/connection-registries/prod.yaml"
+    registry = yaml.safe_load(registry_path.read_bytes())
+    registry["connections"].update(
+        {"ordinary_reader": _vault_connection("postgres", 5432), "ordinary_writer": _vault_connection("mssql", 1433)}
+    )
+    registry_path.write_text(yaml.safe_dump(registry, sort_keys=False))
+    return AirflowDeploymentProjectionService(root=tmp_path).materialize(
+        release_id=release_id,
+        environment="prod",
+        trust_tier="non_production",
+        runtime_image_ref=native_helpers.IMAGE,
+        runtime_image_digest=native_helpers.IMAGE.split("@")[-1],
+        artifact_registry_ref="synthetic-artifacts",
+        registry_config_ref=_config_map_ref("registry", "1"),
+        trust_policy_ref=_config_map_ref("policy", "2"),
+        airflow_bundle_ref="git:" + "d" * 40,
+        composition_supervisor=SUPERVISOR,
+    )
+
+
+def _without_supervisor(projection: AirflowDeploymentProjection) -> Path:
+    deployment = json.loads(json.dumps(projection.deployment))
+    deployment.pop("composition_supervisor")
+    deployment["deployment_id"] = ""
+    forged_deployment_id = deployment_id(deployment)
+    deployment["deployment_id"] = forged_deployment_id
+    deployment_bytes = json_bytes(deployment)
+    index = json.loads(json.dumps(projection.airflow_index))
+    index.pop("composition_supervisor")
+    index["deployment_id"] = forged_deployment_id
+    index["deployment"] = bytes_descriptor(
+        artifact_ref=(
+            f"cache://deployments/{deployment['environment']}/{digest_dir(forged_deployment_id)}/deployment.json"
+        ),
+        payload=deployment_bytes,
+    )
+    target = projection.deployment_dir.parent / digest_dir(forged_deployment_id)
+    shutil.copytree(projection.deployment_dir, target)
+    (target / "deployment.json").write_bytes(deployment_bytes)
+    (target / "airflow-index.json").write_bytes(json_bytes(index))
+    return target
+
+
+def test_local_promotion_rejects_composition_without_supervisor_before_activation(
+    producer_composition,
+    tmp_path,
+) -> None:
+    projection = _supervised_projection(producer_composition, tmp_path)
+    forged = _without_supervisor(projection)
+    events: list[str] = []
+    backend = OfflineBackend(events)
+    store = OfflineProtectedStore(tmp_path / ".dpone-cache", events)
+    coordinator = CompositionActivationCoordinator(
+        inputs=OfflineInputs(tmp_path / ".dpone-cache"),
+        preparation=CompositionActivationPreparation(physical=CompositionPhysicalAdmissionService(backend=backend)),
+        stores=store,
+    )
+
+    with pytest.raises(DeploymentCacheError) as exc_info:
+        DeploymentCacheMaterializer(
+            tmp_path / ".dpone-cache",
+            composition_activation_coordinator=coordinator,
+        ).promote(
+            forged,
+            environment="prod",
+            expect_current_absent=True,
+            activation_id=ACTIVATION_ID,
+        )
+
+    assert exc_info.value.code == "DPONE_COMPOSITION_SUPERVISOR_REQUIRED"
+    assert store.current is None
+    assert events == []
+    assert not (tmp_path / ".dpone-cache" / "current").exists()
+
+
 def test_real_producer_to_v3_cache_with_explicit_offline_admission(producer_composition, tmp_path):
     root, release_id = producer_composition
     sources = build_composition_source_reader().read_sources(root, expected_release_id=release_id)
@@ -293,29 +443,10 @@ def test_real_producer_to_v3_cache_with_explicit_offline_admission(producer_comp
             assert "state" not in manifest
             assert manifest["sink"]["strategy"] == {"mode": "full_refresh", "max_source_bytes": MAX_SOURCE_BYTES}
 
-    _write_environment(tmp_path)
-    environment = tmp_path / "environments/prod/binding-set.yaml"
-    bindings = yaml.safe_load(environment.read_bytes())
-    bindings["bindings"].update({name: {"connection_ref": name} for name in ("ordinary_reader", "ordinary_writer")})
-    environment.write_text(yaml.safe_dump(bindings, sort_keys=False))
-    registry_path = tmp_path / "platform/connection-registries/prod.yaml"
-    registry = yaml.safe_load(registry_path.read_bytes())
-    registry["connections"].update(
-        {"ordinary_reader": _vault_connection("postgres", 5432), "ordinary_writer": _vault_connection("mssql", 1433)}
-    )
-    registry_path.write_text(yaml.safe_dump(registry, sort_keys=False))
     # Descriptors are synthetic authoring metadata. No resolver is invoked.
-    projection = AirflowDeploymentProjectionService(root=tmp_path).materialize(
-        release_id=release_id,
-        environment="prod",
-        trust_tier="non_production",
-        runtime_image_ref=native_helpers.IMAGE,
-        runtime_image_digest=native_helpers.IMAGE.split("@")[-1],
-        artifact_registry_ref="synthetic-artifacts",
-        registry_config_ref=_config_map_ref("registry", "1"),
-        trust_policy_ref=_config_map_ref("policy", "2"),
-        airflow_bundle_ref="git:" + "d" * 40,
-    )
+    projection = _supervised_projection(producer_composition, tmp_path)
+    assert projection.deployment["schema"] == "dpone.deployment-set.v3"
+    assert projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v3"
     cache, events = tmp_path / ".dpone-cache", []
     backend = OfflineBackend(events)
     store = OfflineProtectedStore(cache, events)

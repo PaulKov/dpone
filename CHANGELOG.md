@@ -2,6 +2,55 @@
 
 ## Unreleased
 
+### Added
+
+- Document Kubernetes composition-supervisor provisioning, cache-sync
+  `--workspace-authority-connection-ref`, the three installed execution cells
+  (`sqlserver_dbt_v1`, `postgres_mssql_full_refresh_v1`,
+  `mssql_clickhouse_full_refresh_v1`), `COMMIT_UNKNOWN` recovery, and
+  no-automatic tombstone deletion. See
+  [composition supervisor operations](docs/guides/composition-supervisor-kubernetes.md).
+  Offline tests are not route certification. Live three-cell execution remains
+  `UNVERIFIED`.
+
+### Changed
+
+- Enable the public composition factory
+  `dpone.app.composition_activation.build_composition_activation_coordinator`
+  and the cache-sync/desired-state authority path. Native-v2 behavior is
+  unchanged. Authenticated v3 pack-exec reaches the native dbt parent worker
+  when parent context exists; a missing occurrence context fail-closes as
+  `composition_native_worker_unavailable` before the dbt root is composed.
+  Ordinary pack-exec reaches `CompositionTransferExecutionRoot` when parent
+  context exists and `DPONE_CACHE_ROOT` (or `DPONE_SCHEDULER_CACHE_ROOT`)
+  reopens the sealed parent plan; missing cache, a drifted source subject,
+  or a missing occurrence context fail-closes as
+  `composition_ordinary_worker_unavailable` before login issuance.
+  ClickHouse pack-exec reaches `CompositionClickHouseExecutionRoot` when that
+  plan, the sealed snapshot sidecar, and enrolled supervisor/HTTP collaborators
+  compose; missing originals fail-close with the same reason before login.
+  ClickHouse catalog inspect issues closed HTTP `system.*` reads and hashes the
+  actual response bytes; it does not copy sealed generation content, schema, or
+  physical digests. Pack-exec composes ordinary and ClickHouse roots but does
+  not start login or ingest until independent transfer observation or typed
+  catalog classification exists. A skipped live check is never `PASS`.
+- Treat transfer observations that carry both a success triple and rollback
+  protection as `COMMIT_UNKNOWN` instead of `SUCCEEDED`.
+- Add composition execution integration: reopen sealed parent inputs, select
+  parent admission in the shared dbt engine, use issued-only dbt credentials,
+  and fence generic MSSQL target transactions and receipt replay.
+- Add bounded ClickHouse dispatch with a durable SQL claim/response/closure
+  journal, protected dbt result capture and concrete physical enrollment readers.
+  Bind MSSQL target commits and replay to exact protected operations through a
+  narrow cross-database procedure, retaining separate control and target databases.
+- Integrate canonical finite fixture recipes and complete pre-export bound
+  queries, preserving legacy fixture outputs. Source sealing and campaign budget
+  authority remain separate requirements.
+- Add per-attempt ClickHouse principal gates and complete bounded administrator
+  HTTP responses, with explicit private-namespace LOCAL policy and immutable
+  gate originals. Live supervisor enrollment and the three-cell worker campaign
+  remain `UNVERIFIED`.
+
 ## 0.79.0 - 2026-09-11
 
 ### Changed

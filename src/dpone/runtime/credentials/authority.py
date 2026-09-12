@@ -192,6 +192,7 @@ def _source_materialization_connection_ref(load_config: LoadConfig) -> str | Non
 
 
 __all__ = [
+    "ResolvedBindingConnection",
     "RuntimeResolvedConnections",
     "canonical_runtime_endpoint_type",
     "resolve_runtime_connections",

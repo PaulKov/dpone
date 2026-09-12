@@ -21,6 +21,11 @@ from dpone.contracts.dbt_runtime import (
     validate_dbt_runtime_release_identity,
     validate_dbt_runtime_source_projection,
 )
+from dpone.runtime.composition_verified_dispatch import (
+    COMPOSITION_AUTHORITY_ENV_KEYS,
+    RUNTIME_RELEASE_ADMISSION_ENV,
+    composition_command_authority,
+)
 from dpone.runtime.dbt_project_bundle import verify_dbt_project_bundle_tree
 from dpone.runtime.deployment_cache_common import DeploymentCacheError, open_regular_file
 from dpone.runtime.init_fetch_contract import InitFetchError, cache_relative_path
@@ -123,6 +128,10 @@ class VerifiedPackLauncher:
             except Exception as exc:
                 raise _launcher_error("dbt project bundle worktree verification failed") from exc
         argv, environment = _selected_command(pack, plan)
+        composition = _composition_authority(
+            release_payload=payloads[plan.release.artifact_ref],
+            deployment_payload=payloads[plan.deployment.artifact_ref],
+        )
         # Separate hooks hydrate the same canonical connections as the runtime.
         # Both receive only the context whose artifacts were verified above.
         environment = {
@@ -132,6 +141,13 @@ class VerifiedPackLauncher:
                 artifact_root=self._artifact_root,
             ).as_posix(),
         }
+        # A pack can never supply its own composition authority: only
+        # authenticated release and deployment bytes may add the marker and the
+        # pinned supervisor capability. Legacy releases carry neither, even when
+        # their MSSQL asset outlets use the same v3 deployment wire.
+        for key in COMPOSITION_AUTHORITY_ENV_KEYS:
+            environment.pop(key, None)
+        environment.update(composition)
         _validate_worktree_command(
             argv,
             root=self._worktree_root,
@@ -156,6 +172,22 @@ class VerifiedPackLauncher:
                 else "xcom_gate"
             ),
         )
+
+
+def _composition_authority(
+    *,
+    release_payload: bytes,
+    deployment_payload: bytes,
+) -> Mapping[str, str]:
+    """Project the composition environment from authenticated artifact bytes."""
+
+    try:
+        return composition_command_authority(
+            release_payload=release_payload,
+            deployment_payload=deployment_payload,
+        )
+    except ValueError as exc:
+        raise _launcher_error("verified composition authority could not be projected") from exc
 
 
 def _runtime_connection_context_path(
@@ -312,6 +344,7 @@ def _launcher_error(message: str) -> InitFetchError:
 
 __all__ = [
     "RUNTIME_CONNECTION_CONTEXT_ENV",
+    "RUNTIME_RELEASE_ADMISSION_ENV",
     "VerifiedPackCommand",
     "VerifiedPackLauncher",
 ]

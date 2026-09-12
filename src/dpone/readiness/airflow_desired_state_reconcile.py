@@ -12,6 +12,7 @@ from dpone.adapters.airflow_desired_state_checkpoint import (
     FileDesiredStateReconcileEvidenceStore,
     FileDesiredStateRecoveryRecordStore,
 )
+from dpone.app.composition_activation import build_composition_activation_coordinator
 from dpone.app.dbt_workspace_activation_composition import (
     build_deployment_cache_workspace_activation_coordinator,
 )
@@ -77,6 +78,7 @@ if TYPE_CHECKING:
     from dpone.contracts.airflow_desired_state_reconcile import (
         DesiredStateReconcileEvidence,
     )
+    from dpone.ports.composition_activation import CompositionActivationCoordinatorPort
     from dpone.ports.dbt_workspace_activation import DbtWorkspaceActivationCoordinatorPort
     from dpone.readiness.airflow_artifact_delivery import ArtifactRegistryOptions
     from dpone.readiness.airflow_desired_state_authority import (
@@ -95,6 +97,7 @@ class DeploymentCacheDesiredDeploymentActivator:
         cache_root: Path,
         promoted_by: str,
         workspace_activation: DbtWorkspaceActivationCoordinatorPort | None = None,
+        composition_activation: CompositionActivationCoordinatorPort | None = None,
         workspace_authority_connection_ref: str | None = None,
     ) -> None:
         self._cache_root = cache_root
@@ -105,6 +108,7 @@ class DeploymentCacheDesiredDeploymentActivator:
             cache_root,
             allowed_promoters=(promoted_by,),
             workspace_activation=workspace_activation,
+            composition_activation_coordinator=composition_activation,
         )
 
     def current(self, *, environment: str) -> ActiveDesiredDeployment | None:
@@ -280,6 +284,14 @@ def reconcile_desired_state(
                         promoted_by=authority.watcher_identity,
                         workspace_activation=(
                             build_deployment_cache_workspace_activation_coordinator(
+                                cache_root=root,
+                                authority_connection_ref=authority.workspace_authority_connection_ref,
+                            )
+                            if authority.workspace_authority_connection_ref is not None
+                            else None
+                        ),
+                        composition_activation=(
+                            build_composition_activation_coordinator(
                                 cache_root=root,
                                 authority_connection_ref=authority.workspace_authority_connection_ref,
                             )

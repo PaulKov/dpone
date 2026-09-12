@@ -7,6 +7,9 @@ from copy import deepcopy
 from datetime import timedelta
 from typing import Any
 
+from dpone_airflow_pack.composition_supervisor_pod import (
+    apply_composition_supervisor,
+)
 from dpone_airflow_pack.init_fetch_contract import (
     ConfigMapReference,
     InitFetchDeliveryContext,
@@ -47,6 +50,10 @@ from dpone_airflow_pack.provider_execution import (
     RUNTIME_POD_MANAGED_BY_VALUE,
     WORKLOAD_ID_METADATA_KEY,
     require_provider_execution,
+)
+from dpone_airflow_pack.run_identity import (
+    COMPOSITION_SUPERVISOR_B64_ENV,
+    encode_composition_supervisor,
 )
 from dpone_airflow_pack.xcom_sidecar import require_strict_xcom_sidecar_image
 
@@ -128,6 +135,21 @@ def compose_init_fetch_operator_kwargs(
             "if dag_run is defined and dag_run else '' }}"
         )
 
+    # Materialize init-fetch before adding the supervisor transport to operator
+    # env_vars: only the base process may receive supervisor authority.
+    full_pod_spec = _strict_pod(
+        projection.pod_spec,
+        context=context,
+        env_vars=env_vars,
+        plan_sha256=encoded.sha256,
+        name=str(effective_kwargs.get("name") or effective_kwargs.get("task_id") or "dpone-runtime"),
+        labels=_runtime_labels(projection.kpo_kwargs["labels"]),
+        workload_id=workload_id,
+    )
+    if context.composition_supervisor is not None:
+        env_vars[COMPOSITION_SUPERVISOR_B64_ENV] = encode_composition_supervisor(
+            context.composition_supervisor.to_dict()
+        )
     clean = {key: deepcopy(value) for key, value in effective_kwargs.items() if key in _PRESERVED_KPO_FIELDS}
     runtime_labels = _runtime_labels(projection.kpo_kwargs["labels"])
     annotations = {
@@ -156,15 +178,7 @@ def compose_init_fetch_operator_kwargs(
             "env_vars": env_vars,
             "annotations": annotations,
             "labels": runtime_labels,
-            "full_pod_spec": _strict_pod(
-                projection.pod_spec,
-                context=context,
-                env_vars=env_vars,
-                plan_sha256=encoded.sha256,
-                name=str(clean.get("name") or clean.get("task_id") or "dpone-runtime"),
-                labels=runtime_labels,
-                workload_id=workload_id,
-            ),
+            "full_pod_spec": full_pod_spec,
         }
     )
     execution_timeout_seconds = projection.kpo_kwargs.get("execution_timeout_seconds")
@@ -261,12 +275,15 @@ def _strict_pod(
             WORKLOAD_ID_METADATA_KEY: workload_id,
         },
     }
-    return {
+    pod = {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": metadata,
         "spec": spec,
     }
+    if context.composition_supervisor is not None:
+        apply_composition_supervisor(pod, context.composition_supervisor)
+    return pod
 
 
 def _volumes(
@@ -409,6 +426,7 @@ def _pod_name(value: str) -> str:
 
 __all__ = [
     "ARTIFACT_ROOT",
+    "apply_composition_supervisor",
     "attach_init_fetch_context",
     "compose_init_fetch_operator_kwargs",
     "PLAN_B64_ENV",

@@ -18,6 +18,9 @@ import dpone_airflow_pack.deployment_index_contract as deployment_index_contract
 import dpone_airflow_pack.provider as provider_module
 import pytest
 from dpone_airflow_pack.cache_artifact_contract import verify_cache_artifact
+from dpone_airflow_pack.composition_supervisor_contract import (
+    parse_composition_supervisor,
+)
 from dpone_airflow_pack.dag_loader import load_dpone_dags
 from dpone_airflow_pack.dag_spec_loader import compute_dag_spec_fingerprint, load_dag_spec_file
 from dpone_airflow_pack.deployment_index import (
@@ -149,6 +152,146 @@ def _v2_init_fetch_index_payload(runtime_delivery: Mapping[str, Any]) -> dict[st
         ],
         "runtime_artifact_delivery": dict(runtime_delivery),
     }
+
+
+def _supervisor_payload() -> dict[str, object]:
+    return {
+        "schema": "dpone.composition-supervisor.v1",
+        "persistent_volume_claim": "dpone-composition-supervisor",
+        "child_uid_start": 1_000_000_000,
+        "child_gid_start": 1_000_000_000,
+        "child_identity_count": 1_000_000,
+    }
+
+
+def _write_v3_supervisor_index(
+    tmp_path: Path,
+    supervisor: dict[str, object],
+) -> Path:
+    payload = _v2_init_fetch_index_payload(_init_fetch_delivery())
+    payload["schema"] = "dpone.airflow-deployment-index.v3"
+    payload["composition_supervisor"] = supervisor
+    descriptor = payload["workload_packs"][0]
+    artifact_path = tmp_path / str(descriptor["artifact_ref"]).removeprefix("cache://")
+    artifact_path.parent.mkdir(parents=True)
+    artifact_path.write_bytes(b"{}")
+    descriptor["sha256"] = _sha256(artifact_path)
+    descriptor["bytes"] = 2
+    index_path = tmp_path / "airflow-index.json"
+    index_path.write_text(json.dumps(payload), encoding="utf-8")
+    return index_path
+
+
+@pytest.mark.parametrize(
+    ("supervisor", "accepted"),
+    [
+        pytest.param(_supervisor_payload(), True, id="valid"),
+        pytest.param(
+            {key: value for key, value in _supervisor_payload().items() if key != "child_gid_start"},
+            False,
+            id="missing-field",
+        ),
+        pytest.param(
+            {
+                **_supervisor_payload(),
+                "child_identity_count": True,
+            },
+            False,
+            id="boolean-count",
+        ),
+    ],
+)
+def test_typed_supervisor_parser_matches_public_index_reader(
+    tmp_path: Path,
+    supervisor: dict[str, object],
+    accepted: bool,
+) -> None:
+    index_path = _write_v3_supervisor_index(tmp_path, supervisor)
+
+    if accepted:
+        parsed = parse_composition_supervisor(supervisor)
+        assert parsed is not None
+        loaded = load_airflow_deployment_index(index_path, cache_root=tmp_path)
+        assert loaded.composition_supervisor == parsed.to_dict()
+        return
+
+    with pytest.raises(ValueError, match="composition_supervisor_invalid"):
+        parse_composition_supervisor(supervisor)
+    with pytest.raises(AirflowDeploymentIndexError) as raised:
+        load_airflow_deployment_index(index_path, cache_root=tmp_path)
+    assert raised.value.code == "DPONE_COMPOSITION_SUPERVISOR_INVALID"
+
+
+def test_public_index_reader_delegates_to_typed_supervisor_parser(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[object] = []
+
+    def recording_parser(value: object) -> Any:
+        calls.append(value)
+        return parse_composition_supervisor(value)
+
+    monkeypatch.setattr(
+        deployment_index_contract,
+        "parse_composition_supervisor",
+        recording_parser,
+        raising=False,
+    )
+    index_path = _write_v3_supervisor_index(tmp_path, _supervisor_payload())
+
+    loaded = load_airflow_deployment_index(index_path, cache_root=tmp_path)
+
+    assert loaded.composition_supervisor == _supervisor_payload()
+    assert calls == [_supervisor_payload()]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda value: value.update(persistent_volume_claim=" dpone-composition-supervisor"),
+        lambda value: value.pop("child_gid_start"),
+    ],
+)
+def test_public_provider_reader_rejects_malformed_v3_supervisor(
+    tmp_path: Path,
+    mutation: Callable[[dict[str, object]], object],
+) -> None:
+    index_path = tmp_path / "airflow-index.json"
+    payload = _v2_init_fetch_index_payload(_init_fetch_delivery())
+    payload["schema"] = "dpone.airflow-deployment-index.v3"
+    supervisor = _supervisor_payload()
+    mutation(supervisor)
+    payload["composition_supervisor"] = supervisor
+    index_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(AirflowDeploymentIndexError) as exc_info:
+        load_airflow_deployment_index(index_path, cache_root=tmp_path)
+
+    assert exc_info.value.code == "DPONE_COMPOSITION_SUPERVISOR_INVALID"
+
+
+@pytest.mark.parametrize(
+    "schema",
+    ["dpone.airflow-deployment-index.v1", "dpone.airflow-deployment-index.v2"],
+)
+def test_public_provider_reader_forbids_supervisor_on_v1_v2(
+    tmp_path: Path,
+    schema: str,
+) -> None:
+    index_path = tmp_path / "airflow-index.json"
+    if schema.endswith(".v1"):
+        _write_minimal_index(index_path)
+        payload = json.loads(index_path.read_bytes())
+    else:
+        payload = _v2_init_fetch_index_payload(_init_fetch_delivery())
+    payload["composition_supervisor"] = _supervisor_payload()
+    index_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(AirflowDeploymentIndexError) as exc_info:
+        load_airflow_deployment_index(index_path, cache_root=tmp_path)
+
+    assert exc_info.value.code == "DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN"
 
 
 def _semantic_refresh_projection_descriptor() -> dict[str, object]:

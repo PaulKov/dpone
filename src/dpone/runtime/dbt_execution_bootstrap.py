@@ -15,7 +15,6 @@ from dpone.adapters.dbt_runtime import (
     DistributionDbtToolchainInspector,
     LocalDbtExecutionEvidenceWriter,
     LocalDbtRunResultsReader,
-    OfficialDbtManifestValidator,
     OfficialDbtRunResultsValidator,
     RuntimeDbtProfileRenderer,
     SemanticRefreshDbtRuntimeAuthority,
@@ -26,17 +25,21 @@ from dpone.adapters.dbt_runtime import (
 )
 from dpone.contracts.dbt_runtime import (
     AIRFLOW_RUN_IDENTITY_ENV,
-    DAG_ID_ENV,
-    DAG_RUN_ID_ENV,
     DBT_RUNTIME_WIRE_V1,
-    TRY_NUMBER_ENV,
-    AirflowAttemptCorrelation,
-    AirflowRunIdentity,
     DbtExecutionPack,
     DbtPublishingError,
+    airflow_attempt_from_environment,
+    dbt_execution_interval_from_environment,
     parse_airflow_run_identity_json,
     prove_mutation_closure,
-    run_interval_from_env,
+)
+from dpone.ports.composition_dbt import (
+    COMPOSITION_SUPERVISOR_B64_ENV,
+    CompositionNativeDbtExecutor,
+)
+from dpone.runtime.composition_dbt_bootstrap import (
+    RuntimeDbtManifestSchemaValidator,
+    build_dbt_runtime_preflight,
 )
 from dpone.runtime.credentials.runtime_context import (
     RuntimeConnectionContextLoader,
@@ -44,11 +47,9 @@ from dpone.runtime.credentials.runtime_context import (
 from dpone.runtime.dbt_execution_pack_reader import execution_pack_payload
 from dpone.runtime.dbt_execution_service import (
     DEFAULT_DBT_RUN_OUTPUT_ROOT,
-    DbtExecutionInterval,
     DbtExecutionOutcome,
     DbtExecutionService,
 )
-from dpone.runtime.dbt_preflight import DbtRuntimePreflight
 from dpone.runtime.dbt_semantic_refresh_execution import (
     SemanticRefreshDbtCommandRunner,
     SemanticRefreshDbtExecutionVariables,
@@ -63,35 +64,10 @@ from dpone.runtime.dbt_semantic_refresh_run_authority import (
     validate_static_projection_identity,
 )
 from dpone.runtime.dbt_workspace_attempt_bootstrap import (
-    required_runtime_environment as _required_environment,
-)
-from dpone.runtime.dbt_workspace_attempt_bootstrap import (
     workspace_attempt_dependencies as _workspace_attempt_dependencies,
 )
 
 MAX_DBT_EXECUTION_PACK_BYTES = 1024 * 1024
-
-
-class _ManifestDiagnostic:
-    """Severity projection consumed by the runtime preflight policy."""
-
-    def __init__(self, severity: str) -> None:
-        self.severity = severity
-
-
-class _ManifestValidator:
-    """Adapt the richer official diagnostic to the runtime's narrow port."""
-
-    def __init__(self) -> None:
-        self._delegate = OfficialDbtManifestValidator()
-
-    def validate(
-        self,
-        payload: Mapping[str, Any],
-        *,
-        version: int,
-    ) -> tuple[_ManifestDiagnostic, ...]:
-        return tuple(_ManifestDiagnostic(item.severity) for item in self._delegate.validate(payload, version=version))
 
 
 def execute_dbt_pack(
@@ -101,8 +77,15 @@ def execute_dbt_pack(
     runtime_root: Path | None = None,
     run_output_root: Path = DEFAULT_DBT_RUN_OUTPUT_ROOT,
     profiles_tmpfs_root: Path = Path("/dev/shm/dpone"),
+    composition_executor: CompositionNativeDbtExecutor | None = None,
 ) -> DbtExecutionOutcome:
-    """Compose and execute one scheduler-verified pack without a shell."""
+    """Compose and execute one scheduler-verified pack without a shell.
+
+    ``composition_executor`` is the supervised parent root. When the runtime
+    carries a pinned composition supervisor capability the pack must execute
+    through it; native-v2 workspace admission and generic subprocess dispatch are
+    never an alternative path for an authenticated v3 deployment.
+    """
 
     environment = os.environ if environ is None else environ
     root = (runtime_root or Path.cwd()).absolute()
@@ -120,6 +103,7 @@ def execute_dbt_pack(
         runtime_root=root,
         run_output_root=output_root,
         profiles_tmpfs_root=profiles_tmpfs_root,
+        composition_executor=composition_executor,
     )
 
 
@@ -133,6 +117,7 @@ def _execute_loaded_pack(
     command_runner: Any | None = None,
     preflight: Any | None = None,
     interval: Any | None = None,
+    composition_executor: CompositionNativeDbtExecutor | None = None,
 ) -> DbtExecutionOutcome:
     """Execute one already-authenticated pack through the shared pinned engine."""
 
@@ -149,6 +134,22 @@ def _execute_loaded_pack(
             "DPONE_DBT_EXECUTION_FAILED",
             "Airflow run identity is invalid",
         ) from exc
+    attempt = airflow_attempt_from_environment(environment, run_identity)
+    supervisor = environment.get(COMPOSITION_SUPERVISOR_B64_ENV)
+    if supervisor:
+        if composition_executor is None or command_runner is not None or preflight is not None:
+            raise DbtPublishingError(
+                "DPONE_DBT_COMPOSITION_EXECUTOR_UNAVAILABLE",
+                "supervised composition execution requires the parent worker root",
+            )
+        return composition_executor.execute_native_pack(
+            pack=pack,
+            run_identity=run_identity,
+            airflow_attempt=attempt,
+            runtime_root=runtime_root,
+            interval=interval or dbt_execution_interval_from_environment(environment),
+            supervisor_transport=supervisor,
+        )
     context = RuntimeConnectionContextLoader(
         vault_reader_factory=build_hvac_kubernetes_vault_kv_v2_reader,
     ).load(environment)
@@ -157,7 +158,6 @@ def _execute_loaded_pack(
             "DPONE_DBT_PROFILE_INVALID",
             "Pinned runtime connection context is required",
         )
-    attempt = _airflow_attempt(environment, run_identity)
     local_evidence_writer = LocalDbtExecutionEvidenceWriter(run_output_root / f"dbt-{pack.workflow_id}-execution.json")
     runner = command_runner or SubprocessDbtCommandRunner()
     artifact_reader = LocalDbtRunResultsReader()
@@ -174,12 +174,7 @@ def _execute_loaded_pack(
         profile_store=TemporaryDbtProfileStore(profiles_tmpfs_root),
         run_results_reader=artifact_reader,
         run_results_validator=OfficialDbtRunResultsValidator(),
-        preflight=preflight
-        or DbtRuntimePreflight(
-            command_runner=runner,
-            artifact_reader=artifact_reader,
-            manifest_validator=_ManifestValidator(),
-        ),
+        preflight=preflight or build_dbt_runtime_preflight(runner, artifact_reader=artifact_reader),
         evidence_writer=CampaignDbtExecutionEvidenceWriter(
             local_evidence_writer,
             evidence_root=environment.get(DBT_DEV_EVIDENCE_ROOT_ENV),
@@ -194,7 +189,7 @@ def _execute_loaded_pack(
         run_output_root=run_output_root,
         run_identity=run_identity,
         airflow_attempt=attempt,
-        interval=interval or _execution_interval(environment),
+        interval=interval or dbt_execution_interval_from_environment(environment),
     )
 
 
@@ -281,7 +276,7 @@ def execute_semantic_refresh_dbt_pack(
         project_config_overlay=project_config_overlay,
         authority=authority,
     ) as materialized_root:
-        base_interval = _execution_interval(environment)
+        base_interval = dbt_execution_interval_from_environment(environment)
         variables = SemanticRefreshDbtExecutionVariables(
             start=base_interval.start,
             end=base_interval.end,
@@ -297,7 +292,7 @@ def execute_semantic_refresh_dbt_pack(
         preflight = SemanticRefreshDbtRuntimePreflight(
             command_runner=runner,
             artifact_reader=artifact_reader,
-            manifest_validator=_ManifestValidator(),
+            manifest_validator=RuntimeDbtManifestSchemaValidator(),
             mutation_prover=prove_mutation_closure,
             immutable_proof_rechecker=immutable_proof_rechecker,
             plan_bundle=plan_bundle,
@@ -335,36 +330,6 @@ def _semantic_refresh_projection_identity(
             "DPONE_DBT_V2_RUN_AUTHORITY_INVALID",
             "semantic-refresh static projection authority is invalid",
         ) from exc
-
-
-def _airflow_attempt(
-    environment: dict[str, str] | os._Environ[str],
-    run_identity: AirflowRunIdentity,
-) -> AirflowAttemptCorrelation:
-    try:
-        try_number = int(environment.get(TRY_NUMBER_ENV, ""))
-    except ValueError as exc:
-        raise DbtPublishingError(
-            "DPONE_DBT_EXECUTION_FAILED",
-            "Airflow try number is invalid",
-        ) from exc
-    return AirflowAttemptCorrelation(
-        dag_id=_required_environment(environment, DAG_ID_ENV),
-        task_id=f"{run_identity.workload_pack.id}__dpone_runtime",
-        run_id=_required_environment(environment, DAG_RUN_ID_ENV),
-        try_number=try_number,
-        map_index=-1,
-    )
-
-
-def _execution_interval(
-    environment: dict[str, str] | os._Environ[str],
-) -> DbtExecutionInterval:
-    interval = run_interval_from_env(environment)
-    return DbtExecutionInterval(
-        start=str(interval.interval_start or ""),
-        end=str(interval.interval_end or ""),
-    )
 
 
 __all__ = [
