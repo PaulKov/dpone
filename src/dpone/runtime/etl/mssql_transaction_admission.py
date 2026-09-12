@@ -78,12 +78,18 @@ class MssqlTransactionAdmissionService:
         operation_lease_factory: Any = MssqlOperationLeaseHeartbeat,
         operation_scope_refresher: Callable[[Any], Any] | None = None,
         start_operation_lease_on_admission: bool = False,
+        operation_registrar: Callable[[Any, bytes], None] | None = None,
+        composition_fence: Any | None = None,
+        fence_connector: Any | None = None,
     ) -> None:
         self._target_resolver = target_resolver
         self._state_factory = state_factory or MssqlGenericTransactionState.from_state_storage
         self._operation_lease_factory = operation_lease_factory
         self._operation_scope_refresher = operation_scope_refresher
         self._start_operation_lease_on_admission = start_operation_lease_on_admission
+        self._operation_registrar = operation_registrar
+        self._composition_fence = composition_fence
+        self._fence_connector = fence_connector
 
     def prepare(
         self,
@@ -194,6 +200,10 @@ class MssqlTransactionAdmissionService:
                     sink=sink,
                     admission=admission,
                 )
+                if self._operation_registrar is not None:
+                    self._operation_registrar(
+                        admission, options[MSSQL_SCHEMA_PREPLAN_OPTION].target_mutation_plan.digest
+                    )
             except BaseException as primary:
                 if prepared_boundary is not None:
                     prepared_boundary.abort_preserving(primary)
@@ -203,13 +213,21 @@ class MssqlTransactionAdmissionService:
                 raise
         return replace(load_config, options=options)
 
-    @staticmethod
-    def replay_result(load_config: Any) -> Any | None:
+    def replay_result(self, load_config: Any) -> Any | None:
         """Project exact receipt metrics before any source or payload work."""
 
         admission = (getattr(load_config, "options", {}) or {}).get(ADMISSION_OPTION)
         if not isinstance(admission, MssqlTransactionAdmission) or admission.replay_receipt is None:
             return None
+        if self._composition_fence is not None:
+            connector = self._fence_connector
+            if connector is None:
+                raise RuntimeError("mssql_transaction.composition_fence_connector_required")
+            try:
+                connector.begin()
+                self._composition_fence.require_current(connector, receipt=admission.replay_receipt)
+            finally:
+                connector.rollback()
         return load_result_from_mssql_receipt(
             admission.replay_receipt,
             outcome=AtomicCommitOutcome.REPLAY_SUPPRESSED,

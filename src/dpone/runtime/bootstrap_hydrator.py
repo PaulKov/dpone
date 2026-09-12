@@ -9,9 +9,11 @@ if TYPE_CHECKING:
 
 
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from typing import Any
 
 from dpone.config.postgres_xmin_execution import require_postgres_xmin_execution_route
+from dpone.contracts.runtime_connection import ResolvedBindingConnection
 from dpone.ports.runtime_hydrator import RuntimeBindings
 from dpone.runtime.bootstrap_config import mapping_or_empty
 from dpone.runtime.bootstrap_load_identity import build_load_identity_service
@@ -61,6 +63,10 @@ class DefaultRuntimeHydrator:
         *,
         config: Mapping[str, Any],
         load_config: LoadConfig,
+        sink_connection: ResolvedBindingConnection | None = None,
+        state_connection: ResolvedBindingConnection | None = None,
+        mssql_transaction_admission_service: Any | None = None,
+        composition_transaction_fence: Any | None = None,
     ) -> RuntimeBindings:
         require_postgres_xmin_execution_route(load_config)
         sink_cfg = _canonical_endpoint_config(mapping_or_empty(config.get("sink")))
@@ -75,6 +81,7 @@ class DefaultRuntimeHydrator:
             load_config=load_config,
             context=context,
         )
+        _ = (mssql_transaction_admission_service, composition_transaction_fence)
         apply_connection_database_defaults(load_config=load_config, connections=connections)
         bind_source_materialization_location(load_config=load_config, connections=connections)
         runtime_storage_policy = RuntimeStoragePolicy.from_sources(
@@ -94,6 +101,11 @@ class DefaultRuntimeHydrator:
             verifier_factory=self._mssql_database_authority_verifier_factory,
         )
         _inject_state_identity(config=runtime_config, load_config=load_config, context=context)
+        connections = _with_issued_overlays(
+            connections,
+            sink_connection=sink_connection,
+            state_connection=state_connection,
+        )
         if connections.strict:
             state_bindings = self._state_bootstrap.build_resolved(
                 state_cfg=state_cfg,
@@ -273,6 +285,32 @@ def _canonical_endpoint_config(config: Mapping[str, Any]) -> Mapping[str, Any]:
     if canonical.get("type") not in (None, ""):
         canonical["type"] = canonical_runtime_endpoint_type(canonical["type"])
     return canonical
+
+
+def _with_issued_overlays(
+    connections: Any,
+    *,
+    sink_connection: ResolvedBindingConnection | None,
+    state_connection: ResolvedBindingConnection | None,
+) -> Any:
+    """Replace resolved sink/state after ambient authority pins are proven."""
+
+    if sink_connection is None and state_connection is None:
+        return connections
+    updates: dict[str, ResolvedBindingConnection] = {}
+    if sink_connection is not None:
+        updates["sink"] = _require_issued_overlay(sink_connection)
+    if state_connection is not None:
+        updates["state"] = _require_issued_overlay(state_connection)
+    return replace(connections, **updates)
+
+
+def _require_issued_overlay(connection: ResolvedBindingConnection) -> ResolvedBindingConnection:
+    if type(connection) is not ResolvedBindingConnection:
+        raise RuntimeConfigurationError("composition_issued_login_overlay_required")
+    if (connection.safe_metadata or {}).get("resolver") != "composition-issued-login":
+        raise RuntimeConfigurationError("composition_issued_login_overlay_required")
+    return connection
 
 
 def _inject_state_identity(*, config: Mapping[str, Any], load_config: Any, context: Any) -> None:
