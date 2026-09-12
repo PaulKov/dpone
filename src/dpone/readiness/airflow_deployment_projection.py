@@ -35,6 +35,8 @@ from dpone.readiness.airflow_deployment_projection_policy import (
     require_runtime_payload_authority,
     require_versioned_airflow_bundle_ref,
     runtime_connection_fingerprints,
+    seal_composition_supervisor_projection,
+    supervisor_projection,
     workload_projection_inventory,
 )
 from dpone.readiness.airflow_deployment_projection_policy import (
@@ -99,9 +101,10 @@ class AirflowDeploymentProjectionService:
         airflow_bundle_ref: str | None = None,
         dev_evidence_pvc_claim: str | None = None,
         dev_evidence_worker_queue: str | None = None,
+        composition_supervisor: Mapping[str, object] | None = None,
         semantic_refresh_sidecars: SemanticRefreshDagSidecarFactory | None = None,
     ) -> AirflowDeploymentProjection:
-        """Materialize a strict executable v2 environment projection."""
+        """Materialize a strict executable v2 or supervised v3 projection."""
 
         environment = normalize_environment_segment(environment)
         require_digest("release_id", release_id)
@@ -117,6 +120,10 @@ class AirflowDeploymentProjectionService:
             cache_root=self._cache_root,
             release_id=release_id,
             environment=environment,
+        )
+        supervisor_capability = supervisor_projection(
+            release_schema=inputs.release_schema,
+            value=composition_supervisor,
         )
         if not inputs.workload_packs:
             raise AirflowDeploymentProjectionError(
@@ -169,6 +176,7 @@ class AirflowDeploymentProjectionService:
             pack_payloads=pack_payloads,
         )
         deployment, deployment_bytes, airflow_index = build_environment_deployment_documents(
+            release_schema=inputs.release_schema,
             environment=environment,
             release_id=release_id,
             trust_tier=normalized_trust_tier,
@@ -189,6 +197,12 @@ class AirflowDeploymentProjectionService:
             release_bytes=inputs.release_bytes,
             mssql_outlet_projection=mssql_outlet_projection,
         )
+        if supervisor_capability is not None:
+            deployment_bytes = seal_composition_supervisor_projection(
+                deployment=deployment,
+                airflow_index=airflow_index,
+                projection=supervisor_capability,
+            )
         sidecar_files: dict[str, bytes] = {}
         if semantic_refresh_sidecars is not None:
             sidecars = semantic_refresh_sidecars.build(

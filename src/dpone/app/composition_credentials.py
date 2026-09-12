@@ -7,14 +7,16 @@ cannot become fallback authority. Profiles contain dbt secret env references.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 import yaml
 
 from dpone.adapters.dbt_runtime_profile import RuntimeDbtProfileRenderer
 from dpone.contracts.composition_activation import CompositionAdmissionError
+from dpone.contracts.dbt_invocation import DbtInvocationContext
 from dpone.contracts.runtime_connection import ResolvedBindingConnection
 from dpone.ports.dbt_publishing import RenderedDbtProfile
 from dpone.runtime.credentials.config import CredentialsConfig
@@ -95,6 +97,31 @@ class IssuedDbtProfileRenderer:
         output["user"] = "{{ env_var('" + _USER_ENV + "') }}"
         output["password"] = "{{ env_var('" + _PASSWORD_ENV + "') }}"
         return replace(rendered, content=yaml.safe_dump(document, sort_keys=True).encode("utf-8"))
+
+
+def issued_dbt_child_environment(
+    *, attempt: CompositionAttemptIdentity, credentials: IssuedSqlCredentials, home: Path
+) -> Callable[[], Mapping[str, str]]:
+    """Bind issued secrets to one bounded, explicit child environment.
+
+    The returned provider is scoped to exactly one attempt by construction. It
+    supplies the same pinned invocation environment the shared dbt runner uses,
+    plus the two dbt secret variables the rendered profile references. ``home``
+    must be a child-writable directory of this attempt, because dbt creates its
+    user state below ``HOME``. Nothing here mutates ``os.environ`` and no value
+    is journaled, logged or persisted.
+    """
+    _require_issued(attempt, credentials)
+    pinned = DbtInvocationContext.canonical().environment(home=str(home))
+
+    def environment() -> Mapping[str, str]:
+        return {
+            **pinned,
+            _USER_ENV: credentials.login_name,
+            _PASSWORD_ENV: credentials.password,
+        }
+
+    return environment
 
 
 def issued_dbt_process_factory(

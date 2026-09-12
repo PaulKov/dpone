@@ -64,11 +64,6 @@ class DbtWorkspaceAttemptLifecycle:
         if self._composition_attempt is not None:
             self._composition_attempt.verify_before_build(
                 pack=pack,
-                manifest=self._run_results_reader.read(
-                    output_paths.preflight_target / "manifest.json",
-                    root=output_paths.root,
-                    max_bytes=MAX_DBT_PREFLIGHT_MANIFEST_BYTES,
-                ),
                 run_identity=run_identity,
                 airflow_attempt=airflow_attempt,
             )

@@ -212,6 +212,7 @@ Interpret runtime command exits with the stable code in the container log:
 | `3` | `DPONE_ARTIFACT_REGISTRY_UNAVAILABLE`. | Repair registry/IAM availability, then retry the same pinned task. Each retry gets a fresh `emptyDir`. |
 | `4` | Configuration/trust mismatch, missing or corrupt artifact, required attestation, invalid ready state, or other integrity/contract failure. | Stop execution. Restore exact immutable bytes or publish and promote a new deployment; do not bypass verification. |
 | `5` | `DPONE_RUNTIME_PACK_EXEC_FAILED` or verified child process could not start. | Use stage, exception type, errno and service-path role to distinguish permissions, missing executable/path, full disk and publication failures; follow [startup diagnostics](airflow-runtime-startup-diagnostics.md). |
+| `5` | `DPONE_RUNTIME_COMPOSITION_DISPATCH_REJECTED`: an authenticated `dpone.release-set.v3` workload could not be dispatched to its supervised worker. | Read the `reason` token in the log and `runtime-startup-error.json`; restore the supervisor capability, runtime image or verified command instead of retrying. Composition never falls back to native-v2 or generic execution; follow [startup diagnostics](airflow-runtime-startup-diagnostics.md). |
 | Child exit | Verified workload command started and returned non-zero. | Use normal dpone run/evidence/state recovery for that exact attempt; the launcher preserves the child exit code. |
 
 Useful stable runtime codes include

@@ -1,7 +1,7 @@
 schema_version: 1
 task_id: DPONE-COMPOSITION-ACTIVATION
-title: Composition parent admission foundation
-goal: Implement the full-parent source, admission, lifecycle and attempt-policy foundation while preserving default fail-closed activation.
+title: Complete composition activation and supervised execution
+goal: Implement full-parent admission and protected provider execution while preserving fail-closed activation and native-v2 compatibility.
 specification: docs/feature-specs/composition-activation-execution.md
 base_commit: 67c8ade61732fb1bff267ce3bd26f2af776e79e6
 integrator: root
@@ -10,21 +10,23 @@ acceptance_criteria:
   - Unknown capabilities, collisions, stale epochs and unknown attempts fail closed.
   - The cache lifecycle uses distinct complete-parent PREPARED and ACTIVE authority.
   - Protected backend and real worker integration remain explicit dependent acceptance requirements.
+  - V3 provider execution requires the approved root-supervisor, RWX PVC, tmpfs profile, and reserved child-identity contract.
+  - Verified runtime selection cannot fall back from v3 to native-v2 or generic execution.
   - Preserve native v2 and producer integrity; retain explicit live acceptance gaps.
 public_contract_impact:
   level: compatible
   surfaces: [cli, python, runtime, state, evidence, documentation]
   migration_required: false
-owned_paths: [src/dpone, tests, docs, examples, tools]
+owned_paths: [src/dpone, packages/dpone-airflow-pack, tests, docs, examples, tools]
 integrator_owned_paths: [CHANGELOG.md, mkdocs.yml, .github/workflows]
-read_only_paths: [pyproject.toml, uv.lock, packages]
+read_only_paths: [pyproject.toml, uv.lock]
 forbidden_paths: [.git, pyproject.toml, uv.lock, CHANGELOG.md, mkdocs.yml, .github/workflows]
 shared_file_owner: root
 dependencies: []
 required_checks:
   focused: [composition admission and execution regression tests]
   broad: [ruff, mypy, import rules, layer metrics, module size, non-live pytest, docs]
-  live: [isolated synthetic MSSQL and PostgreSQL execution and reconciliation]
+  live: [isolated Linux x86-64 Kubernetes supervisor with synthetic MSSQL, PostgreSQL, ClickHouse execution and reconciliation]
 required_outputs: [implementation, tests, documentation_impact, completion_report]
 completion_statuses:
   allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]

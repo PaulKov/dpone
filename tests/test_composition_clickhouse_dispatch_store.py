@@ -373,3 +373,28 @@ def test_lost_terminal_ack_can_reopen_only_identical_completed_evidence(active):
     store.record_completed(dispatch, observation(dispatch))
     with pytest.raises(CompositionAdmissionError, match="dispatch_replay"):
         store.claim_once(dispatch)
+
+
+def test_file_snapshot_publication_store_requires_existing_directory(tmp_path):
+    from dpone.adapters.composition_clickhouse_dispatch_store import FileSnapshotPublicationStore
+
+    with pytest.raises(CompositionAdmissionError, match="snapshot_store"):
+        FileSnapshotPublicationStore(tmp_path / "missing")
+
+
+def test_file_snapshot_publication_store_round_trips_prepared_record(tmp_path):
+    from dpone.adapters.composition_clickhouse_dispatch_store import FileSnapshotPublicationStore
+
+    root = tmp_path / "snapshots"
+    root.mkdir()
+    store = FileSnapshotPublicationStore(root)
+    prepared = intent()
+    first = store.prepare(prepared)
+    second = store.prepare(prepared)
+    assert first.state == "PREPARED"
+    assert first.to_bytes() == second.to_bytes()
+    assert store.read(prepared.intent_sha256) == first
+    claimed = store.claim_exchange(first)
+    assert claimed is not None
+    assert claimed.state == "EXCHANGE_INTENT"
+    assert store.records()[-1].state == "EXCHANGE_INTENT"

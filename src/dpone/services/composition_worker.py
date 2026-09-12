@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Generic, Protocol, TypeVar
 
-from dpone.contracts.composition_activation import CompositionAdmissionError
+from dpone.contracts.composition_identity import CompositionAdmissionError
 from dpone.contracts.composition_persistence import (
     CompositionAttemptIdentity,
     CompositionAttemptProof,

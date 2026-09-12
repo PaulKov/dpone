@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +51,14 @@ from dpone.runtime.deployment_cache_integrity_artifacts import (
 _BASE_ARTIFACT_SECTIONS = ("dag_specs", "workload_packs")
 
 
+@dataclass(frozen=True, slots=True)
+class VerifiedReleaseAuthority:
+    """Authenticated release facts consumed by projection policy."""
+
+    schema: str
+    dbt_runtime_wire_contract: str | None
+
+
 def require_release_activation_support(dbt_wire: str | None) -> None:
     """Translate release activation policy before pointer or audit mutation."""
 
@@ -78,10 +87,25 @@ class DeploymentCacheIntegrityVerifier:
     def verify(self, *, index: Mapping[str, Any], index_path: Path, release_id: str) -> None:
         """Fail unless the release-set and every indexed DAG/pack are intact."""
 
-        self.verify_details(index=index, index_path=index_path, release_id=release_id)
+        self.verify_projection_authority(index=index, index_path=index_path, release_id=release_id)
 
     def verify_details(self, *, index: Mapping[str, Any], index_path: Path, release_id: str) -> str | None:
-        """Return the producer wire only after complete indexed-byte verification.
+        """Return the producer wire after complete indexed-byte verification."""
+
+        return self.verify_projection_authority(
+            index=index,
+            index_path=index_path,
+            release_id=release_id,
+        ).dbt_runtime_wire_contract
+
+    def verify_projection_authority(
+        self,
+        *,
+        index: Mapping[str, Any],
+        index_path: Path,
+        release_id: str,
+    ) -> VerifiedReleaseAuthority:
+        """Return authenticated release authority after complete verification.
 
         Generic release v1 has no dbt producer. The compatibility ``verify``
         method keeps its original None return and performs these same checks.
@@ -187,7 +211,10 @@ class DeploymentCacheIntegrityVerifier:
                     "DPONE_COMPOSITION_INVALID", "composition transport inventory is incomplete or corrupt"
                 ) from exc
         self._verify_semantic_refresh_sidecars(index=index, index_path=index_path)
-        return validation.dbt_runtime_wire_contract
+        return VerifiedReleaseAuthority(
+            schema=str(release_schema),
+            dbt_runtime_wire_contract=validation.dbt_runtime_wire_contract,
+        )
 
     def _verify_semantic_refresh_sidecars(
         self,
@@ -303,4 +330,8 @@ class DeploymentCacheIntegrityVerifier:
             )
 
 
-__all__ = ["DEFAULT_MAX_CACHE_ARTIFACT_BYTES", "DeploymentCacheIntegrityVerifier"]
+__all__ = [
+    "DEFAULT_MAX_CACHE_ARTIFACT_BYTES",
+    "DeploymentCacheIntegrityVerifier",
+    "VerifiedReleaseAuthority",
+]

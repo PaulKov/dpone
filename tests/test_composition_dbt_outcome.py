@@ -90,10 +90,18 @@ def scenario(tmp_path):
         state.db_calls.append(attempt)
         return canonical_json_bytes(
             {
+                "schema": "dpone.composition-dbt-materialization-observation.v1",
                 "attempt_sha256": attempt.attempt_sha256,
                 "intent_sha256": intent.intent_sha256,
                 "invocation_id": invocation,
                 "materializations": [list(row) for row in expectation.materializations],
+                "catalog": [
+                    {
+                        "unique_id": unique_id,
+                        "schema_sha256": schema_sha256,
+                    }
+                    for unique_id, _kind, schema_sha256 in expectation.materializations
+                ],
             }
         )
 
@@ -160,3 +168,41 @@ def test_only_protected_undispatched_closure_can_fail(scenario):
     assert state.db_calls == []
     state.record = replace(state.record, undispatched_closure_original=b"{}")
     assert observer.observe(value.attempt).state == "COMMIT_UNKNOWN"
+
+
+def _retarget_catalog(observer, rewrite):
+    """Reshape only the observed catalog of an otherwise complete observation."""
+    delegate = observer._observe_materializations
+
+    def observe(attempt, intent, expectation, invocation):
+        document = json.loads(delegate(attempt, intent, expectation, invocation))
+        document["catalog"] = rewrite(document["catalog"])
+        return canonical_json_bytes(document)
+
+    observer._observe_materializations = observe
+
+
+@pytest.mark.parametrize(
+    "rewrite",
+    [
+        pytest.param(lambda catalog: [], id="missing"),
+        pytest.param(lambda catalog: [{**catalog[0], "unique_id": "model.other.thing"}], id="foreign"),
+        pytest.param(lambda catalog: [{**catalog[0], "schema_sha256": digest("other")}], id="digest"),
+        pytest.param(lambda catalog: [[catalog[0]["unique_id"], catalog[0]["schema_sha256"]]], id="shape"),
+        pytest.param(lambda catalog: catalog[0], id="not_a_list"),
+    ],
+)
+def test_catalog_must_bind_every_declared_materialization(scenario, rewrite):
+    value, _state, observer = scenario
+    _retarget_catalog(observer, rewrite)
+    assert observer.observe(value.attempt).state == "COMMIT_UNKNOWN"
+
+
+def test_catalog_may_carry_additional_observed_metadata(scenario):
+    """Extra observed columns are retained evidence, not an undeclared obligation."""
+    value, _state, observer = scenario
+    _retarget_catalog(
+        observer,
+        lambda catalog: [{**row, "declared_columns": ["date_id"], "kind": "table"} for row in catalog],
+    )
+    assert observer.observe(value.attempt).state == "SUCCEEDED"

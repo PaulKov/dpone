@@ -17,6 +17,7 @@ from dpone.contracts.dbt_runtime import (
     DbtPublishingError,
     parse_airflow_deployment_identity_json,
     require_workspace_authority_connection_ref,
+    required_runtime_environment,
 )
 from dpone.runtime.credentials.resolved_connector_factory import ResolvedConnectorFactory
 
@@ -85,18 +86,6 @@ def _deployment_identity(
             "Airflow deployment activation identity differs from the run identity",
         )
     return identity
-
-
-def required_runtime_environment(environment: Mapping[str, str], name: str) -> str:
-    """Return one required scheduler value using the canonical runtime error."""
-
-    value = environment.get(name)
-    if not isinstance(value, str) or not value:
-        raise DbtPublishingError(
-            "DPONE_DBT_EXECUTION_FAILED",
-            f"{name} is required",
-        )
-    return value
 
 
 __all__ = ["required_runtime_environment", "workspace_attempt_dependencies"]

@@ -37,17 +37,17 @@ class LinuxDbtBuildRunner:
     belongs in the admitted dbt files; stdout/stderr are not trusted receipts.
     """
 
-    def __init__(self, environment: Callable[[CompositionAttemptIdentity], Mapping[str, str]], *, timeout_seconds: int):
+    def __init__(self, environment: Callable[[CompositionAttemptIdentity], Mapping[str, str]]):
         self._environment = environment
-        self._timeout = timeout_seconds
 
     def __call__(self, intent: DbtDispatchIntent) -> DbtChildExit:
+        intent.__post_init__()
         _require_linux_supervisor(intent)
         _require_uid_quiescent(intent.child_uid)
         environment = dict(self._environment(intent.attempt))
         process = subprocess.Popen(
             intent.argv,
-            cwd=intent.output_directory,
+            cwd=intent.working_directory,
             env=environment,
             user=intent.child_uid,
             group=intent.child_gid,
@@ -61,7 +61,7 @@ class LinuxDbtBuildRunner:
             identity = _read_process(process.pid)
             if identity is None or identity[0] != intent.child_uid or identity[1] != process.pid:
                 raise DbtCaptureError("capture_process_identity")
-            result = process.wait(timeout=self._timeout)
+            result = process.wait(timeout=intent.timeout_seconds)
             return DbtChildExit(process.pid, identity[2], result)
         except BaseException:
             # Only the child created here is signalled, never caller-selected PIDs.

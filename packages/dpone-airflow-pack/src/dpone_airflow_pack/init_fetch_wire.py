@@ -64,7 +64,12 @@ _INDEX_KEYS_V2 = frozenset(
         "dev_evidence_delivery",
     }
 )
-_INDEX_KEYS_V3 = _INDEX_KEYS_V2 | frozenset({"mssql_asset_outlet_projection"})
+_INDEX_KEYS_V3 = _INDEX_KEYS_V2 | frozenset(
+    {
+        "composition_supervisor",
+        "mssql_asset_outlet_projection",
+    }
+)
 _OPTIONAL_INDEX_KEYS_V2 = frozenset(
     {
         "runtime_payloads",
@@ -74,7 +79,12 @@ _OPTIONAL_INDEX_KEYS_V2 = frozenset(
         "semantic_refresh_dag_projections",
     }
 )
-_OPTIONAL_INDEX_KEYS_V3 = _OPTIONAL_INDEX_KEYS_V2
+_OPTIONAL_INDEX_KEYS_V3 = _OPTIONAL_INDEX_KEYS_V2 | frozenset(
+    {
+        "composition_supervisor",
+        "mssql_asset_outlet_projection",
+    }
+)
 _CONTEXT_DIGEST_DIR_RE = re.compile(r"^sha256-[0-9a-f]{64}$")
 _SUPPORTED_INDEX_SCHEMAS = frozenset({AIRFLOW_INDEX_SCHEMA_V2, AIRFLOW_INDEX_SCHEMA_V3})
 
@@ -101,6 +111,13 @@ def init_fetch_context_from_payload(
         optional=_OPTIONAL_INDEX_KEYS_V3 if is_v3 else _OPTIONAL_INDEX_KEYS_V2,
         path=path,
     )
+    if is_v3 and not any(
+        payload.get(field) is not None for field in ("composition_supervisor", "mssql_asset_outlet_projection")
+    ):
+        raise field_invalid(
+            "airflow deployment index v3 requires composition_supervisor or mssql_asset_outlet_projection",
+            path,
+        )
     delivery = parse_init_fetch_delivery(payload, path=path)
     release_id = digest(payload.get("release_id"), "release_id", path)
     deployment_id = digest(payload.get("deployment_id"), "deployment_id", path)
@@ -153,7 +170,7 @@ def init_fetch_context_from_payload(
         expected_environment=environment,
         expected_binding_set_ref=str(payload.get("binding_set_ref") or ""),
         expected_connection_registry_ref=str(payload.get("connection_registry_ref") or ""),
-        require_present=is_v3,
+        require_present=False,
     )
     context = InitFetchDeliveryContext(
         environment=environment,

@@ -17,6 +17,14 @@ from tests.dbt_compact_wire_v2_helpers import IMAGE, SIDECAR
 from tests.test_dbt_airflow_release_e2e import _config_map_ref, _write_environment
 from tests.test_release_composition_delivery import composition_request as composition_request
 
+_SUPERVISOR = {
+    "schema": "dpone.composition-supervisor.v1",
+    "persistent_volume_claim": "dpone-composition-supervisor",
+    "child_uid_start": 1_000_000_000,
+    "child_gid_start": 1_000_000_000,
+    "child_identity_count": 1_000_000,
+}
+
 
 class ResolverFactory:
     def __init__(self):
@@ -49,6 +57,7 @@ def installed(composition_request):
         registry_config_ref=_config_map_ref("registry", "1"),
         trust_policy_ref=_config_map_ref("policy", "2"),
         airflow_bundle_ref="git:" + "d" * 40,
+        composition_supervisor=_SUPERVISOR,
     )
     root = cache / "activations" / "prod" / projection.deployment_dir.name
     shutil.copytree(projection.deployment_dir, root)

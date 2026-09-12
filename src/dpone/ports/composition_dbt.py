@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Protocol
+
+from dpone.contracts.composition_execution_authority import COMPOSITION_SUPERVISOR_B64_ENV
 
 if TYPE_CHECKING:
-    from dpone.contracts.dbt_runtime import AirflowAttemptCorrelation, AirflowRunIdentity, DbtExecutionPack
+    from pathlib import Path
+
+    from dpone.contracts.dbt_runtime import (
+        AirflowAttemptCorrelation,
+        AirflowRunIdentity,
+        DbtExecutionInterval,
+        DbtExecutionPack,
+    )
+    from dpone.ports.dbt_publishing import DbtExecutionOutcome
 
 
 class CompositionDbtBuildAuthority(Protocol):
@@ -20,7 +29,34 @@ class CompositionDbtBuildAuthority(Protocol):
         self,
         *,
         pack: DbtExecutionPack,
-        manifest: Mapping[str, Any],
         run_identity: AirflowRunIdentity,
         airflow_attempt: AirflowAttemptCorrelation,
     ) -> None: ...
+
+
+class CompositionNativeDbtExecutor(Protocol):
+    """Supervised parent root that owns one complete native dbt attempt.
+
+    The runtime bootstrap holds no composition policy. It only detects the pinned
+    ``COMPOSITION_SUPERVISOR_B64_ENV`` capability and forwards its exact transport
+    value. Parsing that capability and requiring it to match the supervisor the
+    root was actually composed with belongs to the root itself.
+    """
+
+    def execute_native_pack(
+        self,
+        *,
+        pack: DbtExecutionPack,
+        run_identity: AirflowRunIdentity,
+        airflow_attempt: AirflowAttemptCorrelation,
+        runtime_root: Path,
+        interval: DbtExecutionInterval,
+        supervisor_transport: str,
+    ) -> DbtExecutionOutcome: ...
+
+
+__all__ = [
+    "COMPOSITION_SUPERVISOR_B64_ENV",
+    "CompositionDbtBuildAuthority",
+    "CompositionNativeDbtExecutor",
+]

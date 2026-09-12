@@ -165,17 +165,21 @@ def test_prebuild_revalidates_real_writes_and_protected_fences(failure):
         events.append("read_active")
         return replace(active, receipt=replace(active.receipt, state="RETIRING")) if failure == "active" else active
 
-    lifecycle = CompositionDbtAttemptLifecycle(
-        attempt=identity, occurrence=active, pack=pack, attempts=Reader(), read_active=read_active
-    )
     manifest = _preflight_manifest()
     if failure == "writes":
         for unique_id in pack.selection_lock.selected_graph_unique_ids:
             if unique_id.startswith("model."):
                 manifest["nodes"][unique_id]["alias"] = "unowned"
+    lifecycle = CompositionDbtAttemptLifecycle(
+        attempt=identity,
+        occurrence=active,
+        pack=pack,
+        attempts=Reader(),
+        read_active=read_active,
+        read_preflight_manifest=lambda value: manifest if value == identity else {},
+    )
     kwargs = dict(
         pack=_pack(warning_policy="allow") if failure == "pack" else pack,
-        manifest=manifest,
         run_identity=run_identity(active),
         airflow_attempt=replace(scheduler, try_number=2) if failure == "scheduler" else scheduler,
     )

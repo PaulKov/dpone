@@ -28,6 +28,8 @@ def intent(tmp_path):
             ("execution_evidence", "evidence.json"),
         ),
         "sha256:" + sha256(b"preflight").hexdigest(),
+        working_directory="/project",
+        timeout_seconds=20,
     )
 
 
@@ -203,6 +205,7 @@ def test_linux_runner_drops_uid_gid_and_supplementary_groups(tmp_path, monkeypat
         pid = 123
 
         def wait(self, **kwargs):
+            assert kwargs == {"timeout": value.timeout_seconds}
             return 0
 
     def spawn(argv, **kwargs):
@@ -213,9 +216,11 @@ def test_linux_runner_drops_uid_gid_and_supplementary_groups(tmp_path, monkeypat
     monkeypatch.setattr("dpone.adapters.composition_dbt_capture._require_uid_quiescent", lambda uid: None)
     monkeypatch.setattr("dpone.adapters.composition_dbt_capture._read_process", lambda pid: (1001, 123, 100))
     monkeypatch.setattr("dpone.adapters.composition_dbt_capture.subprocess.Popen", spawn)
-    result = LinuxDbtBuildRunner(lambda attempt: {}, timeout_seconds=10)(value)
+    result = LinuxDbtBuildRunner(lambda attempt: {})(value)
     assert result.pid == 123 and result.start_ticks == 100
     assert calls[0][0] == value.argv
+    assert calls[0][1]["cwd"] == value.working_directory
+    assert value.working_directory != value.output_directory
     assert {key: calls[0][1][key] for key in ("user", "group", "extra_groups", "start_new_session")} == {
         "user": 1001,
         "group": 1001,

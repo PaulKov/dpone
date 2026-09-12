@@ -67,6 +67,13 @@ def register_cache_sync_parser(
         help="Optional promotion attestation reference",
     )
     parser.add_argument(
+        "--workspace-authority-connection-ref",
+        help=(
+            "Protected runtime connection reference for native-v2 or complete-parent "
+            "workspace admission; required by those release wires"
+        ),
+    )
+    parser.add_argument(
         "--precommit-guard-path",
         help="Optional bounded desired-state file rechecked inside the promotion lock",
     )
@@ -121,6 +128,7 @@ def cmd_airflow_cache_sync(
         source_commit=args.source_commit,
         attestation_ref=args.attestation_ref,
         promotion_precondition=precondition,
+        workspace_authority_connection_ref=args.workspace_authority_connection_ref,
     )
     emit_self_service_result(result, args.format, command="airflow_cache_sync")
     if result.exit_code is not None:

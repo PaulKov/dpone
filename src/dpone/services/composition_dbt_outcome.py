@@ -71,14 +71,22 @@ class CompositionDbtOutcomeObserver:
                 raise DbtCaptureError("materialization_original")
             observation = strict_json_object(raw)
             if (
-                observation
+                set(observation)
                 != {
-                    "attempt_sha256": attempt.attempt_sha256,
-                    "intent_sha256": intent.intent_sha256,
-                    "invocation_id": invocation,
-                    "materializations": [list(row) for row in expectation.materializations],
+                    "schema",
+                    "attempt_sha256",
+                    "intent_sha256",
+                    "invocation_id",
+                    "materializations",
+                    "catalog",
                 }
+                or observation["schema"] != "dpone.composition-dbt-materialization-observation.v1"
+                or observation["attempt_sha256"] != attempt.attempt_sha256
+                or observation["intent_sha256"] != intent.intent_sha256
+                or observation["invocation_id"] != invocation
+                or observation["materializations"] != [list(row) for row in expectation.materializations]
                 or not expectation.materializations
+                or not self._matches_catalog(observation["catalog"], expectation)
             ):
                 raise DbtCaptureError("materialization_mismatch")
             return DbtNativeOutcome("SUCCEEDED", "native_invocation_verified", intent.intent_sha256, raw)
@@ -86,6 +94,18 @@ class CompositionDbtOutcomeObserver:
             # Build dispatch may already have committed arbitrary model SQL.
             # Missing, conflicting and failure artifacts are not rollback proof.
             return DbtNativeOutcome("COMMIT_UNKNOWN", "native_outcome_unverified", intent.intent_sha256)
+
+    @staticmethod
+    def _matches_catalog(catalog: object, expectation: DbtOutcomeExpectation) -> bool:
+        if not isinstance(catalog, list) or len(catalog) != len(expectation.materializations):
+            return False
+        expected = {unique_id: schema_sha256 for unique_id, _kind, schema_sha256 in expectation.materializations}
+        return all(
+            isinstance(row, dict)
+            and row.get("unique_id") in expected
+            and row.get("schema_sha256") == expected[row["unique_id"]]
+            for row in catalog
+        ) and len({row["unique_id"] for row in catalog}) == len(catalog)
 
     def _require_successful_capture(self, record: DbtCaptureRecord, expected: DbtOutcomeExpectation) -> str:
         exited = record.exit_record

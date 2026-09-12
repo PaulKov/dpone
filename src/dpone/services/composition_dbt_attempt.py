@@ -91,6 +91,7 @@ class CompositionDbtAttemptLifecycle:
         pack: DbtExecutionPack,
         attempts: CompositionDbtAttemptReader,
         read_active: Callable[[], CompositionActivationOccurrence],
+        read_preflight_manifest: Callable[[CompositionAttemptIdentity], Mapping[str, object]],
     ) -> None:
         require_composition_attempt_scope(occurrence, attempt)
         if attempt.plan_sha256 != pack.pack_sha256:
@@ -100,12 +101,12 @@ class CompositionDbtAttemptLifecycle:
         self._pack = pack
         self._attempts = attempts
         self._read_active = read_active
+        self._read_preflight_manifest = read_preflight_manifest
 
     def verify_before_build(
         self,
         *,
         pack: DbtExecutionPack,
-        manifest: Mapping[str, object],
         run_identity: AirflowRunIdentity,
         airflow_attempt: AirflowAttemptCorrelation,
     ) -> None:
@@ -118,6 +119,7 @@ class CompositionDbtAttemptLifecycle:
             != self._attempt
         ):
             raise CompositionAdmissionError("worker_plan_identity")
+        manifest = self._read_preflight_manifest(self._attempt)
         writes = selected_relation_writes(project_path=pack.project_subdir, execution=pack, manifest=manifest)
         observed = tuple(sorted(dbt_relation_write_subject(write) for write in writes))
         workload = next(

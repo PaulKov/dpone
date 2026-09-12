@@ -8,6 +8,7 @@ from hashlib import sha256
 from pathlib import PurePosixPath
 
 from dpone.contracts.composition_attempt import CompositionAttemptIdentity
+from dpone.contracts.dbt_sqlserver_policy import DBT_PROCESS_TIMEOUT_MAX_SECONDS
 from dpone.contracts.strict_json import canonical_json_bytes
 
 ARTIFACT_ROLES = ("preflight_manifest", "build_manifest", "run_results", "execution_evidence")
@@ -44,7 +45,8 @@ def _text(value: object) -> None:
 class DbtDispatchIntent:
     """Exact app-derived build command after verified preflight; no credentials.
 
-    Root and paths come from protected admission, never user arguments supplied
+    Working directory and bounded timeout bind the actual process launch as well
+    as argv. Root and paths come from protected admission, never user arguments supplied
     to dispatch. Directories must be preprovisioned; capture never chmods them.
     The protected writer retains original preflight bytes with this intent.
     """
@@ -59,6 +61,8 @@ class DbtDispatchIntent:
     child_gid: int
     artifact_paths: tuple[tuple[str, str], ...]
     preflight_manifest_sha256: str
+    working_directory: str
+    timeout_seconds: int
 
     def __post_init__(self) -> None:
         if type(self.attempt) is not CompositionAttemptIdentity:
@@ -66,7 +70,13 @@ class DbtDispatchIntent:
         self.attempt.__post_init__()
         if type(self.argv) is not tuple or not self.argv or len(self.argv) > 256:
             raise DbtCaptureError("capture_argv")
-        for value in (*self.argv, self.toolchain_sha256, self.sql_principal_sid, self.output_directory):
+        for value in (
+            *self.argv,
+            self.toolchain_sha256,
+            self.sql_principal_sid,
+            self.output_directory,
+            self.working_directory,
+        ):
             _text(value)
         if any(
             re.fullmatch(r"sha256:[0-9a-f]{64}", value) is None
@@ -77,6 +87,11 @@ class DbtDispatchIntent:
             raise DbtCaptureError("capture_sid")
         if not PurePosixPath(self.argv[0]).is_absolute():
             raise DbtCaptureError("capture_argv")
+        working = PurePosixPath(self.working_directory)
+        if not working.is_absolute() or ".." in working.parts or str(working) != self.working_directory:
+            raise DbtCaptureError("capture_working_directory")
+        if type(self.timeout_seconds) is not int or not 0 < self.timeout_seconds <= DBT_PROCESS_TIMEOUT_MAX_SECONDS:
+            raise DbtCaptureError("capture_timeout")
         root = PurePosixPath(self.output_directory)
         if not root.is_absolute() or ".." in root.parts or str(root) != self.output_directory:
             raise DbtCaptureError("capture_path")

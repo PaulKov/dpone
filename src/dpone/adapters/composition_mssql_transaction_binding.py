@@ -11,14 +11,17 @@ from typing import Protocol
 from dpone.adapters.composition_mssql_attempts import composition_control_transaction
 from dpone.adapters.composition_mssql_existing_operation import require_existing_execution_in
 from dpone.adapters.composition_mssql_transaction_fence_schema import require_transaction_fence_schema
-from dpone.contracts.composition_activation import CompositionAdmissionError
-from dpone.contracts.composition_attempt import CompositionAttemptIdentity
-from dpone.contracts.composition_execution import CompositionExecutionPlan
+from dpone.contracts.composition_control import (
+    CompositionAdmissionError,
+    CompositionAttemptIdentity,
+    CompositionExecutionPlan,
+    DbtRelationWrite,
+    dbt_relation_write_subject,
+    encode_activation_request,
+    encode_attempt_identity,
+)
 from dpone.contracts.composition_mssql_binding import CompositionMssqlOperationBinding
 from dpone.contracts.composition_ownership import CompositionOwnerReference
-from dpone.contracts.composition_persistence import encode_activation_request, encode_attempt_identity
-from dpone.contracts.dbt_relation_writes import DbtRelationWrite
-from dpone.contracts.dbt_workspace_activation import dbt_relation_write_subject
 from dpone.contracts.mssql_transaction_governance import MssqlTransactionOperation
 from dpone.contracts.strict_json import canonical_json_bytes
 from dpone.ports.sql_connection import SqlControlConnection

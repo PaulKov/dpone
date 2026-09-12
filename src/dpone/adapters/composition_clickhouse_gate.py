@@ -32,10 +32,12 @@ from dpone.adapters.composition_clickhouse_principal import (
     IssuedClickHouseCredentials,
     require_uuid,
 )
+from dpone.adapters.composition_clickhouse_supervisor_enrollment import require_attempt_enrollment_original
 from dpone.adapters.composition_mssql_attempts import ConnectionFactory, composition_control_transaction
 from dpone.adapters.composition_mssql_schema import require_control_schema
 from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.contracts.composition_clickhouse_dispatch import ClickHouseDispatch, ExchangeSnapshotDispatch
+from dpone.contracts.composition_identity import require_digest
 from dpone.contracts.composition_persistence import (
     CompositionAttemptIdentity,
     CompositionAttemptProof,
@@ -81,9 +83,11 @@ class MssqlClickHouseGate:
         principal_admin: ClickHousePrincipalAdmin,
         supervisor: ClickHouseSupervisorObserver,
         dispatch_policy: ClickHouseDispatchPolicy,
+        enrollment_sha256: str,
         control_schema: str = "dpone_control",
     ) -> None:
         require_uuid(expected_service_id)
+        require_digest(enrollment_sha256)
         target.__post_init__()
         require(purpose in {"ingest", "publisher"}, "gate_purpose")
         self._factory, self._service, self._target, self._purpose = (
@@ -94,6 +98,7 @@ class MssqlClickHouseGate:
         )
         self._schema = require_control_schema(control_schema)
         self._admin, self._supervisor, self._policy = principal_admin, supervisor, dispatch_policy
+        self._enrollment = enrollment_sha256
 
     def _binding(self, attempt: CompositionAttemptIdentity) -> ClickHouseGateBinding:
         return ClickHouseGateBinding(attempt, self._target, self._purpose)
@@ -108,6 +113,8 @@ class MssqlClickHouseGate:
     def _observe(self, q: ClickHouseGateQueries, *, recovery: bool) -> SupervisorObservation:
         original = q.scope(recovery=recovery)
         self._admin.require_target(self._target)
+        q.check()
+        require_attempt_enrollment_original(q.ledger, self._enrollment, q.binding.attempt, self._target)
         q.check()
         observation = self._supervisor.observe(q.ledger, attempt=q.binding.attempt, target=self._target)
         q.check()

@@ -43,6 +43,8 @@ def subject():
             ("execution_evidence", "evidence.json"),
         ),
         original.sha256,
+        working_directory="/opt/project",
+        timeout_seconds=600,
     )
     expected = DbtOutcomeExpectation(
         digest("graph"),
@@ -63,6 +65,8 @@ def subject():
 def test_registration_roundtrip_canonical_and_original_identity():
     intent, expected, _ = subject()
     raw = encode_registration(intent, expected)
+    assert b'"working_directory":"/opt/project"' in raw
+    assert b'"timeout_seconds":600' in raw
     assert decode_registration(raw, "sha256:" + sha256(raw).hexdigest()) == (intent, expected)
     with pytest.raises(DbtCaptureError):
         decode_registration(raw + b" ", "sha256:" + sha256(raw + b" ").hexdigest())
@@ -115,3 +119,35 @@ def test_event_original_tampering_fails_closed(damage):
         raw = raw.replace(b'"phase":"DISPATCH"', b'"phase":"DISPATCH","phase":"DISPATCH"')
     with pytest.raises(DbtCaptureError):
         decode_event(raw, "sha256:" + sha256(raw).hexdigest(), "DISPATCH")
+
+
+@pytest.mark.parametrize("field", ["working_directory", "timeout_seconds"])
+def test_registration_requires_original_process_settings(field):
+    from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
+
+    value, expected, _ = subject()
+    document = strict_json_object(encode_registration(value, expected))
+    del document["intent"][field]
+    raw = canonical_json_bytes(document)
+    with pytest.raises(DbtCaptureError):
+        decode_registration(raw, "sha256:" + sha256(raw).hexdigest())
+
+
+@pytest.mark.parametrize("changes", [{"working_directory": "/other/project"}, {"timeout_seconds": 601}])
+def test_process_settings_change_intent_digest(changes):
+    value, _, _ = subject()
+    assert replace(value, **changes).intent_sha256 != value.intent_sha256
+
+
+@pytest.mark.parametrize("working_directory", ["project", "/project/../other", "/project/", "", "/project\x00"])
+def test_intent_rejects_noncanonical_working_directory(working_directory):
+    value, _, _ = subject()
+    with pytest.raises(DbtCaptureError):
+        replace(value, working_directory=working_directory)
+
+
+@pytest.mark.parametrize("timeout_seconds", [0, -1, True, "600", 1.5, 86401])
+def test_intent_rejects_invalid_or_unbounded_timeout(timeout_seconds):
+    value, _, _ = subject()
+    with pytest.raises(DbtCaptureError):
+        replace(value, timeout_seconds=timeout_seconds)

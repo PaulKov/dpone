@@ -293,3 +293,17 @@ Existing manifests, wire/journal/checkpoint formats and recovery require no
 migration. Public native SWITCH remains rejected. Live execution is SKIP until
 an approved environment is supplied; measured acceleration and live certification
 remain UNVERIFIED. No version bump or package publication is part of this closeout.
+
+### Retrieve historical raw test evidence
+
+Some historical JUnit and CI population/receipt files contain environment metadata
+or literal test values rejected by the current source hygiene policy. Their
+original bytes, failures, skips, node IDs and hashes remain preserved at commit
+`6a69861832ffc3dea86fb05d0dd882645399f21a` and in a verified external archive of the
+complete DDA evidence subtree. Only 35 duplicate copies were relocated from the
+current checkout; original audits and Git history were not rewritten.
+
+Use the [historical evidence location index and recovery guide](https://github.com/PaulKov/dpone/blob/master/test_artifacts/delivery-acceleration/hygiene-retention/README.md)
+to recover the complete original context before following historical relative
+links or verifying receipt hashes. The index is not new execution evidence or a
+release-readiness result; fresh checks apply to the eventual release commit.

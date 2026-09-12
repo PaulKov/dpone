@@ -14,6 +14,7 @@ from dpone.adapters.composition_clickhouse_gate_queries import (
     ClickHouseSupervisorObservation,
 )
 from dpone.adapters.composition_clickhouse_principal import IssuedClickHouseCredentials
+from dpone.adapters.composition_clickhouse_supervisor_linux import digest as enrollment_digest
 from dpone.adapters.composition_clickhouse_transport import ClickHouseDispatchObservation
 from dpone.adapters.composition_mssql_attempts import MssqlCompositionAttemptStore
 from dpone.adapters.composition_mssql_store import MssqlCompositionActivationStore
@@ -23,6 +24,7 @@ from dpone.contracts.strict_json import canonical_json_bytes
 from tests.composition_mssql_catalog_helpers import install_offline_catalog_references
 from tests.composition_mssql_store_fault_model import Connection, Cursor, FaultDatabase
 from tests.composition_snapshot_helpers import intent, occurrence
+from tests.test_composition_clickhouse_supervisor_enrollment import enrollment_body
 
 
 def test_supervisor_rejects_digest_without_original():
@@ -66,6 +68,9 @@ class GateCursor(Cursor):
         if "composition_ch_" not in sql:
             return super()._select_or_mutate(sql, p)
         assert self.connection.transaction_id == self.connection.database.lock_owner
+        if "composition_ch_supervisor_enrollments]" in sql:
+            found = self.connection.data.get("enrollments", {}).get(p[0])
+            return [] if found is None else [found]
         for table in ("ch_gates", "ch_gate_bindings", "ch_gate_events"):
             if f"composition_{table}]" not in sql:
                 continue
@@ -209,14 +214,39 @@ class Policy:
             self.change(context)
 
 
+def enrolled_supervisor(value):
+    body = enrollment_body()
+    body["service_id"] = value.target.service_id
+    body["database_uuid"] = value.target.database_id
+    body["target_enrollment_sha256"] = value.target.enrollment_sha256
+    body["boot_id"] = str(UUID(int=701))
+    body["isolation_id"] = str(UUID(int=702))
+    document = canonical_json_bytes(body)
+    key = enrollment_digest(document)
+    return key, (body["service_id"], body["database_uuid"], body["boot_id"], body["isolation_id"], document)
+
+
 @pytest.fixture
 def active(monkeypatch):
     install_offline_catalog_references(monkeypatch)
     monkeypatch.setattr(gate_queries, "require_clickhouse_gate_schema", lambda *_: None)
     monkeypatch.setattr(dispatch_queries, "require_clickhouse_dispatch_schema", lambda *_: None)
+    monkeypatch.setattr(
+        "dpone.adapters.composition_clickhouse_supervisor_enrollment.require_clickhouse_supervisor_schema",
+        lambda *_: None,
+    )
     value = intent()
+    enrollment_key, enrollment_row = enrolled_supervisor(value)
     db = GateDatabase(occurrence().request, SQL_SERVICE)
-    db.data.update(ch_gates={}, ch_gate_bindings={}, ch_gate_events={}, dispatches={}, terminals={}, closures={})
+    db.data.update(
+        ch_gates={},
+        ch_gate_bindings={},
+        ch_gate_events={},
+        dispatches={},
+        terminals={},
+        closures={},
+        enrollments={enrollment_key: enrollment_row},
+    )
     activation = MssqlCompositionActivationStore(db.connect, expected_service_id=SQL_SERVICE)
     activation.prepare(db.request)
     activation.activate(db.request)
@@ -230,7 +260,9 @@ def active(monkeypatch):
         principal_admin=admin,
         supervisor=supervisor,
         dispatch_policy=policy,
+        enrollment_sha256=enrollment_key,
     )
+    db.enrollment_key = enrollment_key
     return db, value, gate, admin, supervisor, policy
 
 
@@ -371,6 +403,7 @@ def test_two_purposes_retain_both_issued_principals_and_proofs(active):
         principal_admin=admin,
         supervisor=supervisor,
         dispatch_policy=policy,
+        enrollment_sha256=db.enrollment_key,
     )
     publisher = publisher_gate.issue_once(value.attempt)
     assert ingest.user_id != publisher.user_id
@@ -537,3 +570,41 @@ def test_local_observation_rejects_invalid_namespace(namespace):
     value = local_observation(Supervisor(intent()).value)
     with pytest.raises(CompositionAdmissionError):
         replace(value, network_namespace_id=namespace)
+
+
+def test_gate_requires_enrollment_original_before_principal_creation(active):
+    db, value, gate, admin, _, _ = active
+    db.data["enrollments"] = {}
+    with pytest.raises(CompositionAdmissionError):
+        gate.issue_once(value.attempt)
+    assert "create" not in admin.events
+
+
+def test_gate_requires_enrollment_original_before_dispatch(active):
+    db, value, gate, _, _, _ = active
+    credentials = gate.issue_once(value.attempt)
+    db.data["enrollments"] = {}
+    with pytest.raises(CompositionAdmissionError):
+        gate.journal(value.attempt, credentials.user_id).claim_once(make_dispatch(value))
+    assert not db.data["dispatches"]
+
+
+def test_gate_closes_dispatch_admission_before_principal_revocation(active):
+    db, value, gate, admin, _, _ = active
+    credentials = gate.issue_once(value.attempt)
+    dispatch = make_dispatch(value)
+    journal = gate.journal(value.attempt, credentials.user_id)
+    journal.claim_once(dispatch)
+    journal.record_completed(dispatch, completed(dispatch))
+    order: list[str] = []
+    original_revoke = admin.revoke
+
+    def revoke(name, user):
+        assert any(phase == "CLOSING" for _gate, phase in db.data["closures"])
+        order.append("close_principal")
+        original_revoke(name, user)
+
+    admin.revoke = revoke
+    assert gate.close(value.attempt).kind == "CLOSED_GATES"
+    assert order == ["close_principal"]
+    assert [phase for _gate, phase in db.data["closures"]].index("CLOSING") == 0

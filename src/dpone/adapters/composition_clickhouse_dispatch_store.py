@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Protocol
+from hashlib import sha256
+from pathlib import Path
+from typing import Any, Protocol
 from uuid import UUID
 
 from dpone.adapters.composition_clickhouse_dispatch_queries import (
@@ -23,12 +25,13 @@ from dpone.adapters.composition_clickhouse_transport import ClickHouseDispatchOb
 from dpone.adapters.composition_mssql_attempts import ConnectionFactory, composition_control_transaction
 from dpone.adapters.composition_mssql_schema import require_control_schema
 from dpone.contracts.composition_clickhouse_dispatch import ClickHouseDispatch
+from dpone.contracts.composition_identity import CompositionAdmissionError
 from dpone.contracts.composition_persistence import (
     CompositionAttemptIdentity,
     CompositionAttemptProof,
     CompositionProofAuthority,
 )
-from dpone.contracts.composition_snapshot import SnapshotTarget
+from dpone.contracts.composition_snapshot import SnapshotPublicationIntent, SnapshotPublicationRecord, SnapshotTarget
 from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 from dpone.ports.composition_sql import CompositionSqlContext
 
@@ -229,3 +232,75 @@ class MssqlClickHouseDispatchStore:
         document = canonical_json_bytes(body)
         require(len(document) <= 8388608, "closure_budget")
         return document
+
+
+class FileSnapshotPublicationStore:
+    """Attempt-scoped snapshot CAS on the supervisor PVC; not a new SQL table."""
+
+    def __init__(self, root: Path) -> None:
+        self._root = Path(root)
+        if not self._root.is_dir():
+            raise CompositionAdmissionError("snapshot_store")
+
+    def prepare(self, intent: SnapshotPublicationIntent) -> SnapshotPublicationRecord:
+        expected = SnapshotPublicationRecord(intent)
+        path = self._path(expected.intent.intent_sha256)
+        existing = self._read_path(path)
+        if existing is not None:
+            if existing.state != "PREPARED" or existing.intent.to_bytes() != intent.to_bytes():
+                raise CompositionAdmissionError("snapshot_prepare_conflict")
+            return existing
+        if any(
+            row.intent.attempt == intent.attempt
+            and row.intent.target.write_subject_sha256 == intent.target.write_subject_sha256
+            for row in self._all()
+        ):
+            raise CompositionAdmissionError("snapshot_prepare_conflict")
+        self._write(path, expected)
+        return expected
+
+    def read(self, intent_sha256: str) -> SnapshotPublicationRecord | None:
+        return self._read_path(self._path(intent_sha256))
+
+    def claim_exchange(self, expected: SnapshotPublicationRecord) -> SnapshotPublicationRecord | None:
+        current = self.read(expected.intent.intent_sha256)
+        if current != expected:
+            return None
+        row = expected.transition("EXCHANGE_INTENT")
+        self._write(self._path(expected.intent.intent_sha256), row)
+        return row
+
+    def resolve(
+        self,
+        expected: SnapshotPublicationRecord,
+        *,
+        state: str,
+        closure: Any,
+        observation: Any,
+    ) -> SnapshotPublicationRecord:
+        current = self.read(expected.intent.intent_sha256)
+        if current != expected:
+            raise CompositionAdmissionError("snapshot_resolve_conflict")
+        row = expected.transition(state, closure=closure, observation=observation)
+        self._write(self._path(expected.intent.intent_sha256), row)
+        return row
+
+    def _path(self, intent_sha256: str) -> Path:
+        return self._root / (intent_sha256.replace(":", "-") + ".json")
+
+    def _read_path(self, path: Path) -> SnapshotPublicationRecord | None:
+        if not path.is_file():
+            return None
+        payload = path.read_bytes()
+        return SnapshotPublicationRecord.from_bytes(payload, "sha256:" + sha256(payload).hexdigest())
+
+    def _write(self, path: Path, record: SnapshotPublicationRecord) -> None:
+        path.write_bytes(record.to_bytes())
+
+    def records(self) -> tuple[SnapshotPublicationRecord, ...]:
+        """Reopen every retained snapshot record from the supervisor PVC."""
+
+        return self._all()
+
+    def _all(self) -> tuple[SnapshotPublicationRecord, ...]:
+        return tuple(row for path in self._root.glob("*.json") if (row := self._read_path(path)) is not None)

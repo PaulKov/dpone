@@ -88,6 +88,48 @@ class DbtExecutionInterval:
         )
 
 
+def required_runtime_environment(environment: Mapping[str, str], name: str) -> str:
+    """Return one required scheduler value using the canonical runtime error."""
+
+    value = environment.get(name)
+    if not isinstance(value, str) or not value:
+        raise DbtPublishingError("DPONE_DBT_EXECUTION_FAILED", f"{name} is required")
+    return value
+
+
+def airflow_attempt_from_environment(
+    environment: Mapping[str, str],
+    run_identity: AirflowRunIdentity,
+) -> AirflowAttemptCorrelation:
+    """Project the exact scheduler task attempt that owns this execution.
+
+    The task identity is derived from the verified workload pack rather than the
+    environment, so a task cannot claim another workload's attempt correlation.
+    """
+
+    try:
+        try_number = int(required_runtime_environment(environment, TRY_NUMBER_ENV))
+    except ValueError as exc:
+        raise DbtPublishingError("DPONE_DBT_EXECUTION_FAILED", "Airflow try number is invalid") from exc
+    return AirflowAttemptCorrelation(
+        dag_id=required_runtime_environment(environment, DAG_ID_ENV),
+        task_id=f"{run_identity.workload_pack.id}__dpone_runtime",
+        run_id=required_runtime_environment(environment, DAG_RUN_ID_ENV),
+        try_number=try_number,
+        map_index=-1,
+    )
+
+
+def dbt_execution_interval_from_environment(environment: Mapping[str, str]) -> DbtExecutionInterval:
+    """Project the replay-defining data interval from the scheduler environment."""
+
+    interval = run_interval_from_env(environment)
+    return DbtExecutionInterval(
+        start=str(interval.interval_start or ""),
+        end=str(interval.interval_end or ""),
+    )
+
+
 def validate_dbt_runtime_release_identity(
     *,
     execution_pack_payload: bytes,
@@ -306,7 +348,9 @@ __all__ = [
     "DbtNodeOutcome",
     "DbtPublishingError",
     "MAX_DBT_SQLSERVER_PROJECT_YAML_BYTES",
+    "airflow_attempt_from_environment",
     "dbt_attempt_id",
+    "dbt_execution_interval_from_environment",
     "dbt_runtime_plan_payload_order",
     "dbt_target_binding_identity_sha256",
     "dbt_target_binding_sha256",
@@ -314,6 +358,7 @@ __all__ = [
     "parse_airflow_deployment_identity_json",
     "parse_airflow_run_identity_json",
     "prove_mutation_closure",
+    "required_runtime_environment",
     "run_interval_from_env",
     "validate_dbt_runtime_release_identity",
     "validate_dbt_runtime_source_projection",

@@ -20,6 +20,7 @@ AIRFLOW_INDEX_SCHEMA_V3 = "dpone.airflow-deployment-index.v3"
 
 def build_environment_deployment_documents(
     *,
+    release_schema: str,
     environment: str,
     release_id: str,
     trust_tier: str,
@@ -42,13 +43,15 @@ def build_environment_deployment_documents(
 ) -> tuple[dict[str, Any], bytes, dict[str, Any]]:
     """Return ``(deployment, deployment_bytes, airflow_index)``.
 
-    When ``mssql_outlet_projection`` is present the closed v3 wire pair is
-    emitted (projection is required on v3). Otherwise the producer keeps the
-    exact v2 pair so older closed readers are unaffected.
+    Composition releases always use the supervised v3 wire. Non-composition
+    releases use v3 only when an MSSQL outlet projection is present, preserving
+    the exact v2 wire for older closed readers.
     """
 
-    use_v3 = mssql_outlet_projection is not None
-    optional_projection = {"mssql_asset_outlet_projection": dict(mssql_outlet_projection)} if use_v3 else {}
+    use_v3 = release_schema == "dpone.release-set.v3" or mssql_outlet_projection is not None
+    optional_projection = (
+        {"mssql_asset_outlet_projection": dict(mssql_outlet_projection)} if mssql_outlet_projection is not None else {}
+    )
     deployment: dict[str, Any] = {
         "schema": DEPLOYMENT_SET_SCHEMA_V3 if use_v3 else DEPLOYMENT_SET_SCHEMA_V2,
         "deployment_id": "",

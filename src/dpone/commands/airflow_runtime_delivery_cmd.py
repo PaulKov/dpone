@@ -6,6 +6,7 @@ import argparse
 import json
 import logging
 
+from dpone.app.composition_verified_pack_dispatcher import compose_verified_pack_dispatcher
 from dpone.readiness.airflow_runtime_init_fetch import (
     AirflowRuntimeDeliveryError,
     AirflowRuntimeInitFetchService,
@@ -72,7 +73,11 @@ def cmd_airflow_runtime_pack_exec(
     del args, ctx
     try:
         command = AirflowRuntimeInitFetchService().prepare_pack_exec()
-        return execute_verified_pack_command(command, logger=logger)
+        return execute_verified_pack_command(
+            command,
+            logger=logger,
+            composition_dispatcher=compose_verified_pack_dispatcher(command),
+        )
     except AirflowRuntimeDeliveryError as exc:
         logger.error("%s: %s", exc.code, exc)
         return _exit_code(exc)

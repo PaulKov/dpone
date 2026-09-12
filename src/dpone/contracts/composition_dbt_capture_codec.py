@@ -40,6 +40,7 @@ def _fields(cls: type) -> set[str]:
 
 
 def _intent(raw: Any) -> DbtDispatchIntent:
+    """Require every protected launch field, including cwd and timeout; no defaults."""
     body = dict(_object(raw, _fields(DbtDispatchIntent)))
     attempt = dict(_object(body["attempt"], _fields(CompositionAttemptIdentity)))
     attempt["guard_epochs"] = tuple(tuple(pair) for pair in attempt["guard_epochs"])

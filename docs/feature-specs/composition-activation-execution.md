@@ -4,7 +4,7 @@
 - Owner: dpone maintainers; root integration agent
 - Base: 67c8ade61732fb1bff267ce3bd26f2af776e79e6 (published 0.75.0)
 - Target release: TBD; publication authorization is separate
-- Last verified: 2026-09-10
+- Last verified: 2026-09-11
 
 ## Executive summary and authorization
 
@@ -156,6 +156,52 @@ migrated automatically. Ordinary binding credentials have read-only authority;
 only issued attempt logins gain the managed writer role. Enrollment must exclude
 ambient writers, legacy worker credentials, impersonation, contained users and
 Windows authentication fallback; a boolean exclusive flag is not sufficient.
+
+## Kubernetes supervisor execution boundary
+
+The maintainer selected the Kubernetes root-supervisor boundary on 2026-09-11.
+The deployment projection gains an optional
+`dpone.composition-supervisor.v1` object. It is mandatory for a v3 composition
+and forbidden as authority for native-v2 or ordinary releases. It contains an
+administrator-provisioned ReadWriteMany PVC claim and one reserved numeric
+UID/GID range. The range must contain at least 1,000,000 identities, fit below
+`2^31`, and be absent from the runtime image's accounts and platform workloads.
+No workload pack, manifest, Airflow parameter or task environment may override
+this object.
+
+The provider projects the object only after verifying the current deployment
+and v3 release authority. Its base container runs the dpone supervisor as UID 0
+with a read-only root filesystem, `allowPrivilegeEscalation=false`,
+`seccompProfile=RuntimeDefault`, and only `CHOWN`, `FOWNER`,
+`DAC_READ_SEARCH`, `SETUID`, `SETGID`, and `KILL` capabilities. The fetched
+worktree stays read-only. A memory-backed volume is mounted for one-shot dbt
+profiles. The PVC is mounted at the fixed supervisor root and retains attempt
+allocation tombstones, capture originals and recovery evidence across pod and
+Airflow retries. Missing PVC, root identity, capability, tmpfs, complete
+`/proc` visibility or reserved identity range rejects v3 before source or
+subprocess I/O.
+
+The supervisor allocates child identities under an exclusive PVC lock. It
+derives a deterministic first candidate from the full attempt digest and uses
+bounded deterministic probing within the reserved range. Separate immutable
+attempt and UID/GID tombstones are fsynced before directory allocation. A
+candidate already owned by another attempt is skipped; conflicting or
+unreadable records reject. The same RUNNING attempt is rejected by protected
+SQL admission before allocation and never receives a second executor permit.
+Tombstones are not automatically deleted in this version. Reclamation requires
+a separate reviewed operation after the parent is `RETIRED`, all attempts are
+terminal, evidence is archived, and no process or transaction remains.
+
+The verified launcher derives a composition marker only from the authenticated
+v3 release bytes. Native-v2 and non-composition commands retain their existing
+path. For v3, the root process alone receives control and source authority.
+Native dbt runs as the allocated child with only issued one-time MSSQL
+credentials. Ordinary transfer keeps its read-only PostgreSQL source and
+receives issued MSSQL sink/state credentials through an invocation-scoped
+dependency-injection overlay. The actual MSSQL finalizer must execute the
+parent fence inside the target transaction before mutation and before receipt
+commit. Process exit, filesystem ownership and generic `LoadResult` are never
+OUTCOME proof.
 
 Gate states are JOURNALED -> READY -> CLOSING -> CLOSED, with no reverse edge.
 A controller-generated immutable SID and deterministic bounded login name are

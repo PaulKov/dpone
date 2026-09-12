@@ -45,7 +45,7 @@ def test_parent_verification_runs_after_preflight_before_build(tmp_path, failure
     events = []
 
     def verify_before_build(**kwargs):
-        assert kwargs["manifest"]["nodes"]
+        assert "manifest" not in kwargs
         assert kwargs["pack"].schema == "dpone.dbt-execution-pack.v2"
         events.append("parent")
         if failure:
