@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from dpone.contracts.composition_execution_authority import COMPOSITION_SUPERVISOR_B64_ENV
 
@@ -30,7 +29,6 @@ class CompositionDbtBuildAuthority(Protocol):
         self,
         *,
         pack: DbtExecutionPack,
-        manifest: Mapping[str, Any],
         run_identity: AirflowRunIdentity,
         airflow_attempt: AirflowAttemptCorrelation,
     ) -> None: ...

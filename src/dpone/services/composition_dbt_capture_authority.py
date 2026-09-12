@@ -213,6 +213,11 @@ class CompositionDbtCaptureAuthority:
         self._require_attempt(attempt)
         return self._contracts(self._manifest()[0])
 
+    def preflight_manifest(self, attempt: CompositionAttemptIdentity) -> Mapping[str, Any]:
+        """Reopen the pinned protected original for the pre-build write fence."""
+        self._require_attempt(attempt)
+        return self._manifest()[0]
+
     def _require_attempt(self, attempt: CompositionAttemptIdentity) -> None:
         if type(attempt) is not CompositionAttemptIdentity or attempt != self._attempt:
             raise DbtCaptureError("capture_attempt")

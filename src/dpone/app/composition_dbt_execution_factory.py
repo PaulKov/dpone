@@ -24,6 +24,7 @@ the attempt would block in durable RUNNING ownership instead.
 
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +44,7 @@ from dpone.adapters.composition_mssql_schema import require_control_schema
 from dpone.adapters.composition_supervisor_filesystem import protected_original_reader
 from dpone.adapters.dbt_executable import current_environment_dbt_executable
 from dpone.adapters.dbt_runtime import DistributionDbtToolchainInspector, SubprocessDbtCommandRunner
+from dpone.app.composition_credentials import IssuedSqlCredentials, issued_dbt_process_factory
 from dpone.app.composition_dbt_execution import (
     DEFAULT_COMPOSITION_PROFILES_ROOT,
     DEFAULT_COMPOSITION_SUPERVISOR_ROOT,
@@ -103,6 +105,7 @@ def build_composition_dbt_execution_dependencies(
     dbt_executable: str | None = None,
     supervisor_root: Path = DEFAULT_COMPOSITION_SUPERVISOR_ROOT,
     profiles_root: Path = DEFAULT_COMPOSITION_PROFILES_ROOT,
+    preflight_popen: Callable[..., Any] = subprocess.Popen,
 ) -> CompositionDbtExecutionDependencies:
     """Return the protected collaborators of one supervised native dbt cell."""
 
@@ -115,6 +118,7 @@ def build_composition_dbt_execution_dependencies(
         supervisor_root=root,
         profiles_root=Path(profiles_root),
     )
+    executable = dbt_executable or current_environment_dbt_executable()
 
     def capture_store(source_verifier: Callable[..., Any]) -> MssqlDbtCaptureStore:
         return MssqlDbtCaptureStore(
@@ -134,6 +138,19 @@ def build_composition_dbt_execution_dependencies(
             read_contracts=read_contracts,
             open_target=open_materialization_target,
             require_target=require_materialization_target,
+        )
+
+    def preflight_command_runner(
+        attempt: CompositionAttemptIdentity,
+        credentials: IssuedSqlCredentials,
+    ) -> SubprocessDbtCommandRunner:
+        return SubprocessDbtCommandRunner(
+            popen_factory=issued_dbt_process_factory(
+                preflight_popen,
+                attempt=attempt,
+                credentials=credentials,
+            ),
+            dbt_executable=executable,
         )
 
     return CompositionDbtExecutionDependencies(
@@ -157,7 +174,7 @@ def build_composition_dbt_execution_dependencies(
         outcome_proof_writer=persist_execution_proof,
         expected_service_id=control.expected_service_id,
         toolchain_inspector=DistributionDbtToolchainInspector(),
-        preflight_command_runner=SubprocessDbtCommandRunner(),
+        preflight_command_runner_factory=preflight_command_runner,
         manifest_reader=protected_original_reader,
         outcome_transaction=lambda: composition_control_transaction(
             control.connection_factory,
@@ -165,7 +182,7 @@ def build_composition_dbt_execution_dependencies(
             control.expected_service_id,
         ),
         target=target,
-        dbt_executable=dbt_executable or current_environment_dbt_executable(),
+        dbt_executable=executable,
     )
 
 

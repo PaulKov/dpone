@@ -8,6 +8,7 @@ child identity and running dbt remain live obligations and are UNVERIFIED here.
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ from dpone.adapters.composition_dbt_process_boundary import LinuxDbtProcessBound
 from dpone.adapters.composition_mssql_attempts import MssqlCompositionAttemptStore
 from dpone.adapters.composition_mssql_dbt_materialization import MssqlDbtMaterializationObserver
 from dpone.adapters.composition_mssql_execution_evidence import persist_execution_proof
+from dpone.adapters.composition_mssql_issuance import MssqlIssuedCredentials
 from dpone.adapters.composition_mssql_login_gate import MssqlCompositionLoginGate
 from dpone.adapters.dbt_executable import current_environment_dbt_executable
 from dpone.app.composition_dbt_execution import CompositionDbtExecutionDependencies
@@ -28,6 +30,8 @@ from dpone.app.composition_dbt_execution_factory import (
 )
 from dpone.contracts.composition_dbt_outcome import DbtCaptureError
 from dpone.contracts.composition_supervisor import CompositionSupervisorProjection
+from dpone.contracts.dbt_invocation import DbtInvocationContext
+from tests.composition_mssql_gate_helpers import attempt
 
 SERVICE = "3f2c1b7a-5d4e-4a91-8b26-0c7d9e1f2a34"
 SUPERVISOR = CompositionSupervisorProjection(
@@ -93,6 +97,51 @@ def test_capture_runs_the_child_through_the_issued_environment() -> None:
     assert type(capture) is ProtectedDbtCapture
     assert type(capture._runner) is LinuxDbtBuildRunner
     assert dict(capture._runner._environment(object())) == issued
+
+
+def test_production_preflight_factory_binds_exact_issued_child_environment(tmp_path: Path) -> None:
+    observed: dict[str, object] = {}
+    identity = attempt()
+    credentials = MssqlIssuedCredentials(
+        "dpone_v3_" + identity.attempt_sha256[7:],
+        b"a" * 16,
+        "issued-preflight-secret",
+    )
+
+    class CompletedProcess:
+        stdout = io.BytesIO(b"issued-preflight-secret")
+        stderr = io.BytesIO(b"issued-preflight-secret")
+
+        def wait(self, timeout: float | None = None) -> int:
+            del timeout
+            return 0
+
+    def popen(args: tuple[str, ...], **kwargs: object) -> CompletedProcess:
+        observed["args"] = args
+        observed.update(kwargs)
+        return CompletedProcess()
+
+    dependencies = _dependencies(preflight_popen=popen)
+    runner = dependencies.preflight_command_runner_factory(identity, credentials)
+    target = (tmp_path / "attempt" / "preflight" / "target").absolute()
+    result = runner.run(
+        ("dbt", "parse", "--target-path", str(target)),
+        cwd=tmp_path,
+        timeout_seconds=10,
+        redactions=(credentials.login_name, credentials.password),
+    )
+
+    expected_home = target.parent.parent / "home"
+    assert observed["env"] == {
+        **DbtInvocationContext.canonical().environment(home=str(expected_home)),
+        "DBT_ENV_SECRET_DPONE_COMPOSITION_USER": credentials.login_name,
+        "DBT_ENV_SECRET_DPONE_COMPOSITION_PASSWORD": credentials.password,
+    }
+    assert credentials.login_name not in observed["args"]
+    assert credentials.password not in observed["args"]
+    assert credentials.password not in result.stdout
+    assert credentials.password not in result.stderr
+    assert credentials.password not in repr(runner)
 
 
 def test_materialization_observer_reopens_source_contracts_per_call() -> None:

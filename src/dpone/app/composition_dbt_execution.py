@@ -34,7 +34,11 @@ from dpone.adapters.composition_dbt_process_boundary import LinuxDbtProcessBound
 from dpone.adapters.composition_supervisor_filesystem import protected_original_reader
 from dpone.adapters.dbt_artifacts import LocalDbtExecutionEvidenceWriter, LocalDbtRunResultsReader
 from dpone.adapters.dbt_run_results_schema import OfficialDbtRunResultsValidator
-from dpone.app.composition_credentials import IssuedDbtProfileRenderer, issued_dbt_child_environment
+from dpone.app.composition_credentials import (
+    IssuedDbtProfileRenderer,
+    IssuedSqlCredentials,
+    issued_dbt_child_environment,
+)
 from dpone.app.composition_dbt_attempt_session import (
     AdmittedExecutionSlot,
     DbtChildProcessBoundary,
@@ -84,6 +88,7 @@ ChildEnvironment = Callable[[], Mapping[str, str]]
 ReadContracts = Callable[[CompositionAttemptIdentity], tuple[DbtMaterializationContract, ...]]
 SourceVerifier = Callable[[CompositionAttemptIdentity], tuple[DbtDispatchIntent, DbtOutcomeExpectation]]
 MaterializationObserver = Callable[..., bytes]
+PreflightRunnerFactory = Callable[[CompositionAttemptIdentity, IssuedSqlCredentials], DbtCommandRunner]
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,7 +128,7 @@ class CompositionDbtExecutionDependencies:
     outcome_proof_writer: Callable[..., None]
     expected_service_id: str
     toolchain_inspector: DbtToolchainInspector
-    preflight_command_runner: DbtCommandRunner
+    preflight_command_runner_factory: PreflightRunnerFactory
     outcome_transaction: Callable[[], Any]
     target: ResolvedBindingConnection
     dbt_executable: str
@@ -181,7 +186,7 @@ class CompositionDbtExecutionRoot:
         result = worker.run(attempt, execute=lambda credentials: self._build(session, credentials))
         return self._agreed(session, result.receipt)
 
-    def _build(self, session: SupervisedDbtSession, credentials: Any) -> DbtExecutionOutcome:
+    def _build(self, session: SupervisedDbtSession, credentials: IssuedSqlCredentials) -> DbtExecutionOutcome:
         """Derive authority, fence dispatch once and capture actual originals."""
         deps, request = self._deps, session.request
         allocation = session.allocation
@@ -230,7 +235,7 @@ class CompositionDbtExecutionRoot:
         authority: CompositionDbtCaptureAuthority,
         store: Any,
         capture: Any,
-        credentials: Any,
+        credentials: IssuedSqlCredentials,
         *,
         project: Path,
     ) -> DbtExecutionOutcome:
@@ -244,7 +249,7 @@ class CompositionDbtExecutionRoot:
             trusted_intent=authority.intent,
             store=store,
             capture=capture,
-            preflight_runner=deps.preflight_command_runner,
+            preflight_runner=deps.preflight_command_runner_factory(session.attempt, credentials),
         )
         artifacts = LocalDbtRunResultsReader()
         service = DbtExecutionService(
@@ -267,6 +272,7 @@ class CompositionDbtExecutionRoot:
                 pack=request.pack,
                 attempts=deps.attempts,
                 read_active=deps.read_active,
+                read_preflight_manifest=authority.preflight_manifest,
             ),
         )
         return service.execute(

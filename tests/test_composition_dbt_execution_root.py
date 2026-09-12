@@ -209,6 +209,7 @@ class _Attempts:
         self.receipt: CompositionAttemptReceipt | None = None
         self.exact_reads = 0
         self.terminal: list[tuple[str, str]] = []
+        self.before_exact_read = lambda: None
 
     def admit_once(self, attempt) -> CompositionAttemptReceipt:
         self._ledger.events.append("admit_attempt")
@@ -220,6 +221,7 @@ class _Attempts:
 
     def read_exact(self, attempt) -> CompositionAttemptReceipt:
         self.exact_reads += 1
+        self.before_exact_read()
         if self.receipt is None:
             raise CompositionAdmissionError("attempt_missing")
         return self.receipt
@@ -369,6 +371,20 @@ class _PreflightRunner:
                 return DbtCommandResult(exit_code=0, stdout=json.dumps({"unique_id": MODEL + "_drifted"}))
             return DbtCommandResult(exit_code=0, stdout=json.dumps({"unique_id": MODEL}))
         raise AssertionError("a build command must never reach the preflight runner")
+
+
+def _issued_preflight_factory(preflight: _PreflightRunner):
+    """Require the root to bind the issued login before any preflight child runs."""
+
+    def factory(attempt, credentials):
+        if (
+            credentials.password != ISSUED_PASSWORD
+            or credentials.login_name != "dpone_v3_" + attempt.attempt_sha256[7:]
+        ):
+            raise AssertionError("preflight must receive the issued attempt credentials")
+        return preflight
+
+    return factory
 
 
 class _CaptureStore:
@@ -602,6 +618,13 @@ def build(tmp_path: Path, **overrides: Any) -> Harness:
     attempts = _Attempts(ledger)
     gate = _Gate(ledger, close_error=overrides.get("close_error"))
     boundary = _Boundary(ledger, tmp_path / "supervisor", tmp_path / "profiles")
+    if overrides.get("mutate_before_build"):
+
+        def mutate_preflight() -> None:
+            manifest = boundary.allocations[0].preflight_target / "manifest.json"
+            manifest.write_text(json.dumps(_manifest(), indent=1), encoding="utf-8")
+
+        attempts.before_exact_read = mutate_preflight
     preflight = _PreflightRunner(
         ledger,
         parse_exit=overrides.get("parse_exit", 0),
@@ -653,7 +676,7 @@ def build(tmp_path: Path, **overrides: Any) -> Harness:
         outcome_proof_writer=proofs,
         expected_service_id=SERVICE,
         toolchain_inspector=_ToolchainInspector(),
-        preflight_command_runner=preflight,
+        preflight_command_runner_factory=_issued_preflight_factory(preflight),
         manifest_reader=manifest_reader,
         outcome_transaction=_transaction,
         target=_target(pack),
@@ -771,11 +794,17 @@ def test_issued_credentials_never_reach_argv_evidence_or_originals(authority: Ha
     authority.root.execute(authority.request)
 
     intent, _ = authority.ledger.registration
+    issued = authority.gate.issued[0]
     evidence = authority.evidence_path().read_bytes()
     assert ISSUED_PASSWORD not in " ".join(intent.argv)
+    assert issued.login_name not in " ".join(intent.argv)
     assert ISSUED_PASSWORD.encode() not in evidence
+    assert issued.login_name.encode() not in evidence
     assert b"ambient-binding-secret" not in evidence
-    assert all(ISSUED_PASSWORD.encode() not in original.content for original in authority.ledger.record.originals)
+    assert all(
+        ISSUED_PASSWORD.encode() not in original.content and issued.login_name.encode() not in original.content
+        for original in authority.ledger.record.originals
+    )
     assert not authority.boundary.allocations[0].profile_store.profile_path.exists()
     environments = authority.capture.child_environments
     assert environments and environments[0]["DBT_ENV_SECRET_DPONE_COMPOSITION_PASSWORD"] == ISSUED_PASSWORD
@@ -881,6 +910,27 @@ def test_capture_authority_rejects_a_mutated_original_between_callbacks(tmp_path
         authority.intent()
 
 
+def test_manifest_substitution_before_build_never_dispatches_or_relaunches(tmp_path: Path) -> None:
+    harness = build(tmp_path, mutate_before_build=True)
+
+    with pytest.raises((CompositionAdmissionError, DbtCaptureError)) as error:
+        harness.root.execute(harness.request)
+
+    issued = harness.gate.issued[0]
+    assert ISSUED_PASSWORD not in str(error.value)
+    assert issued.login_name not in str(error.value)
+    assert harness.events.count("run_child") == 0
+    assert harness.ledger.dispatched is False
+    assert harness.ledger.record is None
+    assert harness.attempts.receipt.state == "RUNNING"
+
+    with pytest.raises(CompositionAdmissionError, match="attempt_replay"):
+        harness.root.execute(harness.request)
+    assert harness.events.count("run_child") == 0
+    assert harness.events.count("allocate_identity") == 1
+    assert harness.events.count("issue_login") == 1
+
+
 def test_replayed_attempt_never_allocates_or_issues_twice(authority: Harness) -> None:
     authority.root.execute(authority.request)
     allocations = len(authority.boundary.allocations)
@@ -951,7 +1001,7 @@ def test_production_preflight_reader_is_the_protected_no_follow_original(authori
         read()
 
     # A refused boundary can never launch a child or seal a terminal state.
-    with pytest.raises(DbtCaptureError):
+    with pytest.raises((CompositionAdmissionError, DbtCaptureError)):
         CompositionDbtExecutionRoot(dependencies).execute(authority.request)
     assert "run_child" not in authority.events
     assert authority.ledger.registration is None
