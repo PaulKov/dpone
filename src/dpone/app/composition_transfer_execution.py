@@ -61,7 +61,15 @@ class CompositionTransferResult:
 
 @dataclass(frozen=True, slots=True)
 class CompositionTransferExecutionDependencies:
-    """Injected protected capabilities; this root owns no ambient client."""
+    """Injected protected capabilities; this root owns no ambient client.
+
+    ``operation_registrar`` is ``MssqlCompositionTransactionBindings.bind`` (or a
+    compatible 4-arg callback). The admission seam is
+    ``Callable[[MssqlTransactionAdmission, bytes], MssqlCompositionTransactionFence | None]``
+    after :func:`composition_transfer_binding_registrar` adapts the binder.
+    Missing ``operation_registrar`` is ``CompositionAdmissionError``. A missing
+    fence is rejected unless that adapted callback returns a fence bound before DML.
+    """
 
     read_active: Callable[[], CompositionActivationOccurrence]
     attempts: Any
@@ -86,6 +94,8 @@ class CompositionTransferExecutionRoot:
     def execute(self, request: CompositionTransferExecutionRequest) -> CompositionTransferResult:
         """Run the complete admission, fenced load and seal sequence once."""
 
+        if self._deps.operation_registrar is None:
+            raise CompositionAdmissionError("operation_registrar")
         occurrence = self._deps.read_active()
         occurrence.require_state("ACTIVE")
         attempt = build_composition_transfer_attempt(
@@ -111,6 +121,8 @@ class CompositionTransferExecutionRoot:
     ) -> CompositionTransferResult:
         """Hydrate issued overlays, register the generic operation, then fence DML."""
 
+        if self._deps.operation_registrar is None:
+            raise CompositionAdmissionError("operation_registrar")
         sink = issued_transfer_connection(self._deps.sink_target, attempt, credentials)
         state = issued_transfer_connection(self._deps.state_target, attempt, credentials)
         bindings = self._deps.hydrator.build(
@@ -126,33 +138,89 @@ class CompositionTransferExecutionRoot:
             process,
             sink_connection=sink,
             state_connection=state,
-            mssql_transaction_admission_service=self._admission(attempt, bindings.sink_obj),
+            mssql_transaction_admission_service=self._admission(request, attempt, bindings.sink_obj),
             composition_transaction_fence=self._deps.composition_fence,
         )
         return CompositionTransferResult(rows_written=int(result.inserted_rows))
 
-    def _admission(self, attempt: CompositionAttemptIdentity, sink: Any) -> Any:
-        if self._deps.admission_service is not None:
-            return self._deps.admission_service
+    def _admission(
+        self,
+        request: CompositionTransferExecutionRequest,
+        attempt: CompositionAttemptIdentity,
+        sink: Any,
+    ) -> Any:
+        if self._deps.operation_registrar is None:
+            raise CompositionAdmissionError("operation_registrar")
+        from dpone.contracts.dbt_relation_writes import transfer_relation_write
         from dpone.runtime.etl.mssql_transaction_admission import MssqlTransactionAdmissionService
 
-        return MssqlTransactionAdmissionService(
-            operation_registrar=self._registrar(attempt, sink),
-            composition_fence=self._deps.composition_fence,
-            fence_connector=getattr(sink, "connector", None),
+        write = transfer_relation_write(
+            project_path=str(request.manifest.get("name") or "composition-transfer"),
+            workflow_id=attempt.workload_id,
+            workload_id=attempt.workload_id,
+            manifest=request.manifest,
         )
+        registrar = self._registrar(attempt, sink, write)
+        service = self._deps.admission_service
+        if service is None:
+            return MssqlTransactionAdmissionService(
+                operation_registrar=registrar,
+                composition_fence=self._deps.composition_fence,
+                fence_connector=getattr(sink, "connector", None),
+            )
+        if getattr(service, "_operation_registrar", None) is None:
+            raise CompositionAdmissionError("operation_registrar")
+        return service
 
-    def _registrar(self, attempt: CompositionAttemptIdentity, sink: Any) -> Callable[..., None] | None:
+    def _registrar(self, attempt: CompositionAttemptIdentity, sink: Any, write: Any) -> Callable[..., None]:
         bind = self._deps.operation_registrar
         if bind is None:
+            raise CompositionAdmissionError("operation_registrar")
+        register = composition_transfer_binding_registrar(bind, attempt=attempt, write=write)
+
+        def attach(admission: Any, mutation_plan_sha256: bytes) -> None:
+            fence = register(admission, mutation_plan_sha256)
+            if fence is None:
+                fence = self._deps.composition_fence
+            if fence is None:
+                raise CompositionAdmissionError("composition_fence")
+            bind_composition_fence(sink, fence)
+
+        return attach
+
+
+def composition_transfer_binding_registrar(
+    bind: Callable[..., Any],
+    *,
+    attempt: CompositionAttemptIdentity,
+    write: Any,
+) -> Callable[[Any, bytes], Any]:
+    """Adapt ``MssqlCompositionTransactionBindings.bind`` to the admission registrar.
+
+    The returned callback is
+    ``Callable[[MssqlTransactionAdmission, bytes], MssqlCompositionTransactionFence | None]``.
+    Task 8 injects the existing 4-arg binder; this wrapper supplies ``attempt`` /
+    ``write``, then wraps a ``CompositionMssqlOperationBinding`` in
+    ``MssqlCompositionTransactionFence``.
+    """
+
+    def register(admission: Any, mutation_plan_sha256: bytes) -> Any:
+        from dpone.adapters.composition_mssql_transaction_fence import MssqlCompositionTransactionFence
+        from dpone.contracts.composition_mssql_binding import CompositionMssqlOperationBinding
+        from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
+
+        if type(admission) is not MssqlTransactionAdmission or admission.operation is None:
+            raise CompositionAdmissionError("transfer_operation")
+        result = bind(attempt, admission.operation, write, mutation_plan_sha256)
+        if result is None:
             return None
+        if isinstance(result, MssqlCompositionTransactionFence):
+            return result
+        if type(result) is CompositionMssqlOperationBinding:
+            return MssqlCompositionTransactionFence(result)
+        raise CompositionAdmissionError("composition_fence")
 
-        def register(admission: Any, mutation_plan_sha256: bytes) -> None:
-            fence = bind(attempt, admission, mutation_plan_sha256)
-            if fence is not None:
-                bind_composition_fence(sink, fence)
-
-        return register
+    return register
 
 
 def issued_transfer_connection(
@@ -230,5 +298,6 @@ __all__ = [
     "CompositionTransferExecutionRoot",
     "CompositionTransferResult",
     "bind_composition_fence",
+    "composition_transfer_binding_registrar",
     "issued_transfer_connection",
 ]

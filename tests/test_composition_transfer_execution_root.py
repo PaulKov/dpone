@@ -80,6 +80,7 @@ class _Ledger:
     quiescence: str | None = None
     source_reads: int = 0
     sink_connection: ResolvedBindingConnection | None = None
+    fence: Any = None
 
 
 class _Attempts:
@@ -173,7 +174,7 @@ class _Runner:
         self._ledger = ledger
 
     def run(self, process, *, sink_connection=None, composition_transaction_fence=None, **_kwargs) -> ProcessResult:
-        del composition_transaction_fence
+        self._ledger.fence = composition_transaction_fence
         if sink_connection is not None:
             self._ledger.sink_connection = sink_connection
         process.config.source_obj.extract()
@@ -272,6 +273,8 @@ def runtime() -> TransferRuntime:
         sink_target=_target(database="warehouse"),
         state_target=_target(database="warehouse_state"),
         expected_service_id=SERVICE,
+        composition_fence=object(),
+        operation_registrar=lambda *_args, **_kwargs: None,
     )
     request = CompositionTransferExecutionRequest(
         manifest=_manifest(),
@@ -298,6 +301,7 @@ def test_transfer_root_issues_sink_and_fences_actual_transaction(runtime):
     result = runtime.execute()
     assert result.rows_written == 3
     assert runtime.sink_credentials.resolver == "composition-issued-login"
+    assert runtime.ledger.fence is not None
     assert runtime.events.index("target_fence_before_mutation") < runtime.events.index("target_dml")
     assert runtime.events.index("target_fence_before_receipt") < runtime.events.index("receipt_insert")
 
@@ -401,6 +405,169 @@ def test_admission_replay_applies_parent_fence():
     assert events == ["begin", "target_fence_before_receipt", "rollback"]
 
 
+def test_missing_operation_registrar_is_rejected(runtime):
+    runtime.root._deps = replace(runtime.root._deps, operation_registrar=None)
+    with pytest.raises(CompositionAdmissionError, match="operation_registrar"):
+        runtime.execute()
+    assert runtime.source_reads == 0
+
+
+def test_missing_composition_fence_is_rejected_when_registrar_returns_none(runtime):
+    from dpone.app.composition_transfer_execution import composition_transfer_binding_registrar
+    from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
+    from tests.test_mssql_composition_transaction_fence import binding
+
+    original = binding()
+    register = composition_transfer_binding_registrar(
+        lambda *_args, **_kwargs: None,
+        attempt=original.attempt,
+        write=original.write,
+    )
+    assert register(MssqlTransactionAdmission(operation=original.operation), original.mutation_plan_sha256) is None
+    runtime.root._deps = replace(
+        runtime.root._deps,
+        composition_fence=None,
+        operation_registrar=lambda *_args, **_kwargs: None,
+    )
+    service = runtime.root._admission(runtime.request, _attempt(runtime), SimpleNamespace(_strategy_map={}))
+    with pytest.raises(CompositionAdmissionError, match="composition_fence"):
+        service._operation_registrar(
+            MssqlTransactionAdmission(operation=original.operation),
+            original.mutation_plan_sha256,
+        )
+
+
+def test_strict_issued_overlay_is_used_to_build_sink(monkeypatch):
+    from dpone.runtime.bootstrap_hydrator import DefaultRuntimeHydrator
+
+    overlay = _issued_overlay("warehouse")
+    endpoints = _RecordingEndpoints()
+    _install_hydrator_connections(monkeypatch, strict=True)
+    bindings = DefaultRuntimeHydrator(
+        state_bootstrap=_IdleStateBootstrap(),
+        endpoint_factory=endpoints,
+        connection_context_loader=_IdleContextLoader(),
+    ).build(
+        config=_overlay_config(),
+        load_config=_overlay_load_config(),
+        sink_connection=overlay,
+        state_connection=_issued_overlay("warehouse_state"),
+    )
+    assert endpoints.sink_connection is overlay
+    assert bindings.sink_obj == "sink"
+
+
+def test_non_strict_issued_overlay_is_rejected(monkeypatch):
+    from dpone.runtime.bootstrap_hydrator import DefaultRuntimeHydrator
+    from dpone.runtime.errors import RuntimeConfigurationError
+
+    endpoints = _RecordingEndpoints()
+    _install_hydrator_connections(monkeypatch, strict=False)
+    with pytest.raises(RuntimeConfigurationError, match="composition_issued_login_overlay_required"):
+        DefaultRuntimeHydrator(
+            state_bootstrap=_IdleStateBootstrap(),
+            endpoint_factory=endpoints,
+            connection_context_loader=_IdleContextLoader(),
+        ).build(
+            config=_overlay_config(),
+            load_config=_overlay_load_config(),
+            sink_connection=_issued_overlay("warehouse"),
+            state_connection=_issued_overlay("warehouse_state"),
+        )
+    assert endpoints.sink_connection is None
+    assert endpoints.legacy_sink is False
+
+
+def test_runner_rejects_issued_overlays_when_hydrator_cannot_apply_them(monkeypatch):
+    from dpone.runtime.bootstrap_runner import _hydrate_invocation
+    from dpone.runtime.errors import RuntimeConfigurationError
+
+    monkeypatch.setattr("dpone.ports.runtime_hydrator.ensure_runtime_hydrator", lambda: object())
+    called: list[str] = []
+    process = SimpleNamespace(
+        config=SimpleNamespace(source_obj=None, ensure_runtime_bindings=lambda: called.append("overlay-free"))
+    )
+    with pytest.raises(RuntimeConfigurationError, match="composition_issued_login_overlay_required"):
+        _hydrate_invocation(
+            process,
+            sink_connection=_issued_overlay("warehouse"),
+            state_connection=_issued_overlay("warehouse_state"),
+        )
+    assert called == []
+
+
+def test_admission_registrar_runs_after_preplan_with_admission_and_digest():
+    from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
+    from dpone.contracts.run_context import RunContext
+    from dpone.runtime.etl.mssql_schema_preplan import MSSQL_SCHEMA_PREPLAN_OPTION
+    from dpone.runtime.etl.mssql_transaction_admission import ADMISSION_OPTION, MssqlTransactionAdmissionService
+    from tests.test_mssql_generic_transaction_governance import (
+        _admission_sink,
+        _AdmissionState,
+        _certified_source,
+        _config,
+    )
+
+    calls: list[tuple[Any, bytes]] = []
+
+    def registrar(admission: Any, digest: bytes) -> None:
+        calls.append((admission, digest))
+
+    captured: list[Any] = []
+    prepared = MssqlTransactionAdmissionService(
+        target_resolver=lambda *_args, **_kwargs: SimpleNamespace(
+            digest=b"t" * 32,
+            database_name="DWH",
+            schema_name="dbo",
+            table_name="target",
+        ),
+        state_factory=lambda _storage: _AdmissionState(captured),
+        operation_registrar=registrar,
+    ).prepare(
+        _config(),
+        source=_certified_source(),
+        sink=_admission_sink(
+            SimpleNamespace(
+                atomicity="target_atomic",
+                provisioning="external",
+                require_database_authority_binding=lambda: None,
+            )
+        ),
+        run_context=RunContext("run", config={"process": "p", "pipeline_id": "pipe", "task_id": "task"}),
+        load_record=SimpleNamespace(load_id="load"),
+        dag_id="dag",
+    )
+    assert len(calls) == 1
+    admission, digest = calls[0]
+    assert isinstance(admission, MssqlTransactionAdmission)
+    assert admission is prepared.options[ADMISSION_OPTION]
+    preplan = prepared.options[MSSQL_SCHEMA_PREPLAN_OPTION]
+    assert digest == preplan.target_mutation_plan.digest
+    assert isinstance(digest, bytes) and len(digest) == 32
+    assert captured, "preplan must run after admission"
+
+
+def test_composition_transfer_binding_adapter_wraps_binder_as_fence():
+    from dpone.adapters.composition_mssql_transaction_fence import MssqlCompositionTransactionFence
+    from dpone.app.composition_transfer_execution import composition_transfer_binding_registrar
+    from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
+    from tests.test_mssql_composition_transaction_fence import binding
+
+    original = binding()
+    calls: list[tuple[Any, Any, Any, bytes]] = []
+
+    def bind(attempt, operation, write, mutation_plan_sha256):
+        calls.append((attempt, operation, write, mutation_plan_sha256))
+        return original
+
+    register = composition_transfer_binding_registrar(bind, attempt=original.attempt, write=original.write)
+    admission = MssqlTransactionAdmission(operation=original.operation)
+    fence = register(admission, original.mutation_plan_sha256)
+    assert isinstance(fence, MssqlCompositionTransactionFence)
+    assert fence.binding is original
+    assert calls == [(original.attempt, original.operation, original.write, original.mutation_plan_sha256)]
+
+
 @contextmanager
 def _transaction():
     yield SimpleNamespace()
@@ -414,3 +581,91 @@ def _attempt(runtime: TransferRuntime):
         run_identity=runtime.request.run_identity,
         airflow_attempt=runtime.request.airflow_attempt,
     )
+
+
+def _issued_overlay(database: str) -> ResolvedBindingConnection:
+    return ResolvedBindingConnection(
+        CredentialsConfig(host="sql", database=database, schema="dbo", username="issued", password=ISSUED_PASSWORD),
+        {"resolver": "composition-issued-login"},
+        ResolvedConnectionDescriptor("mssql", {}),
+    )
+
+
+def _overlay_config() -> dict[str, Any]:
+    return {
+        "source": {"type": "postgres", "connection_ref": "pg-source"},
+        "sink": {"type": "mssql", "connection_ref": "mssql-sink"},
+        "state": {"type": "disabled"},
+    }
+
+
+def _overlay_load_config():
+    from dpone.config.load_config import LoadConfig
+    from dpone.config.load_strategy import LoadStrategy
+
+    return LoadConfig(
+        source_conn_id="pg-source",
+        target_conn_id="mssql-sink",
+        source_schema="public",
+        source_table="orders",
+        target_schema="dbo",
+        target_table="orders",
+        load_strategy=LoadStrategy.FULL_REFRESH,
+    )
+
+
+def _install_hydrator_connections(monkeypatch, *, strict: bool) -> None:
+    from dpone.runtime.credentials.authority import RuntimeResolvedConnections
+
+    monkeypatch.setattr(
+        "dpone.runtime.bootstrap_hydrator.resolve_runtime_connections",
+        lambda **_kwargs: RuntimeResolvedConnections(
+            strict=strict,
+            source=_target(database="sales"),
+            sink=_target(database="warehouse"),
+            state=_target(database="warehouse_state"),
+        ),
+    )
+
+
+class _IdleContextLoader:
+    @staticmethod
+    def load() -> Any:
+        return SimpleNamespace(environment="test")
+
+
+class _IdleStateBootstrap:
+    @staticmethod
+    def _bindings() -> Any:
+        from dpone.runtime.bootstrap_state_models import RuntimeStateBindings
+
+        return RuntimeStateBindings(state_type="disabled", proxy_config={}, xmin_state_storage=None)
+
+    def build_resolved(self, **_kwargs: Any) -> Any:
+        return self._bindings()
+
+    def build(self, **_kwargs: Any) -> Any:
+        return self._bindings()
+
+    def build_run_state_storage(self, **_kwargs: Any) -> None:
+        return None
+
+
+class _RecordingEndpoints:
+    def __init__(self) -> None:
+        self.sink_connection: ResolvedBindingConnection | None = None
+        self.legacy_sink = False
+
+    def build_sink_resolved(self, _cfg: Any, connection: ResolvedBindingConnection, *_args: Any, **_kwargs: Any) -> str:
+        self.sink_connection = connection
+        return "sink"
+
+    def build_source_resolved(self, *_args: Any, **_kwargs: Any) -> str:
+        return "source"
+
+    def build_sink(self, *_args: Any, **_kwargs: Any) -> str:
+        self.legacy_sink = True
+        return "legacy-sink"
+
+    def build_source(self, *_args: Any, **_kwargs: Any) -> str:
+        return "legacy-source"

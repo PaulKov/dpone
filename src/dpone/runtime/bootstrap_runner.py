@@ -166,16 +166,17 @@ class DefaultProcessRunner:
 def _hydrate_invocation(process: Any, *, sink_connection: Any | None, state_connection: Any | None) -> None:
     """Hydrate with issued overlays when unbound; otherwise keep the existing path."""
 
-    if process.config.source_obj is not None or (sink_connection is None and state_connection is None):
+    overlays = sink_connection is not None or state_connection is not None
+    if process.config.source_obj is not None or not overlays:
         process.config.ensure_runtime_bindings()
         return
     from dpone.ports.runtime_hydrator import ensure_runtime_hydrator
     from dpone.runtime.bootstrap_hydrator import DefaultRuntimeHydrator
+    from dpone.runtime.errors import RuntimeConfigurationError
 
     hydrator = ensure_runtime_hydrator()
     if not isinstance(hydrator, DefaultRuntimeHydrator):
-        process.config.ensure_runtime_bindings()
-        return
+        raise RuntimeConfigurationError("composition_issued_login_overlay_required")
     process.config.apply_runtime_bindings(
         hydrator.build(
             config=process.config.raw_config,

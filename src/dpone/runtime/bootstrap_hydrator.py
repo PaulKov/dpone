@@ -297,6 +297,8 @@ def _with_issued_overlays(
 
     if sink_connection is None and state_connection is None:
         return connections
+    if not connections.strict:
+        raise RuntimeConfigurationError("composition_issued_login_overlay_required")
     updates: dict[str, ResolvedBindingConnection] = {}
     if sink_connection is not None:
         updates["sink"] = _require_issued_overlay(sink_connection)
