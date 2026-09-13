@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Iterator, Mapping
+from contextlib import closing
 from typing import Any
 
 from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+from dpone.runtime.mssql_native_row_reservation import _SizedNativeRow
 
 
 def native_source_rows(rows: Iterator[Any], contract: Any, max_row_bytes: int) -> Iterator[Any]:
@@ -13,6 +15,20 @@ def native_source_rows(rows: Iterator[Any], contract: Any, max_row_bytes: int) -
 
     ClickHouse String is binary-safe. Invalid UTF-8 is an error for an authored
     Unicode target, never replacement text. No arbitrary ``str`` coercion occurs.
+    """
+
+    with closing(_sized_native_source_rows(rows, contract, max_row_bytes)) as adapted:
+        for row in adapted:
+            yield row.values
+
+
+def _sized_native_source_rows(
+    rows: Iterator[Any], contract: Any, max_row_bytes: int
+) -> Generator[_SizedNativeRow, None, None]:
+    """Retain the existing early size check for the internal framing consumer.
+
+    The compatibility iterator unwraps values; production framing also consumes
+    the reservation. Closing either iterator deterministically closes the source.
     """
 
     encoder = MssqlNativeEncoder(contract, max_row_bytes=max_row_bytes)
@@ -46,8 +62,8 @@ def native_source_rows(rows: Iterator[Any], contract: Any, max_row_bytes: int) -
                         raise ValueError("mssql_native.invalid_utf8_source_text") from None
                 adapted.append(value)
             normalized = tuple(adapted)
-            encoder.encoded_row_size(normalized)
-            yield normalized
+            size = encoder.encoded_row_size(normalized)
+            yield _SizedNativeRow(normalized, contract, max_row_bytes, size)
     finally:
         close = getattr(rows, "close", None)
         if close is not None:

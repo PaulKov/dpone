@@ -89,11 +89,11 @@ class MssqlNativeStagePreparer:
                 raise ValueError("mssql_native.recovery_source_lifecycle_required")
         else:
             from dpone.runtime.sinks.mssql_native_completed_payload import completion_metadata
-            from dpone.runtime.sinks.mssql_native_source_values import native_source_rows
+            from dpone.runtime.sinks.mssql_native_source_values import _sized_native_source_rows
 
             adapted = context.observer.source_rows(
                 iter(context.row_source()),
-                lambda rows: native_source_rows(rows, context.wire_contract, context.max_row_bytes),
+                lambda rows: _sized_native_source_rows(rows, context.wire_contract, context.max_row_bytes),
             )
             complete = context.executor.stage(
                 context.plan,

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.79.2 - 2026-09-13
+
+### Changed
+
+- Reuse the bounded native source adapter's row-size calculation during framing
+  when its wire contract and row limit match. Preserve early validation, plain
+  tuple API compatibility, IPC bounds, worker checks and recovery formats.
+
 ## 0.79.1 - 2026-09-13
 
 ### Fixed

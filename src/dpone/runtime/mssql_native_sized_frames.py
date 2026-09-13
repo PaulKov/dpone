@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, TypeAlias
 
 from dpone.contracts.bounded_window import WindowContractError
 from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+from dpone.runtime.mssql_native_row_reservation import _SizedNativeRow
 from dpone.runtime.native_wire_models import SourceNativeWireContract
 
 if TYPE_CHECKING:
@@ -55,6 +56,10 @@ def sized_native_frames(
         if check is not None and index % 1024 == 0:
             check()
 
+        reservation = source_row if type(source_row) is _SizedNativeRow else None
+        if reservation is not None:
+            source_row = reservation.values
+
         # Drivers may reuse a row container or binary buffer between fetches.
         def freeze(value: object) -> object:
             return bytes(value) if isinstance(value, (bytearray, memoryview)) else value
@@ -64,7 +69,13 @@ def sized_native_frames(
             if isinstance(source_row, Mapping)
             else tuple(freeze(value) for value in source_row)
         )
-        size = encoder.encoded_row_size(row)
+        size = (
+            reservation.encoded_bytes
+            if reservation is not None
+            and reservation.contract is contract
+            and reservation.max_row_bytes == limits.max_row_bytes
+            else encoder.encoded_row_size(row)
+        )
         ipc_size = len(pickle.dumps(row, protocol=5)) + 16
         if size > limits.max_row_bytes or ipc_size + 64 + ipc_overhead > limits.max_bytes:
             raise WindowContractError("mssql_native.row_exceeds_frame_limit")
