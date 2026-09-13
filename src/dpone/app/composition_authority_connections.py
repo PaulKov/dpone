@@ -217,10 +217,10 @@ class CompositionAuthorityConnections:
             raw = connector.connection
             raw.autocommit = False
             cursor = raw.cursor()
-            cursor.execute(
-                "IF @@TRANCOUNT<>0 THROW 51000,'composition_observer_transaction',1; "
-                "SET XACT_ABORT ON; SET NOCOUNT ON; SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; BEGIN TRANSACTION;"
-            )
+            # Manual-commit ODBC owns transaction entry. The first catalog read
+            # below must observe exactly one committable transaction; explicitly
+            # starting another would nest the driver's transaction.
+            cursor.execute("SET XACT_ABORT ON; SET NOCOUNT ON; SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;")
             header = self._header(cursor, pin)
             self._marker(cursor, service)
             require_composition_mssql_schema(cursor, self._schema)

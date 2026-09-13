@@ -500,8 +500,29 @@ file operations, requires directories `0700` and single-linked regular files
 `0600`, and retains incomplete attempts. Its owner must close the adapter after
 all operations have unwound. Existing root-owned capture remains unchanged.
 
-These components do not enable the remote execution route. The protected whole-cell
-factory, aggregate terminal proof production, service startup and full deployed
+The shared cell constructor now uses the same capture and publication journals
+for terminal evidence. It persists aggregate closure and outcome proofs over
+both issued principals before finalization, then independently reads the actual
+SQL `SUCCEEDED` receipt and nested originals. Missing publication history cannot
+be repaired by issuing another principal or synthesizing a successful receipt.
+
+The optional v2 TLS listener and client exchange scheduler identity and retained
+evidence only. One execution budget closes admission on expiry or shutdown;
+explicit cleanup receives at most 60 additional seconds without authorizing new
+CREATE, INSERT or EXCHANGE operations. ClickHouse HTTP adapters accept that
+absolute deadline and separate mutation guards. Request capacity remains occupied
+until admitted work actually unwinds; a disconnected client cannot authorize a
+retry.
+
+The whole-cell handler now constructs the bounded control/source connectors,
+HTTP clients and host readers from protected configuration and staged originals.
+It verifies retained SQL history before requiring ACTIVE for a new attempt.
+Existing attempts cannot issue credentials or run the cell again. File descriptors
+close even when the fresh custody check fails during context entry, and terminal
+responses are checked again after evidence validation finishes.
+
+These components do not yet enable the deployed remote execution route. Executable
+startup and worker routing remain in progress. The full
 Linux/Kubernetes campaign must still pass before operators use this profile.
 Local filesystem tests simulate Linux identity and protected ancestry; they are
 not a live isolation certificate.

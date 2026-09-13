@@ -129,6 +129,23 @@ def test_control_connection_returns_open_owned_handle_after_verified_rollback(au
     assert "raw.close" not in raw.events
 
 
+def test_control_verification_preserves_driver_owned_transaction(authority):
+    """Manual-commit ODBC opens a transaction before executing the first batch."""
+    instance, raw, _ = authority
+    execute = raw.handle.execute
+
+    def driver_execute(statement, *parameters):
+        # A manual-commit connection already has one transaction at execution.
+        # Explicit BEGIN nests it; a zero-count precondition rejects valid ODBC.
+        if "IF @@TRANCOUNT<>0" in statement or "BEGIN TRANSACTION" in statement:
+            raise RuntimeError("driver_transaction_conflict")
+        return execute(statement, *parameters)
+
+    raw.handle.execute = driver_execute
+    assert instance.control_connection(CONTEXT) is raw
+    assert raw.events[-2:] == ["rollback", "cursor.close"]
+
+
 @pytest.mark.parametrize("mutation", ["service", "missing_control_pin", "different_control_pin", "connector"])
 def test_target_mismatch_rejects_before_connect(authority, mutation):
     authority, _, calls = authority

@@ -97,3 +97,54 @@ def test_compose_clickhouse_pack_dependencies_fail_closes_without_parent() -> No
         compose_clickhouse_pack_dependencies(parent={}, manifest={}, environment={}, plan=SimpleNamespace(writes=()))
         is None
     )
+
+
+def test_concrete_factory_binds_terminal_union_to_original_capture_and_publication_stores(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
+    from dpone.adapters.composition_clickhouse_supervisor import DockerClickHouseLocalSupervisor
+    from dpone.adapters.composition_clickhouse_terminal_store import ClickHouseTerminalStore
+    from dpone.adapters.composition_snapshot_capture_store import ProtectedSnapshotFiles
+    from dpone.app import composition_clickhouse_cell_factory as common
+    from dpone.app import composition_clickhouse_execution_factory as factory
+    from dpone.app.composition_clickhouse_terminal import ClickHouseTerminalWorkerGate
+    from dpone.app.composition_dbt_execution_factory import CompositionDbtControlAuthority
+    from tests.test_composition_clickhouse_capture_factory import arguments
+    from tests.test_composition_clickhouse_supervisor_enrollment import enrolled
+
+    args = arguments(tmp_path)
+    parent = args["parent"]
+    original_control = parent["control"]
+    parent["control"] = CompositionDbtControlAuthority(
+        original_control.connection_factory, original_control.expected_service_id, "control", "custom"
+    )
+    parent["read_active"] = lambda: pytest.fail("construction does not observe publication")
+    parent["target"] = SimpleNamespace(
+        descriptor=SimpleNamespace(properties={"composition_service_id": args["target"].service_id}),
+        credentials=SimpleNamespace(
+            host="127.0.0.1", port=8123, username="admin", password="test-only", secure=False, additional_params={}
+        ),
+    )
+
+    @contextmanager
+    def transaction(*args):
+        yield object()
+
+    monkeypatch.setattr(factory, "composition_control_transaction", transaction)
+    monkeypatch.setattr(factory, "read_service_enrollment", lambda *args: enrolled())
+    monkeypatch.setattr(factory, "clickhouse_plan_write", lambda *args: object())
+    monkeypatch.setattr(common, "snapshot_target_for_write", lambda *unused: args["target"])
+    monkeypatch.setattr(common, "snapshot_limits_from_manifest", lambda *unused: args["limits"])
+    monkeypatch.setattr(factory, "_pack_attempt", lambda *unused: args["attempt"])
+    dependencies = factory._compose_clickhouse_pack_dependencies(parent, args["manifest"], {}, args["plan"])
+    assert isinstance(dependencies.capture._files, ProtectedSnapshotFiles)
+    assert isinstance(dependencies.gate._supervisor, DockerClickHouseLocalSupervisor)
+    worker = dependencies.worker_gate
+    assert isinstance(worker, ClickHouseTerminalWorkerGate)
+    assert dependencies.outcome_observer is worker
+    assert worker._ingest is dependencies.gate and worker._publisher is dependencies.publisher_gate
+    terminal = worker._terminal
+    assert isinstance(terminal, ClickHouseTerminalStore)
+    assert terminal._capture is dependencies.capture._store
+    assert terminal._generation == dependencies.capture.load_generation_in
+    assert terminal._target == dependencies.target

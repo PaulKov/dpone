@@ -163,7 +163,76 @@ UNKNOWN permits COMMIT_UNKNOWN or RUNNING while an expired execution unwinds.
 An absent admitted operation is a transport rejection, never a fabricated
 receipt. All successful envelope counts and complete subjects must agree.
 
-### Execution deadline and shutdown
+### Protected startup configuration
+
+The concrete closed configuration uses `dpone.composition-dispatcher-service.v2`.
+It contains exactly `schema`, `dispatcher_id`, `dispatcher_uid`, `dispatcher_gid`,
+`capture_custody`, `context_root`, `host_probe_socket`,
+`supervisor_enrollment_sha256`, `capture_root`, `capture_root_identity`, `listen`,
+`tls`, `bearer_file`, `accept_timeout_seconds`, `execution_timeout_seconds`,
+`max_concurrency`, and `authorities`. Custody is `dispatcher_owned_v1`.
+Process UID/GID are nonzero integers below `2147483648`, equal to the externally
+provided bootstrap identity and actual process identity. Configuration is read
+through protected no-follow file access and must match its externally provided
+SHA256, which the signed dispatcher binding also pins. It contains no self-digest.
+
+Nested fields are closed: capture identity is `{device, inode, uid, gid, mode}`
+with mode `448` (`0700`); listen is `{address, port}` with a numeric, non-wildcard
+address and a valid TCP port; TLS is `{certificate_file, private_key_file}`.
+All paths are fixed canonical absolute paths. Credentials are read separately
+after configuration validation; configuration contains no credential value.
+Capture identity is independently compared with protected enrollment and fresh
+host facts before it can establish custody.
+
+Acceptance is an integer from 1 to 30 seconds, execution from 1 to 900 seconds,
+and concurrency from 1 to 64, using the listener's one existing slot control.
+Cleanup remains fixed at 60 seconds and is not another configurable allowance.
+The nonempty authority catalog has at most 1024 entries, keyed by exact runtime
+authority digests. Each value contains exactly `context_sha256`,
+`control_connection_ref`, `expected_control_service_id`, `control_schema`.
+Existing logical-reference, canonical UUID and SQL schema validators apply.
+The context digest selects the protected staged original; request fields cannot
+replace any configured control binding or path.
+
+The explicit module entry point is `python -m dpone.app.composition_dispatcher_service`.
+Its required arguments are `--config`, `--configuration-sha256`,
+`--dispatcher-uid`, and `--dispatcher-gid`. The configuration path is canonical
+and absolute, for example `/etc/dpone/dispatcher/startup/service.json`; its
+grandparent is the protected configuration root and its final two components
+select the original. Help requires no connector SDK or credential access.
+Invalid arguments exit 2 before I/O; unavailable protected authority exits 1
+with a fixed actionable stderr message; orderly shutdown exits 0.
+
+Startup reads root:dispatcher protected TLS/bearer files before binding, rejects
+changes across certificate loading, and authenticates the configured dispatcher
+and authority catalog. It creates one shared stop signal and injects its budget
+factory into the listener. Signal callbacks only notify admission stop; normal
+coordinator code closes the listener and joins admitted work. No automatic
+restart or detached execution is introduced. This entry point supplies the v2
+whole-cell handler; existing independently constructed v1 listeners retain their
+original operations. Readiness remains a separate required authority check.
+
+The worker selects the signed dispatcher metadata without resolving source or
+target credentials. It requires the already projected
+`DPONE_DBT_WORKSPACE_AUTHORITY_CONNECTION_REF` for a protected read of the retained
+parent, using its signed database/service pins. This read never registers an
+attempt. The worker resolves only this control binding and the dedicated API
+binding; neither may alias a source/target registry entry. The API binding uses
+the existing resolved `endpoint` and `token` credentials, verified TLS with
+optional `ssl_ca_location`, and positive integer `connect_timeout` (at most 30)
+and `send_receive_timeout` (at most 900) as acceptance/execution limits. The
+administrator aligns the latter with service execution configuration.
+
+Retained parent request hashes and epochs supply candidate identity for ACTIVE,
+RETIRING or RETIRED history. The existing local execution builder still requires
+ACTIVE, and the service grants admission only after a positive absence check and
+fresh ACTIVE derivation. No worker synthesizes ACTIVE state for a retired parent.
+A missing explicit dispatcher binding preserves the existing local profile;
+an invalid or unavailable explicit binding never falls back to local execution.
+Native factory construction is delayed until an actual native request so that
+ordinary remote selection cannot resolve administrative target credentials.
+
+### Execution deadline and shutdown behavior
 
 V2 has a separately configured `execution_timeout_seconds`, an integer from 1 to
 900; handshake/body acceptance retains the existing short bounded transport

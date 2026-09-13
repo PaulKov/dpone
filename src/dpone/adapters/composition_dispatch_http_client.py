@@ -101,7 +101,7 @@ def content_length(headers: dict[str, str], maximum: int) -> int:
     return int(value)
 
 
-def _endpoint(value: str) -> tuple[str, int]:
+def require_endpoint(value: str) -> tuple[str, int]:
     try:
         parsed = urlsplit(value)
         host = parsed.hostname or ""
@@ -126,6 +126,17 @@ def _endpoint(value: str) -> tuple[str, int]:
         raise DispatchHttpError("rpc_endpoint_configuration") from None
 
 
+def require_tls_context(ssl_context: ssl.SSLContext) -> None:
+    """Require peer identity verification and the shared minimum TLS version."""
+    if (
+        not isinstance(ssl_context, ssl.SSLContext)
+        or not ssl_context.check_hostname
+        or ssl_context.verify_mode != ssl.CERT_REQUIRED
+        or ssl_context.minimum_version < ssl.TLSVersion.TLSv1_2
+    ):
+        raise DispatchHttpError("rpc_tls_configuration")
+
+
 class DispatchHttpClient:
     """Each call opens one verified TLS connection and sends exactly once.
 
@@ -143,14 +154,8 @@ class DispatchHttpClient:
         timeout_seconds: float = 30,
         max_payload_bytes: int = DEFAULT_PAYLOAD_BYTES,
     ) -> None:
-        self._host, self._port = _endpoint(endpoint)
-        if (
-            not isinstance(ssl_context, ssl.SSLContext)
-            or not ssl_context.check_hostname
-            or ssl_context.verify_mode != ssl.CERT_REQUIRED
-            or ssl_context.minimum_version < ssl.TLSVersion.TLSv1_2
-        ):
-            raise DispatchHttpError("rpc_tls_configuration")
+        self._host, self._port = require_endpoint(endpoint)
+        require_tls_context(ssl_context)
         require_bearer_token(bearer_token)
         require_payload_limit(max_payload_bytes)
         require_timeout(timeout_seconds)

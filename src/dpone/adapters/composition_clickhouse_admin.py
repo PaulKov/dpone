@@ -8,7 +8,7 @@ transport completion nor this syntax allowlist supplies gate/ownership authority
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from ipaddress import ip_address
 from uuid import uuid4
 
@@ -182,6 +182,8 @@ class ClickHousePrincipalHttpClient:
         timeout_seconds: float,
         max_response_bytes: int = 1024 * 1024,
         ca_file: str | None = None,
+        absolute_deadline: Callable[[], float] | None = None,
+        require_effect: Callable[[], None] | None = None,
     ) -> None:
         self._http = BoundedClickHouseHttp(
             endpoint=endpoint,
@@ -190,13 +192,20 @@ class ClickHousePrincipalHttpClient:
             max_payload_bytes=16384,
             max_response_bytes=max_response_bytes,
             ca_file=ca_file,
+            absolute_deadline=absolute_deadline,
         )
+        _require(require_effect is None or callable(require_effect))
+        self._require_effect = require_effect
 
     def command(self, statement: str, *, parameters: Mapping[str, object], redactions: tuple[str, ...]) -> None:
         """Complete the fixed principal command once; uncertain ACK never retries."""
         _command(statement, parameters, redactions)
         query_id = "dpone-admin-" + uuid4().hex
         try:
+            if self._require_effect is not None and any(
+                pattern.fullmatch(statement) is not None for pattern in (_CREATE, _GRANT, _ENABLE, _LOCAL)
+            ):
+                self._require_effect()
             observed = self._http.request(
                 path=clickhouse_http_path(query_id=query_id), payload=statement.encode(), query_id=query_id
             )

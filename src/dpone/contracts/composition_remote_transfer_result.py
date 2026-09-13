@@ -117,27 +117,11 @@ def _proof(value: Any, attempt: CompositionAttemptIdentity, kind: str) -> Compos
     return proof
 
 
-def _closures(
-    body: dict[str, Any], kind: str, attempt: CompositionAttemptIdentity, principals: tuple[Any, ...], target: Any
-):
-    if type(body) is not dict or set(body) != {"terminal", "ingest", "publisher"}:
+def _purpose_proofs(body, kind, attempt, principals, target):
+    if type(body) is not dict or set(body) != {"ingest", "publisher"}:
         raise ValueError
-    proofs = tuple(_proof(body[name], attempt, kind) for name in ("terminal", "ingest", "publisher"))
-    terminal, ingest, publisher = proofs
-    if (ingest.authorities, publisher.authorities, terminal.authorities) != (
-        (principals[0],),
-        (principals[1],),
-        tuple(sorted(principals)),
-    ):
-        raise ValueError
-    expected = {
-        "schema": "dpone.composition-clickhouse-terminal-closure.v1",
-        "kind": kind,
-        "attempt_sha256": attempt.attempt_sha256,
-        "ingest_proof_sha256": ingest.proof_sha256,
-        "publisher_proof_sha256": publisher.proof_sha256,
-    }
-    if body["terminal"]["evidence_document"] != expected:
+    proofs = tuple(_proof(body[name], attempt, kind) for name in ("ingest", "publisher"))
+    if tuple(p.authorities for p in proofs) != ((principals[0],), (principals[1],)):
         raise ValueError
     # Purpose evidence has no independent public decoder. Require the existing
     # producer's closed outer shape and identity; SQL reader validates its nested
@@ -175,6 +159,82 @@ def _closures(
     return proofs
 
 
+def _closures(body, kind, attempt, principals, target):
+    if type(body) is not dict or set(body) != {"terminal", "ingest", "publisher"}:
+        raise ValueError
+    ingest, publisher = _purpose_proofs(
+        {n: body[n] for n in ("ingest", "publisher")}, kind, attempt, principals, target
+    )
+    terminal = _proof(body["terminal"], attempt, kind)
+    if terminal.authorities != tuple(sorted(principals)) or body["terminal"]["evidence_document"] != {
+        "schema": "dpone.composition-clickhouse-terminal-closure.v1",
+        "kind": kind,
+        "attempt_sha256": attempt.attempt_sha256,
+        "ingest_proof_sha256": ingest.proof_sha256,
+        "publisher_proof_sha256": publisher.proof_sha256,
+    }:
+        raise ValueError
+    return terminal, ingest, publisher
+
+
+@dataclass(frozen=True, slots=True)
+class PublicationOriginals:
+    """Receipt-independent consistency of a sealed capture and publication."""
+
+    subject: SnapshotCaptureSubject
+    captured: SnapshotCaptureRecord
+    published: SnapshotPublicationRecord
+
+
+def decode_publication_originals(
+    capture_document: bytes,
+    publication_document: bytes,
+    *,
+    attempt: CompositionAttemptIdentity,
+    closed_gates: dict[str, Any],
+    quiescence: dict[str, Any],
+) -> PublicationOriginals:
+    """Validate nested originals before finalization; never synthesize a receipt."""
+    try:
+        capture = _object(capture_document)
+        if (
+            set(capture) != {"schema", "subject", "captured", "generation_seal"}
+            or capture["schema"] != "dpone.composition-remote-capture-originals.v1"
+        ):
+            raise ValueError
+        subject = SnapshotCaptureSubject.from_bytes(_original(capture["subject"]))
+        captured = SnapshotCaptureRecord.from_bytes(_original(capture["captured"]))
+        seal_document = _original(capture["generation_seal"])
+        generation = decode_generation_seal(subject, captured, seal_document)
+        seal = _object(seal_document)
+        _object(publication_document)
+        published = SnapshotPublicationRecord.from_bytes(publication_document, evidence_digest(publication_document))
+        intent = published.intent
+        if (
+            subject.attempt != attempt
+            or intent.attempt != attempt
+            or (intent.target, intent.limits, intent.generation) != (subject.target, subject.limits, generation)
+            or published.state != "PUBLISHED"
+            or published.observation is None
+            or published.observation.generation_rows != captured.rows
+        ):
+            raise ValueError
+        principals = intent.ingest_principal, intent.publisher_principal
+        closed = _purpose_proofs(closed_gates, "CLOSED_GATES", attempt, principals, intent.target)
+        quiet = _purpose_proofs(quiescence, "QUIESCENCE", attempt, principals, intent.target)
+        if (
+            (seal["closed_gates_sha256"], seal["quiescence_sha256"], intent.closed_ingest_sha256)
+            != (closed[0].proof_sha256, quiet[0].proof_sha256, closed[0].proof_sha256)
+            or published.closure is None
+            or (published.closure.closed_gates_sha256, published.closure.quiescence_sha256)
+            != (closed[1].proof_sha256, quiet[1].proof_sha256)
+        ):
+            raise ValueError
+        return PublicationOriginals(subject, captured, published)
+    except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
+        raise CompositionAdmissionError("remote_transfer_publication_originals") from None
+
+
 @dataclass(frozen=True, slots=True)
 class RemoteTransferResult:
     """Validated evidence bytes and count; no source rows or secret material."""
@@ -200,35 +260,23 @@ def decode_result(
         )
         if observed_attempt != attempt:
             raise ValueError
-        capture = _object(_bytes(body["capture_document"], body["capture_sha256"]))
-        if (
-            set(capture) != {"schema", "subject", "captured", "generation_seal"}
-            or capture["schema"] != "dpone.composition-remote-capture-originals.v1"
-        ):
-            raise ValueError
-        subject = SnapshotCaptureSubject.from_bytes(_original(capture["subject"]))
-        captured = SnapshotCaptureRecord.from_bytes(_original(capture["captured"]))
-        seal_document = _original(capture["generation_seal"])
-        generation = decode_generation_seal(subject, captured, seal_document)
-        seal = _object(seal_document)
-        published = SnapshotPublicationRecord.from_bytes(
-            _bytes(body["publication_document"], body["publication_sha256"]), body["publication_sha256"]
+        nested = decode_publication_originals(
+            _bytes(body["capture_document"], body["capture_sha256"]),
+            _bytes(body["publication_document"], body["publication_sha256"]),
+            attempt=attempt,
+            closed_gates={n: body["closed_gates"][n] for n in ("ingest", "publisher")},
+            quiescence={n: body["quiescence"][n] for n in ("ingest", "publisher")},
         )
+        captured, published = nested.captured, nested.published
         intent = published.intent
         receipt = decode_receipt_observation(
             _bytes(body["terminal_receipt_document"], body["terminal_receipt_sha256"]), body["terminal_receipt_sha256"]
         )
         if (
-            subject.attempt != attempt
-            or intent.attempt != attempt
-            or receipt.attempt != attempt
-            or (intent.target, intent.limits, intent.generation) != (subject.target, subject.limits, generation)
-            or published.state != "PUBLISHED"
+            receipt.attempt != attempt
             or receipt.state != "SUCCEEDED"
             or type(body["rows"]) is not int
             or body["rows"] != captured.rows
-            or published.observation is None
-            or published.observation.generation_rows != captured.rows
         ):
             raise ValueError
         principals = (intent.ingest_principal, intent.publisher_principal)
@@ -240,11 +288,6 @@ def decode_result(
             or outcome.outcome_state != "SUCCEEDED"
             or (receipt.closed_gates_sha256, receipt.quiescence_sha256, receipt.outcome_evidence_sha256)
             != (closed[0].proof_sha256, quiet[0].proof_sha256, outcome.proof_sha256)
-            or (seal["closed_gates_sha256"], seal["quiescence_sha256"], intent.closed_ingest_sha256)
-            != (closed[1].proof_sha256, quiet[1].proof_sha256, closed[1].proof_sha256)
-            or published.closure is None
-            or (published.closure.closed_gates_sha256, published.closure.quiescence_sha256)
-            != (closed[2].proof_sha256, quiet[2].proof_sha256)
         ):
             raise ValueError
         if body["outcome"]["evidence_document"] != {

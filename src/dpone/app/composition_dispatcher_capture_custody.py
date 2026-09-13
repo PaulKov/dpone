@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from dpone.adapters.composition_clickhouse_supervisor_enrollment import (
@@ -34,10 +35,20 @@ class DispatcherCaptureCustody:
     The protected service factory provides the SQL-retained enrollment and one
     absolute request deadline. Each host check obtains two fresh authenticated
     observations under that deadline. A later status request needs its own
-    observation lifetime; this object never renews an expired execution budget.
+    observation lifetime. An explicit phase callback permits read-only cleanup
+    checks, bounded by the initial execution deadline plus sixty seconds. This
+    object never starts cleanup or grants effect authority.
     """
 
-    def __init__(self, *, enrollment: ClickHouseSupervisorEnrollment, socket_path: str | Path, deadline: float):
+    def __init__(
+        self,
+        *,
+        enrollment: ClickHouseSupervisorEnrollment,
+        socket_path: str | Path,
+        deadline: float,
+        absolute_deadline: Callable[[], float] | None = None,
+    ):
+        _require(absolute_deadline is None or callable(absolute_deadline))
         _require(type(enrollment) is ClickHouseSupervisorEnrollment)
         enrollment.__post_init__()
         _require(type(deadline) in (float, int) and math.isfinite(deadline) and 0 < deadline - time.monotonic() <= 900)
@@ -54,22 +65,32 @@ class DispatcherCaptureCustody:
             raise CompositionAdmissionError("dispatcher_capture_custody") from None
         self._enrollment = enrollment
         self._deadline = float(deadline)
+        self._absolute_deadline = absolute_deadline
         self._client = CaptureSupervisorFactsClient(
             Path(socket_path), dispatcher_gid=custody["gid"], timeout_seconds=10.0
         )
 
     @property
     def deadline(self) -> float:
-        """The immutable upper bound supplied by the request owner."""
+        """The immutable initial execution bound supplied by the request owner."""
         return self._deadline
+
+    def _phase_deadline(self) -> float:
+        if self._absolute_deadline is None:
+            return self.deadline
+        phase = self._absolute_deadline()
+        _require(type(phase) in (int, float) and math.isfinite(phase))
+        return min(phase, self.deadline + 60.0)
 
     def require_host(self) -> None:
         """Compare exact canonical fresh facts without acquiring a SQL connection."""
-        deadline = min(self.deadline, time.monotonic() + 10.0)
+        deadline = min(self._phase_deadline(), time.monotonic() + 10.0)
         expected = canonical_json_bytes(self._enrollment.body["facts"])
         for _ in range(2):
+            deadline = min(deadline, self._phase_deadline())
             _require(time.monotonic() < deadline)
             facts = self._client.capture(self._enrollment.enrollment_sha256, deadline=deadline)
+            deadline = min(deadline, self._phase_deadline())
             _require(time.monotonic() < deadline and canonical_json_bytes(facts) == expected)
 
     def require_enrollment_in(self, ledger: CompositionMssqlLedger, subject: SnapshotCaptureSubject) -> None:

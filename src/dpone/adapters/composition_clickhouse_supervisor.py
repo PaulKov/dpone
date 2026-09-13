@@ -11,6 +11,7 @@ import ipaddress
 import math
 import re
 import time
+from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
@@ -283,7 +284,8 @@ class RemoteClickHouseLocalSupervisor(_EnrolledClickHouseSupervisor):
 
     The dispatcher never constructs host probes. Both RPC calls share the outer
     observation deadline and independently authenticate their nonce-bound reply.
-    A successful transport response alone grants no enrollment authority.
+    An optional phase deadline can shorten that bound and is rechecked after
+    every RPC. A successful response alone grants no enrollment authority.
     """
 
     def __init__(
@@ -293,11 +295,23 @@ class RemoteClickHouseLocalSupervisor(_EnrolledClickHouseSupervisor):
         socket_path: Path,
         dispatcher_gid: int,
         timeout_seconds: float = 10.0,
+        absolute_deadline: Callable[[], float] | None = None,
     ) -> None:
+        require(absolute_deadline is None or callable(absolute_deadline), "deadline_budget")
+        self._absolute_deadline = absolute_deadline
         super().__init__(enrollment_sha256=enrollment_sha256, timeout_seconds=timeout_seconds)
         self._client = CaptureSupervisorFactsClient(
             socket_path, dispatcher_gid=dispatcher_gid, timeout_seconds=timeout_seconds
         )
 
+    def _phase_deadline(self, outer: float) -> float:
+        phase = outer if self._absolute_deadline is None else self._absolute_deadline()
+        require(type(phase) in (int, float) and math.isfinite(phase), "deadline_budget")
+        return min(outer, phase)
+
     def _capture(self, enrollment: ClickHouseSupervisorEnrollment, deadline: float) -> dict[str, Any]:
-        return self._client.capture(enrollment.enrollment_sha256, deadline=deadline)
+        deadline = self._phase_deadline(deadline)
+        require(time.monotonic() < deadline, "observation_deadline")
+        facts = self._client.capture(enrollment.enrollment_sha256, deadline=deadline)
+        require(time.monotonic() < self._phase_deadline(deadline), "observation_deadline")
+        return facts

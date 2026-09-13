@@ -39,6 +39,28 @@ def test_gate_requires_real_dependencies():
         MssqlClickHouseGate(lambda: None)
 
 
+def test_execution_guard_refuses_issuance_before_intent(active):
+    db, value, original, admin, supervisor, policy = active
+
+    def closed():
+        raise CompositionAdmissionError("execution_closed")
+
+    gate = MssqlClickHouseGate(
+        db.connect,
+        expected_service_id=SQL_SERVICE,
+        target=value.target,
+        purpose="ingest",
+        principal_admin=admin,
+        supervisor=supervisor,
+        dispatch_policy=policy,
+        enrollment_sha256=db.enrollment_key,
+        require_effect=closed,
+    )
+    with pytest.raises(CompositionAdmissionError, match="execution_closed"):
+        gate.issue_once(value.attempt)
+    assert not db.data["ch_gates"]
+
+
 # The existing SQL transaction/history model is reused; only this additive
 # catalog and external ClickHouse/supervisor observations are offline doubles.
 

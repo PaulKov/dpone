@@ -151,3 +151,41 @@ def test_invalid_custody_validator_rejects_before_secret_resolution(tmp_path, na
     args["parent"]["resolver"].resolve = lambda ref: pytest.fail("resolved before custody validation")
     with pytest.raises(CompositionAdmissionError, match="snapshot_capture_storage"):
         build_clickhouse_capture_components(**args, **{name: True})
+
+
+@pytest.mark.parametrize("name", ["absolute_deadline", "require_effect", "source_connector_factory"])
+def test_invalid_execution_collaborator_rejects_before_secrets(tmp_path, name):
+    args = arguments(tmp_path)
+    args["parent"]["resolver"].resolve = lambda _: pytest.fail("resolved secrets")
+    with pytest.raises(CompositionAdmissionError):
+        build_clickhouse_capture_components(**args, **{name: False})
+
+
+def test_source_open_guard_precedes_injected_factory_and_never_retries(tmp_path):
+    calls = []
+    connection = object()
+
+    def guard():
+        calls.append("guard")
+        if len(calls) > 2:
+            raise RuntimeError("execution stopped")
+
+    def factory(resolved, *, autocommit):
+        calls.append((resolved, autocommit))
+        return SimpleNamespace(connection=connection)
+
+    args = arguments(tmp_path)
+
+    def deadline():
+        return 123.0
+
+    components = build_clickhouse_capture_components(
+        **args, source_connector_factory=factory, require_effect=guard, absolute_deadline=deadline
+    )
+    assert calls == []
+    assert components.catalog._http._absolute_deadline is deadline
+    assert components.source._open() is connection
+    assert calls == ["guard", (args["parent"]["resolver"].resolve("source-ref"), False)]
+    with pytest.raises(RuntimeError, match="execution stopped"):
+        components.source._open()
+    assert len(calls) == 3

@@ -30,6 +30,7 @@ class ClickHouseCaptureComponents:
     capture: CompositionClickHouseCapture
     catalog: ClickHouseHttpSnapshotCatalog
     source: MssqlClickHouseSourceReader
+    store: MssqlSnapshotCaptureStore | None = None
 
 
 def build_clickhouse_capture_components(
@@ -47,6 +48,9 @@ def build_clickhouse_capture_components(
     files: Any | None = None,
     require_custody: Callable[[], None] | None = None,
     require_enrollment_in: Callable[..., None] | None = None,
+    absolute_deadline: Callable[[], float] | None = None,
+    require_effect: Callable[[], None] | None = None,
+    source_connector_factory: Callable[..., Any] = ResolvedConnectorFactory.create,
 ) -> ClickHouseCaptureComponents:
     """Bind one exact attempt; no source read or target mutation during construction.
 
@@ -54,6 +58,9 @@ def build_clickhouse_capture_components(
     omission preserves the existing root-owned profile. Construction neither
     adopts nor changes storage ownership. Host custody callbacks are SQL-free;
     enrollment callbacks reuse the supplied store transaction.
+
+    The optional deadline bounds catalog HTTP. The effect guard runs immediately
+    before the injected source connector opens; cleanup remains caller-owned.
 
     The source verifier is intentionally SQL-free: capture journals call it while
     holding their control transaction. Current owner/epochs are reopened by the
@@ -63,6 +70,10 @@ def build_clickhouse_capture_components(
         raise CompositionAdmissionError("snapshot_capture_storage")
     if any(value is not None and not callable(value) for value in (require_custody, require_enrollment_in)):
         raise CompositionAdmissionError("snapshot_capture_storage")
+    if any(value is not None and not callable(value) for value in (absolute_deadline, require_effect)) or not callable(
+        source_connector_factory
+    ):
+        raise CompositionAdmissionError("snapshot_capture_execution_configuration")
     control = parent["control"]
     source = manifest.get("source")
     table = source.get("table") if isinstance(source, Mapping) else None
@@ -116,8 +127,13 @@ def build_clickhouse_capture_components(
             service_id=control.expected_service_id,
         )
 
+    def open_source() -> Any:
+        if require_effect is not None:
+            require_effect()
+        return source_connector_factory(resolved, autocommit=False).connection
+
     reader = MssqlClickHouseSourceReader(
-        open_connection=lambda: ResolvedConnectorFactory.create(resolved, autocommit=False).connection,
+        open_connection=open_source,
         table={"database": database, "schema": source_table[1], "name": source_table[2]},
         limits=limits,
         require_source=require_source,
@@ -128,6 +144,7 @@ def build_clickhouse_capture_components(
         timeout_seconds=30.0,
         max_response_bytes=SNAPSHOT_MATERIALIZATION_RESPONSE_BYTES,
         ca_file=ca_file,
+        absolute_deadline=absolute_deadline,
     )
     visibility = ClickHouseCatalogVisibility(http=http, service_id=target.service_id, username=credentials.username)
     catalog = ClickHouseHttpSnapshotCatalog(
@@ -155,4 +172,5 @@ def build_clickhouse_capture_components(
         ),
         catalog,
         reader,
+        store,
     )

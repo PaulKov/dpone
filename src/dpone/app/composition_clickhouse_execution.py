@@ -98,6 +98,7 @@ class CompositionClickHouseExecutionDependencies:
     limits: SnapshotLimits | None = None
     capture: Any | None = None
     worker_gate: Any | None = None
+    require_effect: Callable[[], None] | None = None
 
 
 class CompositionClickHouseExecutionRoot:
@@ -130,6 +131,8 @@ class CompositionClickHouseExecutionRoot:
             gate=self._deps.gate if self._deps.worker_gate is None else self._deps.worker_gate,
             outcome_observer=self._deps.outcome_observer,
         )
+        if self._deps.require_effect is not None:
+            self._deps.require_effect()
         result = worker.run(attempt, execute=lambda credentials: self._refresh(request, attempt, credentials))
         return result.value
 
@@ -267,6 +270,42 @@ def build_composition_clickhouse_attempt(
     """Bind the verified generated transfer to the ACTIVE parent membership."""
 
     occurrence.require_state("ACTIVE")
+    return derive_retained_clickhouse_attempt(
+        occurrence,
+        manifest=manifest,
+        plan_sha256=plan_sha256,
+        run_identity=run_identity,
+        airflow_attempt=airflow_attempt,
+    )
+
+
+def derive_retained_clickhouse_attempt(
+    occurrence: CompositionActivationOccurrence,
+    *,
+    manifest: Mapping[str, Any],
+    plan_sha256: str,
+    run_identity: AirflowRunIdentity,
+    airflow_attempt: AirflowAttemptCorrelation,
+) -> CompositionAttemptIdentity:
+    """Derive coordinates from a retained parent without granting admission.
+
+    A protected reader must authenticate the occurrence. Historical callers keep
+    its original request and epochs; fresh execution still uses the ACTIVE-only
+    wrapper and the SQL store's atomic admission fence.
+    """
+    occurrence.__post_init__()
+    if occurrence.receipt.state not in {"ACTIVE", "RETIRING", "RETIRED"}:
+        raise CompositionAdmissionError("occurrence_state")
+    try:
+        if (
+            AirflowRunIdentity.from_mapping(run_identity.to_dict()) != run_identity
+            or AirflowAttemptCorrelation.from_mapping(airflow_attempt.to_dict()) != airflow_attempt
+        ):
+            raise ValueError
+    except (AttributeError, TypeError, ValueError):
+        raise CompositionAdmissionError("worker_parent_identity") from None
+    if run_identity.dag_spec is not None and run_identity.dag_spec.id != airflow_attempt.dag_id:
+        raise CompositionAdmissionError("worker_parent_identity")
     cell = composition_generated_transfer_cell(manifest)
     if cell != CLICKHOUSE_CELL:
         raise CompositionAdmissionError("worker_clickhouse_cell")

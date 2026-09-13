@@ -8,7 +8,7 @@ requires separately approved supervisor teardown/reconciliation (ADR 0063).
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from secrets import token_urlsafe
 from typing import Protocol
@@ -85,11 +85,14 @@ class MssqlClickHouseGate:
         dispatch_policy: ClickHouseDispatchPolicy,
         enrollment_sha256: str,
         control_schema: str = "dpone_control",
+        require_effect: Callable[[], None] | None = None,
     ) -> None:
         require_uuid(expected_service_id)
         require_digest(enrollment_sha256)
         target.__post_init__()
         require(purpose in {"ingest", "publisher"}, "gate_purpose")
+        require(require_effect is None or callable(require_effect), "gate_execution_guard")
+        self._require_effect = require_effect
         self._factory, self._service, self._target, self._purpose = (
             connection_factory,
             expected_service_id,
@@ -142,11 +145,15 @@ class MssqlClickHouseGate:
         Every exceptional boundary leaves originals for reconciliation. There is
         no read-existing-as-permit path and no password reset or fallback user.
         """
+        if self._require_effect is not None:
+            self._require_effect()
         binding = self._binding(attempt)
         with self._transaction(attempt) as q:
             observation = self._observe(q, recovery=False)
             require(q.original("ch_gates") is None, "gate_issuance_replay")
             document = binding.document(observation)
+            if self._require_effect is not None:
+                self._require_effect()
             q.append(
                 "ch_gates",
                 "gate_key,operation_key,login_name,evidence_sha256,evidence_document",

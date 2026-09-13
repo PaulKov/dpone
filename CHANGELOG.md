@@ -17,12 +17,6 @@
 - Refuse composition activation before reservations when required execution
   readiness cannot be established. Installed constructors alone are insufficient.
 
-- Allow local DDA cleanup to resume after an owned business table was removed;
-  retain ownership verification and unknown-commit refusal.
-- Qualify the original ClickHouse timestamp column in bounded-native window
-  predicates so temporal SELECT aliases cannot replace it with integer
-  microseconds. Preserve exact half-open UTC boundaries and duplicate rows.
-
 ### Added
 
 - Add an explicitly approved local Docker DDA route factory using real native
@@ -34,11 +28,11 @@
   mutation; use per-attempt generations and reconcile typed content independently.
   Reject snapshots exceeding the observer page budget before target mutation.
 - Add authenticated TLS dispatcher transport and a separately runnable protected
-  host observation service with bounded shutdown. The protected remote business
-  handler and full Kubernetes execution campaign remain incomplete.
+  host observation service with bounded shutdown. Executable service startup
+  and the full Kubernetes execution campaign remain incomplete.
 - Add closed signed dispatcher bindings and protected staged-context selection,
   cross-checking verified parent/runtime/plan identities before resolving secrets.
-  Dispatcher startup, remote business handling and deployment remain incomplete.
+  Dispatcher startup and deployment remain incomplete.
 - Add exact staged-attempt selection, private bounded dispatcher gate sessions,
   immutable historical dispatch status and a remote host-facts consumer.
   The capture-custody architecture amendment is approved; implementation and
@@ -46,12 +40,26 @@
 - Add explicit v2 dispatcher-volume enrollment and immutable service-owned
   capture storage. Bind host socket identity to enrolled UID/GID and reject
   rootless/remapped Docker, shared volume aliases and custody drift. The complete
-  v2 execution factory and deployed Linux certification remain outstanding.
+  worker route and deployed Linux certification remain outstanding.
 - Add closed whole-cell v2 request/result codecs with scheduler correlation,
   capture/publication originals and complete terminal proof consistency checks.
   Reopen capture/publication history on the caller's pinned SQL transaction;
   keep host custody checks separate from SQL enrollment validation. Actual v2
-  service handling and aggregate proof production remain incomplete.
+  service startup and worker routing remain incomplete.
+- Persist aggregate ClickHouse closure/outcome proofs over both issued purposes
+  before terminal finalization; expose successful results only after actual SQL
+  SUCCEEDED readback. The concrete cell factory preserves singleton dispatch
+  gates and uses aggregate worker closure. Missing publisher history cannot
+  create another principal or a success receipt.
+- Add an optional metadata-only v2 TLS route with a fixed execution budget and
+  nonrenewable cleanup deadline. Signal notification does not acquire shutdown
+  locks, and request slots remain held until execution unwinds. Dispatcher
+  startup and full deployed execution remain unverified.
+- Compose the v2 whole-cell handler from protected staged originals, current SQL
+  authority and enrolled capture custody. Bound control/source/HTTP/host I/O,
+  keep historical requests read-only, and reject late terminal responses.
+  Validate protected service configuration independently of deployment readiness.
+  The worker route, executable startup and live campaign remain in progress.
 - Independently derive and retain canonical SQL preplans before registration;
   bind the complete envelope through composition binding v2 without changing
   generic receipt formats or existing plan digests. Recovery verifies registry
@@ -103,6 +111,24 @@
   HTTP responses, with explicit private-namespace LOCAL policy and immutable
   gate originals. Live supervisor enrollment and the three-cell worker campaign
   remain `UNVERIFIED`.
+
+## 0.79.1 - 2026-09-13
+
+### Fixed
+
+- Allow local DDA cleanup to resume after an owned business table was removed;
+  retain ownership verification and unknown-commit refusal.
+- Qualify the original ClickHouse timestamp column in bounded-native window
+  predicates so temporal SELECT aliases cannot replace it with integer
+  microseconds. Preserve exact half-open UTC boundaries and duplicate rows.
+
+### Added
+
+- Add an explicitly approved local Docker DDA route factory using real native
+  ClickHouse extraction, BCP, SQL transaction receipts and durable recovery.
+  Unknown commit outcomes retain resources; acknowledged rollback requires
+  cleanup and a new invocation. Binary source mapping and performance
+  certification remain unverified.
 
 ## 0.79.0 - 2026-09-11
 

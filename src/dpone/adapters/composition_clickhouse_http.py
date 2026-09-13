@@ -15,7 +15,7 @@ import re
 import socket
 import ssl
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from ipaddress import ip_address
 from threading import Timer
@@ -195,6 +195,7 @@ class BoundedClickHouseHttp:
         max_payload_bytes: int = MAX_DISPATCH_PAYLOAD_BYTES,
         max_response_bytes: int = 64 * 1024,
         ca_file: str | None = None,
+        absolute_deadline: Callable[[], float] | None = None,
     ) -> None:
         try:
             parsed = urlsplit(endpoint)
@@ -246,13 +247,32 @@ class BoundedClickHouseHttp:
         self._timeout = float(timeout_seconds)
         self._max_payload = max_payload_bytes
         self._max_response = max_response_bytes
+        if absolute_deadline is not None and not callable(absolute_deadline):
+            raise CompositionAdmissionError("clickhouse_transport_deadline")
+        self._absolute_deadline = absolute_deadline
+
+    def require_deadline(self) -> float:
+        """Cap this request by an external absolute budget without extending it."""
+        try:
+            now = time.monotonic()
+            limit = now + self._timeout
+            if self._absolute_deadline is not None:
+                absolute = self._absolute_deadline()
+                if type(absolute) not in {int, float} or not math.isfinite(absolute):
+                    raise ValueError
+                limit = min(limit, absolute)
+            if limit <= time.monotonic():
+                raise ValueError
+            return limit
+        except Exception:
+            raise ClickHouseHttpError(0) from None
 
     def request(self, *, path: str, payload: bytes, query_id: str) -> ClickHouseHttpObservation:
         if type(payload) is not bytes or len(payload) > self._max_payload:
             raise CompositionAdmissionError("clickhouse_transport_payload_budget")
         if type(path) is not str or not path.startswith("/?") or len(path) > 1024 * 1024:
             raise CompositionAdmissionError("clickhouse_transport_path")
-        deadline = time.monotonic() + self._timeout
+        deadline = self.require_deadline()
         connection = None
         sent = 0
         timer = None

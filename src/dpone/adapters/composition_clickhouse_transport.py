@@ -8,6 +8,7 @@ Acknowledgement is transport evidence, not catalog outcome or writer quiescence.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from hashlib import sha256
 from typing import Protocol
 
@@ -80,6 +81,8 @@ class ClickHouseDispatchTransport:
         max_payload_bytes: int = MAX_DISPATCH_PAYLOAD_BYTES,
         max_response_bytes: int = 64 * 1024,
         ca_file: str | None = None,
+        absolute_deadline: Callable[[], float] | None = None,
+        require_effect: Callable[[], None] | None = None,
     ) -> None:
         self._http = BoundedClickHouseHttp(
             endpoint=endpoint,
@@ -88,7 +91,11 @@ class ClickHouseDispatchTransport:
             max_payload_bytes=max_payload_bytes,
             max_response_bytes=max_response_bytes,
             ca_file=ca_file,
+            absolute_deadline=absolute_deadline,
         )
+        if require_effect is not None and not callable(require_effect):
+            raise CompositionAdmissionError("clickhouse_dispatch_effect_guard")
+        self._require_effect = require_effect
         self._journal, self._max_payload = journal, max_payload_bytes
 
     def execute(self, dispatch: ClickHouseDispatch, *, payload: bytes = b"") -> ClickHouseDispatchObservation:
@@ -113,7 +120,18 @@ class ClickHouseDispatchTransport:
         elif payload:
             raise CompositionAdmissionError("clickhouse_dispatch_unexpected_payload")
         path = clickhouse_http_path(query_id=dispatch.query_id, statement=_statement(dispatch))
+        try:
+            self._http.require_deadline()
+            if self._require_effect is not None:
+                self._require_effect()
+        except Exception:
+            raise CompositionAdmissionError("clickhouse_dispatch_effect_closed") from None
         self._journal.claim_once(dispatch)
+        try:
+            if self._require_effect is not None:
+                self._require_effect()
+        except Exception:
+            raise ClickHouseDispatchTransportError(dispatch_sha256=dispatch_hash, request_body_bytes=0) from None
         try:
             observed = self._http.request(path=path, payload=payload, query_id=dispatch.query_id)
             if observed.body:

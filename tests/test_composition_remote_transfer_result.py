@@ -283,3 +283,18 @@ def test_status_reference_order_duplicates_and_size_are_closed():
             decode_status(canonical_json_bytes(body), status="UNKNOWN", attempt=attempt)
     with pytest.raises(CompositionAdmissionError):
         decode_status(b" " * (1024 * 1024 + 1), status="UNKNOWN", attempt=attempt)
+
+
+def test_publication_originals_validate_without_any_terminal_receipt():
+    from dpone.contracts.composition_remote_transfer_result import decode_publication_originals
+
+    attempt, body = result_body()
+    value = decode_publication_originals(
+        canonical_json_bytes(body["capture_document"]),
+        canonical_json_bytes(body["publication_document"]),
+        attempt=attempt,
+        closed_gates={k: body["closed_gates"][k] for k in ("ingest", "publisher")},
+        quiescence={k: body["quiescence"][k] for k in ("ingest", "publisher")},
+    )
+    assert value.captured.rows == 2 and value.published.state == "PUBLISHED"
+    assert value.subject.attempt == attempt

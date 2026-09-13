@@ -653,6 +653,41 @@ def test_missing_limits_cannot_admit_or_issue_attempt(runtime):
     assert runtime.ledger.dispatches == []
 
 
+def test_execution_budget_closes_before_attempt_admission(runtime):
+    from dpone.app.composition_clickhouse_execution import CompositionClickHouseExecutionRoot
+
+    def closed():
+        raise CompositionAdmissionError("execution_closed")
+
+    runtime.root = CompositionClickHouseExecutionRoot(replace(runtime.root._deps, require_effect=closed))
+    with pytest.raises(CompositionAdmissionError, match="execution_closed"):
+        runtime.execute()
+    assert "admit_attempt" not in runtime.events
+    assert runtime.ledger.issued == []
+
+
+def test_retained_identity_derivation_does_not_grant_active_execution(runtime):
+    from dpone.app.composition_clickhouse_execution import (
+        build_composition_clickhouse_attempt,
+        derive_retained_clickhouse_attempt,
+    )
+
+    active = runtime.root._deps.read_active()
+    retired = replace(active, receipt=replace(active.receipt, state="RETIRED"))
+    request = runtime.request
+    arguments = dict(
+        manifest=request.manifest,
+        plan_sha256=request.plan_sha256,
+        run_identity=request.run_identity,
+        airflow_attempt=request.airflow_attempt,
+    )
+    expected = build_composition_clickhouse_attempt(active, **arguments)
+    assert derive_retained_clickhouse_attempt(retired, **arguments) == expected
+    with pytest.raises(CompositionAdmissionError, match="occurrence_state"):
+        build_composition_clickhouse_attempt(retired, **arguments)
+    assert "admit_attempt" not in runtime.events
+
+
 def test_empty_source_creates_only_validated_empty_generation(runtime):
     runtime.seed_source([])
     runtime.execute()
