@@ -532,3 +532,45 @@ def test_full_refresh_unknown_commit_may_replace_all_old_rows(monkeypatch):
 
     monkeypatch.setattr(FakeSession, "_publish", publish)
     assert all(c["status"] == "PASS" for c in failure_recovery(FakeFactory(), Dataset("narrow", 16), "full_refresh"))
+
+
+@pytest.mark.parametrize("known", [False, True])
+def test_cleanup_maintenance_does_not_require_business_rows(tmp_path, known):
+    """A prior owned DROP may have succeeded before its acknowledgement was lost."""
+    from tools.native_delivery_live_support.execution import DeliveryClock
+    from tools.native_delivery_live_support.maintenance import maintain
+
+    session = FakeSession(Dataset("narrow", 0), "existing", DeliveryClock())
+    session.known = known
+
+    def missing_table():
+        raise AssertionError("business table already removed by owned cleanup")
+
+    session.snapshot = missing_table
+    factory = FakeFactory()
+    factory.attach = lambda owner: session
+    result = maintain(
+        factory, action="cleanup", owner=session.invocation_id, store=ArtifactStore(tmp_path / "operation.json")
+    )
+    assert result["status"] == ("PASS" if known else "UNVERIFIED")
+    assert session.cleaned is known
+    assert session.closed
+
+
+def test_cleanup_maintenance_preserves_owner_refusal(tmp_path):
+    from tools.native_delivery_live_support.execution import DeliveryClock
+    from tools.native_delivery_live_support.maintenance import maintain
+
+    session = FakeSession(Dataset("narrow", 0), "existing", DeliveryClock())
+
+    def replaced_object():
+        raise ValueError("owned object has been replaced")
+
+    session.cleanup = replaced_object
+    factory = FakeFactory()
+    factory.attach = lambda owner: session
+    result = maintain(
+        factory, action="cleanup", owner=session.invocation_id, store=ArtifactStore(tmp_path / "operation.json")
+    )
+    assert result["status"] == "UNVERIFIED"
+    assert not session.cleaned and session.closed

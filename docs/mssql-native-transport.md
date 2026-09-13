@@ -45,8 +45,13 @@ microseconds to avoid driver floating-point conversion. Unsupported engines,
 views, computed columns, custom SQL, deduplication, CDC and uncomposed hooks fail
 admission. All ordinary table columns are extracted; authored column selection is rejected.
 NaN, Infinity, numeric overflow and fractional truncation are rejected.
-Text decoding is strict; arbitrary binary values require binary target
-types. VARCHAR/CHAR are currently rejected by the importer, including when a collation
+Text decoding is strict. The native encoder can preserve arbitrary bytes for an
+already admitted binary wire contract, but the canonical ClickHouse planner maps
+`String` to Unicode text. There is currently no authored binary-semantic mapping
+from ClickHouse `String` to MSSQL `varbinary`; a physical type override is rejected
+as a cross-family conversion. Binary encoder tests therefore do not certify that
+end-to-end source route. Its live binary profile remains **UNVERIFIED**.
+VARCHAR/CHAR are currently rejected by the importer, including when a collation
 is configured.
 
 Bounded delivery reuses frame sizes, projects canonical metadata in the prepared
