@@ -7,14 +7,15 @@ Lease expiry is renewal metadata, deliberately excluded from stable identity.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from hashlib import sha256
+from typing import Any
 from uuid import UUID
 
 from dpone.contracts.composition_attempt import CompositionAttemptIdentity
 from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
-from dpone.contracts.composition_persistence import encode_attempt_identity
-from dpone.contracts.dbt_relation_writes import DbtRelationWrite
+from dpone.contracts.composition_persistence import decode_attempt_identity, encode_attempt_identity
+from dpone.contracts.dbt_relation_writes import DbtRelationWrite, transfer_relation_write
 from dpone.contracts.mssql_transaction_governance import (
     InvocationIdentity,
     MssqlAttemptRequest,
@@ -22,6 +23,7 @@ from dpone.contracts.mssql_transaction_governance import (
     MssqlTransactionAttempt,
     MssqlTransactionOperation,
 )
+from dpone.contracts.source_physical_identity import SourcePhysicalIdentity
 from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 
 
@@ -104,24 +106,7 @@ class CompositionMssqlOperationBinding:
         """Decode only the original canonical registered binding, including operation."""
         try:
             body = strict_json_object(document)
-            raw = strict_json_object(bytes.fromhex(body["operation_original"]))
-            invocation = InvocationIdentity(**raw["attempt"]["request"].pop("invocation"))
-            request = raw["attempt"]["request"]
-            for key in ("target_identity", "route_fingerprint"):
-                request[key] = bytes.fromhex(request[key])
-            transaction_attempt = MssqlTransactionAttempt(
-                request=MssqlAttemptRequest(invocation=invocation, **request),
-                generation=raw["attempt"]["generation"],
-                is_current_generation=raw["attempt"]["is_current_generation"],
-            )
-            operation = MssqlTransactionOperation(
-                attempt=transaction_attempt,
-                operation_key=bytes.fromhex(raw["operation_key"]),
-                scope_hash=bytes.fromhex(raw["scope_hash"]),
-                owner_digest=bytes.fromhex(raw["owner_digest"]),
-                epoch=raw["epoch"],
-                lease_expires_at_utc=None,
-            )
+            operation = decode_stable_operation_document(bytes.fromhex(body["operation_original"]))
             binding = cls(
                 attempt,
                 operation,
@@ -220,3 +205,149 @@ class CompositionMssqlOperationBinding:
         )
         if actual != expected:
             raise CompositionAdmissionError("transfer_receipt_binding")
+
+
+MAX_TRANSFER_PREPLAN_BYTES = 4 * 1024 * 1024
+_PREPLAN_FIELDS = {
+    "schema",
+    "attempt_original",
+    "operation_original",
+    "write",
+    "plan_sha256",
+    "manifest_sha256",
+    "preplan",
+    "source_identity",
+    "source_projection",
+    "source_provenance_sha256",
+    "target_identity",
+    "route_fingerprint",
+    "connection_observation",
+}
+
+
+def _closed_model(kind: Any, value: Any) -> Any:
+    if type(value) is not dict or set(value) != {field.name for field in fields(kind)}:
+        raise ValueError
+    return kind(**value)
+
+
+def decode_stable_operation_document(document: bytes) -> MssqlTransactionOperation:
+    """Decode the same closed operation original for bindings and preplan envelopes.
+
+    The roundtrip preserves canonical digest spelling and rejects renewable lease
+    metadata. Callers retain their boundary-specific admission error vocabulary.
+    """
+    value = strict_json_object(document)
+    raw, attempt = dict(value), dict(value["attempt"])
+    request = dict(attempt["request"])
+    request["invocation"] = _closed_model(InvocationIdentity, request["invocation"])
+    for key in ("target_identity", "route_fingerprint"):
+        request[key] = bytes.fromhex(request[key])
+    attempt["request"] = _closed_model(MssqlAttemptRequest, request)
+    raw["attempt"] = _closed_model(MssqlTransactionAttempt, attempt)
+    for key in ("operation_key", "scope_hash", "owner_digest"):
+        raw[key] = bytes.fromhex(raw[key])
+    raw["lease_expires_at_utc"] = None
+    result = _closed_model(MssqlTransactionOperation, raw)
+    if stable_operation_document(result) != document:
+        raise ValueError
+    return result
+
+
+def decode_transfer_preplan_subject(
+    document: bytes, expected_sha256: bytes, *, attempt: CompositionAttemptIdentity
+) -> tuple[dict[str, Any], DbtRelationWrite, MssqlTransactionOperation]:
+    """Validate the bounded envelope's original identity, not runtime catalog models.
+
+    Projection, schema-preplan and target reconstruction remain runtime work.
+    Filesystem ownership and independently observed authority remain caller duties.
+    """
+    try:
+        if (
+            type(document) is not bytes
+            or not 0 < len(document) <= MAX_TRANSFER_PREPLAN_BYTES
+            or type(expected_sha256) is not bytes
+            or len(expected_sha256) != 32
+            or sha256(document).digest() != expected_sha256
+        ):
+            raise ValueError
+        body = strict_json_object(document)
+        if (
+            set(body) != _PREPLAN_FIELDS
+            or body["schema"] != "dpone.composition-transfer-preplan.v1"
+            or canonical_json_bytes(body) != document
+        ):
+            raise ValueError
+        original = canonical_json_bytes(body["attempt_original"])
+        decode_attempt_identity(original, attempt.attempt_sha256)
+        if original != encode_attempt_identity(attempt) or body["plan_sha256"] != attempt.plan_sha256:
+            raise ValueError
+        require_digest(body["manifest_sha256"])
+        write = _closed_model(DbtRelationWrite, body["write"])
+        if write.kind != "transfer" or write.connector != "mssql" or write.role != "target":
+            raise ValueError
+        identity = SourcePhysicalIdentity(**body["source_identity"])
+        if identity.version not in {2, 3} or identity.to_dict() != body["source_identity"]:
+            raise ValueError
+        operation = decode_stable_operation_document(canonical_json_bytes(body["operation_original"]))
+        if type(body["connection_observation"]) is not dict or not body["connection_observation"]:
+            raise ValueError
+        return body, write, operation
+    except Exception:
+        raise CompositionAdmissionError("transfer_preplan_original") from None
+
+
+def require_transfer_manifest_write(
+    attempt: CompositionAttemptIdentity, write: DbtRelationWrite, manifest: dict[str, Any]
+) -> None:
+    """Match the verified manifest to the exact transfer write before observation."""
+    expected = transfer_relation_write(
+        project_path=attempt.constituent_id,
+        workflow_id=write.workflow_id,
+        workload_id=attempt.workload_id,
+        manifest=manifest,
+    )
+    if write != expected:
+        raise CompositionAdmissionError("transfer_preplan_write")
+
+
+def transfer_preplan_document(
+    attempt: CompositionAttemptIdentity,
+    operation: MssqlTransactionOperation,
+    write: DbtRelationWrite,
+    *,
+    manifest_sha256: str,
+    observations: dict[str, Any],
+) -> bytes:
+    """Encode the unchanged V1 envelope around detached runtime observations.
+
+    Runtime owns observation/model serialization; this policy owns the versioned
+    subject envelope. A document creates no authority or persistence permission.
+    """
+    subject_fields = {"schema", "attempt_original", "operation_original", "write", "plan_sha256", "manifest_sha256"}
+    if set(observations) != _PREPLAN_FIELDS - subject_fields:
+        raise ValueError("transfer_preplan_observation_fields")
+    return canonical_json_bytes(
+        {
+            "schema": "dpone.composition-transfer-preplan.v1",
+            "attempt_original": strict_json_object(encode_attempt_identity(attempt)),
+            "operation_original": strict_json_object(stable_operation_document(operation)),
+            "write": asdict(write),
+            "plan_sha256": attempt.plan_sha256,
+            "manifest_sha256": manifest_sha256,
+            **observations,
+        }
+    )
+
+
+def require_transfer_preplan_binding(
+    body: dict[str, Any], binding: CompositionMssqlOperationBinding, mutation_plan_sha256: bytes
+) -> None:
+    """Compare retained subject originals with the protected registered binding."""
+    if (
+        canonical_json_bytes(body["attempt_original"]) != encode_attempt_identity(binding.attempt)
+        or canonical_json_bytes(body["operation_original"]) != stable_operation_document(binding.operation)
+        or body["write"] != asdict(binding.write)
+        or mutation_plan_sha256 != binding.mutation_plan_sha256
+    ):
+        raise CompositionAdmissionError("transfer_preplan_binding")

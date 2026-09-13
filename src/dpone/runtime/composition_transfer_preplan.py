@@ -16,9 +16,12 @@ from types import SimpleNamespace
 from typing import Any
 
 from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
-from dpone.contracts.composition_mssql_binding import stable_operation_document
-from dpone.contracts.composition_persistence import encode_attempt_identity
-from dpone.contracts.dbt_relation_writes import transfer_relation_write
+from dpone.contracts.composition_mssql_binding import (
+    require_transfer_manifest_write,
+    require_transfer_preplan_binding,
+    stable_operation_document,
+    transfer_preplan_document,
+)
 from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
 from dpone.contracts.mssql_transaction_identity import validate_source_physical_identity
 from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
@@ -96,14 +99,7 @@ class CompositionTransferPreplanService:
         if plan_sha256 != attempt.plan_sha256 or not callable(require_target):
             raise CompositionAdmissionError("transfer_preplan_context")
         self._manifest = canonical_json_bytes(dict(verified_manifest))
-        expected_write = transfer_relation_write(
-            project_path=attempt.constituent_id,
-            workflow_id=write.workflow_id,
-            workload_id=attempt.workload_id,
-            manifest=strict_json_object(self._manifest),
-        )
-        if write != expected_write:
-            raise CompositionAdmissionError("transfer_preplan_write")
+        require_transfer_manifest_write(attempt, write, strict_json_object(self._manifest))
         self._connections = RuntimeResolvedConnections(
             strict=True,
             source=_detached_binding(source_target),
@@ -189,14 +185,12 @@ class CompositionTransferPreplanService:
             prepared_boundary.require_active(source.connector)
             if source.fetch_schema_projection(config) != projection or self._observation(sink) != observed:
                 raise CompositionAdmissionError("transfer_preplan_observation_changed")
-            document = canonical_json_bytes(
-                {
-                    "schema": "dpone.composition-transfer-preplan.v1",
-                    "attempt_original": strict_json_object(encode_attempt_identity(self._attempt)),
-                    "operation_original": strict_json_object(stable_operation_document(operation)),
-                    "write": asdict(self._write),
-                    "plan_sha256": self._attempt.plan_sha256,
-                    "manifest_sha256": "sha256:" + sha256(self._manifest).hexdigest(),
+            document = transfer_preplan_document(
+                self._attempt,
+                operation,
+                self._write,
+                manifest_sha256="sha256:" + sha256(self._manifest).hexdigest(),
+                observations={
                     "preplan": strict_json_object(encode_mssql_schema_preplan(independent)),
                     "source_identity": identity.to_dict(),
                     "source_projection": asdict(projection),
@@ -204,7 +198,7 @@ class CompositionTransferPreplanService:
                     "target_identity": {**asdict(physical), "binding_id": str(physical.binding_id)},
                     "route_fingerprint": route.hex(),
                     "connection_observation": strict_json_object(observed),
-                }
+                },
             )
             return self._journal.capture(self._attempt, document)
         finally:
@@ -241,13 +235,7 @@ def verify_retained_transfer_commit(
     retained = decode_transfer_preplan(reference.document, reference.document_sha256, attempt=binding.attempt)
     body = retained.body
     mutation = retained.preplan.target_mutation_plan
-    if (
-        canonical_json_bytes(body["attempt_original"]) != encode_attempt_identity(binding.attempt)
-        or canonical_json_bytes(body["operation_original"]) != stable_operation_document(binding.operation)
-        or body["write"] != asdict(binding.write)
-        or mutation.digest != binding.mutation_plan_sha256
-    ):
-        raise CompositionAdmissionError("transfer_preplan_binding")
+    require_transfer_preplan_binding(body, binding, mutation.digest)
     binding.require_receipt(receipt)
     if (
         receipt.target_before_sha256 != mutation.expected_before_sha256

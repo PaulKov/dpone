@@ -16,17 +16,8 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
-from dpone.contracts.composition_mssql_binding import stable_operation_document
-from dpone.contracts.composition_persistence import decode_attempt_identity, encode_attempt_identity
-from dpone.contracts.dbt_relation_writes import DbtRelationWrite
-from dpone.contracts.mssql_transaction_governance import (
-    InvocationIdentity,
-    MssqlAttemptRequest,
-    MssqlTransactionAttempt,
-    MssqlTransactionOperation,
-)
-from dpone.contracts.source_physical_identity import SourcePhysicalIdentity
+from dpone.contracts.composition_identity import CompositionAdmissionError
+from dpone.contracts.composition_mssql_binding import MAX_TRANSFER_PREPLAN_BYTES, decode_transfer_preplan_subject
 from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 from dpone.runtime.consumed_payload_evidence import canonical_source_provenance_sha256
 from dpone.runtime.etl.mssql_schema_preplan_codec import decode_mssql_schema_preplan
@@ -40,23 +31,6 @@ from dpone.runtime.support.postgres_mssql_projection_models import (
 )
 from dpone.runtime.support.postgres_mssql_retained_catalog import RetainedMssqlTargetColumn
 from dpone.type_system.source_sink.provenance import SourceColumnProvenance
-
-MAX_TRANSFER_PREPLAN_BYTES = 4 * 1024 * 1024
-_FIELDS = {
-    "schema",
-    "attempt_original",
-    "operation_original",
-    "write",
-    "plan_sha256",
-    "manifest_sha256",
-    "preplan",
-    "source_identity",
-    "source_projection",
-    "source_provenance_sha256",
-    "target_identity",
-    "route_fingerprint",
-    "connection_observation",
-}
 
 
 def _model(kind: Any, value: Any) -> Any:
@@ -101,24 +75,6 @@ def projection_provenance(projection: PostgresFetchedSchema) -> str:
     )
 
 
-def _operation(value: Any) -> MssqlTransactionOperation:
-    raw = dict(value)
-    attempt = dict(raw["attempt"])
-    request = dict(attempt["request"])
-    request["invocation"] = _model(InvocationIdentity, request["invocation"])
-    for key in ("target_identity", "route_fingerprint"):
-        request[key] = binary_digest(request[key])
-    attempt["request"] = _model(MssqlAttemptRequest, request)
-    raw["attempt"] = _model(MssqlTransactionAttempt, attempt)
-    for key in ("operation_key", "scope_hash", "owner_digest"):
-        raw[key] = binary_digest(raw[key])
-    raw["lease_expires_at_utc"] = None
-    result = _model(MssqlTransactionOperation, raw)
-    if stable_operation_document(result) != canonical_json_bytes(value):
-        raise ValueError
-    return result
-
-
 @dataclass(frozen=True, slots=True)
 class RetainedTransferPreplanReference:
     """Exact detached bytes whose digest can be bound in a protected SQL original."""
@@ -148,32 +104,7 @@ def decode_transfer_preplan(
 ) -> RetainedTransferPreplanReference:
     """Check complete envelope integrity, structure and internal identity links."""
     try:
-        if (
-            type(document) is not bytes
-            or not 0 < len(document) <= MAX_TRANSFER_PREPLAN_BYTES
-            or type(expected_sha256) is not bytes
-            or len(expected_sha256) != 32
-            or sha256(document).digest() != expected_sha256
-        ):
-            raise ValueError
-        body = strict_json_object(document)
-        if (
-            set(body) != _FIELDS
-            or body["schema"] != "dpone.composition-transfer-preplan.v1"
-            or canonical_json_bytes(body) != document
-        ):
-            raise ValueError
-        original = canonical_json_bytes(body["attempt_original"])
-        decode_attempt_identity(original, attempt.attempt_sha256)
-        if original != encode_attempt_identity(attempt) or body["plan_sha256"] != attempt.plan_sha256:
-            raise ValueError
-        require_digest(body["manifest_sha256"])
-        write = _model(DbtRelationWrite, body["write"])
-        if write.kind != "transfer" or write.connector != "mssql" or write.role != "target":
-            raise ValueError
-        identity = SourcePhysicalIdentity(**body["source_identity"])
-        if identity.version not in {2, 3} or identity.to_dict() != body["source_identity"]:
-            raise ValueError
+        body, write, operation = decode_transfer_preplan_subject(document, expected_sha256, attempt=attempt)
         projection = decode_source_projection(body["source_projection"])
         if body["source_provenance_sha256"] != projection_provenance(projection):
             raise ValueError
@@ -188,7 +119,7 @@ def decode_transfer_preplan(
         mutation = preplan.target_mutation_plan
         if preplan.source_schema_sha256 != schema_columns_sha256(source_columns(projection)):
             raise ValueError
-        request = _operation(body["operation_original"]).attempt.request
+        request = operation.attempt.request
         route = binary_digest(body["route_fingerprint"])
         if (
             request.target_identity != target.digest
@@ -202,8 +133,6 @@ def decode_transfer_preplan(
             != (write.database, write.schema, write.relation)
             or request.strategy != "full_refresh"
         ):
-            raise ValueError
-        if type(body["connection_observation"]) is not dict or not body["connection_observation"]:
             raise ValueError
         return reference
     except Exception:

@@ -6,26 +6,26 @@ protected gate/budget/observer callbacks and commits the resulting originals.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 from hashlib import sha256
 from typing import Any
-from uuid import UUID
 
 from dpone.adapters.composition_clickhouse_dispatch_schema import require_clickhouse_dispatch_schema
-from dpone.adapters.composition_clickhouse_transport import ClickHouseDispatchObservation
 from dpone.adapters.composition_mssql_existing_operation import require_existing_execution_in
 from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.contracts.composition_clickhouse_dispatch import (
     ClickHouseDispatch,
-    CreateGenerationDispatch,
-    ExchangeSnapshotDispatch,
-    InsertGenerationDispatch,
     decode_clickhouse_dispatch,
 )
+from dpone.contracts.composition_clickhouse_dispatch import (
+    DispatchBinding as DispatchBinding,
+)
+from dpone.contracts.composition_clickhouse_dispatch import (
+    require_terminal_document as require_terminal_document,
+)
+from dpone.contracts.composition_clickhouse_dispatch import (
+    terminal_document as terminal_document,
+)
 from dpone.contracts.composition_identity import CompositionAdmissionError
-from dpone.contracts.composition_persistence import CompositionAttemptIdentity
-from dpone.contracts.composition_snapshot import SnapshotTarget
-from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 
 
 def require(value: bool, reason: str) -> None:
@@ -35,78 +35,6 @@ def require(value: bool, reason: str) -> None:
 
 def document_sha256(document: bytes) -> str:
     return "sha256:" + sha256(document).hexdigest()
-
-
-@dataclass(frozen=True, slots=True)
-class DispatchBinding:
-    """Root-pinned single issued user and exact attempt/target, never credentials."""
-
-    attempt: CompositionAttemptIdentity
-    target: SnapshotTarget
-    gate_id: str
-
-    def __post_init__(self) -> None:
-        require(type(self.attempt) is CompositionAttemptIdentity and type(self.target) is SnapshotTarget, "binding")
-        self.attempt.__post_init__()
-        self.target.__post_init__()
-        try:
-            valid = str(UUID(self.gate_id)) == self.gate_id and UUID(self.gate_id).int != 0
-        except (ValueError, TypeError, AttributeError):
-            valid = False
-        require(valid and self.target.guard_id in dict(self.attempt.guard_epochs), "binding")
-
-    @property
-    def principal_id(self) -> str:
-        return "clickhouse-user:" + self.gate_id
-
-    def require_dispatch(self, dispatch: ClickHouseDispatch) -> None:
-        require(
-            type(dispatch) in {CreateGenerationDispatch, InsertGenerationDispatch, ExchangeSnapshotDispatch},
-            "dispatch_shape",
-        )
-        dispatch.__post_init__()
-        require((dispatch.attempt, dispatch.target) == (self.attempt, self.target), "dispatch_scope")
-        if isinstance(dispatch, ExchangeSnapshotDispatch):
-            require(dispatch.intent.publisher_principal.principal_id == self.principal_id, "publisher")
-
-    def closing_document(self) -> bytes:
-        return canonical_json_bytes(
-            {
-                "schema": "dpone.composition-clickhouse-dispatch-closure.v1",
-                "phase": "CLOSING",
-                **asdict(self),
-            }
-        )
-
-
-def terminal_document(dispatch: ClickHouseDispatch, observation: ClickHouseDispatchObservation) -> bytes:
-    """Accept only this dispatch's complete, empty, synchronously framed response."""
-    require(type(observation) is ClickHouseDispatchObservation, "terminal_shape")
-    expected = dispatch.payload_bytes if isinstance(dispatch, InsertGenerationDispatch) else 0
-    require(
-        (observation.dispatch_sha256, observation.claim_key, observation.query_id)
-        == (dispatch.dispatch_sha256, dispatch.claim_key, dispatch.query_id)
-        and type(observation.request_body_bytes) is int
-        and observation.request_body_bytes == expected
-        and type(observation.response_body_bytes) is int
-        and observation.response_body_bytes == 0
-        and observation.response_body_sha256 == document_sha256(b"")
-        and observation.response_framing in {"chunked", "content-length"},
-        "terminal_observation",
-    )
-    return canonical_json_bytes({"schema": "dpone.composition-clickhouse-dispatch-terminal.v1", **asdict(observation)})
-
-
-def require_terminal_document(dispatch: ClickHouseDispatch, digest: str, document: bytes) -> None:
-    try:
-        require(type(document) is bytes and 0 < len(document) <= 65536, "terminal_budget")
-        require(document_sha256(document) == digest, "terminal_hash")
-        body = strict_json_object(document)
-        require(body.pop("schema") == "dpone.composition-clickhouse-dispatch-terminal.v1", "terminal_schema")
-        observation = ClickHouseDispatchObservation(**body)
-        require(terminal_document(dispatch, observation) == document, "terminal_original")
-    except (TypeError, ValueError, KeyError, AttributeError):
-        raise CompositionAdmissionError("clickhouse_journal_terminal_original") from None
 
 
 class DispatchQueries:

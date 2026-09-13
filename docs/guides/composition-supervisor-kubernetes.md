@@ -333,7 +333,9 @@ plan. `mssql_clickhouse_full_refresh_v1` can reach
 runtime snapshot capture, and enrolled supervisor/HTTP collaborators compose.
 The runtime captures the bounded MSSQL source once in a consistent transaction,
 preserves exact Native bytes, and independently reads typed ClickHouse content
-before publication. Source connections must include signed `database_authorities`
+before publication. This sealed snapshot requires independently verified content;
+an HTTP acknowledgement does not establish its seal. Source connections must
+include signed `database_authorities`
 for both the actual source database and the composition control database, plus
 the expected `composition_service_id`. Runtime verifies these pins on the same
 business connection before and after extraction. Every attempt reserves a different generation name; the

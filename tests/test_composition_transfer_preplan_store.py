@@ -178,3 +178,46 @@ def test_semantic_identity_mismatch_with_fresh_outer_hash_is_rejected(path):
     changed = canonical_json_bytes(body)
     with pytest.raises(ValueError):
         decode_transfer_preplan(changed, sha256(changed).digest(), attempt=selected)
+
+
+def test_contract_envelope_policy_preserves_existing_wire_bytes():
+    from dpone.contracts.composition_mssql_binding import decode_transfer_preplan_subject, transfer_preplan_document
+
+    selected, document = envelope()
+    body, write, operation = decode_transfer_preplan_subject(document, sha256(document).digest(), attempt=selected)
+    observations = {
+        key: value
+        for key, value in body.items()
+        if key not in {"schema", "attempt_original", "operation_original", "write", "plan_sha256", "manifest_sha256"}
+    }
+    assert (
+        transfer_preplan_document(
+            selected, operation, write, manifest_sha256=body["manifest_sha256"], observations=observations
+        )
+        == document
+    )
+
+
+@pytest.mark.parametrize(
+    "damage", ["write_role", "source_version", "source_extra", "plan", "manifest_digest", "operation_extra"]
+)
+def test_contract_envelope_policy_rejects_foreign_original_with_recomputed_hash(damage):
+    from dpone.contracts.composition_mssql_binding import decode_transfer_preplan_subject
+
+    selected, document = envelope()
+    body = strict_json_object(document)
+    if damage == "write_role":
+        body["write"]["role"] = "source"
+    elif damage == "source_version":
+        body["source_identity"]["version"] = 1
+    elif damage == "source_extra":
+        body["source_identity"]["foreign"] = True
+    elif damage == "plan":
+        body["plan_sha256"] = "sha256:" + "f" * 64
+    elif damage == "manifest_digest":
+        body["manifest_sha256"] = "f" * 64
+    else:
+        body["operation_original"]["foreign"] = True
+    changed = canonical_json_bytes(body)
+    with pytest.raises(ValueError):
+        decode_transfer_preplan_subject(changed, sha256(changed).digest(), attempt=selected)

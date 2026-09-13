@@ -136,3 +136,119 @@ def derive_dbt_materializations(
     if not 1 <= len(contracts) <= MAX_MATERIALIZATIONS:
         raise DbtCaptureError("materialization_selection")
     return tuple(sorted(contracts, key=lambda row: row.write.resource_id))
+
+
+_OBJECT_FIELDS = ("object_id", "schema", "name", "kind", "create_token", "modify_token", "module_sha256")
+_COLUMN_FIELDS = (
+    "column_id",
+    "name",
+    "system_type",
+    "user_type",
+    "user_defined",
+    "max_length",
+    "precision",
+    "scale",
+    "nullable",
+    "collation",
+    "computed",
+    "identity",
+    "hidden",
+    "generated_always_type",
+    "encryption_type",
+)
+
+
+def materialization_catalog_columns(object_row: tuple[Any, ...], rows: tuple[tuple[Any, ...], ...]) -> dict[str, Any]:
+    """Validate and canonically project bounded physical catalog rows."""
+    if not 1 <= len(rows) <= MAX_COLUMNS:
+        raise DbtCaptureError("materialization_column_budget")
+    prior = 0
+    names = set()
+    for row in rows:
+        if len(row) != 15 or type(row[0]) is not int or row[0] <= prior:
+            raise DbtCaptureError("materialization_catalog_columns")
+        require_observable_identifier(row[1])
+        if row[1].casefold() in names or any(type(row[index]) is not int for index in (4, 5, 6, 7, 8, 10, 11, 12, 13)):
+            raise DbtCaptureError("materialization_catalog_columns")
+        if (row[2] is not None and type(row[2]) is not str) or type(row[3]) is not str:
+            raise DbtCaptureError("materialization_catalog_columns")
+        if (row[9] is not None and (type(row[9]) is not str or len(row[9]) > 128)) or (
+            row[14] is not None and type(row[14]) is not int
+        ):
+            raise DbtCaptureError("materialization_catalog_columns")
+        if (
+            any(row[index] not in (0, 1) for index in (4, 8, 10, 11, 12))
+            or not -1 <= row[5] <= 32767
+            or not 0 <= row[6] <= 255
+            or not 0 <= row[7] <= 38
+            or not 0 <= row[13] <= 8
+            or row[14] not in (None, 1, 2)
+            or len(row[3]) > 257
+            or (row[2] is not None and len(row[2]) > 128)
+        ):
+            raise DbtCaptureError("materialization_catalog_columns")
+        names.add(row[1].casefold())
+        prior = row[0]
+    return {
+        "object": dict(
+            zip(_OBJECT_FIELDS, (*object_row[:6], object_row[6].hex() if object_row[6] else None), strict=True)
+        ),
+        "columns": [dict(zip(_COLUMN_FIELDS, row, strict=True)) for row in rows],
+    }
+
+
+def require_materialization_columns(contract: DbtMaterializationContract, actual: list[dict[str, Any]]) -> None:
+    columns = {row["name"]: row for row in actual}
+    for declared in contract.columns:
+        column = columns.get(declared.name)
+        if column is None:
+            raise DbtCaptureError("materialization_missing_column")
+        if declared.data_type is not None and actual_materialization_type(column) != declared.data_type:
+            raise DbtCaptureError("materialization_column_type")
+
+
+def actual_materialization_type(column: dict[str, Any]) -> str:
+    """Reconstruct exact SQL catalog dimensions, then use the shared type parser."""
+    kind = column["system_type"]
+    if column["user_defined"] or column["encryption_type"] is not None or type(kind) is not str:
+        raise DbtCaptureError("materialization_column_type")
+    if kind in {"varchar", "nvarchar", "char", "nchar", "binary", "varbinary"}:
+        length = column["max_length"]
+        if length != -1 and kind in {"nvarchar", "nchar"}:
+            if length % 2:
+                raise DbtCaptureError("materialization_column_type")
+            length //= 2
+        dtype = f"{kind}({'max' if length == -1 else length})"
+    elif kind in {"decimal", "numeric"}:
+        dtype = f"{kind}({column['precision']},{column['scale']})"
+    elif kind in {"datetime2", "datetimeoffset", "time"}:
+        dtype = f"{kind}({column['scale']})"
+    elif kind == "float":
+        dtype = f"float({column['precision']})"
+    else:
+        dtype = kind
+    return materialization_type(dtype)
+
+
+def materialization_observation_document(
+    *,
+    attempt_sha256: str,
+    intent_sha256: str,
+    invocation: str,
+    projected: tuple[tuple[str, str, str], ...],
+    catalog: list[dict[str, Any]],
+) -> bytes:
+    """Encode the complete observed outcome, keeping the existing byte budget."""
+    original = canonical_json_bytes(
+        {
+            "schema": "dpone.composition-dbt-materialization-observation.v1",
+            "attempt_sha256": attempt_sha256,
+            "intent_sha256": intent_sha256,
+            "invocation_id": invocation,
+            "materializations": projected,
+            "catalog": catalog,
+        }
+    )
+    if len(original) > MAX_MATERIALIZATION_BYTES:
+        raise DbtCaptureError("materialization_budget")
+    return original

@@ -67,3 +67,31 @@ def test_registrar_pins_only_matching_trusted_envelope_before_sql(tmp_path, fore
                 {"preplan_document_sha256": "sha256:" + reference.document_sha256.hex()},
             )
         ]
+
+
+def test_shared_operation_decoder_preserves_stable_original_and_binding_bytes():
+    from dpone.contracts.composition_mssql_binding import decode_stable_operation_document, stable_operation_document
+
+    value = binding()
+    original = stable_operation_document(value.operation)
+    assert stable_operation_document(decode_stable_operation_document(original)) == original
+    assert CompositionMssqlOperationBinding.from_bytes(value.document, value.attempt).document == value.document
+
+
+@pytest.mark.parametrize("damage", ["extra", "uppercase", "lease", "invocation", "short_digest"])
+def test_shared_operation_decoder_rejects_noncanonical_nested_originals(damage):
+    from dpone.contracts.composition_mssql_binding import decode_stable_operation_document, stable_operation_document
+
+    body = strict_json_object(stable_operation_document(binding().operation))
+    if damage == "extra":
+        body["foreign"] = True
+    elif damage == "uppercase":
+        body["operation_key"] = "AB" * 32
+    elif damage == "lease":
+        body["lease_expires_at_utc"] = None
+    elif damage == "invocation":
+        body["attempt"]["request"]["invocation"]["foreign"] = True
+    else:
+        body["scope_hash"] = "ab"
+    with pytest.raises(ValueError):
+        decode_stable_operation_document(canonical_json_bytes(body))

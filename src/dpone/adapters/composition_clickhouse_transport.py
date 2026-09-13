@@ -8,7 +8,6 @@ Acknowledgement is transport evidence, not catalog outcome or writer quiescence.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from hashlib import sha256
 from typing import Protocol
 
@@ -20,6 +19,9 @@ from dpone.contracts.composition_clickhouse_dispatch import (
     CreateGenerationDispatch,
     ExchangeSnapshotDispatch,
     InsertGenerationDispatch,
+)
+from dpone.contracts.composition_clickhouse_dispatch import (
+    ClickHouseDispatchObservation as ClickHouseDispatchObservation,
 )
 from dpone.contracts.composition_identity import CompositionAdmissionError
 
@@ -35,24 +37,6 @@ class ClickHouseDispatchJournal(Protocol):
     """
 
     def claim_once(self, dispatch: ClickHouseDispatch) -> None: ...
-
-
-@dataclass(frozen=True, slots=True)
-class ClickHouseDispatchObservation:
-    """Complete transport observation; root persists it before worker ACK.
-
-    request_body_bytes counts payload octets actually accepted by socket.send,
-    excluding HTTP headers, URI SQL, TLS records and TCP framing. It is not
-    source-export bytes. No failed/partial observation is a terminal receipt.
-    """
-
-    dispatch_sha256: str
-    claim_key: str
-    query_id: str
-    request_body_bytes: int
-    response_body_bytes: int
-    response_body_sha256: str
-    response_framing: str
 
 
 class ClickHouseDispatchTransportError(RuntimeError):

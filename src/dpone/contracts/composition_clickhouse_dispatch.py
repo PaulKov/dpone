@@ -14,7 +14,11 @@ from typing import Any, ClassVar, TypeAlias, cast
 from uuid import UUID
 
 from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
-from dpone.contracts.composition_persistence import CompositionAttemptIdentity
+from dpone.contracts.composition_persistence import (
+    CompositionAttemptIdentity,
+    CompositionAttemptProof,
+    CompositionProofAuthority,
+)
 from dpone.contracts.composition_snapshot import SnapshotPublicationIntent, SnapshotTarget
 from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 
@@ -218,3 +222,115 @@ def decode_clickhouse_dispatch(document: bytes, expected_sha256: str) -> ClickHo
         return result
     except (ValueError, TypeError, KeyError, AttributeError, RecursionError, OverflowError):
         raise CompositionAdmissionError("clickhouse_dispatch_document") from None
+
+
+@dataclass(frozen=True, slots=True)
+class ClickHouseDispatchObservation:
+    """Complete transport observation; root persists it before worker ACK.
+
+    request_body_bytes counts payload octets actually accepted by socket.send,
+    excluding HTTP headers, URI SQL, TLS records and TCP framing. It is not
+    source-export bytes. No failed/partial observation is a terminal receipt.
+    """
+
+    dispatch_sha256: str
+    claim_key: str
+    query_id: str
+    request_body_bytes: int
+    response_body_bytes: int
+    response_body_sha256: str
+    response_framing: str
+
+
+def _journal_require(value: bool, reason: str) -> None:
+    if not value:
+        raise CompositionAdmissionError("clickhouse_journal_" + reason)
+
+
+@dataclass(frozen=True, slots=True)
+class DispatchBinding:
+    """Root-pinned single issued user and exact attempt/target, never credentials."""
+
+    attempt: CompositionAttemptIdentity
+    target: SnapshotTarget
+    gate_id: str
+
+    def __post_init__(self) -> None:
+        _journal_require(
+            type(self.attempt) is CompositionAttemptIdentity and type(self.target) is SnapshotTarget, "binding"
+        )
+        self.attempt.__post_init__()
+        self.target.__post_init__()
+        try:
+            valid = str(UUID(self.gate_id)) == self.gate_id and UUID(self.gate_id).int != 0
+        except (ValueError, TypeError, AttributeError):
+            valid = False
+        _journal_require(valid and self.target.guard_id in dict(self.attempt.guard_epochs), "binding")
+
+    @property
+    def principal_id(self) -> str:
+        return "clickhouse-user:" + self.gate_id
+
+    def require_dispatch(self, dispatch: ClickHouseDispatch) -> None:
+        _journal_require(
+            type(dispatch) in {CreateGenerationDispatch, InsertGenerationDispatch, ExchangeSnapshotDispatch},
+            "dispatch_shape",
+        )
+        dispatch.__post_init__()
+        _journal_require((dispatch.attempt, dispatch.target) == (self.attempt, self.target), "dispatch_scope")
+        if isinstance(dispatch, ExchangeSnapshotDispatch):
+            _journal_require(dispatch.intent.publisher_principal.principal_id == self.principal_id, "publisher")
+
+    def closing_document(self) -> bytes:
+        return canonical_json_bytes(
+            {
+                "schema": "dpone.composition-clickhouse-dispatch-closure.v1",
+                "phase": "CLOSING",
+                **asdict(self),
+            }
+        )
+
+    def closed_document(
+        self, links: tuple[tuple[str, str], ...], proofs: tuple[CompositionAttemptProof, CompositionAttemptProof]
+    ) -> bytes:
+        _journal_require(type(proofs) is tuple and len(proofs) == 2, "closure_proof_shape")
+        issued = (CompositionProofAuthority("clickhouse", self.target.service_id, self.principal_id),)
+        for proof, kind in zip(proofs, ("CLOSED_GATES", "QUIESCENCE"), strict=True):
+            _journal_require(type(proof) is CompositionAttemptProof, "closure_proof_shape")
+            proof.require_attempt(self.attempt)
+            _journal_require(proof.kind == kind and proof.authorities == issued, "closure_proof_subject")
+        body = strict_json_object(self.closing_document())
+        body.update(phase="CLOSED", dispatch_terminals=links, proofs=tuple(proof.to_dict() for proof in proofs))
+        document = canonical_json_bytes(body)
+        _journal_require(len(document) <= 8388608, "closure_budget")
+        return document
+
+
+def terminal_document(dispatch: ClickHouseDispatch, observation: ClickHouseDispatchObservation) -> bytes:
+    """Accept only this dispatch's complete, empty, synchronously framed response."""
+    _journal_require(type(observation) is ClickHouseDispatchObservation, "terminal_shape")
+    expected = dispatch.payload_bytes if isinstance(dispatch, InsertGenerationDispatch) else 0
+    _journal_require(
+        (observation.dispatch_sha256, observation.claim_key, observation.query_id)
+        == (dispatch.dispatch_sha256, dispatch.claim_key, dispatch.query_id)
+        and type(observation.request_body_bytes) is int
+        and observation.request_body_bytes == expected
+        and type(observation.response_body_bytes) is int
+        and observation.response_body_bytes == 0
+        and observation.response_body_sha256 == _hash(b"")
+        and observation.response_framing in {"chunked", "content-length"},
+        "terminal_observation",
+    )
+    return canonical_json_bytes({"schema": "dpone.composition-clickhouse-dispatch-terminal.v1", **asdict(observation)})
+
+
+def require_terminal_document(dispatch: ClickHouseDispatch, digest: str, document: bytes) -> None:
+    try:
+        _journal_require(type(document) is bytes and 0 < len(document) <= 65536, "terminal_budget")
+        _journal_require(_hash(document) == digest, "terminal_hash")
+        body = strict_json_object(document)
+        _journal_require(body.pop("schema") == "dpone.composition-clickhouse-dispatch-terminal.v1", "terminal_schema")
+        observation = ClickHouseDispatchObservation(**body)
+        _journal_require(terminal_document(dispatch, observation) == document, "terminal_original")
+    except (TypeError, ValueError, KeyError, AttributeError):
+        raise CompositionAdmissionError("clickhouse_journal_terminal_original") from None

@@ -29,10 +29,8 @@ from dpone.contracts.composition_identity import CompositionAdmissionError
 from dpone.contracts.composition_persistence import (
     CompositionAttemptIdentity,
     CompositionAttemptProof,
-    CompositionProofAuthority,
 )
 from dpone.contracts.composition_snapshot import SnapshotPublicationIntent, SnapshotPublicationRecord, SnapshotTarget
-from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 from dpone.ports.composition_sql import CompositionSqlContext
 
 
@@ -200,7 +198,7 @@ class MssqlClickHouseDispatchStore:
             q.check()
             require(q.require_scope(recovery=True) == original, "closure_changed_subject")
             require(q.drained_links() == links, "closure_changed_dispatches")
-            document = self._closed_document(links, proofs)
+            document = self._binding.closed_document(links, proofs)
             expected = document_sha256(document), document
             previous = q.phase("CLOSED")
             if previous is None:
@@ -217,21 +215,6 @@ class MssqlClickHouseDispatchStore:
             q.require_closing()
             require(q.drained_links() == links and q.phase("CLOSED") == expected, "closed_readback")
         return expected[0]
-
-    def _closed_document(
-        self, links: tuple[tuple[str, str], ...], proofs: tuple[CompositionAttemptProof, CompositionAttemptProof]
-    ) -> bytes:
-        require(type(proofs) is tuple and len(proofs) == 2, "closure_proof_shape")
-        issued = (CompositionProofAuthority("clickhouse", self._binding.target.service_id, self._binding.principal_id),)
-        for proof, kind in zip(proofs, ("CLOSED_GATES", "QUIESCENCE"), strict=True):
-            require(type(proof) is CompositionAttemptProof, "closure_proof_shape")
-            proof.require_attempt(self._binding.attempt)
-            require(proof.kind == kind and proof.authorities == issued, "closure_proof_subject")
-        body = strict_json_object(self._binding.closing_document())
-        body.update(phase="CLOSED", dispatch_terminals=links, proofs=tuple(proof.to_dict() for proof in proofs))
-        document = canonical_json_bytes(body)
-        require(len(document) <= 8388608, "closure_budget")
-        return document
 
 
 class FileSnapshotPublicationStore:
