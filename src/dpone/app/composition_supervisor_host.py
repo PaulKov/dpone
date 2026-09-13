@@ -84,12 +84,30 @@ def build_supervisor_facts_server(
         # A fresh decoded policy prevents an observer from mutating future calls.
         return capture_supervisor_facts(docker, linux, enrollment.policy, deadline)
 
+    def capture_mounts(deadline: float) -> dict[str, Any]:
+        # Fixed roles come only from the protected enrollment, never the request.
+        original = enrollment.body["facts"]
+        before = capture(deadline)
+        if canonical_json_bytes(before) != canonical_json_bytes(original):
+            raise SupervisorProbeError("supervisor_probe_mount_observation")
+        tables = {}
+        for identifier in sorted(enrollment.role_id(role) for role in ("dispatcher", "clickhouse")):
+            rows = linux.mounts(before["docker"]["containers"][identifier]["pid"], deadline)
+            expected = original["linux"]["containers"][identifier]["mounts"]["mountinfo_sha256"]
+            if "sha256:" + sha256(canonical_json_bytes(rows)).hexdigest() != expected:
+                raise SupervisorProbeError("supervisor_probe_mount_pin")
+            tables[identifier] = rows
+        if canonical_json_bytes(capture(deadline)) != canonical_json_bytes(original):
+            raise SupervisorProbeError("supervisor_probe_mount_observation")
+        return tables
+
     return SupervisorFactsServer(
         Path(config["socket_path"]),
         enrollment_sha256=enrollment.enrollment_sha256,
         dispatcher_uid=config["dispatcher_uid"],
         dispatcher_gid=config["dispatcher_gid"],
         capture=capture,
+        capture_mounts=capture_mounts,
         timeout_seconds=config["timeout_seconds"],
     )
 

@@ -17,7 +17,8 @@ import stat
 import struct
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,8 @@ from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 
 REQUEST_SCHEMA = "dpone.composition-host-probe-request.v1"
 RESPONSE_SCHEMA = "dpone.composition-host-probe-response.v1"
+MOUNTS_REQUEST_SCHEMA = "dpone.composition-host-mounts-request.v1"
+MOUNTS_RESPONSE_SCHEMA = "dpone.composition-host-mounts-response.v1"
 MAX_REQUEST_BYTES = 1024
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
@@ -126,7 +129,7 @@ def _write_frame(connection: socket.socket, body: dict[str, Any], maximum: int, 
 def _request(body: dict[str, Any], enrollment: str) -> str:
     _require(
         set(body) == {"schema", "enrollment_sha256", "nonce"}
-        and body["schema"] == REQUEST_SCHEMA
+        and body["schema"] in {REQUEST_SCHEMA, MOUNTS_REQUEST_SCHEMA}
         and body["enrollment_sha256"] == enrollment,
         "request_subject",
     )
@@ -145,6 +148,58 @@ def _facts(value: object) -> None:
     )
 
 
+def _mount_tables(value: object) -> None:
+    _require(type(value) is dict and len(value) == 2, "mount_tables")
+    assert isinstance(value, dict)
+    for identifier, rows in value.items():
+        _require(type(identifier) is str and re.fullmatch(r"[0-9a-f]{64}", identifier) is not None, "mount_container")
+        _require(type(rows) in {list, tuple} and 1 <= len(rows) <= 1024, "mount_rows")
+        ids = set()
+        for row in rows:
+            _require(
+                type(row) is dict
+                and set(row)
+                == {
+                    "id",
+                    "parent",
+                    "device",
+                    "root",
+                    "destination",
+                    "options",
+                    "propagation",
+                    "filesystem",
+                    "source",
+                    "super_options",
+                },
+                "mount_row",
+            )
+            _require(
+                all(type(row[key]) is int and row[key] >= 0 for key in ("id", "parent")) and row["id"] not in ids,
+                "mount_identity",
+            )
+            ids.add(row["id"])
+            _require(
+                all(
+                    type(row[key]) is str and row[key] and "\0" not in row[key]
+                    for key in ("device", "root", "destination", "filesystem", "source")
+                ),
+                "mount_value",
+            )
+            _require(
+                re.fullmatch(r"[0-9]+:[0-9]+", row["device"]) is not None
+                and all(row[key].startswith("/") for key in ("root", "destination")),
+                "mount_path",
+            )
+            for key in ("options", "propagation", "super_options"):
+                parts = row[key]
+                _require(
+                    type(parts) in {list, tuple}
+                    and all(type(part) is str and part and "\0" not in part for part in parts)
+                    and list(parts) == sorted(parts),
+                    "mount_options",
+                )
+
+
 class CaptureSupervisorFactsClient:
     """One root-authenticated observation; caller still compares protected SQL originals."""
 
@@ -154,6 +209,47 @@ class CaptureSupervisorFactsClient:
 
     def capture(self, enrollment_sha256: str, *, deadline: float | None = None) -> dict[str, Any]:
         """Verify exact nonce/enrollment echoes and complete response before returning facts."""
+        return self._exchange(enrollment_sha256, REQUEST_SCHEMA, RESPONSE_SCHEMA, "facts", _facts, deadline)
+
+    def capture_mounts(
+        self,
+        enrollment_sha256: str,
+        *,
+        expected_mountinfo_sha256: Mapping[str, str],
+        deadline: float | None = None,
+    ) -> dict[str, Any]:
+        """Read both fixed enrolled tables; local pins never become remote selectors."""
+        _require(isinstance(expected_mountinfo_sha256, Mapping) and len(expected_mountinfo_sha256) == 2, "mount_pins")
+        pins = dict(expected_mountinfo_sha256)
+        _require(
+            len(pins) == 2 and all(type(key) is str and re.fullmatch(r"[0-9a-f]{64}", key) for key in pins),
+            "mount_pins",
+        )
+        for digest in pins.values():
+            _digest(digest)
+
+        def validate(value: object) -> None:
+            _mount_tables(value)
+            assert isinstance(value, dict)
+            _require(
+                set(value) == set(pins)
+                and all("sha256:" + sha256(canonical_json_bytes(value[key])).hexdigest() == pins[key] for key in pins),
+                "mount_pin",
+            )
+
+        return self._exchange(
+            enrollment_sha256, MOUNTS_REQUEST_SCHEMA, MOUNTS_RESPONSE_SCHEMA, "mount_tables", validate, deadline
+        )
+
+    def _exchange(
+        self,
+        enrollment_sha256: str,
+        request_schema: str,
+        response_schema: str,
+        field: str,
+        validate: Callable[[object], None],
+        deadline: float | None,
+    ) -> dict[str, Any]:
         _digest(enrollment_sha256)
         nonce = secrets.token_hex(32)
         own_deadline = time.monotonic() + self.timeout
@@ -169,21 +265,21 @@ class CaptureSupervisorFactsClient:
                 _require(_peer_uid(connection) == 0, "server_identity")
                 _write_frame(
                     connection,
-                    {"schema": REQUEST_SCHEMA, "enrollment_sha256": enrollment_sha256, "nonce": nonce},
+                    {"schema": request_schema, "enrollment_sha256": enrollment_sha256, "nonce": nonce},
                     MAX_REQUEST_BYTES,
                     deadline,
                 )
                 body = _read_frame(connection, MAX_RESPONSE_BYTES, deadline)
             _require(
-                set(body) == {"schema", "enrollment_sha256", "nonce", "facts"}
-                and body["schema"] == RESPONSE_SCHEMA
+                set(body) == {"schema", "enrollment_sha256", "nonce", field}
+                and body["schema"] == response_schema
                 and body["enrollment_sha256"] == enrollment_sha256
                 and body["nonce"] == nonce,
                 "response_subject",
             )
-            _facts(body["facts"])
+            validate(body[field])
             _remaining(deadline)
-            return body["facts"]
+            return body[field]
         except SupervisorProbeError:
             raise
         except Exception:
@@ -207,12 +303,15 @@ class SupervisorFactsServer:
         dispatcher_gid: int,
         capture: Callable[[float], dict[str, Any]],
         timeout_seconds: float = 5.0,
+        capture_mounts: Callable[[float], dict[str, Any]] | None = None,
     ) -> None:
         _digest(enrollment_sha256)
         _identifier(dispatcher_uid)
         _identifier(dispatcher_gid)
         self.path, self.enrollment = _path(path), enrollment_sha256
         self.uid, self.gid, self.capture = dispatcher_uid, dispatcher_gid, capture
+        _require(capture_mounts is None or callable(capture_mounts), "mounts_callback")
+        self.capture_mounts = capture_mounts
         self.timeout = _timeout(timeout_seconds)
         self._socket: socket.socket | None = None
         self._identity: tuple[int, int] | None = None
@@ -258,12 +357,20 @@ class SupervisorFactsServer:
                 _require(_peer_uid(connection) == self.uid, "dispatcher_identity")
                 body = _read_frame(connection, MAX_REQUEST_BYTES, deadline)
                 nonce = _request(body, self.enrollment)
-                facts = self.capture(deadline)
-                _facts(facts)
+                field, schema = "facts", RESPONSE_SCHEMA
+                if body["schema"] == MOUNTS_REQUEST_SCHEMA:
+                    _require(self.capture_mounts is not None, "mounts_unavailable")
+                    assert self.capture_mounts is not None
+                    facts = self.capture_mounts(deadline)
+                    _mount_tables(facts)
+                    field, schema = "mount_tables", MOUNTS_RESPONSE_SCHEMA
+                else:
+                    facts = self.capture(deadline)
+                    _facts(facts)
                 _remaining(deadline)
                 _write_frame(
                     connection,
-                    {"schema": RESPONSE_SCHEMA, "enrollment_sha256": self.enrollment, "nonce": nonce, "facts": facts},
+                    {"schema": schema, "enrollment_sha256": self.enrollment, "nonce": nonce, field: facts},
                     MAX_RESPONSE_BYTES,
                     deadline,
                 )

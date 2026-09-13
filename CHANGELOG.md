@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Accept the valid cgroup-v2 namespace root when observing the dispatcher from
+  inside its Docker container; keep rejecting v1 and malformed cgroup records.
 - Keep the independently verified MSSQL control-service identity paired with its
   connection during ClickHouse activation. Distinct ClickHouse and control UUIDs
   no longer reject valid enrollment or substitute one service for the other.
@@ -22,15 +24,24 @@
 
 ### Added
 
+- Add an authenticated, fixed-scope host mount-table observation for bootstrap
+  verification, pinned to existing enrollment hashes and fresh complete facts.
+  Reuse ClickHouse domain metadata validation without resolving target secrets.
+  Policy startup now checks control SQL, this process/listener and complete
+  artifact isolation before opening admission; deployed certification remains
+  required.
 - Add protected bootstrap retention, a one-way startup coordinator and verified
   discovery of all matching dispatcher contexts. Waiting serves no requests;
   failed verification closes ownership and shutdown joins work before releasing
-  bootstrap files. Policy launch and deployment verification are still required.
+  bootstrap files. Select this path with paired policy/digest flags; legacy
+  configuration launch remains compatible. Full deployment certification remains
+  required.
 - Add explicit dispatcher policy bindings and separate policy/bootstrap codecs
   to remove the configuration-to-runtime hash cycle. Preserve legacy full-byte
   configuration identity, and reject digest-kind confusion in staged selection
-  and transfer handling. The two-phase listener/bootstrap lifecycle remains
-  required; legacy startup rejects the new bootstrap format before binding.
+  and transfer handling. Two-phase policy startup observes the same process and
+  socket before opening admission; legacy startup rejects the new bootstrap
+  format before binding.
 - Observe native runner filesystem facts through held protected descriptors and
   fresh root comparisons, with actual Linux root/tmpfs and fixed-deadline checks.
   Reject malformed supervisor projections before filesystem access. These
@@ -63,8 +74,8 @@
   live verification remain in progress.
 - Add explicit v2 dispatcher-volume enrollment and immutable service-owned
   capture storage. Bind host socket identity to enrolled UID/GID and reject
-  rootless/remapped Docker, shared volume aliases and custody drift. The policy
-  launch path and deployed Linux certification remain outstanding.
+  rootless/remapped Docker, shared volume aliases and custody drift. Deployed
+  Linux certification remains outstanding.
 - Add closed whole-cell v2 request/result codecs with scheduler correlation,
   capture/publication originals and complete terminal proof consistency checks.
   Reopen capture/publication history on the caller's pinned SQL transaction;
@@ -84,7 +95,7 @@
   authority and enrolled capture custody. Bound control/source/HTTP/host I/O,
   keep historical requests read-only, and reject late terminal responses.
   Validate protected service configuration independently of deployment readiness.
-  The policy launch path and full deployed live campaign remain in progress.
+  The full deployed live campaign remains in progress.
 - Independently derive and retain canonical SQL preplans before registration;
   bind the complete envelope through composition binding v2 without changing
   generic receipt formats or existing plan digests. Recovery verifies registry

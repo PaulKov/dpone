@@ -383,3 +383,48 @@ def test_bootstrap_failure_or_stop_never_handles_request(monkeypatch, failure):
     assert "request" not in server.events
     assert server.events[-2:] == ["close-and-join", "bootstrap-close"]
     assert signals.handlers == signals.original
+
+
+def test_policy_cli_passes_exact_pins_and_waits_before_serving():
+    signals = Signals()
+    server = Server(signals)
+    startup = SimpleNamespace(poll=lambda: True, close=lambda: server.events.append("bootstrap-close"))
+    calls = []
+
+    def build(path, **kwargs):
+        calls.append((path, kwargs))
+        return SimpleNamespace(server=server, startup=startup)
+
+    args = ["--policy", "/etc/dpone/startup/policy.json", "--policy-sha256", DIGEST, *ARGS[4:]]
+    assert service.main(args, build_policy_server=build, signals=signals, stderr=io.StringIO()) == 0
+    assert calls == [
+        (Path(args[1]), {"expected_policy_sha256": DIGEST, "dispatcher_uid": 1200, "dispatcher_gid": 1201})
+    ]
+    assert server.events[-2:] == ["close-and-join", "bootstrap-close"]
+
+
+@pytest.mark.parametrize(
+    "selection",
+    [
+        ["--policy", "/etc/dpone/startup/policy.json"],
+        ["--policy-sha256", DIGEST],
+        ["--config", "/etc/dpone/startup/service.json", "--policy-sha256", DIGEST],
+        ["--policy", "/etc/dpone/startup/policy.json", "--configuration-sha256", DIGEST],
+        [
+            "--policy",
+            "/etc/dpone/startup/policy.json",
+            "--policy-sha256",
+            DIGEST,
+            "--config",
+            "/etc/dpone/startup/service.json",
+        ],
+    ],
+)
+def test_incomplete_or_mixed_startup_modes_fail_before_io(selection):
+    with pytest.raises(SystemExit) as caught:
+        service.main(
+            selection + ARGS[4:],
+            build_server=lambda *a, **k: pytest.fail("invalid mode performed I/O"),
+            build_policy_server=lambda *a, **k: pytest.fail("invalid mode performed I/O"),
+        )
+    assert caught.value.code == 2

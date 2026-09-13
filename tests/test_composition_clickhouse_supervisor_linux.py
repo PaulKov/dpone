@@ -79,3 +79,63 @@ def test_process_inventory_includes_each_thread_namespace(tmp_path, monkeypatch)
     (tmp_path / "10" / "task" / "10").mkdir(parents=True)
     (tmp_path / "10" / "task" / "11").mkdir()
     assert probe.processes(time.monotonic() + 1) == (10, 11)
+
+
+@pytest.fixture
+def synthetic_process(tmp_path, monkeypatch):
+    """Real probe and parsers over files; only the proc root/platform are doubled."""
+    import dpone.adapters.composition_clickhouse_supervisor_linux as module
+
+    monkeypatch.setattr(module.sys, "platform", "linux")
+    probe = module.LinuxSupervisorProbe()
+    probe._proc = tmp_path
+    base = tmp_path / "42"
+    (base / "ns").mkdir(parents=True)
+    fields = ["S", "1", "42", "42"] + ["0"] * 15 + ["9876"]
+    (base / "stat").write_text("42 (dispatcher) " + " ".join(fields))
+    status = ["Uid:\t100001 100001 100001 100001", "Gid:\t100002 100002 100002 100002", "NSpid:\t42"]
+    status += [name + ":\t0000000000000000" for name in ("CapInh", "CapPrm", "CapEff", "CapBnd", "CapAmb")]
+    status += ["NoNewPrivs:\t1", "Seccomp:\t2"]
+    (base / "status").write_text("\n".join(status) + "\n")
+    for name in ("pid", "net", "mnt"):
+        (base / "ns" / name).write_bytes(b"synthetic namespace inode")
+    executable = tmp_path / "dispatcher"
+    executable.write_bytes(b"synthetic executable inode")
+    (base / "exe").symlink_to(executable)
+    return probe, base
+
+
+@pytest.mark.parametrize("cgroup", [b"0::/\n", b"0::/system.slice/dispatcher.service\n"])
+def test_actual_process_probe_accepts_root_and_host_cgroup_v2_paths(synthetic_process, cgroup):
+    import time
+
+    probe, base = synthetic_process
+    (base / "cgroup").write_bytes(cgroup)
+    observed = probe.process(42, time.monotonic() + 1)
+    assert observed["cgroup"] == cgroup.decode().strip()
+    assert observed["pid"] == 42 and observed["start_ticks"] == 9876
+    assert observed["NSpid"] == (42,)
+    assert observed["Uid"] == (100001,) * 4
+    assert set(observed["namespaces"]) == {"pid", "net", "mnt"}
+    assert observed["executable"]["inode"] == (base / "exe").stat().st_ino
+
+
+@pytest.mark.parametrize(
+    "cgroup",
+    [
+        b"",
+        b"0::\n",
+        b"0::relative\n",
+        b"0:/\n",
+        b"1:name=systemd:/\n",
+        b"2:cpu:/dispatcher\n",
+        b"0::/\n2:cpu:/dispatcher\n",
+    ],
+)
+def test_actual_process_probe_rejects_malformed_and_v1_cgroup_records(synthetic_process, cgroup):
+    import time
+
+    probe, base = synthetic_process
+    (base / "cgroup").write_bytes(cgroup)
+    with pytest.raises(CompositionAdmissionError, match="cgroup_v2_required"):
+        probe.process(42, time.monotonic() + 1)

@@ -168,7 +168,7 @@ class LinuxSupervisorProbe:
         original = parse_process_stat(self._read(base / "stat", deadline), pid)
         status = parse_status(self._read(base / "status", deadline))
         cgroup = self._read(base / "cgroup", deadline).decode("ascii").strip()
-        require(re.fullmatch(r"0::/[^\r\n]+", cgroup) is not None, "cgroup_v2_required")
+        require(re.fullmatch(r"0::/[^\r\n]*", cgroup) is not None, "cgroup_v2_required")
         namespaces = {name: self.namespace(pid, name, deadline) for name in ("net", "pid", "mnt")}
         executable = os.stat(base / "exe")
         require(stat.S_ISREG(executable.st_mode), "process_executable")

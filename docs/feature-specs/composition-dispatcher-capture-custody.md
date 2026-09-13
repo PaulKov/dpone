@@ -209,7 +209,7 @@ The context digest selects the protected staged original; request fields cannot
 replace any configured control binding or path.
 
 The explicit module entry point is `python -m dpone.app.composition_dispatcher_service`.
-Its required arguments are `--config`, `--configuration-sha256`,
+For legacy configuration launch, its required arguments are `--config`, `--configuration-sha256`,
 `--dispatcher-uid`, and `--dispatcher-gid`. The configuration path is canonical
 and absolute, for example `/etc/dpone/dispatcher/startup/service.json`; its
 grandparent is the protected configuration root and its final two components
@@ -339,15 +339,24 @@ operation returns those tables without accepting caller paths or container
 selectors. Each table must hash to E's existing `mountinfo_sha256`, bracketed by
 fresh complete host observations equal to E. The dispatcher compares its own
 parsed mount table with the same pin before deriving filesystem coordinates.
-Missing, ambiguous or unresolvable mappings reject startup. This sidecar does
+Missing, ambiguous or unresolvable mappings reject startup. Supported relevant
+mount mappings use ext4, xfs or tmpfs; stacked destinations, mounts inside an
+assessed tree and unmodeled backing filesystems reject. Complete artifact-tree
+observations additionally reject symlinks, special files and regular files with
+multiple hardlinks, and compare every inode against retained immutable-tree
+entries. Two protected descriptor-based inventories must agree, bounded to 8192
+entries across both artifact roots and depth 32 under the same startup deadline.
+Disjoint trees on the same filesystem require this actual hardlink/inode proof;
+Docker volume names and mount translation alone cannot establish isolation. This sidecar does
 not change E or the existing facts operation and grants no execution authority.
 
 Implementation checkpoint: the protected original reader, staged bootstrap
 context selection, one-way startup coordinator and closed-admission service loop
-are implemented and tested with injected verification. The preparation callback
-must still be composed with real SQL/host/process/listener verification before
-the policy launch path can be enabled. These tests are not deployment evidence.
-The legacy launcher continues to reject v3 bootstrap input.
+are composed with control-only SQL enrollment, authenticated host/mount facts,
+actual process/listener/policy observation and complete artifact isolation.
+The policy CLI selects this path separately from the legacy configuration
+launcher. Real deployment certification and the full three-cell campaign remain
+required; component doubles and the isolated TLS handoff are not that evidence.
 
 ### Native execution-profile readiness observation
 

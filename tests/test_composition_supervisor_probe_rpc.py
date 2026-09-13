@@ -18,11 +18,17 @@ FACTS = {"docker": {"synthetic": True}, "linux": {"synthetic": True}}
 
 
 @pytest.mark.parametrize("deadline", [True, float("nan"), float("inf"), -1.0])
-def test_client_rejects_invalid_or_expired_outer_deadline_before_endpoint(monkeypatch, deadline):
+@pytest.mark.parametrize("sidecar", [False, True])
+def test_client_rejects_invalid_or_expired_outer_deadline_before_endpoint(monkeypatch, deadline, sidecar):
     monkeypatch.setattr(rpc, "_require_endpoint", lambda *args: pytest.fail("endpoint accessed"))
     client = rpc.CaptureSupervisorFactsClient(Path("/run/probe.sock"), dispatcher_gid=100001)
     with pytest.raises(rpc.SupervisorProbeError, match="deadline"):
-        client.capture(DIGEST, deadline=deadline)
+        if sidecar:
+            from tests.test_composition_supervisor_mount_sidecar import PINS
+
+            client.capture_mounts(DIGEST, expected_mountinfo_sha256=PINS, deadline=deadline)
+        else:
+            client.capture(DIGEST, deadline=deadline)
 
 
 @pytest.mark.parametrize("outer,expected", [(102.0, 102.0), (200.0, 105.0), (None, 105.0)])
@@ -192,19 +198,25 @@ def test_server_rejects_wrong_peer_before_capture(socket_authority, monkeypatch)
 @pytest.mark.parametrize(
     "mutation", ["nonce", "enrollment", "schema", "extra", "facts", "truncated", "trailing", "noncanonical", "oversize"]
 )
-def test_client_rejects_response_substitution_and_bad_framing(socket_authority, mutation):
+@pytest.mark.parametrize("sidecar", [False, True])
+def test_client_rejects_response_substitution_and_bad_framing(socket_authority, mutation, sidecar):
     failures = []
+    from tests.test_composition_supervisor_mount_sidecar import PINS, TABLES
+
+    field = "mount_tables" if sidecar else "facts"
 
     def responder(listener):
         try:
             connection, _ = listener.accept()
             with connection:
                 request = rpc._read_frame(connection, rpc.MAX_REQUEST_BYTES, time.monotonic() + 2)
+                assert set(request) == {"schema", "enrollment_sha256", "nonce"}
+                assert request["schema"] == (rpc.MOUNTS_REQUEST_SCHEMA if sidecar else rpc.REQUEST_SCHEMA)
                 response = {
-                    "schema": rpc.RESPONSE_SCHEMA,
+                    "schema": rpc.MOUNTS_RESPONSE_SCHEMA if sidecar else rpc.RESPONSE_SCHEMA,
                     "enrollment_sha256": DIGEST,
                     "nonce": request["nonce"],
-                    "facts": FACTS,
+                    field: TABLES if sidecar else FACTS,
                 }
                 if mutation == "nonce":
                     response["nonce"] = "f" * 64
@@ -215,7 +227,7 @@ def test_client_rejects_response_substitution_and_bad_framing(socket_authority, 
                 elif mutation == "extra":
                     response["command"] = "forbidden"
                 elif mutation == "facts":
-                    response["facts"] = {"linux": {}}
+                    response[field] = {"linux": {}}
                 document = canonical_json_bytes(response)
                 if mutation == "noncanonical":
                     document += b" "
@@ -237,7 +249,11 @@ def test_client_rejects_response_substitution_and_bad_framing(socket_authority, 
         thread = threading.Thread(target=responder, args=(listener,))
         thread.start()
         with pytest.raises(rpc.SupervisorProbeError):
-            rpc.CaptureSupervisorFactsClient(socket_authority, dispatcher_gid=100001, timeout_seconds=1).capture(DIGEST)
+            client = rpc.CaptureSupervisorFactsClient(socket_authority, dispatcher_gid=100001, timeout_seconds=1)
+            if sidecar:
+                client.capture_mounts(DIGEST, expected_mountinfo_sha256=PINS)
+            else:
+                client.capture(DIGEST)
         thread.join(2)
     assert not thread.is_alive() and failures == []
 

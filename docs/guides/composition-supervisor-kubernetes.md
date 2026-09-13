@@ -314,13 +314,14 @@ socket inode owned by this process.
 
 This entry point does not provision enrollment, start the remote dispatcher or
 certify the Kubernetes route. The HTTPS transport and host observation service
-still require protected business-handler wiring and a real Linux campaign.
+are connected to the protected handler; the complete deployed Linux campaign
+remains required.
 
 ## Protected dispatcher context
 
-The dispatcher context reader is an integration API. A dispatcher startup command
-and business-operation handler consuming it remain incomplete; this section does
-not establish Kubernetes execution readiness.
+The dispatcher context reader is consumed by protected policy startup and the
+whole-cell business-operation handler. This integration alone does not establish
+Kubernetes execution readiness.
 
 A verified ClickHouse connection may carry `composition_dispatcher` with the exact
 schema `dpone.composition-dispatcher-binding.v1`, `dispatcher_id`, `connection_ref`
@@ -566,8 +567,7 @@ staged context in that order; adding a release rotates the bootstrap without
 requiring the policy to hash its own registry. Installing a changed bootstrap
 requires a controlled restart and newly observed enrollment of the process and
 listener; the service never adopts changes through hot reload. Legacy binding
-v1 and service v2
-retain their full-configuration hash and existing decoder behavior.
+v1 and service v2 retain their full-configuration hash and existing decoder behavior.
 
 Developers can decode these originals with
 `decode_dispatcher_service_policy` and `decode_dispatcher_service_config` in the
@@ -577,21 +577,59 @@ configuration, `configuration_sha256`/`sha256` identify the complete bootstrap;
 selected preimage. Staged context selection must explicitly choose `policy`
 identity; a matching digest with the wrong kind is rejected.
 
-The new two-phase startup lifecycle is still required before this profile is
-operational. The legacy `--config` launch rejects v3 before reading TLS credentials
-or binding a socket. Do not launch it with a substituted digest or fabricated
-enrollment. The [approved startup specification](../feature-specs/composition-dispatcher-capture-custody.md#acyclic-service-policy-and-bootstrap-lifecycle)
-defines closed-listener startup, atomic protected bootstrap installation,
-immutable-tree/mount separation and fresh enrollment verification before opening
-admission. This checkpoint does not certify that lifecycle or a live route.
+The policy launch path binds the actual nonroot TLS listener before enrollment,
+with request handling closed. Provision the protected policy and staged context,
+then launch with the administrator-provided policy digest:
 
-The startup components now retain the protected bootstrap original and verify
-all matching staged contexts without inventing an attempt or resolving business
-credentials. The coordinator waits only for a missing file under one deadline;
-malformed originals, replacement, timeout and shutdown cannot open admission.
-The serving loop waits before processing requests and releases the bootstrap
-only after admitted handlers finish. Real SQL/host/listener verification and the
-policy CLI still need to be connected before this path is operational.
+```bash
+python -m dpone.app.composition_dispatcher_service \
+  --policy /etc/dpone/startup/policy.json \
+  --policy-sha256 "${DPONE_DISPATCHER_POLICY_SHA256}" \
+  --dispatcher-uid 1200 \
+  --dispatcher-gid 1201
+```
+
+Capture enrollment against this running process and socket, then atomically
+install the matching bootstrap at the path declared in the policy. Keep both
+bootstrap and context trees outside enrolled immutable trees. Relevant mount
+mappings must use ext4, xfs or tmpfs; internal mounts, ambiguous mappings and
+unmodeled backing filesystems reject. The artifact inventory is bounded to 8192
+entries across both roots and depth 32. Regular artifact files must have one
+hardlink; disjoint Docker volume names alone do not prove filesystem isolation.
+
+While waiting, the listener accepts no application requests or TLS handshakes.
+The service waits only for an absent bootstrap within the policy's fixed startup
+deadline. Malformed originals, replacement, timeout or failed verification exit
+without opening admission. The policy and digest flags must be supplied together
+and cannot be mixed with legacy configuration flags. Legacy `--config` rejects
+v3 before reading TLS credentials or binding a socket.
+
+Before admission, the service reopens every catalog authority's SQL enrollment,
+closes SQL, obtains fresh authenticated host and mount observations, and checks
+this process, its listener, exact policy file and artifact isolation. It repeats
+these checks, then rechecks the retained bootstrap and stop signal. The process
+and socket remain unchanged. Shutdown joins admitted work before releasing the
+bootstrap. A controlled restart requires newly observed enrollment.
+
+The [approved startup specification](../feature-specs/composition-dispatcher-capture-custody.md#acyclic-service-policy-and-bootstrap-lifecycle)
+defines the full handoff. Component tests and a TLS transition with a substituted
+enrollment verifier do not certify the full deployed route; the complete live
+SQL/host/readiness and three-cell campaign remains required.
+
+For bootstrap isolation checks, the root host service can now return ordered
+mount tables for the two containers selected by the enrollment. The authenticated
+`CaptureSupervisorFactsClient.capture_mounts` operation accepts the enrollment
+pin and locally expected mount-table hashes; callers cannot select containers
+or filesystem paths through the request. Complete host facts must match before
+and after collection, and both returned tables must match their enrollment
+hashes. The isolation verifier also checks protected artifact inventories and
+retained immutable-tree inode identities; the mount response grants no authority
+to execute a cell.
+
+The metadata-only `clickhouse_domain_for_write(properties, write)` helper shares
+runtime database-authority validation without constructing target credentials.
+Its result is a declared domain; startup must still compare it with protected SQL
+enrollment. Ordinary runtime admission retains its credential-database check.
 
 The activation connection API also preserves distinct physical identities:
 `control_connection_with_service(context)` returns the verified MSSQL connection

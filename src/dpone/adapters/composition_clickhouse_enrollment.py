@@ -222,19 +222,31 @@ class ClickHouseCompositionEnrollmentReader:
         if descriptor is None or descriptor.connection_type != "clickhouse":
             raise CompositionAdmissionError("physical_binding_connector")
         properties = descriptor.properties
-        authorities = properties.get("database_authorities")
+        if properties.get("database") != connection.credentials.database:
+            raise CompositionAdmissionError("clickhouse_database_authorities")
+        domain = clickhouse_domain_for_write(properties, write)
+        identity = properties["database_authorities"][database]["database_uuid"]
+        return domain, database, identity
 
-        if (
-            not isinstance(authorities, Mapping)
-            or not authorities
-            or properties.get("database") != connection.credentials.database
-        ):
+
+def clickhouse_domain_for_write(properties: Mapping[str, Any], write: DbtRelationWrite) -> CompositionPhysicalDomain:
+    """Derive the declared domain without resolving a source or target credential.
+
+    Verify the complete signed authority map using the same policy as runtime
+    enrollment. This computes a declared identity only; the caller must compare
+    it with independently observed protected enrollment before granting authority.
+    Runtime admission additionally checks the resolved credential database.
+    """
+    database = ClickHouseCompositionEnrollmentReader._database(write)
+    authorities = properties.get("database_authorities")
+    if not isinstance(authorities, Mapping) or not authorities:
+        raise CompositionAdmissionError("clickhouse_database_authorities")
+    for name, value in authorities.items():
+        if type(name) is not str or not name or not isinstance(value, Mapping) or set(value) != {"database_uuid"}:
             raise CompositionAdmissionError("clickhouse_database_authorities")
-        for name, value in authorities.items():
-            if type(name) is not str or not name or not isinstance(value, Mapping) or set(value) != {"database_uuid"}:
-                raise CompositionAdmissionError("clickhouse_database_authorities")
-            _uuid(value["database_uuid"])
-        if properties["database"] not in authorities or database not in authorities:
-            raise CompositionAdmissionError("clickhouse_database_authorities")
-        identity = authorities[database]["database_uuid"]
-        return clickhouse_physical_domain(properties.get("composition_service_id"), identity), database, identity
+        _uuid(value["database_uuid"])
+    if properties.get("database") not in authorities or database not in authorities:
+        raise CompositionAdmissionError("clickhouse_database_authorities")
+    return clickhouse_physical_domain(
+        _uuid(properties.get("composition_service_id")), authorities[database]["database_uuid"]
+    )

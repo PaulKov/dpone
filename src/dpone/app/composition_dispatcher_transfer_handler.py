@@ -27,6 +27,7 @@ from dpone.app.composition_clickhouse_execution import (
 from dpone.app.composition_dispatcher_attempt_authority import DispatcherAttemptAuthority
 from dpone.app.composition_dispatcher_capture_custody import DispatcherCaptureCustody
 from dpone.app.composition_dispatcher_context import StagedDispatcherAttempt, StagedDispatcherContextLoader
+from dpone.app.composition_dispatcher_enrollment_validation import require_dispatcher_enrollment
 from dpone.app.composition_dispatcher_service_config import DispatcherServiceConfig, decode_dispatcher_service_config
 from dpone.app.composition_mssql_execution_deadline import BudgetedMssqlConnectorFactory
 from dpone.contracts.airflow_correlation import AirflowAttemptCorrelation
@@ -205,27 +206,7 @@ class DispatcherTransferHandler:
             control.expected_service_id,
         ) as ledger:
             enrollment = read_service_enrollment(ledger, service)
-        enrollment.__post_init__()
-        body = enrollment.body
-        _require(
-            enrollment.enrollment_sha256 == self._config.supervisor_enrollment_sha256
-            and body["schema"] == "dpone.composition-clickhouse-supervisor-enrollment.v2"
-            and body["service_id"] == service
-        )
-        policy = body["policy"]["capture_custody"]
-        _require(
-            canonical_json_bytes({name: policy[name] for name in ("profile", "uid", "gid", "destination")})
-            == canonical_json_bytes(
-                {
-                    "profile": self._config.capture_custody,
-                    "uid": self._config.dispatcher_uid,
-                    "gid": self._config.dispatcher_gid,
-                    "destination": str(self._config.capture_root),
-                }
-            )
-            and canonical_json_bytes(body["facts"]["linux"]["capture_custody"]["root_identity"])
-            == canonical_json_bytes(asdict(self._config.capture_root_identity))
-        )
+        require_dispatcher_enrollment(self._config, enrollment, service)
         return {
             "control": control,
             "target": target,

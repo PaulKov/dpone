@@ -49,15 +49,19 @@ def _arguments(argv: Sequence[str] | None) -> Any:
         description="Run the protected v2 whole-cell dispatcher using administrator-provisioned configuration.",
         allow_abbrev=False,
     )
-    parser.add_argument(
-        "--config", required=True, action=Once, type=path, help="Canonical absolute startup configuration file."
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--config", action=Once, type=path, help="Canonical absolute legacy startup configuration file.")
+    mode.add_argument(
+        "--policy", action=Once, type=path, help="Canonical absolute policy for closed-listener bootstrap."
     )
     parser.add_argument(
         "--configuration-sha256",
-        required=True,
         action=Once,
         type=digest,
         help="Externally pinned SHA256 of the exact configuration bytes.",
+    )
+    parser.add_argument(
+        "--policy-sha256", action=Once, type=digest, help="Externally pinned SHA256 of exact policy bytes."
     )
     parser.add_argument(
         "--dispatcher-uid", required=True, action=Once, type=identity, help="Enrolled nonzero Linux dispatcher UID."
@@ -65,7 +69,13 @@ def _arguments(argv: Sequence[str] | None) -> Any:
     parser.add_argument(
         "--dispatcher-gid", required=True, action=Once, type=identity, help="Enrolled nonzero Linux dispatcher GID."
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.config is not None:
+        if args.configuration_sha256 is None or args.policy_sha256 is not None:
+            parser.error("--config requires --configuration-sha256 and excludes --policy-sha256")
+    elif args.policy_sha256 is None or args.configuration_sha256 is not None:
+        parser.error("--policy requires --policy-sha256 and excludes --configuration-sha256")
+    return args
 
 
 def _pause_startup() -> None:
@@ -123,6 +133,7 @@ def main(
     argv: Sequence[str] | None = None,
     *,
     build_server: Callable[..., Any] | None = None,
+    build_policy_server: Callable[..., Any] | None = None,
     signals: Any = None,
     stderr: TextIO | None = None,
 ) -> int:
@@ -137,17 +148,30 @@ def main(
     import sys
 
     try:
-        if build_server is None:
-            from dpone.app.composition_dispatcher_service_factory import build_dispatcher_server
+        if args.policy is not None:
+            if build_policy_server is None:
+                from dpone.app.composition_dispatcher_policy_server import build_dispatcher_policy_server
 
-            build_server = build_dispatcher_server
-        server = build_server(
-            args.config,
-            expected_configuration_sha256=args.configuration_sha256,
-            dispatcher_uid=args.dispatcher_uid,
-            dispatcher_gid=args.dispatcher_gid,
-        )
-        _serve(server, signal if signals is None else signals)
+                build_policy_server = build_dispatcher_policy_server
+            service = build_policy_server(
+                args.policy,
+                expected_policy_sha256=args.policy_sha256,
+                dispatcher_uid=args.dispatcher_uid,
+                dispatcher_gid=args.dispatcher_gid,
+            )
+            _serve(service.server, signal if signals is None else signals, startup=service.startup)
+        else:
+            if build_server is None:
+                from dpone.app.composition_dispatcher_service_factory import build_dispatcher_server
+
+                build_server = build_dispatcher_server
+            server = build_server(
+                args.config,
+                expected_configuration_sha256=args.configuration_sha256,
+                dispatcher_uid=args.dispatcher_uid,
+                dispatcher_gid=args.dispatcher_gid,
+            )
+            _serve(server, signal if signals is None else signals)
         return 0
     except Exception:
         print(

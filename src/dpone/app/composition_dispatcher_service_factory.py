@@ -30,6 +30,7 @@ from dpone.adapters.composition_supervisor_filesystem import open_protected
 from dpone.adapters.dbt_runtime import build_hvac_kubernetes_vault_kv_v2_reader
 from dpone.app.composition_dispatcher_context import StagedDispatcherContextLoader
 from dpone.app.composition_dispatcher_service_config import DispatcherServiceConfig, load_dispatcher_service_config
+from dpone.app.composition_dispatcher_service_policy import DispatcherServicePolicy
 from dpone.app.composition_dispatcher_transfer_handler import DispatcherTransferHandler
 from dpone.contracts.composition_dispatch_rpc import require_bearer_token
 from dpone.contracts.composition_dispatch_v2 import DispatchV2Request
@@ -109,7 +110,7 @@ def _held_original(path: Path, gid: int, original: bytes) -> Iterator[str]:
             os.close(parent)
 
 
-def _credentials(config: DispatcherServiceConfig) -> tuple[ssl.SSLContext, str]:
+def _credentials(config: DispatcherServiceConfig | DispatcherServicePolicy) -> tuple[ssl.SSLContext, str]:
     certificate, key = config.tls.certificate_file, config.tls.private_key_file
     gid = config.dispatcher_gid
     original_certificate = _protected_read(certificate, gid, _MAX_TLS_BYTES)
