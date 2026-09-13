@@ -316,6 +316,42 @@ This entry point does not provision enrollment, start the remote dispatcher or
 certify the Kubernetes route. The HTTPS transport and host observation service
 still require protected business-handler wiring and a real Linux campaign.
 
+## Protected dispatcher context
+
+The dispatcher context reader is an integration API. A dispatcher startup command
+and business-operation handler consuming it remain incomplete; this section does
+not establish Kubernetes execution readiness.
+
+A verified ClickHouse connection may carry `composition_dispatcher` with the exact
+schema `dpone.composition-dispatcher-binding.v1`, `dispatcher_id`, `connection_ref`
+and `service_configuration_sha256`. The reference selects an existing API binding;
+the descriptor contains no endpoint or credential. Logical references follow the
+existing connection-reference grammar.
+
+The protected service configuration must pin a catalog from each
+`runtime_authority_sha256` to its complete staged context-document digest.
+`StagedDispatcherContextLoader` accepts that catalog at construction. A request
+selects only an existing digest; it cannot choose paths, environment variables
+or a replacement catalog. The reader verifies the runtime connection context,
+parent release/deployment, producer-backed composition plan and signed dispatcher
+binding before exposing the lazy resolver. Current SQL activation and attempt
+ownership still require independent checks by the operation handler.
+
+The staged layout is `<root>/<64-hex-authority>/context.json` with a sibling
+`cache/` containing the verified release cache. Directories use root ownership,
+the configured dispatcher group and mode `0750`; single-linked regular files use
+root ownership, that group and mode `0640`. Other-account access, group writes,
+symlinks and special files are rejected. The context original is limited to 1 MiB;
+the cache scan is limited to 8192 entries and depth 32.
+
+The canonical `dpone.composition-dispatcher-context.v1` original contains exactly
+`schema`, `runtime_authority_sha256`, `deployment_identity`, `init_fetch_plan_b64`,
+`init_fetch_plan_sha256` and `plan_sha256`. Deployment identity uses the existing
+`AirflowDeploymentIdentity` document. The loader passes only the three explicit
+runtime-loader environment keys and does not inherit worker ambient authority.
+Provisioning and startup must supply authentic originals; this reader creates
+neither originals nor a new execution permit.
+
 ## DAG triggering
 
 Composed synthetic DAGs keep `schedule: null`. Load every expected DAG through

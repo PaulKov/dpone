@@ -25,6 +25,9 @@
 - Add authenticated TLS dispatcher transport and a separately runnable protected
   host observation service with bounded shutdown. The protected remote business
   handler and full Kubernetes execution campaign remain incomplete.
+- Add closed signed dispatcher bindings and protected staged-context selection,
+  cross-checking verified parent/runtime/plan identities before resolving secrets.
+  Dispatcher startup, remote business handling and deployment remain incomplete.
 - Independently derive and retain canonical SQL preplans before registration;
   bind the complete envelope through composition binding v2 without changing
   generic receipt formats or existing plan digests. Recovery verifies registry
