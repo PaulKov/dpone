@@ -125,3 +125,71 @@ def test_unavailable_http_original_is_rejected_by_contract():
 
     with pytest.raises(CompositionAdmissionError, match="snapshot_catalog_visibility"):
         ClickHouseCatalogVisibility(http=Unavailable(), service_id=SERVICE, username="protected_admin")()
+
+
+def test_retained_visibility_round_trip_preserves_producer_bytes():
+    from dpone.contracts.composition_snapshot_materialization import require_catalog_visibility_original
+
+    original = ClickHouseCatalogVisibility(http=Http(response()), service_id=SERVICE, username="protected_admin")()
+    assert (
+        require_catalog_visibility_original(original, expected_service_id=SERVICE, expected_observer="protected_admin")
+        == original
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "extra",
+        "missing",
+        "schema",
+        "observer",
+        "service",
+        "revokes",
+        "complete",
+        "boolean",
+        "string",
+        "duplicate",
+        "noncanonical",
+        "oversized",
+        "unavailable",
+        "http",
+    ],
+)
+def test_retained_visibility_rejects_incomplete_foreign_and_noncanonical_originals(mutation):
+    from dpone.contracts.composition_snapshot_materialization import require_catalog_visibility_original
+    from dpone.contracts.strict_json import canonical_json_bytes
+
+    document = {
+        "schema": "dpone.composition-catalog-visibility.v1",
+        "observer": "protected_admin",
+        "service": SERVICE,
+        "revokes": 0,
+        "complete": 1,
+    }
+    changes = {
+        "extra": {"asserted": True},
+        "schema": {"schema": "v2"},
+        "observer": {"observer": "worker"},
+        "service": {"service": "22222222-2222-2222-2222-222222222222"},
+        "revokes": {"revokes": 1},
+        "complete": {"complete": 0},
+        "boolean": {"revokes": False},
+        "string": {"complete": "1"},
+    }
+    document.update(changes.get(mutation, {}))
+    if mutation == "missing":
+        del document["complete"]
+    body = canonical_json_bytes(document)
+    if mutation == "duplicate":
+        body = body[:-1] + b',"complete":1}'
+    elif mutation == "noncanonical":
+        body += b"\n"
+    elif mutation == "oversized":
+        body = b" " * 8193
+    elif mutation == "unavailable":
+        body = None
+    elif mutation == "http":
+        body = response()
+    with pytest.raises(CompositionAdmissionError, match="snapshot_catalog_visibility"):
+        require_catalog_visibility_original(body, expected_service_id=SERVICE, expected_observer="protected_admin")

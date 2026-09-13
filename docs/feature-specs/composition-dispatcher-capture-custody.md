@@ -39,6 +39,22 @@ or predecessor drain. Upgrade and rollback preserve every old original.
 
 ## Scope and non-goals
 
+### Retained visibility validation for readiness
+
+Readiness consumers must validate the existing canonical
+`dpone.composition-catalog-visibility.v1` original independently of its HTTP
+JSONCompact producer. Its exact fields are `schema`, `observer`, `service`,
+`revokes`, and `complete`. Require the independently selected observer and
+service, integer zero revokes and integer one complete grant coverage. Reject
+unknown or duplicate fields, noncanonical bytes, boolean/string counters,
+unavailable input and documents exceeding the existing 8192-byte bound. The
+validator returns the unchanged original and performs no I/O. This additive
+decoder preserves the existing producer's bytes and transport normalization.
+It does not establish freshness or provenance: the enclosing readiness producer
+must independently observe and bind those facts to the request and deadline.
+Adversarial codec tests cover each refusal and producer round trips; this
+component alone does not enable a cell or certify runtime readiness.
+
 Only the existing `mssql_clickhouse_full_refresh_v1` load semantics are affected.
 No new connector, strategy, background cleanup, replica topology, source-row
 transformation or generalized remote SQL API is proposed. Native dbt and

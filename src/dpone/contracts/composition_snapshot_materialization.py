@@ -201,15 +201,56 @@ def catalog_visibility_original(body: bytes | None, *, expected_service_id: str,
         for actual, expected in zip(row[2:], (0, 1), strict=True):
             if not (type(actual) is int and actual == expected or type(actual) is str and actual == str(expected)):
                 raise ValueError
-        return canonical_json_bytes(
-            {
-                "schema": "dpone.composition-catalog-visibility.v1",
-                "observer": row[0],
-                "service": row[1],
-                "revokes": 0,
-                "complete": 1,
-            }
+        return require_catalog_visibility_original(
+            canonical_json_bytes(
+                {
+                    "schema": "dpone.composition-catalog-visibility.v1",
+                    "observer": row[0],
+                    "service": row[1],
+                    "revokes": 0,
+                    "complete": 1,
+                }
+            ),
+            expected_service_id=expected_service_id,
+            expected_observer=expected_observer,
         )
+    except Exception:
+        raise CompositionAdmissionError("snapshot_catalog_visibility") from None
+
+
+def require_catalog_visibility_original(
+    body: bytes | None, *, expected_service_id: str, expected_observer: str
+) -> bytes:
+    """Validate retained V1 semantics without treating them as a fresh observation.
+
+    Pins come from independently verified connection authority. Unlike the HTTP
+    producer, this decoder accepts only the exact canonical retained format; it
+    does not normalize strings into counters or discard additional fields. The
+    enclosing consumer remains responsible for provenance, nonce and freshness.
+    """
+    try:
+        if type(body) is not bytes or not 1 <= len(body) <= 8192:
+            raise ValueError
+        value = strict_json_object(body)
+        expected = {
+            "schema": "dpone.composition-catalog-visibility.v1",
+            "observer": expected_observer,
+            "service": expected_service_id,
+            "revokes": 0,
+            "complete": 1,
+        }
+        if (
+            type(expected_service_id) is not str
+            or type(expected_observer) is not str
+            or not expected_service_id
+            or not expected_observer
+            or value != expected
+            or type(value["revokes"]) is not int
+            or type(value["complete"]) is not int
+            or canonical_json_bytes(value) != body
+        ):
+            raise ValueError
+        return body
     except Exception:
         raise CompositionAdmissionError("snapshot_catalog_visibility") from None
 
