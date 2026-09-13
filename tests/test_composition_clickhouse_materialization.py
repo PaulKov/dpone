@@ -329,8 +329,8 @@ def test_catalog_materializes_wide_captured_string_within_explicit_budget(text):
 
 
 def test_catalog_string_decoder_enforces_utf8_byte_budget():
-    from dpone.app.composition_clickhouse_catalog import _cell
+    from dpone.contracts.composition_snapshot_materialization import _catalog_response_cell
 
-    assert _cell("жж", "Nullable(String)", 4) == "жж"
+    assert _catalog_response_cell("жж", "Nullable(String)", 4) == "жж"
     with pytest.raises(CompositionAdmissionError):
-        _cell("жж", "Nullable(String)", 3)
+        _catalog_response_cell("жж", "Nullable(String)", 3)

@@ -15,8 +15,7 @@ from dpone.contracts.composition_clickhouse_dispatch import ClickHouseDispatchCo
 from dpone.contracts.composition_persistence import CompositionAttemptIdentity
 from dpone.contracts.composition_snapshot import SnapshotCatalogObservation, SnapshotPublicationIntent, SnapshotTarget
 from dpone.contracts.composition_snapshot_capture import SnapshotCaptureSubject
-from dpone.contracts.composition_snapshot_materialization import require_snapshot_columns
-from dpone.contracts.strict_json import strict_json_object
+from dpone.contracts.composition_snapshot_materialization import catalog_response_rows, require_snapshot_columns
 
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _DESIGN = re.compile(
@@ -52,46 +51,6 @@ def _identifier(value: str) -> str:
     if type(value) is not str or not 1 <= len(value) <= 128 or _IDENTIFIER.fullmatch(value) is None:
         raise CompositionAdmissionError("snapshot_catalog_shape")
     return value
-
-
-def _cell(value: object, kind: str, max_string_bytes: int) -> object:
-    if kind.startswith("Nullable(") and kind.endswith(")"):
-        return None if value is None else _cell(value, kind[9:-1], max_string_bytes)
-    if kind == "String":
-        if type(value) is not str or len(value.encode("utf-8")) > max_string_bytes:
-            raise CompositionAdmissionError("snapshot_catalog_shape")
-        return value
-    if kind == "UInt64" and type(value) is str:
-        if re.fullmatch(r"0|[1-9][0-9]{0,19}", value) is None:
-            raise CompositionAdmissionError("snapshot_catalog_shape")
-        value = int(value)
-    if kind == "UInt64" and type(value) is int and 0 <= value <= 2**64 - 1:
-        return value
-    raise CompositionAdmissionError("snapshot_catalog_shape")
-
-
-def _rows(
-    body: bytes, columns: tuple[str, ...], types: tuple[str, ...], maximum: int, max_string_bytes: int
-) -> tuple[tuple[object, ...], ...]:
-    value = strict_json_object(body)
-    if not {"meta", "data", "rows"} <= set(value) or not set(value) <= {
-        "meta",
-        "data",
-        "rows",
-        "statistics",
-        "rows_before_limit_at_least",
-    }:
-        raise CompositionAdmissionError("snapshot_catalog_shape")
-    if value["meta"] != [{"name": name, "type": kind} for name, kind in zip(columns, types, strict=True)]:
-        raise CompositionAdmissionError("snapshot_catalog_shape")
-    data = value["data"]
-    if type(data) is not list or len(data) > maximum or type(value["rows"]) is not int or value["rows"] != len(data):
-        raise CompositionAdmissionError("snapshot_catalog_shape")
-    if not all(type(row) is list and len(row) == len(columns) for row in data):
-        raise CompositionAdmissionError("snapshot_catalog_shape")
-    return tuple(
-        tuple(_cell(cell, kind, max_string_bytes) for cell, kind in zip(row, types, strict=True)) for row in data
-    )
 
 
 def _uuid(value: object) -> str:
@@ -421,7 +380,7 @@ class ClickHouseHttpSnapshotCatalog:
         evidence.update(len(observed.body).to_bytes(8, "big"))
         evidence.update(observed.body)
         try:
-            return _rows(observed.body, columns, types, maximum, self._max_content_bytes)
+            return catalog_response_rows(observed.body, columns, types, maximum, self._max_content_bytes)
         except CompositionAdmissionError:
             raise
         except Exception:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -140,3 +141,23 @@ __all__ = [
     "build_composition_transfer_execution_dependencies",
     "build_composition_transfer_execution_root",
 ]
+
+
+def transfer_payload_root(environment: Mapping[str, str]) -> Path:
+    """Reopen the administrator-provisioned private supervisor capture directory."""
+    import os
+
+    from dpone.adapters.composition_supervisor_filesystem import (
+        absolute_supervisor_path,
+        open_protected,
+        require_supervisor,
+    )
+
+    require_supervisor()
+    root = absolute_supervisor_path(
+        Path(environment.get("DPONE_COMPOSITION_SUPERVISOR_ROOT") or "/var/lib/dpone/composition")
+    )
+    payloads = root / "transfers"
+    descriptor = open_protected(payloads, traversable=False)
+    os.close(descriptor)
+    return payloads

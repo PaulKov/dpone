@@ -42,6 +42,9 @@ from dpone.app.composition_transfer_execution import (
 from dpone.app.composition_transfer_execution_factory import (
     build_composition_transfer_execution_dependencies,
 )
+from dpone.app.composition_transfer_execution_factory import (
+    transfer_payload_root as _transfer_payload_root,
+)
 from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
 from dpone.contracts.composition_activation import CompositionAdmissionError
 from dpone.contracts.composition_control import CompositionExecutionPlan
@@ -370,26 +373,6 @@ def _transfer_dependencies(
         state_config=state,
         payload_root=_transfer_payload_root(environment),
     )
-
-
-def _transfer_payload_root(environment: Mapping[str, str]) -> Path:
-    """Reopen the administrator-provisioned private supervisor capture directory."""
-    import os
-
-    from dpone.adapters.composition_supervisor_filesystem import (
-        absolute_supervisor_path,
-        open_protected,
-        require_supervisor,
-    )
-
-    require_supervisor()
-    root = absolute_supervisor_path(
-        Path(environment.get("DPONE_COMPOSITION_SUPERVISOR_ROOT") or "/var/lib/dpone/composition")
-    )
-    payloads = root / "transfers"
-    descriptor = open_protected(payloads, traversable=False)
-    os.close(descriptor)
-    return payloads
 
 
 __all__ = [

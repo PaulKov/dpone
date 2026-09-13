@@ -130,3 +130,30 @@ Implementation must include actual service startup, units/container and ingress
 configuration, positive authenticated delivery, denied raw ClickHouse access,
 duplicate/paused/ambiguous dispatch tests and the complete provider campaign.
 The architect's recommendation is not an implementation or certification claim.
+
+## Trusted transfer preplan completion
+
+The existing approved independent-outcome requirement includes independent
+physical-route and schema-mutation authorization. A worker-supplied 32-byte plan
+digest is insufficient. Before SQL registration and extraction, reconstruct the
+load configuration from the verified manifest and signed resolved bindings.
+Use the actual prepared PostgreSQL snapshot lease to reverify source identity
+and reread its projection on that same session. Observe the target registry and
+source/target authority independently, recompute the route fingerprint, and run
+the existing schema preplanner through a separately owned target connection.
+Close only that private target connection; leave the extraction snapshot active.
+
+Retain the independently generated preplan, full observed source projection,
+physical identities, route and exact attempt/write/operation originals in an
+exclusive fsynced supervisor envelope under a separate preplans directory.
+The composition binding v2 must pin this envelope digest. Generic receipt formats
+remain unchanged, and historical v1 bindings remain decodable but cannot acquire
+new independent-success authority. Recovery reads the original; it never plans
+against a catalog already changed by the committed mutation. Recheck the current
+physical registry, retained after-expectations, receipt before/after hashes and
+captured payload provenance before accepting an outcome.
+
+This is an implementation elaboration of the approved execution specification;
+it does not mark the existing SQL5 finding fixed. Shared registration, hydration,
+binding and observation seams remain integrator-owned until the complete path
+and its regressions are verified.
