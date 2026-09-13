@@ -61,10 +61,10 @@ All code paths above are relative to `src/dpone/` at the observed source SHA.
 | dbt TLS booleans | Accepted | String `yes` rejected by renderer |
 | dbt missing schema | `DPONE_DBT_PROFILE_INVALID` | Missing schema in example runtime registry is a follow-up gap |
 | dbt mismatched schema | `DPONE_DBT_TARGET_IDENTITY_MISMATCH` | Fails before rendering/execution |
-| secure CH connector → bulk HTTP | Defaults false / 8123 | Explicit transport settings work; inheritance is not established |
-| secure CH connector → bulk native TCP | Defaults false / 9000 | Both native builders agree; explicit values work |
-| secure CH connector → client mode | Inherits true / 9440 in probe | Different omission semantics from HTTP/native TCP |
-| custom CA | Retained on connector; HTTP forwards; native drops | Bulk credential contracts lack CA field; no handshake run |
+| secure CH connector → bulk HTTP | Source code selects false / 8123 defaults | Source inspection only; dynamically UNVERIFIED |
+| secure CH connector → bulk native TCP | Source code selects false / 9000 defaults | Source inspection only; dynamically UNVERIFIED |
+| secure CH connector → client mode | Source code falls back to connector fields | Source inspection only; dynamically UNVERIFIED |
+| custom CA | HTTP control construction forwards it; native construction omits it | Bulk credential contracts lack CA field; source inspection only, dynamically UNVERIFIED |
 | compiled lower interval bound | Leaves `{{timestamp}}` after runtime binding | Confirmed isolated bug; fixed separately |
 | composition activation | Fail closed at this baseline | Existing native execution does not activate composition |
 
@@ -138,9 +138,13 @@ is changed here. Durable identity collision hypotheses remain UNVERIFIED.
 
 `probe_profile.py` produces admission, compiler, interval and renderer JSON.
 `profile-baseline.json` was produced before the one-line implementation change;
-its interval status is FAIL. `probe_tls.py` blocks sockets/subprocesses and
-produces `tls-observations.json`. Its PASS means current behavior reproduced,
-including the projection gaps, not secure live execution.
+its interval status is FAIL. TLS conclusions come only from source inspection
+of `runtime/bulk_options.py`, `runtime/sinks/clickhouse_bulk_mixin.py`,
+`runtime/credentials/resolved_connector_factory.py` and
+`runtime/connectors/clickhouse.py`. Dynamic TLS projection and handshakes are
+UNVERIFIED. An earlier TLS probe replaced SDK/module methods and was rejected
+under the task's no-monkey-patching boundary; its code/results were removed
+from the candidate and must not be used as acceptance evidence.
 
 The test specialist executed 233 selected existing tests: 230 passed in a
 cached minimal Python 3.12.11/pytest 9.1.1 environment; three isolated-import

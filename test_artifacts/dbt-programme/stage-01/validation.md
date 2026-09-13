@@ -35,7 +35,7 @@ root; do not hand-edit previously generated manifests or execution packs.
 |---|---|---|
 | Existing baseline selection | PASS with environment correction | 230 cases passed in cached Python3.12.11/pytest9.1.1; three `python -I` imports initially failed because dpone was not installed; only those three reran and passed in the frozen editable environment |
 | Profile/identity/renderer probe | PASS for observations | `profile-baseline.json` records closed admission and the interval defect; no live execution |
-| TLS projection probe | PASS for observations | `tls-observations.json`; sockets and subprocesses prohibited, existing projection gaps retained |
+| TLS projection probe | SKIP / rejected evidence | Earlier monkey-patched probe and its PASS JSON removed; source inspection retained, dynamic projection UNVERIFIED |
 | New interval regressions before source fix | FAIL, expected RED | Both exact-bound assertions observed `{{2026-09-01T00:00:00Z}}` in generated runtime SQL |
 | New interval + service + schema tests after fix | PASS | 54 passed in 1.52s |
 | Docs contracts + language | PASS | 39 passed in 5.71s; repeated after the final active macro-count correction |
@@ -57,7 +57,6 @@ uv run --frozen --offline pytest -o addopts= -q \
 uv run --frozen --offline pytest -o addopts= -q \
   tests/test_dbt_self_service_docs_contracts.py tests/test_docs_language_contracts.py
 uv run --frozen --offline python -B test_artifacts/dbt-programme/stage-01/probe_profile.py
-uv run --frozen --offline python -B test_artifacts/dbt-programme/stage-01/probe_tls.py
 ```
 
 The initial baseline used an offline cached dependency environment without an
@@ -110,8 +109,11 @@ registry/schema example, strict TLS field placement, exact option admission,
 partition completeness and separate execution-family semantics. The profile
 extension remains a DRAFT and requires a fully enumerated approved contract.
 
-The custom-CA and TLS omission observations are current behavior gaps; this PR
-does not claim they are regressions or alter them. No current live adapter or
+The custom-CA and TLS omission questions are source-inspection findings, with
+dynamic behavior UNVERIFIED. The coordinator rejected the earlier SDK/module
+replacement probe under the no-monkey-patching task boundary; it is not valid
+acceptance evidence and has been removed. This PR does not claim these findings
+are regressions or alter them. No current live adapter or
 end-to-end certification is implied by unit/contract passes.
 
 Independent fresh-context review: UNVERIFIED pending source/evidence freeze.
