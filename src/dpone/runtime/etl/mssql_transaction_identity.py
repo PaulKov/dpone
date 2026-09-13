@@ -48,6 +48,7 @@ from dpone.contracts.mssql_transaction_identity import require_authority_sha256 
 from dpone.contracts.mssql_transaction_identity import (
     require_source_physical_identity_binding as require_source_physical_identity_binding,
 )
+from dpone.runtime.etl.mssql_transaction_request import attempt_target_coordinates, live_target_coordinates
 from dpone.runtime.etl.mssql_transaction_route_identity import (
     _backfill_execution_policy_digest,
     invocation_route_fingerprint,
@@ -114,3 +115,34 @@ __all__ = [
     "require_source_physical_identity_binding",
     "resolve_source_physical_identity",
 ]
+
+
+def derive_mssql_runtime_requests(
+    load_config: Any,
+    *,
+    source: Any,
+    sink: Any,
+    state_storage: Any,
+    target_resolver: Any,
+    invocation: Any,
+    load_id: str,
+) -> tuple[MssqlAttemptRequest, MssqlOperationRequest]:
+    live_database, identity_schema, identity_table = live_target_coordinates(load_config)
+    physical = target_resolver(
+        sink.connector,
+        state_storage,
+        database=live_database,
+        schema=identity_schema,
+        table=identity_table,
+    )
+    source_identity = resolve_source_physical_identity(source, load_config)
+    coordinates = attempt_target_coordinates(load_config, physical_target=physical)
+    attempt = build_mssql_attempt_request(
+        load_config,
+        invocation=invocation,
+        target_identity=physical.digest,
+        source_identity=source_identity,
+        load_id=load_id,
+        request_coordinates=coordinates,
+    )
+    return attempt, operation_request(load_config, invocation)

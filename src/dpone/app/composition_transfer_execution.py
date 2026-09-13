@@ -20,7 +20,7 @@ v3 transfer, and no process return value alone can terminalize a parent attempt.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from types import SimpleNamespace
 from typing import Any
 
@@ -30,8 +30,9 @@ from dpone.contracts.composition_activation import (
     CompositionActivationOccurrence,
     CompositionAdmissionError,
 )
-from dpone.contracts.composition_persistence import CompositionAttemptIdentity
+from dpone.contracts.composition_persistence import CompositionAttemptIdentity, encode_attempt_identity
 from dpone.contracts.runtime_connection import ResolvedBindingConnection
+from dpone.contracts.strict_json import canonical_json_bytes
 from dpone.runtime.credentials.config import CredentialsConfig
 from dpone.services.composition_transfer_attempt import build_composition_transfer_attempt
 from dpone.services.composition_worker import CompositionWorker
@@ -85,6 +86,7 @@ class CompositionTransferExecutionDependencies:
     composition_fence: Any | None = None
     operation_registrar: Callable[..., Any] | None = None
     capture_lifecycle: Callable[[CompositionAttemptIdentity], Any] | None = None
+    preplan_factory: Callable[..., Any] | None = None
 
 
 class CompositionTransferExecutionRoot:
@@ -185,9 +187,14 @@ class CompositionTransferExecutionRoot:
         if service is None:
             return MssqlTransactionAdmissionService(
                 operation_registrar=registrar,
+                preplan_verifier=(
+                    self._deps.preplan_factory(attempt, write).verify_preplan if self._deps.preplan_factory else None
+                ),
                 composition_fence=self._deps.composition_fence,
                 fence_connector=getattr(sink, "connector", None),
             )
+        if self._deps.preplan_factory is not None and getattr(service, "_preplan_verifier", None) is None:
+            raise CompositionAdmissionError("transfer_preplan_configuration")
         if getattr(service, "_operation_registrar", None) is None:
             raise CompositionAdmissionError("operation_registrar")
         return service
@@ -198,8 +205,8 @@ class CompositionTransferExecutionRoot:
             raise CompositionAdmissionError("operation_registrar")
         register = composition_transfer_binding_registrar(bind, attempt=attempt, write=write)
 
-        def attach(admission: Any, mutation_plan_sha256: bytes) -> None:
-            fence = register(admission, mutation_plan_sha256)
+        def attach(admission: Any, mutation_plan_sha256: bytes, *, preplan_reference: Any = None) -> None:
+            fence = register(admission, mutation_plan_sha256, preplan_reference=preplan_reference)
             if fence is None:
                 fence = self._deps.composition_fence
             if fence is None:
@@ -214,24 +221,45 @@ def composition_transfer_binding_registrar(
     *,
     attempt: CompositionAttemptIdentity,
     write: Any,
-) -> Callable[[Any, bytes], Any]:
+) -> Callable[..., Any]:
     """Adapt ``MssqlCompositionTransactionBindings.bind`` to the admission registrar.
 
     The returned callback is
     ``Callable[[MssqlTransactionAdmission, bytes], MssqlCompositionTransactionFence | None]``.
-    Task 8 injects the existing 4-arg binder; this wrapper supplies ``attempt`` /
-    ``write``, then wraps a ``CompositionMssqlOperationBinding`` in
-    ``MssqlCompositionTransactionFence``.
+    The legacy four-argument binder remains supported. Trusted admission adds
+    a keyword-only retained preplan reference whose whole digest is pinned in
+    the v2 binding before the resulting composition fence can be attached.
     """
 
-    def register(admission: Any, mutation_plan_sha256: bytes) -> Any:
+    def register(admission: Any, mutation_plan_sha256: bytes, *, preplan_reference: Any = None) -> Any:
         from dpone.adapters.composition_mssql_transaction_fence import MssqlCompositionTransactionFence
-        from dpone.contracts.composition_mssql_binding import CompositionMssqlOperationBinding
+        from dpone.contracts.composition_mssql_binding import (
+            CompositionMssqlOperationBinding,
+            stable_operation_document,
+        )
         from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
 
         if type(admission) is not MssqlTransactionAdmission or admission.operation is None:
             raise CompositionAdmissionError("transfer_operation")
-        result = bind(attempt, admission.operation, write, mutation_plan_sha256)
+        extra = {}
+        if preplan_reference is not None:
+            from dpone.runtime.composition_transfer_preplan_store import RetainedTransferPreplanReference
+
+            if (
+                type(preplan_reference) is not RetainedTransferPreplanReference
+                or preplan_reference.mutation_plan_sha256 != mutation_plan_sha256
+            ):
+                raise CompositionAdmissionError("transfer_preplan_original")
+            original = preplan_reference.body
+            if (
+                canonical_json_bytes(original["attempt_original"]) != encode_attempt_identity(attempt)
+                or canonical_json_bytes(original["operation_original"])
+                != stable_operation_document(admission.operation)
+                or original["write"] != asdict(write)
+            ):
+                raise CompositionAdmissionError("transfer_preplan_original")
+            extra["preplan_document_sha256"] = "sha256:" + preplan_reference.document_sha256.hex()
+        result = bind(attempt, admission.operation, write, mutation_plan_sha256, **extra)
         if result is None:
             return None
         if isinstance(result, MssqlCompositionTransactionFence):

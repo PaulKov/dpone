@@ -69,6 +69,8 @@ class MssqlCompositionTransactionBindings:
         operation: MssqlTransactionOperation,
         write: DbtRelationWrite,
         mutation_plan_sha256: bytes,
+        *,
+        preplan_document_sha256: str | None = None,
     ) -> CompositionMssqlOperationBinding:
         """Verify source membership and current issued identity, then commit once.
 
@@ -128,6 +130,7 @@ class MssqlCompositionTransactionBindings:
                 self._service,
                 self._database,
                 encode_activation_request(occurrence.request),
+                preplan_document_sha256,
             )
             owner_key = CompositionOwnerReference("execution", occurrence.request.activation_id).owner_key
             request = operation.attempt.request

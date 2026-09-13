@@ -36,11 +36,13 @@ class CompositionTransferCommittedObserver:
         read_receipt: Callable[..., Any],
         require_target: Callable[..., Any],
         read_payload: Callable[..., RetainedTransferPayload] | None,
+        verify_retained_commit: Callable[..., None] | None = None,
         max_rows: int = 1_000_000,
         max_row_bytes: int = 1024 * 1024,
     ) -> None:
         self._binding, self._transaction, self._receipt = read_binding, transaction, read_receipt
         self._target, self._payload = require_target, read_payload
+        self._verify_preplan = verify_retained_commit
         if type(max_rows) is not int or max_rows <= 0 or type(max_row_bytes) is not int or max_row_bytes <= 0:
             raise CompositionAdmissionError("transfer_observation_budget")
         self._max_rows, self._max_row_bytes = max_rows, max_row_bytes
@@ -76,6 +78,8 @@ class CompositionTransferCommittedObserver:
                 if receipt is None:
                     return CompositionTransferObservation(False, False, False, False, False)
                 bound.require_receipt(receipt)
+                if self._verify_preplan is not None:
+                    self._verify_preplan(connection, bound, receipt, payload)
                 columns = _columns(cursor, bound)
                 names = ",".join(_quote(column["target_name"]) for column in columns)
                 target = ".".join(
@@ -96,6 +100,8 @@ class CompositionTransferCommittedObserver:
                 source_rows, target_rows = reconciled.source_rows, reconciled.target_rows
                 source_digest, target_digest = reconciled.source_digest, reconciled.target_digest
                 self._target(connection, bound)
+                if self._verify_preplan is not None:
+                    self._verify_preplan(connection, bound, receipt, payload)
                 if (
                     connection.autocommit is not False
                     or _transaction_state(cursor) != state

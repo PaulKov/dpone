@@ -37,6 +37,7 @@ def build_composition_transfer_observation(
     read_plan: Any,
     verify_operation: Any,
     payload_root: Path,
+    verify_retained_commit: Any,
 ) -> tuple[CompositionTransferCommittedObserver, Any]:
     """Build an independent reader and the capture hook for the same supervisor root.
 
@@ -44,6 +45,8 @@ def build_composition_transfer_observation(
     connection bindings and state configuration come from the verified parent.
     Constructing this factory neither connects nor grants database permissions.
     """
+    if not callable(verify_retained_commit):
+        raise CompositionAdmissionError("transfer_preplan_configuration")
     location = resolve_mssql_state_location(state_config, state_target)
     if location.atomicity != "target_atomic" or location.provisioning != "external":
         raise CompositionAdmissionError("external_target_atomic_state_required")
@@ -80,7 +83,9 @@ def build_composition_transfer_observation(
         ).receipt_by_key(bound.operation.operation_key)
 
     def require_target(connection: Any, bound: CompositionMssqlOperationBinding) -> None:
-        _require_target(connection, bound, control, sink_target, state_target, location.location.database)
+        require_transfer_target_identity(
+            connection, bound.write, control, sink_target, state_target, location.location.database
+        )
 
     observer = CompositionTransferCommittedObserver(
         read_binding=bindings.read_closed,
@@ -88,6 +93,7 @@ def build_composition_transfer_observation(
         read_receipt=read_receipt,
         require_target=require_target,
         read_payload=payloads.read,
+        verify_retained_commit=verify_retained_commit,
     )
     return observer, partial(CompositionTransferCaptureLifecycle, payloads)
 
@@ -100,6 +106,27 @@ class _ReadSession:
 
     def __init__(self, connection: Any) -> None:
         self.connection = connection
+
+    @staticmethod
+    def quote_identifier(value: str) -> str:
+        if type(value) is not str or not value or len(value) > 128 or "\x00" in value:
+            raise CompositionAdmissionError("transfer_observation_identifier")
+        return "[" + value.replace("]", "]]") + "]"
+
+    def qualified_name(self, schema: str, table: str, *, database: str | None = None) -> str:
+        names = (schema, table) if database is None else (database, schema, table)
+        return ".".join(self.quote_identifier(name) for name in names)
+
+    def table_exists(self, schema: str, table: str, *, database: str) -> bool:
+        prefix = self.quote_identifier(database)
+        rows = self.get_records(
+            f"SELECT COUNT_BIG(*) FROM {prefix}.sys.tables t "
+            f"JOIN {prefix}.sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=? AND t.name=?;",
+            (schema, table),
+        )
+        if rows not in (((0,),), ((1,),)):
+            raise CompositionAdmissionError("transfer_observation_catalog")
+        return rows == ((1,),)
 
     def get_records(self, sql: str, params: Any = (), *, as_dict: bool = False) -> Any:
         cursor = self.connection.cursor()
@@ -116,10 +143,11 @@ class _ReadSession:
             cursor.close()
 
 
-def _require_target(
-    connection: Any, bound: CompositionMssqlOperationBinding, control: Any, target: Any, state: Any, state_database: str
-) -> None:
-    target_pin = mssql_target_pin(target, bound.write)
+def require_transfer_target_identity(
+    connection: Any, write: Any, control: Any, target: Any, state: Any, state_database: str
+) -> bytes:
+    """Verify signed target/state/control pins on the supplied business connection."""
+    target_pin = mssql_target_pin(target, write)
     state_pins = MssqlDatabaseAuthoritySet.from_connection_properties(state.descriptor.properties, capability="state")
     state_pin = state_pins.require(state_database, capability="state")
     # Both endpoint descriptors must pin the same control database continuity;
@@ -130,7 +158,7 @@ def _require_target(
     control_pin = target_pins.require(control.control_database, capability="target")
     if state_pins.require(control.control_database, capability="state") != control_pin:
         raise CompositionAdmissionError("transfer_observation_service")
-    require_mssql_connection_identity(
+    return require_mssql_connection_identity(
         connection,
         pins=(target_pin, state_pin, control_pin),
         control_database=control.control_database,

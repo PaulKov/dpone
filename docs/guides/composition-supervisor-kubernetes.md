@@ -250,13 +250,33 @@ re-implementing fetch, materialize, and cache-sync in shell.
 
 A READY marker or successful pointer switch is not worker execution.
 
+For PostgreSQL-to-MSSQL execution, runtime retains the independently derived
+pre-extraction plan under `transfers/preplans/<attempt-digest>.json`. The v2
+composition binding pins the complete envelope digest in its existing protected
+SQL original. The envelope includes source identity and projection, target
+registry identity, physical route and the existing schema preplan. Generic
+commit-receipt formats remain unchanged.
+
+Admission verifies the source on the same prepared PostgreSQL snapshot used for
+extraction. Recovery reopens the retained envelope and checks the current target
+registry, the plan's AFTER catalog expectations, receipt before/after hashes and
+captured source provenance on the observer's existing SQL transaction. It never
+reconstructs a before-plan from a catalog already changed by the load.
+
+Preserve these files alongside the retained payload. Historical v1 bindings
+remain readable but cannot establish the new independent OUTCOME proof. Do not
+manufacture v2 originals or replay a `COMMIT_UNKNOWN` attempt to obtain them.
+
 For ClickHouse capture, provision the private root-owned `0700` directory
 `/var/lib/dpone/composition/snapshots`. Runtime stores immutable `source.json`
 and `payload.native` under the complete attempt digest and pins their hashes in
 protected SQL before CREATE. A deployment-side `composition-snapshots` file is
 not a runtime source original. Never overwrite or remove capture files needed
 for reconciliation. Retained generations count toward configured storage limits;
-there is no implicit deletion policy.
+there is no implicit deletion policy. Before CREATE, runtime conservatively
+checks whether every possible 64-row observation page fits the 1 MiB HTTP
+profile, including JSON escaping. An oversized page rejects with
+`snapshot_materialization_page_budget` before target mutation.
 
 The catalog observer needs direct global SHOW DATABASES, SHOW TABLES, SHOW
 COLUMNS, SHOW USERS, SHOW ROLES, SHOW ROW POLICIES and SELECT privileges (their

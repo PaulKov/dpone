@@ -30,15 +30,11 @@ from dpone.runtime.etl.mssql_schema_preplan import (
     MssqlSchemaPreplanner,
 )
 from dpone.runtime.etl.mssql_transaction_identity import (
-    build_mssql_attempt_request,
-    invocation_identity,
-    operation_request,
-    require_source_physical_identity_binding,
-    resolve_source_physical_identity,
+    derive_mssql_runtime_requests as _locally_derived_requests,
 )
-from dpone.runtime.etl.mssql_transaction_request import (
-    attempt_target_coordinates,
-    live_target_coordinates,
+from dpone.runtime.etl.mssql_transaction_identity import (
+    invocation_identity,
+    require_source_physical_identity_binding,
 )
 from dpone.runtime.etl.portable_scope_preflight import prepare_portable_scope_binding
 from dpone.runtime.governance.mssql_hook_replay_policy import (
@@ -78,7 +74,8 @@ class MssqlTransactionAdmissionService:
         operation_lease_factory: Any = MssqlOperationLeaseHeartbeat,
         operation_scope_refresher: Callable[[Any], Any] | None = None,
         start_operation_lease_on_admission: bool = False,
-        operation_registrar: Callable[[Any, bytes], None] | None = None,
+        operation_registrar: Callable[..., None] | None = None,
+        preplan_verifier: Callable[..., Any] | None = None,
         composition_fence: Any | None = None,
         fence_connector: Any | None = None,
     ) -> None:
@@ -88,6 +85,7 @@ class MssqlTransactionAdmissionService:
         self._operation_scope_refresher = operation_scope_refresher
         self._start_operation_lease_on_admission = start_operation_lease_on_admission
         self._operation_registrar = operation_registrar
+        self._preplan_verifier = preplan_verifier
         self._composition_fence = composition_fence
         self._fence_connector = fence_connector
 
@@ -201,9 +199,17 @@ class MssqlTransactionAdmissionService:
                     admission=admission,
                 )
                 if self._operation_registrar is not None:
-                    self._operation_registrar(
-                        admission, options[MSSQL_SCHEMA_PREPLAN_OPTION].target_mutation_plan.digest
-                    )
+                    digest = options[MSSQL_SCHEMA_PREPLAN_OPTION].target_mutation_plan.digest
+                    if self._preplan_verifier is None:
+                        self._operation_registrar(admission, digest)
+                    else:
+                        reference = self._preplan_verifier(
+                            admission,
+                            source=source,
+                            prepared_boundary=prepared_boundary,
+                            submitted_mutation_sha256=digest,
+                        )
+                        self._operation_registrar(admission, digest, preplan_reference=reference)
             except BaseException as primary:
                 if prepared_boundary is not None:
                     prepared_boundary.abort_preserving(primary)
@@ -348,37 +354,6 @@ def _parent_receipt_authority(
     ):
         raise RuntimeError("mssql_transaction.parent_receipt_authority_invalid")
     return authority
-
-
-def _locally_derived_requests(
-    load_config: Any,
-    *,
-    source: Any,
-    sink: Any,
-    state_storage: Any,
-    target_resolver: Any,
-    invocation: Any,
-    load_id: str,
-) -> tuple[MssqlAttemptRequest, MssqlOperationRequest]:
-    live_database, identity_schema, identity_table = live_target_coordinates(load_config)
-    physical = target_resolver(
-        sink.connector,
-        state_storage,
-        database=live_database,
-        schema=identity_schema,
-        table=identity_table,
-    )
-    source_identity = resolve_source_physical_identity(source, load_config)
-    coordinates = attempt_target_coordinates(load_config, physical_target=physical)
-    attempt = build_mssql_attempt_request(
-        load_config,
-        invocation=invocation,
-        target_identity=physical.digest,
-        source_identity=source_identity,
-        load_id=load_id,
-        request_coordinates=coordinates,
-    )
-    return attempt, operation_request(load_config, invocation)
 
 
 __all__ = ["ADMISSION_OPTION", "MssqlTransactionAdmissionService"]

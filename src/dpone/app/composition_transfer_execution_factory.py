@@ -41,6 +41,9 @@ def build_composition_transfer_execution_dependencies(
     observe: Any | None = None,
     state_config: Any | None = None,
     payload_root: Path | None = None,
+    verified_manifest: Any | None = None,
+    source_target: Any | None = None,
+    parent_context: Any | None = None,
 ) -> CompositionTransferExecutionDependencies:
     """Return protected collaborators of one supervised ordinary transfer cell."""
 
@@ -56,8 +59,10 @@ def build_composition_transfer_execution_dependencies(
         control_schema=control.control_schema,
     )
 
-    def register(attempt: Any, operation: Any, write: Any, mutation: bytes) -> MssqlCompositionTransactionFence:
-        binding = bindings.bind(attempt, operation, write, mutation)
+    def register(
+        attempt: Any, operation: Any, write: Any, mutation: bytes, *, preplan_document_sha256: str | None = None
+    ) -> MssqlCompositionTransactionFence:
+        binding = bindings.bind(attempt, operation, write, mutation, preplan_document_sha256=preplan_document_sha256)
         return MssqlCompositionTransactionFence(binding, control.control_schema)
 
     def principal(attempt: Any) -> str:
@@ -66,13 +71,31 @@ def build_composition_transfer_execution_dependencies(
         ) as ledger:
             return resolve_transfer_principal(ledger, attempt, control.expected_service_id)
 
-    capture_lifecycle = None
+    capture_lifecycle = preplan_factory = None
     if (state_config is None) != (payload_root is None):
         raise CompositionAdmissionError("transfer_observation_configuration")
     if payload_root is not None:
         if observe is not None:
             raise CompositionAdmissionError("transfer_observation_configuration")
+        if verified_manifest is None or source_target is None or parent_context is None:
+            raise CompositionAdmissionError("transfer_preplan_configuration")
         from dpone.app.composition_transfer_observation_factory import build_composition_transfer_observation
+        from dpone.app.composition_transfer_preplan_factory import (
+            build_transfer_commit_verifier,
+            build_transfer_preplan_factory,
+        )
+
+        preplan_factory = build_transfer_preplan_factory(
+            control=control,
+            verified_manifest=verified_manifest,
+            source_target=source_target,
+            sink_target=sink_target,
+            state_target=state_target,
+            state_config=state_config,
+            parent_context=parent_context,
+            payload_root=payload_root,
+            read_plan=read_plan,
+        )
 
         observe, capture_lifecycle = build_composition_transfer_observation(
             control=control,
@@ -82,6 +105,7 @@ def build_composition_transfer_execution_dependencies(
             payload_root=payload_root,
             read_plan=read_plan,
             verify_operation=verify_operation,
+            verify_retained_commit=build_transfer_commit_verifier(payload_root),
         )
 
     return CompositionTransferExecutionDependencies(
@@ -117,6 +141,7 @@ def build_composition_transfer_execution_dependencies(
         expected_service_id=control.expected_service_id,
         operation_registrar=register,
         capture_lifecycle=capture_lifecycle,
+        preplan_factory=preplan_factory,
     )
 
 

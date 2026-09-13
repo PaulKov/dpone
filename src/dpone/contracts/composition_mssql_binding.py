@@ -11,8 +11,8 @@ from dataclasses import asdict, dataclass
 from hashlib import sha256
 from uuid import UUID
 
-from dpone.contracts.composition_activation import CompositionAdmissionError
 from dpone.contracts.composition_attempt import CompositionAttemptIdentity
+from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
 from dpone.contracts.composition_persistence import encode_attempt_identity
 from dpone.contracts.dbt_relation_writes import DbtRelationWrite
 from dpone.contracts.mssql_transaction_governance import (
@@ -55,10 +55,13 @@ class CompositionMssqlOperationBinding:
     service_id: str
     control_database: str
     parent_document: bytes
+    preplan_document_sha256: str | None = None
 
     def __post_init__(self) -> None:
         if type(self.attempt) is not CompositionAttemptIdentity or type(self.write) is not DbtRelationWrite:
             raise CompositionAdmissionError("transfer_binding")
+        if self.preplan_document_sha256 is not None:
+            require_digest(self.preplan_document_sha256)
         self.attempt.__post_init__()
         self.write.__post_init__()
         stable_operation_document(self.operation)
@@ -128,6 +131,7 @@ class CompositionMssqlOperationBinding:
                 body["service_id"],
                 body["control_database"],
                 bytes.fromhex(body["parent_original"]),
+                body.get("preplan_document_sha256"),
             )
             if binding.document != document:
                 raise ValueError("original")
@@ -141,7 +145,14 @@ class CompositionMssqlOperationBinding:
         self.__post_init__()
         return canonical_json_bytes(
             {
-                "schema": "dpone.composition-mssql-operation-binding.v1",
+                "schema": "dpone.composition-mssql-operation-binding.v1"
+                if self.preplan_document_sha256 is None
+                else "dpone.composition-mssql-operation-binding.v2",
+                **(
+                    {}
+                    if self.preplan_document_sha256 is None
+                    else {"preplan_document_sha256": self.preplan_document_sha256}
+                ),
                 "attempt_original": encode_attempt_identity(self.attempt).hex(),
                 "operation_original": stable_operation_document(self.operation).hex(),
                 "write": asdict(self.write),
@@ -157,6 +168,13 @@ class CompositionMssqlOperationBinding:
     def digest(self) -> bytes:
         """Binary SHA256 of the exact original, without SQL text re-encoding."""
         return sha256(self.document).digest()
+
+    def require_preplan(self) -> str:
+        """Require the v2 trusted envelope; v1 remains readable without new authority."""
+        if self.preplan_document_sha256 is None:
+            raise CompositionAdmissionError("transfer_preplan_original")
+        require_digest(self.preplan_document_sha256)
+        return self.preplan_document_sha256
 
     def require_operation(self, operation: MssqlTransactionOperation, mutation_plan_sha256: bytes) -> None:
         """Reject changed invocation, coordinates, generation, owner, epoch or plan."""

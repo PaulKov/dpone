@@ -25,8 +25,11 @@
 - Add authenticated TLS dispatcher transport and a separately runnable protected
   host observation service with bounded shutdown. The protected remote business
   handler and full Kubernetes execution campaign remain incomplete.
-- Preserve canonical SQL mutation-plan originals without changing their existing
-  digests. Trusted pre-extraction journal binding remains a follow-up requirement.
+- Independently derive and retain canonical SQL preplans before registration;
+  bind the complete envelope through composition binding v2 without changing
+  generic receipt formats or existing plan digests. Recovery verifies registry
+  continuity, AFTER catalog expectations, receipt hashes and source provenance.
+  Historical v1 originals remain readable but cannot acquire new proof authority.
 - Document Kubernetes composition-supervisor provisioning, cache-sync
   `--workspace-authority-connection-ref`, the three installed execution cells
   (`sqlserver_dbt_v1`, `postgres_mssql_full_refresh_v1`,

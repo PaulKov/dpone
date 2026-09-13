@@ -372,6 +372,9 @@ def _transfer_dependencies(
         ),
         state_config=state,
         payload_root=_transfer_payload_root(environment),
+        verified_manifest=manifest,
+        source_target=parent["resolver"].resolve(str(manifest["source"]["connection_ref"])),
+        parent_context=parent["context"],
     )
 
 
