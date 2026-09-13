@@ -52,6 +52,25 @@ def transfer_batches(database, schema):
     )
 
 
+def observe_worker_transaction(worker):
+    """Retain only bounded transaction counters and the implicit-mode option.
+
+    A SELECT without a FROM clause does not itself start an implicit transaction;
+    this observation neither commits pending data nor changes driver SQL mode.
+    """
+    rows = execute(worker, "SELECT @@TRANCOUNT,XACT_STATE(),CONVERT(int,@@OPTIONS & 2);")
+    if (
+        len(rows) != 1
+        or len(rows[0]) != 3
+        or any(type(value) is not int for value in rows[0])
+        or not 0 <= rows[0][0] < 2**31
+        or rows[0][1] not in (-1, 0, 1)
+        or rows[0][2] not in (0, 2)
+    ):
+        raise RuntimeError("transfer_transaction_observation")
+    return dict(zip(("transaction_count", "transaction_state", "implicit_option"), rows[0], strict=True))
+
+
 def observe_transfer_permissions(cursor, credentials=None):
     """Bounded public or issued-user grants, with no grantee names or SIDs."""
     predicate = (
@@ -257,9 +276,21 @@ class TransferGateCase(GateCase):
     def worker_sql(worker, statement, *parameters):
         return execute(worker, statement, *parameters)
 
-    def begin_fence(self, worker):
+    def begin_worker(self, worker):
+        """Use the same DBAPI manual-commit boundary as the MSSQL connector.
+
+        Do not mix SQL transaction statements or mode changes with ODBC manual
+        commit. The first read opens its driver-managed transaction before the
+        fence observes it; neither this helper nor the fence performs a commit.
+        """
         worker.autocommit = False
-        execute(worker, "SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRANSACTION;")
+        execute(worker, "SELECT COUNT_BIG(*) FROM [managed].[rows];")
+        observed = observe_worker_transaction(worker)
+        self.record("transfer_begin", observed)
+        assert observed["transaction_count"] == 1 and observed["transaction_state"] == 1
+
+    def begin_fence(self, worker):
+        self.begin_worker(worker)
         return self.require_fence(worker)
 
     def require_fence(self, worker, **kwargs):

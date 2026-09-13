@@ -50,6 +50,7 @@ class CompositionTransferExecutionRequest:
     raw_config: Mapping[str, Any]
     load_config: Any
     selector: str | None = None
+    execution_date: Any | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +84,7 @@ class CompositionTransferExecutionDependencies:
     admission_service: Any | None = None
     composition_fence: Any | None = None
     operation_registrar: Callable[..., Any] | None = None
+    capture_lifecycle: Callable[[CompositionAttemptIdentity], Any] | None = None
 
 
 class CompositionTransferExecutionRoot:
@@ -139,15 +141,27 @@ class CompositionTransferExecutionRoot:
             mssql_transaction_admission_service=self._deps.admission_service,
             composition_transaction_fence=self._deps.composition_fence,
         )
-        process = _invocation_process(request, bindings)
-        result = self._deps.runner.run(
-            process,
-            sink_connection=sink,
-            state_connection=state,
-            mssql_transaction_admission_service=self._admission(request, attempt, bindings.sink_obj),
-            composition_transaction_fence=self._deps.composition_fence,
-        )
-        return CompositionTransferResult(rows_written=int(result.inserted_rows))
+        from dpone.runtime.bootstrap_hydrator import close_runtime_resources
+
+        try:
+            process = _invocation_process(request, bindings)
+            result = self._deps.runner.run(
+                process,
+                context=_scheduler_context(request),
+                dag_id=request.airflow_attempt.dag_id,
+                execution_date=request.execution_date,
+                sink_connection=sink,
+                state_connection=state,
+                mssql_transaction_admission_service=self._admission(request, attempt, bindings.sink_obj),
+                composition_transaction_fence=self._deps.composition_fence,
+                source_extraction_lifecycle_service=(
+                    self._deps.capture_lifecycle(attempt) if self._deps.capture_lifecycle else None
+                ),
+            )
+            return CompositionTransferResult(rows_written=int(result.inserted_rows))
+
+        finally:
+            close_runtime_resources(bindings)
 
     def _admission(
         self,
@@ -275,6 +289,21 @@ def bind_composition_fence(sink: Any, fence: Any) -> None:
 
     for strategy in getattr(sink, "_strategy_map", {}).values():
         strategy.transaction_finalizer_factory = factory
+
+
+def _scheduler_context(request: CompositionTransferExecutionRequest) -> Any:
+    """Preserve scheduler invocation across retries and distinguish mapped tasks."""
+    from dpone.app.composition_transfer_invocation import transfer_scheduler_context
+
+    scheduler = request.airflow_attempt
+    return transfer_scheduler_context(
+        run_id=scheduler.run_id,
+        workflow_id=scheduler.dag_id,
+        task_id=scheduler.task_id,
+        map_index=scheduler.map_index,
+        run_identity=request.run_identity,
+        airflow_attempt=scheduler,
+    )
 
 
 def _invocation_process(request: CompositionTransferExecutionRequest, bindings: Any) -> Any:

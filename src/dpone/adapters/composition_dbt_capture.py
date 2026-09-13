@@ -12,10 +12,19 @@ import os
 import stat
 import subprocess
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from dpone.adapters.composition_dbt_cleanup import (
+    FINAL_GRACE,
+    LinuxDbtProcessLifecycle,
+    LinuxProcessOperations,
+    ProcessLifecycleError,
+    read_process,
+    require_waitid,
+)
 from dpone.contracts.composition_attempt import CompositionAttemptIdentity
 from dpone.contracts.composition_dbt_outcome import (
     MAX_ARTIFACT_BYTES,
@@ -41,33 +50,26 @@ class LinuxDbtBuildRunner:
         self._environment = environment
 
     def __call__(self, intent: DbtDispatchIntent) -> DbtChildExit:
-        intent.__post_init__()
-        _require_linux_supervisor(intent)
-        _require_uid_quiescent(intent.child_uid)
-        environment = dict(self._environment(intent.attempt))
-        process = subprocess.Popen(
-            intent.argv,
-            cwd=intent.working_directory,
-            env=environment,
-            user=intent.child_uid,
-            group=intent.child_gid,
-            extra_groups=[],
-            start_new_session=True,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        try:
-            identity = _read_process(process.pid)
-            if identity is None or identity[0] != intent.child_uid or identity[1] != process.pid:
-                raise DbtCaptureError("capture_process_identity")
-            result = process.wait(timeout=intent.timeout_seconds)
-            return DbtChildExit(process.pid, identity[2], result)
-        except BaseException:
-            # Only the child created here is signalled, never caller-selected PIDs.
-            process.kill()
-            process.wait()
-            raise
+        with _capture_process_errors():
+            intent.__post_init__()
+            _require_linux_supervisor(intent)
+            require_waitid()
+            _require_uid_quiescent(intent.child_uid)
+            environment = dict(self._environment(intent.attempt))
+            process = subprocess.Popen(
+                intent.argv,
+                cwd=intent.working_directory,
+                env=environment,
+                user=intent.child_uid,
+                group=intent.child_gid,
+                extra_groups=[],
+                start_new_session=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            child = LinuxDbtProcessLifecycle().run(process, intent.child_uid, intent.timeout_seconds)
+            return DbtChildExit(child.pid, child.start_ticks, child.exit_code)
 
 
 class ProtectedDbtCapture:
@@ -245,32 +247,29 @@ def _open_directory(path: str) -> int:
 
 
 def _read_process(pid: int) -> tuple[int, int, int] | None:
-    try:
-        root = Path("/proc") / str(pid)
-        status = root.joinpath("status").read_text()
-        fields = root.joinpath("stat").read_text().rsplit(")", 1)[1].split()
-        uids = next(line for line in status.splitlines() if line.startswith("Uid:")).split()[1:]
-        if len(uids) != 4 or len(set(uids)) != 1:
-            raise DbtCaptureError("capture_process_uid")
-        return int(uids[0]), int(fields[2]), int(fields[19])
-    except FileNotFoundError:
-        return None
-    except (OSError, ValueError, IndexError, StopIteration):
-        raise DbtCaptureError("capture_process_visibility") from None
+    with _capture_process_errors():
+        observed = read_process(pid)
+        if observed is None:
+            return None
+        return observed.uid, observed.pgid, observed.start_ticks
 
 
 def _require_uid_quiescent(uid: int) -> None:
-    # Dedicated UID catches descendants that escaped the original process group.
-    # Incomplete /proc visibility is a blocker, never an empty process set.
+    # Independently includes escaped groups and zombies; bounded visibility
+    # failures block capture rather than manufacturing an empty process set.
+    with _capture_process_errors():
+        operations = LinuxProcessOperations()
+        if any(item.uid == uid for item in operations.inventory(operations.monotonic() + FINAL_GRACE)):
+            raise DbtCaptureError("capture_child_not_quiescent")
+
+
+@contextmanager
+def _capture_process_errors() -> Iterator[None]:
+    """Translate the OS boundary while preserving the original cancellation cause."""
     try:
-        entries = tuple(Path("/proc").iterdir())
-        for entry in entries:
-            if entry.name.isdecimal():
-                observed = _read_process(int(entry.name))
-                if observed is not None and observed[0] == uid:
-                    raise DbtCaptureError("capture_child_not_quiescent")
-    except OSError:
-        raise DbtCaptureError("capture_process_visibility") from None
+        yield
+    except ProcessLifecycleError as error:
+        raise DbtCaptureError(str(error)) from (error.__cause__ or error)
 
 
 def _require_protected_ancestors(path: str) -> None:

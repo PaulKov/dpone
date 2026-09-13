@@ -59,7 +59,11 @@ DISPATCH_TABLES = (
 
 
 def dispatch_trigger_sql(control_schema: str, name: str) -> str:
-    """Generate exact immutable originals and closed append dependencies."""
+    """Generate exact immutable originals and closed append dependencies.
+
+    A healthy transaction and its exclusive ledger lock are the authority.
+    Trigger nesting depth is not an additional control-ledger requirement.
+    """
     schema = require_control_schema(control_schema)
     definition = next((table for table in DISPATCH_TABLES if table.name == name), None)
     if definition is None:
@@ -102,7 +106,7 @@ BEGIN
     SET NOCOUNT ON;
     IF EXISTS (SELECT 1 FROM deleted)
         THROW 51000, 'DPONE_COMPOSITION_DISPATCH_IMMUTABLE', 1;
-    IF @@TRANCOUNT<2 OR XACT_STATE()<>1
+    IF XACT_STATE()<>1
         THROW 51000, 'DPONE_COMPOSITION_DISPATCH_LOCK', 1;
     IF ISNULL(APPLOCK_MODE(N'public',
         N'{COMPOSITION_MSSQL_LEDGER_LOCK}',N'Transaction'),N'NoLock')<>N'Exclusive'

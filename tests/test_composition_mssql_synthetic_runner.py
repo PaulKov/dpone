@@ -219,7 +219,7 @@ def test_output_under_checkout_is_refused_without_side_effects(monkeypatch, harn
     assert not calls and not output.exists()
 
 
-@pytest.mark.parametrize("profile,count", [("store", 10), ("gate", 24), ("trust", 9), ("registration", 18)])
+@pytest.mark.parametrize("profile,count", [("store", 11), ("gate", 25), ("trust", 9), ("registration", 18)])
 def test_profiles_have_closed_disjoint_case_inventories(tmp_path, profile, count):
     cases = runner.expected_cases(profile)
     assert len(cases) == len(set(cases)) == count
@@ -322,7 +322,7 @@ def test_gate_child_collects_only_exact_gate_cases_and_skips_without_optin(tmp_p
     with pytest.raises(runner.RunFailure, match="junit_incomplete_or_not_green"):
         runner.execute_component(tmp_path, env, "gate")
     cases = junit_cases(tmp_path / "junit.xml")
-    assert len(cases) == 24
+    assert len(cases) == 25
     assert {case.node_id for case in cases} == set(runner.expected_cases("gate"))
     assert all(case.status == "skipped" for case in cases)
 

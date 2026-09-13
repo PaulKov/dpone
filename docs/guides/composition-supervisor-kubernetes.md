@@ -112,11 +112,62 @@ Namespace prerequisites that must be true together:
 
 Install the protected SQL control schema and login-gate batches from the
 [activation contract](../composition-activation-contract.md) on an isolated
-SQL Server. Desired-state watchers bind the same logical control reference in
+SQL Server. The base installation does not include execution evidence or dbt
+capture tables. After the base and login-gate batches, generate these additive
+batches with the same `control_schema`:
+
+```python
+from pathlib import Path
+
+from dpone.adapters.composition_dbt_capture_schema import render_dbt_capture_schema
+from dpone.adapters.composition_execution_evidence_schema import render_execution_evidence_schema
+from dpone.adapters.composition_snapshot_sql_schema import render_snapshot_publication_schema
+from dpone.adapters.composition_snapshot_capture_schema import render_snapshot_capture_schema
+
+schema = "dpone_control"
+Path("composition-execution-evidence.sql").write_text(
+    render_execution_evidence_schema(schema), encoding="utf-8"
+)
+Path("composition-dbt-capture.sql").write_text(
+    render_dbt_capture_schema(schema), encoding="utf-8"
+)
+Path("composition-snapshot-publication.sql").write_text(
+    render_snapshot_publication_schema(schema), encoding="utf-8"
+)
+Path("composition-snapshot-capture.sql").write_text(
+    render_snapshot_capture_schema(schema), encoding="utf-8"
+)
+```
+
+An administrator installs these generated batches in the protected control
+database, before any worker invocation. Use the existing controller principal;
+issued worker principals must not receive write access to these control tables.
+Runtime never installs or repairs the schema. Verify the installed originals
+using `require_execution_evidence_schema(cursor, schema)` and
+`require_dbt_capture_schema(cursor, schema)` and
+`require_snapshot_publication_schema(cursor, schema)` and
+`require_snapshot_capture_schema(cursor, schema)` from the respective modules, on a
+controller connection with complete metadata visibility. A missing or altered
+object is an installation failure; stop before activation and correct the
+administrator installation rather than granting a worker additional rights.
+Do not reapply one-time creation batches to an existing populated schema. Desired-state watchers bind the same logical control reference in
 `dpone.airflow-desired-state-authority.v2` as
 `workspace_authority_connection_ref`. That field is a non-secret connection
 alias, never a password or target binding. See
 [desired-state authority](../airflow-desired-state.md).
+
+Provision `/var/lib/dpone/composition/transfers` as an existing directory owned
+by the supervisor's effective root UID, mode `0700`, with no symbolic links in
+its path. Transfer capture persists the exact extracted bytes before artifact
+cleanup and reopens them for receipt and target-content comparison. The current
+capture supports one eager, uncompressed delimited artifact with the standard
+codec; unsupported artifact shapes reject the operation. Do not remove retained
+files while their attempt requires reconciliation.
+
+The dbt supervisor uses bounded TERM/KILL/reap cleanup on failure and cancellation.
+Failure to observe process termination cannot yield success or a reusable UID.
+Linux process and UID isolation checks are required for the deployed profile;
+local non-Linux tests do not establish them.
 
 ## Data-engineer compose and build
 
@@ -131,12 +182,25 @@ reject it with `DPONE_COMPOSITION_SUPERVISOR_FORBIDDEN`.
 : "${DPONE_RELEASE_ID:?set the composed v3 release digest}"
 : "${DPONE_RUNTIME_IMAGE_DIGEST:?set the pinned runtime image digest}"
 : "${DPONE_ARTIFACT_REGISTRY_REF:?set the deployment registry reference}"
+: "${DPONE_RUNTIME_IMAGE_REF:?set the image reference including its digest}"
+: "${DPONE_REGISTRY_CONFIG_SHA256:?set the registry ConfigMap content digest}"
+: "${DPONE_TRUST_POLICY_SHA256:?set the production trust policy digest}"
+: "${DPONE_SOURCE_COMMIT:?set the Airflow bundle source commit}"
 
 dpone airflow build \
   --release-id "${DPONE_RELEASE_ID}" \
   --environment prod \
+  --trust-tier production \
+  --runtime-image-ref "${DPONE_RUNTIME_IMAGE_REF}" \
   --runtime-image-digest "${DPONE_RUNTIME_IMAGE_DIGEST}" \
   --artifact-registry-ref "${DPONE_ARTIFACT_REGISTRY_REF}" \
+  --registry-config-map-name dpone-artifact-registry \
+  --registry-config-map-key registry.json \
+  --registry-config-sha256 "${DPONE_REGISTRY_CONFIG_SHA256}" \
+  --trust-policy-config-map-name dpone-artifact-trust-policy \
+  --trust-policy-config-map-key policy.json \
+  --trust-policy-sha256 "${DPONE_TRUST_POLICY_SHA256}" \
+  --airflow-bundle-ref "git:${DPONE_SOURCE_COMMIT}" \
   --composition-supervisor-pvc dpone-composition-supervisor \
   --composition-child-uid-start 1000000000 \
   --composition-child-gid-start 1000000000 \
@@ -186,6 +250,52 @@ re-implementing fetch, materialize, and cache-sync in shell.
 
 A READY marker or successful pointer switch is not worker execution.
 
+For ClickHouse capture, provision the private root-owned `0700` directory
+`/var/lib/dpone/composition/snapshots`. Runtime stores immutable `source.json`
+and `payload.native` under the complete attempt digest and pins their hashes in
+protected SQL before CREATE. A deployment-side `composition-snapshots` file is
+not a runtime source original. Never overwrite or remove capture files needed
+for reconciliation. Retained generations count toward configured storage limits;
+there is no implicit deletion policy.
+
+The catalog observer needs direct global SHOW DATABASES, SHOW TABLES, SHOW
+COLUMNS, SHOW USERS, SHOW ROLES, SHOW ROW POLICIES and SELECT privileges (their
+ancestor groups also qualify), with no partial revokes. These privileges belong
+to the protected observer. Runtime does not grant them to workers. Role-only
+observer grants are currently unsupported. The observer rechecks its actual
+identity and grants before and after materialization; unsupported row policies,
+physical designs and cluster topology still reject independently.
+
+## Host observation service
+
+The root host observer has a separate entry point:
+
+```bash
+/opt/dpone/venv/bin/python -m dpone.app.composition_supervisor_host_service \
+  --config /etc/dpone/composition/host-probe.json \
+  --configuration-sha256 "${DPONE_HOST_PROBE_CONFIG_SHA256:?set the approved configuration digest}"
+```
+
+The configuration must be canonical JSON in a root-owned protected directory.
+Its closed `dpone.composition-host-probe-config.v1` fields are `schema`,
+`socket_path`, `dispatcher_uid`, `dispatcher_gid`, `timeout_seconds`,
+`enrollment_sha256` and `enrollment_document`. The supplied configuration digest
+pins the entire original, including the complete enrolled Docker/Linux policy.
+Use a dedicated nonzero dispatcher UID/GID. Keep Docker and host process access
+inside this host service; expose only its peer-credential-checked Unix socket.
+
+The [systemd template](../../examples/composition-supervisor/dpone-host-probe.service)
+requires administrator substitution of its installation path, configuration
+hash and dispatcher group before installation. It runs as host root and does
+not automatically restart. An idle accept timeout keeps the listener available;
+a failed accepted request exits without recapturing it. SIGTERM/SIGINT finish
+within the configured request deadline, close the listener and remove only the
+socket inode owned by this process.
+
+This entry point does not provision enrollment, start the remote dispatcher or
+certify the Kubernetes route. The HTTPS transport and host observation service
+still require protected business-handler wiring and a real Linux campaign.
+
 ## DAG triggering
 
 Composed synthetic DAGs keep `schedule: null`. Load every expected DAG through
@@ -200,9 +310,14 @@ exists. `postgres_mssql_full_refresh_v1` can reach
 `DPONE_CACHE_ROOT` (or `DPONE_SCHEDULER_CACHE_ROOT`) reopens the sealed parent
 plan. `mssql_clickhouse_full_refresh_v1` can reach
 `CompositionClickHouseExecutionRoot` when that parent context, cache plan,
-sealed snapshot sidecar, and enrolled supervisor/HTTP collaborators compose.
-The composed catalog inspects both names over closed ClickHouse HTTP and
-hashes the response bytes; it does not invent typed B content. Pack-exec
+runtime snapshot capture, and enrolled supervisor/HTTP collaborators compose.
+The runtime captures the bounded MSSQL source once in a consistent transaction,
+preserves exact Native bytes, and independently reads typed ClickHouse content
+before publication. Source connections must include signed `database_authorities`
+for both the actual source database and the composition control database, plus
+the expected `composition_service_id`. Runtime verifies these pins on the same
+business connection before and after extraction. Every attempt reserves a different generation name; the
+previous target remains retained after exchange. Pack-exec
 refuses login and ingest until an independent transfer observer or typed
 catalog classification exists, so a composed root is not a mutation permit.
 Missing any of those originals fail-closes with
@@ -227,10 +342,16 @@ Inspect these independent surfaces before retrying:
 
 | Surface | What it proves | What it does not prove |
 |---|---|---|
-| `/var/lib/dpone/run/runtime-startup-error.json` | Dispatch rejection before a worker started | Business outcome |
+| `/var/lib/dpone/run/runtime-startup-error.json` | Dispatch rejection; inspect whether dispatch started | Absence of worker execution or mutations |
 | `/var/lib/dpone/run/runtime-evidence.json` | Worker-reported files for this attempt | OUTCOME without the control ledger |
 | Control `composition_operations` plus `execution_evidence` | Protected `CLOSED_GATES`, `QUIESCENCE`, and `OUTCOME` originals | That a process exit succeeded |
 | Supervisor PVC at `/var/lib/dpone/composition` | Immutable attempt and UID/GID tombstones | That SQL committed |
+
+A startup-error artifact can also be written after execution starts, for
+example when terminal evidence cannot be verified. Distinguish pre-dispatch
+rejection from a failure with `dispatch_started=True`; the artifact name alone
+never proves that no SQL ran. Inspect the exact attempt in the protected control
+ledger and complete closure/reconciliation before retrying an uncertain run.
 
 Process exit, filesystem ownership, generic `LoadResult`, and a dbt exit code
 are never OUTCOME proof. Arguments, credentials, and connection strings must
@@ -244,7 +365,7 @@ not appear in tickets, XCom, or committed fixtures. See
 |---|---|---|
 | `composition_supervisor_authority_missing` | Verified command lacks `DPONE_COMPOSITION_SUPERVISOR_B64` | Rebuild with the complete supervisor group; do not patch the pod env |
 | `composition_native_worker_unavailable` | Native pack-exec has no parent context or no `sqlserver_dbt_v1` factory | Do not treat this as worker execution; restore parent context or the native factory |
-| `composition_ordinary_worker_unavailable` | Ordinary or ClickHouse pack-exec missing parent context, `DPONE_CACHE_ROOT`, a matching sealed plan, the ClickHouse snapshot sidecar, or enrolled supervisor/HTTP collaborators | Restore the shared release cache, sealed snapshot, and parent identity; do not retry as if a worker ran |
+| `composition_ordinary_worker_unavailable` | Ordinary or ClickHouse pack-exec missing parent context, `DPONE_CACHE_ROOT`, a matching sealed plan, protected runtime capture originals, or enrolled supervisor/HTTP collaborators | Restore the shared release cache and protected originals; verify parent identity; do not retry as if a worker ran |
 | `DPONE_COMPOSITION_SUPERVISOR_REQUIRED` | v3 deployment omitted the sealed supervisor object | Rebuild and promote the exact projection |
 | Duplicate RUNNING admission | The original executor still owns the attempt | Inspect that attempt; do not start a second worker |
 | Durable `COMMIT_UNKNOWN` | SQL or publication outcome is unproven | Close gates, prove quiescence, then reconcile; do not replay mutation |

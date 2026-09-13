@@ -8,14 +8,15 @@ PostgreSQL→MSSQL pack-exec reopens the producer-verified parent plan from
 ``DPONE_CACHE_ROOT`` (or ``DPONE_SCHEDULER_CACHE_ROOT``) before composing a
 root. Missing cache, a drifted source subject, or a missing factory fail closed
 before login issuance. ClickHouse pack-exec composes
-``CompositionClickHouseExecutionRoot`` only when that plan, the sealed snapshot
-sidecar, and enrolled supervisor/HTTP collaborators all exist.
+``CompositionClickHouseExecutionRoot`` only when that plan, protected runtime snapshot
+capture, and enrolled supervisor/HTTP collaborators all exist.
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -165,10 +166,17 @@ def verify_transfer_pack_operation(
     write: Any,
     mutation_plan_sha256: bytes,
     plan: Any,
+    *,
+    verified_manifest: Mapping[str, Any] | None = None,
+    runtime_environment: str | None = None,
 ) -> None:
     """Reject a generic operation that is not the sealed plan write."""
 
-    del attempt
+    from dpone.contracts.composition_persistence import CompositionAttemptIdentity
+
+    if type(attempt) is not CompositionAttemptIdentity:
+        raise CompositionAdmissionError("transfer_operation")
+    attempt.__post_init__()
     writes = getattr(plan, "writes", ())
     request = getattr(getattr(operation, "attempt", None), "request", None)
     if (
@@ -180,6 +188,17 @@ def verify_transfer_pack_operation(
         or type(mutation_plan_sha256) is not bytes
         or len(mutation_plan_sha256) != 32
     ):
+        raise CompositionAdmissionError("transfer_operation")
+    from dpone.app.composition_transfer_invocation import expected_transfer_invocation
+
+    invocation = getattr(request, "invocation", None)
+    expected = expected_transfer_invocation(
+        attempt,
+        write,
+        verified_manifest=verified_manifest,
+        runtime_environment=runtime_environment,
+    )
+    if invocation != expected or getattr(getattr(plan, "sources", None), "subject_sha256", None) != attempt.plan_sha256:
         raise CompositionAdmissionError("transfer_operation")
     declared = getattr(write, "database", None)
     if declared is not None and getattr(request, "target_database", None) != declared:
@@ -200,6 +219,15 @@ def transfer_execution_request(
         identity = parse_airflow_run_identity_json(str(request.env.get(AIRFLOW_RUN_IDENTITY_ENV) or ""))
         attempt = airflow_attempt_from_environment(request.env, identity)
         load_config = LoadConfigBuilder().build(dict(manifest), base_path=request.working_directory)
+        from dpone.services.airflow_mapping_context import AirflowMappingContextService
+        from dpone.services.interval_context import IntervalContextService
+        from dpone.services.run_invocation_context import RunInvocationContextService
+
+        invocation = RunInvocationContextService(
+            mapping_context_service=AirflowMappingContextService(),
+            interval_context_factory=IntervalContextService,
+        ).resolve(environ=request.env, dag_id=attempt.dag_id)
+        load_config = invocation.load_config_mutator(load_config)
     except (CompositionAdmissionError, OSError, TypeError, ValueError):
         raise
     except Exception:
@@ -213,6 +241,7 @@ def transfer_execution_request(
         raw_config=manifest,
         load_config=load_config,
         selector=selector or None,
+        execution_date=invocation.execution_date,
     )
 
 
@@ -235,7 +264,7 @@ def compose_pack_execution_root(
     cache = cache_root_from_environment(environment)
     plan = reopen_composition_plan(cache, parent["context"].release_id)
     if cell == POSTGRES_MSSQL_FULL_REFRESH_V1:
-        root = factory(dependencies=_transfer_dependencies(parent, manifest, cache, plan))
+        root = factory(dependencies=_transfer_dependencies(parent, manifest, cache, plan, environment=environment))
         if type(root) is not CompositionTransferExecutionRoot:
             raise CompositionAdmissionError("execution_capability")
         return root
@@ -306,6 +335,8 @@ def _transfer_dependencies(
     manifest: Mapping[str, Any],
     cache_root: Path,
     plan: CompositionExecutionPlan,
+    *,
+    environment: Mapping[str, str],
 ) -> Any:
     state = manifest.get("state")
     if not isinstance(state, Mapping) or not isinstance(state.get("connection_ref"), str):
@@ -331,8 +362,34 @@ def _transfer_dependencies(
         sink_target=parent["target"],
         state_target=parent["resolver"].resolve(str(state["connection_ref"])),
         read_plan=read_plan,
-        verify_operation=verify_transfer_pack_operation,
+        verify_operation=partial(
+            verify_transfer_pack_operation,
+            verified_manifest=manifest,
+            runtime_environment=parent["context"].environment,
+        ),
+        state_config=state,
+        payload_root=_transfer_payload_root(environment),
     )
+
+
+def _transfer_payload_root(environment: Mapping[str, str]) -> Path:
+    """Reopen the administrator-provisioned private supervisor capture directory."""
+    import os
+
+    from dpone.adapters.composition_supervisor_filesystem import (
+        absolute_supervisor_path,
+        open_protected,
+        require_supervisor,
+    )
+
+    require_supervisor()
+    root = absolute_supervisor_path(
+        Path(environment.get("DPONE_COMPOSITION_SUPERVISOR_ROOT") or "/var/lib/dpone/composition")
+    )
+    payloads = root / "transfers"
+    descriptor = open_protected(payloads, traversable=False)
+    os.close(descriptor)
+    return payloads
 
 
 __all__ = [

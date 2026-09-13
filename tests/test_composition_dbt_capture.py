@@ -145,12 +145,12 @@ def test_journal_replay_is_not_a_new_executor(tmp_path, monkeypatch):
 
 
 def test_proc_uid_scan_includes_escaped_process_groups(monkeypatch):
-    from pathlib import Path
-
     from dpone.adapters.composition_dbt_capture import _require_uid_quiescent
+    from dpone.adapters.composition_dbt_cleanup import LinuxProcessOperations, ProcessIdentity
 
-    monkeypatch.setattr(Path, "iterdir", lambda path: iter([Path("/proc/123")]))
-    monkeypatch.setattr("dpone.adapters.composition_dbt_capture._read_process", lambda pid: (1001, 999, 10))
+    monkeypatch.setattr(
+        LinuxProcessOperations, "inventory", lambda self, deadline: [ProcessIdentity(123, 1001, 999, 10, "S")]
+    )
     with pytest.raises(DbtCaptureError, match="capture_child_not_quiescent"):
         _require_uid_quiescent(1001)
 
@@ -187,10 +187,10 @@ def test_proc_read_permission_failure_is_not_quiescence(monkeypatch):
 
     from dpone.adapters.composition_dbt_capture import _read_process
 
-    def unavailable(path):
+    def unavailable(path, *args, **kwargs):
         raise PermissionError("unavailable")
 
-    monkeypatch.setattr(Path, "read_text", unavailable)
+    monkeypatch.setattr(Path, "open", unavailable)
     with pytest.raises(DbtCaptureError, match="capture_process_visibility"):
         _read_process(123)
 
@@ -204,9 +204,12 @@ def test_linux_runner_drops_uid_gid_and_supplementary_groups(tmp_path, monkeypat
     class Process:
         pid = 123
 
-        def wait(self, **kwargs):
-            assert kwargs == {"timeout": value.timeout_seconds}
-            return 0
+    class Lifecycle:
+        def run(self, process, uid, timeout):
+            from dpone.contracts.composition_dbt_outcome import DbtChildExit
+
+            assert (process.pid, uid, timeout) == (123, value.child_uid, value.timeout_seconds)
+            return DbtChildExit(123, 100, 0)
 
     def spawn(argv, **kwargs):
         calls.append((argv, kwargs))
@@ -215,6 +218,8 @@ def test_linux_runner_drops_uid_gid_and_supplementary_groups(tmp_path, monkeypat
     monkeypatch.setattr("dpone.adapters.composition_dbt_capture._require_linux_supervisor", lambda value: None)
     monkeypatch.setattr("dpone.adapters.composition_dbt_capture._require_uid_quiescent", lambda uid: None)
     monkeypatch.setattr("dpone.adapters.composition_dbt_capture._read_process", lambda pid: (1001, 123, 100))
+    monkeypatch.setattr("dpone.adapters.composition_dbt_capture.require_waitid", lambda: None)
+    monkeypatch.setattr("dpone.adapters.composition_dbt_capture.LinuxDbtProcessLifecycle", Lifecycle)
     monkeypatch.setattr("dpone.adapters.composition_dbt_capture.subprocess.Popen", spawn)
     result = LinuxDbtBuildRunner(lambda attempt: {})(value)
     assert result.pid == 123 and result.start_ticks == 100
@@ -227,3 +232,45 @@ def test_linux_runner_drops_uid_gid_and_supplementary_groups(tmp_path, monkeypat
         "extra_groups": [],
         "start_new_session": True,
     }
+
+
+def test_runner_timeout_never_records_exit_or_permits_replay(tmp_path, monkeypatch):
+    import subprocess
+
+    from dpone.contracts.composition_dbt_outcome import DbtArtifactOriginal
+
+    value = intent(tmp_path)
+    store = Store(value)
+    launches, exits = [], []
+    store.record_exit_once = lambda record: exits.append(record)
+
+    def runner(value):
+        launches.append(value)
+        raise subprocess.TimeoutExpired(value.argv, value.timeout_seconds)
+
+    capture = ProtectedDbtCapture(store, runner)
+    monkeypatch.setattr(capture, "_require_boundary", lambda value: None)
+    monkeypatch.setattr("dpone.adapters.composition_dbt_capture._require_uid_quiescent", lambda uid: None)
+    monkeypatch.setattr(
+        capture,
+        "_read_original",
+        lambda value, role: DbtArtifactOriginal(role, "preflight/manifest.json", b"preflight"),
+    )
+    with pytest.raises(subprocess.TimeoutExpired):
+        capture.dispatch(value.attempt)
+    with pytest.raises(DbtCaptureError, match="dispatch_unknown"):
+        capture.dispatch(value.attempt)
+    assert len(launches) == 1 and exits == [] and "capture" not in store.calls
+
+
+def test_process_boundary_maps_error_and_preserves_timeout_cause():
+    import subprocess
+
+    from dpone.adapters.composition_dbt_capture import _capture_process_errors
+    from dpone.adapters.composition_dbt_cleanup import ProcessLifecycleError
+
+    timeout = subprocess.TimeoutExpired(("dbt", "build"), 20)
+    with pytest.raises(DbtCaptureError, match="capture_cleanup_unresolved") as caught:
+        with _capture_process_errors():
+            raise ProcessLifecycleError("capture_cleanup_unresolved") from timeout
+    assert caught.value.__cause__ is timeout

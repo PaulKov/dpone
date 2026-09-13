@@ -34,6 +34,7 @@ from dpone.contracts.composition_persistence import (
     CompositionProofAuthority,
     composition_attempt_epoch_subject,
 )
+from dpone.contracts.composition_snapshot import SnapshotLimits
 from dpone.runtime.composition_snapshot import ClickHouseAtomicSnapshotPublisher
 from tests.composition_mssql_catalog_helpers import install_offline_catalog_references
 from tests.composition_snapshot_helpers import (
@@ -462,6 +463,7 @@ def runtime(monkeypatch) -> ClickHouseRuntime:
         target=prepared.target,
         expected_service_id=SERVICE,
         can_classify_publication=True,
+        limits=SnapshotLimits(100, 4096, 4096, 4096, 4096, 8192),
     )
     return ClickHouseRuntime(
         CompositionClickHouseExecutionRoot(dependencies),
@@ -618,3 +620,119 @@ def test_root_rejects_missing_transport_binding(runtime):
     with pytest.raises(CompositionAdmissionError, match="worker_commit_unknown"):
         runtime.execute()
     assert not runtime.db.data["dispatches"]
+
+
+@pytest.mark.parametrize("rows", [[(1, object())], [(1, "x" * 10000)]])
+def test_invalid_or_oversized_source_never_creates_generation(runtime, rows):
+    runtime.seed_source(rows)
+    with pytest.raises(CompositionAdmissionError):
+        runtime.execute()
+    assert runtime.ledger.dispatches == []
+
+
+def test_wire_limit_is_checked_before_create(runtime):
+    from dpone.app.composition_clickhouse_execution import CompositionClickHouseExecutionRoot
+
+    runtime.seed_source([(1, "new")])
+    runtime.root = CompositionClickHouseExecutionRoot(
+        replace(runtime.root._deps, limits=replace(runtime.root._deps.limits, max_wire_bytes=1))
+    )
+    with pytest.raises(CompositionAdmissionError):
+        runtime.execute()
+    assert runtime.ledger.dispatches == []
+
+
+def test_missing_limits_cannot_admit_or_issue_attempt(runtime):
+    from dpone.app.composition_clickhouse_execution import CompositionClickHouseExecutionRoot
+
+    runtime.root = CompositionClickHouseExecutionRoot(replace(runtime.root._deps, limits=None))
+    assert not runtime.root.can_execute_attempt()
+    with pytest.raises(CompositionAdmissionError, match="clickhouse_execution_limits"):
+        runtime.execute()
+    assert runtime.ledger.issued == []
+    assert runtime.ledger.dispatches == []
+
+
+def test_empty_source_creates_only_validated_empty_generation(runtime):
+    runtime.seed_source([])
+    runtime.execute()
+    assert any(type(dispatch) is CreateGenerationDispatch for dispatch, _ in runtime.ledger.dispatches)
+    assert not any(type(dispatch) is InsertGenerationDispatch for dispatch, _ in runtime.ledger.dispatches)
+
+
+def test_root_stops_consuming_at_first_row_over_budget(runtime):
+    from dpone.app.composition_clickhouse_execution import CompositionClickHouseExecutionRoot
+
+    visits = []
+
+    def rows(_attempt):
+        try:
+            for i in range(100):
+                visits.append(i)
+                yield (i, "bounded")
+        finally:
+            visits.append("closed")
+
+    runtime.root = CompositionClickHouseExecutionRoot(
+        replace(runtime.root._deps, limits=replace(runtime.root._deps.limits, max_rows=1), read_source=rows)
+    )
+    with pytest.raises(CompositionAdmissionError):
+        runtime.execute()
+    assert visits == [0, 1, "closed"]
+    assert runtime.ledger.dispatches == []
+
+
+def test_root_capture_owns_payload_and_generation_after_ingest_closure(runtime, monkeypatch):
+    """Root seam uses a capture double; actual capture/store have separate tests."""
+    from types import SimpleNamespace
+
+    import dpone.app.composition_clickhouse_execution as module
+
+    runtime.seed_source([(1, "captured"), (3, None)])
+    generation = runtime.authority.value.generation
+    captured = SimpleNamespace(
+        subject=SimpleNamespace(
+            attempt=runtime.authority.value.attempt,
+            target=runtime.root._deps.target,
+            generation_uuid=generation.new_generation_uuid,
+        ),
+        columns=COLUMNS,
+        rows=tuple(runtime.tables.source),
+        payload=b"exact already encoded Native bytes",
+    )
+
+    class Capture:
+        def capture_once(self, attempt):
+            assert attempt == captured.subject.attempt
+            assert runtime.ledger.dispatches == []
+            runtime.events.append("capture")
+            return captured
+
+        def finalize(self, actual, closed, quiet):
+            assert actual is captured
+            assert closed.kind == "CLOSED_GATES" and quiet.kind == "QUIESCENCE"
+            assert runtime.ledger.closed == closed.proof_sha256
+            assert runtime.ledger.quiescence == quiet.proof_sha256
+            assert [type(d) for d, _ in runtime.ledger.dispatches] == [
+                CreateGenerationDispatch,
+                InsertGenerationDispatch,
+            ]
+            runtime.events.append("seal_generation")
+            return generation
+
+    def forbidden(*_args):
+        raise AssertionError("capture must own source reading and encoding")
+
+    monkeypatch.setattr(module, "_native_payload", forbidden)
+    runtime.root = module.CompositionClickHouseExecutionRoot(
+        replace(runtime.root._deps, capture=Capture(), read_source=forbidden)
+    )
+    runtime.request = replace(runtime.request, columns=(), generation_uuid="untrusted", generation_ref="untrusted")
+    runtime.execute()
+    assert runtime.ledger.dispatches[1][1] == captured.payload
+    assert (
+        runtime.events.index("capture")
+        < runtime.events.index("close_dispatch")
+        < runtime.events.index("seal_generation")
+        < runtime.events.index("prepare")
+    )

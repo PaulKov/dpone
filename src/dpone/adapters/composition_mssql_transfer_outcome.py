@@ -43,6 +43,7 @@ class CompositionTransferObservation:
     content_evidence: bool
     rollback_protected: bool
     no_mutation: bool
+    evidence_document: bytes | None = None
 
     @property
     def state(self) -> str:
@@ -70,12 +71,14 @@ class CompositionMssqlTransferOutcomeObserver:
         principal_id: str,
         observe: ObserveTransfer,
         persist: ProofWriter | None = None,
+        resolve_principal: Callable[[CompositionAttemptIdentity], str] | None = None,
     ) -> None:
         self._transaction = transaction
         self._service_id = expected_service_id
         self._principal_id = principal_id
         self._observe = observe
         self._persist = persist
+        self._resolve_principal = resolve_principal
 
     def can_prove_outcome(self) -> bool:
         """The default unknown observer cannot seal SUCCEEDED or proven FAILED."""
@@ -84,12 +87,18 @@ class CompositionMssqlTransferOutcomeObserver:
 
     def observe(self, attempt: CompositionAttemptIdentity) -> CompositionAttemptProof:
         attempt.__post_init__()
+        principal = self._resolve_principal(attempt) if self._resolve_principal else self._principal_id
         try:
             observed = self._observe(attempt)
         except Exception:
             observed = CompositionTransferObservation(False, False, False, False, False)
         if type(observed) is not CompositionTransferObservation:
             raise CompositionAdmissionError("transfer_outcome_observation")
+        import json
+
+        evidence = {}
+        if observed.evidence_document is not None:
+            evidence["observation"] = json.loads(observed.evidence_document)
         document = canonical_json_bytes(
             {
                 "schema": "dpone.composition-transfer-outcome-evidence.v1",
@@ -101,6 +110,7 @@ class CompositionMssqlTransferOutcomeObserver:
                 "content_evidence": observed.content_evidence,
                 "rollback_protected": observed.rollback_protected,
                 "no_mutation": observed.no_mutation,
+                **evidence,
             }
         )
         proof = CompositionAttemptProof(
@@ -108,7 +118,7 @@ class CompositionMssqlTransferOutcomeObserver:
             attempt.attempt_sha256,
             attempt.activation_request_sha256,
             composition_attempt_epoch_subject(attempt),
-            (CompositionProofAuthority("mssql", self._service_id, self._principal_id),),
+            (CompositionProofAuthority("mssql", self._service_id, principal),),
             "sha256:" + sha256(document).hexdigest(),
             observed.state,
         )
@@ -120,4 +130,29 @@ class CompositionMssqlTransferOutcomeObserver:
         return proof.require_attempt(attempt)
 
 
-__all__ = ["CompositionMssqlTransferOutcomeObserver", "CompositionTransferObservation"]
+def resolve_transfer_principal(ledger: Any, attempt: CompositionAttemptIdentity, service_id: str) -> str:
+    """Resolve the closed, immutable issued SID under protected ledger authority.
+
+    A service UUID or a caller-selected login name cannot stand in for this
+    per-attempt principal. Closure and OUTCOME must name the same retained SID.
+    """
+    attempt.__post_init__()
+    ledger.cursor.execute(
+        "SELECT TOP (2) g.login_sid FROM "
+        + ledger.table("login_gates")
+        + " g WITH (HOLDLOCK) JOIN "
+        + ledger.table("issued_authorities")
+        + " a WITH (HOLDLOCK) ON a.operation_key=g.operation_key "
+        "WHERE g.operation_key=? AND g.operation_family='execution' AND g.gate_state='CLOSED' "
+        "AND g.disabled_evidence_sha256 IS NOT NULL AND a.connector='mssql' AND a.service_id=? "
+        "AND a.principal_id='mssql-sid:'+LOWER(CONVERT(varchar(32),g.login_sid,2));",
+        attempt.attempt_sha256,
+        service_id,
+    )
+    rows = tuple(tuple(row) for row in ledger.cursor.fetchall())
+    if len(rows) != 1 or len(rows[0]) != 1 or type(rows[0][0]) is not bytes or len(rows[0][0]) != 16:
+        raise CompositionAdmissionError("transfer_issued_sid")
+    return "mssql-sid:" + rows[0][0].hex()
+
+
+__all__ = ["CompositionMssqlTransferOutcomeObserver", "CompositionTransferObservation", "resolve_transfer_principal"]

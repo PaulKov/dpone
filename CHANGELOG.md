@@ -2,8 +2,31 @@
 
 ## Unreleased
 
+### Fixed
+
+- Preserve exact transfer extraction bytes for independent committed-receipt and
+  typed target-content reconciliation; retain scheduler identity across retries
+  and mapped tasks, including explicitly configured state process identity.
+- Close hydrated transfer resources before proving gate closure, and avoid
+  nesting SQL Server transactions when the DB-API driver owns transaction entry.
+- Persist composition snapshot publication intents and transitions in protected
+  SQL with immutable originals and single-winner exchange claims. Uncertain
+  acknowledgement never authorizes a repeated exchange.
+- Bound dbt failure and cancellation cleanup through TERM, KILL and reaping;
+  unresolved process closure cannot authorize success or UID reuse.
+- Refuse composition activation before reservations when required execution
+  readiness cannot be established. Installed constructors alone are insufficient.
+
 ### Added
 
+- Capture immutable MSSQL source originals and Native bytes before ClickHouse
+  mutation; use per-attempt generations and reconcile typed content independently.
+  Reject snapshots exceeding the observer page budget before target mutation.
+- Add authenticated TLS dispatcher transport and a separately runnable protected
+  host observation service with bounded shutdown. The protected remote business
+  handler and full Kubernetes execution campaign remain incomplete.
+- Preserve canonical SQL mutation-plan originals without changing their existing
+  digests. Trusted pre-extraction journal binding remains a follow-up requirement.
 - Document Kubernetes composition-supervisor provisioning, cache-sync
   `--workspace-authority-connection-ref`, the three installed execution cells
   (`sqlserver_dbt_v1`, `postgres_mssql_full_refresh_v1`,
@@ -27,7 +50,7 @@
   or a missing occurrence context fail-closes as
   `composition_ordinary_worker_unavailable` before login issuance.
   ClickHouse pack-exec reaches `CompositionClickHouseExecutionRoot` when that
-  plan, the sealed snapshot sidecar, and enrolled supervisor/HTTP collaborators
+  plan, protected runtime snapshot capture, and enrolled supervisor/HTTP collaborators
   compose; missing originals fail-close with the same reason before login.
   ClickHouse catalog inspect issues closed HTTP `system.*` reads and hashes the
   actual response bytes; it does not copy sealed generation content, schema, or

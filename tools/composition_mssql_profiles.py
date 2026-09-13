@@ -20,6 +20,7 @@ EXPECTED_TESTS = (
 GATE_CASES = {
     "tests.integration.composition.test_composition_mssql_transfer_fence_live": (
         "test_transfer_exact_binding_commits_actual_target_rows",
+        "test_transfer_rollback_releases_transaction_without_committing_rows",
         "test_transfer_foreign_operation_and_receipt_cannot_mutate",
         "test_transfer_server_rejects_foreign_binding_digest_and_bytes",
         "test_transfer_server_rejects_stale_domain_epoch",
@@ -109,7 +110,8 @@ _PROFILES = {
             {
                 TEST_CLASS: EXPECTED_TESTS,
                 "tests.integration.composition.test_composition_dispatch_schema_live": (
-                    "test_dispatch_catalog_and_append_only_closure",
+                    "test_dispatch_catalog_and_append_only_closure[True]",
+                    "test_dispatch_catalog_and_append_only_closure[False]",
                     "test_dispatch_catalog_drift_is_rejected",
                     "test_dispatch_claim_terminal_and_closure_order",
                 ),

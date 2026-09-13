@@ -25,14 +25,15 @@ UNVERIFIED.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from hashlib import sha256
 from typing import Any
 
 from dpone.adapters.composition_clickhouse_http import ClickHouseTransportCredentials
 from dpone.adapters.composition_clickhouse_principal import IssuedClickHouseCredentials
 from dpone.adapters.composition_clickhouse_transport import ClickHouseDispatchTransportError
+from dpone.app.composition_clickhouse_source import bounded_clickhouse_rows
 from dpone.contracts.airflow_correlation import AirflowAttemptCorrelation
 from dpone.contracts.airflow_run_identity import AirflowRunIdentity
 from dpone.contracts.composition_activation import (
@@ -49,7 +50,7 @@ from dpone.contracts.composition_persistence import (
     CompositionAttemptIdentity,
     require_composition_attempt_scope,
 )
-from dpone.contracts.composition_snapshot import SnapshotTarget
+from dpone.contracts.composition_snapshot import SnapshotLimits, SnapshotTarget
 from dpone.runtime.clickhouse_native import ClickHouseNativeEncoder
 from dpone.services.composition_worker import CompositionWorker
 
@@ -64,9 +65,9 @@ class CompositionClickHouseExecutionRequest:
     plan_sha256: str
     run_identity: AirflowRunIdentity
     airflow_attempt: AirflowAttemptCorrelation
-    generation_ref: str
-    generation_uuid: str
-    columns: tuple[ClickHouseDispatchColumn, ...]
+    generation_ref: str = ""
+    generation_uuid: str = ""
+    columns: tuple[ClickHouseDispatchColumn, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,13 +88,15 @@ class CompositionClickHouseExecutionDependencies:
     publisher_gate: Any
     publisher: Any
     bind_transport: Callable[[ClickHouseTransportCredentials, Any], Any] | None
-    read_source: Callable[[CompositionAttemptIdentity], Sequence[tuple[object, ...]]]
+    read_source: Callable[[CompositionAttemptIdentity], Iterable[tuple[object, ...]]]
     require_enrollment: Callable[[CompositionAttemptIdentity, str], Any]
     outcome_observer: Any
     target: SnapshotTarget
     expected_service_id: str
     attach_publisher_transport: Callable[..., None] | None = None
     can_classify_publication: bool = False
+    limits: SnapshotLimits | None = None
+    capture: Any | None = None
 
 
 class CompositionClickHouseExecutionRoot:
@@ -105,11 +108,13 @@ class CompositionClickHouseExecutionRoot:
     def can_execute_attempt(self) -> bool:
         """Refuse ingest when catalog cannot independently classify publication."""
 
-        return bool(self._deps.can_classify_publication)
+        return bool(self._deps.can_classify_publication) and type(self._deps.limits) is SnapshotLimits
 
     def execute(self, request: CompositionClickHouseExecutionRequest) -> CompositionClickHouseResult:
         """Run admission, enrolled dispatch, atomic publication and seal once."""
 
+        if not self.can_execute_attempt():
+            raise CompositionAdmissionError("clickhouse_execution_limits")
         occurrence = self._deps.read_active()
         occurrence.require_state("ACTIVE")
         attempt = build_composition_clickhouse_attempt(
@@ -141,11 +146,26 @@ class CompositionClickHouseExecutionRoot:
             if not self.can_execute_attempt():
                 raise CompositionAdmissionError("snapshot_catalog_shape")
             self._deps.require_enrollment(attempt, "dispatch")
-            rows = tuple(self._deps.read_source(attempt))
+            limits = self._deps.limits
+            if limits is None:
+                raise CompositionAdmissionError("clickhouse_execution_limits")
+            captured = None
+            if self._deps.capture is not None:
+                captured = self._deps.capture.capture_once(attempt)
+                if captured.subject.attempt != attempt or captured.subject.target != self._deps.target:
+                    raise CompositionAdmissionError("snapshot_capture_subject")
+                request = replace(request, columns=captured.columns, generation_uuid=captured.subject.generation_uuid)
+                rows, payload = captured.rows, captured.payload
+            else:
+                rows = tuple(bounded_clickhouse_rows(self._deps.read_source(attempt), request.columns, limits))
+                payload = _native_payload(request.columns, rows, limits.max_wire_bytes) if rows else b""
             journal = self._journal(self._deps.gate, attempt, credentials.user_id)
             transport = self._bind_transport(credentials, journal)
-            self._ingest(request, attempt, rows, transport, journal)
-            self._close_purpose(self._deps.gate, attempt)
+            self._ingest(request, attempt, rows, payload, transport, journal)
+            closed, quiet = self._close_purpose(self._deps.gate, attempt)
+            if captured is not None and self._deps.capture is not None:
+                generation = self._deps.capture.finalize(captured, closed, quiet)
+                request = replace(request, generation_ref=generation.record_sha256)
             self._deps.require_enrollment(attempt, "publication")
             publisher_gate = self._deps.publisher_gate
             if publisher_gate is None:
@@ -176,7 +196,7 @@ class CompositionClickHouseExecutionRoot:
             raise CompositionAdmissionError("clickhouse_transport_binding")
         return bind(ClickHouseTransportCredentials(credentials.username, credentials.password), journal)
 
-    def _close_purpose(self, gate: Any, attempt: CompositionAttemptIdentity) -> None:
+    def _close_purpose(self, gate: Any, attempt: CompositionAttemptIdentity) -> tuple[Any, Any]:
         close = getattr(gate, "close", None)
         prove = getattr(gate, "prove_quiescence", None)
         if not callable(close) or not callable(prove):
@@ -187,12 +207,14 @@ class CompositionClickHouseExecutionRoot:
         quiet = prove(attempt)
         if getattr(quiet, "kind", None) != "QUIESCENCE":
             raise CompositionAdmissionError("clickhouse_ingest_quiescence")
+        return closed, quiet
 
     def _ingest(
         self,
         request: CompositionClickHouseExecutionRequest,
         attempt: CompositionAttemptIdentity,
         rows: tuple[tuple[object, ...], ...],
+        payload: bytes,
         transport: Any,
         journal: Any,
     ) -> None:
@@ -204,7 +226,6 @@ class CompositionClickHouseExecutionRoot:
         )
         if not rows:
             return
-        payload = _native_payload(request.columns, rows)
         self._send(
             transport,
             journal,
@@ -283,13 +304,15 @@ def build_composition_clickhouse_attempt(
     return result
 
 
-def _native_payload(columns: tuple[ClickHouseDispatchColumn, ...], rows: Sequence[tuple[object, ...]]) -> bytes:
+def _native_payload(
+    columns: tuple[ClickHouseDispatchColumn, ...], rows: Sequence[tuple[object, ...]], maximum_bytes: int
+) -> bytes:
     try:
         schema = tuple((column.name, column.type_name) for column in columns)
         payload = b"".join(ClickHouseNativeEncoder(schema, target_schema=schema).iter_batches(rows))
     except Exception:
         raise CompositionAdmissionError("clickhouse_source_payload") from None
-    if type(payload) is not bytes or not payload:
+    if type(payload) is not bytes or not payload or len(payload) > maximum_bytes:
         raise CompositionAdmissionError("clickhouse_source_payload")
     return payload
 

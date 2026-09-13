@@ -77,6 +77,11 @@ writer exclusion.
 The platform installs the SQL from
 `dpone.adapters.composition_mssql_schema.render_composition_mssql_schema()`
 explicitly, then provisions and protects the authority and domain records.
+Supervised execution additionally requires administrator-installed
+`render_execution_evidence_schema()` and `render_dbt_capture_schema()` batches;
+base control and login-gate installation does not create these tables. See the
+[administrator provisioning instructions](guides/composition-supervisor-kubernetes.md#administrator-provisioning)
+for producers, order, permissions and catalog verification.
 Reapplying the initial DDL fails rather than adopting existing tables. Runtime
 operations never create, repair or enroll their own authority. Each transaction
 requires schema version 2, the externally pinned service UUID and the complete
@@ -293,8 +298,8 @@ does not pass a v3 parent to the native-only coordinator. At DAG trigger,
 `postgres_mssql_full_refresh_v1` can reach `CompositionTransferExecutionRoot`
 when that context and `DPONE_CACHE_ROOT` reopen the sealed plan.
 `mssql_clickhouse_full_refresh_v1` can reach
-`CompositionClickHouseExecutionRoot` when that plan, the sealed snapshot
-sidecar, and enrolled supervisor/HTTP collaborators compose. Pack-exec does
+`CompositionClickHouseExecutionRoot` when that plan, protected runtime snapshot
+capture, and enrolled supervisor/HTTP collaborators compose. Pack-exec does
 not start login or ingest until an independent transfer observer can prove
 receipt/row/content, or until catalog inspect can independently classify
 publication; missing that proof fail-closes as
@@ -381,7 +386,7 @@ attempts across native and ordinary workloads.
 
 A terminal receipt requires independent closed-gate, server-quiescence and durable
 outcome evidence. A closed gate or exited process does not resolve an unknown SQL
-commit. No TTL may release its resource ownership. The installed roots apply these checks when pack-exec reaches them. Ordinary pack-exec reaches the transfer root only with parent context and a reopened cache plan. ClickHouse pack-exec reaches `CompositionClickHouseExecutionRoot` when that plan, the sealed snapshot sidecar, and enrolled supervisor/HTTP collaborators compose; missing originals fail-close. A missing live observation remains `UNVERIFIED`, not a pass.
+commit. No TTL may release its resource ownership. The installed roots apply these checks when pack-exec reaches them. Ordinary pack-exec reaches the transfer root only with parent context and a reopened cache plan. ClickHouse pack-exec reaches `CompositionClickHouseExecutionRoot` when that plan, protected runtime snapshot capture, and enrolled supervisor/HTTP collaborators compose; missing originals fail-close. A missing live observation remains `UNVERIFIED`, not a pass.
 
 ## Downstream CI and recovery acceptance
 
@@ -419,8 +424,8 @@ campaign retains provider-to-worker evidence for every installed cell. That
 campaign is not ready: shipped pack-exec reaches `sqlserver_dbt_v1` when
 parent context exists, `postgres_mssql_full_refresh_v1` when that context
 and `DPONE_CACHE_ROOT` reopen the sealed plan, and
-`mssql_clickhouse_full_refresh_v1` when that plan, the sealed snapshot
-sidecar, and enrolled supervisor/HTTP collaborators compose. ClickHouse
+`mssql_clickhouse_full_refresh_v1` when that plan, protected runtime snapshot
+capture, and enrolled supervisor/HTTP collaborators compose. ClickHouse
 catalog inspect hashes actual HTTP responses and does not invent typed B
 content, so publication stays `COMMIT_UNKNOWN` without independent content
 parity. Offline tests and SQL component profiles are not that campaign and

@@ -198,10 +198,30 @@ def test_parent_and_cache_plan_installs_transfer_root(command, clean_ambient, mo
     from dpone.app import composition_verified_pack_dispatcher as module
     from dpone.app.composition_transfer_execution import CompositionTransferExecutionRoot
     from dpone.app.composition_verified_pack_dispatcher import compose_verified_pack_dispatcher
+    from dpone.contracts.runtime_connection import ResolvedBindingConnection, ResolvedConnectionDescriptor
+    from dpone.runtime.credentials.config import CredentialsConfig
     from tests.test_verified_pack_execution import ORDINARY_ARGV
 
     parent = parent_authority()
-    parent["resolver"] = type("Resolver", (), {"resolve": staticmethod(lambda _ref: object())})()
+    service = parent["control"].expected_service_id
+
+    def target(database):
+        return ResolvedBindingConnection(
+            CredentialsConfig(host="offline-sql", database=database, schema="dbo"),
+            {},
+            ResolvedConnectionDescriptor(
+                "mssql", {"database": database, "schema": "dbo", "composition_service_id": service}
+            ),
+        )
+
+    parent["target"] = target("warehouse")
+    state = target("warehouse_state")
+    parent["resolver"] = type("Resolver", (), {"resolve": staticmethod(lambda _ref: state)})()
+    payload_root = command.working_directory / "private-transfer-captures"
+    payload_root.mkdir(mode=0o700)
+    monkeypatch.setattr(
+        "dpone.app.composition_pack_execution_dispatcher._transfer_payload_root", lambda _env: payload_root
+    )
     constructed: list[object] = []
 
     class Caps:
@@ -267,6 +287,8 @@ def test_parent_and_cache_plan_installs_transfer_root(command, clean_ambient, mo
 
     assert type(root) is CompositionTransferExecutionRoot
     assert constructed
+    assert root.can_execute_attempt()
+    assert root._deps.capture_lifecycle is not None
 
 
 def test_missing_cache_plan_does_not_construct_ordinary_root(

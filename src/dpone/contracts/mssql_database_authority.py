@@ -110,8 +110,8 @@ class MssqlDatabaseAuthoritySet:
 
 
 def _capability_prefix(capability: str) -> str:
-    if capability not in {"target", "staging", "state"}:
-        raise ValueError("MSSQL database authority capability must be target, staging, or state")
+    if capability not in {"source", "target", "staging", "state"}:
+        raise ValueError("MSSQL database authority capability must be source, target, staging, or state")
     return f"mssql_transaction.{capability}"
 
 

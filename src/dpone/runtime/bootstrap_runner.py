@@ -51,6 +51,7 @@ class DefaultProcessRunner:
         state_connection: Any | None = None,
         mssql_transaction_admission_service: Any | None = None,
         composition_transaction_fence: Any | None = None,
+        source_extraction_lifecycle_service: Any | None = None,
     ) -> ProcessResult:
         from dpone.backfill.state_factory import BackfillStateStoreFactory
         from dpone.runtime.etl.backfill_orchestrator import execute_process_with_backfill
@@ -116,6 +117,7 @@ class DefaultProcessRunner:
             route_capability_orchestrator=route_capability_orchestrator,
             load_governance_service=load_governance_service,
             mssql_transaction_admission_service=mssql_transaction_admission_service,
+            source_extraction_lifecycle_service=source_extraction_lifecycle_service,
         )
         orchestration_options = {}
         if self._backfill_orchestrator_factory is not None:
@@ -244,12 +246,15 @@ def _processor(
     route_capability_orchestrator: Any,
     load_governance_service: Any,
     mssql_transaction_admission_service: Any | None = None,
+    source_extraction_lifecycle_service: Any | None = None,
 ) -> Any:
     from dpone.runtime.etl.processor import ETLProcessor
 
     options = {}
     if mssql_transaction_admission_service is not None:
         options["mssql_transaction_admission_service"] = mssql_transaction_admission_service
+    if source_extraction_lifecycle_service is not None:
+        options["source_extraction_lifecycle_service"] = source_extraction_lifecycle_service
     return ETLProcessor(
         source=bindings.source_obj,
         sink=bindings.sink_obj,

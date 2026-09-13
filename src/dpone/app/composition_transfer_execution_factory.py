@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from dpone.adapters.composition_mssql_attempts import (
@@ -11,9 +12,12 @@ from dpone.adapters.composition_mssql_attempts import (
 from dpone.adapters.composition_mssql_execution_evidence import persist_execution_proof
 from dpone.adapters.composition_mssql_login_gate import MssqlCompositionLoginGate
 from dpone.adapters.composition_mssql_transaction_binding import MssqlCompositionTransactionBindings
+from dpone.adapters.composition_mssql_transaction_fence import MssqlCompositionTransactionFence
+from dpone.adapters.composition_mssql_transfer_access import MssqlCompositionTransferAccess
 from dpone.adapters.composition_mssql_transfer_outcome import (
     CompositionMssqlTransferOutcomeObserver,
     CompositionTransferObservation,
+    resolve_transfer_principal,
 )
 from dpone.app.composition_dbt_execution_factory import CompositionDbtControlAuthority
 from dpone.app.composition_transfer_execution import (
@@ -34,6 +38,8 @@ def build_composition_transfer_execution_dependencies(
     read_plan: Any,
     verify_operation: Any,
     observe: Any | None = None,
+    state_config: Any | None = None,
+    payload_root: Path | None = None,
 ) -> CompositionTransferExecutionDependencies:
     """Return protected collaborators of one supervised ordinary transfer cell."""
 
@@ -48,6 +54,35 @@ def build_composition_transfer_execution_dependencies(
         verify_operation=verify_operation,
         control_schema=control.control_schema,
     )
+
+    def register(attempt: Any, operation: Any, write: Any, mutation: bytes) -> MssqlCompositionTransactionFence:
+        binding = bindings.bind(attempt, operation, write, mutation)
+        return MssqlCompositionTransactionFence(binding, control.control_schema)
+
+    def principal(attempt: Any) -> str:
+        with composition_control_transaction(
+            control.connection_factory, control.control_schema, control.expected_service_id
+        ) as ledger:
+            return resolve_transfer_principal(ledger, attempt, control.expected_service_id)
+
+    capture_lifecycle = None
+    if (state_config is None) != (payload_root is None):
+        raise CompositionAdmissionError("transfer_observation_configuration")
+    if payload_root is not None:
+        if observe is not None:
+            raise CompositionAdmissionError("transfer_observation_configuration")
+        from dpone.app.composition_transfer_observation_factory import build_composition_transfer_observation
+
+        observe, capture_lifecycle = build_composition_transfer_observation(
+            control=control,
+            sink_target=sink_target,
+            state_target=state_target,
+            state_config=state_config,
+            payload_root=payload_root,
+            read_plan=read_plan,
+            verify_operation=verify_operation,
+        )
+
     return CompositionTransferExecutionDependencies(
         read_active=read_active,
         attempts=MssqlCompositionAttemptStore(
@@ -57,6 +92,7 @@ def build_composition_transfer_execution_dependencies(
         ),
         gate=MssqlCompositionLoginGate(
             control.connection_factory,
+            transfer_access=MssqlCompositionTransferAccess(),
             expected_service_id=control.expected_service_id,
             control_database=control.control_database,
             control_schema=control.control_schema,
@@ -71,13 +107,15 @@ def build_composition_transfer_execution_dependencies(
             ),
             expected_service_id=control.expected_service_id,
             principal_id=control.expected_service_id,
+            resolve_principal=principal,
             observe=observe or _unknown_transfer_observation,
             persist=persist_execution_proof,
         ),
         sink_target=sink_target,
         state_target=state_target,
         expected_service_id=control.expected_service_id,
-        operation_registrar=bindings.bind,
+        operation_registrar=register,
+        capture_lifecycle=capture_lifecycle,
     )
 
 

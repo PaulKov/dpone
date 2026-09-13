@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -29,7 +30,6 @@ from dpone.app.composition_transfer_execution import (
 from dpone.contracts.airflow_run_identity import AirflowArtifactIdentity, AirflowRunIdentity
 from dpone.contracts.composition_activation import CompositionAdmissionError
 from dpone.contracts.composition_execution_authority import CompositionSupervisorProjection
-from dpone.contracts.dbt_relation_writes import DbtRelationWrite
 from dpone.contracts.dbt_runtime import (
     AIRFLOW_RUN_IDENTITY_ENV,
     DAG_ID_ENV,
@@ -126,41 +126,60 @@ def test_reopen_composition_plan_rejects_missing_release_cache(tmp_path: Path) -
         reopen_composition_plan(cache, _RELEASE)
 
 
+def _transfer_operation_case(*, map_index: int = -1):
+    from dpone.contracts.mssql_transaction_governance import InvocationIdentity
+    from tests.test_mssql_composition_transaction_fence import binding
+
+    bound = binding()
+    attempt = replace(bound.attempt, map_index=map_index)
+    task = attempt.task_id + (f"[{map_index}]" if map_index >= 0 else "")
+    invocation = InvocationIdentity(attempt.dag_run_id, bound.write.workflow_id, f"{bound.write.workflow_id}:{task}")
+    request = replace(bound.operation.attempt.request, invocation=invocation)
+    operation = replace(bound.operation, attempt=replace(bound.operation.attempt, request=request))
+    plan = SimpleNamespace(writes=(bound.write,), sources=SimpleNamespace(subject_sha256=attempt.plan_sha256))
+    return attempt, operation, bound.write, bound.mutation_plan_sha256, plan
+
+
 def test_verify_operation_requires_write_in_plan() -> None:
-    write = DbtRelationWrite(
-        project_path="standalone",
-        workflow_id="b_ordinary",
-        resource_id="b_ordinary",
-        kind="transfer",
-        connector="mssql",
-        connection_ref="mssql-sink",
-        database="warehouse",
-        schema="dbo",
-        relation="orders",
-    )
-    plan = SimpleNamespace(writes=(write,))
-    request = SimpleNamespace(
-        target_database="warehouse",
-        target_schema="dbo",
-        target_table="orders",
-        strategy="full_refresh",
-    )
-    operation = SimpleNamespace(attempt=SimpleNamespace(request=request))
-    verify_transfer_pack_operation(object(), operation, write, b"\x00" * 32, plan)
+    attempt, operation, write, mutation, plan = _transfer_operation_case()
+    verify_transfer_pack_operation(attempt, operation, write, mutation, plan)
     with pytest.raises(CompositionAdmissionError, match="transfer_operation"):
-        verify_transfer_pack_operation(object(), operation, write, b"\x00" * 32, SimpleNamespace(writes=()))
-    foreign = SimpleNamespace(
-        attempt=SimpleNamespace(
-            request=SimpleNamespace(
-                target_database="warehouse",
-                target_schema="other",
-                target_table="orders",
-                strategy="full_refresh",
-            )
-        )
+        verify_transfer_pack_operation(attempt, operation, write, mutation, SimpleNamespace(writes=()))
+    foreign = replace(
+        operation, attempt=replace(operation.attempt, request=replace(operation.attempt.request, target_schema="other"))
     )
     with pytest.raises(CompositionAdmissionError, match="transfer_operation"):
-        verify_transfer_pack_operation(object(), foreign, write, b"\x00" * 32, plan)
+        verify_transfer_pack_operation(attempt, foreign, write, mutation, plan)
+
+
+@pytest.mark.parametrize("field", ["run_id", "process", "task_partition"])
+def test_verify_operation_rejects_foreign_invocation(field: str) -> None:
+    attempt, operation, write, mutation, plan = _transfer_operation_case()
+    request = operation.attempt.request
+    foreign = replace(
+        operation,
+        attempt=replace(
+            operation.attempt, request=replace(request, invocation=replace(request.invocation, **{field: "foreign"}))
+        ),
+    )
+    with pytest.raises(CompositionAdmissionError, match="transfer_operation"):
+        verify_transfer_pack_operation(attempt, foreign, write, mutation, plan)
+
+
+def test_verify_operation_rejects_other_source_plan() -> None:
+    attempt, operation, write, mutation, plan = _transfer_operation_case()
+    plan.sources.subject_sha256 = "sha256:" + "e" * 64
+    with pytest.raises(CompositionAdmissionError, match="transfer_operation"):
+        verify_transfer_pack_operation(attempt, operation, write, mutation, plan)
+
+
+@pytest.mark.parametrize("map_index", [-1, 0, 2])
+def test_verify_operation_preserves_mapped_task_identity(map_index: int) -> None:
+    attempt, operation, write, mutation, plan = _transfer_operation_case(map_index=map_index)
+    verify_transfer_pack_operation(attempt, operation, write, mutation, plan)
+    foreign = replace(attempt, map_index=map_index + 1)
+    with pytest.raises(CompositionAdmissionError, match="transfer_operation"):
+        verify_transfer_pack_operation(foreign, operation, write, mutation, plan)
 
 
 def test_transfer_request_binds_run_identity_and_load_config(tmp_path: Path) -> None:
@@ -259,7 +278,6 @@ _CH_MANIFEST = {
 
 def test_run_ordinary_executes_typed_clickhouse_request(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from dpone.app.composition_clickhouse_execution import CompositionClickHouseExecutionRequest
-    from tests.composition_snapshot_helpers import digest
 
     seen: list[object] = []
 
@@ -269,18 +287,7 @@ def test_run_ordinary_executes_typed_clickhouse_request(tmp_path: Path, monkeypa
             return CompositionClickHouseResult(rows=((1,),), publication_state="PUBLISHED")
 
     cache = tmp_path / "cache"
-    snap = cache / "releases" / _RELEASE.replace(":", "-") / "composition-snapshots"
-    snap.mkdir(parents=True)
-    (snap / "a_native.json").write_text(
-        json.dumps(
-            {
-                "generation_ref": digest("generation record"),
-                "generation_uuid": "10000000-0000-4000-8000-000000000013",
-                "columns": [{"name": "id", "type_name": "Int32"}],
-            }
-        ),
-        encoding="utf-8",
-    )
+    cache.mkdir()  # Runtime capture no longer requires a release-side snapshot.
     monkeypatch.setattr(
         "dpone.app.composition_pack_execution_dispatcher.reopen_composition_plan",
         lambda *_args, **_kwargs: SimpleNamespace(sources=SimpleNamespace(subject_sha256=_RELEASE)),
@@ -318,6 +325,9 @@ def test_run_ordinary_executes_typed_clickhouse_request(tmp_path: Path, monkeypa
     assert dispatcher.run(request) == 0
     assert len(seen) == 1
     assert type(seen[0]) is CompositionClickHouseExecutionRequest
+    assert seen[0].columns == ()
+    assert seen[0].generation_ref == ""
+    assert seen[0].generation_uuid == ""
     payload = json.loads(request.run_volume.evidence_path.read_text(encoding="utf-8"))
     assert payload["cell"] == MSSQL_CLICKHOUSE_FULL_REFRESH_V1
     assert payload["publication_state"] == "PUBLISHED"

@@ -41,15 +41,16 @@ def _pin(database_id: int, token: str) -> dict[str, Any]:
     }
 
 
-def test_database_authority_set_is_closed_canonical_and_case_alias_aware() -> None:
+@pytest.mark.parametrize("capability", ["source", "target", "staging", "state"])
+def test_database_authority_set_is_closed_canonical_and_case_alias_aware(capability: str) -> None:
     properties = _connection_properties("DWH", {"DWH": _pin(7, "1")})
 
     authorities = MssqlDatabaseAuthoritySet.from_connection_properties(
         properties,
-        capability="target",
+        capability=capability,
     )
 
-    assert authorities.require("dwh", capability="target").database_name == "DWH"
+    assert authorities.require("dwh", capability=capability).database_name == "DWH"
 
 
 @pytest.mark.parametrize(

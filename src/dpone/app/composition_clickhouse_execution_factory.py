@@ -8,7 +8,6 @@ from typing import Any, cast
 from uuid import UUID
 
 from dpone.adapters.composition_clickhouse_admin import ClickHousePrincipalHttpClient
-from dpone.adapters.composition_clickhouse_dispatch_store import FileSnapshotPublicationStore
 from dpone.adapters.composition_clickhouse_gate import ClickHouseSupervisorObserver, MssqlClickHouseGate
 from dpone.adapters.composition_clickhouse_principal import ClickHousePrincipalAdmin
 from dpone.adapters.composition_clickhouse_supervisor import DockerClickHouseLocalSupervisor
@@ -20,11 +19,13 @@ from dpone.adapters.composition_clickhouse_supervisor_enrollment import (
 from dpone.adapters.composition_clickhouse_supervisor_linux import LinuxSupervisorProbe
 from dpone.adapters.composition_clickhouse_transport import ClickHouseDispatchTransport
 from dpone.adapters.composition_mssql_attempts import MssqlCompositionAttemptStore, composition_control_transaction
-from dpone.app.composition_clickhouse_catalog import ClickHouseHttpSnapshotCatalog
+from dpone.adapters.composition_snapshot_sql_store import MssqlSnapshotPublicationStore
+from dpone.app.composition_clickhouse_capture_factory import build_clickhouse_capture_components
 from dpone.app.composition_clickhouse_execution import (
     CompositionClickHouseExecutionDependencies,
     CompositionClickHouseExecutionRequest,
     CompositionClickHouseExecutionRoot,
+    build_composition_clickhouse_attempt,
 )
 from dpone.app.composition_clickhouse_outcome import (
     CompositionClickHouseOutcomeObserver,
@@ -39,16 +40,14 @@ from dpone.app.composition_clickhouse_publication import (
     snapshot_limits_from_manifest,
     snapshot_target_for_write,
 )
-from dpone.app.composition_clickhouse_source import MssqlClickHouseSourceReader
 from dpone.app.composition_dbt_execution_factory import CompositionDbtControlAuthority
-from dpone.app.composition_pack_cache import cache_root_from_environment
 from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
 from dpone.contracts.composition_activation import CompositionAdmissionError
 from dpone.contracts.composition_clickhouse_dispatch import ClickHouseDispatchColumn
-from dpone.contracts.composition_snapshot import SnapshotGeneration
+from dpone.contracts.composition_snapshot import SnapshotGeneration, SnapshotLimits
+from dpone.contracts.composition_snapshot_capture import attempt_snapshot_target
 from dpone.contracts.strict_json import strict_json_object
 from dpone.runtime.composition_snapshot import ClickHouseAtomicSnapshotPublisher
-from dpone.runtime.credentials.resolved_connector_factory import ResolvedConnectorFactory
 from dpone.runtime.deployment_cache_common import require_path_without_symlinks
 
 SUPERVISOR_ROOT_ENV = "DPONE_COMPOSITION_SUPERVISOR_ROOT"
@@ -69,6 +68,8 @@ def build_composition_clickhouse_execution_dependencies(
     target: Any,
     attach_publisher_transport: Any | None = None,
     can_classify_publication: bool = False,
+    limits: SnapshotLimits | None = None,
+    capture: Any | None = None,
 ) -> CompositionClickHouseExecutionDependencies:
     """Return protected collaborators of one supervised ClickHouse cell."""
 
@@ -95,6 +96,8 @@ def build_composition_clickhouse_execution_dependencies(
         expected_service_id=control.expected_service_id,
         attach_publisher_transport=attach_publisher_transport,
         can_classify_publication=can_classify_publication,
+        limits=limits,
+        capture=capture,
     )
 
 
@@ -150,7 +153,7 @@ def clickhouse_execution_request(
     plan_sha256: str,
     cache_root: Path,
 ) -> CompositionClickHouseExecutionRequest:
-    """Bind scheduler identity to a sealed ClickHouse generation original."""
+    """Bind scheduler identity; source originals are produced by runtime capture."""
 
     from dpone.contracts.dbt_runtime import (
         AIRFLOW_RUN_IDENTITY_ENV,
@@ -162,15 +165,12 @@ def clickhouse_execution_request(
         raise CompositionAdmissionError("clickhouse_source_payload")
     identity = parse_airflow_run_identity_json(str(request.env.get(AIRFLOW_RUN_IDENTITY_ENV) or ""))
     attempt = airflow_attempt_from_environment(request.env, identity)
-    snapshot = load_sealed_clickhouse_snapshot(cache_root, identity.release_id, str(manifest.get("name") or ""))
+    del cache_root  # Retained call signature; release-side snapshot files grant no authority.
     return CompositionClickHouseExecutionRequest(
         manifest=manifest,
         plan_sha256=plan_sha256,
         run_identity=identity,
         airflow_attempt=attempt,
-        generation_ref=snapshot["generation_ref"],
-        generation_uuid=snapshot["generation_uuid"],
-        columns=snapshot["columns"],
     )
 
 
@@ -214,13 +214,22 @@ def _compose_clickhouse_pack_dependencies(
     ) as ledger:
         service_id = parent["target"].descriptor.properties.get("composition_service_id")
         enrollment = read_service_enrollment(ledger, str(service_id))
-    target = snapshot_target_for_write(enrollment, write)
+    attempt = _pack_attempt(parent, manifest, environment, plan)
+    target = attempt_snapshot_target(snapshot_target_for_write(enrollment, write), attempt)
     limits = snapshot_limits_from_manifest(manifest)
     endpoint, admin_credentials, ca_file = clickhouse_http_endpoint(parent["target"])
-    cache = cache_root_from_environment(environment)
-    release_id = parent["context"].release_id
-    snapshot = load_sealed_clickhouse_snapshot(cache, release_id, str(manifest.get("name") or write.resource_id))
-    store = FileSnapshotPublicationStore(snapshot_store_root(environment))
+    components = build_clickhouse_capture_components(
+        parent=parent,
+        manifest=manifest,
+        plan=plan,
+        attempt=attempt,
+        target=target,
+        limits=limits,
+        root=snapshot_store_root(environment),
+        endpoint=endpoint,
+        credentials=admin_credentials,
+        ca_file=ca_file,
+    )
     admin = ClickHousePrincipalAdmin(
         ClickHousePrincipalHttpClient(
             endpoint=endpoint, credentials=admin_credentials, timeout_seconds=30.0, ca_file=ca_file
@@ -259,13 +268,6 @@ def _compose_clickhouse_pack_dependencies(
     )
     executor = ClickHouseHttpSnapshotExecutor()
 
-    def load_generation(attempt: Any, generation_ref: str) -> Any:
-        del attempt
-        generation = snapshot["generation"]
-        if generation is None or generation.record_sha256 != generation_ref:
-            raise CompositionAdmissionError("snapshot_prepared_subject")
-        return generation
-
     authority = ObservingSnapshotPublicationAuthority(
         read_active=parent["read_active"],
         connection_factory=control.connection_factory,
@@ -273,16 +275,20 @@ def _compose_clickhouse_pack_dependencies(
         target=target,
         limits=limits,
         enrollment_sha256=enrollment.enrollment_sha256,
-        load_generation=load_generation,
+        load_generation=components.capture.load_generation,
+        load_generation_in=components.capture.load_generation_in,
         publisher_gate=publisher_gate,
+        ingest_gate=gate,
+        control_service_id=control.expected_service_id,
     )
-    catalog = ClickHouseHttpSnapshotCatalog(
-        endpoint=endpoint,
-        credentials=admin_credentials,
-        timeout_seconds=30.0,
-        max_response_bytes=1024 * 1024,
-        ca_file=ca_file,
+    store = MssqlSnapshotPublicationStore(
+        control.connection_factory,
+        expected_service_id=control.expected_service_id,
+        authority=authority,
+        attempt=attempt,
+        control_schema=control.control_schema,
     )
+    catalog = components.catalog
     publisher = ClickHouseAtomicSnapshotPublisher(
         authority=authority,
         store=store,
@@ -318,15 +324,8 @@ def _compose_clickhouse_pack_dependencies(
         publisher_gate=publisher_gate,
         publisher=publisher,
         bind_transport=bind_transport,
-        read_source=MssqlClickHouseSourceReader(
-            open_connection=lambda: (
-                ResolvedConnectorFactory.create(
-                    parent["resolver"].resolve(str(source["connection_ref"])), autocommit=True
-                ).connection
-            ),
-            table=source["table"] if isinstance(source.get("table"), Mapping) else {},
-            columns=snapshot["columns"],
-        ),
+        read_source=components.source,
+        capture=components.capture,
         require_enrollment=require_enrollment,
         outcome_observer=CompositionClickHouseOutcomeObserver(
             transaction=lambda: composition_control_transaction(
@@ -338,7 +337,25 @@ def _compose_clickhouse_pack_dependencies(
         ),
         target=target,
         attach_publisher_transport=executor.attach,
-        can_classify_publication=catalog.can_classify_publication(),
+        can_classify_publication=catalog.can_observe_capture(),
+        limits=limits,
+    )
+
+
+def _pack_attempt(parent: Any, manifest: Any, environment: Any, plan: Any) -> Any:
+    from dpone.contracts.dbt_runtime import (
+        AIRFLOW_RUN_IDENTITY_ENV,
+        airflow_attempt_from_environment,
+        parse_airflow_run_identity_json,
+    )
+
+    identity = parse_airflow_run_identity_json(str(environment.get(AIRFLOW_RUN_IDENTITY_ENV) or ""))
+    return build_composition_clickhouse_attempt(
+        parent["read_active"](),
+        manifest=manifest,
+        plan_sha256=plan.sources.subject_sha256,
+        run_identity=identity,
+        airflow_attempt=airflow_attempt_from_environment(environment, identity),
     )
 
 

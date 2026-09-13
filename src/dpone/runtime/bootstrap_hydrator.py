@@ -103,104 +103,110 @@ class DefaultRuntimeHydrator:
             load_config=load_config,
             verifier_factory=self._mssql_database_authority_verifier_factory,
         )
-        _inject_state_identity(config=runtime_config, load_config=load_config, context=context)
+        apply_runtime_state_identity(config=runtime_config, load_config=load_config, context=context)
         connections = _with_issued_overlays(
             connections,
             sink_connection=sink_connection,
             state_connection=state_connection,
         )
-        if connections.strict:
-            state_bindings = self._state_bootstrap.build_resolved(
-                state_cfg=state_cfg,
-                load_config=load_config,
-                state_connection=connections.state,
-                proxy_connection=connections.proxy,
-                state_configured=state_configured,
-                sink_type=_resolved_endpoint_type(connections.sink, sink_cfg),
+        state_bindings = sink_obj = source_obj = run_state_storage = None
+        try:
+            if connections.strict:
+                state_bindings = self._state_bootstrap.build_resolved(
+                    state_cfg=state_cfg,
+                    load_config=load_config,
+                    state_connection=connections.state,
+                    proxy_connection=connections.proxy,
+                    state_configured=state_configured,
+                    sink_type=_resolved_endpoint_type(connections.sink, sink_cfg),
+                )
+                sink_obj = self._endpoint_factory.build_sink_resolved(
+                    sink_cfg,
+                    connections.sink,
+                    state_bindings.xmin_state_storage,
+                    proxy_connection=connections.proxy,
+                    shared_bq_connector=state_bindings.shared_bq_connector,
+                    runtime_storage_policy=runtime_storage_policy,
+                )
+            else:
+                state_bindings = self._state_bootstrap.build(
+                    config=runtime_config,
+                    sink_cfg=sink_cfg,
+                    state_cfg=state_cfg,
+                    load_config=load_config,
+                    state_configured=state_configured,
+                )
+                sink_obj = self._endpoint_factory.build_sink(
+                    sink_cfg,
+                    state_bindings.xmin_state_storage,
+                    shared_bq_connector=state_bindings.shared_bq_connector,
+                    proxy_config=state_bindings.proxy_config,
+                    runtime_storage_policy=runtime_storage_policy,
+                )
+            bind_target_atomic_state(
+                state_bindings=state_bindings,
+                sink_obj=sink_obj,
+                connections=connections,
+                database_authority_verifier=database_authority_verifier,
             )
-            sink_obj = self._endpoint_factory.build_sink_resolved(
-                sink_cfg,
-                connections.sink,
-                state_bindings.xmin_state_storage,
-                proxy_connection=connections.proxy,
-                shared_bq_connector=state_bindings.shared_bq_connector,
-                runtime_storage_policy=runtime_storage_policy,
+            source_state_storage = (
+                state_bindings.kafka_offset_state_storage
+                if (source_cfg or {}).get("type") == "kafka"
+                else state_bindings.xmin_state_storage
             )
-        else:
-            state_bindings = self._state_bootstrap.build(
-                config=runtime_config,
+            sink_connector = sink_obj.connector if hasattr(sink_obj, "connector") else None
+            if connections.strict:
+                source_obj = self._endpoint_factory.build_source_resolved(
+                    source_cfg,
+                    connections.source,
+                    source_state_storage,
+                    sink_connector=sink_connector,
+                )
+            else:
+                source_obj = self._endpoint_factory.build_source(
+                    source_cfg,
+                    source_state_storage,
+                    sink_connector=sink_connector,
+                )
+            bind_postgres_source_authority(
+                source_obj=source_obj,
+                verifier=source_authority_verifier,
+            )
+            _bind_internal_query_capability(
+                source_obj=source_obj,
+                sink_obj=sink_obj,
+                connections=connections,
+                source_cfg=source_cfg,
                 sink_cfg=sink_cfg,
-                state_cfg=state_cfg,
                 load_config=load_config,
-                state_configured=state_configured,
             )
-            sink_obj = self._endpoint_factory.build_sink(
-                sink_cfg,
-                state_bindings.xmin_state_storage,
-                shared_bq_connector=state_bindings.shared_bq_connector,
-                proxy_config=state_bindings.proxy_config,
-                runtime_storage_policy=runtime_storage_policy,
+            run_state_storage = self._state_bootstrap.build_run_state_storage(
+                state_bindings=state_bindings,
+                state_cfg=state_cfg,
+                sink_obj=sink_obj,
             )
-        bind_target_atomic_state(
-            state_bindings=state_bindings,
-            sink_obj=sink_obj,
-            connections=connections,
-            database_authority_verifier=database_authority_verifier,
-        )
-        source_state_storage = (
-            state_bindings.kafka_offset_state_storage
-            if (source_cfg or {}).get("type") == "kafka"
-            else state_bindings.xmin_state_storage
-        )
-        sink_connector = sink_obj.connector if hasattr(sink_obj, "connector") else None
-        if connections.strict:
-            source_obj = self._endpoint_factory.build_source_resolved(
-                source_cfg,
-                connections.source,
-                source_state_storage,
-                sink_connector=sink_connector,
-            )
-        else:
-            source_obj = self._endpoint_factory.build_source(
-                source_cfg,
-                source_state_storage,
-                sink_connector=sink_connector,
-            )
-        bind_postgres_source_authority(
-            source_obj=source_obj,
-            verifier=source_authority_verifier,
-        )
-        _bind_internal_query_capability(
-            source_obj=source_obj,
-            sink_obj=sink_obj,
-            connections=connections,
-            source_cfg=source_cfg,
-            sink_cfg=sink_cfg,
-            load_config=load_config,
-        )
-        run_state_storage = self._state_bootstrap.build_run_state_storage(
-            state_bindings=state_bindings,
-            state_cfg=state_cfg,
-            sink_obj=sink_obj,
-        )
 
-        from dpone.runtime.process_logging import create_etl_logger
+            from dpone.runtime.process_logging import create_etl_logger
 
-        etl_logger = create_etl_logger()
+            etl_logger = create_etl_logger()
 
-        return RuntimeBindings(
-            source_obj=source_obj,
-            sink_obj=sink_obj,
-            etl_logger=etl_logger,
-            run_state_storage=run_state_storage,
-            xmin_handoff_state_storage=getattr(state_bindings, "xmin_handoff_state_storage", None),
-            partition_checkpoint_store=state_bindings.partition_checkpoint_store,
-            load_identity_service=build_load_identity_service(
-                audit_storage=getattr(state_bindings, "load_audit_storage", None),
+            return RuntimeBindings(
+                source_obj=source_obj,
+                sink_obj=sink_obj,
                 etl_logger=etl_logger,
-            ),
-            credential_resolution_receipts=connections.receipts,
-        )
+                run_state_storage=run_state_storage,
+                xmin_handoff_state_storage=getattr(state_bindings, "xmin_handoff_state_storage", None),
+                partition_checkpoint_store=state_bindings.partition_checkpoint_store,
+                load_identity_service=build_load_identity_service(
+                    audit_storage=getattr(state_bindings, "load_audit_storage", None),
+                    etl_logger=etl_logger,
+                ),
+                credential_resolution_receipts=connections.receipts,
+            )
+
+        except BaseException:
+            close_runtime_resources(state_bindings, sink_obj, source_obj, run_state_storage)
+            raise
 
     @staticmethod
     def _build_source(
@@ -318,7 +324,7 @@ def _require_issued_overlay(connection: ResolvedBindingConnection) -> ResolvedBi
     return connection
 
 
-def _inject_state_identity(*, config: Mapping[str, Any], load_config: Any, context: Any) -> None:
+def apply_runtime_state_identity(*, config: Mapping[str, Any], load_config: Any, context: Any) -> None:
     """Attach verified environment/process dimensions for collision-safe state."""
 
     options = getattr(load_config, "options", {}) or {}
@@ -339,4 +345,47 @@ def _inject_state_identity(*, config: Mapping[str, Any], load_config: Any, conte
     }
 
 
-__all__ = ["DefaultRuntimeHydrator"]
+# Preserve the existing internal name for consumers during the additive rollout.
+_inject_state_identity = apply_runtime_state_identity
+
+__all__ = ["DefaultRuntimeHydrator", "apply_runtime_state_identity"]
+
+
+def close_runtime_resources(*resources: Any) -> None:
+    """Close distinct invocation connectors, including partially hydrated state.
+
+    Traverse only known ownership links. Attempt every close even when a driver
+    fails; report failure without retaining driver text or credentials.
+    """
+    links = (
+        "source_obj",
+        "sink_obj",
+        "connector",
+        "state_storage",
+        "run_state_storage",
+        "xmin_state_storage",
+        "xmin_handoff_state_storage",
+        "partition_checkpoint_store",
+        "shared_mssql_state_connector",
+        "shared_postgres_state_connector",
+        "shared_bq_connector",
+        "kafka_offset_state_storage",
+        "load_audit_storage",
+    )
+    pending = list(resources)
+    seen: set[int] = set()
+    failed = False
+    while pending:
+        resource = pending.pop()
+        if resource is None or id(resource) in seen:
+            continue
+        seen.add(id(resource))
+        pending.extend(getattr(resource, name, None) for name in links)
+        closer = getattr(resource, "close", None)
+        if callable(closer):
+            try:
+                closer()
+            except Exception:
+                failed = True
+    if failed:
+        raise RuntimeConfigurationError("runtime_connection_cleanup_failed") from None

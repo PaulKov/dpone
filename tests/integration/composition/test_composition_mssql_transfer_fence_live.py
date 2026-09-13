@@ -5,6 +5,7 @@ permission, transaction and row observation below uses the disposable SQL server
 """
 
 import pytest
+from tests.integration.composition.mssql_transfer_fence_live_support import observe_worker_transaction
 
 pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql]
 pytest_plugins = [
@@ -20,7 +21,13 @@ def test_transfer_exact_binding_commits_actual_target_rows(transfer_case):
     transaction = case.begin_fence(worker)
     case.worker_sql(worker, "INSERT INTO [managed].[rows] VALUES (1,'component');")
     assert case.require_fence(worker, transaction_id=transaction) == transaction
+    before = observe_worker_transaction(worker)
+    case.record("transfer_before_commit", before)
+    assert before["transaction_count"] == 1 and before["transaction_state"] == 1
     worker.commit()
+    after = observe_worker_transaction(worker)
+    case.record("transfer_after_commit", after)
+    assert after["transaction_count"] == 0 and after["transaction_state"] == 0
     assert case.target_sql("SELECT row_id,value FROM [managed].[rows];") == ((1, "component"),)
     assert case.target != case.environment.database.database
     assert case.binding.issued_sid != case.environment.controller_sid
@@ -35,6 +42,20 @@ def test_transfer_exact_binding_commits_actual_target_rows(transfer_case):
     )
 
 
+def test_transfer_rollback_releases_transaction_without_committing_rows(transfer_case):
+    case = transfer_case
+    case.bind_worker()
+    worker = case.worker()
+    transaction = case.begin_fence(worker)
+    case.worker_sql(worker, "INSERT INTO [managed].[rows] VALUES (1,'component');")
+    assert case.require_fence(worker, transaction_id=transaction) == transaction
+    worker.rollback()
+    after = observe_worker_transaction(worker)
+    case.record("transfer_after_rollback", after)
+    assert after["transaction_count"] == 0 and after["transaction_state"] == 0
+    assert case.target_sql("SELECT COUNT(*) FROM [managed].[rows];") == ((0,),)
+
+
 def test_transfer_foreign_operation_and_receipt_cannot_mutate(transfer_case):
     from dataclasses import replace
     from types import SimpleNamespace
@@ -46,8 +67,7 @@ def test_transfer_foreign_operation_and_receipt_cannot_mutate(transfer_case):
     case = transfer_case
     case.bind_worker()
     worker = case.worker()
-    worker.autocommit = False
-    case.worker_sql(worker, "SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRANSACTION;")
+    case.begin_worker(worker)
     connector = SimpleNamespace(connection=worker)
     for field, value in (
         ("target_schema", "unmanaged"),
@@ -78,9 +98,8 @@ def test_transfer_server_rejects_foreign_binding_digest_and_bytes(transfer_case)
     case = transfer_case
     case.bind_worker()
     worker = case.worker()
-    worker.autocommit = False
     for changed in ({"digest": b"x" * 32}, {"document": case.binding.document + b" "}):
-        case.worker_sql(worker, "SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRANSACTION;")
+        case.begin_worker(worker)
         with pytest.raises(SqlFailure) as caught:
             case.direct_fence(worker, **changed)
         assert caught.value.code == 51000
@@ -102,8 +121,7 @@ def test_transfer_server_rejects_stale_domain_epoch(transfer_case):
     worker = case.worker()
     try:
         change(epoch + 1)
-        worker.autocommit = False
-        case.worker_sql(worker, "SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRANSACTION;")
+        case.begin_worker(worker)
         with pytest.raises(SqlFailure) as caught:
             case.direct_fence(worker)
         assert caught.value.code == 51000
@@ -121,8 +139,7 @@ def test_transfer_server_rejects_retiring_parent(transfer_case):
     case.bind_worker()
     worker = case.worker()
     case.store.begin_retirement(case.request)
-    worker.autocommit = False
-    case.worker_sql(worker, "SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRANSACTION;")
+    case.begin_worker(worker)
     with pytest.raises(SqlFailure) as caught:
         case.direct_fence(worker)
     assert caught.value.code == 51000
@@ -140,8 +157,7 @@ def test_transfer_closed_gate_denies_existing_worker_transaction(transfer_case):
     case.gate.close(case.attempt)
     assert case.gate_row()[2] == "CLOSED"
     require_denied(lambda: case.worker())
-    worker.autocommit = False
-    case.worker_sql(worker, "SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRANSACTION;")
+    case.begin_worker(worker)
     with pytest.raises(SqlFailure) as caught:
         case.direct_fence(worker)
     assert caught.value.code == 51000

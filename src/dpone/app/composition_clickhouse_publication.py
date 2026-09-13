@@ -6,10 +6,9 @@ from collections.abc import Mapping
 from ipaddress import ip_address
 from typing import Any
 from urllib.parse import urlsplit
-from uuid import UUID
 
 from dpone.adapters.composition_clickhouse_enrollment import clickhouse_physical_domain
-from dpone.adapters.composition_clickhouse_gate_queries import ClickHouseGateBinding
+from dpone.adapters.composition_clickhouse_gate_queries import ClickHouseGateBinding, ClickHouseGateQueries
 from dpone.adapters.composition_clickhouse_http import ClickHouseTransportCredentials
 from dpone.adapters.composition_clickhouse_supervisor_enrollment import require_attempt_enrollment_original
 from dpone.adapters.composition_mssql_attempts import composition_control_transaction
@@ -124,20 +123,26 @@ class ObservingSnapshotPublicationAuthority:
         read_active: Any,
         connection_factory: Any,
         control_schema: str,
+        control_service_id: str,
         target: SnapshotTarget,
         limits: SnapshotLimits,
         enrollment_sha256: str,
         load_generation: Any,
         publisher_gate: Any,
+        ingest_gate: Any,
+        load_generation_in: Any = None,
     ) -> None:
         self._read_active = read_active
         self._factory = connection_factory
         self._schema = control_schema
+        self._control_service = control_service_id
         self._target = target
         self._limits = limits
         self._enrollment = enrollment_sha256
         self._load_generation = load_generation
+        self._load_generation_in = load_generation_in
         self._publisher_gate = publisher_gate
+        self._ingest_gate = ingest_gate
 
     def load_prepared(self, attempt: Any, generation_ref: str) -> SnapshotPublicationIntent:
         generation = self._load_generation(attempt, generation_ref)
@@ -147,51 +152,89 @@ class ObservingSnapshotPublicationAuthority:
         return intent
 
     def require_current(self, intent: SnapshotPublicationIntent, *, recovery: bool) -> Any:
-        del recovery
-        return self._read_active()
+        occurrence = self._read_active()
+        intent.require_parent_scope(occurrence, recovery=recovery)
+        return occurrence
 
     def require_enrollment(self, attempt: Any, target: SnapshotTarget) -> None:
         if target != self._target:
             raise CompositionAdmissionError("clickhouse_enrollment")
-        with composition_control_transaction(self._factory, self._schema, self._target.service_id) as ledger:
+        with composition_control_transaction(self._factory, self._schema, self._control_service) as ledger:
             require_attempt_enrollment_original(ledger, self._enrollment, attempt, target)
 
     def ingest_authority(self, attempt: Any) -> CompositionProofAuthority:
         """Reopen the issued ingest principal; this does not close or reissue it."""
 
-        with composition_control_transaction(self._factory, self._schema, self._target.service_id) as ledger:
+        with composition_control_transaction(self._factory, self._schema, self._control_service) as ledger:
             return self._gate_principal(ledger, attempt, "ingest")
 
     def close_publisher(self, intent: SnapshotPublicationIntent) -> SnapshotPublisherClosure:
         closed = self._publisher_gate.close(intent.attempt)
         quiet = self._publisher_gate.prove_quiescence(intent.attempt)
-        return SnapshotPublisherClosure(intent.intent_sha256, closed.evidence_sha256, quiet.evidence_sha256)
+        return SnapshotPublisherClosure(intent.intent_sha256, closed.proof_sha256, quiet.proof_sha256)
 
     def _observe_principals(self, attempt: Any) -> tuple[CompositionProofAuthority, CompositionProofAuthority, str]:
-        with composition_control_transaction(self._factory, self._schema, self._target.service_id) as ledger:
+        with composition_control_transaction(self._factory, self._schema, self._control_service) as ledger:
             ingest = self._gate_principal(ledger, attempt, "ingest")
             publisher = self._gate_principal(ledger, attempt, "publisher")
-            ledger.cursor.execute(
-                f"SELECT TOP (2) evidence_sha256 FROM {ledger.table('proofs')} WITH (HOLDLOCK) "
-                "WHERE operation_key=? AND kind='CLOSED_GATES';",
-                attempt.attempt_sha256,
+            closed, _quiet = self._ingest_gate.observe_closed(
+                ledger,
+                attempt=attempt,
+                target=self._target,
+                gate_id=ingest.principal_id.removeprefix("clickhouse-user:"),
             )
-            rows = tuple(tuple(row) for row in ledger.cursor.fetchall())
-        if len(rows) != 1 or type(rows[0][0]) is not str:
-            raise CompositionAdmissionError("snapshot_prepare_unavailable")
-        return ingest, publisher, rows[0][0]
+        return ingest, publisher, closed.proof_sha256
 
     def _gate_principal(self, ledger: Any, attempt: Any, purpose: str) -> CompositionProofAuthority:
         binding = ClickHouseGateBinding(attempt, self._target, purpose)
-        ledger.cursor.execute(
-            f"SELECT TOP (2) LOWER(CONVERT(char(36),gate_id)) FROM {ledger.table('ch_gate_bindings')} "
-            "WITH (HOLDLOCK) WHERE gate_key=?;",
-            binding.key,
-        )
-        rows = tuple(tuple(row) for row in ledger.cursor.fetchall())
-        if len(rows) != 1 or str(UUID(str(rows[0][0]))) != rows[0][0]:
+        identifier = ClickHouseGateQueries(ledger, binding).binding_id()
+        return CompositionProofAuthority("clickhouse", self._target.service_id, "clickhouse-user:" + identifier)
+
+    def _require_originals(self, ledger: Any, intent: SnapshotPublicationIntent) -> None:
+        require_attempt_enrollment_original(ledger, self._enrollment, intent.attempt, self._target)
+        if (
+            intent.target != self._target
+            or intent.limits != self._limits
+            or self._generation_in(ledger, intent) != intent.generation
+        ):
+            raise CompositionAdmissionError("snapshot_prepared_subject")
+        ingest = self._gate_principal(ledger, intent.attempt, "ingest")
+        publisher = self._gate_principal(ledger, intent.attempt, "publisher")
+        if (ingest, publisher) != (intent.ingest_principal, intent.publisher_principal):
             raise CompositionAdmissionError("snapshot_prepare_unavailable")
-        return CompositionProofAuthority("clickhouse", self._target.service_id, "clickhouse-user:" + rows[0][0])
+        closed, _quiet = self._ingest_gate.observe_closed(
+            ledger,
+            attempt=intent.attempt,
+            target=self._target,
+            gate_id=ingest.principal_id.removeprefix("clickhouse-user:"),
+        )
+        if closed.proof_sha256 != intent.closed_ingest_sha256:
+            raise CompositionAdmissionError("snapshot_prepare_unavailable")
+
+    def _generation_in(self, ledger: Any, intent: SnapshotPublicationIntent) -> Any:
+        if self._load_generation_in is not None:
+            return self._load_generation_in(ledger, intent.attempt, intent.generation.record_sha256)
+        return self._load_generation(intent.attempt, intent.generation.record_sha256)
+
+    def require_ready(self, ledger: Any, intent: SnapshotPublicationIntent) -> None:
+        """SQL journal callback: reopen source, ingest and ready publisher authority."""
+        self._require_originals(ledger, intent)
+        self._publisher_gate.require_dispatch(ledger, ExchangeSnapshotDispatch(intent))
+
+    def require_closure(
+        self, ledger: Any, intent: SnapshotPublicationIntent, closure: SnapshotPublisherClosure
+    ) -> None:
+        """SQL journal callback: compare actual publisher closure proof originals."""
+        self._require_originals(ledger, intent)
+        closed, quiet = self._publisher_gate.observe_closed(
+            ledger,
+            attempt=intent.attempt,
+            target=self._target,
+            gate_id=intent.publisher_principal.principal_id.removeprefix("clickhouse-user:"),
+        )
+        expected = SnapshotPublisherClosure(intent.intent_sha256, closed.proof_sha256, quiet.proof_sha256)
+        if closure != expected:
+            raise CompositionAdmissionError("snapshot_publisher_closure")
 
 
 class ClickHouseHttpSnapshotExecutor:

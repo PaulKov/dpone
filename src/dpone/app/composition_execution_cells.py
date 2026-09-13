@@ -34,6 +34,7 @@ class CompositionExecutionCellFactory:
     cell: str
     root_type: type
     builder: Callable[..., Any]
+    require_ready: Callable[[Any, Any], None] | None = None
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return self.builder(*args, **kwargs)
@@ -65,6 +66,11 @@ class InstalledCompositionExecutionCapabilities:
         if plan.sources.release_id != context.release_id:
             raise CompositionAdmissionError("execution_context")
         plan.require_installed_cells(self.execution_cells)
+        for cell in sorted({workload.execution_cell for workload in plan.workloads}):
+            probe = self.factory(cell).require_ready
+            if not callable(probe):
+                raise CompositionAdmissionError("complete_execution_capability_unavailable")
+            probe(plan, context)
 
     def materialization_seams(self, **kwargs: Any) -> Mapping[str, Any]:
         return build_composition_materialization_seams(**kwargs)

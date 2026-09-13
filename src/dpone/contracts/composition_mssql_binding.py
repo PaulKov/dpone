@@ -5,6 +5,8 @@ plan, parent workload and issued SID before retaining their canonical originals.
 Lease expiry is renewal metadata, deliberately excluded from stable identity.
 """
 
+from __future__ import annotations
+
 from dataclasses import asdict, dataclass
 from hashlib import sha256
 from uuid import UUID
@@ -13,8 +15,14 @@ from dpone.contracts.composition_activation import CompositionAdmissionError
 from dpone.contracts.composition_attempt import CompositionAttemptIdentity
 from dpone.contracts.composition_persistence import encode_attempt_identity
 from dpone.contracts.dbt_relation_writes import DbtRelationWrite
-from dpone.contracts.mssql_transaction_governance import MssqlGenericCommitReceipt, MssqlTransactionOperation
-from dpone.contracts.strict_json import canonical_json_bytes
+from dpone.contracts.mssql_transaction_governance import (
+    InvocationIdentity,
+    MssqlAttemptRequest,
+    MssqlGenericCommitReceipt,
+    MssqlTransactionAttempt,
+    MssqlTransactionOperation,
+)
+from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 
 
 def stable_operation_document(operation: MssqlTransactionOperation) -> bytes:
@@ -87,6 +95,45 @@ class CompositionMssqlOperationBinding:
             or "sha256:" + sha256(self.parent_document).hexdigest() != self.attempt.activation_request_sha256
         ):
             raise CompositionAdmissionError("transfer_parent_original")
+
+    @classmethod
+    def from_bytes(cls, document: bytes, attempt: CompositionAttemptIdentity) -> CompositionMssqlOperationBinding:
+        """Decode only the original canonical registered binding, including operation."""
+        try:
+            body = strict_json_object(document)
+            raw = strict_json_object(bytes.fromhex(body["operation_original"]))
+            invocation = InvocationIdentity(**raw["attempt"]["request"].pop("invocation"))
+            request = raw["attempt"]["request"]
+            for key in ("target_identity", "route_fingerprint"):
+                request[key] = bytes.fromhex(request[key])
+            transaction_attempt = MssqlTransactionAttempt(
+                request=MssqlAttemptRequest(invocation=invocation, **request),
+                generation=raw["attempt"]["generation"],
+                is_current_generation=raw["attempt"]["is_current_generation"],
+            )
+            operation = MssqlTransactionOperation(
+                attempt=transaction_attempt,
+                operation_key=bytes.fromhex(raw["operation_key"]),
+                scope_hash=bytes.fromhex(raw["scope_hash"]),
+                owner_digest=bytes.fromhex(raw["owner_digest"]),
+                epoch=raw["epoch"],
+                lease_expires_at_utc=None,
+            )
+            binding = cls(
+                attempt,
+                operation,
+                DbtRelationWrite(**body["write"]),
+                bytes.fromhex(body["mutation_plan_sha256"]),
+                bytes.fromhex(body["issued_sid"]),
+                body["service_id"],
+                body["control_database"],
+                bytes.fromhex(body["parent_original"]),
+            )
+            if binding.document != document:
+                raise ValueError("original")
+            return binding
+        except Exception:
+            raise CompositionAdmissionError("transfer_binding_original") from None
 
     @property
     def document(self) -> bytes:

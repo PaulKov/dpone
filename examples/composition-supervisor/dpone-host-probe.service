@@ -1,0 +1,39 @@
+# TEMPLATE ONLY: not a deployment or host certification.
+# Replace <DISPATCHER_GROUP> with the reserved dispatcher's host group and
+# <CONFIGURATION_SHA256> with sha256:<64 lowercase hex> of canonical config bytes.
+# Install dpone in /opt/dpone/venv and root-owned config at /etc/dpone/host-probe.json.
+# Config socket_path must be /run/dpone-host-probe/probe.sock and dispatcher_gid
+# must match <DISPATCHER_GROUP>. All path ancestors must be root-owned with no
+# group/other write permission. Preprovision the dispatcher UID/group; never use 0.
+# The enrollment pins the whole observed container/network/configuration topology.
+# This root service intentionally observes the real host /proc, Docker socket,
+# namespaces and configuration mounts. Do not add PrivateNetwork/PrivateUsers,
+# PrivateMounts, ProtectProc or namespace restrictions that invalidate those facts.
+[Unit]
+Description=dpone protected host observation service
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+RuntimeDirectory=dpone-host-probe
+RuntimeDirectoryMode=0750
+# The protected config loader requires root UID/GID; only the socket directory
+# and socket grant traversal/connect access to the reserved dispatcher group.
+ExecStartPre=/usr/bin/chgrp <DISPATCHER_GROUP> /run/dpone-host-probe
+UMask=0077
+ExecStart=/opt/dpone/venv/bin/python -m dpone.app.composition_supervisor_host_service --config /etc/dpone/host-probe.json --configuration-sha256 <CONFIGURATION_SHA256>
+Restart=no
+KillSignal=SIGTERM
+KillMode=control-group
+# Configured socket/capture deadline is at most 60s. A stuck host syscall is
+# terminated after this grace; no observation is accepted as successful.
+TimeoutStopSec=70
+SendSIGKILL=yes
+StandardOutput=null
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

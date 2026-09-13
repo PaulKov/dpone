@@ -11,6 +11,7 @@ from typing import Protocol
 from dpone.adapters.composition_mssql_attempts import composition_control_transaction
 from dpone.adapters.composition_mssql_existing_operation import require_existing_execution_in
 from dpone.adapters.composition_mssql_transaction_fence_schema import require_transaction_fence_schema
+from dpone.adapters.composition_mssql_transfer_outcome import resolve_transfer_principal
 from dpone.contracts.composition_control import (
     CompositionAdmissionError,
     CompositionAttemptIdentity,
@@ -168,3 +169,46 @@ class MssqlCompositionTransactionBindings:
             if tuple(tuple(row) for row in cursor.fetchall()) != (values,):
                 raise CompositionAdmissionError("transfer_binding_original")
             return binding
+
+    def read_closed(self, attempt: CompositionAttemptIdentity) -> CompositionMssqlOperationBinding:
+        """Reopen protected originals and closed principal evidence on one transaction."""
+        plan = self._read_plan(attempt)
+        with composition_control_transaction(self._factory, self._schema, self._service) as ledger:
+            occurrence, receipt = require_existing_execution_in(
+                ledger,
+                attempt,
+                expected_service_id=self._service,
+                terminal_validator=ledger.terminal_validator,
+            )
+            if occurrence.receipt.state not in {"ACTIVE", "RETIRING"} or receipt.state not in {
+                "RUNNING",
+                "COMMIT_UNKNOWN",
+            }:
+                raise CompositionAdmissionError("transfer_observation_attempt")
+            ledger.cursor.execute("SELECT DB_NAME();")
+            if tuple(tuple(row) for row in ledger.cursor.fetchall()) != ((self._database,),):
+                raise CompositionAdmissionError("control_database")
+            principal = resolve_transfer_principal(ledger, attempt, self._service)
+            ledger.cursor.execute(
+                f"SELECT TOP (2) binding_sha256,binding_document FROM {ledger.table('transfer_bindings')} WITH (HOLDLOCK) WHERE operation_key=?;",
+                attempt.attempt_sha256,
+            )
+            rows = tuple(tuple(row) for row in ledger.cursor.fetchall())
+            if len(rows) != 1 or len(rows[0]) != 2 or type(rows[0][1]) is not bytes:
+                raise CompositionAdmissionError("transfer_binding_original")
+            bound = CompositionMssqlOperationBinding.from_bytes(rows[0][1], attempt)
+            if (
+                bound.digest != rows[0][0]
+                or bound.service_id != self._service
+                or bound.control_database != self._database
+                or "mssql-sid:" + bound.issued_sid.hex() != principal
+            ):
+                raise CompositionAdmissionError("transfer_binding_original")
+            if (
+                plan.sources.subject_sha256 != occurrence.request.source_subject_sha256
+                or plan.workloads != occurrence.request.workloads
+                or bound.write not in plan.writes
+            ):
+                raise CompositionAdmissionError("transfer_source_plan")
+            self._verify_operation(attempt, bound.operation, bound.write, bound.mutation_plan_sha256, plan)
+            return bound

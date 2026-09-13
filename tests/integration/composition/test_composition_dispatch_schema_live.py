@@ -14,6 +14,7 @@ from dpone.adapters.composition_clickhouse_dispatch_schema import (
     require_clickhouse_dispatch_schema,
 )
 from dpone.adapters.composition_mssql_attempts import MssqlCompositionAttemptStore, composition_control_transaction
+from dpone.adapters.composition_mssql_schema import COMPOSITION_MSSQL_LEDGER_LOCK
 from dpone.contracts.composition_attempt import CompositionAttemptIdentity
 from dpone.contracts.composition_identity import CompositionAdmissionError
 
@@ -21,7 +22,8 @@ pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql]
 sql_case = support.sql_case
 
 
-def test_dispatch_catalog_and_append_only_closure(sql_case, record_property):
+@pytest.mark.parametrize("unlocked_autocommit", [True, False])
+def test_dispatch_catalog_and_append_only_closure(sql_case, record_property, unlocked_autocommit):
     """Exercise actual module metadata, global lock, original hashes and immutability."""
     case = sql_case
     case.install()
@@ -36,6 +38,7 @@ def test_dispatch_catalog_and_append_only_closure(sql_case, record_property):
         "(gate_id,phase,evidence_sha256,evidence_document) VALUES (?, ?, ?, ?)"
     )
     with closing(case.database.connect()) as connection:
+        connection.autocommit = unlocked_autocommit
         with pytest.raises(support.SqlFailure) as refused:
             support.execute(connection, statement, gate, "CLOSING", digest, original)
         assert refused.value.code == 51000
@@ -125,6 +128,30 @@ def observed_transaction(case, stage, record_property):
     factory = diagnostics.factory(case.database.connect, scope="attempt")
     try:
         with composition_control_transaction(factory, case.schema, case.service_id) as ledger:
+            ledger.cursor.execute(
+                "SELECT @@TRANCOUNT,XACT_STATE(),CONVERT(int,@@OPTIONS & 2),"
+                "CASE WHEN APPLOCK_MODE(N'public',?,N'Transaction')=N'Exclusive' THEN 1 ELSE 0 END;",
+                COMPOSITION_MSSQL_LEDGER_LOCK,
+            )
+            rows = support.drain_results(ledger.cursor)
+            if len(rows) != 1 or len(rows[0]) != 4 or any(type(value) is not int for value in rows[0]):
+                raise RuntimeError("dispatch_transaction_observation")
+            count, state, implicit, exclusive = rows[0]
+            if not (0 <= count < 2**31 and state in (-1, 0, 1) and implicit in (0, 2) and exclusive in (0, 1)):
+                raise RuntimeError("dispatch_transaction_observation")
+            record_property(
+                "dpone.dispatch.transaction_" + stage,
+                observation_document(
+                    dict(
+                        zip(
+                            ("transaction_count", "transaction_state", "implicit_option", "exclusive_lock"),
+                            rows[0],
+                            strict=True,
+                        )
+                    )
+                ),
+            )
+            assert count >= 1 and state == 1 and exclusive == 1
             yield ledger
     finally:
         record_property("dpone.dispatch." + stage, observation_document(diagnostics.snapshot()))

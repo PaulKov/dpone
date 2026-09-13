@@ -704,3 +704,163 @@ class _RecordingEndpoints:
 
     def build_source(self, *_args: Any, **_kwargs: Any) -> str:
         return "legacy-source"
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_connections_close_once_before_gate_on_success_and_failure(runtime, failure):
+    build = runtime.root._deps.hydrator.build
+    run = runtime.root._deps.runner.run
+    source = SimpleNamespace(close=lambda: runtime.events.append("close_source"))
+    sink = SimpleNamespace(close=lambda: runtime.events.append("close_sink"))
+    state = SimpleNamespace(close=lambda: runtime.events.append("close_state"))
+
+    def hydrate(**kwargs):
+        bindings = build(**kwargs)
+        bindings.source_obj.connector = source
+        bindings.sink_obj.connector = sink
+        bindings.sink_obj.state_storage = SimpleNamespace(connector=state)
+        bindings.run_state_storage = SimpleNamespace(connector=state)
+        return bindings
+
+    def execute(*args, **kwargs):
+        if failure:
+            raise RuntimeError("executor failed")
+        return run(*args, **kwargs)
+
+    runtime.root._deps.hydrator.build = hydrate
+    runtime.root._deps.runner.run = execute
+    if failure:
+        with pytest.raises(CompositionAdmissionError, match="worker_executor_failed"):
+            runtime.execute()
+    else:
+        runtime.execute()
+    for name in ("source", "sink", "state"):
+        event = "close_" + name
+        assert runtime.events.count(event) == 1
+        assert runtime.events.index(event) < runtime.events.index("close_gate")
+
+
+def test_protected_principal_resolver_overrides_static_authority(runtime):
+    observer = CompositionMssqlTransferOutcomeObserver(
+        transaction=_transaction,
+        expected_service_id=SERVICE,
+        principal_id=SERVICE,
+        resolve_principal=lambda attempt: "mssql-sid:" + runtime.gate.sid.hex(),
+        observe=lambda attempt: CompositionTransferObservation(True, True, True, False, False),
+        persist=lambda *args, **kwargs: None,
+    )
+    assert observer.observe(_attempt(runtime)).authorities[0].principal_id == "mssql-sid:" + runtime.gate.sid.hex()
+
+
+def test_partial_hydration_closes_state_and_sink_when_source_creation_fails(monkeypatch):
+    from dpone.runtime.bootstrap_hydrator import DefaultRuntimeHydrator
+
+    events = []
+    state_connector = SimpleNamespace(close=lambda: events.append("state"))
+    sink_connector = SimpleNamespace(close=lambda: events.append("sink"))
+
+    class State(_IdleStateBootstrap):
+        def build_resolved(self, **kwargs):
+            return replace(self._bindings(), shared_mssql_state_connector=state_connector)
+
+    class Endpoints(_RecordingEndpoints):
+        def build_sink_resolved(self, *args, **kwargs):
+            return SimpleNamespace(connector=sink_connector)
+
+        def build_source_resolved(self, *args, **kwargs):
+            raise RuntimeError("source unavailable")
+
+    _install_hydrator_connections(monkeypatch, strict=True)
+    with pytest.raises(RuntimeError, match="source unavailable"):
+        DefaultRuntimeHydrator(
+            state_bootstrap=State(), endpoint_factory=Endpoints(), connection_context_loader=_IdleContextLoader()
+        ).build(config=_overlay_config(), load_config=_overlay_load_config())
+    assert sorted(events) == ["sink", "state"]
+
+
+def test_cleanup_continues_after_driver_close_failure():
+    from dpone.runtime.bootstrap_hydrator import close_runtime_resources
+    from dpone.runtime.errors import RuntimeConfigurationError
+
+    events = []
+
+    def fail():
+        events.append("failed")
+        raise RuntimeError("secret driver diagnostic")
+
+    with pytest.raises(RuntimeConfigurationError, match="runtime_connection_cleanup_failed") as caught:
+        close_runtime_resources(SimpleNamespace(close=lambda: events.append("closed")), SimpleNamespace(close=fail))
+    assert events == ["failed", "closed"]
+    assert "secret" not in str(caught.value)
+
+
+def test_runner_injects_capture_lifecycle_into_actual_processor(monkeypatch):
+    from dpone.runtime.bootstrap_runner import _processor
+
+    capture = object()
+    monkeypatch.setattr("dpone.runtime.etl.processor.ETLProcessor", lambda **kwargs: kwargs)
+    bindings = SimpleNamespace(source_obj=object(), sink_obj=object(), etl_logger=None, run_state_storage=None)
+    constructed = _processor(
+        bindings,
+        load_config=SimpleNamespace(log_sample_rows=0),
+        native_transfer_runtime_service=None,
+        route_capability_orchestrator=None,
+        load_governance_service=None,
+        source_extraction_lifecycle_service=capture,
+    )
+    assert constructed["source_extraction_lifecycle_service"] is capture
+
+
+@pytest.mark.parametrize("rows", [[], [(b"x" * 16,), (b"y" * 16,)], [(b"short",)], [("service-uuid",)]])
+def test_protected_sid_resolution_rejects_missing_ambiguous_or_invalid(runtime, rows):
+    from dpone.adapters.composition_mssql_transfer_outcome import resolve_transfer_principal
+
+    cursor = SimpleNamespace(execute=lambda *args: None, fetchall=lambda: rows)
+    ledger = SimpleNamespace(cursor=cursor, table=lambda value: "[control].[" + value + "]")
+    with pytest.raises(CompositionAdmissionError, match="transfer_issued_sid"):
+        resolve_transfer_principal(ledger, _attempt(runtime), SERVICE)
+
+
+def test_protected_sid_resolution_requires_closed_matching_issued_authority(runtime):
+    from dpone.adapters.composition_mssql_transfer_outcome import resolve_transfer_principal
+
+    statements = []
+    cursor = SimpleNamespace(execute=lambda *args: statements.append(args), fetchall=lambda: [(runtime.gate.sid,)])
+    ledger = SimpleNamespace(cursor=cursor, table=lambda value: "[control].[" + value + "]")
+    assert resolve_transfer_principal(ledger, _attempt(runtime), SERVICE) == "mssql-sid:" + runtime.gate.sid.hex()
+    sql, key, service = statements[0]
+    assert "g.gate_state='CLOSED'" in sql and "a.principal_id=" in sql
+    assert key == _attempt(runtime).attempt_sha256 and service == SERVICE
+
+
+@pytest.mark.parametrize("map_index,task_suffix", [(-1, ""), (0, "[0]"), (2, "[2]")])
+def test_actual_runner_uses_scheduler_stable_invocation(runtime, map_index, task_suffix):
+    from dpone.contracts.mssql_transaction_identity import invocation_identity
+
+    original = runtime.root._deps.runner.run
+    captured = []
+
+    def run(process, **kwargs):
+        captured.append(kwargs)
+        return original(process, **kwargs)
+
+    runtime.root._deps.runner.run = run
+    runtime.request = replace(
+        runtime.request, airflow_attempt=replace(runtime.request.airflow_attempt, map_index=map_index)
+    )
+    runtime.execute()
+    kwargs = captured[0]
+    scheduler = runtime.request.airflow_attempt
+    assert kwargs["dag_id"] == scheduler.dag_id
+    assert kwargs["execution_date"] is None
+    context = kwargs["context"]
+    assert context.run_id == scheduler.run_id
+    identity = invocation_identity(
+        context,
+        SimpleNamespace(options={}, target_table="orders"),
+        dag_id=kwargs["dag_id"],
+        execution_policy_resolver=lambda value: None,
+    )
+    assert identity.process == scheduler.dag_id
+    assert identity.task_partition == scheduler.dag_id + ":" + scheduler.task_id + task_suffix
+    assert context.config["airflow_run_identity"] == runtime.request.run_identity.to_dict()
