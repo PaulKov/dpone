@@ -152,12 +152,16 @@ class CaptureSupervisorFactsClient:
         _identifier(dispatcher_gid)
         self.path, self.gid, self.timeout = _path(path), dispatcher_gid, _timeout(timeout_seconds)
 
-    def capture(self, enrollment_sha256: str) -> dict[str, Any]:
+    def capture(self, enrollment_sha256: str, *, deadline: float | None = None) -> dict[str, Any]:
         """Verify exact nonce/enrollment echoes and complete response before returning facts."""
         _digest(enrollment_sha256)
         nonce = secrets.token_hex(32)
-        deadline = time.monotonic() + self.timeout
+        own_deadline = time.monotonic() + self.timeout
+        if deadline is not None:
+            _require(type(deadline) in {int, float} and math.isfinite(deadline), "deadline")
+        deadline = own_deadline if deadline is None else min(deadline, own_deadline)
         try:
+            _remaining(deadline)
             _require_endpoint(self.path, self.gid)
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
                 connection.settimeout(_remaining(deadline))

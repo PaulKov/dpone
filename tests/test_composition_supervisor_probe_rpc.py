@@ -17,6 +17,30 @@ DIGEST = "sha256:" + "a" * 64
 FACTS = {"docker": {"synthetic": True}, "linux": {"synthetic": True}}
 
 
+@pytest.mark.parametrize("deadline", [True, float("nan"), float("inf"), -1.0])
+def test_client_rejects_invalid_or_expired_outer_deadline_before_endpoint(monkeypatch, deadline):
+    monkeypatch.setattr(rpc, "_require_endpoint", lambda *args: pytest.fail("endpoint accessed"))
+    client = rpc.CaptureSupervisorFactsClient(Path("/run/probe.sock"), dispatcher_gid=100001)
+    with pytest.raises(rpc.SupervisorProbeError, match="deadline"):
+        client.capture(DIGEST, deadline=deadline)
+
+
+@pytest.mark.parametrize("outer,expected", [(102.0, 102.0), (200.0, 105.0), (None, 105.0)])
+def test_client_outer_deadline_never_extends_own_timeout(monkeypatch, outer, expected):
+    observed = []
+    monkeypatch.setattr(rpc.time, "monotonic", lambda: 100.0)
+
+    def remaining(deadline):
+        observed.append(deadline)
+        raise rpc.SupervisorProbeError("test_stop_before_io")
+
+    monkeypatch.setattr(rpc, "_remaining", remaining)
+    client = rpc.CaptureSupervisorFactsClient(Path("/run/probe.sock"), dispatcher_gid=100001, timeout_seconds=5)
+    with pytest.raises(rpc.SupervisorProbeError, match="test_stop_before_io"):
+        client.capture(DIGEST, deadline=outer)
+    assert observed == [expected]
+
+
 @pytest.fixture
 def socket_authority(monkeypatch, tmp_path):
     # These doubles permit unprivileged/macOS transport tests. They are not
@@ -42,7 +66,8 @@ def run_once(server, errors):
         errors.append(error)
 
 
-def test_real_unix_roundtrip_has_exact_nonce_bound_facts(socket_authority):
+@pytest.mark.parametrize("outer_budget", [None, 0.8])
+def test_real_unix_roundtrip_has_exact_nonce_bound_facts(socket_authority, outer_budget):
     deadlines, errors = [], []
 
     def capture(deadline):
@@ -60,7 +85,9 @@ def test_real_unix_roundtrip_has_exact_nonce_bound_facts(socket_authority):
         thread = threading.Thread(target=run_once, args=(server, errors))
         thread.start()
         assert (
-            rpc.CaptureSupervisorFactsClient(socket_authority, dispatcher_gid=100001, timeout_seconds=1).capture(DIGEST)
+            rpc.CaptureSupervisorFactsClient(socket_authority, dispatcher_gid=100001, timeout_seconds=1).capture(
+                DIGEST, deadline=None if outer_budget is None else time.monotonic() + outer_budget
+            )
             == FACTS
         )
         thread.join(2)

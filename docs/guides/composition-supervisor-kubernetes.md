@@ -352,6 +352,27 @@ runtime-loader environment keys and does not inherit worker ambient authority.
 Provisioning and startup must supply authentic originals; this reader creates
 neither originals nor a new execution permit.
 
+The integration API also provides `load_attempt()` for exact workload/pack/write
+selection and `DispatcherSessions` for bounded private gate credentials. Duplicate
+or uncertain OPEN never reconstructs credentials. CLOSE blocks new local dispatch
+admission while the existing SQL closure barrier handles earlier claims. A late
+transport result is retained before a timeout can reject its acknowledgement.
+The service factory must still verify current SQL parent authority and bound I/O.
+
+`MssqlClickHouseDispatchStore.read_status()` validates exact retained claim and
+terminal originals, including complete terminal proofs under ACTIVE, RETIRING
+and RETIRED parents. Absence is not permission to resend, and transport completion
+is not an independent data outcome. `RemoteClickHouseLocalSupervisor` obtains two
+fresh observations from the protected host service under one deadline and compares
+both with the pinned SQL enrollment; it does not instantiate local host probes.
+
+The complete capture path still requires a placement decision: its current
+root-owned storage adapter cannot run inside the enrolled nonroot dispatcher.
+The [proposed capture-custody amendment](../feature-specs/composition-dispatcher-capture-custody.md)
+and [proposed ADR 0064](../adr/0064-dispatcher-owned-composition-capture.md) describe
+an explicit service-owned profile and whole-cell request. They are unapproved;
+no v2 execution route or new storage ownership is enabled by these integrations.
+
 ## DAG triggering
 
 Composed synthetic DAGs keep `schedule: null`. Load every expected DAG through

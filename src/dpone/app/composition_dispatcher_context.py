@@ -21,13 +21,17 @@ from dpone.adapters.composition_dispatcher_context_files import DispatcherContex
 from dpone.app.composition_pack_execution_dispatcher import reopen_composition_plan
 from dpone.contracts.airflow_run_identity import AirflowDeploymentIdentity
 from dpone.contracts.composition_activation import CompositionOccurrenceContext
+from dpone.contracts.composition_control import dbt_relation_write_subject
 from dpone.contracts.composition_dispatcher_binding import (
     CompositionDispatcherBinding,
     require_dispatcher_connection_ref,
 )
 from dpone.contracts.composition_execution import CompositionExecutionPlan
 from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
+from dpone.contracts.composition_persistence import CompositionAttemptIdentity
+from dpone.contracts.dbt_relation_writes import DbtRelationWrite, transfer_relation_write
 from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
+from dpone.manifest.bounded_yaml import load_bounded_yaml
 from dpone.runtime.credentials.runtime_context import (
     RUNTIME_CONNECTION_CONTEXT_ENV,
     RUNTIME_INIT_FETCH_PLAN_B64_ENV,
@@ -58,6 +62,61 @@ class StagedDispatcherContext:
     runtime: RuntimeConnectionContext = field(repr=False)
     cache_root: Path = field(repr=False)
     target_binding_ref: str
+
+
+@dataclass(frozen=True, slots=True)
+class StagedDispatcherAttempt:
+    """Exact producer workload selected independently of a previous readiness call."""
+
+    context: StagedDispatcherContext = field(repr=False)
+    attempt: CompositionAttemptIdentity
+    write: DbtRelationWrite
+    manifest_document: bytes = field(repr=False)
+
+    @property
+    def manifest(self) -> dict[str, Any]:
+        return load_bounded_yaml(self.manifest_document)
+
+
+def _select_attempt(
+    plan: CompositionExecutionPlan, attempt: CompositionAttemptIdentity
+) -> tuple[DbtRelationWrite, bytes]:
+    attempt.__post_init__()
+    matches = [row for row in plan.workloads if row.workload_id == attempt.workload_id]
+    if (
+        len(matches) != 1
+        or (matches[0].pack_sha256, matches[0].constituent_id, matches[0].execution_cell)
+        != (attempt.pack_sha256, attempt.constituent_id, "mssql_clickhouse_full_refresh_v1")
+        or plan.sources.subject_sha256 != attempt.plan_sha256
+    ):
+        raise ValueError
+    writes = [
+        row
+        for row in plan.writes
+        if row.kind == "transfer"
+        and row.connector == "clickhouse"
+        and row.resource_id == attempt.workload_id
+        and dbt_relation_write_subject(row) in matches[0].write_subjects
+    ]
+    if len(writes) != 1 or matches[0].write_subjects != (dbt_relation_write_subject(writes[0]),):
+        raise ValueError
+    originals = [body for name, body in plan.sources.transfer_manifests if name == attempt.workload_id]
+    if len(originals) != 1:
+        raise ValueError
+    manifest = load_bounded_yaml(originals[0])
+    write = writes[0]
+    if (
+        manifest["name"] != attempt.workload_id
+        or transfer_relation_write(
+            project_path=write.project_path,
+            workflow_id=write.workflow_id,
+            workload_id=attempt.workload_id,
+            manifest=manifest,
+        )
+        != write
+    ):
+        raise ValueError
+    return write, originals[0]
 
 
 def _registry_entry(runtime: RuntimeConnectionContext, alias: str) -> Mapping[str, Any]:
@@ -110,11 +169,49 @@ class StagedDispatcherContextLoader:
         plan_sha256: str,
         target_binding_ref: str,
     ) -> StagedDispatcherContext:
+        """Retain the existing explicit readiness selection API."""
+        return self._load(
+            runtime_authority_sha256,
+            dispatcher_id=dispatcher_id,
+            configuration_sha256=configuration_sha256,
+            plan_sha256=plan_sha256,
+            target_binding_ref=target_binding_ref,
+        )
+
+    def load_attempt(
+        self, runtime_authority_sha256: str, attempt: CompositionAttemptIdentity
+    ) -> StagedDispatcherAttempt:
+        """Derive the target and manifest from the exact staged workload and pack."""
+        try:
+            context = self._load(
+                runtime_authority_sha256,
+                dispatcher_id=self._identity.dispatcher_id,
+                configuration_sha256=self._identity.service_configuration_sha256,
+                plan_sha256=attempt.plan_sha256,
+                target_binding_ref=None,
+                attempt=attempt,
+            )
+            write, original = _select_attempt(context.plan, attempt)
+            return StagedDispatcherAttempt(context, attempt, write, original)
+        except Exception:
+            raise CompositionAdmissionError("dispatcher_attempt_unverified") from None
+
+    def _load(
+        self,
+        runtime_authority_sha256: str,
+        *,
+        dispatcher_id: str,
+        configuration_sha256: str,
+        plan_sha256: str,
+        target_binding_ref: str | None,
+        attempt: CompositionAttemptIdentity | None = None,
+    ) -> StagedDispatcherContext:
         """Verify staged parent, source plan and signed dispatcher before resolution."""
         try:
             require_digest(runtime_authority_sha256)
             require_digest(plan_sha256)
-            require_dispatcher_connection_ref(target_binding_ref)
+            if target_binding_ref is not None:
+                require_dispatcher_connection_ref(target_binding_ref)
             if (dispatcher_id, configuration_sha256) != (
                 self._identity.dispatcher_id,
                 self._identity.service_configuration_sha256,
@@ -155,6 +252,10 @@ class StagedDispatcherContextLoader:
             ) != (runtime_authority_sha256, identity.release_id, identity.deployment_id, init_plan.environment):
                 raise ValueError
             plan = reopen_composition_plan(cache, identity.release_id)
+            if attempt is not None:
+                target_binding_ref = _select_attempt(plan, attempt)[0].connection_ref
+            if target_binding_ref is None:
+                raise ValueError
             if plan.sources.subject_sha256 != plan_sha256 or not any(
                 write.connector == "clickhouse"
                 and write.kind == "transfer"

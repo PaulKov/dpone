@@ -24,8 +24,8 @@ from dpone.adapters.composition_clickhouse_dispatch_queries import (
 from dpone.adapters.composition_clickhouse_transport import ClickHouseDispatchObservation
 from dpone.adapters.composition_mssql_attempts import ConnectionFactory, composition_control_transaction
 from dpone.adapters.composition_mssql_schema import require_control_schema
-from dpone.contracts.composition_clickhouse_dispatch import ClickHouseDispatch
-from dpone.contracts.composition_identity import CompositionAdmissionError
+from dpone.contracts.composition_clickhouse_dispatch import ClickHouseDispatch, ClickHouseDispatchStatus
+from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
 from dpone.contracts.composition_persistence import (
     CompositionAttemptIdentity,
     CompositionAttemptProof,
@@ -91,6 +91,21 @@ class MssqlClickHouseDispatchStore:
             queries = DispatchQueries(ledger, self._binding)
             yield queries
             queries.check()
+
+    def read_status(self, dispatch_sha256: str) -> ClickHouseDispatchStatus | None:
+        """Read exact retained evidence, including historical terminal attempts.
+
+        This path issues no claim, credential or closure and never calls the
+        mutation authority. A missing original cannot authorize a retry. Both
+        scope observations and all bounded journal reads share one pinned SQL
+        transaction; the return occurs only after its successful completion.
+        """
+        require_digest(dispatch_sha256)
+        with self._transaction() as q:
+            original = q.require_status_scope()
+            status = q.status(dispatch_sha256)
+            require(q.require_status_scope() == original, "status_changed_subject")
+        return status
 
     def claim_once(self, dispatch: ClickHouseDispatch) -> None:
         """ACK only this invocation's new durable claim; never return a replay permit.

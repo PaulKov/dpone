@@ -16,7 +16,11 @@ from dpone.contracts.composition_clickhouse_dispatch import (
     InsertGenerationDispatch,
 )
 from dpone.contracts.composition_identity import CompositionAdmissionError
-from dpone.contracts.composition_persistence import CompositionAttemptProof, composition_attempt_epoch_subject
+from dpone.contracts.composition_persistence import (
+    CompositionAttemptProof,
+    composition_attempt_epoch_subject,
+    encode_attempt_proof,
+)
 from tests.composition_mssql_catalog_helpers import install_offline_catalog_references
 from tests.composition_mssql_store_fault_model import Connection, Cursor, FaultDatabase
 from tests.composition_snapshot_helpers import digest, intent, occurrence
@@ -398,3 +402,170 @@ def test_file_snapshot_publication_store_round_trips_prepared_record(tmp_path):
     assert claimed is not None
     assert claimed.state == "EXCHANGE_INTENT"
     assert store.records()[-1].state == "EXCHANGE_INTENT"
+
+
+def test_status_absence_and_retained_originals_never_mutate_or_call_authority(active):
+    from copy import deepcopy
+    from dataclasses import FrozenInstanceError
+
+    db, store, dispatch, authority = active
+    before = deepcopy(db.data)
+    assert store.read_status(dispatch.dispatch_sha256) is None
+    assert db.data == before and authority.events == []
+    store.claim_once(dispatch)
+    pending = store.read_status(dispatch.dispatch_sha256)
+    assert pending.dispatch_document == dispatch.to_bytes()
+    assert pending.dispatch_sha256 == dispatch.dispatch_sha256 and pending.terminal is None
+    with pytest.raises(FrozenInstanceError):
+        pending.terminal = (digest("fake"), b"fake")
+    store.record_completed(dispatch, observation(dispatch))
+    before = deepcopy(db.data)
+    completed = store.read_status(dispatch.dispatch_sha256)
+    assert completed.terminal == db.data["terminals"][dispatch.dispatch_sha256]
+    assert completed.binding.attempt == dispatch.attempt and completed.binding.target == dispatch.target
+    assert db.data == before and authority.events == ["admit"]
+
+
+@pytest.mark.parametrize("damage", ["missing", "corrupt"])
+@pytest.mark.parametrize("owner_state", ["ACTIVE", "RETIRING", "RETIRED"])
+@pytest.mark.parametrize("state", ["SUCCEEDED", "FAILED"])
+def test_status_reads_terminal_attempt_without_relaxing_mutation_scope(active, state, owner_state, damage):
+    db, store, dispatch, _ = active
+    store.claim_once(dispatch)
+    store.record_completed(dispatch, observation(dispatch))
+    key = dispatch.attempt.attempt_sha256
+    record = db.data["operations"][key]
+    proofs = tuple(
+        CompositionAttemptProof(
+            kind,
+            dispatch.attempt.attempt_sha256,
+            dispatch.attempt.activation_request_sha256,
+            composition_attempt_epoch_subject(dispatch.attempt),
+            (intent().ingest_principal,),
+            digest(kind),
+            outcome_state=state if kind == "OUTCOME" else None,
+        )
+        for kind in ("CLOSED_GATES", "QUIESCENCE", "OUTCOME")
+    )
+    db.data["operations"][key] = (*record[:6], state, *(proof.proof_sha256 for proof in proofs))
+    for proof in proofs:
+        db.data["proofs"][key, proof.kind, proof.proof_sha256] = ("execution", encode_attempt_proof(proof))
+    owner_key = record[2]
+    owner = db.data["owners"][owner_key]
+    db.data["owners"][owner_key] = (*owner[:5], owner_state)
+    if owner_state == "RETIRED":
+        db.data["domains"] = {guard: (*row[:4], None) for guard, row in db.data["domains"].items()}
+    assert store.read_status(dispatch.dispatch_sha256).terminal is not None
+    for mutation in (
+        lambda: store.claim_once(dispatch),
+        lambda: store.record_completed(dispatch, observation(dispatch)),
+        store.begin_closure,
+    ):
+        with pytest.raises(CompositionAdmissionError, match="attempt_state|occurrence_state"):
+            mutation()
+    if damage == "missing":
+        db.data["proofs"].clear()
+    else:
+        proof_key = next(iter(db.data["proofs"]))
+        family, document = db.data["proofs"][proof_key]
+        db.data["proofs"][proof_key] = family, document + b" "
+    with pytest.raises(CompositionAdmissionError):
+        store.read_status(dispatch.dispatch_sha256)
+
+
+@pytest.mark.parametrize("changed", ["claim", "terminal", "principal", "target"])
+def test_status_rejects_changed_retained_subject_or_original(active, changed):
+    db, store, dispatch, _ = active
+    store.claim_once(dispatch)
+    store.record_completed(dispatch, observation(dispatch))
+    key = dispatch.dispatch_sha256
+    if changed == "claim":
+        row = db.data["dispatches"][key]
+        db.data["dispatches"][key] = (*row[:-1], row[-1] + b" ")
+    elif changed == "terminal":
+        ref, body = db.data["terminals"][key]
+        db.data["terminals"][key] = (ref, body + b" ")
+    elif changed == "principal":
+        db.data["issued_authorities"].clear()
+    else:
+        store._binding = replace(
+            store._binding, target=replace(dispatch.target, write_subject_sha256=digest("wrong write"))
+        )
+    with pytest.raises(CompositionAdmissionError):
+        store.read_status(key)
+
+
+def test_status_rejects_transaction_replacement_during_read(active, monkeypatch):
+    db, store, dispatch, _ = active
+    store.claim_once(dispatch)
+    original = DispatchCursor._select_or_mutate
+
+    def changed(cursor, sql, parameters):
+        rows = original(cursor, sql, parameters)
+        if "FROM [dpone_control].[composition_ch_dispatches]" in sql:
+            cursor.connection.transaction_id += 1
+            cursor.connection.database.lock_owner = cursor.connection.transaction_id
+        return rows
+
+    monkeypatch.setattr(DispatchCursor, "_select_or_mutate", changed)
+    with pytest.raises(CompositionAdmissionError, match="transaction_identity"):
+        store.read_status(dispatch.dispatch_sha256)
+
+
+def test_status_rejects_invalid_digest_before_opening_sql(active):
+    db, store, _, _ = active
+    count = len(db.connections)
+    with pytest.raises(CompositionAdmissionError):
+        store.read_status("not a digest")
+    assert len(db.connections) == count
+
+
+def test_status_rejects_scope_change_between_observations(active, monkeypatch):
+    db, store, dispatch, _ = active
+    store.claim_once(dispatch)
+    original = queries.DispatchQueries.status
+
+    def change(q, ref):
+        result = original(q, ref)
+        rows = q.ledger.cursor.connection.data["operations"]
+        key = dispatch.attempt.attempt_sha256
+        record = rows[key]
+        rows[key] = (*record[:6], "COMMIT_UNKNOWN", *record[7:])
+        return result
+
+    monkeypatch.setattr(queries.DispatchQueries, "status", change)
+    with pytest.raises(CompositionAdmissionError, match="status_changed_subject"):
+        store.read_status(dispatch.dispatch_sha256)
+    assert db.data["operations"][dispatch.attempt.attempt_sha256][6] == "RUNNING"
+
+
+@pytest.mark.parametrize("wrong", ["digest", "duplicate", "oversize"])
+def test_status_rejects_wrong_or_unbounded_query_original(active, monkeypatch, wrong):
+    _, store, dispatch, _ = active
+    store.claim_once(dispatch)
+    original = queries.DispatchQueries.rows
+
+    def change(q, sql, *parameters):
+        rows = original(q, sql, *parameters)
+        if "FROM [dpone_control].[composition_ch_dispatches]" not in sql:
+            return rows
+        assert "TOP (2)" in sql and "DATALENGTH(dispatch_document) BETWEEN 1 AND 1048576" in sql
+        if wrong == "duplicate":
+            return rows + rows
+        if wrong == "oversize":
+            return ((*rows[0][:-1], None),)
+        other = replace(dispatch, columns=(ClickHouseDispatchColumn("id", "Int64"),))
+        return (
+            (
+                other.dispatch_sha256,
+                other.claim_key,
+                other.attempt.attempt_sha256,
+                q.binding.gate_id,
+                other.query_id,
+                other.to_bytes(),
+            ),
+        )
+
+    monkeypatch.setattr(queries.DispatchQueries, "rows", change)
+    with pytest.raises(CompositionAdmissionError):
+        store.read_status(dispatch.dispatch_sha256)

@@ -334,3 +334,28 @@ def require_terminal_document(dispatch: ClickHouseDispatch, digest: str, documen
         _journal_require(terminal_document(dispatch, observation) == document, "terminal_original")
     except (TypeError, ValueError, KeyError, AttributeError):
         raise CompositionAdmissionError("clickhouse_journal_terminal_original") from None
+
+
+@dataclass(frozen=True, slots=True)
+class ClickHouseDispatchStatus:
+    """Retained claim and optional complete transport original, never a permit.
+
+    A terminal proves only the journaled transport observation. It does not
+    establish generation contents, publication, or business success. Absence is
+    represented by the reader returning None, which never authorizes dispatch.
+    No new wire schema is introduced; these are the existing exact originals.
+    """
+
+    binding: DispatchBinding
+    dispatch_sha256: str
+    dispatch_document: bytes
+    terminal: tuple[str, bytes] | None
+
+    def __post_init__(self) -> None:
+        _journal_require(type(self.binding) is DispatchBinding, "binding")
+        self.binding.__post_init__()
+        dispatch = decode_clickhouse_dispatch(self.dispatch_document, self.dispatch_sha256)
+        self.binding.require_dispatch(dispatch)
+        if self.terminal is not None:
+            _journal_require(type(self.terminal) is tuple and len(self.terminal) == 2, "terminal_original")
+            require_terminal_document(dispatch, *self.terminal)

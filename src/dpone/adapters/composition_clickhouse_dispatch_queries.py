@@ -14,6 +14,7 @@ from dpone.adapters.composition_mssql_existing_operation import require_existing
 from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.contracts.composition_clickhouse_dispatch import (
     ClickHouseDispatch,
+    ClickHouseDispatchStatus,
     decode_clickhouse_dispatch,
 )
 from dpone.contracts.composition_clickhouse_dispatch import (
@@ -72,7 +73,7 @@ class DispatchQueries:
 
     def require_scope(self, *, recovery: bool):
         self.check()
-        attempt, target = self.binding.attempt, self.binding.target
+        attempt = self.binding.attempt
         occurrence, receipt = require_existing_execution_in(
             self.ledger,
             attempt,
@@ -82,6 +83,30 @@ class DispatchQueries:
         self.check()
         require(occurrence.receipt.state in ({"ACTIVE", "RETIRING"} if recovery else {"ACTIVE"}), "occurrence_state")
         require(receipt.state in ({"RUNNING", "COMMIT_UNKNOWN"} if recovery else {"RUNNING"}), "attempt_state")
+        self._require_membership(occurrence)
+        return occurrence, receipt
+
+    def require_status_scope(self):
+        """Audit retained history without granting any mutation or recovery permit."""
+        self.check()
+        original = require_existing_execution_in(
+            self.ledger,
+            self.binding.attempt,
+            expected_service_id=self.ledger.expected_service_id,
+            terminal_validator=self.ledger.terminal_validator,
+        )
+        self.check()
+        self._require_membership(original[0])
+        if original[1].state in {"SUCCEEDED", "FAILED"}:
+            # The existing-operation audit exempts the current nonretired
+            # operation. A status read must still reopen its terminal proofs.
+            self.check()
+            self.ledger.terminal_validator(self.ledger, *original)
+            self.check()
+        return original
+
+    def _require_membership(self, occurrence) -> None:
+        attempt, target = self.binding.attempt, self.binding.target
         workload = next(row for row in occurrence.request.workloads if row.workload_id == attempt.workload_id)
         resource = next((row for row in occurrence.request.resources if row.guard_id == target.guard_id), None)
         require(resource is not None, "target_guard")
@@ -102,7 +127,15 @@ class DispatchQueries:
             self.binding.principal_id,
         )
         require(issued == ((attempt.attempt_sha256,),), "issued_identity")
-        return occurrence, receipt
+
+    def status(self, dispatch_sha256: str) -> ClickHouseDispatchStatus | None:
+        rows = self.rows(self._claim_select() + "WHERE dispatch_sha256=?;", dispatch_sha256)
+        require(len(rows) <= 1, "claim_original")
+        if not rows:
+            return None
+        dispatch = self.decode_claim(rows[0])
+        require(dispatch.dispatch_sha256 == dispatch_sha256, "claim_identity")
+        return ClickHouseDispatchStatus(self.binding, dispatch_sha256, rows[0][5], self.terminal(dispatch))
 
     def require_open(self) -> None:
         rows = self.rows(

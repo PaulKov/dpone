@@ -3,6 +3,7 @@
 Architecture Decision Records document important design choices and their consequences.
 
 - [ADR 0063: ClickHouse composition dispatch closure](adr/0063-clickhouse-composition-dispatch-closure.md)
+- [ADR 0064: Dispatcher-owned composition capture (proposed)](adr/0064-dispatcher-owned-composition-capture.md)
 
 - [ADR 0001: Layered architecture](adr/0001-layered-architecture.md)
 - [ADR 0002: Variant C batch manifest](adr/0002-variant-c-batch-manifest.md)

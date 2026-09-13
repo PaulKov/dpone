@@ -11,7 +11,7 @@ import ipaddress
 import math
 import re
 import time
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
 from dpone.adapters.composition_clickhouse_gate_queries import ClickHouseLocalSupervisorObservation
@@ -23,6 +23,7 @@ from dpone.adapters.composition_clickhouse_supervisor_enrollment import (
 )
 from dpone.adapters.composition_clickhouse_supervisor_linux import LinuxSupervisorProbe, digest, require
 from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
+from dpone.adapters.composition_supervisor_probe_rpc import CaptureSupervisorFactsClient
 from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
 from dpone.contracts.composition_persistence import CompositionAttemptIdentity
 from dpone.contracts.composition_snapshot import SnapshotTarget
@@ -191,15 +192,13 @@ def capture_supervisor_facts(
     )
 
 
-class DockerClickHouseLocalSupervisor:
-    """Fail closed on unavailable Linux, Docker, enrollment or identity changes."""
+class _EnrolledClickHouseSupervisor:
+    """Compare fresh captured facts with pinned SQL enrollment twice."""
 
     def __init__(
         self,
         *,
         enrollment_sha256: str,
-        docker: LocalDockerSupervisorClient,
-        linux: LinuxSupervisorProbe,
         timeout_seconds: float = 10.0,
     ) -> None:
         require_digest(enrollment_sha256)
@@ -207,10 +206,10 @@ class DockerClickHouseLocalSupervisor:
             type(timeout_seconds) in {int, float} and math.isfinite(timeout_seconds) and 0 < timeout_seconds <= 60,
             "deadline_budget",
         )
-        self._reference, self._docker, self._linux, self._timeout = enrollment_sha256, docker, linux, timeout_seconds
+        self._reference, self._timeout = enrollment_sha256, timeout_seconds
 
     def _capture(self, enrollment: ClickHouseSupervisorEnrollment, deadline: float) -> dict[str, Any]:
-        return capture_supervisor_facts(self._docker, self._linux, enrollment.policy, deadline)
+        raise NotImplementedError
 
     def observe(
         self, context: CompositionMssqlLedger, *, attempt: CompositionAttemptIdentity, target: SnapshotTarget
@@ -239,3 +238,46 @@ class DockerClickHouseLocalSupervisor:
             )
         except Exception:
             raise CompositionAdmissionError("clickhouse_supervisor_unverified") from None
+
+
+class DockerClickHouseLocalSupervisor(_EnrolledClickHouseSupervisor):
+    """Observe host facts locally, preserving the existing Docker/Linux API."""
+
+    def __init__(
+        self,
+        *,
+        enrollment_sha256: str,
+        docker: LocalDockerSupervisorClient,
+        linux: LinuxSupervisorProbe,
+        timeout_seconds: float = 10.0,
+    ) -> None:
+        super().__init__(enrollment_sha256=enrollment_sha256, timeout_seconds=timeout_seconds)
+        self._docker, self._linux = docker, linux
+
+    def _capture(self, enrollment: ClickHouseSupervisorEnrollment, deadline: float) -> dict[str, Any]:
+        return capture_supervisor_facts(self._docker, self._linux, enrollment.policy, deadline)
+
+
+class RemoteClickHouseLocalSupervisor(_EnrolledClickHouseSupervisor):
+    """Read fresh host facts over root-authenticated RPC, then verify SQL enrollment.
+
+    The dispatcher never constructs host probes. Both RPC calls share the outer
+    observation deadline and independently authenticate their nonce-bound reply.
+    A successful transport response alone grants no enrollment authority.
+    """
+
+    def __init__(
+        self,
+        *,
+        enrollment_sha256: str,
+        socket_path: Path,
+        dispatcher_gid: int,
+        timeout_seconds: float = 10.0,
+    ) -> None:
+        super().__init__(enrollment_sha256=enrollment_sha256, timeout_seconds=timeout_seconds)
+        self._client = CaptureSupervisorFactsClient(
+            socket_path, dispatcher_gid=dispatcher_gid, timeout_seconds=timeout_seconds
+        )
+
+    def _capture(self, enrollment: ClickHouseSupervisorEnrollment, deadline: float) -> dict[str, Any]:
+        return self._client.capture(enrollment.enrollment_sha256, deadline=deadline)

@@ -238,3 +238,73 @@ def test_second_capture_config_drift_blocks_original(monkeypatch):
     monkeypatch.setattr(supervisor, "_capture", drift)
     with pytest.raises(CompositionAdmissionError, match="unverified"):
         supervisor.observe(None, attempt=None, target=None)
+
+
+@pytest.mark.parametrize("failure", [None, "facts", "enrollment", "context", "transport", "deadline"])
+def test_remote_observer_rechecks_original_and_context_around_two_fresh_captures(monkeypatch, failure):
+    from pathlib import Path
+
+    import dpone.adapters.composition_clickhouse_supervisor as module
+
+    facts = capture()
+    value = enrolled(enrollment_body(facts))
+    events, deadlines = [], []
+    clock = [100.0]
+    monkeypatch.setattr(module.time, "monotonic", lambda: clock[0])
+
+    class Reader:
+        def __init__(self, context, reference, attempt, target):
+            assert (context, reference, attempt, target) == ("context", value.enrollment_sha256, "attempt", "target")
+
+        def check(self):
+            events.append("check")
+            if failure == "context" and len(deadlines) == 1:
+                raise RuntimeError("context changed")
+
+        def read(self):
+            events.append("read")
+            if failure == "enrollment" and deadlines:
+                from types import SimpleNamespace
+
+                return SimpleNamespace(document=b"changed")
+            return value
+
+    class Client:
+        def __init__(self, path, *, dispatcher_gid, timeout_seconds):
+            assert (path, dispatcher_gid, timeout_seconds) == (Path("/run/probe.sock"), 100001, 10)
+
+        def capture(self, reference, *, deadline):
+            assert reference == value.enrollment_sha256
+            events.append("capture")
+            deadlines.append(deadline)
+            if failure == "transport":
+                raise RuntimeError("private transport detail")
+            result = deepcopy(facts)
+            if len(deadlines) == 2 and failure == "facts":
+                result["linux"]["network_namespace_id"] = "changed"
+            if failure == "deadline":
+                clock[0] = deadline
+            return result
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("remote observer invoked host API")
+
+    monkeypatch.setattr(module, "SupervisorEnrollmentReader", Reader)
+    monkeypatch.setattr(module, "CaptureSupervisorFactsClient", Client)
+    monkeypatch.setattr(module, "LocalDockerSupervisorClient", forbidden)
+    monkeypatch.setattr(module, "LinuxSupervisorProbe", forbidden)
+    monkeypatch.setattr(module, "capture_supervisor_facts", forbidden)
+    supervisor = module.RemoteClickHouseLocalSupervisor(
+        enrollment_sha256=value.enrollment_sha256, socket_path=Path("/run/probe.sock"), dispatcher_gid=100001
+    )
+    if failure is not None:
+        with pytest.raises(
+            CompositionAdmissionError,
+            match="^DPONE_COMPOSITION_ADMISSION_UNAVAILABLE: clickhouse_supervisor_unverified$",
+        ):
+            supervisor.observe("context", attempt="attempt", target="target")
+    else:
+        observed = supervisor.observe("context", attempt="attempt", target="target")
+        assert observed.enrollment_sha256 == value.enrollment_sha256
+        assert events == ["read", "check", "capture", "check", "read", "check", "capture", "check", "read"]
+        assert deadlines == [110.0, 110.0]
