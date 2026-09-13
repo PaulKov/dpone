@@ -12,7 +12,6 @@ SQL credentials.
 
 from __future__ import annotations
 
-import ctypes
 import os
 import re
 import stat
@@ -33,6 +32,7 @@ from dpone.adapters.composition_supervisor_filesystem import PROTECTED_FLAGS as 
 from dpone.adapters.composition_supervisor_filesystem import absolute_supervisor_path as _absolute
 from dpone.adapters.composition_supervisor_filesystem import open_protected as _open_protected
 from dpone.adapters.composition_supervisor_filesystem import require_supervisor as _require_supervisor
+from dpone.adapters.composition_supervisor_filesystem import require_tmpfs as _require_tmpfs
 from dpone.contracts.composition_attempt import CompositionAttemptIdentity
 from dpone.contracts.composition_dbt_outcome import MAX_ARTIFACT_BYTES, DbtCaptureError
 
@@ -277,18 +277,6 @@ def _mkdir(parent: int, name: str, mode: int, *, uid: int = 0, gid: int = 0) -> 
     except BaseException:
         os.close(descriptor)
         raise
-
-
-def _require_tmpfs(descriptor: int) -> None:
-    # Linux fstatfs starts with a native long filesystem magic. An oversized
-    # buffer avoids relying on architecture-specific trailing structure fields.
-    libc = ctypes.CDLL(None, use_errno=True)
-    observation = ctypes.create_string_buffer(256)
-    if (
-        libc.fstatfs(descriptor, ctypes.byref(observation)) != 0
-        or ctypes.c_long.from_buffer(observation).value != 0x01021994
-    ):
-        raise DbtCaptureError("capture_profile_not_tmpfs")
 
 
 def _require_identity_quiescent(uid: int, gid: int) -> None:

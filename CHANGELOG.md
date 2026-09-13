@@ -19,6 +19,12 @@
 
 ### Added
 
+- Observe native runner filesystem facts through held protected descriptors and
+  fresh root comparisons, with actual Linux root/tmpfs and fixed-deadline checks.
+  Reject malformed supervisor projections before filesystem access. These
+  read-only facts require enclosing authenticated readiness evidence; they do
+  not certify deployment isolation or future execution.
+
 - Wire protected v2 dispatcher startup and remote ClickHouse worker selection
   before local administrative credential resolution. Keep native construction
   lazy, preserve terminal originals in worker evidence, and retain validated

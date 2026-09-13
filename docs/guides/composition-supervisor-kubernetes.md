@@ -521,8 +521,31 @@ Existing attempts cannot issue credentials or run the cell again. File descripto
 close even when the fresh custody check fails during context entry, and terminal
 responses are checked again after evidence validation finishes.
 
-These components do not yet enable the deployed remote execution route. Executable
-startup and worker routing remain in progress. The full
+Executable dispatcher startup and worker routing are installed. The full
 Linux/Kubernetes campaign must still pass before operators use this profile.
-Local filesystem tests simulate Linux identity and protected ancestry; they are
-not a live isolation certificate.
+
+### Observe the actual native runner profile
+
+The read-only Python adapter
+`dpone.adapters.composition_native_profile.observe_native_execution_profile`
+accepts the validated `CompositionSupervisorProjection`, absolute
+`supervisor_root` and `profiles_root` paths, and an `io_deadline` callback returning
+one absolute monotonic deadline. Call it on the provisioned Linux execution runner
+as root UID/GID. Provision `supervisor_root/run` and a tmpfs `profiles_root` before
+calling; the observer creates no directories, locks or child identities.
+
+It returns canonical `dpone.composition-native-profile-observation.v1` bytes
+containing the closed supervisor projection, its `sha256:`-prefixed digest, and
+observed path/device/inode/UID/GID/mode/filesystem-type facts for the supervisor,
+run and profiles roots. It holds protected no-follow descriptors, independently
+reopens each root and rejects identity, permission or privilege drift. Profiles
+must actually be tmpfs. Timeout or unavailable observations raise
+`DbtCaptureError`; the caller must keep readiness closed.
+
+The enclosing readiness producer must bind these bytes to authenticated runner,
+configuration, mount provenance, toolchain and SQL originals. The inode facts do
+not prove the named PVC identity, future dbt execution or deployment isolation.
+The opt-in test `tests/test_composition_native_profile.py` takes
+`DPONE_NATIVE_PROFILE_TEST_ROOT` and `DPONE_NATIVE_PROFILE_TEST_PROFILES` for
+externally provisioned roots. A passing real Linux/tmpfs observation test proves
+this observer only; it does not certify the complete execution route.

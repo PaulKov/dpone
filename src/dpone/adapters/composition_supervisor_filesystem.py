@@ -10,6 +10,7 @@ adapters from drifting apart on a security-critical check.
 
 from __future__ import annotations
 
+import ctypes
 import os
 import stat
 import sys
@@ -37,21 +38,29 @@ def require_supervisor() -> None:
         raise DbtCaptureError("capture_supervisor_boundary")
 
 
-def open_protected(path: Path, *, traversable: bool = True) -> int:
+def open_protected(path: Path, *, traversable: bool = True, require_current: Callable[[], None] | None = None) -> int:
     """Open one directory component by component, never following a symlink."""
 
+    check = require_current or (lambda: None)
+    check()
     descriptor = os.open("/", PROTECTED_FLAGS)
     try:
+        check()
         for part in path.parts[1:]:
+            check()
             following = os.open(part, PROTECTED_FLAGS, dir_fd=descriptor)
             os.close(descriptor)
             descriptor = following
+            check()
             info = os.fstat(descriptor)
+            check()
             if info.st_uid != 0 or (info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX):
                 raise DbtCaptureError("capture_allocation_ancestry")
             if traversable and not info.st_mode & stat.S_IXOTH:
                 raise DbtCaptureError("capture_allocation_inaccessible")
+        check()
         info = os.fstat(descriptor)
+        check()
         if info.st_mode & 0o022:
             raise DbtCaptureError("capture_allocation_permissions")
         return descriptor
@@ -126,3 +135,18 @@ __all__ = [
     "read_protected_original",
     "require_supervisor",
 ]
+
+
+def filesystem_type(descriptor: int) -> int:
+    """Observe Linux fstatfs magic without architecture-specific trailing fields."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    observation = ctypes.create_string_buffer(256)
+    if libc.fstatfs(descriptor, ctypes.byref(observation)) != 0:
+        raise DbtCaptureError("capture_profile_not_tmpfs")
+    return ctypes.c_long.from_buffer(observation).value
+
+
+def require_tmpfs(descriptor: int) -> None:
+    """Require the same Linux tmpfs profile boundary used during execution."""
+    if filesystem_type(descriptor) != 0x01021994:
+        raise DbtCaptureError("capture_profile_not_tmpfs")

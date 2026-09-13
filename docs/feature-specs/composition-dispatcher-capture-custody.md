@@ -252,6 +252,38 @@ an invalid or unavailable explicit binding never falls back to local execution.
 Native factory construction is delayed until an actual native request so that
 ordinary remote selection cannot resolve administrative target credentials.
 
+### Native execution-profile readiness observation
+
+The approved completion includes a side-effect-free observer running in the actual
+provisioned Linux execution profile, never inferred from the activation host.
+`observe_native_execution_profile(supervisor=..., supervisor_root=...,
+profiles_root=..., io_deadline=...)` returns canonical bytes with exactly `schema`,
+`supervisor`, `supervisor_sha256`, and `roots`. The schema is
+`dpone.composition-native-profile-observation.v1`. `roots` has exactly
+`supervisor`, `run`, `profiles`; each records the canonical absolute `path`, actual
+`device`, `inode`, `uid`, `gid`, permission `mode`, and numeric `filesystem_type`.
+The supervisor is the original validated closed projection and its canonical
+`sha256:`-prefixed SHA256 digest. The observer rejects subclasses and reconstructs
+the closed projection before opening roots. This observation is not a standalone
+readiness permit.
+
+The observer validates the explicit projection and paths, requires actual Linux
+root UID/GID, opens and holds all three directories through the shared protected
+no-follow traversal, observes actual filesystem type, and requires the profiles
+root to be tmpfs. It then reopens each configured path and compares all recorded
+facts with the held descriptor before returning canonical bytes. One fixed
+caller-provided deadline brackets every OS operation and serialization; timeout,
+path rotation, privilege/permission drift, unavailable observations or malformed
+inputs reject with a credential-safe error. Every opened descriptor closes on
+all paths, including failed acquisition and failed final verification.
+
+The observer never allocates a child identity, creates a lock/directory/profile,
+reads credentials or scans attempt-specific process identities. Shared filesystem
+primitives remain the authority for execution as well as readiness. Actual mount
+provenance, nonce, runner identity, configuration, toolchain and SQL observations
+must be bound by the enclosing readiness producer. Local inode observations do
+not establish a named Docker-volume/PVC identity or prove future dbt execution.
+
 ### Execution deadline and shutdown behavior
 
 V2 has a separately configured `execution_timeout_seconds`, an integer from 1 to
