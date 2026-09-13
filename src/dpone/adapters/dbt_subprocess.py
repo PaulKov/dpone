@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import codecs
 import io
 import math
 import os
@@ -335,14 +336,50 @@ def _sanitize(
     limit_bytes: int,
     secrets: tuple[str, ...],
 ) -> tuple[str, bool]:
-    text = value.decode("utf-8", errors="replace")
-    for secret in secrets:
-        text = text.replace(secret, "[REDACTED]")
-    encoded = text.encode("utf-8")
+    retained_truncated = total_bytes > len(value)
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    text = decoder.decode(value, final=not retained_truncated)
+    encoded = _redacted_output(text, limit_bytes=limit_bytes, secrets=secrets, retained_truncated=retained_truncated)
     truncated = total_bytes > limit_bytes or len(encoded) > limit_bytes
-    if len(encoded) > limit_bytes:
-        text = encoded[:limit_bytes].decode("utf-8", errors="ignore")
-    return text, truncated
+    return encoded[:limit_bytes].decode("utf-8", errors="ignore"), truncated
+
+
+def _redacted_output(value: str, *, limit_bytes: int, secrets: tuple[str, ...], retained_truncated: bool) -> bytes:
+    """Mask original matches and possible secret prefixes at the retained boundary.
+
+    Replacement can shorten text and expose retained lookahead. If retention
+    stopped mid-secret, conservatively mask the matching suffix too. Mark all
+    matches before replacing anything, including overlaps obscured by earlier
+    replacements. Storage is bounded by retained input and the output limit.
+    """
+
+    protected = bytearray(len(value))
+    for secret in secrets:
+        start = value.find(secret)
+        covered_until = 0
+        while 0 <= start < len(protected):
+            end = start + len(secret)
+            mark_start = max(start, covered_until)
+            protected[mark_start:end] = b"\x01" * (end - mark_start)
+            covered_until = end
+            start = value.find(secret, start + 1)
+        if retained_truncated:
+            for length in range(min(len(secret) - 1, len(value)), 0, -1):
+                if value.endswith(secret[:length]):
+                    protected[-length:] = b"\x01" * length
+                    break
+    output = bytearray()
+    position = 0
+    while position < len(protected) and len(output) <= limit_bytes:
+        masked = protected[position]
+        end = protected.find(b"\x00" if masked else b"\x01", position)
+        if end < 0:
+            end = len(protected)
+        segment = b"[REDACTED]" if masked else value[position:end].encode("utf-8")
+        # One extra byte distinguishes replacement expansion from an exact fit.
+        output.extend(segment[: limit_bytes + 1 - len(output)])
+        position = end
+    return bytes(output)
 
 
 def _environment(cwd: Path) -> dict[str, str]:

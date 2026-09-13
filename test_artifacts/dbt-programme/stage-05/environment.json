@@ -1,0 +1,18 @@
+{
+  "live_execution": "SKIP",
+  "packages": {
+    "dbt-core": "1.12.3",
+    "dbt-sqlserver": "1.11.1",
+    "dpone-native-accel": "0.79.2",
+    "google-cloud-bigquery": "3.42.2",
+    "google-cloud-storage": "3.12.1",
+    "pendulum": "3.2.0",
+    "psycopg": "3.3.4",
+    "pyarrow": "23.0.1",
+    "pytest": "9.0.3"
+  },
+  "platform": "Darwin",
+  "python": "3.12.11",
+  "setup": "uv sync --locked --all-extras",
+  "setup_status": "PASS"
+}
