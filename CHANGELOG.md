@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Fixed
+
+- Qualify the original ClickHouse timestamp column in bounded-native window
+  predicates so temporal SELECT aliases cannot replace it with integer
+  microseconds. Preserve exact half-open UTC boundaries and duplicate rows.
+
+### Added
+
+- Add an explicitly approved local Docker DDA route factory using real native
+  ClickHouse extraction, BCP, SQL transaction receipts and durable recovery.
+  Unknown commit outcomes retain resources; acknowledged rollback requires
+  cleanup and a new invocation. Binary source mapping and performance
+  certification remain unverified.
+
 ## 0.79.0 - 2026-09-11
 
 ### Changed
