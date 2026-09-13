@@ -333,3 +333,53 @@ def test_legacy_launch_does_not_bypass_policy_bootstrap_lifecycle(startup):
             dispatcher_gid=1201,
         )
     assert events == ["config"]
+
+
+def test_bootstrap_wait_never_handles_requests_and_closes_after_join(monkeypatch):
+    signals = Signals()
+    server = Server(signals)
+    polls = iter([False, False, True])
+
+    def poll():
+        server.events.append("poll")
+        return next(polls)
+
+    startup = SimpleNamespace(poll=poll, close=lambda: server.events.append("bootstrap-close"))
+    monkeypatch.setattr(service, "_pause_startup", lambda: server.events.append("wait"))
+    service._serve(server, signals, startup=startup)
+    assert server.events == [
+        "enter",
+        "poll",
+        "wait",
+        "poll",
+        "wait",
+        "poll",
+        "request",
+        "notify",
+        "close-and-join",
+        "bootstrap-close",
+    ]
+    assert signals.handlers == signals.original
+
+
+@pytest.mark.parametrize("failure", [True, False])
+def test_bootstrap_failure_or_stop_never_handles_request(monkeypatch, failure):
+    signals = Signals()
+    server = Server(signals)
+
+    def poll():
+        if failure:
+            raise CompositionAdmissionError("dispatcher_bootstrap_unavailable")
+        server.stop_admission()
+        return False
+
+    startup = SimpleNamespace(poll=poll, close=lambda: server.events.append("bootstrap-close"))
+    monkeypatch.setattr(service, "_pause_startup", lambda: None)
+    if failure:
+        with pytest.raises(CompositionAdmissionError):
+            service._serve(server, signals, startup=startup)
+    else:
+        service._serve(server, signals, startup=startup)
+    assert "request" not in server.events
+    assert server.events[-2:] == ["close-and-join", "bootstrap-close"]
+    assert signals.handlers == signals.original

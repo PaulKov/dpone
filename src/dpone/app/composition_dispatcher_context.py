@@ -204,6 +204,41 @@ class StagedDispatcherContextLoader:
         except Exception:
             raise CompositionAdmissionError("dispatcher_attempt_unverified") from None
 
+    def load_bootstrap(self, runtime_authority_sha256: str) -> tuple[StagedDispatcherContext, ...]:
+        """Discover all protected plan aliases assigned to this dispatcher.
+
+        No incoming attempt, plan hash or credential supplies discovery authority.
+        Other dispatcher identities are ignored; every alias naming this one must
+        match its exact configured identity kind and digest. No SQL is opened.
+        """
+        try:
+            verified = self._verified(runtime_authority_sha256)
+            _, runtime, plan, _ = verified
+            aliases = sorted(
+                {
+                    write.connection_ref
+                    for write in plan.writes
+                    if write.connector == "clickhouse" and write.kind == "transfer"
+                }
+            )
+            contexts = []
+            for alias in aliases:
+                target = _registry_entry(runtime, alias)
+                if target["type"] != "clickhouse":
+                    raise ValueError
+                binding = target["connection"].get("composition_dispatcher")
+                if binding is None and "composition_dispatcher" not in target["connection"]:
+                    continue
+                if not isinstance(binding, Mapping) or "dispatcher_id" not in binding:
+                    raise ValueError
+                if binding["dispatcher_id"] == self._identity.dispatcher_id:
+                    contexts.append(self._selected(verified, alias))
+            if not contexts:
+                raise ValueError
+            return tuple(contexts)
+        except Exception:
+            raise CompositionAdmissionError("dispatcher_bootstrap_unverified") from None
+
     def _load(
         self,
         runtime_authority_sha256: str,
@@ -216,79 +251,96 @@ class StagedDispatcherContextLoader:
     ) -> StagedDispatcherContext:
         """Verify staged parent, source plan and signed dispatcher before resolution."""
         try:
-            require_digest(runtime_authority_sha256)
             require_digest(plan_sha256)
-            if target_binding_ref is not None:
-                require_dispatcher_connection_ref(target_binding_ref)
             if (dispatcher_id, configuration_sha256) != (
                 self._identity.dispatcher_id,
                 self._identity.identity_sha256,
             ):
                 raise ValueError
-            expected = self._catalog[runtime_authority_sha256]
-            directory = runtime_authority_sha256.removeprefix("sha256:")
-            original = self._files.read(directory + "/context.json")
-            if "sha256:" + sha256(original).hexdigest() != expected:
-                raise ValueError
-            body = strict_json_object(original)
-            if (
-                set(body) != _FIELDS
-                or canonical_json_bytes(body) != original
-                or body["schema"] != "dpone.composition-dispatcher-context.v1"
-                or body["runtime_authority_sha256"] != runtime_authority_sha256
-                or body["plan_sha256"] != plan_sha256
-            ):
-                raise ValueError
-            identity = AirflowDeploymentIdentity.from_mapping(body["deployment_identity"])
-            init_plan, _ = decode_runtime_init_fetch_plan(body["init_fetch_plan_b64"], body["init_fetch_plan_sha256"])
-            if (init_plan.release_id, init_plan.deployment_id) != (identity.release_id, identity.deployment_id):
-                raise ValueError
-            cache = self._files.require_tree(directory + "/cache")
-            context_root = cache / "payload" / cache_relative_path(init_plan.binding_set.artifact_ref).parent
-            runtime = self._runtime_loader.load(
-                {
-                    RUNTIME_CONNECTION_CONTEXT_ENV: str(context_root),
-                    RUNTIME_INIT_FETCH_PLAN_B64_ENV: body["init_fetch_plan_b64"],
-                    RUNTIME_INIT_FETCH_PLAN_SHA256_ENV: body["init_fetch_plan_sha256"],
-                }
-            )
-            if runtime is None or (
-                runtime.authority_subject_sha256,
-                runtime.release_id,
-                runtime.deployment_id,
-                runtime.environment,
-            ) != (runtime_authority_sha256, identity.release_id, identity.deployment_id, init_plan.environment):
-                raise ValueError
-            plan = reopen_composition_plan(cache, identity.release_id)
+            verified = self._verified(runtime_authority_sha256, plan_sha256)
             if attempt is not None:
-                target_binding_ref = _select_attempt(plan, attempt)[0].connection_ref
+                target_binding_ref = _select_attempt(verified[2], attempt)[0].connection_ref
             if target_binding_ref is None:
                 raise ValueError
-            if plan.sources.subject_sha256 != plan_sha256 or not any(
-                write.connector == "clickhouse"
-                and write.kind == "transfer"
-                and write.connection_ref == target_binding_ref
-                for write in plan.writes
-            ):
-                raise ValueError
-            target = _registry_entry(runtime, target_binding_ref)
-            if target["type"] != "clickhouse":
-                raise ValueError
-            binding = CompositionDispatcherBinding.from_mapping(target["connection"]["composition_dispatcher"])
-            if (binding.dispatcher_id, binding.identity_kind, binding.identity_sha256) != (
-                dispatcher_id,
-                self._identity.identity_kind,
-                configuration_sha256,
-            ) or _registry_entry(runtime, binding.connection_ref)["type"] != "api":
-                raise ValueError
-            occurrence = CompositionOccurrenceContext(
-                identity.activation_id,
-                runtime.environment,
-                identity.release_id,
-                identity.deployment_id,
-                None,
-                runtime_authority_sha256,
-            )
-            return StagedDispatcherContext(occurrence, binding, plan, runtime, cache, target_binding_ref)
+            return self._selected(verified, target_binding_ref)
         except Exception:
             raise CompositionAdmissionError("dispatcher_context_unverified") from None
+
+    def _verified(
+        self,
+        runtime_authority_sha256: str,
+        plan_sha256: str | None = None,
+    ) -> tuple[CompositionOccurrenceContext, RuntimeConnectionContext, CompositionExecutionPlan, Path]:
+        """Reopen the same closed pinned original, runtime and producer plan once."""
+        require_digest(runtime_authority_sha256)
+        expected = self._catalog[runtime_authority_sha256]
+        directory = runtime_authority_sha256.removeprefix("sha256:")
+        original = self._files.read(directory + "/context.json")
+        if "sha256:" + sha256(original).hexdigest() != expected:
+            raise ValueError
+        body = strict_json_object(original)
+        if (
+            set(body) != _FIELDS
+            or canonical_json_bytes(body) != original
+            or body["schema"] != "dpone.composition-dispatcher-context.v1"
+            or body["runtime_authority_sha256"] != runtime_authority_sha256
+            or (plan_sha256 is not None and body["plan_sha256"] != plan_sha256)
+        ):
+            raise ValueError
+        require_digest(body["plan_sha256"])
+        identity = AirflowDeploymentIdentity.from_mapping(body["deployment_identity"])
+        init_plan, _ = decode_runtime_init_fetch_plan(body["init_fetch_plan_b64"], body["init_fetch_plan_sha256"])
+        if (init_plan.release_id, init_plan.deployment_id) != (identity.release_id, identity.deployment_id):
+            raise ValueError
+        cache = self._files.require_tree(directory + "/cache")
+        context_root = cache / "payload" / cache_relative_path(init_plan.binding_set.artifact_ref).parent
+        runtime = self._runtime_loader.load(
+            {
+                RUNTIME_CONNECTION_CONTEXT_ENV: str(context_root),
+                RUNTIME_INIT_FETCH_PLAN_B64_ENV: body["init_fetch_plan_b64"],
+                RUNTIME_INIT_FETCH_PLAN_SHA256_ENV: body["init_fetch_plan_sha256"],
+            }
+        )
+        if runtime is None or (
+            runtime.authority_subject_sha256,
+            runtime.release_id,
+            runtime.deployment_id,
+            runtime.environment,
+        ) != (runtime_authority_sha256, identity.release_id, identity.deployment_id, init_plan.environment):
+            raise ValueError
+        plan = reopen_composition_plan(cache, identity.release_id)
+        if plan.sources.subject_sha256 != body["plan_sha256"]:
+            raise ValueError
+        occurrence = CompositionOccurrenceContext(
+            identity.activation_id,
+            runtime.environment,
+            identity.release_id,
+            identity.deployment_id,
+            None,
+            runtime_authority_sha256,
+        )
+        return occurrence, runtime, plan, cache
+
+    def _selected(
+        self,
+        verified: tuple[CompositionOccurrenceContext, RuntimeConnectionContext, CompositionExecutionPlan, Path],
+        target_binding_ref: str,
+    ) -> StagedDispatcherContext:
+        occurrence, runtime, plan, cache = verified
+        require_dispatcher_connection_ref(target_binding_ref)
+        if not any(
+            write.connector == "clickhouse" and write.kind == "transfer" and write.connection_ref == target_binding_ref
+            for write in plan.writes
+        ):
+            raise ValueError
+        target = _registry_entry(runtime, target_binding_ref)
+        if target["type"] != "clickhouse":
+            raise ValueError
+        binding = CompositionDispatcherBinding.from_mapping(target["connection"]["composition_dispatcher"])
+        if (binding.dispatcher_id, binding.identity_kind, binding.identity_sha256) != (
+            self._identity.dispatcher_id,
+            self._identity.identity_kind,
+            self._identity.identity_sha256,
+        ) or _registry_entry(runtime, binding.connection_ref)["type"] != "api":
+            raise ValueError
+        return StagedDispatcherContext(occurrence, binding, plan, runtime, cache, target_binding_ref)

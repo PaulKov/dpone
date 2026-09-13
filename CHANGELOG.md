@@ -22,6 +22,10 @@
 
 ### Added
 
+- Add protected bootstrap retention, a one-way startup coordinator and verified
+  discovery of all matching dispatcher contexts. Waiting serves no requests;
+  failed verification closes ownership and shutdown joins work before releasing
+  bootstrap files. Policy launch and deployment verification are still required.
 - Add explicit dispatcher policy bindings and separate policy/bootstrap codecs
   to remove the configuration-to-runtime hash cycle. Preserve legacy full-byte
   configuration identity, and reject digest-kind confusion in staged selection
@@ -59,8 +63,8 @@
   live verification remain in progress.
 - Add explicit v2 dispatcher-volume enrollment and immutable service-owned
   capture storage. Bind host socket identity to enrolled UID/GID and reject
-  rootless/remapped Docker, shared volume aliases and custody drift. The complete
-  worker route and deployed Linux certification remain outstanding.
+  rootless/remapped Docker, shared volume aliases and custody drift. The policy
+  launch path and deployed Linux certification remain outstanding.
 - Add closed whole-cell v2 request/result codecs with scheduler correlation,
   capture/publication originals and complete terminal proof consistency checks.
   Reopen capture/publication history on the caller's pinned SQL transaction;
@@ -80,7 +84,7 @@
   authority and enrolled capture custody. Bound control/source/HTTP/host I/O,
   keep historical requests read-only, and reject late terminal responses.
   Validate protected service configuration independently of deployment readiness.
-  The worker route, executable startup and live campaign remain in progress.
+  The policy launch path and full deployed live campaign remain in progress.
 - Independently derive and retain canonical SQL preplans before registration;
   bind the complete envelope through composition binding v2 without changing
   generic receipt formats or existing plan digests. Recovery verifies registry

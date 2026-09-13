@@ -563,7 +563,10 @@ Bootstrap `dpone.composition-dispatcher-service.v3` contains that exact policy,
 `supervisor_enrollment_sha256` and the authority/context catalog. Its complete
 bytes have their own digest. Build policy, signed registry, runtime authority and
 staged context in that order; adding a release rotates the bootstrap without
-requiring the policy to hash its own registry. Legacy binding v1 and service v2
+requiring the policy to hash its own registry. Installing a changed bootstrap
+requires a controlled restart and newly observed enrollment of the process and
+listener; the service never adopts changes through hot reload. Legacy binding
+v1 and service v2
 retain their full-configuration hash and existing decoder behavior.
 
 Developers can decode these originals with
@@ -580,7 +583,15 @@ or binding a socket. Do not launch it with a substituted digest or fabricated
 enrollment. The [approved startup specification](../feature-specs/composition-dispatcher-capture-custody.md#acyclic-service-policy-and-bootstrap-lifecycle)
 defines closed-listener startup, atomic protected bootstrap installation,
 immutable-tree/mount separation and fresh enrollment verification before opening
-admission. This codec checkpoint does not certify that lifecycle or a live route.
+admission. This checkpoint does not certify that lifecycle or a live route.
+
+The startup components now retain the protected bootstrap original and verify
+all matching staged contexts without inventing an attempt or resolving business
+credentials. The coordinator waits only for a missing file under one deadline;
+malformed originals, replacement, timeout and shutdown cannot open admission.
+The serving loop waits before processing requests and releases the bootstrap
+only after admitted handlers finish. Real SQL/host/listener verification and the
+policy CLI still need to be connected before this path is operational.
 
 The activation connection API also preserves distinct physical identities:
 `control_connection_with_service(context)` returns the verified MSSQL connection

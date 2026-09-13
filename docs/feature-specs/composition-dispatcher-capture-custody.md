@@ -333,6 +333,22 @@ installation and unchanged process/socket on transition. Stale enrollment,
 partial installation, timeout, alias/overlap, pathname rotation and shutdown
 must never admit work. Full deployed route certification is still separate.
 
+Mount alias verification uses root-authenticated parsed mount tables for the
+fixed dispatcher and ClickHouse containers selected by E. A bootstrap-only RPC
+operation returns those tables without accepting caller paths or container
+selectors. Each table must hash to E's existing `mountinfo_sha256`, bracketed by
+fresh complete host observations equal to E. The dispatcher compares its own
+parsed mount table with the same pin before deriving filesystem coordinates.
+Missing, ambiguous or unresolvable mappings reject startup. This sidecar does
+not change E or the existing facts operation and grants no execution authority.
+
+Implementation checkpoint: the protected original reader, staged bootstrap
+context selection, one-way startup coordinator and closed-admission service loop
+are implemented and tested with injected verification. The preparation callback
+must still be composed with real SQL/host/process/listener verification before
+the policy launch path can be enabled. These tests are not deployment evidence.
+The legacy launcher continues to reject v3 bootstrap input.
+
 ### Native execution-profile readiness observation
 
 The approved completion includes a side-effect-free observer running in the actual

@@ -68,7 +68,14 @@ def _arguments(argv: Sequence[str] | None) -> Any:
     return parser.parse_args(argv)
 
 
-def _serve(server: Any, signals: Any) -> None:
+def _pause_startup() -> None:
+    """Bound idle polling without creating another thread or process."""
+    import time
+
+    time.sleep(0.1)
+
+
+def _serve(server: Any, signals: Any, *, startup: Any = None) -> None:
     """Notify from signals; close and join actual request work from coordinator.
 
     handle_request uses a short idle poll. We never call shutdown from the serving
@@ -86,10 +93,23 @@ def _serve(server: Any, signals: Any) -> None:
             server.timeout = 0.25
             for signum in (signals.SIGTERM, signals.SIGINT):
                 previous[signum] = signals.signal(signum, stop)
+            active = startup is None
             while not server.admission_stop.is_set():
-                server.handle_request()
+                if not active:
+                    active = startup.poll()
+                    if not active:
+                        if not server.admission_stop.is_set():
+                            _pause_startup()
+                        continue
+                if not server.admission_stop.is_set():
+                    server.handle_request()
     finally:
         failure = None
+        if startup is not None:
+            try:
+                startup.close()
+            except Exception as error:
+                failure = error
         for signum, handler in previous.items():
             try:
                 signals.signal(signum, handler)
