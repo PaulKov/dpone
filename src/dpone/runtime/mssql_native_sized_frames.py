@@ -5,44 +5,17 @@ from __future__ import annotations
 import pickle
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeAlias, overload
+from typing import TYPE_CHECKING, TypeAlias
 
 from dpone.contracts.bounded_window import WindowContractError
 from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+from dpone.runtime.mssql_native_row_reservation import _SizedNativeRow
 from dpone.runtime.native_wire_models import SourceNativeWireContract
 
 if TYPE_CHECKING:
     from dpone.contracts.mssql_native_chunks import NativeChunkLimits
 
 NativeRow: TypeAlias = Sequence[object] | Mapping[str, object]
-
-
-@dataclass(frozen=True)
-class _SizedNativeRow(Sequence[object]):
-    """Private source reservation; only matching consumers may reuse its size.
-
-    Values have passed source adaptation and sizing, including rejection of
-    mutable binary inputs. The plain tuple is the sole worker/IPC representation.
-    Contract identity and the row limit bind this accounting shortcut; workers
-    still validate scalar domains and actual encoded bytes independently.
-    """
-
-    values: tuple[object, ...]
-    contract: SourceNativeWireContract
-    max_row_bytes: int
-    encoded_bytes: int
-
-    def __len__(self) -> int:
-        return len(self.values)
-
-    @overload
-    def __getitem__(self, index: int) -> object: ...
-
-    @overload
-    def __getitem__(self, index: slice) -> tuple[object, ...]: ...
-
-    def __getitem__(self, index: int | slice) -> object:
-        return self.values[index]
 
 
 @dataclass(frozen=True)

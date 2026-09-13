@@ -7,7 +7,7 @@ from contextlib import closing
 from typing import Any
 
 from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
-from dpone.runtime.mssql_native_sized_frames import _SizedNativeRow
+from dpone.runtime.mssql_native_row_reservation import _SizedNativeRow
 
 
 def native_source_rows(rows: Iterator[Any], contract: Any, max_row_bytes: int) -> Iterator[Any]:
