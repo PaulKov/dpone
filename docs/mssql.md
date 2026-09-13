@@ -257,6 +257,28 @@ connection string and maps `connect_timeout` to the pyodbc login timeout.
 
 MSSQL `merge_policy: auto` resolves to `delete_insert`.
 
+### Interrupted target commit
+
+For receipt-backed MSSQL loads, an interrupted `COMMIT` leaves the outcome
+unresolved: the target may already contain the data and receipt. The runtime
+retains staging and source-file evidence through the existing
+`preserve_staging_evidence` disposition. `KeyboardInterrupt` and `SystemExit`
+remain cancellation signals, including the original exit code; receipt recovery
+does not convert them into successful load results.
+
+An ordinary lost acknowledgement recovers success only after the target handle
+closes and a fresh-session receipt exactly matches the payload, completed source
+lifecycle and target mutation plan. A failed close, unavailable probe or missing
+or mismatched receipt remains `mssql_transaction.commit_outcome_unknown`.
+An interruption during reconciliation also retains evidence and propagates as
+cancellation. A missing receipt does not prove rollback.
+
+Before retrying or deleting retained artifacts, reconcile the operation's durable
+receipt and target state using the [MSSQL transaction recovery guidance](state.md#generic-mssql-transaction-state).
+Do not rerun business writes solely because the client was interrupted.
+This protection applies to exceptions handled by the running process; it does
+not certify recovery from a forced process kill or a host failure.
+
 ## Physical design
 
 Use [Physical design](physical-design.md) for MSSQL target DDL controls:

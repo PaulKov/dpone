@@ -6,7 +6,7 @@ from contextlib import suppress
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
-from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
+from dpone.contracts.mssql_transaction_governance import MssqlCleanupDisposition, MssqlTransactionAdmission
 from dpone.runtime.extraction_lifecycle import ExtractionLifecycleStateError
 from dpone.runtime.sinks.mssql_transaction_requirement import require_generic_transaction_state
 from dpone.runtime.sinks.strategies.mssql.mssql_initial_typed_staging import (
@@ -18,7 +18,6 @@ from dpone.runtime.sinks.strategies.mssql.mssql_native_lineage import (
 )
 from dpone.runtime.sinks.strategies.mssql.mssql_native_staging import MssqlNativeStagingNormalizer
 from dpone.runtime.sinks.strategies.mssql.mssql_transaction_finalizer import (
-    MssqlGenericCommitOutcomeUnknown,
     MssqlGenericTransactionFinalizer,
 )
 
@@ -138,11 +137,11 @@ class MssqlStagingConsumer:
                 source_lifecycle_receipt=source_lifecycle,
             )
             result = _with_staging_execution_evidence(result, raw_staging)
-        except MssqlGenericCommitOutcomeUnknown:
-            # The target handle is closed and staging is durable evidence until
-            # an operator resolves the ambiguous receipt outcome.
-            raise
-        except BaseException:
+        except BaseException as error:
+            # Commit/reconciliation interruptions carry the same retention
+            # disposition as an unknown receipt outcome. Check before cleanup.
+            if getattr(error, "cleanup_disposition", None) is MssqlCleanupDisposition.PRESERVE_STAGING_EVIDENCE:
+                raise
             self._cleanup_after_terminal((staging, raw_staging), committed=False)
             raise
         self._cleanup_after_terminal((staging, raw_staging), committed=True)
