@@ -252,7 +252,13 @@ class ClickHouseQueryOps:
 
 
 def _should_retry_ddl(query: Any, exc: Exception, *, attempt: int, attempts: int) -> bool:
-    return attempt < attempts and _is_ddl_like(query) and _is_retryable_cluster_metadata_error(exc)
+    # EXCHANGE can have committed before an error is observed; replay swaps back.
+    return (
+        attempt < attempts
+        and _statement_kind(query) != "EXCHANGE"
+        and _is_ddl_like(query)
+        and _is_retryable_cluster_metadata_error(exc)
+    )
 
 
 def _is_ddl_like(query: Any) -> bool:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,11 +14,16 @@ SCHEMA_VERSION = "dpone.clickhouse.cluster_topology.v1"
 _UNAVAILABLE_MARKERS = (
     "Code: 279",
     "All connection tries failed",
-    "While executing Remote",
-    "HedgedConnections",
     "Connection refused",
     "Timeout exceeded",
     "NetException",
+)
+
+# Authentication/authorization failures must win over outer transport context.
+_ACCESS_FAILURE = re.compile(
+    r"\bCode:\s*(?:192|193|194|195|291|497|516)\b"
+    r"|access[_ ]denied|authentication[_ ]failed|not enough privileges",
+    re.IGNORECASE,
 )
 
 
@@ -82,6 +88,17 @@ class ClickHouseClusterTopologyProbe:
         table_rows, unreachable = self._target_rows(cluster, load_config, expected_hosts=expected)
         actual = tuple(row.host for row in table_rows)
         if not actual:
+            if unreachable:
+                return ClickHouseClusterTopologyEvidence(
+                    target=target,
+                    cluster=cluster,
+                    status="blocked",
+                    expected_hosts=expected,
+                    missing_hosts=expected,
+                    unreachable_hosts=unreachable,
+                    blockers=("clickhouse_cluster_target_observation_unavailable",),
+                    warnings=_unreachable_warnings(unreachable),
+                )
             return ClickHouseClusterTopologyEvidence(
                 target=target,
                 cluster=cluster,
@@ -298,6 +315,8 @@ def _skip_unavailable_shards() -> bool:
 
 def _is_host_unavailable_error(exc: BaseException) -> bool:
     text = str(exc)
+    if isinstance(exc, PermissionError) or _ACCESS_FAILURE.search(text):
+        return False
     return any(marker in text for marker in _UNAVAILABLE_MARKERS)
 
 

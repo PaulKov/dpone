@@ -372,10 +372,29 @@ or when replicas disagree on the table UUID/engine. The decision is emitted as
 `decision_id=clickhouse.cluster_target_topology` in runtime decision audit and,
 for governed loads, in `__dpone__load_steps.details_json`.
 
+`target_absent` requires successful metadata observations. If no target was
+observed and a required host cannot be inspected, the preflight fails. With
+`DPONE_CLICKHOUSE_SKIP_UNAVAILABLE_SHARDS=1`, a classified unavailable host
+produces `blocked` with `clickhouse_cluster_target_observation_unavailable`;
+strict mode propagates the metadata error. `expected_hosts` names the
+required hosts, `actual_hosts` names hosts where a target was observed,
+`missing_hosts` names hosts without an observed target, and `unreachable_hosts`
+identifies the observations that could not complete. Zero returned table rows
+with an unavailable host do not prove that creating or replacing a target is
+safe. Restore connectivity and metadata visibility, then rerun the preflight.
+
+Authentication and permission failures propagate even when the error includes
+Remote or transport context. Check the configured principal and its catalog
+permissions; do not treat denial as proof that a table is absent. The existing
+`DPONE_CLICKHOUSE_SKIP_UNAVAILABLE_SHARDS=1` policy still permits
+`passed_partial` when a target was actually observed on reachable hosts and the
+remaining checks pass. This status is not evidence of complete replica coverage.
+
 Common blocker codes:
 
 | Blocker | Meaning | Remediation |
 | --- | --- | --- |
+| `clickhouse_cluster_target_observation_unavailable` | No target was observed and at least one required host could not be inspected. | Restore access to every required host and rerun the preflight before creating or replacing the target. |
 | `clickhouse_cluster_target_missing_replicas` | The target exists on only some cluster hosts. | Recreate or repair the table with the same UUID and `ON CLUSTER`, then rerun. |
 | `clickhouse_cluster_target_uuid_mismatch` | Hosts have tables with the same name but different UUIDs. | Stop using the target until DDL is reconciled; different UUIDs mean different replicated paths when `{uuid}` is used. |
 | `clickhouse_cluster_target_engine_mismatch` | Hosts disagree on the engine or physical layout. | Reconcile physical DDL before loading; finalization would be inconsistent. |
@@ -397,6 +416,23 @@ ORDER BY (...);
 Do not create the missing replicas without preserving the UUID when the engine
 path contains `{uuid}`; that creates independent replicated tables with the
 same name rather than one consistent table.
+
+### Recovering an uncertain EXCHANGE
+
+Within one `execute_query` call, the native connector dispatches `EXCHANGE`
+once. A metadata-lag error is returned with its original cause; it does not
+trigger an automatic retry. Other statements retain their existing retry
+policy and DDL settings. This protection does not make an outer Airflow or
+runtime task retry safe, or establish durable exactly-once publication.
+
+An error response alone does not establish whether an exchange took effect.
+Repeating it can swap the old table back into place. Stop automatic replay,
+retain both attempt tables and the original error, and have the operator verify
+the exact table UUIDs and contents against the attempt's before/after identities.
+Do not drop either table or advance state from an uncertain result. Resume only
+through the owning publication workflow's verified recovery procedure; if that
+workflow cannot establish the outcome, leave it unresolved. The generic
+connector does not provide a new reconciliation or rollback service.
 
 ## Physical design drift
 
