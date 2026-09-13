@@ -360,21 +360,15 @@ class MssqlClickHouseGate:
     ) -> tuple[CompositionAttemptProof, CompositionAttemptProof]:
         authority = (CompositionProofAuthority("clickhouse", self._target.service_id, "clickhouse-user:" + user_id),)
         digest = document_sha256(canonical_json_bytes(evidence))
-        return (
+        closed, quiescence = (
             CompositionAttemptProof(
-                "CLOSED_GATES",
+                kind,
                 attempt.attempt_sha256,
                 attempt.activation_request_sha256,
                 composition_attempt_epoch_subject(attempt),
                 authority,
                 digest,
-            ),
-            CompositionAttemptProof(
-                "QUIESCENCE",
-                attempt.attempt_sha256,
-                attempt.activation_request_sha256,
-                composition_attempt_epoch_subject(attempt),
-                authority,
-                digest,
-            ),
+            )
+            for kind in ("CLOSED_GATES", "QUIESCENCE")
         )
+        return closed, quiescence

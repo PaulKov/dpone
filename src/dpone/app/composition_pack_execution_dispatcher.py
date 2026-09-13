@@ -14,7 +14,6 @@ capture, and enrolled supervisor/HTTP collaborators all exist.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Mapping
 from functools import partial
 from pathlib import Path
@@ -22,7 +21,6 @@ from typing import Any
 
 from dpone.app.composition_clickhouse_execution import (
     CompositionClickHouseExecutionRoot,
-    CompositionClickHouseResult,
 )
 from dpone.app.composition_execution_cells import (
     MSSQL_CLICKHOUSE_FULL_REFRESH_V1,
@@ -34,10 +32,10 @@ from dpone.app.composition_pack_cache import (
     SCHEDULER_CACHE_ROOT_ENV,
     cache_root_from_environment,
 )
+from dpone.app.composition_pack_execution_evidence import publish_pack_exec_evidence, write_pack_execution_evidence
 from dpone.app.composition_transfer_execution import (
     CompositionTransferExecutionRequest,
     CompositionTransferExecutionRoot,
-    CompositionTransferResult,
 )
 from dpone.app.composition_transfer_execution_factory import (
     build_composition_transfer_execution_dependencies,
@@ -52,7 +50,6 @@ from dpone.contracts.composition_execution import (
     composition_generated_transfer_cell,
     composition_transfer_cell,
 )
-from dpone.contracts.composition_remote_transfer_result import RemoteTransferResult, decode_result
 from dpone.contracts.dbt_runtime import (
     AIRFLOW_RUN_IDENTITY_ENV,
     airflow_attempt_from_environment,
@@ -63,14 +60,12 @@ from dpone.dag.load_config_builder import LoadConfigBuilder
 from dpone.manifest.composition_execution_plan import plan_composition_execution
 from dpone.runtime.composition_native_dbt_dispatch import (
     EVIDENCE_DISAGREEMENT,
-    EVIDENCE_WRITE_FAILED,
     ORDINARY_WORKER_UNAVAILABLE,
     CompositionNativeDbtDispatcher,
 )
 from dpone.runtime.composition_verified_dispatch import (
     CompositionDispatchRejection,
     CompositionDispatchRequest,
-    CompositionRunVolume,
 )
 from dpone.runtime.deployment_cache_common import require_path_without_symlinks
 
@@ -129,7 +124,7 @@ class CompositionPackExecutionDispatcher:
         try:
             result = root.execute(typed)
         except RemoteClickHouseNonSuccess as error:
-            _write_pack_evidence(
+            write_pack_execution_evidence(
                 request.run_volume,
                 cell,
                 {
@@ -303,46 +298,6 @@ def compose_pack_execution_root(
     if type(root) is not CompositionClickHouseExecutionRoot:
         raise CompositionAdmissionError("execution_capability")
     return root
-
-
-def publish_pack_exec_evidence(run_volume: CompositionRunVolume, cell: str, result: Any) -> int:
-    """Retain worker metrics only after the parent root already sealed OUTCOME."""
-
-    if type(result) is CompositionTransferResult:
-        rows = result.rows_written
-        if isinstance(rows, bool) or not isinstance(rows, int) or rows < 0:
-            raise CompositionDispatchRejection(EVIDENCE_DISAGREEMENT, dispatch_started=True)
-        extra: dict[str, Any] = {"rows_written": rows}
-    elif type(result) is RemoteTransferResult:
-        try:
-            verified = decode_result(result.document, result.sha256, attempt=result.attempt)
-            if cell != MSSQL_CLICKHOUSE_FULL_REFRESH_V1 or verified != result:
-                raise ValueError("remote result mismatch")
-            extra = {
-                "publication_state": "PUBLISHED",
-                "rows": verified.rows,
-                "remote_result_sha256": verified.sha256,
-                "remote_result_document": strict_json_object(verified.document),
-            }
-        except (CompositionAdmissionError, TypeError, ValueError):
-            raise CompositionDispatchRejection(EVIDENCE_DISAGREEMENT, dispatch_started=True) from None
-    elif type(result) is CompositionClickHouseResult:
-        if result.publication_state != "PUBLISHED":
-            raise CompositionDispatchRejection(EVIDENCE_DISAGREEMENT, dispatch_started=True)
-        extra = {"publication_state": result.publication_state, "rows": len(result.rows)}
-    else:
-        raise CompositionDispatchRejection(EVIDENCE_DISAGREEMENT, dispatch_started=True)
-    _write_pack_evidence(run_volume, cell, {"status": "passed", **extra})
-    return 0
-
-
-def _write_pack_evidence(run_volume: CompositionRunVolume, cell: str, extra: Mapping[str, Any]) -> None:
-    payload = {"kind": "dpone.composition.pack-exec-evidence.v1", "cell": cell, **extra}
-    try:
-        document = json.dumps(payload, allow_nan=False, ensure_ascii=False, indent=2)
-        run_volume.evidence_path.write_text(document, encoding="utf-8")
-    except (OSError, TypeError, ValueError):
-        raise CompositionDispatchRejection(EVIDENCE_WRITE_FAILED, dispatch_started=True) from None
 
 
 def _typed_ordinary_request(
