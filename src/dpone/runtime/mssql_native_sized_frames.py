@@ -5,7 +5,7 @@ from __future__ import annotations
 import pickle
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, TypeAlias, overload
 
 from dpone.contracts.bounded_window import WindowContractError
 from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
@@ -15,6 +15,34 @@ if TYPE_CHECKING:
     from dpone.contracts.mssql_native_chunks import NativeChunkLimits
 
 NativeRow: TypeAlias = Sequence[object] | Mapping[str, object]
+
+
+@dataclass(frozen=True)
+class _SizedNativeRow(Sequence[object]):
+    """Private source reservation; only matching consumers may reuse its size.
+
+    Values have passed source adaptation and sizing, including rejection of
+    mutable binary inputs. The plain tuple is the sole worker/IPC representation.
+    Contract identity and the row limit bind this accounting shortcut; workers
+    still validate scalar domains and actual encoded bytes independently.
+    """
+
+    values: tuple[object, ...]
+    contract: SourceNativeWireContract
+    max_row_bytes: int
+    encoded_bytes: int
+
+    def __len__(self) -> int:
+        return len(self.values)
+
+    @overload
+    def __getitem__(self, index: int) -> object: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> tuple[object, ...]: ...
+
+    def __getitem__(self, index: int | slice) -> object:
+        return self.values[index]
 
 
 @dataclass(frozen=True)
@@ -55,6 +83,10 @@ def sized_native_frames(
         if check is not None and index % 1024 == 0:
             check()
 
+        reservation = source_row if type(source_row) is _SizedNativeRow else None
+        if reservation is not None:
+            source_row = reservation.values
+
         # Drivers may reuse a row container or binary buffer between fetches.
         def freeze(value: object) -> object:
             return bytes(value) if isinstance(value, (bytearray, memoryview)) else value
@@ -64,7 +96,13 @@ def sized_native_frames(
             if isinstance(source_row, Mapping)
             else tuple(freeze(value) for value in source_row)
         )
-        size = encoder.encoded_row_size(row)
+        size = (
+            reservation.encoded_bytes
+            if reservation is not None
+            and reservation.contract is contract
+            and reservation.max_row_bytes == limits.max_row_bytes
+            else encoder.encoded_row_size(row)
+        )
         ipc_size = len(pickle.dumps(row, protocol=5)) + 16
         if size > limits.max_row_bytes or ipc_size + 64 + ipc_overhead > limits.max_bytes:
             raise WindowContractError("mssql_native.row_exceeds_frame_limit")

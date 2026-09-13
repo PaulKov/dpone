@@ -154,6 +154,30 @@ commit. DDA-05/DDA-06 own approved live route evidence.
 
 ## Diagnose and verify
 
+### Source adapter reservation
+
+The production source adapter retains its exact native row-size calculation in
+a private immutable sequence. Framing unwraps its values before IPC accounting
+and reuses the size only when the wire-contract object and row-byte limit match.
+A different contract or limit uses the ordinary sizing checks. The standalone
+`native_source_rows` API continues to yield plain tuples with the same early
+source validation and deterministic closure.
+
+This removes the duplicate adapter-to-framer scan. The source still rejects
+invalid UTF-8, mismatched columns, excessive native bytes and unsupported mutable
+binary values before yielding. Cancellation cadence and one-row lookahead remain
+unchanged. Workers receive ordinary tuples and independently validate encoded
+values, actual sizes and files. No private row reservation enters a journal or
+becomes evidence of data correctness.
+
+`tests/test_mssql_native_source_reservations.py` exercises the adapter through
+enabled/disabled observations into framing. It compares frame and pickle bytes,
+source errors, closure and mismatched sizing contexts. One size calculation per
+row is structural evidence only; elapsed-time improvement remains unmeasured.
+See the [stage plan](next-stages.md) for release acceptance and subsequent work.
+
+### Existing diagnostics
+
 | Diagnostic | Next action |
 | --- | --- |
 | `mssql_native_row_bytes_exceeded` / `mssql_native.row_exceeds_frame_limit` | Inspect the declared row/native and IPC limits and schema width. A single row must fit; reducing rows per frame cannot repair an oversized row. |

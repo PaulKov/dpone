@@ -187,7 +187,9 @@ def test_real_native_prepare_keeps_duplicates_across_chunks_and_persists_prepare
 
     class Executor:
         def stage(self, plan, rows, contract, lease, **kwargs):
-            assert list(rows) == [(7,)] * sum(counts)
+            # The executor accepts NativeRow sequences; workers receive tuples
+            # after framing unwraps the private source reservation.
+            assert [tuple(row) for row in rows] == [(7,)] * sum(counts)
             assert kwargs["completion_metadata"]()["lifecycle"]["extraction_completed_at"]
             return SimpleNamespace(receipts=receipts, rows=sum(counts))
 

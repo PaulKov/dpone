@@ -74,6 +74,8 @@ describes the immutable scope and ownership of this work.
 
 ## Choose the next step
 
+- Follow the [next release stages](next-stages.md) for source sizing reuse and
+  separately scoped future acceleration work.
 - Read [frame sizing](frames.md) and [preparation integrity](preparation.md) for
   algorithms, bounds and preserved verification boundaries.
 - Add [phase observations](observations.md) using the composition instructions in
