@@ -383,7 +383,9 @@ def test_parent_context_installs_dbt_root_via_sqlserver_dbt_v1(command, clean_am
 
     dispatcher = compose_verified_pack_dispatcher(admitted(command))
 
-    assert type(dispatcher._native._executor) is CompositionDbtExecutionRoot
+    assert not observed
+    assert dispatcher._native._executor is None
+    assert type(dispatcher._native_executor_factory()) is CompositionDbtExecutionRoot
     assert observed
 
 
@@ -456,3 +458,26 @@ def parent_authority() -> dict[str, object]:
         "require_target_service": lambda *_args, **_kwargs: None,
         "context": CONTEXT,
     }
+
+
+def test_remote_selection_precedes_local_credentials(command, monkeypatch):
+    from dpone.app import composition_verified_pack_dispatcher as module
+    from dpone.app.composition_execution_cells import MSSQL_CLICKHOUSE_FULL_REFRESH_V1
+
+    remote = object()
+    monkeypatch.setattr(module, "compose_remote_clickhouse_pack_root", lambda **kwargs: remote)
+    monkeypatch.setattr(module, "_parent_context", lambda *args, **kwargs: pytest.fail("local credentials resolved"))
+    assert module._ordinary_executor(command, object(), MSSQL_CLICKHOUSE_FULL_REFRESH_V1, {}, None) is remote
+
+
+def test_explicit_remote_failure_never_falls_back(command, monkeypatch):
+    from dpone.app import composition_verified_pack_dispatcher as module
+    from dpone.app.composition_execution_cells import MSSQL_CLICKHOUSE_FULL_REFRESH_V1
+    from dpone.contracts.composition_activation import CompositionAdmissionError
+
+    def reject(**kwargs):
+        raise CompositionAdmissionError("remote_clickhouse_unverified")
+
+    monkeypatch.setattr(module, "compose_remote_clickhouse_pack_root", reject)
+    monkeypatch.setattr(module, "_parent_context", lambda *args, **kwargs: pytest.fail("local fallback"))
+    assert module._ordinary_executor(command, object(), MSSQL_CLICKHOUSE_FULL_REFRESH_V1, {}, None) is None

@@ -102,6 +102,11 @@ def harness(monkeypatch, states=(None, "SUCCEEDED")):
             events.append("inspect")
             return receipts.pop(0)
 
+        def inspect_existing(self, run_identity, airflow_attempt):
+            assert (run_identity, airflow_attempt) == (run, airflow)
+            events.append("inspect-existing")
+            return receipts.pop(0)
+
         def read_active(self):
             pytest.fail("read_active belongs to real root, not handler")
 
@@ -431,3 +436,45 @@ def test_failed_file_entry_closes_owned_descriptor_exactly_once(monkeypatch, tmp
         # The initial RED must not itself leak a test descriptor.
         if "descriptor-close" not in case.events:
             os.close(descriptor)
+
+
+@pytest.mark.parametrize(
+    ("state", "status"),
+    [
+        (None, "UNKNOWN"),
+        ("RUNNING", "IN_PROGRESS"),
+        ("COMMIT_UNKNOWN", "UNKNOWN"),
+        ("FAILED", "FAILED"),
+        ("SUCCEEDED", "SUCCEEDED"),
+    ],
+)
+def test_read_status_never_executes_or_uses_admission_inspection(monkeypatch, state, status):
+    case = harness(monkeypatch, (state,))
+    request = replace(case.request, operation="READ_STATUS")
+    response = module.DispatcherTransferHandler(case.config, case.loader)(request, case.budget)
+    assert decode_response(response.to_bytes(), request).status == status
+    assert "inspect-existing" in case.events
+    assert "inspect" not in case.events and "execute" not in case.events
+    if state != "SUCCEEDED":
+        assert case.events == ["load", "authority", "inspect-existing"]
+    else:
+        assert "terminal" in case.events and case.events[-1] == "files-close"
+    if state is None:
+        assert strict_json_object(response.evidence_document) == {
+            "schema": "dpone.composition-remote-transfer-absence.v1",
+            "attempt_sha256": request.attempt.attempt_sha256,
+            "observation": "ABSENT",
+        }
+
+
+def test_status_sql_failure_cannot_become_absence(monkeypatch):
+    case = harness(monkeypatch, (None,))
+    request = replace(case.request, operation="READ_STATUS")
+    monkeypatch.setattr(
+        module.DispatcherAttemptAuthority,
+        "inspect_existing",
+        lambda *args: (_ for _ in ()).throw(RuntimeError("secret")),
+    )
+    with pytest.raises(CompositionAdmissionError, match="dispatcher_transfer_unknown"):
+        module.DispatcherTransferHandler(case.config, case.loader)(request, case.budget)
+    assert case.events == ["load", "authority"]

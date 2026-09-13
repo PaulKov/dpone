@@ -138,3 +138,47 @@ def test_pinned_dag_spec_must_match_scheduler_dag_with_other_identity_unchanged(
     subject["airflow_attempt"]["dag_id"] = "forged-dag"
     with pytest.raises(CompositionAdmissionError):
         replace(original, subject=canonical_json_bytes(subject))
+
+
+def test_read_status_uses_same_closed_metadata():
+    from dataclasses import replace
+
+    original = replace(request(), operation="READ_STATUS")
+    assert decode_request(encode_request(original)) == original
+    assert original.payload_spec == (0, None)
+
+
+@pytest.mark.parametrize(
+    "operation,status,mutation,valid",
+    [
+        ("READ_STATUS", "UNKNOWN", None, True),
+        ("EXECUTE_TRANSFER", "UNKNOWN", None, False),
+        ("READ_STATUS", "IN_PROGRESS", None, False),
+        ("READ_STATUS", "UNKNOWN", "foreign", False),
+        ("READ_STATUS", "UNKNOWN", "extra", False),
+        ("READ_STATUS", "UNKNOWN", "observation", False),
+    ],
+)
+def test_absence_is_only_status_observation(operation, status, mutation, valid):
+    from dataclasses import replace
+
+    from dpone.contracts.composition_dispatch_v2 import DispatchV2Response, decode_response
+
+    original = replace(request(), operation=operation)
+    body = {
+        "schema": "dpone.composition-remote-transfer-absence.v1",
+        "attempt_sha256": original.attempt.attempt_sha256,
+        "observation": "ABSENT",
+    }
+    if mutation == "foreign":
+        body["attempt_sha256"] = SHA
+    elif mutation == "extra":
+        body["receipt"] = None
+    elif mutation == "observation":
+        body["observation"] = "NEVER_EXECUTED"
+    if valid:
+        response = DispatchV2Response.for_request(original, canonical_json_bytes(body), status=status)
+        assert decode_response(response.to_bytes(), original) == response
+    else:
+        with pytest.raises(CompositionAdmissionError):
+            DispatchV2Response.for_request(original, canonical_json_bytes(body), status=status)

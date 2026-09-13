@@ -28,6 +28,7 @@ from dpone.app.composition_dbt_execution_factory import (
     build_composition_dbt_execution_dependencies,
 )
 from dpone.app.composition_execution_cells import (
+    MSSQL_CLICKHOUSE_FULL_REFRESH_V1,
     SQLSERVER_DBT_V1,
     build_installed_execution_capabilities,
 )
@@ -36,6 +37,7 @@ from dpone.app.composition_pack_execution_dispatcher import (
     CompositionPackExecutionDispatcher,
     compose_pack_execution_root,
 )
+from dpone.app.composition_remote_clickhouse_worker import compose_remote_clickhouse_pack_root
 from dpone.contracts.composition_activation import CompositionAdmissionError, CompositionOccurrenceContext
 from dpone.contracts.composition_execution_authority import supervisor_from_transport
 from dpone.contracts.dbt_contract_validation import DbtPublishingError
@@ -109,7 +111,8 @@ def _admitted_dispatcher(command: VerifiedPackCommand) -> CompositionVerifiedDis
     return CompositionPackExecutionDispatcher(
         supervisor=supervisor,
         capabilities=capabilities,
-        native_executor=_native_executor(command, supervisor, capabilities),
+        native_executor=None,
+        native_executor_factory=lambda: _native_executor(command, supervisor, capabilities),
         ordinary_root=lambda request, cell, manifest: _ordinary_executor(
             command, request, cell, manifest, capabilities
         ),
@@ -146,6 +149,10 @@ def _ordinary_executor(
     """Compose an ordinary root when parent context and the sealed plan exist."""
 
     try:
+        if cell == MSSQL_CLICKHOUSE_FULL_REFRESH_V1:
+            remote = compose_remote_clickhouse_pack_root(request=request, manifest=manifest)
+            if remote is not None:
+                return remote
         parent = _parent_context(command, manifest=manifest)
         if parent.get("context") is None:
             return None

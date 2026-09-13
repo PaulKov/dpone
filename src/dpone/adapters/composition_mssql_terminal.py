@@ -109,7 +109,9 @@ def select_terminal_hashes_in(
     transaction = require_shared_transaction_in(context, expected_service_id=expected_service_id)
     _require_attempt(attempt)
     require_digest(outcome)
-    issued = read_issued_authorities_in(context, attempt, expected_service_id=expected_service_id, transaction_id=transaction)
+    issued = read_issued_authorities_in(
+        context, attempt, expected_service_id=expected_service_id, transaction_id=transaction
+    )
     selected = []
     for kind in _KINDS:
         require_shared_transaction_in(context, expected_service_id=expected_service_id, transaction_id=transaction)
@@ -148,7 +150,9 @@ def require_proofs_in(
         raise CompositionAdmissionError("terminal_evidence")
     if expected_outcome_state not in ("SUCCEEDED", "FAILED", "COMMIT_UNKNOWN"):
         raise CompositionAdmissionError("terminal_outcome_state")
-    issued = read_issued_authorities_in(context, attempt, expected_service_id=expected_service_id, transaction_id=transaction)
+    issued = read_issued_authorities_in(
+        context, attempt, expected_service_id=expected_service_id, transaction_id=transaction
+    )
     if {(value.connector, value.service_id) for value in issued} != services:
         raise CompositionAdmissionError("terminal_issued_authorities")
     selected = []

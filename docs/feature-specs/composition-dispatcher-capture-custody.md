@@ -85,7 +85,7 @@ they cannot adopt, chown, overwrite or recertify historical root-owned artifacts
 The new route is `POST /v2/composition-dispatch` and schema is
 `dpone.composition-dispatch-rpc.v2`. Its canonical envelope has exactly `schema`,
 `request_id`, `dispatcher_id`, `runtime_authority_sha256`, `operation`, `subject`.
-`EXECUTE_TRANSFER.subject` has exactly `attempt_document`, `attempt_sha256`,
+`EXECUTE_TRANSFER.subject` and `READ_STATUS.subject` have exactly `attempt_document`, `attempt_sha256`,
 `airflow_run_identity`, `airflow_attempt`. Decode attempt through
 `composition_persistence.decode_attempt_identity`; decode the scheduler originals
 through `AirflowRunIdentity.from_mapping` and `AirflowAttemptCorrelation.from_mapping`
@@ -115,6 +115,20 @@ hash. It never accepts a bare count or status string as result authority.
 Oversized evidence rejects; it is not truncated or replaced with an unverified
 summary. Non-success evidence contains only the verified current receipt and
 bounded original references, never the successful-result schema.
+
+`READ_STATUS` uses the same authenticated full attempt/scheduler subject. It only
+inspects retained SQL operations: absence never reads ACTIVE, constructs an
+executable candidate or starts an effect. Existing receipts use the same status
+and terminal-original responses as execution. Positive absence in the protected
+transaction returns `UNKNOWN` with exactly
+`{"schema":"dpone.composition-remote-transfer-absence.v1","attempt_sha256":"<requested digest>","observation":"ABSENT"}`.
+The decoder accepts this shape only for `READ_STATUS` plus `UNKNOWN` and the exact
+requested attempt digest. It is an observation, not proof that an operation never
+ran, and grants no retry permission. No synthetic receipt is created. The v1
+protocol remains unchanged. The worker root exposes an explicit
+`read_status(request)` operation for the same verified typed candidate, usable
+before or after submission. It returns the decoded response, does not change the
+single-submission guard, and never automatically executes or retries.
 
 ### Original envelopes and terminal aggregation
 
@@ -221,7 +235,13 @@ binding; neither may alias a source/target registry entry. The API binding uses
 the existing resolved `endpoint` and `token` credentials, verified TLS with
 optional `ssl_ca_location`, and positive integer `connect_timeout` (at most 30)
 and `send_receive_timeout` (at most 900) as acceptance/execution limits. The
-administrator aligns the latter with service execution configuration.
+administrator aligns the latter with service execution configuration. The signed
+control connection descriptor may set `composition_control_schema`; its default
+is `dpone_control`, preserving existing profiles. The worker validates this value
+with the canonical SQL control-schema validator before opening a connection and
+passes it to both SQL authority collaborators. It must equal the corresponding
+protected service authority's `control_schema`. An environment variable or an
+incoming request cannot override this coordinate.
 
 Retained parent request hashes and epochs supply candidate identity for ACTIVE,
 RETIRING or RETIRED history. The existing local execution builder still requires

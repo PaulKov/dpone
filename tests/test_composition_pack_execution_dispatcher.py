@@ -462,3 +462,70 @@ def test_compose_pack_execution_root_omits_clickhouse_without_collaborators(
     )
     assert root is None
     assert constructed == []
+
+
+@pytest.mark.parametrize("mutate", [False, True])
+def test_remote_evidence_preserves_verified_originals(tmp_path, mutate):
+    from dpone.app.composition_pack_execution_dispatcher import publish_pack_exec_evidence
+    from dpone.contracts.composition_remote_transfer_result import decode_result, evidence_digest
+    from dpone.contracts.strict_json import canonical_json_bytes
+    from tests.test_composition_remote_transfer_result import result_body
+
+    attempt, body = result_body(rows=7)
+    document = canonical_json_bytes(body)
+    result = decode_result(document, evidence_digest(document), attempt=attempt)
+    volume = CompositionRunVolume(tmp_path / "evidence.json", tmp_path / "stderr.log")
+    if mutate:
+        with pytest.raises(CompositionDispatchRejection):
+            publish_pack_exec_evidence(volume, MSSQL_CLICKHOUSE_FULL_REFRESH_V1, replace(result, rows=8))
+        assert not volume.evidence_path.exists()
+    else:
+        assert publish_pack_exec_evidence(volume, MSSQL_CLICKHOUSE_FULL_REFRESH_V1, result) == 0
+        payload = json.loads(volume.evidence_path.read_text())
+        assert payload["rows"] == 7
+        assert canonical_json_bytes(payload["remote_result_document"]) == document
+        assert payload["remote_result_sha256"] == result.sha256
+
+
+@pytest.mark.parametrize(
+    "status,state", [("IN_PROGRESS", "RUNNING"), ("UNKNOWN", "COMMIT_UNKNOWN"), ("FAILED", "FAILED")]
+)
+def test_remote_non_success_preserves_recovery_evidence(tmp_path, monkeypatch, status, state):
+    from dpone.app import composition_pack_execution_dispatcher as module
+    from dpone.contracts.composition_dispatch_v2 import DispatchV2Response
+    from dpone.contracts.strict_json import canonical_json_bytes
+    from tests.composition_snapshot_helpers import digest
+    from tests.test_composition_remote_clickhouse_worker import direct_root
+    from tests.test_composition_remote_transfer_result import ref, status_body
+
+    _, body = status_body(state)
+    if state == "FAILED":
+        receipt = body["receipt"]["document"]
+        for field in ("closed_gates_sha256", "quiescence_sha256", "outcome_evidence_sha256"):
+            receipt[field] = digest(field)
+        body["receipt"] = ref(canonical_json_bytes(receipt))
+    responses = []
+
+    def call(wire):
+        response = DispatchV2Response.for_request(wire, canonical_json_bytes(body), status=status)
+        responses.append(response)
+        return response
+
+    root, typed = direct_root(call)
+    request = _dispatch(tmp_path)
+    monkeypatch.setattr(module, "ordinary_manifest", lambda request: typed.manifest)
+    monkeypatch.setattr(module, "ordinary_cell", lambda manifest: MSSQL_CLICKHOUSE_FULL_REFRESH_V1)
+    monkeypatch.setattr(module, "_typed_ordinary_request", lambda *args: typed)
+    dispatcher = CompositionPackExecutionDispatcher(
+        supervisor=_SUPERVISOR,
+        capabilities=SimpleNamespace(factory=lambda cell: object),
+        native_executor=None,
+        ordinary_root=lambda *args: root,
+    )
+    with pytest.raises(CompositionDispatchRejection) as caught:
+        dispatcher.run(request)
+    assert caught.value.dispatch_started
+    payload = json.loads(request.run_volume.evidence_path.read_text())
+    assert payload["status"] == status.lower()
+    assert canonical_json_bytes(payload["remote_response_document"]) == responses[0].to_bytes()
+    assert len(responses) == 1

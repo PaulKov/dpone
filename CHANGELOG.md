@@ -19,6 +19,12 @@
 
 ### Added
 
+- Wire protected v2 dispatcher startup and remote ClickHouse worker selection
+  before local administrative credential resolution. Keep native construction
+  lazy, preserve terminal originals in worker evidence, and retain validated
+  non-success responses for recovery without retry. Signed control descriptors
+  support `composition_control_schema`, defaulting to `dpone_control`.
+
 - Add an explicitly approved local Docker DDA route factory using real native
   ClickHouse extraction, BCP, SQL transaction receipts and durable recovery.
   Unknown commit outcomes retain resources; acknowledged rollback requires
@@ -28,11 +34,11 @@
   mutation; use per-attempt generations and reconcile typed content independently.
   Reject snapshots exceeding the observer page budget before target mutation.
 - Add authenticated TLS dispatcher transport and a separately runnable protected
-  host observation service with bounded shutdown. Executable service startup
-  and the full Kubernetes execution campaign remain incomplete.
+  host observation service with bounded shutdown. Protected v2 dispatcher startup
+  is installed; the full Kubernetes execution campaign remains incomplete.
 - Add closed signed dispatcher bindings and protected staged-context selection,
   cross-checking verified parent/runtime/plan identities before resolving secrets.
-  Dispatcher startup and deployment remain incomplete.
+  Deployment certification remains incomplete.
 - Add exact staged-attempt selection, private bounded dispatcher gate sessions,
   immutable historical dispatch status and a remote host-facts consumer.
   The capture-custody architecture amendment is approved; implementation and
@@ -45,7 +51,8 @@
   capture/publication originals and complete terminal proof consistency checks.
   Reopen capture/publication history on the caller's pinned SQL transaction;
   keep host custody checks separate from SQL enrollment validation. Actual v2
-  service startup and worker routing remain incomplete.
+  service startup and worker routing are installed; deployed readiness remains
+  unverified.
 - Persist aggregate ClickHouse closure/outcome proofs over both issued purposes
   before terminal finalization; expose successful results only after actual SQL
   SUCCEEDED readback. The concrete cell factory preserves singleton dispatch

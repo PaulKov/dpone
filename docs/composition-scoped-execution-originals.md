@@ -220,3 +220,54 @@ qualification seal cannot prove that generation. Full native recipe support,
 protected observers, lifecycle counters, source leases, issuers and the actual
 current/provider/worker SQL campaign remain separate unfinished work. These
 codecs add no runnable self-service path or production/native-v2 migration.
+
+
+## Protected dispatcher startup and worker configuration
+
+The installed service entry point is:
+
+```text
+python -m dpone.app.composition_dispatcher_service --config /etc/dpone/dispatcher/startup/service.json --configuration-sha256 sha256:<64 lowercase hexadecimal digits> --dispatcher-uid <enrolled UID> --dispatcher-gid <enrolled GID>
+```
+
+Replace the placeholders with externally provisioned values. Startup requires
+Linux and the exact enrolled nonzero process UID/GID. The configuration digest
+pins the original file bytes; the service does not provision its own authority.
+Use the protected configuration schema in the
+[approved custody specification](feature-specs/composition-dispatcher-capture-custody.md).
+Provision an unencrypted protected TLS private key and a URL-safe bearer token
+of 43–256 ASCII characters with no trailing newline. Certificate and key files
+remain open through verification and TLS loading; startup rejects changed files.
+
+The signed control connection descriptor's optional `composition_control_schema`
+must match the service authority's `control_schema`; both default to
+`dpone_control`. Configure the API connection's `connect_timeout` from 1 to 30
+seconds and `send_receive_timeout` from 1 to 900 seconds, aligned with the
+service execution limit. The worker resolves only control and dispatcher API
+credentials. An invalid explicit dispatcher binding fails closed.
+
+`--help` does not load connector SDKs. Invalid arguments exit 2; unavailable
+startup authority exits 1 with a sanitized diagnostic. An orderly SIGTERM or
+SIGINT stops new admission and waits for admitted work to unwind before exit 0.
+A driver overrun retains its execution slot; shutdown does not certify that a
+blocked database operation was cancelled.
+
+An installed entry point and passing unit tests do not certify deployment
+readiness. Full deployed custody, recovery/status observations and live route
+certification remain required before release readiness can be claimed.
+
+
+### Inspecting an uncertain remote operation
+
+Use the remote worker root's explicit `read_status(request)` with the same
+verified request used for execution. It sends `READ_STATUS` once and returns a
+correlated response without submitting an execution. A successful response must
+still contain verified terminal originals. Failed or unresolved execution replies
+are retained in worker evidence with a nonpassing status and the canonical remote
+response for diagnosis.
+
+An `UNKNOWN` response containing `observation: ABSENT` means that the protected
+read did not observe the requested operation. It does not prove that execution
+never occurred and does not authorize replay. Preserve the request identity and
+investigate service/SQL observations. Repeating `EXECUTE_TRANSFER` is not a status
+query; an absent executable candidate may be admitted by that operation.

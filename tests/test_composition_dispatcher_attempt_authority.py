@@ -8,6 +8,7 @@ import pytest
 
 from dpone.adapters.composition_mssql_attempts import MssqlCompositionAttemptStore
 from dpone.adapters.composition_mssql_store import MssqlCompositionActivationStore
+from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
 from dpone.app import composition_dispatcher_attempt_authority as module
 from dpone.app.composition_clickhouse_execution import build_composition_clickhouse_attempt
 from dpone.app.composition_dispatcher_context import StagedDispatcherAttempt
@@ -153,9 +154,12 @@ def test_scheduler_substitution_rejected_before_sql(case, field):
     assert not case.verified
 
 
+@pytest.mark.parametrize("method", ["inspect", "inspect_existing"])
 @pytest.mark.parametrize("state", ["ACTIVE", "RETIRING", "RETIRED"])
 @pytest.mark.parametrize("terminal", ["SUCCEEDED", "FAILED"])
-def test_historical_terminal_is_independently_validated_and_never_requires_active(case, state, terminal, monkeypatch):
+def test_historical_terminal_is_independently_validated_and_never_requires_active(
+    case, state, terminal, monkeypatch, method
+):
     attempt = case.selected.attempt
     MssqlCompositionAttemptStore(case.db.connect, expected_service_id=SQL_SERVICE).admit_once(attempt)
     record = case.db.data["operations"][attempt.attempt_sha256]
@@ -195,10 +199,10 @@ def test_historical_terminal_is_independently_validated_and_never_requires_activ
         lambda *args, **kwargs: pytest.fail("historical ACTIVE derivation"),
     )
     reader = authority(case)
-    assert reader.inspect(case.run, case.correlation).state == terminal
+    assert getattr(reader, method)(case.run, case.correlation).state == terminal
     case.db.data["proofs"].clear()
     with pytest.raises(CompositionAdmissionError):
-        reader.inspect(case.run, case.correlation)
+        getattr(reader, method)(case.run, case.correlation)
 
 
 @pytest.mark.parametrize("field", ["environment", "release_id", "runtime_context_sha256"])
@@ -225,7 +229,8 @@ def test_control_cannot_alias_source_registry_entry(case):
     assert not case.resolutions
 
 
-def test_sql_read_failure_never_becomes_absence(case, monkeypatch):
+@pytest.mark.parametrize("method", ["inspect", "inspect_existing"])
+def test_sql_read_failure_never_becomes_absence(case, monkeypatch, method):
     def fail(*args, **kwargs):
         raise CompositionAdmissionError("actual_control_failure")
 
@@ -234,7 +239,7 @@ def test_sql_read_failure_never_becomes_absence(case, monkeypatch):
         module, "build_composition_clickhouse_attempt", lambda *args, **kwargs: pytest.fail("failure became absence")
     )
     with pytest.raises(CompositionAdmissionError, match="actual_control_failure"):
-        authority(case).inspect(case.run, case.correlation)
+        getattr(authority(case), method)(case.run, case.correlation)
 
 
 def test_source_subject_mismatch_rejected(case):
@@ -270,7 +275,8 @@ def test_pinned_inputs_reject_foreign_reference_and_context(case, monkeypatch):
     assert len(observed) == 1
 
 
-def test_actual_transaction_change_is_rejected(case, monkeypatch):
+@pytest.mark.parametrize("method", ["inspect", "inspect_existing"])
+def test_actual_transaction_change_is_rejected(case, monkeypatch, method):
     original = module.read_shared_operation_in
 
     def changed(ledger, *args, **kwargs):
@@ -280,7 +286,7 @@ def test_actual_transaction_change_is_rejected(case, monkeypatch):
 
     monkeypatch.setattr(module, "read_shared_operation_in", changed)
     with pytest.raises(CompositionAdmissionError):
-        authority(case).inspect(case.run, case.correlation)
+        getattr(authority(case), method)(case.run, case.correlation)
 
 
 @pytest.mark.parametrize("case", ["predecessor"], indirect=True)
@@ -292,11 +298,31 @@ def test_unprovided_predecessor_preserves_exact_retained_request(case):
     assert reader.read_active().request == case.parent.request
 
 
+@pytest.mark.parametrize("method", ["inspect", "inspect_existing"])
 @pytest.mark.parametrize("existing", [False, True])
-def test_dag_spec_mismatch_rejected_before_sql_for_fresh_and_existing(case, existing):
+def test_dag_spec_mismatch_rejected_before_sql_for_fresh_and_existing(case, existing, method):
     if existing:
         MssqlCompositionAttemptStore(case.db.connect, expected_service_id=SQL_SERVICE).admit_once(case.selected.attempt)
     run = replace(case.run, dag_spec=AirflowArtifactIdentity("foreign-dag", digest("dag")))
     with pytest.raises(CompositionAdmissionError, match="dispatcher_scheduler_identity"):
-        authority(case).inspect(run, case.correlation)
+        getattr(authority(case), method)(run, case.correlation)
     assert not case.verified
+
+
+def test_status_absence_never_reads_parent_or_derives_candidate(case, monkeypatch):
+    before = deepcopy(case.db.data)
+    monkeypatch.setattr(CompositionMssqlLedger, "read", lambda *args: pytest.fail("status read ACTIVE parent"))
+    monkeypatch.setattr(
+        module, "build_composition_clickhouse_attempt", lambda *args, **kwargs: pytest.fail("status derived candidate")
+    )
+    assert authority(case).inspect_existing(case.run, case.correlation) is None
+    assert case.db.data == before and len(case.verified) == 1
+
+
+def test_status_retains_running_receipt_without_admission(case):
+    expected = MssqlCompositionAttemptStore(case.db.connect, expected_service_id=SQL_SERVICE).admit_once(
+        case.selected.attempt
+    )
+    before = deepcopy(case.db.data)
+    assert authority(case).inspect_existing(case.run, case.correlation) == expected
+    assert case.db.data == before

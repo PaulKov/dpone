@@ -117,6 +117,21 @@ class DispatcherAttemptAuthority:
         self, run_identity: AirflowRunIdentity, airflow_attempt: AirflowAttemptCorrelation
     ) -> CompositionAttemptReceipt | None:
         """Return verified retained receipt, or positively absent ACTIVE candidate."""
+        return self._inspect(run_identity, airflow_attempt, derive_absent=True)
+
+    def inspect_existing(
+        self, run_identity: AirflowRunIdentity, airflow_attempt: AirflowAttemptCorrelation
+    ) -> CompositionAttemptReceipt | None:
+        """Observe retained history; absence grants no candidate or retry authority."""
+        return self._inspect(run_identity, airflow_attempt, derive_absent=False)
+
+    def _inspect(
+        self,
+        run_identity: AirflowRunIdentity,
+        airflow_attempt: AirflowAttemptCorrelation,
+        *,
+        derive_absent: bool,
+    ) -> CompositionAttemptReceipt | None:
         self._require_scheduler(run_identity, airflow_attempt)
         control, attempt = self.control, self._selected.attempt
         with composition_control_transaction(
@@ -148,6 +163,8 @@ class DispatcherAttemptAuthority:
                     raise CompositionAdmissionError("dispatcher_attempt_changed")
                 ledger.require_transaction(transaction)
                 return receipt
+            if not derive_absent:
+                return None
             active = ledger.read(self._selected.context.occurrence.activation_id)
             if active is None:
                 raise CompositionAdmissionError("dispatcher_parent_missing")

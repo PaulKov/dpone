@@ -77,7 +77,7 @@ class DispatchV2Request:
             _uuid(self.request_id, random=True)
             _uuid(self.dispatcher_id)
             require_digest(self.runtime_authority_sha256)
-            if self.operation != "EXECUTE_TRANSFER":
+            if self.operation not in {"EXECUTE_TRANSFER", "READ_STATUS"}:
                 raise ValueError
             _attempt(self.subject)
             if len(self.to_bytes()) > MAX_METADATA_BYTES:
@@ -152,7 +152,7 @@ class DispatchV2Response:
             _uuid(self.dispatcher_id)
             require_digest(self.runtime_authority_sha256)
             require_digest(self.subject_sha256)
-            if self.operation != "EXECUTE_TRANSFER" or self.status not in {
+            if self.operation not in {"EXECUTE_TRANSFER", "READ_STATUS"} or self.status not in {
                 "SUCCEEDED",
                 "FAILED",
                 "IN_PROGRESS",
@@ -236,6 +236,17 @@ def decode_response(document: bytes, request: DispatchV2Request) -> DispatchV2Re
             raise ValueError
         if result.status == "SUCCEEDED":
             decode_result(evidence, digest(evidence), attempt=request.attempt)
+        elif (
+            request.operation == "READ_STATUS"
+            and result.status == "UNKNOWN"
+            and strict_json_object(evidence).get("schema") == "dpone.composition-remote-transfer-absence.v1"
+        ):
+            if strict_json_object(evidence) != {
+                "schema": "dpone.composition-remote-transfer-absence.v1",
+                "attempt_sha256": request.attempt.attempt_sha256,
+                "observation": "ABSENT",
+            }:
+                raise ValueError
         else:
             decode_status(evidence, status=result.status, attempt=request.attempt)
         return result

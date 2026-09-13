@@ -127,7 +127,24 @@ class DispatcherTransferHandler:
             subject = strict_json_object(request.subject)
             run = AirflowRunIdentity.from_mapping(subject["airflow_run_identity"])
             airflow = AirflowAttemptCorrelation.from_mapping(subject["airflow_attempt"])
-            receipt = authority.inspect(run, airflow)
+            if request.operation == "READ_STATUS":
+                receipt = authority.inspect_existing(run, airflow)
+                if receipt is None:
+                    response = DispatchV2Response.for_request(
+                        request,
+                        canonical_json_bytes(
+                            {
+                                "schema": "dpone.composition-remote-transfer-absence.v1",
+                                "attempt_sha256": request.attempt.attempt_sha256,
+                                "observation": "ABSENT",
+                            }
+                        ),
+                        status="UNKNOWN",
+                    )
+                    budget.io_deadline()
+                    return response
+            else:
+                receipt = authority.inspect(run, airflow)
             if receipt is not None and receipt.state != "SUCCEEDED":
                 return self._respond(request, receipt, budget, duplicate=True)
             if receipt is None:
