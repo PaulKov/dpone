@@ -91,7 +91,7 @@ class NativeTransferExecutionPolicy:
             **(
                 {
                     "native_chunks": {
-                        key: value for key, value in asdict(self.native_chunks).items() if key != "parallelism"
+                        key: value for key, value in self.native_chunks.to_dict().items() if key != "parallelism"
                     }
                 }
                 if self.native_chunks is not None

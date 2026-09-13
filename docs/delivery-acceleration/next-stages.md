@@ -12,7 +12,7 @@ intact. Start with the [delivery overview](index.md).
 | Stage | Release class | Deliverable | Definition of done |
 | --- | --- | --- | --- |
 | 1: source sizing reuse | Patch; initial candidate 0.79.2 | Reuse the source adapter's native row size in framing. | Identical rows, frame partitions, wire bytes, exceptions, closure and resource bounds; one sizing pass per adapted row under matching contracts; focused and broad checks, local Docker route evidence and independent review. |
-| 2: independent stage limits | Minor | Separately configure encoding and import concurrency with bounded admission. | Written approved contract; old settings retain their behavior; deterministic queue/byte limits; cancellation, saturation, retry and recovery tests; narrow/wide local measurements and documented configuration. Automatic tuning is deferred. |
+| 2: independent stage limits | Minor; 0.80.0 | Separately configure encoding and import concurrency with bounded admission. | Written approved contract; old settings retain their behavior; deterministic queue/byte limits; cancellation, saturation, retry and recovery tests; narrow/wide local measurements and documented configuration. Automatic tuning is deferred. |
 | 3: verification CPU cost | Patch if contracts remain identical | Optimize typed verification transport/encoding after profiling the remaining passes. | Exact existing digest and duplicate semantics; unchanged verification boundaries; corruption and mutation rejection; measured CPU/end-to-end comparison. Removing or merging authority boundaries requires a separate design and minor stage. |
 | 4: Arrow bulk backend | Minor | Optional typed Arrow transport into owned raw staging. | Dependency and type admission, durable replay, independent bulk transaction handling, NULL/decimal/time/binary fidelity, partial-batch failure and source-free recovery; comparison against native BCP; installation and migration documentation. |
 | 5: eligible SWITCH publication | Minor | Activate the isolated SWITCH component for explicitly admitted layouts. | Schema/index/filegroup admission before mutation; owned stages, transactional publication receipt and unknown-outcome recovery; lock/concurrency tests, live full-refresh/window replacement cases and rollback runbook. |
@@ -49,6 +49,22 @@ composition feature remain outside this plan.
 - Changes belong to source-value adaptation, framing, preparer wiring, focused
   tests and delivery documentation. No SQL, schema, state, retry or finalizer
   changes are required. No ADR or migration is required for this internal reuse.
+
+## Stage 2 implementation contract
+
+The [approved specification](../feature-specs/dda-independent-stage-limits.md)
+and [ADR 0063](../adr/0063-independent-native-stage-limits.md) define independent
+encoding/import limits with one shared max-based retained-work capacity. The
+[concurrency how-to](concurrency.md) covers defaults, manifest versus Python null
+semantics, resolved planning, exact recovery policy and report-reader migration.
+Legacy-effective settings keep the eight-field policy and v1 run envelope;
+extended settings use ten canonical fields and v2 runs. All verification and
+publication authorities remain in place.
+
+Release acceptance requires exact-source evidence. Narrow/wide measurements must retain each
+configuration separately; exact comparison equality is unchanged and no
+cross-policy speedup is certified. Existing stage 1 observations cannot certify
+stage 2. Automatic tuning, dbt and composition changes remain out of scope.
 
 ## Evidence and release acceptance
 

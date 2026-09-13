@@ -18,6 +18,7 @@ from dpone.contracts.native_delivery_observations import (
     CHECKS_BY_SCOPE,
     RECEIPT_SCHEMA,
     RUN_SCHEMA,
+    RUN_SCHEMA_V2,
     comparable_delivery_environment,
     normalize_delivery_limits,
 )
@@ -143,12 +144,15 @@ def _status(statuses: list[str]) -> str:
 
 def _run(store: BenchmarkArtifacts, path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     run = store.json(path)
-    _validate(run, RUN_SCHEMA)
+    version = run.get("schema_version") if isinstance(run, dict) else None
+    if type(version) is not int or version not in (1, 2):
+        raise BenchmarkInputError("invalid_schema")
+    _validate(run, RUN_SCHEMA if version == 1 else RUN_SCHEMA_V2)
     if any(type(run["workload"][key]) is not int for key in ("seed", "rows", "columns")):
         raise BenchmarkInputError("invalid_workload_integer")
     limits = run["configuration"]["limits"]
     try:
-        normalized_limits = normalize_delivery_limits(limits)
+        normalized_limits = normalize_delivery_limits(limits, schema_version=version)
     except (TypeError, ValueError):
         raise BenchmarkInputError("invalid_limits") from None
     if content_sha256(canonical_json(normalized_limits)) != run["configuration"]["sha256"]:
@@ -253,7 +257,7 @@ def _campaign(store: BenchmarkArtifacts, path: Path) -> tuple[list[str], dict[tu
 
 
 def compare(baseline: Path, candidate: Path, *, output: Path | None = None, overwrite: bool = False) -> dict[str, Any]:
-    """Validate v1 runs/campaigns and optionally atomically write a comparison.
+    """Validate v1/v2 runs and v1 campaigns and optionally atomically write a comparison.
 
     Schema, identity and file errors raise; missing eligible measurements yield
     UNVERIFIED. No SQL/network is used, and no thresholds are treated as results.

@@ -10,7 +10,7 @@ from typing import Any
 from .artifacts import canonical_json, digest, read_artifact
 from .correctness import RECOVERY_CHECKS, SAMPLE_CHECKS
 from .profiles import Dataset
-from .runner import configuration, route_record
+from .runner import configuration, route_record, run_schema_version
 
 STATUSES = {"PASS", "FAIL", "SKIP", "UNVERIFIED"}
 
@@ -131,7 +131,7 @@ def validate_run(envelope: dict[str, Any], root: Path) -> list[dict[str, Any]]:
             "limitations",
         }
     )
-    _require(type(envelope["schema_version"]) is int and envelope["schema_version"] == 1)
+    _require(type(envelope["schema_version"]) is int and envelope["schema_version"] in (1, 2))
     _require(envelope["kind"] == "native-delivery-run" and envelope["status"] in STATUSES)
     for key in ("producer", "subject"):
         _hash(envelope[key]["commit"], 40)
@@ -148,6 +148,7 @@ def validate_run(envelope: dict[str, Any], root: Path) -> list[dict[str, Any]]:
     for key in ("workload", "configuration", "environment"):
         _hash(envelope[key]["sha256"])
     _require(configuration(envelope["configuration"]["limits"]) == envelope["configuration"])
+    _require(envelope["schema_version"] == run_schema_version(envelope["configuration"]))
     _require(Dataset(workload["id"], workload["rows"], workload["seed"]).envelope() == workload)
     environment = envelope["environment"]
     _require(digest({k: v for k, v in environment.items() if k != "sha256"}) == environment["sha256"])

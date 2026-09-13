@@ -52,7 +52,8 @@ legacy flag's name, record source imports honestly as source imports.
 
 ## Run and inspect
 
-Prepare a JSON limits file containing all eight `NativeChunkLimits` fields:
+Prepare a JSON limits file containing the exact eight legacy `NativeChunkLimits`
+fields for a v1 run:
 
 ```json
 {
@@ -66,6 +67,20 @@ Prepare a JSON limits file containing all eight `NativeChunkLimits` fields:
   "parallelism": 1
 }
 ```
+
+For an independent-stage experiment, create a separate limits file with all
+eight fields above plus `"encoding_parallelism": 2` and
+`"import_parallelism": 1`. With `parallelism: 1`, this is a canonical ten-field
+policy and produces a v2 run. Repeat with E=1/I=2 in another file. A ten-field
+record with both counts equal to `parallelism` is noncanonical; use the eight-field
+record instead. Manifest omission/fallback rules differ from these exact report
+inputs; see [concurrency](concurrency.md) and
+[report migration](observations.md#shared-limit-validation).
+
+The frozen old subject accepts the eight-field path through its own limits model
+and the explicit legacy serialization whitelist. Ten-field input requires the
+new model capability and fails before fixture provisioning on old subjects.
+Keep candidate `src` out of that subject's import path.
 
 After environment approval, set `DPONE_RUN_INTEGRATION=1`,
 `DPONE_RUN_INTEGRATION_LIVE=1` and `DPONE_DDA_DISPOSABLE_APPROVED=1`.
@@ -88,6 +103,14 @@ authored ClickHouse String-to-varbinary mapping. Do not bypass that rejection.
 The harness runs exact fidelity and recovery checks before timed trials, then
 one warmup and at least three trials. Inspect with the harness `inspect` command.
 A dirty producer or subject remains UNVERIFIED even when component checks pass.
+
+For stage 2, retain narrow and wide/Unicode runs separately for each policy,
+with one warmup and three measured trials, raw observations, correctness and
+recovery receipts, limits, hashes and exact source/environment identities.
+A comparison PASS still requires the same full configuration on both subjects;
+these different-policy runs are diagnostic tuning observations and cannot certify
+a cross-policy speedup. Stage 2's initial candidate is 0.80.0; release and fresh
+live certification remain pending.
 
 ## Recover and clean up
 

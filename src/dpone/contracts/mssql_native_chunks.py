@@ -7,6 +7,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+LEGACY_NATIVE_LIMIT_FIELDS = (
+    "max_total_encoded_bytes",
+    "stage_allocated_bytes_stop_threshold",
+    "max_rows",
+    "max_bytes",
+    "max_row_bytes",
+    "max_pending",
+    "max_staging_tables",
+    "parallelism",
+)
+NATIVE_STAGE_LIMIT_FIELDS = ("encoding_parallelism", "import_parallelism")
+
 
 @dataclass(frozen=True)
 class NativeChunkLimits:
@@ -20,20 +32,59 @@ class NativeChunkLimits:
     max_pending: int = 2
     max_staging_tables: int = 1024
     parallelism: int = 1
+    encoding_parallelism: int | None = field(default=None, kw_only=True)
+    import_parallelism: int | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
-        caps = {"max_rows": 1000000, "max_bytes": 1073741824, "max_pending": 64, "parallelism": 64}
+        caps = {
+            "max_rows": 1000000,
+            "max_bytes": 1073741824,
+            "max_pending": 64,
+            "parallelism": 64,
+            **dict.fromkeys(NATIVE_STAGE_LIMIT_FIELDS, 64),
+        }
         for name in self.__dataclass_fields__:
             value = getattr(self, name)
+            if name in NATIVE_STAGE_LIMIT_FIELDS and value is None:
+                continue
             if type(value) is not int or value < 1 or value > caps.get(name, value):
                 raise ValueError(f"mssql_native.invalid_limit:{name}")
         if self.max_row_bytes > self.max_bytes:
             raise ValueError("mssql_native.max_row_bytes_exceeds_chunk")
 
     @property
+    def effective_encoding_parallelism(self) -> int:
+        """Resolve the CPU worker count independently of import concurrency."""
+        return self.parallelism if self.encoding_parallelism is None else self.encoding_parallelism
+
+    @property
+    def effective_import_parallelism(self) -> int:
+        """Resolve concurrent import/verify tasks, not all target connections."""
+        return self.parallelism if self.import_parallelism is None else self.import_parallelism
+
+    @property
+    def retained_work_capacity(self) -> int:
+        """Shared ceiling for encoding, sealed files, importing and retries."""
+        return max(self.effective_encoding_parallelism, self.effective_import_parallelism) + self.max_pending
+
+    def to_dict(self) -> dict[str, int]:
+        """Preserve the exact legacy durable record for legacy-effective settings.
+
+        Extended records contain both resolved counts. Authored fallback remains
+        significant; journal readers never rewrite previously persisted records.
+        """
+        values = {name: getattr(self, name) for name in LEGACY_NATIVE_LIMIT_FIELDS}
+        if (self.effective_encoding_parallelism, self.effective_import_parallelism) != (self.parallelism,) * 2:
+            values.update(
+                encoding_parallelism=self.effective_encoding_parallelism,
+                import_parallelism=self.effective_import_parallelism,
+            )
+        return values
+
+    @property
     def spool_payload_bound(self) -> int:
         """Payload reservation excluding separately accounted format/receipt files."""
-        return (self.parallelism + self.max_pending + 1) * self.max_bytes
+        return (self.retained_work_capacity + 1) * self.max_bytes
 
 
 @dataclass(frozen=True)

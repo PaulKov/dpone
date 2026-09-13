@@ -84,9 +84,14 @@ iterator; neither closes the caller's source.
 | Exact frame IPC bound | The scheduler checks `len(pickle.dumps(frame.rows, protocol=5)) <= max_bytes`. |
 | Exact submitted-task IPC bound | The scheduler checks `len(pickle.dumps(args, protocol=5)) + 128 <= max_bytes`; `args` contains the complete worker positional arguments, unchanged by optional observations. |
 | `max_total_encoded_bytes` | The scheduler bounds cumulative reservations across all frames. |
-| Spool payload bound | Existing pending/concurrency limits and `spool_payload_bound` bound retained native payload; format/receipt files are separately accounted. |
+| Spool payload bound | `spool_payload_bound = (max(E, I) + max_pending + 1) * max_bytes`, where E/I are resolved encoding/import limits; format/receipt files are separately accounted. |
 | `stage_allocated_bytes_stop_threshold` | Observed SQL allocation stop threshold, checked through the importer. |
 | Python heap / RSS | Measured separately; native and pickle byte limits are not a heap or RSS ceiling. |
+
+Independent stage limits share one retained-work map with capacity
+`max(E, I) + max_pending`. Encoding-to-import transitions and retries keep their
+slot; verified receipt acceptance and successful file removal release it. See
+[concurrency configuration](concurrency.md) for fallback and recovery semantics.
 
 Neither sizing nor pickle serialization validates every scalar value. Workers
 continue to validate, encode, hash, fsync and seal exclusive files. Their actual

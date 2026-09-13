@@ -128,16 +128,26 @@ These fixtures are not deployment authorities.
 
 ## Resource limits and observations
 
-`execution.native_chunks` requires `max_total_encoded_bytes` and
+`native_transfer.execution.native_chunks` requires `max_total_encoded_bytes` and
 `stage_allocated_bytes_stop_threshold`. Defaults are 65,536 rows, 16 MiB per chunk,
 1 MiB per business row, two pending chunks and 1,024 staging tables. Parallelism
-is 1–64. The pending bound is independent of the cumulative encoded-byte limit.
+defaults to 1 and is 1–64. Optional `encoding_parallelism` and
+`import_parallelism` under `native_chunks` independently fall back to
+`execution.chunking.parallelism`. Authored overrides must be strict integers
+1–64; explicit YAML null is invalid. Python keyword-only overrides default to
+`None`, retaining all eight historical positional fields. Follow the
+[concurrency how-to](delivery-acceleration/concurrency.md) and its
+[new example](../examples/native/clickhouse-to-mssql-native-concurrency.yaml)
+for resolved planner output and upgrade guidance. The pending bound is independent of the cumulative encoded-byte limit.
 One prepared table also counts toward the staging-table limit. Rows are limited
 to 1–1,000,000; chunk bytes to 1–1 GiB; row bytes must not exceed chunk bytes;
 pending chunks and parallelism are 1–64. Required cumulative limits and staging
 table counts are positive integers. Booleans and unknown limit keys are rejected.
 
-The local payload bound is `(parallelism + max_pending + 1) * max_bytes`, plus
+The shared retained-work capacity is `C = max(E, I) + max_pending`, where E/I
+are the effective encoding/import limits. Import concurrency bounds file
+import/verify tasks, not all target connections. The local payload bound is
+`(C + 1) * max_bytes`, plus
 format/receipt overhead. The executor checks observed filesystem capacity with a
 1 GiB reserve before worker startup. Driver allocation and process RSS are
 separate observations; encoded-byte limits do not guarantee physical RSS caps. Application preflight also checks capacity

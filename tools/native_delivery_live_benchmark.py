@@ -43,7 +43,12 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--rows", type=int, default=10000)
     run.add_argument("--seed", type=int, default=7)
     run.add_argument("--trials", type=int, default=3)
-    run.add_argument("--limits", type=Path, required=True, help="JSON object with all eight NativeChunkLimits fields.")
+    run.add_argument(
+        "--limits",
+        type=Path,
+        required=True,
+        help="JSON object with eight legacy fields or ten canonical fields with both resolved stage limits.",
+    )
     run.add_argument("--adapter", choices=("baseline", "candidate"), default="candidate")
     run.add_argument("--strategy", choices=("full_refresh", "partition_replace"), default="full_refresh")
     run.add_argument("--mode", choices=("bounded_native", "isolated_switch"), default="bounded_native")

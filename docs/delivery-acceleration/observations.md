@@ -134,7 +134,7 @@ publication, rollback, recovery, or cleanup.
 ## Compare retained benchmark runs
 
 Prerequisites: a repository checkout with its locked Python dependencies, two
-retained v1 run envelopes (or two v1 campaign files), their referenced evidence,
+retained v1 or v2 run envelopes (or two v1 campaign files), their referenced evidence,
 and an existing writable output directory. Input paths in these examples are
 caller-provided artifact locations; they are not distributed benchmark results.
 DDA-05's producer and DDA-06's composed runtime supply real inputs. Live execution
@@ -241,15 +241,46 @@ structural test evidence. Optional missing resources limit only their own claims
 ## Shared limit validation
 
 `normalize_delivery_limits` in `dpone.contracts.native_delivery_observations`
-owns the offline consumer's exact field-set validation beside the v1 run schema.
-The external harness also runs against the frozen baseline, where this helper
-does not exist. It derives the field set from that interpreter's canonical
-`NativeChunkLimits` dataclass, invokes its constructor and returns detached
-canonical values. It never imports candidate dpone into the baseline environment.
-Missing fields are not filled with defaults. Producer field-set errors remain `exact_limits_required`, value
-errors retain their canonical codes, and the consumer maps invalid limits to
-`BenchmarkInputError("invalid_limits")`. Normalized configuration bytes and
-digests are unchanged.
+retains exact eight-field v1 validation by default. Its explicit v2 path admits
+only canonical ten-field limits. The [concurrency policy](concurrency.md) owns
+the durable representation; producers select the run version from that record.
+
+| Representation | Required fields and version |
+| --- | --- |
+| Legacy-effective policy | Exactly `max_total_encoded_bytes`, `stage_allocated_bytes_stop_threshold`, `max_rows`, `max_bytes`, `max_row_bytes`, `max_pending`, `max_staging_tables`, `parallelism`; run envelope v1 |
+| Extended policy | Those eight fields plus concrete `encoding_parallelism` and `import_parallelism`; run envelope v2 |
+
+Both effective counts equal to `parallelism` means legacy-effective, even when
+an override was explicitly supplied. A ten-field record for that policy is
+noncanonical and rejected. Extended records require both strict integer counts
+1–64; null, missing counts, booleans and one-sided extension are invalid. The
+fallback `parallelism` remains significant even with both overrides supplied.
+Missing fields are never filled with defaults in retained experiment inputs.
+
+`RUN_SCHEMA` remains v1; the separate v2 run schema changes only its version and
+limit admission. Consumers dispatch only on exact integer run versions 1 or 2,
+rejecting booleans, strings and unknown versions. Correctness receipts, phase
+observations, maintenance envelopes, campaigns and comparison schemas remain v1;
+their authority is unchanged. A v2 run does not upgrade its nested artifacts.
+
+Upgrade consumers before sharing extended reports: old readers reject v2. Keep
+historical bytes and configuration hashes unchanged. Hashes cover the exact
+canonical record; never add defaults to old evidence, rewrite journals, or
+silently upgrade retained files. Comparisons still require exact full
+configuration equality. Separate policies belong in separate tuning experiments,
+with separate hashes and correctness evidence; a symmetric baseline and asymmetric
+candidate cannot produce a certified cross-policy speedup.
+
+The external harness also runs against a frozen old subject without these new
+methods. For eight-field input it constructs that interpreter's
+`NativeChunkLimits` and serializes only the explicit legacy whitelist above.
+It does not derive the v1 field set from all dataclass fields, unconditionally
+import a new normalizer, or call a new method on the old model. Ten-field input
+requires the new model capability and fails before fixture provisioning on an
+old subject. Never inject candidate `src` into the old subject's import path.
+Producer field-set errors remain `exact_limits_required`, value errors retain
+their canonical codes, and the consumer maps invalid limits to
+`BenchmarkInputError("invalid_limits")`.
 
 The recorder's observer parameter retains its postponed annotation. Developer
 tools using `typing.get_type_hints` supply the canonical observer type namespace
