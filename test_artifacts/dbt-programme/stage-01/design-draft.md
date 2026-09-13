@@ -65,6 +65,12 @@ it by placing credentials or endpoint overrides in publish profiles.
 3. Resolve model identity from dbt's manifest. Preserve profile defaults and
    author overrides; attach explicit extraction scope independently from the
    physical partition expression/type/completeness claim.
+   Preserve ordered source column types, wire format/bytes and validation receipt
+   identity as one artifact contract. Target column projection must not silently
+   rewrite source authority. A prevalidated boolean is not an authenticated
+   receipt; temporal schema changes must match actual bytes. Business NULL,
+   default and timezone rules remain authored. These decisions require the
+   types/artifacts stage's retained public-interface evidence before approval.
 4. Match the exact route variant and current certification dimensions. A
    tuning field must not select a different transport implicitly.
 5. Copy validated transfer options into the generated workload. Keep fixed dbt

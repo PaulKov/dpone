@@ -1,0 +1,50 @@
+{
+  "baseline_commit": "46830976b214262c7772800523e832a5a6f6d78f",
+  "candidate_source_commit": "6ba5b6bc3ad96dd9451e07911bbdc640da931aec",
+  "producer_version": "0.74.28",
+  "technique": "Real public singleton writers on separate unmodified source checkouts; constructor DI; full canonical schemas; no method replacement",
+  "file_count": 60,
+  "unchanged_files": 56,
+  "changed": {
+    "_dbt/manifests/dbt_competitive_pricing.yaml": {
+      "base_sha256": "56d4fb2be027ec1c360d0f5f691975e9b5a813242ee0b00dc6d0dd01622fa350",
+      "candidate_sha256": "cc74f3df6fdb2963d6d1a9af854f1012cee984e4fbb6b4d572c858986a022e28"
+    },
+    "dbt_competitive_pricing/airflow-pack.json": {
+      "base_sha256": "191b4989dd0bbef119273e0df2e78cfab0a8ec7256f5095533f42a3ac128f7e7",
+      "candidate_sha256": "6cd7b95e3536531f8406be45db028302b28c922d979edb3ca20d94f748c1c308",
+      "changed_json_paths": [
+        "/pack_fingerprint",
+        "/pod_spec/spec/initContainers/0/args/0",
+        "/runtime_manifest/sha256",
+        "/runtime_payload/archive/data",
+        "/runtime_payload/archive/sha256",
+        "/workload_dependencies/0/sha256"
+      ]
+    },
+    "packs/dbt_competitive_pricing.airflow-pack.json": {
+      "base_sha256": "191b4989dd0bbef119273e0df2e78cfab0a8ec7256f5095533f42a3ac128f7e7",
+      "candidate_sha256": "6cd7b95e3536531f8406be45db028302b28c922d979edb3ca20d94f748c1c308",
+      "changed_json_paths": [
+        "/pack_fingerprint",
+        "/pod_spec/spec/initContainers/0/args/0",
+        "/runtime_manifest/sha256",
+        "/runtime_payload/archive/data",
+        "/runtime_payload/archive/sha256",
+        "/workload_dependencies/0/sha256"
+      ]
+    },
+    "release-set.json": {
+      "base_sha256": "ac917e90140898a5be0bb7160a908e32e2c09135c53d7ec7cc8fc1cc0bb7fd53",
+      "candidate_sha256": "137aeb1fecebcc3a783c1ad2e74fe94b3c13c00d4e31769c0801df3225ee3db6",
+      "changed_json_paths": [
+        "/artifacts/workload_packs/1/pack_fingerprint",
+        "/artifacts/workload_packs/1/sha256",
+        "/release_id"
+      ]
+    }
+  },
+  "predicate_before": "[date_id] >= DATEADD(day, -44, CONVERT(datetime2, '{{{{ data_interval_start }}}}', 127)) AND [date_id] < CONVERT(datetime2, '{{ data_interval_end }}', 127)",
+  "predicate_after": "[date_id] >= DATEADD(day, -44, CONVERT(datetime2, '{{ data_interval_start }}', 127)) AND [date_id] < CONVERT(datetime2, '{{ data_interval_end }}', 127)",
+  "manifest_diff": "--- base/_dbt/manifests/dbt_competitive_pricing.yaml\n+++ candidate/_dbt/manifests/dbt_competitive_pricing.yaml\n@@ -13,8 +13,8 @@\n     native_transfer:\n       mode: auto\n     partition_column: date_id\n-    source_custom_predicate: '[date_id] >= DATEADD(day, -44, CONVERT(datetime2, ''{{{{\n-      data_interval_start }}}}'', 127)) AND [date_id] < CONVERT(datetime2, ''{{ data_interval_end\n+    source_custom_predicate: '[date_id] >= DATEADD(day, -44, CONVERT(datetime2, ''{{\n+      data_interval_start }}'', 127)) AND [date_id] < CONVERT(datetime2, ''{{ data_interval_end\n       }}'', 127)'\n sink:\n   type: clickhouse\n"
+}

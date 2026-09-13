@@ -37,8 +37,8 @@ root; do not hand-edit previously generated manifests or execution packs.
 | Profile/identity/renderer probe | PASS for observations | `profile-baseline.json` records closed admission and the interval defect; no live execution |
 | TLS projection probe | SKIP / rejected evidence | Earlier monkey-patched probe and its PASS JSON removed; source inspection retained, dynamic projection UNVERIFIED |
 | New interval regressions before source fix | FAIL, expected RED | Both exact-bound assertions observed `{{2026-09-01T00:00:00Z}}` in generated runtime SQL |
-| New interval + service + schema tests after fix | PASS | 54 passed in 1.52s |
-| Docs contracts + language | PASS | 39 passed in 5.71s; repeated after the final active macro-count correction |
+| New interval + service + schema tests after fix | PASS | 54 passed in 1.52s; expanded projector/migration selection: 69 passed in 3.26s |
+| Docs contracts + language | PASS | 39 passed in 5.71s; final active macro-count correction: 39 passed in 37.85s |
 | Candidate profile probe | PASS | `profile-candidate.json` records both resolved bounds and preserved admitted options |
 | Rendered documentation | PASS | `rendered-docs.json`: current versions and navigation in five HTML pages, policy-v3 link present |
 
@@ -89,17 +89,58 @@ reproducible synthetic observations contain no local machine paths or secrets.
 | Command suffix | Status | Result |
 |---|---|---|
 | `ruff check .` | PASS | All checks passed |
-| `ruff format --check .` | PASS | 6081 files already formatted |
+| `ruff format --check .` | PASS | 6080 files already formatted after removal of the rejected probe |
 | `mypy --config-file mypy.ini` | PASS | No issues in 1209 source files |
 | `dpone docs check-import-rules` | PASS | No violations |
 | `dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json` | PASS | Issues: none |
 | `dpone docs check-module-size --baseline docs/module_size_baseline.json --base-ref 46830976b214262c7772800523e832a5a6f6d78f --head-ref 228697c084523218c4ff6a889a73277709aee739` | PASS | No module-size issues, ratchet-v2 |
 | `dpone docs check-docs` | PASS | 844 Markdown files / 3414 local links |
 | `dpone docs check-generated-references` | PASS | 3/3 in sync |
-| `mkdocs build --strict` | PASS | Built in 94.46s; rendered text/link inspection passed |
+| `mkdocs build --strict` | PASS | Initial build 94.46s; final active macro-count correction 250.71s; rendered text/link inspection passed |
 | `python tools/agent_policy/select_checks.py --base-ref origin/master` | PASS | Change-aware plan generated; focused tests above and broad non-live suite selected |
-| `pytest -m "not integration_live" -n auto --dist loadfile` | UNVERIFIED | Running at report creation; final outcome pending |
+| `pytest -m "not integration_live" -n auto --dist loadfile` | FAIL | 43 failed, 24074 passed, 815 skipped, 2 collection errors in 1289.98s; optional extras were absent |
 | Live route / production / release / benchmark | SKIP | Outside authorized environment and scope |
+
+### Failure reconciliation and artifact migration
+
+The full run began at `228697c` with constant source/tests; HEAD, docs and evidence
+changed during execution. It is not exact-final-commit acceptance. All original
+outcomes remain recorded in `failure-classification.json`. The 815 skipped cases
+are not passes. No second full suite has run; the coordinator queues a frozen
+all-extras full acceptance run after the active programme stages.
+
+`uv sync --frozen --all-extras` completed without changing the lockfile. Versions
+and lock digest are in `all-extras-environment.json`. With those prerequisites,
+all 38 previously failing non-timeout/non-migration cases passed, including the
+quoted-SQL, real dbt parse and hermetic benchmark cases. Adding the PostgreSQL
+snapshot-retry file yielded 57 passes in 29.50s. The former live-file collection
+error now collects one test; that live test was not executed. Four timeout cases
+passed in focused execution in 10.18s without source or timeout changes. These
+observations do not establish host contention as the original timeout cause.
+
+The singleton migration regression needed an explicit update for corrected
+artifact bytes. Its existing schema-producer monkey patch was removed. The real
+writer emits 60 files: the historical 57-file fixture is unchanged, 50 historical
+files retain their exact hashes, seven intentional historical migrations and
+three additional existing schemas have fixed reviewed expected hashes. The test
+rejects any unexpected path, asserts the exact two-bound predicate, verifies both
+transfer pack fingerprints and embedded manifest bytes, and checks release
+identity and every artifact descriptor. Expected hashes are not calculated from
+the output being asserted.
+
+`artifact-migration.json` compares real public writers on unmodified baseline
+`46830976` and candidate `6ba5b6b` source checkouts, both with producer version
+`0.74.28`. Exactly four of 60 files change: the manifest, two transfer-pack copies
+and release-set; 56 are unchanged. The only manifest difference is lower-token
+escaping. Pack changes bind the corrected inline bytes and their fingerprints;
+release changes bind the affected pack and release identity. No schema producer
+or runtime method was replaced in this comparison. Focused RED reproduced the
+three newly affected historical paths before the expected migration update;
+GREEN passed all 69 projector/interval/context/schema cases in 3.26s.
+
+Lint, format and change-aware check selection passed again after the test update.
+Focused recovery of all 43 failures does not promote the original full run to
+PASS or complete the queued final-commit acceptance gate.
 
 ## Documentation and remaining work
 
@@ -116,6 +157,7 @@ acceptance evidence and has been removed. This PR does not claim these findings
 are regressions or alter them. No current live adapter or
 end-to-end certification is implied by unit/contract passes.
 
-Independent fresh-context review: UNVERIFIED pending source/evidence freeze.
-Ready for review as a draft; merge/release readiness is not established until
-the remaining suite and independent review are reconciled.
+Independent fresh-context review at `6ba5b6b`: scoped approval with validation
+hold; prior evidence blocker resolved. See `review.md`. Follow-up review of the
+migration regression update is pending. Ready for review as a draft; merge/release
+readiness remains on hold pending final review and the coordinated full gate.

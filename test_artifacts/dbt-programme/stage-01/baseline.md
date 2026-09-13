@@ -106,6 +106,7 @@ schema helpers must not widen historical policy versions accidentally.
 | Partition scope | physical expression, evaluated type, complete-partition proof; never infer completeness from column alone |
 | Empty behavior | V2 empty window does not exchange/advance generation; composition whole empty snapshot replaces with empty |
 | Transfer options | admitted source wire/execution vs sink ingest settings; route certification coordinates separate |
+| Typed artifact | ordered source columns/types, wire bytes/format and receipt authority stay bound; target projection is a separate identity |
 | Connection snapshot | credential-safe driver/TLS/port/CA projection and precedence, endpoint identity, resolver version |
 | Publication/recovery | finalizer capability, owner/attempt, journal and commit/evidence/checkpoint order; stage 03 owns analysis |
 | Physical/resources | layout, partition limits and bounded execution; PR 48 owns independent DDA limits |
@@ -116,6 +117,10 @@ partition replacement while extracting a daily window could erase other days.
 The brace fix restores the existing window; it neither fixes nor widens this
 separate partition-completeness contract. No empty/vanished partition behavior
 is changed here. Durable identity collision hypotheses remain UNVERIFIED.
+The types/artifacts stage must resolve validated-file wrapper dispatch, receipt
+binding under column renames and temporal schema/byte consistency. An authored
+prevalidated boolean is not receipt authority. Business NULL/default/timezone
+rules remain authored; this stage grants no conversion or wrapper change.
 
 ## Approval coverage and external overlap
 
