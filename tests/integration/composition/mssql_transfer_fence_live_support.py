@@ -55,8 +55,9 @@ def transfer_batches(database, schema):
 def observe_worker_transaction(worker):
     """Retain only bounded transaction counters and the implicit-mode option.
 
-    A SELECT without a FROM clause does not itself start an implicit transaction;
-    this observation neither commits pending data nor changes driver SQL mode.
+    ODBC manual-commit mode can start a fresh transaction for this SELECT after
+    commit or rollback. Counters therefore describe this statement, not whether
+    the preceding transaction ended. This never commits or changes driver mode.
     """
     rows = execute(worker, "SELECT @@TRANCOUNT,XACT_STATE(),CONVERT(int,@@OPTIONS & 2);")
     if (
@@ -69,6 +70,24 @@ def observe_worker_transaction(worker):
     ):
         raise RuntimeError("transfer_transaction_observation")
     return dict(zip(("transaction_count", "transaction_state", "implicit_option"), rows[0], strict=True))
+
+
+def observe_original_transaction(case, transaction_id):
+    """Read the original worker transaction through an independent admin session.
+
+    SQL Server transaction IDs identify transactions across sessions. A presence
+    check before the boundary establishes DMV visibility; absence afterwards
+    proves termination without opening another transaction on the worker.
+    """
+    if type(transaction_id) is not int or not 0 < transaction_id < 2**63:
+        raise RuntimeError("transfer_transaction_identity")
+    rows = case.target_sql(
+        "SELECT COUNT_BIG(*) FROM sys.dm_tran_session_transactions WHERE transaction_id=?;",
+        transaction_id,
+    )
+    if len(rows) != 1 or len(rows[0]) != 1 or type(rows[0][0]) is not int or rows[0][0] not in (0, 1):
+        raise RuntimeError("transfer_original_transaction_observation")
+    return {"transaction_id": transaction_id, "active_session_count": rows[0][0]}
 
 
 def observe_transfer_permissions(cursor, credentials=None):

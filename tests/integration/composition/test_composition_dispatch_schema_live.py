@@ -42,6 +42,7 @@ def test_dispatch_catalog_and_append_only_closure(sql_case, record_property, unl
         with pytest.raises(support.SqlFailure) as refused:
             support.execute(connection, statement, gate, "CLOSING", digest, original)
         assert refused.value.code == 51000
+    assert case.sql(f"SELECT COUNT_BIG(*) FROM {case.table('ch_dispatch_closures')} WHERE gate_id=?", gate) == ((0,),)
     with observed_transaction(case, "closing_insert", record_property) as ledger:
         ledger.cursor.execute(statement, gate, "CLOSING", digest, original)
     assert case.sql(f"SELECT phase,evidence_document FROM {case.table('ch_dispatch_closures')}") == (

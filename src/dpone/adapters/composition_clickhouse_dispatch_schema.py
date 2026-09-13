@@ -63,6 +63,9 @@ def dispatch_trigger_sql(control_schema: str, name: str) -> str:
 
     A healthy transaction and its exclusive ledger lock are the authority.
     Trigger nesting depth is not an additional control-ledger requirement.
+    APPLOCK_MODE can raise 3918 inside an autocommit statement's trigger because
+    its transaction owner requires a user transaction. Translate that refusal
+    to the same lock invariant; preserve every other SQL error unchanged.
     """
     schema = require_control_schema(control_schema)
     definition = next((table for table in DISPATCH_TABLES if table.name == name), None)
@@ -108,8 +111,17 @@ BEGIN
         THROW 51000, 'DPONE_COMPOSITION_DISPATCH_IMMUTABLE', 1;
     IF XACT_STATE()<>1
         THROW 51000, 'DPONE_COMPOSITION_DISPATCH_LOCK', 1;
-    IF ISNULL(APPLOCK_MODE(N'public',
-        N'{COMPOSITION_MSSQL_LEDGER_LOCK}',N'Transaction'),N'NoLock')<>N'Exclusive'
+    DECLARE @ledger_lock_mode nvarchar(32);
+    BEGIN TRY
+        SET @ledger_lock_mode=APPLOCK_MODE(N'public',
+            N'{COMPOSITION_MSSQL_LEDGER_LOCK}',N'Transaction');
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER()=3918
+            THROW 51000, 'DPONE_COMPOSITION_DISPATCH_LOCK', 1;
+        THROW;
+    END CATCH;
+    IF ISNULL(@ledger_lock_mode,N'NoLock')<>N'Exclusive'
         THROW 51000, 'DPONE_COMPOSITION_DISPATCH_LOCK', 1;
     IF EXISTS (SELECT 1 FROM inserted WHERE DATALENGTH({document}) NOT BETWEEN 1 AND 8388608
         OR DATALENGTH({digest})<>71 OR {digest}<>'sha256:' +

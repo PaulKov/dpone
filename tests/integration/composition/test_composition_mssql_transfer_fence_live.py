@@ -5,7 +5,10 @@ permission, transaction and row observation below uses the disposable SQL server
 """
 
 import pytest
-from tests.integration.composition.mssql_transfer_fence_live_support import observe_worker_transaction
+from tests.integration.composition.mssql_transfer_fence_live_support import (
+    observe_original_transaction,
+    observe_worker_transaction,
+)
 
 pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql]
 pytest_plugins = [
@@ -24,11 +27,16 @@ def test_transfer_exact_binding_commits_actual_target_rows(transfer_case):
     before = observe_worker_transaction(worker)
     case.record("transfer_before_commit", before)
     assert before["transaction_count"] == 1 and before["transaction_state"] == 1
+    original = observe_original_transaction(case, transaction)
+    case.record("transfer_original_before_commit", original)
+    assert original["active_session_count"] == 1
     worker.commit()
+    original = observe_original_transaction(case, transaction)
+    case.record("transfer_original_after_commit", original)
+    assert original["active_session_count"] == 0
+    assert case.target_sql("SELECT row_id,value FROM [managed].[rows];") == ((1, "component"),)
     after = observe_worker_transaction(worker)
     case.record("transfer_after_commit", after)
-    assert after["transaction_count"] == 0 and after["transaction_state"] == 0
-    assert case.target_sql("SELECT row_id,value FROM [managed].[rows];") == ((1, "component"),)
     assert case.target != case.environment.database.database
     assert case.binding.issued_sid != case.environment.controller_sid
     case.record(
@@ -49,11 +57,19 @@ def test_transfer_rollback_releases_transaction_without_committing_rows(transfer
     transaction = case.begin_fence(worker)
     case.worker_sql(worker, "INSERT INTO [managed].[rows] VALUES (1,'component');")
     assert case.require_fence(worker, transaction_id=transaction) == transaction
+    before = observe_worker_transaction(worker)
+    case.record("transfer_before_rollback", before)
+    assert before["transaction_count"] == 1 and before["transaction_state"] == 1
+    original = observe_original_transaction(case, transaction)
+    case.record("transfer_original_before_rollback", original)
+    assert original["active_session_count"] == 1
     worker.rollback()
+    original = observe_original_transaction(case, transaction)
+    case.record("transfer_original_after_rollback", original)
+    assert original["active_session_count"] == 0
+    assert case.target_sql("SELECT COUNT(*) FROM [managed].[rows];") == ((0,),)
     after = observe_worker_transaction(worker)
     case.record("transfer_after_rollback", after)
-    assert after["transaction_count"] == 0 and after["transaction_state"] == 0
-    assert case.target_sql("SELECT COUNT(*) FROM [managed].[rows];") == ((0,),)
 
 
 def test_transfer_foreign_operation_and_receipt_cannot_mutate(transfer_case):

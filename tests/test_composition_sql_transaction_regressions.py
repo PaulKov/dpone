@@ -17,6 +17,39 @@ def test_dispatch_requires_actual_transaction_lock_without_nested_count_assumpti
     assert "IF EXISTS (SELECT 1 FROM deleted)" in sql
 
 
+@pytest.mark.parametrize("table", [table.name for table in DISPATCH_TABLES])
+def test_dispatch_translates_only_missing_user_transaction_at_lock_observation(table):
+    sql = dispatch_trigger_sql("dpone_control", table)
+    guarded = sql.split("BEGIN TRY", 1)[1].split("END TRY", 1)[0]
+    assert "SET @ledger_lock_mode=APPLOCK_MODE" in guarded
+    assert "INSERT" not in guarded and "THROW" not in guarded
+    caught = sql.split("BEGIN CATCH", 1)[1].split("END CATCH", 1)[0]
+    assert "IF ERROR_NUMBER()=3918" in caught
+    assert "THROW 51000, 'DPONE_COMPOSITION_DISPATCH_LOCK', 1;" in caught
+    assert caught.strip().endswith("THROW;")
+    assert "IF ISNULL(@ledger_lock_mode,N'NoLock')<>N'Exclusive'" in sql
+
+
+@pytest.mark.parametrize("count", [0, 1])
+def test_original_transaction_observed_independently_with_exact_identity(count):
+    calls = []
+
+    def target_sql(sql, identity):
+        calls.append((sql, identity))
+        return ((count,),)
+
+    result = transfer.observe_original_transaction(SimpleNamespace(target_sql=target_sql), 123)
+    assert result == {"transaction_id": 123, "active_session_count": count}
+    assert calls == [("SELECT COUNT_BIG(*) FROM sys.dm_tran_session_transactions WHERE transaction_id=?;", 123)]
+
+
+@pytest.mark.parametrize("rows", [(), ((True,),), ((2,),), ((0, 1),)])
+def test_original_transaction_observation_rejects_ambiguous_shape(rows):
+    case = SimpleNamespace(target_sql=lambda *args: rows)
+    with pytest.raises(RuntimeError, match="original_transaction_observation"):
+        transfer.observe_original_transaction(case, 123)
+
+
 def test_transfer_fixture_uses_dbapi_transaction_without_sql_mode_override(monkeypatch):
     calls = []
     worker = SimpleNamespace(autocommit=True)
