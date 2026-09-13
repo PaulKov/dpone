@@ -38,6 +38,7 @@ from dpone.contracts.composition_control import (
 
 if TYPE_CHECKING:
     from dpone.adapters.composition_mssql_store_queries import CompositionMssqlLedger
+    from dpone.adapters.composition_mssql_transfer_access import MssqlCompositionTransferAccess
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,9 +98,11 @@ class MssqlCompositionLoginGate:
         expected_service_id: str,
         control_database: str,
         control_schema: str = "dpone_control",
+        transfer_access: MssqlCompositionTransferAccess | None = None,
     ) -> None:
         if str(UUID(expected_service_id)) != expected_service_id:
             raise CompositionAdmissionError("control_service")
+        self._transfer_access = transfer_access
         self._factory = connection_factory
         self._service_id = expected_service_id
         self._database = require_control_schema(control_database)
@@ -150,6 +153,8 @@ class MssqlCompositionLoginGate:
                 self._require_gate(ledger, attempt, credentials, "JOURNALED")
                 enrollments = require_enrollments(ledger, attempt, self._service_id)
                 create_login(ledger, credentials, enrollments)
+                if self._transfer_access is not None:
+                    self._transfer_access.grant(ledger, credentials)
                 require_worker_users(ledger, credentials, enrollments)
                 self._transition(ledger, attempt, "JOURNALED", "READY")
             with self._transaction() as ledger:
@@ -157,6 +162,8 @@ class MssqlCompositionLoginGate:
                 self._require_gate(ledger, attempt, credentials, "READY")
                 enrollments = require_enrollments(ledger, attempt, self._service_id)
                 require_worker_users(ledger, credentials, enrollments)
+                if self._transfer_access is not None:
+                    self._transfer_access.require(ledger, credentials)
                 require_login(ledger, credentials.login_name, credentials.login_sid, disabled=False)
             return credentials
         except Exception:

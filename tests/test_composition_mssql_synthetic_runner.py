@@ -14,7 +14,7 @@ from tests.integration.composition.mssql_store_live_support import OwnedDatabase
 
 
 def junit(path, names=None, *, outcome=None, declared=None):
-    names = runner.EXPECTED_TESTS if names is None else names
+    names = runner.expected_cases("store") if names is None else names
     suite = ET.Element(
         "testsuite",
         tests=str(len(names) if declared is None else declared),
@@ -23,7 +23,8 @@ def junit(path, names=None, *, outcome=None, declared=None):
         skipped=str(len(names) if outcome == "skipped" else 0),
     )
     for name in names:
-        case = ET.SubElement(suite, "testcase", classname=runner.TEST_CLASS, name=name)
+        module, _, case_name = name.rpartition("::")
+        case = ET.SubElement(suite, "testcase", classname=module or runner.TEST_CLASS, name=case_name)
         if outcome:
             ET.SubElement(case, outcome)
     ET.ElementTree(suite).write(path)
@@ -38,13 +39,13 @@ def test_junit_requires_every_expected_case_and_zero_nonpasses(tmp_path, outcome
             runner.validate_results(path)
     else:
         result = runner.validate_results(path)
-        assert result["totals"]["passed"] == len(runner.EXPECTED_TESTS) > 0
+        assert result["totals"]["passed"] == len(runner.expected_cases("store")) > 0
 
 
 @pytest.mark.parametrize("variant", ["empty", "missing", "duplicate", "inflated", "foreign", "malformed"])
 def test_junit_rejects_incomplete_or_inconsistent_evidence(tmp_path, variant):
     path = tmp_path / "junit.xml"
-    names = list(runner.EXPECTED_TESTS)
+    names = list(runner.expected_cases("store"))
     if variant == "empty":
         names = []
     elif variant == "missing":
@@ -218,7 +219,7 @@ def test_output_under_checkout_is_refused_without_side_effects(monkeypatch, harn
     assert not calls and not output.exists()
 
 
-@pytest.mark.parametrize("profile,count", [("store", 7), ("gate", 16), ("trust", 9), ("registration", 18)])
+@pytest.mark.parametrize("profile,count", [("store", 11), ("gate", 25), ("trust", 9), ("registration", 18)])
 def test_profiles_have_closed_disjoint_case_inventories(tmp_path, profile, count):
     cases = runner.expected_cases(profile)
     assert len(cases) == len(set(cases)) == count
@@ -321,7 +322,7 @@ def test_gate_child_collects_only_exact_gate_cases_and_skips_without_optin(tmp_p
     with pytest.raises(runner.RunFailure, match="junit_incomplete_or_not_green"):
         runner.execute_component(tmp_path, env, "gate")
     cases = junit_cases(tmp_path / "junit.xml")
-    assert len(cases) == 16
+    assert len(cases) == 25
     assert {case.node_id for case in cases} == set(runner.expected_cases("gate"))
     assert all(case.status == "skipped" for case in cases)
 

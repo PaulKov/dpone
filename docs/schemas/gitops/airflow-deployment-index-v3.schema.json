@@ -445,6 +445,20 @@
           }
         }
       }
+    },
+    {
+      "anyOf": [
+        {
+          "required": [
+            "composition_supervisor"
+          ]
+        },
+        {
+          "required": [
+            "mssql_asset_outlet_projection"
+          ]
+        }
+      ]
     }
   ],
   "properties": {
@@ -470,6 +484,42 @@
     },
     "binding_set_ref": {
       "$ref": "#/$defs/identity"
+    },
+    "composition_supervisor": {
+      "additionalProperties": false,
+      "properties": {
+        "child_gid_start": {
+          "maximum": 2146483647,
+          "minimum": 1000000,
+          "type": "integer"
+        },
+        "child_identity_count": {
+          "minimum": 1000000,
+          "type": "integer"
+        },
+        "child_uid_start": {
+          "maximum": 2146483647,
+          "minimum": 1000000,
+          "type": "integer"
+        },
+        "persistent_volume_claim": {
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "type": "string"
+        },
+        "schema": {
+          "const": "dpone.composition-supervisor.v1"
+        }
+      },
+      "required": [
+        "schema",
+        "persistent_volume_claim",
+        "child_uid_start",
+        "child_gid_start",
+        "child_identity_count"
+      ],
+      "type": "object"
     },
     "connection_registry": {
       "allOf": [
@@ -793,8 +843,7 @@
     "airflow_bundle_ref",
     "runtime_artifact_delivery",
     "release",
-    "deployment",
-    "mssql_asset_outlet_projection"
+    "deployment"
   ],
   "title": "dpone GitOps executable Airflow deployment index v3",
   "type": "object"

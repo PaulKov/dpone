@@ -427,6 +427,56 @@ def test_missing_intent_cannot_create_recovery_or_dispatch_authority():
     assert not authority.closed and not authority.calls and not store.records and not executor.calls
 
 
+class _AuthorityWithoutEnrollment:
+    def __init__(self, inner):
+        self.load_prepared = inner.load_prepared
+        self.require_current = inner.require_current
+        self.close_publisher = inner.close_publisher
+
+
+def test_require_current_rejects_authority_without_enrollment_hook():
+    value = intent()
+    publisher, store, authority, _, executor = rig(value)
+    publisher._authority = _AuthorityWithoutEnrollment(authority)
+    with pytest.raises(CompositionAdmissionError):
+        prepare(publisher, value)
+    assert not store.records and not executor.calls
+
+
+def test_require_current_reopens_enrollment_for_attempt_and_target():
+    value = intent()
+    publisher, store, authority, _, _ = rig(value)
+    calls = []
+
+    def require_enrollment(attempt, target):
+        calls.append((attempt, target))
+
+    authority.require_enrollment = require_enrollment
+    prepare(publisher, value)
+    assert calls == [(value.attempt, value.target)]
+
+
+def test_deleted_enrollment_during_require_current_is_not_published():
+    value = intent()
+    publisher, store, authority, _, executor = rig(value)
+    enrollments = {"original": b"supervisor-enrollment"}
+    calls = []
+
+    def require_enrollment(attempt, target):
+        calls.append((attempt, target))
+        if len(calls) > 1:
+            enrollments.clear()
+        if not enrollments:
+            raise CompositionAdmissionError("enrollment_missing")
+
+    authority.require_enrollment = require_enrollment
+    prepare(publisher, value)
+    with pytest.raises(CompositionAdmissionError):
+        publisher.publish(value.intent_sha256)
+    assert store.records[value.intent_sha256].state != "PUBLISHED"
+    assert not executor.calls or store.records[value.intent_sha256].state != "PUBLISHED"
+
+
 def test_exact_attempt_bytes_must_match_protected_generation_even_for_legacy_hash_alias(monkeypatch):
     value = intent()
     protected = replace(value, attempt=replace(value.attempt, dag_run_id="run\\attempt"))

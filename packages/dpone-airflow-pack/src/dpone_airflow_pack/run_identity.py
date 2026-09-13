@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from collections.abc import Mapping
 from typing import Any
@@ -15,6 +16,7 @@ WORKSPACE_AUTHORITY_CONNECTION_REF_CONTEXT_KEY = "_workspace_authority_connectio
 AIRFLOW_ACTIVATION_TAG_PREFIX = "dpone_activation:"
 AIRFLOW_RELEASE_TAG_PREFIX = "dpone_release:"
 AIRFLOW_DEPLOYMENT_TAG_PREFIX = "dpone_deployment:"
+COMPOSITION_SUPERVISOR_B64_ENV = "DPONE_COMPOSITION_SUPERVISOR_B64"
 MAX_AIRFLOW_RUN_IDENTITY_BYTES = 16 * 1024
 
 
@@ -89,6 +91,18 @@ def serialize_run_identity(identity: Mapping[str, Any]) -> str:
     return encoded
 
 
+def encode_composition_supervisor(projection: Mapping[str, object]) -> str:
+    """Encode the verified, non-secret supervisor contract canonically."""
+
+    payload = json.dumps(
+        dict(projection),
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("ascii")
+    return base64.b64encode(payload).decode("ascii")
+
+
 def _airflow_bundle(ref: str | None) -> dict[str, Any] | None:
     text = _safe_bundle_ref(ref)
     if not text:
@@ -156,9 +170,11 @@ __all__ = [
     "AIRFLOW_RELEASE_TAG_PREFIX",
     "AIRFLOW_RUN_IDENTITY_ENV",
     "AIRFLOW_RUN_IDENTITY_SCHEMA",
+    "COMPOSITION_SUPERVISOR_B64_ENV",
     "MAX_AIRFLOW_RUN_IDENTITY_BYTES",
     "build_dag_run_identity_context",
     "build_task_group_run_identity_context",
     "build_workload_run_identity",
+    "encode_composition_supervisor",
     "serialize_run_identity",
 ]

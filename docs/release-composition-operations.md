@@ -70,14 +70,21 @@ workloads, the verified strict transfer bootstrap remains the execution entrypoi
 Do not write custom init-fetch plans, reorder trios, or weaken readers to accept
 missing source artifacts.
 
-**Default public composition activation is unavailable.** The
-[base coordinator contract](composition-activation-contract.md) adds a separate
-parent integration boundary; protected backend and worker integration are pending. Activation fails with
-`DPONE_COMPOSITION_ADMISSION_UNAVAILABLE` until physical-target admission covers
-all constituents. Supplying a native-only workspace activation coordinator does
-not grant this authority. Preserve the existing active deployment. Local
-projection, cache installation, parse/selection checks, and successful artifact
-verification are not activation approvals.
+Public composition activation is the shipped
+[activation contract](composition-activation-contract.md) factory and the
+operator how-to
+[Operate Kubernetes composition supervision](guides/composition-supervisor-kubernetes.md).
+Cache-sync and desired-state require `--workspace-authority-connection-ref`.
+Authenticated v3 pack-exec reaches the native dbt parent worker when parent
+context exists, the ordinary transfer worker when that context and
+`DPONE_CACHE_ROOT` reopen the sealed plan, and the ClickHouse worker when those
+plus the sealed snapshot sidecar and enrolled supervisor/HTTP collaborators
+compose. Missing ClickHouse originals fail-close with
+`composition_ordinary_worker_unavailable`. Supplying a native-only workspace
+activation coordinator does not grant v3 authority. Local projection, cache
+installation, parse/selection checks, and successful artifact verification are
+not SQL execution and are not route certification. Live three-cell execution
+remains `UNVERIFIED`, never `PASS`.
 
 ## Diagnose a failed build or installation
 
@@ -93,7 +100,8 @@ verification are not activation approvals.
 | Existing immutable destination differs | Existing release descriptor and requested input pins | Retain the old release and choose a new destination for changed inputs |
 | Composition cache installation rejected | Full source sidecars, integrity subject, unchanged sidecar, and complete DAG selection | Restore the exact complete parent or regenerate it; repeat source admission through `release-materialize` |
 | Unknown release schema in a consumer | Installed core/provider/runtime versions | Upgrade compatible readers first; never relabel v3 as v1/v2 |
-| Activation admission unavailable | Physical-target admission for the full union | Keep the current deployment and use the separately approved activation process when available |
+| `composition_native_worker_unavailable` | Parent context or native factory missing at pack-exec | Restore activation identity and workspace authority; see the [supervisor how-to](guides/composition-supervisor-kubernetes.md) |
+| `composition_ordinary_worker_unavailable` | ClickHouse pack-exec, or ordinary pack-exec missing cache/plan/parent | Restore `DPONE_CACHE_ROOT` and parent identity; do not treat as a three-cell campaign pass |
 | SQL `control_schema_reference` or `login_gate_schema_reference` | Generated CHECK reference and the exact DDL producer | Follow the [controlled catalog capture procedure](composition-shared-sql-storage.md#catalog-reference-and-controlled-installation); retain failed capture evidence and rerun the new committed source after generation |
 | SQL `shared_transaction_identity` or trust `trust_ledger_lock` | Whether a callback closed, replaced or invalidated the protected transaction | Roll back the caller-owned transaction, retain uncertainty and recover from original records; reacquiring the same lock does not validate earlier observations |
 

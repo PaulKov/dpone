@@ -6,6 +6,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from dpone.app.composition_activation import build_composition_activation_coordinator
+from dpone.app.dbt_workspace_activation_composition import (
+    build_deployment_cache_workspace_activation_coordinator,
+)
+from dpone.contracts.dbt_workspace_activation import DbtWorkspaceActivationError
+from dpone.contracts.dbt_workspace_attempt import require_workspace_authority_connection_ref
 from dpone.readiness.airflow_self_service_models import SelfServiceResult, dpone_error, manual_fix
 from dpone.runtime.deployment_cache import (
     DeploymentCacheCurrentState,
@@ -90,6 +96,7 @@ def cache_sync_result(
     source_commit: str | None = None,
     attestation_ref: str | None = None,
     promotion_precondition: PromotionPrecondition | None = None,
+    workspace_authority_connection_ref: str | None = None,
 ) -> SelfServiceResult:
     """Promote one complete deployment projection with explicit platform acknowledgement."""
 
@@ -108,8 +115,36 @@ def cache_sync_result(
     )
     if policy_error is not None:
         return policy_error
+    if workspace_authority_connection_ref is not None:
+        try:
+            workspace_authority_connection_ref = require_workspace_authority_connection_ref(
+                workspace_authority_connection_ref
+            )
+        except DbtWorkspaceActivationError as exc:
+            return _failed(
+                exc.code,
+                str(exc),
+                path=str(deployment_dir),
+                environment=environment,
+            )
     try:
-        current = DeploymentCacheMaterializer(cache_root, allowed_promoters=allowed_promoters).promote(
+        workspace_activation = None
+        composition_activation = None
+        if workspace_authority_connection_ref is not None:
+            workspace_activation = build_deployment_cache_workspace_activation_coordinator(
+                cache_root=Path(cache_root),
+                authority_connection_ref=workspace_authority_connection_ref,
+            )
+            composition_activation = build_composition_activation_coordinator(
+                cache_root=Path(cache_root),
+                authority_connection_ref=workspace_authority_connection_ref,
+            )
+        current = DeploymentCacheMaterializer(
+            cache_root,
+            allowed_promoters=allowed_promoters,
+            workspace_activation=workspace_activation,
+            composition_activation_coordinator=composition_activation,
+        ).promote(
             deployment_dir,
             environment=environment,
             promoted_by=promoted_by,
@@ -118,6 +153,7 @@ def cache_sync_result(
             source_commit=source_commit,
             attestation_ref=attestation_ref,
             precommit_check=(promotion_precondition.enforce if promotion_precondition is not None else None),
+            workspace_authority_connection_ref=workspace_authority_connection_ref,
         )
     except DeploymentCacheError as exc:
         return _failed(

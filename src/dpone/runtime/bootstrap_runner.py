@@ -47,6 +47,11 @@ class DefaultProcessRunner:
         context: RunContext | None = None,
         dag_id: str | None = None,
         execution_date: Any | None = None,
+        sink_connection: Any | None = None,
+        state_connection: Any | None = None,
+        mssql_transaction_admission_service: Any | None = None,
+        composition_transaction_fence: Any | None = None,
+        source_extraction_lifecycle_service: Any | None = None,
     ) -> ProcessResult:
         from dpone.backfill.state_factory import BackfillStateStoreFactory
         from dpone.runtime.etl.backfill_orchestrator import execute_process_with_backfill
@@ -90,7 +95,8 @@ class DefaultProcessRunner:
         from dpone.runtime.rolling_window_admission import reject_orphan_window_chunking
 
         reject_orphan_window_chunking(process.config.load_config)
-        process.config.ensure_runtime_bindings()
+        _hydrate_invocation(process, sink_connection=sink_connection, state_connection=state_connection)
+        _bind_composition_fence(getattr(process.config, "sink_obj", None), composition_transaction_fence)
         native_transfer_runtime_service = NativeTransferRuntimeService(
             checkpoint_store=process.config.partition_checkpoint_store,
         )
@@ -110,6 +116,8 @@ class DefaultProcessRunner:
             native_transfer_runtime_service=native_transfer_runtime_service,
             route_capability_orchestrator=route_capability_orchestrator,
             load_governance_service=load_governance_service,
+            mssql_transaction_admission_service=mssql_transaction_admission_service,
+            source_extraction_lifecycle_service=source_extraction_lifecycle_service,
         )
         orchestration_options = {}
         if self._backfill_orchestrator_factory is not None:
@@ -157,6 +165,44 @@ class DefaultProcessRunner:
         return result
 
 
+def _hydrate_invocation(process: Any, *, sink_connection: Any | None, state_connection: Any | None) -> None:
+    """Hydrate with issued overlays when unbound; otherwise keep the existing path."""
+
+    overlays = sink_connection is not None or state_connection is not None
+    if process.config.source_obj is not None or not overlays:
+        process.config.ensure_runtime_bindings()
+        return
+    from dpone.ports.runtime_hydrator import ensure_runtime_hydrator
+    from dpone.runtime.bootstrap_hydrator import DefaultRuntimeHydrator
+    from dpone.runtime.errors import RuntimeConfigurationError
+
+    hydrator = ensure_runtime_hydrator()
+    if not isinstance(hydrator, DefaultRuntimeHydrator):
+        raise RuntimeConfigurationError("composition_issued_login_overlay_required")
+    process.config.apply_runtime_bindings(
+        hydrator.build(
+            config=process.config.raw_config,
+            load_config=process.config.load_config,
+            sink_connection=sink_connection,
+            state_connection=state_connection,
+        )
+    )
+
+
+def _bind_composition_fence(sink: Any, fence: Any) -> None:
+    if fence is None or sink is None:
+        return
+    from dpone.runtime.sinks.strategies.mssql.mssql_transaction_finalizer import (
+        MssqlGenericTransactionFinalizer,
+    )
+
+    def factory(strategy: Any, state_storage: Any, **kwargs: Any) -> Any:
+        return MssqlGenericTransactionFinalizer(strategy, state_storage, composition_fence=fence, **kwargs)
+
+    for strategy in getattr(sink, "_strategy_map", {}).values():
+        strategy.transaction_finalizer_factory = factory
+
+
 def _runtime_result_details(
     result: dict[str, Any],
     load_step_collector: RuntimeLoadStepAuditCollector,
@@ -200,12 +246,15 @@ def _processor(
     route_capability_orchestrator: Any,
     load_governance_service: Any,
     mssql_transaction_admission_service: Any | None = None,
+    source_extraction_lifecycle_service: Any | None = None,
 ) -> Any:
     from dpone.runtime.etl.processor import ETLProcessor
 
     options = {}
     if mssql_transaction_admission_service is not None:
         options["mssql_transaction_admission_service"] = mssql_transaction_admission_service
+    if source_extraction_lifecycle_service is not None:
+        options["source_extraction_lifecycle_service"] = source_extraction_lifecycle_service
     return ETLProcessor(
         source=bindings.source_obj,
         sink=bindings.sink_obj,

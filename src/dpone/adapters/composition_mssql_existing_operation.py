@@ -19,14 +19,15 @@ from dpone.adapters.composition_mssql_operations import (
 )
 from dpone.adapters.composition_mssql_ownership import SharedOwnerRecord, iter_shared_owners_in, read_shared_owner_in
 from dpone.adapters.composition_mssql_transaction import require_shared_transaction_in
-from dpone.contracts.composition_activation import CompositionActivationOccurrence, CompositionAdmissionError
-from dpone.contracts.composition_ownership import CompositionOwnerReference
-from dpone.contracts.composition_persistence import (
+from dpone.contracts.composition_control import (
+    CompositionActivationOccurrence,
+    CompositionAdmissionError,
     CompositionAttemptIdentity,
     CompositionAttemptReceipt,
     encode_attempt_identity,
     require_composition_attempt_scope,
 )
+from dpone.contracts.composition_ownership import CompositionOwnerReference
 
 if TYPE_CHECKING:
     from dpone.ports.composition_sql import CompositionSqlContext, ExecutionTerminalValidator

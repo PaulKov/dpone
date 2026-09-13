@@ -7,6 +7,7 @@ from threading import Lock
 from dpone.contracts.composition_activation import (
     CompositionActivationOccurrence,
     CompositionActivationReceipt,
+    CompositionAdmissionError,
     CompositionPhysicalResource,
 )
 from dpone.contracts.composition_attempt import CompositionAttemptIdentity
@@ -213,6 +214,8 @@ class Authority:
         self.close_error = False
         self.current_error = False
         self.calls = []
+        self.enrollment_calls = []
+        self.enrollments = {"original": b"supervisor-enrollment"}
 
     def load_prepared(self, attempt, generation_ref):
         assert self.value.attempt == attempt and self.value.generation.record_sha256 == generation_ref
@@ -226,6 +229,11 @@ class Authority:
             raise RuntimeError("closed gate")
         return self.parent
 
+    def require_enrollment(self, attempt, target):
+        self.enrollment_calls.append((attempt, target))
+        if not self.enrollments:
+            raise CompositionAdmissionError("enrollment_missing")
+
     def close_publisher(self, value):
         self.closed = True
         if self.close_error:
@@ -237,6 +245,9 @@ class Catalog:
     def __init__(self, value):
         self.value = observation(value)
         self.error = False
+
+    def can_classify_publication(self) -> bool:
+        return True
 
     def inspect(self, intent):
         if self.error:

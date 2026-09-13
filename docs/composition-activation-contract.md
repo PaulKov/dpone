@@ -1,17 +1,23 @@
 # Composition activation contract
 
-The base coordinator provides complete parent source, physical-admission and
-occurrence contracts. **Public composition activation and actual worker execution
-remain unavailable until protected backend adapters and worker fencing are
-installed and verified.** No production factory or new cache-sync CLI option is
-provided by this base change. The existing default returns
-`DPONE_COMPOSITION_ADMISSION_UNAVAILABLE`.
+The public factory
+`dpone.app.composition_activation.build_composition_activation_coordinator`
+constructs a separate v3 coordinator after verified schema admission. Cache-sync
+and desired-state use that factory when
+`--workspace-authority-connection-ref` (or the matching desired-state authority
+field) is present. Omitting the authority reference continues to fail closed
+with `DPONE_COMPOSITION_ADMISSION_UNAVAILABLE`. Native-v2 factories keep
+native-only behavior.
 
-This page describes the implemented integration boundary and the required
-follow-up acceptance. See [composition operations](release-composition-operations.md)
-for artifact delivery, and [the approved specification](feature-specs/composition-activation-execution.md)
+This page is the integration contract. Follow the
+[Kubernetes supervisor operations guide](guides/composition-supervisor-kubernetes.md)
+for provisioning, promotion, DAG trigger, evidence, and `COMMIT_UNKNOWN`
+recovery. See [composition operations](release-composition-operations.md) for
+artifact delivery, and [the approved specification](feature-specs/composition-activation-execution.md)
 for the full execution scope. A successful source read, plan, fake-adapter test,
-cache install or launcher prepare does not certify SQL execution.
+cache install or launcher prepare does not certify SQL execution. Offline tests
+are not route certification. A skipped live campaign is `UNVERIFIED`, never
+`PASS`.
 
 The separate [ClickHouse snapshot component](composition-clickhouse-snapshots.md)
 defines strict whole-snapshot intents and one-time EXCHANGE/recovery policy.
@@ -22,6 +28,41 @@ The internal [scoped owner original](composition-scoped-execution-originals.md)
 describes complete retained reads and helper effects while preserving the
 activation request and attempt write projection. Its pure comparisons do not
 enable this coordinator or the current SQL store to admit scoped execution.
+
+## Worker integration components
+
+The current implementation includes sealed deployment inputs and protected
+connection construction, independent physical enrollment readers, and a parent
+worker lifecycle. The worker admits once, issues credentials once, executes,
+closes access, observes quiescence and business outcome, and persists the exact
+terminal receipt. Missing evidence retains blocking ownership.
+
+The shared dbt service selects either native-v2 admission or parent admission.
+The parent branch rechecks the actual preflight manifest before build. Its
+issued profile renderer replaces ambient credentials; the protected Linux
+capture requires a separate child UID and durable supervisor records. A dbt
+exit code or a writable local result file is not a parent outcome proof.
+
+For PostgreSQL-to-MSSQL transfers, the target transaction and target-atomic state
+share the target database. The protected composition control database is a
+**separate database on the same SQL Server instance**. The platform installs
+`render_composition_mssql_transaction_fence(control_database=..., control_schema=...)`
+from `dpone.adapters.composition_mssql_transaction_fence_schema` as external SQL
+batches. The issued worker receives only EXECUTE on `composition_require_transfer`
+in the control database. It receives no controller role or ledger table access.
+The procedure holds the shared control lock inside the actual target transaction.
+The binding includes the complete operation, exact target, mutation plan, parent
+attempt, issued SID and retained epochs; a receipt replay must match that binding.
+
+The ClickHouse transport accepts only typed generation creation, Native insert
+and snapshot exchange requests. Its SQL dispatch journal claims before network
+I/O, retains complete response observations and prevents closure while a claim
+is unresolved. A lost claim acknowledgement never permits a resend. See the
+[dispatch closure decision](adr/0063-clickhouse-composition-dispatch-closure.md)
+for the required protected supervisor and network boundary. These components do
+not by themselves certify a live provider-to-worker campaign. Live three-cell
+execution remains `UNVERIFIED` until the isolated Linux x86-64 campaign retains
+evidence.
 
 ## Concrete SQL Server persistence
 
@@ -36,6 +77,11 @@ writer exclusion.
 The platform installs the SQL from
 `dpone.adapters.composition_mssql_schema.render_composition_mssql_schema()`
 explicitly, then provisions and protects the authority and domain records.
+Supervised execution additionally requires administrator-installed
+`render_execution_evidence_schema()` and `render_dbt_capture_schema()` batches;
+base control and login-gate installation does not create these tables. See the
+[administrator provisioning instructions](guides/composition-supervisor-kubernetes.md#administrator-provisioning)
+for producers, order, permissions and catalog verification.
 Reapplying the initial DDL fails rather than adopting existing tables. Runtime
 operations never create, repair or enroll their own authority. Each transaction
 requires schema version 2, the externally pinned service UUID and the complete
@@ -78,9 +124,9 @@ before any epoch is advanced.
 
 Offline adapter tests use explicit DB-API doubles. The separate synthetic SQL
 component runner exercises real control transactions; neither is the full
-current/provider/native/generated/ordinary execution campaign. Public activation
-remains unavailable until the complete protected backend and worker path is
-installed and verified.
+current/provider/native/generated/ordinary execution campaign and neither is
+route certification. Public factory and cache-sync authority are shipped; the
+complete live campaign remains `UNVERIFIED`.
 
 ## SQL Server attempt and connection gates
 
@@ -200,9 +246,9 @@ the `store` profile supplies no such evidence.
 
 | Workload | Required route | Base contract | Actual parent execution |
 |---|---|---|---|
-| Native dbt | Verified SQL Server execution-pack.v2 | Full native workflow/model/helper ownership | UNVERIFIED; protected SQL login gate and worker integration pending |
-| Native-generated transfer | MSSQL to ClickHouse full_refresh | Separate producer-aware classifier; positive cumulative max_source_bytes required | UNVERIFIED; protected CH gate, Atomic publication and canonical route evidence pending |
-| Ordinary transfer | PostgreSQL to MSSQL full_refresh | Explicit external target_atomic state; table extraction only | UNVERIFIED; parent fence inside the actual target transaction pending |
+| Native dbt | Verified SQL Server execution-pack.v2 | Full native workflow/model/helper ownership | Installed cell `sqlserver_dbt_v1`; live campaign `UNVERIFIED` |
+| Native-generated transfer | MSSQL to ClickHouse full_refresh | Separate producer-aware classifier; positive cumulative max_source_bytes required | Installed cell `mssql_clickhouse_full_refresh_v1`; live campaign `UNVERIFIED` |
+| Ordinary transfer | PostgreSQL to MSSQL full_refresh | Explicit external target_atomic state; table extraction only | Installed cell `postgres_mssql_full_refresh_v1`; live campaign `UNVERIFIED` |
 | Other cells, including ordinary MSSQL to ClickHouse | Not in this initial matrix | Rejected | Unsupported |
 
 The required downstream spans SQL Server and ClickHouse. A SQL Server-only
@@ -242,9 +288,27 @@ budget. They are not stripped into an ordinary-manifest shape. The protected
 backend must subsequently validate all option effects, physical design, state,
 permissions, enrollment and writer-session capabilities.
 
-Application integrators construct
+Production callers use
+`dpone.app.composition_activation.build_composition_activation_coordinator(*,
+cache_root, authority_connection_ref, control_schema="dpone_control")`. That
+factory installs callable roots for `sqlserver_dbt_v1`,
+`postgres_mssql_full_refresh_v1`, and `mssql_clickhouse_full_refresh_v1`. It
+does not pass a v3 parent to the native-only coordinator. At DAG trigger,
+`sqlserver_dbt_v1` can reach a worker root when parent context exists.
+`postgres_mssql_full_refresh_v1` can reach `CompositionTransferExecutionRoot`
+when that context and `DPONE_CACHE_ROOT` reopen the sealed plan.
+`mssql_clickhouse_full_refresh_v1` can reach
+`CompositionClickHouseExecutionRoot` when that plan, protected runtime snapshot
+capture, and enrolled supervisor/HTTP collaborators compose. Pack-exec does
+not start login or ingest until an independent transfer observer can prove
+receipt/row/content, or until catalog inspect can independently classify
+publication; missing that proof fail-closes as
+`composition_ordinary_worker_unavailable`. That three-cell trigger campaign
+is not ready.
+
+Application integrators that construct
 `dpone.services.composition_activation_coordinator.CompositionActivationCoordinator`
-with keyword capabilities `inputs`, `preparation` and `stores`.
+directly still supply keyword capabilities `inputs`, `preparation` and `stores`.
 `CompositionActivationPreparation(physical=...)` uses
 `CompositionPhysicalAdmissionService(backend=...)` to merge aliases before
 physical observation. The ports document the protected transaction and session
@@ -322,8 +386,7 @@ attempts across native and ordinary workloads.
 
 A terminal receipt requires independent closed-gate, server-quiescence and durable
 outcome evidence. A closed gate or exited process does not resolve an unknown SQL
-commit. No TTL may release its resource ownership. These policy checks still need
-to be connected to actual worker sessions and target transactions.
+commit. No TTL may release its resource ownership. The installed roots apply these checks when pack-exec reaches them. Ordinary pack-exec reaches the transfer root only with parent context and a reopened cache plan. ClickHouse pack-exec reaches `CompositionClickHouseExecutionRoot` when that plan, protected runtime snapshot capture, and enrolled supervisor/HTTP collaborators compose; missing originals fail-close. A missing live observation remains `UNVERIFIED`, not a pass.
 
 ## Downstream CI and recovery acceptance
 
@@ -356,19 +419,29 @@ ClickHouse recovery must compare persisted before/after UUID identities: blindly
 retrying EXCHANGE can exchange the tables back. Close and drain stage writers
 before exposing that UUID as the target. Deployment rollback does not undo SQL.
 
-Current acceptance gaps are explicit:
+Current live acceptance remains `UNVERIFIED` until the isolated Linux x86-64
+campaign retains provider-to-worker evidence for every installed cell. That
+campaign is not ready: shipped pack-exec reaches `sqlserver_dbt_v1` when
+parent context exists, `postgres_mssql_full_refresh_v1` when that context
+and `DPONE_CACHE_ROOT` reopen the sealed plan, and
+`mssql_clickhouse_full_refresh_v1` when that plan, protected runtime snapshot
+capture, and enrolled supervisor/HTTP collaborators compose. ClickHouse
+catalog inspect hashes actual HTTP responses and does not invent typed B
+content, so publication stays `COMMIT_UNKNOWN` without independent content
+parity. Offline tests and SQL component profiles are not that campaign and
+are not route certification.
 
-- Protected SQL Server enrollment, one-time login issuance, LOGON closure barrier,
-  DMV quiescence and actual dbt/ordinary worker credential injection.
+- Protected SQL Server enrollment, one-time login issuance, LOGON closure, DMV
+  quiescence, and issued dbt/ordinary credentials must be observed on the pinned
+  server version.
 - ClickHouse physical enrollment, per-attempt writer closure, staged snapshot
-  publication with atomic EXCHANGE and durable recovery intent.
-- Genuine route qualification and the separately approved
-  [nonproduction authority family](feature-specs/nonproduction-composition-authority.md)
-  for the synthetic campaign. Existing production/native-v2 requirements retain
-  their meaning; local synthetic receipts cannot be relabeled as production.
-- The public authority-aware app factory/CLI and complete current/provider/SQL
-  reconciliation run. Local ARM64 Docker is not the vendor-supported SQL Server
-  container cell; use an isolated Linux x86-64 runner for that proof.
+  publication with atomic EXCHANGE, and durable recovery intent must be observed
+  on the pinned service.
+- Genuine route qualification still requires the separately approved
+  [nonproduction authority family](feature-specs/nonproduction-composition-authority.md).
+  Local synthetic receipts cannot be relabeled as production.
+- Local ARM64 Docker is not the vendor-supported SQL Server container cell.
 
-The base contracts are reviewable independently. These gaps remain requirements
-for completing the feature and declaring downstream readiness.
+The public factory, supervisor build flags, and
+`--workspace-authority-connection-ref` are shipped. Operate them from the
+[Kubernetes supervisor guide](guides/composition-supervisor-kubernetes.md).

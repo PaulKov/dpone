@@ -336,6 +336,7 @@ def pytest_runtest_makereport(item, call):
     result = yield
     if item.nodeid.split("::", 1)[0] not in {
         "tests/integration/composition/test_composition_mssql_gate_live.py",
+        "tests/integration/composition/test_composition_mssql_transfer_fence_live.py",
         "tests/integration/composition/test_composition_mssql_gate_recovery_live.py",
     }:
         return
@@ -378,6 +379,8 @@ def failure_locations(error):
             "test_composition_mssql_gate_live.py",
             "test_composition_mssql_gate_recovery_live.py",
             "mssql_gate_live_support.py",
+            "test_composition_mssql_transfer_fence_live.py",
+            "mssql_transfer_fence_live_support.py",
             "mssql_gate_live_provisioning.py",
             "mssql_gate_live_outcomes.py",
         )

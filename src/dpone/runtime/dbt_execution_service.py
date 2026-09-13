@@ -60,6 +60,7 @@ from dpone.runtime.dbt_sqlserver_project_policy import (
 from dpone.runtime.dbt_workspace_attempt_lifecycle import DbtWorkspaceAttemptLifecycle
 
 if TYPE_CHECKING:
+    from dpone.ports.composition_dbt import CompositionDbtBuildAuthority
     from dpone.ports.dbt_workspace_attempt import (
         DbtWorkspaceAttemptAdmissionPort,
         DbtWorkspaceAttemptRequest,
@@ -84,6 +85,7 @@ class DbtExecutionService:
         evidence_writer: DbtExecutionEvidenceWriter,
         workspace_attempt_factory: DbtWorkspaceAttemptRequestFactoryPort | None = None,
         workspace_attempt_admission: DbtWorkspaceAttemptAdmissionPort | None = None,
+        composition_attempt: CompositionDbtBuildAuthority | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._command_runner = command_runner
@@ -98,6 +100,7 @@ class DbtExecutionService:
             run_results_reader=run_results_reader,
             request_factory=workspace_attempt_factory,
             admission=workspace_attempt_admission,
+            composition_attempt=composition_attempt,
         )
         self._clock = clock or (lambda: datetime.now(UTC))
 
@@ -145,11 +148,8 @@ class DbtExecutionService:
                 validated_pack.adapter_runtime,
             )
             credential_versions = rendered.credential_versions
-            if rendered.logical_target_sha256 != dbt_target_identity_sha256(invocation_profile):
-                raise DbtPublishingError(
-                    "DPONE_DBT_TARGET_IDENTITY_MISMATCH",
-                    "Rendered dbt target identity differs from the release",
-                )
+            expected_target = dbt_target_identity_sha256(invocation_profile)
+            self._workspace_attempts.require_target(expected_target, rendered.logical_target_sha256)
             output_paths = prepare_dbt_output_paths(
                 Path(run_output_root),
                 validated_pack.target_path,

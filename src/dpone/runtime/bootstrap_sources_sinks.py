@@ -246,3 +246,43 @@ class RuntimeEndpointFactory:
 
 
 __all__ = ["RuntimeEndpointFactory"]
+
+
+def close_runtime_resources(*resources: Any) -> None:
+    """Close distinct invocation connectors, including partially hydrated state.
+
+    Traverse only known ownership links. Attempt every close even when a driver
+    fails; report failure without retaining driver text or credentials.
+    """
+    links = (
+        "source_obj",
+        "sink_obj",
+        "connector",
+        "state_storage",
+        "run_state_storage",
+        "xmin_state_storage",
+        "xmin_handoff_state_storage",
+        "partition_checkpoint_store",
+        "shared_mssql_state_connector",
+        "shared_postgres_state_connector",
+        "shared_bq_connector",
+        "kafka_offset_state_storage",
+        "load_audit_storage",
+    )
+    pending = list(resources)
+    seen: set[int] = set()
+    failed = False
+    while pending:
+        resource = pending.pop()
+        if resource is None or id(resource) in seen:
+            continue
+        seen.add(id(resource))
+        pending.extend(getattr(resource, name, None) for name in links)
+        closer = getattr(resource, "close", None)
+        if callable(closer):
+            try:
+                closer()
+            except Exception:
+                failed = True
+    if failed:
+        raise RuntimeConfigurationError("runtime_connection_cleanup_failed") from None

@@ -1058,7 +1058,10 @@ SQL execution and workspace activation authority.
 Use [release composition](release-composition.md) to deliver one complete native
 workspace and independently authored ordinary transfer packs in an explicit
 `dpone.release-set.v3` parent. Native v2 authority and bytes remain intact. Upgrade
-all readers before using v3. Composition activation is unavailable until physical
-admission covers every constituent; see the
-[contracts](release-composition-reference.md) and
-[migration and recovery guide](release-composition-operations.md).
+all readers before using v3. v3 runtime pods require the sealed supervisor
+capability and never fall back to native-v2 or generic `dpone run`. See the
+[contracts](release-composition-reference.md),
+[migration and recovery guide](release-composition-operations.md), and
+[Kubernetes supervisor operations](guides/composition-supervisor-kubernetes.md).
+A successful parse or READY marker is not SQL execution. Live three-cell
+execution remains `UNVERIFIED` until the isolated campaign retains evidence.

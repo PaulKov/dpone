@@ -715,6 +715,48 @@ def test_materialize_downloads_exact_pins_without_activating_current(tmp_path: P
     assert repeated.local_deployment_state == "no_op"
 
 
+def test_materialize_rejects_supervisor_mismatch_before_remaining_downloads(tmp_path: Path) -> None:
+    source_cache = tmp_path / "source-cache"
+    release_id, deployment_id = write_exact_test_projection(source_cache)
+    registry = _registry(tmp_path)
+    AirflowArtifactPublisher(registry=registry).publish(
+        _publish_request(
+            source_cache,
+            release_id,
+            deployment_id,
+            publication_mode="exact",
+        )
+    )
+    remote_index = (
+        tmp_path
+        / "registry"
+        / "s3"
+        / "dpone-artifacts"
+        / "airflow"
+        / "deployments"
+        / "dev"
+        / _digest_dir(deployment_id)
+        / "airflow-index.json"
+    )
+    index = json.loads(remote_index.read_bytes())
+    index["composition_supervisor"] = {
+        "schema": "dpone.composition-supervisor.v1",
+        "persistent_volume_claim": "dpone-composition-supervisor",
+        "child_uid_start": 1_000_000_000,
+        "child_gid_start": 1_000_000_000,
+        "child_identity_count": 1_000_000,
+    }
+    remote_index.write_text(json.dumps(index, sort_keys=True), encoding="utf-8")
+
+    with pytest.raises(AirflowArtifactDeliveryError) as exc_info:
+        AirflowArtifactMaterializer(registry=registry).materialize(
+            _materialize_request(tmp_path / "target-cache", release_id, deployment_id)
+        )
+
+    assert exc_info.value.code == "DPONE_COMPOSITION_SUPERVISOR_MISMATCH"
+    assert exc_info.value.details["downloaded_objects"] == 3
+
+
 def test_publish_and_materialize_preserve_exact_semantic_refresh_sidecar(
     tmp_path: Path,
 ) -> None:

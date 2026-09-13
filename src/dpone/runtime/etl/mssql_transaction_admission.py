@@ -30,15 +30,11 @@ from dpone.runtime.etl.mssql_schema_preplan import (
     MssqlSchemaPreplanner,
 )
 from dpone.runtime.etl.mssql_transaction_identity import (
-    build_mssql_attempt_request,
-    invocation_identity,
-    operation_request,
-    require_source_physical_identity_binding,
-    resolve_source_physical_identity,
+    derive_mssql_runtime_requests as _locally_derived_requests,
 )
-from dpone.runtime.etl.mssql_transaction_request import (
-    attempt_target_coordinates,
-    live_target_coordinates,
+from dpone.runtime.etl.mssql_transaction_identity import (
+    invocation_identity,
+    require_source_physical_identity_binding,
 )
 from dpone.runtime.etl.portable_scope_preflight import prepare_portable_scope_binding
 from dpone.runtime.governance.mssql_hook_replay_policy import (
@@ -78,12 +74,20 @@ class MssqlTransactionAdmissionService:
         operation_lease_factory: Any = MssqlOperationLeaseHeartbeat,
         operation_scope_refresher: Callable[[Any], Any] | None = None,
         start_operation_lease_on_admission: bool = False,
+        operation_registrar: Callable[..., None] | None = None,
+        preplan_verifier: Callable[..., Any] | None = None,
+        composition_fence: Any | None = None,
+        fence_connector: Any | None = None,
     ) -> None:
         self._target_resolver = target_resolver
         self._state_factory = state_factory or MssqlGenericTransactionState.from_state_storage
         self._operation_lease_factory = operation_lease_factory
         self._operation_scope_refresher = operation_scope_refresher
         self._start_operation_lease_on_admission = start_operation_lease_on_admission
+        self._operation_registrar = operation_registrar
+        self._preplan_verifier = preplan_verifier
+        self._composition_fence = composition_fence
+        self._fence_connector = fence_connector
 
     def prepare(
         self,
@@ -194,6 +198,18 @@ class MssqlTransactionAdmissionService:
                     sink=sink,
                     admission=admission,
                 )
+                if self._operation_registrar is not None:
+                    digest = options[MSSQL_SCHEMA_PREPLAN_OPTION].target_mutation_plan.digest
+                    if self._preplan_verifier is None:
+                        self._operation_registrar(admission, digest)
+                    else:
+                        reference = self._preplan_verifier(
+                            admission,
+                            source=source,
+                            prepared_boundary=prepared_boundary,
+                            submitted_mutation_sha256=digest,
+                        )
+                        self._operation_registrar(admission, digest, preplan_reference=reference)
             except BaseException as primary:
                 if prepared_boundary is not None:
                     prepared_boundary.abort_preserving(primary)
@@ -203,13 +219,21 @@ class MssqlTransactionAdmissionService:
                 raise
         return replace(load_config, options=options)
 
-    @staticmethod
-    def replay_result(load_config: Any) -> Any | None:
+    def replay_result(self, load_config: Any) -> Any | None:
         """Project exact receipt metrics before any source or payload work."""
 
         admission = (getattr(load_config, "options", {}) or {}).get(ADMISSION_OPTION)
         if not isinstance(admission, MssqlTransactionAdmission) or admission.replay_receipt is None:
             return None
+        if self._composition_fence is not None:
+            connector = self._fence_connector
+            if connector is None:
+                raise RuntimeError("mssql_transaction.composition_fence_connector_required")
+            try:
+                connector.begin()
+                self._composition_fence.require_current(connector, receipt=admission.replay_receipt)
+            finally:
+                connector.rollback()
         return load_result_from_mssql_receipt(
             admission.replay_receipt,
             outcome=AtomicCommitOutcome.REPLAY_SUPPRESSED,
@@ -330,37 +354,6 @@ def _parent_receipt_authority(
     ):
         raise RuntimeError("mssql_transaction.parent_receipt_authority_invalid")
     return authority
-
-
-def _locally_derived_requests(
-    load_config: Any,
-    *,
-    source: Any,
-    sink: Any,
-    state_storage: Any,
-    target_resolver: Any,
-    invocation: Any,
-    load_id: str,
-) -> tuple[MssqlAttemptRequest, MssqlOperationRequest]:
-    live_database, identity_schema, identity_table = live_target_coordinates(load_config)
-    physical = target_resolver(
-        sink.connector,
-        state_storage,
-        database=live_database,
-        schema=identity_schema,
-        table=identity_table,
-    )
-    source_identity = resolve_source_physical_identity(source, load_config)
-    coordinates = attempt_target_coordinates(load_config, physical_target=physical)
-    attempt = build_mssql_attempt_request(
-        load_config,
-        invocation=invocation,
-        target_identity=physical.digest,
-        source_identity=source_identity,
-        load_id=load_id,
-        request_coordinates=coordinates,
-    )
-    return attempt, operation_request(load_config, invocation)
 
 
 __all__ = ["ADMISSION_OPTION", "MssqlTransactionAdmissionService"]
