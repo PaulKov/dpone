@@ -123,7 +123,13 @@ class ClickHouseNativeSource:
         if window is not None:
             if window.column not in dict(schema) or not temporal(dict(schema)[window.column]):
                 raise ValueError("mssql_native.window_column_missing")
-            query += f" WHERE {_identifier(window.column)} >= toDateTime64(%(start)s, 6, 'UTC') AND {_identifier(window.column)} < toDateTime64(%(end)s, 6, 'UTC')"
+            # Qualify the physical column: ClickHouse can otherwise substitute
+            # its SELECT alias, which contains integer microseconds, into WHERE.
+            source_column = f"`__dpone_native_source`.{_identifier(window.column)}"
+            query += (
+                f" AS `__dpone_native_source` WHERE {source_column} >= toDateTime64(%(start)s, 6, 'UTC')"
+                f" AND {source_column} < toDateTime64(%(end)s, 6, 'UTC')"
+            )
             query_params = {
                 "start": window.start.strftime("%Y-%m-%d %H:%M:%S.%f"),
                 "end": window.end.strftime("%Y-%m-%d %H:%M:%S.%f"),

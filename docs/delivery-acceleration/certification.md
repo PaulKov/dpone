@@ -313,3 +313,8 @@ Hermetic fixtures validate this seam and producer/parser contracts. They do not
 prove actual BCP fidelity, SQL rollback, server performance or public SWITCH
 admission. DDA-06 must connect the reviewed producer and DDA-01 consumer, run
 fresh integration validation, and preserve this distinction in any release claim.
+
+## Disposable local Docker procedure
+
+Use the [local Docker runbook](local-docker.md) for the real source/BCP factory,
+required environment, maintenance behavior and limits of the local experiment.
