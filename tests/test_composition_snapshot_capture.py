@@ -66,7 +66,7 @@ def capture_env(runtime, monkeypatch, tmp_path):
         data = cursor.connection.data
         if "composition_ch_gate_bindings] b JOIN" in statement:
             return [(closure["user"],)] if "user" in closure else []
-        if statement.startswith("SELECT TOP (2) proof_document"):
+        if statement.startswith("SELECT TOP (2)") and "proof_document" in statement and "proofs]" in statement:
             from dpone.contracts.composition_persistence import encode_attempt_proof
 
             proof = closure.get("proofs", {}).get(params[-1])
@@ -404,3 +404,100 @@ def test_actual_capture_page_rejection_leaves_only_claim(capture_env, monkeypatc
     with pytest.raises(CompositionAdmissionError, match="snapshot_materialization_page_budget"):
         env.service.capture_once(subject.attempt)
     assert set(env.store.read(subject.attempt)[1]) == {"CLAIMED"}
+
+
+@pytest.mark.parametrize("fail_at", [1, 2])
+def test_service_custody_failure_around_source_keeps_claim_without_capture(capture_env, fail_at):
+    env = capture_env
+    calls = []
+
+    def custody():
+        calls.append(len(calls) + 1)
+        if len(calls) == fail_at:
+            raise CompositionAdmissionError("custody_drift")
+
+    service = CompositionClickHouseCapture(
+        store=env.store, files=env.files, source_reader=env.source, catalog=env.catalog, require_custody=custody
+    )
+    with pytest.raises(CompositionAdmissionError, match="custody_drift"):
+        service.capture_once(env.subject.attempt)
+    assert set(env.store.read(env.subject.attempt)[1]) == {"CLAIMED"}
+    assert not list(env.root.iterdir())
+    assert bool(env.cursor.statements) is (fail_at == 2)
+
+
+def test_custody_callback_cannot_return_a_boolean_as_proof(capture_env):
+    env = capture_env
+    service = CompositionClickHouseCapture(
+        store=env.store, files=env.files, source_reader=env.source, catalog=env.catalog, require_custody=lambda: True
+    )
+    with pytest.raises(CompositionAdmissionError, match="snapshot_capture_custody"):
+        service.capture_once(env.subject.attempt)
+    assert not env.cursor.statements
+
+
+def test_custody_brackets_source_and_catalog_observation(capture_env, monkeypatch):
+    env = capture_env
+    events = []
+    source_read = env.source.read_snapshot
+    catalog_read = env.catalog.observe_capture
+
+    def source():
+        events.append("source")
+        return source_read()
+
+    def catalog(*args, **kwargs):
+        events.append("catalog")
+        return catalog_read(*args, **kwargs)
+
+    monkeypatch.setattr(env.source, "read_snapshot", source)
+    monkeypatch.setattr(env.catalog, "observe_capture", catalog)
+    service = CompositionClickHouseCapture(
+        store=env.store,
+        files=env.files,
+        source_reader=env.source,
+        catalog=env.catalog,
+        require_custody=lambda: events.append("custody"),
+    )
+    service.capture_once(env.subject.attempt)
+    assert events == ["custody", "source", "custody", "custody", "catalog", "custody"]
+
+
+def test_custody_drift_after_materialization_prevents_generation_seal(capture_env):
+    env = capture_env
+    captured = env.service.capture_once(env.subject.attempt)
+    env.catalog.ingested = True
+    checks = []
+
+    def custody():
+        checks.append(None)
+        if len(checks) == 2:
+            raise CompositionAdmissionError("custody_drift")
+
+    service = CompositionClickHouseCapture(
+        store=env.store, files=env.files, source_reader=env.source, catalog=env.catalog, require_custody=custody
+    )
+    with pytest.raises(CompositionAdmissionError, match="custody_drift"):
+        service.finalize(captured, *_closure(env))
+    assert "GENERATION_SEALED" not in env.store.read(env.subject.attempt)[1]
+
+
+def test_custody_is_rechecked_when_source_read_raises(capture_env, monkeypatch):
+    env = capture_env
+    checks = []
+
+    def failed_source():
+        raise OSError("source disconnected")
+
+    monkeypatch.setattr(env.source, "read_snapshot", failed_source)
+    service = CompositionClickHouseCapture(
+        store=env.store,
+        files=env.files,
+        source_reader=env.source,
+        catalog=env.catalog,
+        require_custody=lambda: checks.append(None),
+    )
+    with pytest.raises(OSError, match="source disconnected"):
+        service.capture_once(env.subject.attempt)
+    assert checks == [None, None]
+    assert set(env.store.read(env.subject.attempt)[1]) == {"CLAIMED"}

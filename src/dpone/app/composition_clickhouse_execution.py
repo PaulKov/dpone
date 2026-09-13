@@ -97,6 +97,7 @@ class CompositionClickHouseExecutionDependencies:
     can_classify_publication: bool = False
     limits: SnapshotLimits | None = None
     capture: Any | None = None
+    worker_gate: Any | None = None
 
 
 class CompositionClickHouseExecutionRoot:
@@ -126,7 +127,7 @@ class CompositionClickHouseExecutionRoot:
         )
         worker: CompositionWorker[Any] = CompositionWorker(
             attempts=self._deps.attempts,
-            gate=self._deps.gate,
+            gate=self._deps.gate if self._deps.worker_gate is None else self._deps.worker_gate,
             outcome_observer=self._deps.outcome_observer,
         )
         result = worker.run(attempt, execute=lambda credentials: self._refresh(request, attempt, credentials))

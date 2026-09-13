@@ -186,6 +186,16 @@ external service teardown requires the existing host/quiescence recovery barrier
 No background retry, unbounded detached thread or forced-cancellation assumption
 is introduced.
 
+### Custody callback transaction boundary
+
+The host custody callback is SQL-free: it obtains authenticated host facts and
+compares them with the exact composition-pinned enrollment. The same callback
+brackets source and catalog observation and immutable file operations. A separate
+`require_enrollment_in(ledger, subject)` callback reopens SQL enrollment using the
+capture store's existing pinned ledger, including before write commit. Historical
+readers reuse that supplied ledger and validate terminal history. Neither callback
+opens a nested control transaction or uses an ambient current-ledger registry.
+
 ## Algorithm and state
 
 1. Authenticate the v2 bounded request before accepting its subject. Reserve a

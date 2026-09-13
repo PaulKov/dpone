@@ -36,13 +36,18 @@ if TYPE_CHECKING:
 _KINDS = ("CLOSED_GATES", "QUIESCENCE", "OUTCOME")
 
 
-def _issued_in(
+def read_issued_authorities_in(
     context: CompositionSqlContext,
     attempt: CompositionAttemptIdentity,
     *,
     expected_service_id: str,
     transaction_id: int,
 ) -> tuple[CompositionProofAuthority, ...]:
+    """Read the complete immutable issuance set on an already pinned ledger.
+
+    This original reader grants no execution or retry permission. Its caller
+    independently verifies operation scope and retains the transaction identity.
+    """
     rows = _rows_in(
         context,
         "SELECT TOP (8193) connector, LOWER(CONVERT(char(36), service_id)), principal_id "
@@ -104,7 +109,7 @@ def select_terminal_hashes_in(
     transaction = require_shared_transaction_in(context, expected_service_id=expected_service_id)
     _require_attempt(attempt)
     require_digest(outcome)
-    issued = _issued_in(context, attempt, expected_service_id=expected_service_id, transaction_id=transaction)
+    issued = read_issued_authorities_in(context, attempt, expected_service_id=expected_service_id, transaction_id=transaction)
     selected = []
     for kind in _KINDS:
         require_shared_transaction_in(context, expected_service_id=expected_service_id, transaction_id=transaction)
@@ -143,7 +148,7 @@ def require_proofs_in(
         raise CompositionAdmissionError("terminal_evidence")
     if expected_outcome_state not in ("SUCCEEDED", "FAILED", "COMMIT_UNKNOWN"):
         raise CompositionAdmissionError("terminal_outcome_state")
-    issued = _issued_in(context, attempt, expected_service_id=expected_service_id, transaction_id=transaction)
+    issued = read_issued_authorities_in(context, attempt, expected_service_id=expected_service_id, transaction_id=transaction)
     if {(value.connector, value.service_id) for value in issued} != services:
         raise CompositionAdmissionError("terminal_issued_authorities")
     selected = []

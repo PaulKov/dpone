@@ -54,16 +54,19 @@ class MssqlSnapshotCaptureStore:
         expected_service_id: str,
         source_verifier: Callable[[CompositionAttemptIdentity], SnapshotCaptureSubject],
         control_schema: str = "dpone_control",
+        require_enrollment_in: Callable[[CompositionMssqlLedger, SnapshotCaptureSubject], None] | None = None,
     ) -> None:
-        if not callable(source_verifier):
+        if not callable(source_verifier) or (require_enrollment_in is not None and not callable(require_enrollment_in)):
             raise CompositionAdmissionError("snapshot_capture_source_verifier")
         self._factory, self._service, self._schema = connection_factory, expected_service_id, control_schema
         self._verify = source_verifier
+        self._enrollment = require_enrollment_in
 
     def _transaction(self):
         return composition_control_transaction(self._factory, self._schema, self._service)
 
-    def _authorize(self, ledger: Any, subject: SnapshotCaptureSubject, *, active: bool) -> None:
+    def _authorize(self, ledger: Any, subject: SnapshotCaptureSubject, *, active: bool) -> object:
+        cursor, transaction = ledger.cursor, ledger.require_transaction()
         subject.__post_init__()
         if self._verify(subject.attempt) != subject:
             raise CompositionAdmissionError("snapshot_capture_source_binding")
@@ -76,11 +79,20 @@ class MssqlSnapshotCaptureStore:
         if resource is None or subject.target.write_subject_sha256 not in resource.write_subjects:
             raise CompositionAdmissionError("snapshot_capture_target")
         require_snapshot_capture_schema(ledger.cursor, self._schema)
-        ledger.require_transaction()
+        if not active and receipt.state in {"SUCCEEDED", "FAILED"}:
+            ledger.terminal_validator(ledger, occurrence, receipt)
+        if self._enrollment is not None:
+            self._enrollment(ledger, subject)
+        if ledger.cursor is not cursor or (ledger.schema, ledger.expected_service_id) != (self._schema, self._service):
+            raise CompositionAdmissionError("snapshot_capture_context")
+        ledger.require_transaction(transaction)
+        return occurrence, receipt
 
     def _read(self, ledger: Any, subject: SnapshotCaptureSubject) -> dict[str, bytes]:
         ledger.cursor.execute(
-            f"SELECT TOP (4) phase,subject_sha256,LOWER(CONVERT(char(36),generation_uuid)),document_sha256,document FROM {ledger.table('snapshot_captures')} WITH (HOLDLOCK) WHERE operation_key=?;",
+            f"SELECT TOP (4) phase,subject_sha256,LOWER(CONVERT(char(36),generation_uuid)),document_sha256,"
+            f"CASE WHEN DATALENGTH(document) BETWEEN 1 AND {MAX_CAPTURE_METADATA_BYTES} THEN document END "
+            f"FROM {ledger.table('snapshot_captures')} WITH (HOLDLOCK) WHERE operation_key=?;",
             subject.attempt.attempt_sha256,
         )
         events: dict[str, bytes] = {}
@@ -120,7 +132,7 @@ class MssqlSnapshotCaptureStore:
             proofs = []
             for field, kind in (("closed_gates_sha256", "CLOSED_GATES"), ("quiescence_sha256", "QUIESCENCE")):
                 ledger.cursor.execute(
-                    f"SELECT TOP (2) proof_document FROM {ledger.table('proofs')} WITH (HOLDLOCK) "
+                    f"SELECT TOP (2) CASE WHEN DATALENGTH(proof_document) BETWEEN 1 AND 8388608 THEN proof_document END FROM {ledger.table('proofs')} WITH (HOLDLOCK) "
                     "WHERE operation_key=? AND operation_family='execution' AND kind=? AND proof_sha256=?;",
                     subject.attempt.attempt_sha256,
                     kind,
@@ -141,9 +153,33 @@ class MssqlSnapshotCaptureStore:
         self, ledger: CompositionMssqlLedger, attempt: CompositionAttemptIdentity
     ) -> tuple[SnapshotCaptureSubject, dict[str, bytes]]:
         """Verify originals using the caller's existing protected transaction."""
+        if not isinstance(ledger, CompositionMssqlLedger) or (ledger.schema, ledger.expected_service_id) != (
+            self._schema,
+            self._service,
+        ):
+            raise CompositionAdmissionError("snapshot_capture_context")
+        cursor, transaction = ledger.cursor, ledger.require_transaction()
+
+        def check():
+            if ledger.cursor is not cursor or (ledger.schema, ledger.expected_service_id) != (
+                self._schema,
+                self._service,
+            ):
+                raise CompositionAdmissionError("snapshot_capture_context")
+            ledger.require_transaction(transaction)
+
         subject = self._verify(attempt)
-        self._authorize(ledger, subject, active=False)
-        return subject, self._read(ledger, subject)
+        check()
+        if subject.attempt != attempt:
+            raise CompositionAdmissionError("snapshot_capture_source_binding")
+        original = self._authorize(ledger, subject, active=False)
+        check()
+        events = self._read(ledger, subject)
+        check()
+        if self._authorize(ledger, subject, active=False) != original:
+            raise CompositionAdmissionError("snapshot_capture_scope_changed")
+        check()
+        return subject, events
 
     def claim_once(self, attempt: CompositionAttemptIdentity) -> SnapshotCaptureSubject:
         subject = self._verify(attempt)
@@ -154,6 +190,7 @@ class MssqlSnapshotCaptureStore:
             self._insert(ledger, subject, "CLAIMED", subject.to_bytes())
             if self._read(ledger, subject) != {"CLAIMED": subject.to_bytes()}:
                 raise CompositionAdmissionError("snapshot_capture_readback")
+            self._authorize(ledger, subject, active=True)
         if self.read(attempt) != (subject, {"CLAIMED": subject.to_bytes()}):
             raise CompositionAdmissionError("snapshot_capture_readback")
         return subject
@@ -202,6 +239,7 @@ class MssqlSnapshotCaptureStore:
             expected = {**events, phase: document}
             if self._read(ledger, subject) != expected:
                 raise CompositionAdmissionError("snapshot_capture_readback")
+            self._authorize(ledger, subject, active=True)
         if self.read(subject.attempt) != (subject, expected):
             raise CompositionAdmissionError("snapshot_capture_readback")
 
@@ -240,7 +278,7 @@ class MssqlSnapshotCaptureStore:
             ) != ("clickhouse", subject.target.service_id, "clickhouse-user:" + identities[0][0]):
                 raise CompositionAdmissionError("snapshot_capture_closure")
             ledger.cursor.execute(
-                f"SELECT TOP (2) proof_document FROM {ledger.table('proofs')} WITH (HOLDLOCK) WHERE operation_key=? AND operation_family='execution' AND kind=? AND proof_sha256=?;",
+                f"SELECT TOP (2) CASE WHEN DATALENGTH(proof_document) BETWEEN 1 AND 8388608 THEN proof_document END FROM {ledger.table('proofs')} WITH (HOLDLOCK) WHERE operation_key=? AND operation_family='execution' AND kind=? AND proof_sha256=?;",
                 subject.attempt.attempt_sha256,
                 proof.kind,
                 proof.proof_sha256,

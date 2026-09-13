@@ -250,6 +250,53 @@ class MssqlSnapshotPublicationStore:
                 self._bound(record.intent)
             return record
 
+    def _read_scope(self, q: _Queries) -> object:
+        q.check()
+        _require((q.ledger.schema, q.ledger.expected_service_id) == (self._schema, self._service), "context")
+        original = require_existing_execution_in(
+            q.ledger, self._attempt, expected_service_id=self._service, terminal_validator=q.ledger.terminal_validator
+        )
+        q.check()
+        if original[1].state in {"SUCCEEDED", "FAILED"}:
+            q.ledger.terminal_validator(q.ledger, *original)
+            q.check()
+        return original
+
+    def read_in(self, ledger: CompositionMssqlLedger, intent_sha256: str) -> SnapshotPublicationRecord | None:
+        """Read canonical history on the caller's transaction; never grant mutation."""
+        require_digest(intent_sha256)
+        _require(
+            isinstance(ledger, CompositionMssqlLedger)
+            and (ledger.schema, ledger.expected_service_id) == (self._schema, self._service),
+            "context",
+        )
+        q = _Queries(ledger)
+        original = self._read_scope(q)
+        record = q.read(intent_sha256)
+        if record is not None:
+            self._bound(record.intent)
+        _require(self._read_scope(q) == original, "read_scope_changed")
+        return record
+
+    def records_in(self, ledger: CompositionMssqlLedger) -> tuple[SnapshotPublicationRecord, ...]:
+        """Reopen this attempt's bounded histories without another SQL connection."""
+        _require(
+            isinstance(ledger, CompositionMssqlLedger)
+            and (ledger.schema, ledger.expected_service_id) == (self._schema, self._service),
+            "context",
+        )
+        q = _Queries(ledger)
+        original = self._read_scope(q)
+        records = []
+        for value in q.intents("WHERE operation_key=? ORDER BY intent_sha256", self._attempt.attempt_sha256):
+            self._bound(value)
+            record = q.read(value.intent_sha256)
+            _require(record is not None, "history_missing")
+            assert record is not None
+            records.append(record)
+        _require(self._read_scope(q) == original, "read_scope_changed")
+        return tuple(records)
+
     def claim_exchange(self, expected: SnapshotPublicationRecord) -> SnapshotPublicationRecord | None:
         """ACK only this invocation's new PREPARED→EXCHANGE_INTENT claim."""
         self._bound(expected.intent)

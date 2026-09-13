@@ -8,6 +8,7 @@ source truth. A failed/uncertain claim, capture or CREATE is not retried here.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -51,14 +52,46 @@ class CapturedClickHouseSnapshot:
 class CompositionClickHouseCapture:
     """Claim → read one bounded snapshot → fsync originals → pin SQL → observe B."""
 
-    def __init__(self, *, store: Any, files: Any, source_reader: Any, catalog: Any) -> None:
+    def __init__(
+        self,
+        *,
+        store: Any,
+        files: Any,
+        source_reader: Any,
+        catalog: Any,
+        require_custody: Callable[[], None] | None = None,
+    ) -> None:
+        """Custody observes host facts only; SQL enrollment uses the store's ledger.
+
+        The explicit service-owned profile supplies a fresh host validator. It
+        must never open SQL because generation reads may hold the control lock.
+        Omission preserves the existing root-owned storage profile.
+        """
+        if require_custody is not None and not callable(require_custody):
+            raise CompositionAdmissionError("snapshot_capture_custody")
         self._store, self._files, self._source, self._catalog = store, files, source_reader, catalog
+        self._require_custody = require_custody
+
+    def _check_custody(self) -> None:
+        if self._require_custody is not None and self._require_custody() is not None:
+            raise CompositionAdmissionError("snapshot_capture_custody")
+
+    def _observe_capture(self, *args: Any, **kwargs: Any) -> Any:
+        self._check_custody()
+        try:
+            return self._catalog.observe_capture(*args, **kwargs)
+        finally:
+            self._check_custody()
 
     def capture_once(self, attempt: CompositionAttemptIdentity) -> CapturedClickHouseSnapshot:
         subject = self._store.claim_once(attempt)
         if self._source.table_identity != subject.source_table or self._source.limits != subject.limits:
             raise CompositionAdmissionError("snapshot_capture_source_binding")
-        columns, source_rows = self._source.read_snapshot()
+        self._check_custody()
+        try:
+            columns, source_rows = self._source.read_snapshot()
+        finally:
+            self._check_custody()
         source_identity = self._source.source_identity_original
         if type(source_identity) is not bytes or not 1 <= len(source_identity) <= 16384:
             raise CompositionAdmissionError("snapshot_capture_source_identity")
@@ -70,7 +103,7 @@ class CompositionClickHouseCapture:
         payload = b"".join(ClickHouseNativeEncoder(schema, target_schema=schema).iter_batches(rows))
         if len(payload) > subject.limits.max_wire_bytes:
             raise CompositionAdmissionError("snapshot_capture_wire_budget")
-        observed = self._catalog.observe_capture(subject, columns)
+        observed = self._observe_capture(subject, columns)
         if (
             observed.target != subject.target
             or observed.target_uuid is None
@@ -136,7 +169,7 @@ class CompositionClickHouseCapture:
             proof.require_attempt(subject.attempt)
             if proof.kind != kind:
                 raise CompositionAdmissionError("snapshot_capture_closure")
-        observed = self._catalog.observe_capture(subject, captured.columns, old_target_uuid=record.old_target_uuid)
+        observed = self._observe_capture(subject, captured.columns, old_target_uuid=record.old_target_uuid)
         generation = snapshot_generation_from_observation(subject, record, observed)
         document = canonical_json_bytes(
             {

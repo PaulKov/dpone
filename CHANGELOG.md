@@ -36,6 +36,11 @@
   capture storage. Bind host socket identity to enrolled UID/GID and reject
   rootless/remapped Docker, shared volume aliases and custody drift. The complete
   v2 execution factory and deployed Linux certification remain outstanding.
+- Add closed whole-cell v2 request/result codecs with scheduler correlation,
+  capture/publication originals and complete terminal proof consistency checks.
+  Reopen capture/publication history on the caller's pinned SQL transaction;
+  keep host custody checks separate from SQL enrollment validation. Actual v2
+  service handling and aggregate proof production remain incomplete.
 - Independently derive and retain canonical SQL preplans before registration;
   bind the complete envelope through composition binding v2 without changing
   generic receipt formats or existing plan digests. Recovery verifies registry

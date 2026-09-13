@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -45,18 +45,23 @@ def build_clickhouse_capture_components(
     credentials: Any,
     ca_file: str | None,
     files: Any | None = None,
+    require_custody: Callable[[], None] | None = None,
+    require_enrollment_in: Callable[..., None] | None = None,
 ) -> ClickHouseCaptureComponents:
     """Bind one exact attempt; no source read or target mutation during construction.
 
     An explicit storage collaborator selects an enrolled custody implementation;
     omission preserves the existing root-owned profile. Construction neither
-    adopts nor changes storage ownership.
+    adopts nor changes storage ownership. Host custody callbacks are SQL-free;
+    enrollment callbacks reuse the supplied store transaction.
 
     The source verifier is intentionally SQL-free: capture journals call it while
     holding their control transaction. Current owner/epochs are reopened by the
     journal on that same transaction, rather than through a second connection.
     """
     if files is not None and any(not callable(getattr(files, name, None)) for name in ("write_once", "read")):
+        raise CompositionAdmissionError("snapshot_capture_storage")
+    if any(value is not None and not callable(value) for value in (require_custody, require_enrollment_in)):
         raise CompositionAdmissionError("snapshot_capture_storage")
     control = parent["control"]
     source = manifest.get("source")
@@ -137,6 +142,7 @@ def build_clickhouse_capture_components(
         control.connection_factory,
         expected_service_id=control.expected_service_id,
         source_verifier=verify_source,
+        require_enrollment_in=require_enrollment_in,
         control_schema=control.control_schema,
     )
     return ClickHouseCaptureComponents(
@@ -145,6 +151,7 @@ def build_clickhouse_capture_components(
             files=ProtectedSnapshotFiles(root) if files is None else files,
             source_reader=reader,
             catalog=catalog,
+            require_custody=require_custody,
         ),
         catalog,
         reader,

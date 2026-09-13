@@ -123,3 +123,31 @@ def test_explicit_capture_storage_is_used_without_root_store_construction(tmp_pa
 def test_invalid_capture_storage_rejects_before_connections(tmp_path, files):
     with pytest.raises(CompositionAdmissionError, match="capture_storage"):
         build_clickhouse_capture_components(**arguments(tmp_path), files=files)
+
+
+def test_factory_installs_separate_host_and_same_transaction_enrollment_checks(tmp_path):
+    args = arguments(tmp_path)
+    calls = []
+    files = SimpleNamespace(write_once=lambda *args: None, read=lambda *args: None)
+
+    def host_custody():
+        calls.append("host")
+
+    def enrollment(ledger, subject):
+        calls.append((ledger, subject))
+
+    components = build_clickhouse_capture_components(
+        **args, files=files, require_custody=host_custody, require_enrollment_in=enrollment
+    )
+    components.capture._check_custody()
+    assert calls == ["host"]
+    assert components.capture._store._enrollment is enrollment
+    assert components.capture._files is files
+
+
+@pytest.mark.parametrize("name", ["require_custody", "require_enrollment_in"])
+def test_invalid_custody_validator_rejects_before_secret_resolution(tmp_path, name):
+    args = arguments(tmp_path)
+    args["parent"]["resolver"].resolve = lambda ref: pytest.fail("resolved before custody validation")
+    with pytest.raises(CompositionAdmissionError, match="snapshot_capture_storage"):
+        build_clickhouse_capture_components(**args, **{name: True})

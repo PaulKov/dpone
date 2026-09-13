@@ -736,3 +736,27 @@ def test_root_capture_owns_payload_and_generation_after_ingest_closure(runtime, 
         < runtime.events.index("seal_generation")
         < runtime.events.index("prepare")
     )
+
+
+def test_worker_terminal_gate_is_separate_from_ingest_dispatch_gate(runtime):
+    dependencies = runtime.root._deps
+    calls = []
+
+    class WorkerGate:
+        def issue_once(self, attempt):
+            calls.append("issue")
+            return dependencies.gate.issue_once(attempt)
+
+        def close(self, attempt):
+            calls.append("close")
+            return dependencies.gate.close(attempt)
+
+        def prove_quiescence(self, attempt):
+            calls.append("quiet")
+            return dependencies.gate.prove_quiescence(attempt)
+
+    runtime.root._deps = replace(dependencies, worker_gate=WorkerGate())
+    runtime.execute()
+    assert calls == ["issue", "close", "quiet"]
+    assert runtime.root._deps.gate is dependencies.gate
+    assert runtime.target_rows() == runtime.tables.source

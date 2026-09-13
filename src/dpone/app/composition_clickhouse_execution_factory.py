@@ -70,6 +70,7 @@ def build_composition_clickhouse_execution_dependencies(
     can_classify_publication: bool = False,
     limits: SnapshotLimits | None = None,
     capture: Any | None = None,
+    worker_gate: Any | None = None,
 ) -> CompositionClickHouseExecutionDependencies:
     """Return protected collaborators of one supervised ClickHouse cell."""
 
@@ -98,6 +99,7 @@ def build_composition_clickhouse_execution_dependencies(
         can_classify_publication=can_classify_publication,
         limits=limits,
         capture=capture,
+        worker_gate=worker_gate,
     )
 
 
