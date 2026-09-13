@@ -253,3 +253,23 @@ def catalog_response_rows(
         tuple(_catalog_response_cell(cell, kind, max_string_bytes) for cell, kind in zip(row, types, strict=True))
         for row in data
     )
+
+
+def catalog_uuid(value: object) -> str:
+    text = str(value)
+    try:
+        if str(UUID(text)) != text or UUID(text).int == 0:
+            raise ValueError
+    except (ValueError, TypeError, AttributeError):
+        raise CompositionAdmissionError("snapshot_catalog_shape") from None
+    return text
+
+
+def catalog_integer(value: object) -> int:
+    if type(value) is not int:
+        raise CompositionAdmissionError("snapshot_catalog_shape")
+    return value
+
+
+def catalog_counter(value: object) -> int | None:
+    return None if value is None else catalog_integer(value)

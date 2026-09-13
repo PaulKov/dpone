@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable, Mapping
 from hashlib import sha256
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from dpone.adapters.composition_clickhouse_http import BoundedClickHouseHttp, clickhouse_http_path
 from dpone.adapters.composition_clickhouse_materialization import ClickHouseSnapshotMaterializationReader
@@ -15,7 +15,13 @@ from dpone.contracts.composition_clickhouse_dispatch import ClickHouseDispatchCo
 from dpone.contracts.composition_persistence import CompositionAttemptIdentity
 from dpone.contracts.composition_snapshot import SnapshotCatalogObservation, SnapshotPublicationIntent, SnapshotTarget
 from dpone.contracts.composition_snapshot_capture import SnapshotCaptureSubject
-from dpone.contracts.composition_snapshot_materialization import catalog_response_rows, require_snapshot_columns
+from dpone.contracts.composition_snapshot_materialization import (
+    catalog_counter,
+    catalog_integer,
+    catalog_response_rows,
+    catalog_uuid,
+    require_snapshot_columns,
+)
 
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _DESIGN = re.compile(
@@ -53,31 +59,11 @@ def _identifier(value: str) -> str:
     return value
 
 
-def _uuid(value: object) -> str:
-    text = str(value)
-    try:
-        if str(UUID(text)) != text or UUID(text).int == 0:
-            raise ValueError
-    except (ValueError, TypeError, AttributeError):
-        raise CompositionAdmissionError("snapshot_catalog_shape") from None
-    return text
-
-
-def _require_int(value: object) -> int:
-    if type(value) is not int:
-        raise CompositionAdmissionError("snapshot_catalog_shape")
-    return value
-
-
-def _counter(value: object) -> int | None:
-    return None if value is None else _require_int(value)
-
-
 def _findings(
     tables: tuple[tuple[object, ...], ...], ddl: Mapping[object, object], effects: tuple[object, ...]
 ) -> tuple[str, ...]:
     labels = ("mutations", "row_policies", "computed_columns", "skipping_indices", "distributed_topology")
-    findings = [label for label, count in zip(labels, effects, strict=True) if _require_int(count)]
+    findings = [label for label, count in zip(labels, effects, strict=True) if catalog_integer(count)]
     for row in tables:
         engine = str(row[2])
         if "View" in engine:
@@ -235,7 +221,7 @@ class ClickHouseHttpSnapshotCatalog:
         )
         if len(topology) != 1 or len(effects) != 1:
             raise CompositionAdmissionError("snapshot_catalog_shape")
-        identities = tuple(_uuid(row[1]) for row in tables)
+        identities = tuple(catalog_uuid(row[1]) for row in tables)
         if len(set(identities)) != len(identities) or len({row[0] for row in tables}) != len(tables):
             raise CompositionAdmissionError("snapshot_catalog_shape")
         by_name = {row[0]: row for row in tables}
@@ -244,13 +230,13 @@ class ClickHouseHttpSnapshotCatalog:
         generation_row = by_name.get(target.generation_table)
         generation = by_uuid.get(new_uuid)
         if old_uuid is None and target_row is not None:
-            old_uuid = _uuid(target_row[1])
+            old_uuid = catalog_uuid(target_row[1])
         previous = None if old_uuid is None else by_uuid.get(old_uuid)
         retained: int | None = 0
         for row, identity in zip(tables, identities, strict=True):
             if identity == new_uuid:
                 continue
-            measured = _counter(row[3])
+            measured = catalog_counter(row[3])
             retained = None if measured is None or retained is None else retained + measured
         if plain_profile:
             ClickHouseSnapshotMaterializationReader.require_plain_profile(self._query, target, evidence)
@@ -259,22 +245,22 @@ class ClickHouseHttpSnapshotCatalog:
         )
         observation = SnapshotCatalogObservation(
             target,
-            None if target_row is None else _uuid(target_row[1]),
-            None if generation_row is None else _uuid(generation_row[1]),
+            None if target_row is None else catalog_uuid(target_row[1]),
+            None if generation_row is None else catalog_uuid(generation_row[1]),
             engine_rows[0][0],
             (
                 None if target_row is None else str(target_row[2]),
                 None if generation_row is None else str(generation_row[2]),
             ),
-            _require_int(topology[0][0]),
-            _require_int(topology[0][1]),
+            catalog_integer(topology[0][0]),
+            catalog_integer(topology[0][1]),
             schemas,
             designs,
             _findings(tables, ddl, effects[0]),
             content,
-            row_count if self._reader is not None else (None if generation is None else _counter(generation[4])),
-            None if generation is None else _counter(generation[3]),
-            None if previous is None else _counter(previous[3]),
+            row_count if self._reader is not None else (None if generation is None else catalog_counter(generation[4])),
+            None if generation is None else catalog_counter(generation[3]),
+            None if previous is None else catalog_counter(previous[3]),
             retained,
             "sha256:" + evidence.hexdigest(),
         )
