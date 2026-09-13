@@ -445,3 +445,55 @@ def test_idle_accept_timeout_is_distinct_from_accepted_request_failure(socket_au
     ) as server:
         assert server.serve_once() is False
     assert captured == []
+
+
+@pytest.mark.parametrize("field", ["dispatcher_uid", "dispatcher_gid"])
+@pytest.mark.parametrize("custom_loader", [False, True])
+def test_v2_host_rejects_socket_identity_outside_enrolled_custody(monkeypatch, field, custom_loader):
+    from hashlib import sha256
+
+    from dpone.app import composition_supervisor_host as host
+    from tests.test_composition_clickhouse_custody_enrollment import v2_body
+    from tests.test_composition_clickhouse_supervisor_enrollment import enrolled
+
+    enrollment = enrolled(v2_body())
+    config = host_config(Path("/run/dpone/probe.sock"))
+    config.update(
+        enrollment_sha256=enrollment.enrollment_sha256,
+        enrollment_document=enrollment.body,
+        dispatcher_uid=101,
+        dispatcher_gid=101,
+    )
+    config[field] = 102
+    document = canonical_json_bytes(config)
+    digest = "sha256:" + sha256(document).hexdigest()
+    monkeypatch.setattr(host, "read_protected_original", lambda *args, **kwargs: document)
+    monkeypatch.setattr(
+        host, "LocalDockerSupervisorClient", lambda: pytest.fail("Docker created before identity check")
+    )
+    kwargs = {"load_config": lambda *args, **kwargs: config} if custom_loader else {}
+    with pytest.raises(rpc.SupervisorProbeError, match="configuration"):
+        host.build_supervisor_facts_server(Path("/etc/dpone/host.json"), expected_configuration_sha256=digest, **kwargs)
+
+
+def test_v2_host_accepts_exact_enrolled_socket_identity(socket_authority, monkeypatch):
+    from hashlib import sha256
+
+    from dpone.app import composition_supervisor_host as host
+    from tests.test_composition_clickhouse_custody_enrollment import v2_body
+    from tests.test_composition_clickhouse_supervisor_enrollment import enrolled
+
+    enrollment = enrolled(v2_body())
+    config = host_config(socket_authority)
+    config.update(
+        enrollment_sha256=enrollment.enrollment_sha256,
+        enrollment_document=enrollment.body,
+        dispatcher_uid=101,
+        dispatcher_gid=101,
+    )
+    document = canonical_json_bytes(config)
+    digest = "sha256:" + sha256(document).hexdigest()
+    monkeypatch.setattr(host, "read_protected_original", lambda *args, **kwargs: document)
+    monkeypatch.setattr(host, "capture_supervisor_facts", lambda *args: FACTS)
+    server = host.build_supervisor_facts_server(Path("/etc/dpone/host.json"), expected_configuration_sha256=digest)
+    assert server.capture(time.monotonic() + 1) == FACTS

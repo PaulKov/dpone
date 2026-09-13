@@ -1,6 +1,6 @@
 # Feature design: dispatcher-owned composition capture
 
-- Status: RESEARCHED
+- Status: APPROVED
 - Owner: maintainer; implementation integrator: root
 - Issue: PR42
 - Target release: TBD; existing published versions are preserved
@@ -20,8 +20,8 @@ Recommended amendment: execute the complete existing ClickHouse cell inside the
 protected nonroot dispatcher, using a separately enrolled service-owned capture
 volume. Keep the existing root-owned storage profile unchanged. Add an explicit
 versioned whole-cell request; do not hide source capture inside OPEN_GATE or treat
-worker-supplied Native bytes as independent source proof. This document proposes
-a changed custody boundary and is not implementation authorization.
+worker-supplied Native bytes as independent source proof. The maintainer explicitly approved this changed custody boundary and its
+implementation on 2026-09-13.
 
 ## Personas and customer journey
 
@@ -115,6 +115,53 @@ hash. It never accepts a bare count or status string as result authority.
 Oversized evidence rejects; it is not truncated or replaced with an unverified
 summary. Non-success evidence contains only the verified current receipt and
 bounded original references, never the successful-result schema.
+
+### Original envelopes and terminal aggregation
+
+`capture_document` uses `dpone.composition-remote-capture-originals.v1` and
+contains exactly `schema`, `subject`, `captured`, `generation_seal`. Each original
+reference is `{document, sha256}` and uses its existing canonical typed decoder.
+The subject, captured record and seal must reconstruct the same generation.
+`publication_document` is the existing PUBLISHED `SnapshotPublicationRecord`.
+
+`terminal_receipt_document` uses
+`dpone.composition-remote-attempt-observation.v1` with exactly `schema`,
+`attempt_document`, `attempt_sha256`, `state`, `closed_gates_sha256`,
+`quiescence_sha256`, `outcome_evidence_sha256`. This is a **derived protected SQL
+readback**, not a document retained verbatim in SQL. Its producer reads the
+original operation and actual receipt columns in one pinned transaction and
+validates terminal proofs and their ClickHouse evidence before returning it.
+
+`closed_gates` and `quiescence` each contain exactly `terminal`, `ingest`,
+`publisher`. Each proof reference contains `document`, `sha256`, and
+`evidence_document`; the latter must hash to the proof's `evidence_sha256`.
+`outcome` is one such proof reference. Preserve singleton purpose proofs for the
+capture seal and publication closure. Each terminal proof instead covers the
+complete sorted immutable issued-authority tuple, exactly the union of both
+purpose authorities. The protected producer must reject additional issuance.
+
+Aggregate closure evidence uses
+`dpone.composition-clickhouse-terminal-closure.v1` with exactly `schema`, `kind`,
+`attempt_sha256`, `ingest_proof_sha256`, `publisher_proof_sha256`. Aggregate OUTCOME
+evidence uses `dpone.composition-clickhouse-terminal-outcome.v1` with exactly
+`schema`, `attempt_sha256`, `state`, `capture_sha256`, `publication_sha256`.
+The capture envelope digest includes the complete generation seal. These stable
+originals are persisted and independently reopened before finalization; they
+cannot be manufactured from an HTTP success or a list of proof hashes. The
+producer reopens purpose proof/evidence originals, capture/seal and the exact
+PUBLISHED record in the same pinned control transaction. Existing generic SQL
+terminal validation remains required but is insufficient without this nested
+ClickHouse validation. Codecs check consistency; authenticated service delivery
+and protected SQL observations establish authority.
+
+Non-success evidence uses `dpone.composition-remote-transfer-status.v1` with
+exactly `schema`, `receipt`, `references`. The receipt is an original reference
+to the derived observation. References are a sorted unique list of at most 16
+`{kind, sha256}` entries, with kinds CAPTURE, PUBLICATION, CLOSED_GATES,
+QUIESCENCE, OUTCOME. FAILED requires FAILED; IN_PROGRESS requires RUNNING;
+UNKNOWN permits COMMIT_UNKNOWN or RUNNING while an expired execution unwinds.
+An absent admitted operation is a transport rejection, never a fabricated
+receipt. All successful envelope counts and complete subjects must agree.
 
 ### Execution deadline and shutdown
 
@@ -232,8 +279,7 @@ remain blockers; this amendment does not raise budgets or authorize new debt.
 | Give worker admin/Docker authority | Reuses local factory | Violates approved isolation | Rejected |
 | Make host-facts service execute SQL/capture | Fewer processes | Violates its read-only boundary | Rejected |
 
-ADR 0064 records the proposed change to ADR 0063. Neither decision is accepted
-until the maintainer approves this amendment.
+ADR 0064 records the proposed change to ADR 0063. The maintainer approved this amendment on 2026-09-13.
 
 ## Research and measurable outcome
 
@@ -284,4 +330,4 @@ required before integration. All live execution remains UNVERIFIED.
 - [x] Proposed identity, custody, effect and recovery behavior specified.
 - [x] Compatibility and validation obligations stated.
 - [x] Independent review of this proposal resolved (read-only; not implementation approval).
-- [ ] Maintainer marks this specification APPROVED.
+- [x] Maintainer explicitly approved the complete proposal on 2026-09-13.

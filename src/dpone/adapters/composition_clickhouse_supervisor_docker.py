@@ -16,7 +16,11 @@ from threading import Timer
 from typing import Any
 
 from dpone.adapters.composition_clickhouse_http import CompleteHttpResponse
-from dpone.adapters.composition_clickhouse_supervisor_enrollment import absolute_path, container_id
+from dpone.adapters.composition_clickhouse_supervisor_enrollment import (
+    absolute_path,
+    capture_custody_policy,
+    container_id,
+)
 from dpone.adapters.composition_clickhouse_supervisor_linux import digest, require
 from dpone.contracts.composition_identity import CompositionAdmissionError
 from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
@@ -56,7 +60,9 @@ def _closed_mount(value: Any) -> dict[str, Any]:
     }
 
 
-def normalize_container(raw: Any, *, role: str, clickhouse_id: str) -> dict[str, Any]:
+def normalize_container(
+    raw: Any, *, role: str, clickhouse_id: str, capture_custody: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Whitelist stable fields and reject access that can escape the enrolled cell."""
     require(type(raw) is dict and type(raw.get("HostConfig")) is dict, "docker_container")
     host = raw["HostConfig"]
@@ -114,10 +120,24 @@ def normalize_container(raw: Any, *, role: str, clickhouse_id: str) -> dict[str,
         require(host.get("ReadonlyRootfs") is True, "docker_root_writable")
         writable = [value for value in mounts if not value["readonly"]]
         expected = ("volume", "/var/lib/clickhouse") if role == "clickhouse" else ("tmpfs", "/run/dpone-secrets")
-        require(
-            len(writable) == 1 and (writable[0]["type"], writable[0]["destination"]) == expected,
-            "docker_writable_mount",
-        )
+        if role == "dispatcher" and capture_custody is not None:
+            custody = capture_custody_policy(capture_custody)
+            require(config["User"] == f"{custody['uid']}:{custody['gid']}", "custody_identity")
+            require(host.get("UsernsMode", "") in {"", "host"}, "custody_userns")
+            secret = [row for row in writable if (row["type"], row["destination"]) == expected]
+            captures = [
+                row
+                for row in writable
+                if row["type"] == "volume"
+                and (row["name"], row["source"], row["destination"])
+                == (custody["volume_name"], custody["source"], custody["destination"])
+            ]
+            require(len(writable) == 2 and len(secret) == len(captures) == 1, "docker_writable_mount")
+        else:
+            require(
+                len(writable) == 1 and (writable[0]["type"], writable[0]["destination"]) == expected,
+                "docker_writable_mount",
+            )
     networks = network.get("Networks")
     require(type(networks) is dict and len(networks) <= 1, "docker_extra_network")
     memberships = []
@@ -216,6 +236,14 @@ class LocalDockerSupervisorClient:
     def snapshot(self, policy: dict[str, Any], deadline: float) -> dict[str, Any]:
         """Complete running inventory must equal the external policy exactly."""
         info = self._get("/v1.41/info", deadline)
+        if "capture_custody" in policy:
+            security = info.get("SecurityOptions") if type(info) is dict else None
+            require(
+                type(security) is list
+                and all(type(item) is str for item in security)
+                and not any(re.search(r"(?:^|[=,])(?:rootless|userns)(?:$|[=,])", item) for item in security),
+                "custody_daemon",
+            )
         require(
             type(info) is dict
             and info.get("OSType") == "linux"
@@ -235,6 +263,7 @@ class LocalDockerSupervisorClient:
                 self._get("/v1.41/containers/" + identifier + "/json", deadline),
                 role=policy["roles"][identifier],
                 clickhouse_id=clickhouse,
+                capture_custody=policy.get("capture_custody"),
             )
             require(
                 value["id"] == identifier and all(row["id"] == policy["network_id"] for row in value["networks"]),

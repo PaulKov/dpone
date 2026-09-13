@@ -30,7 +30,12 @@
   Dispatcher startup, remote business handling and deployment remain incomplete.
 - Add exact staged-attempt selection, private bounded dispatcher gate sessions,
   immutable historical dispatch status and a remote host-facts consumer.
-  Complete capture placement remains an unapproved architecture amendment.
+  The capture-custody architecture amendment is approved; implementation and
+  live verification remain in progress.
+- Add explicit v2 dispatcher-volume enrollment and immutable service-owned
+  capture storage. Bind host socket identity to enrolled UID/GID and reject
+  rootless/remapped Docker, shared volume aliases and custody drift. The complete
+  v2 execution factory and deployed Linux certification remain outstanding.
 - Independently derive and retain canonical SQL preplans before registration;
   bind the complete envelope through composition binding v2 without changing
   generic receipt formats or existing plan digests. Recovery verifies registry

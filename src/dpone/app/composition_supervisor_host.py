@@ -52,7 +52,10 @@ def load_host_probe_config(path: Path, *, expected_configuration_sha256: str) ->
             or type(body["socket_path"]) is not str
         ):
             raise ValueError
-        ClickHouseSupervisorEnrollment(body["enrollment_sha256"], canonical_json_bytes(body["enrollment_document"]))
+        enrollment = ClickHouseSupervisorEnrollment(
+            body["enrollment_sha256"], canonical_json_bytes(body["enrollment_document"])
+        )
+        _require_custody_identity(body, enrollment)
         return body
     except Exception:
         raise SupervisorProbeError("supervisor_probe_configuration") from None
@@ -74,6 +77,7 @@ def build_supervisor_facts_server(
         config["enrollment_sha256"],
         canonical_json_bytes(config["enrollment_document"]),
     )
+    _require_custody_identity(config, enrollment)
     docker, linux = LocalDockerSupervisorClient(), LinuxSupervisorProbe()
 
     def capture(deadline: float) -> dict[str, Any]:
@@ -88,3 +92,13 @@ def build_supervisor_facts_server(
         capture=capture,
         timeout_seconds=config["timeout_seconds"],
     )
+
+
+def _require_custody_identity(config: dict[str, Any], enrollment: ClickHouseSupervisorEnrollment) -> None:
+    """Bind the socket caller to the same explicitly enrolled volume owner."""
+    custody = enrollment.policy.get("capture_custody")
+    if custody is not None and any(
+        type(config.get("dispatcher_" + name)) is not int or config["dispatcher_" + name] != custody[name]
+        for name in ("uid", "gid")
+    ):
+        raise SupervisorProbeError("supervisor_probe_configuration")

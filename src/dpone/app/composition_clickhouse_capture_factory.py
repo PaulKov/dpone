@@ -44,13 +44,20 @@ def build_clickhouse_capture_components(
     endpoint: str,
     credentials: Any,
     ca_file: str | None,
+    files: Any | None = None,
 ) -> ClickHouseCaptureComponents:
     """Bind one exact attempt; no source read or target mutation during construction.
+
+    An explicit storage collaborator selects an enrolled custody implementation;
+    omission preserves the existing root-owned profile. Construction neither
+    adopts nor changes storage ownership.
 
     The source verifier is intentionally SQL-free: capture journals call it while
     holding their control transaction. Current owner/epochs are reopened by the
     journal on that same transaction, rather than through a second connection.
     """
+    if files is not None and any(not callable(getattr(files, name, None)) for name in ("write_once", "read")):
+        raise CompositionAdmissionError("snapshot_capture_storage")
     control = parent["control"]
     source = manifest.get("source")
     table = source.get("table") if isinstance(source, Mapping) else None
@@ -134,7 +141,10 @@ def build_clickhouse_capture_components(
     )
     return ClickHouseCaptureComponents(
         CompositionClickHouseCapture(
-            store=store, files=ProtectedSnapshotFiles(root), source_reader=reader, catalog=catalog
+            store=store,
+            files=ProtectedSnapshotFiles(root) if files is None else files,
+            source_reader=reader,
+            catalog=catalog,
         ),
         catalog,
         reader,

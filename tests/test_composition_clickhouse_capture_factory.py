@@ -108,3 +108,18 @@ def test_missing_source_or_control_pin_is_admission_failure_without_sql(tmp_path
     del args["parent"]["resolver"].resolve("source-ref").descriptor.properties["database_authorities"][missing]
     with pytest.raises(CompositionAdmissionError, match="source_authority"):
         build_clickhouse_capture_components(**args)
+
+
+def test_explicit_capture_storage_is_used_without_root_store_construction(tmp_path, monkeypatch):
+    from dpone.app import composition_clickhouse_capture_factory as module
+
+    files = SimpleNamespace(write_once=lambda *args: None, read=lambda *args: (b"", b""))
+    monkeypatch.setattr(module, "ProtectedSnapshotFiles", lambda *_: pytest.fail("root store constructed"))
+    components = build_clickhouse_capture_components(**arguments(tmp_path), files=files)
+    assert components.capture._files is files
+
+
+@pytest.mark.parametrize("files", [object(), SimpleNamespace(read=lambda *_: ())])
+def test_invalid_capture_storage_rejects_before_connections(tmp_path, files):
+    with pytest.raises(CompositionAdmissionError, match="capture_storage"):
+        build_clickhouse_capture_components(**arguments(tmp_path), files=files)

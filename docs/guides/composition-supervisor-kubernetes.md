@@ -368,10 +368,10 @@ both with the pinned SQL enrollment; it does not instantiate local host probes.
 
 The complete capture path still requires a placement decision: its current
 root-owned storage adapter cannot run inside the enrolled nonroot dispatcher.
-The [proposed capture-custody amendment](../feature-specs/composition-dispatcher-capture-custody.md)
-and [proposed ADR 0064](../adr/0064-dispatcher-owned-composition-capture.md) describe
-an explicit service-owned profile and whole-cell request. They are unapproved;
-no v2 execution route or new storage ownership is enabled by these integrations.
+The [approved capture-custody amendment](../feature-specs/composition-dispatcher-capture-custody.md)
+and [ADR 0064](../adr/0064-dispatcher-owned-composition-capture.md) describe
+an explicit service-owned profile and whole-cell request. Implementation is in
+progress; approval alone does not enable a v2 route or certify deployed custody.
 
 ## DAG triggering
 
@@ -486,3 +486,22 @@ control_schema="dpone_control")`.
 Return to the [activation contract](../composition-activation-contract.md),
 [CLI reference](../cli-reference.md), or
 [compatibility notes](../compatibility.md).
+
+### Dispatcher-owned capture implementation status
+
+The approved v2 profile now has explicit enrollment validation and a separate
+`ServiceSnapshotFiles` adapter. The host probe configuration must use the same
+nonzero UID/GID as `policy.capture_custody`; each identifier is less than
+`2147483648`. Provision the named volume and its protected parent externally.
+The service never adopts an existing directory or changes its ownership.
+
+The adapter pins the enrolled device/inode, checks fresh custody before and after
+file operations, requires directories `0700` and single-linked regular files
+`0600`, and retains incomplete attempts. Its owner must close the adapter after
+all operations have unwound. Existing root-owned capture remains unchanged.
+
+These components do not enable the remote execution route. The protected whole-cell
+factory, aggregate terminal proof production, service startup and full deployed
+Linux/Kubernetes campaign must still pass before operators use this profile.
+Local filesystem tests simulate Linux identity and protected ancestry; they are
+not a live isolation certificate.

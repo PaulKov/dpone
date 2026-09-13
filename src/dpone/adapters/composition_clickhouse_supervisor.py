@@ -152,6 +152,23 @@ def capture_supervisor_facts(
         "namespace_shared",
     )
     _protected_sources(containers, processes, protected)
+    custody_facts = {}
+    if "capture_custody" in policy:
+        custody = policy["capture_custody"]
+        require(
+            tuple(frontend["Uid"]) == (custody["uid"],) * 4 and tuple(frontend["Gid"]) == (custody["gid"],) * 4,
+            "custody_identity",
+        )
+        pid = containers[dispatcher]["pid"]
+        maps = linux.identity_maps(pid, deadline)
+        source = linux.directory_identity(custody["source"], deadline)
+        inside = linux.directory_identity(f"/proc/{pid}/root" + custody["destination"], deadline)
+        require(
+            source == inside
+            and (source["uid"], source["gid"], source["mode"]) == (custody["uid"], custody["gid"], 0o700),
+            "custody_directory",
+        )
+        custody_facts = {"capture_custody": {"identity_maps": maps, "root_identity": source}}
     owners: dict[int, set[str]] = {}
     for pid in linux.processes(deadline):
         if linux.namespace(pid, "net", deadline) != namespace:
@@ -161,6 +178,8 @@ def capture_supervisor_facts(
         require(len(matches) == 1, "unattributed_process")
         owner = matches[0]
         _secure_process(process, containers[owner])
+        if owner == dispatcher and "capture_custody" in policy:
+            require(tuple(process["Gid"]) == (policy["capture_custody"]["gid"],) * 4, "custody_identity")
         require(process["namespaces"] == processes[owner]["init"]["namespaces"], "process_namespace_escape")
         for inode in linux.socket_inodes(pid, deadline):
             owners.setdefault(inode, set()).add(owner)
@@ -186,6 +205,7 @@ def capture_supervisor_facts(
                     "containers": processes,
                     "network_namespace_id": namespace,
                     "listeners": sockets,
+                    **custody_facts,
                 },
             }
         )

@@ -38,6 +38,25 @@ def absolute_path(value: object) -> str:
     return value
 
 
+def capture_custody_policy(value: Any) -> dict[str, Any]:
+    """Validate the explicit v2 named-volume and identity profile; no defaults."""
+    require(
+        type(value) is dict and set(value) == {"profile", "uid", "gid", "volume_name", "source", "destination"},
+        "custody_policy",
+    )
+    require(value["profile"] == "dispatcher_owned_v1", "custody_profile")
+    for name in ("uid", "gid"):
+        require(type(value[name]) is int and 0 < value[name] < 2**31, "custody_identity")
+    require(
+        type(value["volume_name"]) is str
+        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,254}", value["volume_name"]) is not None,
+        "custody_volume",
+    )
+    absolute_path(value["source"])
+    absolute_path(value["destination"])
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class ClickHouseSupervisorEnrollment:
     """Externally reviewed policy plus complete expected stable observation facts.
@@ -72,7 +91,11 @@ class ClickHouseSupervisorEnrollment:
                 "policy",
                 "facts",
             }
-            and body["schema"] == "dpone.composition-clickhouse-supervisor-enrollment.v1"
+            and body["schema"]
+            in {
+                "dpone.composition-clickhouse-supervisor-enrollment.v1",
+                "dpone.composition-clickhouse-supervisor-enrollment.v2",
+            }
             and canonical_json_bytes(body) == self.document,
             "enrollment_shape",
         )
@@ -80,8 +103,11 @@ class ClickHouseSupervisorEnrollment:
             require_uuid(body[name])
         require_digest(body["target_enrollment_sha256"])
         policy = body["policy"]
+        custody = body["schema"].endswith(".v2")
         require(
-            type(policy) is dict and set(policy) == {"roles", "network_id", "frontend_port", "config_roots"},
+            type(policy) is dict
+            and set(policy)
+            == {"roles", "network_id", "frontend_port", "config_roots"} | ({"capture_custody"} if custody else set()),
             "enrollment_policy",
         )
         roles = policy["roles"]
@@ -109,6 +135,17 @@ class ClickHouseSupervisorEnrollment:
                 absolute_path(path)
             if roles[key] == "clickhouse":
                 require("/etc/clickhouse-server" in paths, "enrollment_ch_config")
+        if custody:
+            capture_custody_policy(policy["capture_custody"])
+            destination = PurePosixPath(policy["capture_custody"]["destination"])
+            dispatcher = next(key for key, role in roles.items() if role == "dispatcher")
+            require(
+                all(
+                    not destination.is_relative_to(path) and not PurePosixPath(path).is_relative_to(destination)
+                    for path in ["/run/dpone-secrets", *roots[dispatcher]]
+                ),
+                "custody_config_overlap",
+            )
         facts = body["facts"]
         require(type(facts) is dict and set(facts) == {"docker", "linux"}, "enrollment_facts")
         require(type(facts["docker"]) is dict and type(facts["linux"]) is dict, "enrollment_facts")

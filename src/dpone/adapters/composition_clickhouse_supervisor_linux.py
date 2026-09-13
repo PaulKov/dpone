@@ -158,7 +158,7 @@ class LinuxSupervisorProbe:
 
     def namespace(self, pid: int, name: str, deadline: float) -> str:
         self._check(deadline)
-        require(type(pid) is int and 0 < pid < 2**31 and name in {"net", "pid", "mnt"}, "namespace_subject")
+        require(type(pid) is int and 0 < pid < 2**31 and name in {"net", "pid", "mnt", "user"}, "namespace_subject")
         value = os.stat(self._proc / str(pid) / "ns" / name)
         require(value.st_ino > 0, "namespace_inode")
         return str(value.st_ino)
@@ -238,6 +238,31 @@ class LinuxSupervisorProbe:
             "uid": value.st_uid,
             "gid": value.st_gid,
         }
+
+    def identity_maps(self, pid: int, deadline: float) -> dict[str, list[list[int]]]:
+        """Observe full host identity mapping; remapped or partial ranges refuse."""
+        result = {}
+        for name in ("uid_map", "gid_map"):
+            raw = self._read(self._proc / str(pid) / name, deadline, 1024)
+            require(re.fullmatch(rb"\s*0\s+0\s+4294967295\s*", raw) is not None, "custody_identity_map")
+            result[name] = [[0, 0, 4294967295]]
+        require(self.namespace(pid, "user", deadline) == self.namespace(1, "user", deadline), "custody_userns")
+        return result
+
+    def directory_identity(self, path: str, deadline: float) -> dict[str, int]:
+        """Require a real directory and stable metadata around the shared reader."""
+        self._check(deadline)
+        before = os.stat(path, follow_symlinks=False)
+        require(stat.S_ISDIR(before.st_mode), "custody_directory")
+        value = self.path_identity(path, deadline)
+        after = os.stat(path, follow_symlinks=False)
+        require(
+            (before.st_dev, before.st_ino, before.st_mode, before.st_uid, before.st_gid)
+            == (after.st_dev, after.st_ino, after.st_mode, after.st_uid, after.st_gid),
+            "custody_directory_changed",
+        )
+        self._check(deadline)
+        return value
 
     def config_tree(self, pid: int, destination: str, deadline: float) -> tuple[dict[str, object], ...]:
         """Hash complete bounded local readonly configuration; no symlink/FIFO fallback."""

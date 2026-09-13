@@ -1,6 +1,6 @@
 # ADR 0064: Dispatcher-owned composition capture
 
-Status: Proposed; not authorized for implementation
+Status: Accepted by the maintainer on 2026-09-13
 
 Date: 2026-09-13
 
@@ -11,7 +11,7 @@ service. Current snapshot capture requires a root-owned file adapter and direct
 source/control/catalog authority. The ordinary worker, nonroot dispatcher and
 read-only host probe do not provide a compatible complete placement.
 
-## Proposed decision
+## Decision
 
 Run the complete existing ClickHouse cell inside the protected dispatcher. Add
 an explicitly enrolled nonroot service-owned capture storage profile, preserving
@@ -22,8 +22,8 @@ Docker authority or source rows. Do not make OPEN_GATE implicitly capture data.
 
 The [capture custody specification](../feature-specs/composition-dispatcher-capture-custody.md)
 defines the complete proposed contract, algorithm, alternatives and validation.
-This changes the trusted producer/storage boundary and needs maintainer approval.
-It does not amend accepted behavior merely by being committed as a proposal.
+The maintainer explicitly approved this trusted producer/storage boundary change.
+Implementation and live certification remain separate requirements.
 
 ## Consequences and alternative
 
