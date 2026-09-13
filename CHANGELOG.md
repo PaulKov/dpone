@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.79.1 - 2026-09-13
+
 ### Fixed
 
 - Allow local DDA cleanup to resume after an owned business table was removed;
