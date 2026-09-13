@@ -247,8 +247,8 @@ target matrix, not a record that live or Cosmos checks passed:
 | Component | Required target | Current claim |
 | --- | --- | --- |
 | Python | `>=3.11,<3.13` | Package support range |
-| `dbt-core` | `1.10.13` | Exact v1 MSSQL target; end-to-end production certification `UNVERIFIED` |
-| `dbt-sqlserver` | `1.10.1` | Exact v1 adapter target; end-to-end production certification `UNVERIFIED` |
+| `dbt-core` | `1.12.3` | Exact MSSQL toolchain target; end-to-end production certification `UNVERIFIED` |
+| `dbt-sqlserver` | `1.11.1` | Exact adapter toolchain target; end-to-end production certification `UNVERIFIED` |
 | dbt manifest | v12 | Production target; v10/v11 remain accepted compatibility inputs |
 | `dpone` | One exact released version in dev, prod, and runtime | Compiler, release, deployment, and evidence authority |
 | `apache-airflow-providers-dpone` | Same version as `dpone` | Scheduler-side `airflow.providers.dpone` namespace |
