@@ -164,5 +164,9 @@ def test_window_parameters_keep_microseconds_and_force_complete_query():
     query, params, kwargs = connector.selects[0]
     assert params["end"].endswith(".000001") and params["start"].endswith(".000001")
     assert "toUnixTimestamp64Micro" in query and " < toDateTime64" in query
+    # The SELECT alias contains integer microseconds; the window must bind the
+    # original DateTime column, not that alias under ClickHouse alias substitution.
+    assert "AS `__dpone_native_source` WHERE `__dpone_native_source`.`observed_at` >=" in query
+    assert "AND `__dpone_native_source`.`observed_at` <" in query
     assert kwargs["settings"]["result_overflow_mode"] == "throw"
     assert kwargs["settings"]["use_query_cache"] == 0

@@ -48,8 +48,8 @@ def maintain(factory: RouteFactory, *, action: str, owner: str, store: ArtifactS
     try:
         if invocation_id(session.invocation_id) != owner:
             raise ValueError("attached_owner_mismatch")
-        before = session.snapshot()
         if action == "recover":
+            before = session.snapshot()
             before_rows, before_outside = exact_multiset(before.rows), exact_multiset(before.outside_rows)
             session.recover(source_allowed=False)
             after = session.snapshot()
@@ -69,8 +69,8 @@ def maintain(factory: RouteFactory, *, action: str, owner: str, store: ArtifactS
             ):
                 raise ValueError("committed_recovery_mutated_target")
         elif action == "cleanup":
-            if not before.commit_known:
-                raise ValueError("cleanup_outcome_unknown")
+            # cleanup owns the required identity/outcome checks. A business
+            # snapshot is unavailable after an acknowledged or partially saved DROP.
             session.cleanup()
         else:
             raise ValueError("invalid_maintenance_action")
