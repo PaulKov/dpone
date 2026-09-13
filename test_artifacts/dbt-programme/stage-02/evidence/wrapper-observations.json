@@ -1,0 +1,39 @@
+{
+  "dependency_injection": "ClickHouseSink(connector=RecordingConnector), explicit python bulk",
+  "entrypoint": "ClickHouseSink.stage_payload",
+  "method_replacements": false,
+  "partition_boolean_admission": {
+    "child_receipt": null,
+    "default_runtime_reachability": "UNVERIFIED; no production construction site found",
+    "rows": 2,
+    "status": "REPRODUCED"
+  },
+  "raw_file_control": {
+    "rows": [
+      [
+        16909060
+      ],
+      [
+        286397204
+      ]
+    ],
+    "staged_rows": 2,
+    "status": "PASS"
+  },
+  "real_sink_io": "SKIP",
+  "renamed_wrapper": {
+    "blocker": "file_contract_receipt.wire_identity_mismatch",
+    "status": "REPRODUCED_SAFE_FAILURE"
+  },
+  "single_file_boolean_rejected": {
+    "blocker": "file_contract_receipt.required",
+    "status": "PASS"
+  },
+  "wrapped_file_dispatch": {
+    "additional_rows": 0,
+    "error": "'ClickHouseSink' object has no attribute 'create'",
+    "receipt_identity_preserved": true,
+    "status": "REPRODUCED",
+    "terminal_outcome": null
+  }
+}

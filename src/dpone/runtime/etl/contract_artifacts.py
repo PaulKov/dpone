@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import itertools
 from collections import Counter
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -27,6 +27,8 @@ from dpone.runtime.etl.file_contract_validation import (
     require_file_contract_validation,
 )
 from dpone.runtime.extraction_lifecycle import ArtifactTerminalOutcome
+from dpone.runtime.file_artifacts import FileExportArtifact
+from dpone.runtime.native_transfer_row_authority import require_target_row_count
 from dpone.runtime.staging import owned_staging_handle
 from dpone.type_system import ContractEnforcementResult, ContractEnforcementService
 from dpone.type_system.models import ConflictPolicy
@@ -203,7 +205,7 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
 
 
 class ContractValidatedFileArtifact(BaseExtractionArtifact):
-    """Fail-closed wrapper for opaque file fast paths unless prevalidated."""
+    """Preserve source-receipted file fast paths and their validation authority."""
 
     def __init__(
         self,
@@ -262,6 +264,39 @@ class ContractValidatedFileArtifact(BaseExtractionArtifact):
             validation_mode="opaque_file_prevalidated",
         )
         return handle
+
+    def _consume_validated_file(self, loader: Callable[[FileExportArtifact], int]) -> int:
+        """Dispatch the same concrete file once, sealing its summary after postchecks.
+
+        This runtime-internal bridge keeps the sink's existing file loader and
+        staging cleanup owner. It neither unwraps arbitrary artifacts nor changes
+        source resources, terminal decisions or retry ownership.
+        """
+        self.validation_summary = ContractValidationSummary(validation_mode="opaque_file")
+        if self._validation_error is not None:
+            raise self._validation_error
+        receipt = self._receipt
+        if receipt is None:
+            raise FileContractValidationError("file_contract_receipt.required")
+        artifact = self._artifact
+        if not isinstance(artifact, FileExportArtifact):
+            raise FileContractValidationError("file_contract_receipt.unsupported_artifact")
+        self._require_unchanged_file_receipt(artifact)
+        reported_rows = loader(artifact)
+        self._require_unchanged_file_receipt(artifact)
+        rows = require_target_row_count(reported_rows)
+        if rows != receipt.rows_validated:
+            raise FileContractValidationError("file_contract_receipt.row_count_mismatch")
+        self.validation_summary = ContractValidationSummary(
+            accepted_rows=rows, validation_mode="opaque_file_prevalidated"
+        )
+        return rows
+
+    def _require_unchanged_file_receipt(self, artifact: FileExportArtifact) -> None:
+        """Reopen byte/wire/schema checks without accepting differently bound proof."""
+        current = require_file_contract_validation(artifact, self._contract, schema=self._validation_schema)
+        if current != self._receipt:
+            raise FileContractValidationError("file_contract_receipt.receipt_identity_mismatch")
 
     def cleanup(self) -> None:
         self.terminate(ArtifactTerminalOutcome.ABORT)

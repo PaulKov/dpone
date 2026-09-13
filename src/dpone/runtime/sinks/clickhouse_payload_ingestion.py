@@ -7,6 +7,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from dpone.runtime.byte_stream_artifacts import ByteStreamArtifact
+from dpone.runtime.etl.contract_artifacts import ContractValidatedFileArtifact
 from dpone.runtime.file_artifacts import FileExportArtifact, PartitionedFileExportArtifact
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.native_transfer_artifacts import PartitionedTransferPlanArtifact
@@ -49,6 +50,10 @@ class ClickHousePayloadIngestionService:
                     load_config,
                     payload.rebind(artifact=artifact),
                 )
+            )
+        if isinstance(payload.artifact, ContractValidatedFileArtifact):
+            return payload.artifact._consume_validated_file(
+                lambda artifact: self.insert_file(load_config, artifact, payload.schema)
             )
         if is_object_storage_columnar_chunked_artifact(payload.artifact):
             return self.insert_object_storage_chunked(load_config, payload.artifact, payload.schema)

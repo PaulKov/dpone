@@ -768,6 +768,14 @@ MSSQL -> ClickHouse uses a lossless-first type profile for native transfers. The
 
 `dpone plan` includes a `type_fidelity` section when MSSQL source schema metadata is available. Review that section before enabling a new table in production.
 
+For an admitted native `time nullable` source declaration, the implicit scale is
+seven, just as for `time(7) nullable`. With the default string policy, Python
+RowBinary, Python Native and accelerated Native preserve canonical text such as
+`00:00:01.0000001`, including the seventh digit, midnight, the final day tick and
+NULL. Catalog metadata normally supplies an explicit scale. This spelling
+consistency does not change an authored whole-seconds policy, timezone choice,
+or the governed temporal narrowing described below.
+
 ### Native-required and Python temporal target matrix
 
 The BCP-native `typed_binary` contract supports an explicitly governed target
