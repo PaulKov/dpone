@@ -150,7 +150,7 @@ These are requests for future assignments, not ownership claims:
 
 | Slice | Minimal candidate paths | Required predecessor/approval |
 | --- | --- | --- |
-| Existing redaction defect | `src/dpone/adapters/dbt_subprocess.py`, one new boundary regression file, narrow threat-model text | Granted separately in ownership.yml |
+| Existing redaction defect | `src/dpone/adapters/dbt_subprocess.py`, internal `dbt_output_redaction.py`, one new boundary regression file, narrow threat-model text | Granted separately in ownership.yml |
 | Authored start-date precision | `packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_schedule.py`, one dedicated provider regression file | Separate existing-contract assessment and path grant |
 | Output/lifecycle DI | Existing runner, execution service and bootstrap; narrow new port/contract only if needed | Stage 01 public API and channel agreement; coordinator shared-file assignment |
 | Diagnostic excerpts | One bounded reader/writer and dedicated diagnostic contract | Artifact identity, retention, redaction, sidecar/schema decision |

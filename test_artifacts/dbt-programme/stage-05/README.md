@@ -2,8 +2,9 @@
 
 The implemented slice repairs the existing captured-output secrecy guarantee.
 Broader diagnostics and interval proposals remain [DRAFT](design-draft.md).
-[Ownership](ownership.yml) permits only the runner, its dedicated regression
-file, narrow threat-model documentation and this artifact directory.
+[Ownership](ownership.yml) permits only the runner, a cohesive internal output
+helper, the dedicated regression file, narrow threat-model documentation and
+this artifact directory.
 
 ## Impact and algorithm
 
@@ -21,6 +22,9 @@ withheld. A bounded coverage mask identifies all original secret occurrences,
 including overlaps. If retention truncated the stream, the longest suffix that
 could be a prefix of each known secret is masked conservatively too. Replacing
 covered runs then cannot expose an unfinished secret after earlier shrinkage.
+The internal helper uses KMP prefix lengths: matching and suffix recognition
+take linear work per secret instead of rescanning a long secret for every
+overlap. Prefix-table storage is proportional to the bounded secret length.
 
 Output accumulation keeps at most the configured limit plus one byte, allowing
 truncation to remain explicit even when replacement expands text. Final clipping
@@ -53,7 +57,10 @@ Transient local logs are excluded from the public artifact set.
 | Intermediate implementation | FAIL | 1 existing output-fill assertion failed / 98 passed; no test weakened |
 | Refined focused implementation | PASS | 107 tests before six additional UTF-8/retention controls |
 | First expanded final test scope | FAIL | 2 failures / 111 passes: the test helper admitted malformed 0xff but incorrectly excluded incomplete UTF-8 at true EOF; corrected the helper without changing the explicit expected output |
-| Final focused runner/supervision/runtime suite | PASS | 113 tests with all UTF-8/retention controls |
+| Pre-review focused runner/supervision/runtime suite | PASS | 113 tests with all UTF-8/retention controls |
+| Initial independent review | FAIL | Candidate dbd26a02 required a cohesive size extraction and linear overlap matching; no secrecy failure found |
+| Initial committed module-size gate | FAIL | Candidate dbd26a02 added unbaselined warning debt: 359 SLOC versus warning threshold 350 |
+| Revised focused runner/supervision/runtime suite | PASS | 119 tests, including maximum-size repeated secrets in both streams |
 | Ruff / formatting | PASS | Repository check and format check |
 | Mypy | PASS | 1209 source files |
 | Import rules / layer metrics | PASS | Existing production boundaries and budgets preserved |
@@ -63,7 +70,7 @@ Transient local logs are excluded from the public artifact set.
 | Generated references | PASS | 3/3 in sync |
 | Change-aware selector | PASS | Python, dbt and docs categories; complete suite remains required |
 | Module-size gate on committed candidate | UNVERIFIED | Pending candidate commit |
-| Complete non-live pytest gate | UNVERIFIED | Queued under coordinator shared-host scheduling; not waived |
+| Complete non-live pytest gate | UNVERIFIED | Coordinator owns one frozen integrated-candidate run; this stage's gate is deferred to it, not waived |
 | Independent final-commit review | UNVERIFIED | Pending frozen candidate |
 | Live services and release publication | SKIP | Outside authorization |
 
@@ -83,10 +90,21 @@ UTF-8, replacement expansion, no-secret controls and real exit preservation.
 These checks establish local capture behavior, not live dbt/Airflow certification
 or a measured peak-memory claim.
 
+An additional public-runner resource observation used 1,052,673 bytes of repeated
+synthetic output and the default 1 MiB limit. With 1-, 64- and 4,096-character
+secrets, the revised implementation took approximately 0.141, 0.147 and 0.175
+seconds respectively in separate untraced local samples. A separate traced
+4,096-character sample peaked at 4,443,484 Python-allocated bytes after the caller
+payload had already been allocated. This excludes native allocations and is not
+process RSS or live latency certification. Source hashes, precise measurements
+and review results remain in local/PR records so operational reporting does not
+change the frozen candidate.
+
 ## Remaining work and boundaries
 
-The complete non-live gate, committed module-size validation and independent
-review remain required before merge readiness. The coordinator owns CHANGELOG
+Committed module-size validation and independent review are required for the
+stage handoff. The coordinator's complete integrated non-live gate remains
+required before merge readiness. The coordinator also owns CHANGELOG
 integration. Suggested entry: fix bounded dbt output redaction for overlapping
 secrets and secret fragments at retained-output boundaries while preserving
 UTF-8 limits and subprocess exit semantics.

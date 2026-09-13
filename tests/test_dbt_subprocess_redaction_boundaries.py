@@ -169,3 +169,20 @@ def test_large_synthetic_child_output_is_drained_from_both_pipes(tmp_path: Path)
     assert result.exit_code == 0
     assert result.stdout == result.stderr == "x" * 64
     assert result.stdout_truncated and result.stderr_truncated
+
+
+@pytest.mark.parametrize("stream", ("stdout", "stderr"))
+@pytest.mark.parametrize("secret_size", (1, 64, 4096))
+def test_maximum_retained_repetition_preserves_overlaps_with_long_secrets(
+    tmp_path: Path, stream: str, secret_size: int
+) -> None:
+    text, truncated = _capture(
+        tmp_path,
+        payload=b"a" * (1024 * 1024 + 4097),
+        secrets=("a" * secret_size,),
+        limit=1024 * 1024,
+        stream=stream,
+    )
+
+    assert text == "[REDACTED]"
+    assert truncated

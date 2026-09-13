@@ -27,6 +27,7 @@ public_contract_impact:
 owned_paths:
 - test_artifacts/dbt-programme/stage-05
 - src/dpone/adapters/dbt_subprocess.py
+- src/dpone/adapters/dbt_output_redaction.py
 - tests/test_dbt_subprocess_redaction_boundaries.py
 - docs/dbt-self-service-threat-model.md
 integrator_owned_paths: []
