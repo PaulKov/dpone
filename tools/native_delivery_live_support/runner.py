@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, fields
+from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
@@ -18,10 +18,38 @@ def configuration(limits: dict[str, Any]) -> dict[str, Any]:
     """Adapt the loaded subject's canonical model, including the frozen baseline."""
     from dpone.contracts.mssql_native_chunks import NativeChunkLimits
 
-    if set(limits) != {field.name for field in fields(NativeChunkLimits)}:
+    legacy = {
+        "max_total_encoded_bytes",
+        "stage_allocated_bytes_stop_threshold",
+        "max_rows",
+        "max_bytes",
+        "max_row_bytes",
+        "max_pending",
+        "max_staging_tables",
+        "parallelism",
+    }
+    stages = {"encoding_parallelism", "import_parallelism"}
+    if set(limits) not in (legacy, legacy | stages):
         raise ValueError("exact_limits_required")
-    resolved = asdict(NativeChunkLimits(**limits))
+    extended = set(limits) != legacy
+    if extended and not stages <= {field.name for field in fields(NativeChunkLimits)}:
+        raise ValueError("subject_stage_limits_unsupported")
+    if extended and any(limits[name] is None for name in stages):
+        raise ValueError("noncanonical_limits")
+    model = NativeChunkLimits(**limits)
+    # The frozen baseline lacks new helpers: its legacy constructor remains the
+    # value authority. Never import candidate runtime contracts into that subject.
+    resolved = {name: getattr(model, name) for name in legacy}
+    if extended:
+        if all(limits[name] == model.parallelism for name in stages):
+            raise ValueError("noncanonical_limits")
+        resolved.update({name: getattr(model, name) for name in stages})
     return {"limits": resolved, "sha256": digest(resolved)}
+
+
+def run_schema_version(config: dict[str, Any]) -> int:
+    """Choose the run envelope version from an already validated configuration."""
+    return 2 if "encoding_parallelism" in config["limits"] else 1
 
 
 def route_record(strategy: str, mode: str) -> dict[str, str]:
@@ -37,7 +65,7 @@ def _envelope(
 ) -> dict[str, Any]:
     producer = git_identity(Path(__file__).resolve().parents[2])
     return {
-        "schema_version": 1,
+        "schema_version": run_schema_version(config),
         "kind": "native-delivery-run",
         "producer": {"name": "dpone-native-delivery-live", "version": "1", **producer},
         "subject": subject,

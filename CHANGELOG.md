@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.80.0 - 2026-09-13
+
+### Added
+
+- Independent optional native encoding and import concurrency for ClickHouse to
+  SQL Server, with one bounded retained-work queue and resolved planner output.
+- Canonical v2 delivery run reports for extended worker policies. Existing v1
+  records and exact-configuration comparisons remain unchanged.
+- Configuration, capacity and recovery guidance with an asymmetric example.
+
+### Compatibility
+
+- Omitted overrides keep existing behavior. Legacy-effective limits preserve
+  eight-field journal records; new policies bind both resolved counts. Finish
+  or settle extended-policy invocations before downgrading, and retain their
+  original settings for recovery. This release does not claim a measured
+  production throughput improvement or extend binary-route certification.
+
 ## 0.79.2 - 2026-09-13
 
 ### Changed

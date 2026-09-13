@@ -15,7 +15,7 @@ import time
 from collections.abc import Callable, Iterator
 from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, ThreadPoolExecutor, wait
 from contextlib import AbstractContextManager
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from threading import Event, Thread, get_ident
 from typing import TYPE_CHECKING, Any, cast
@@ -149,7 +149,7 @@ class BoundedNativeChunks:
             self._check(lease, cancel)
             require_native_spool_capacity(self.work_dir, self.limits)
             journal.begin()
-            journal.bind_limits(asdict(self.limits))
+            journal.bind_limits(self.limits.to_dict())
             heartbeat = Thread(target=self._heartbeat, args=(lease, stopped, cancel), daemon=True)
             heartbeat.start()
             return self._stage(journal, rows, contract, cancel, completion_metadata)
@@ -174,7 +174,7 @@ class BoundedNativeChunks:
         target transaction receipt before asking to settle any partial extraction.
         """
         journal = NativeChunkJournal(self.store, lease, plan)
-        journal.bind_limits(asdict(self.limits))
+        journal.bind_limits(self.limits.to_dict())
         publication = journal.publication.state()
         if publication is not None and publication["phase"] not in ("preparing", "prepared"):
             raise WindowOutcomeUnknown("mssql_native.publication_requires_reconciliation")
@@ -258,13 +258,13 @@ class BoundedNativeChunks:
         total, ordinal, eof = 0, 0, False
         with (
             ProcessPoolExecutor(
-                max_workers=limits.parallelism, mp_context=multiprocessing.get_context("spawn")
+                max_workers=limits.effective_encoding_parallelism, mp_context=multiprocessing.get_context("spawn")
             ) as encoders,
-            ThreadPoolExecutor(max_workers=limits.parallelism) as imports,
+            ThreadPoolExecutor(max_workers=limits.effective_import_parallelism) as imports,
         ):
             try:
                 while not eof or pending:
-                    while not eof and len(pending) < limits.parallelism + limits.max_pending:
+                    while not eof and len(pending) < limits.retained_work_capacity:
                         self._check(lease, cancelled)
                         with frame_observation(recorder, rows, ordinal):
                             sized_frame = next(frames, None)

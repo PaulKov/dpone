@@ -45,6 +45,9 @@ def native_limits(config: Any) -> NativeChunkLimits:
         raise ValueError("mssql_native.native_chunks_invalid")
     if not {"max_total_encoded_bytes", "stage_allocated_bytes_stop_threshold"}.issubset(chunks):
         raise ValueError("mssql_native.capacity_limits_required")
+    for name in ("encoding_parallelism", "import_parallelism"):
+        if name in chunks and chunks[name] is None:
+            raise ValueError(f"mssql_native.invalid_limit:{name}")
     return NativeChunkLimits(**dict(chunks), parallelism=chunking.get("parallelism", 1))
 
 

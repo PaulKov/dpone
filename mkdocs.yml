@@ -184,6 +184,7 @@ nav:
           - Observations and comparison: delivery-acceleration/observations.md
           - Prepared metadata and integrity: delivery-acceleration/preparation.md
           - Sized frame handoff: delivery-acceleration/frames.md
+          - Independent stage limits: delivery-acceleration/concurrency.md
           - Isolated partition SWITCH: delivery-acceleration/partition-switch.md
           - Certification experiments: delivery-acceleration/certification.md
           - Operations and recovery: delivery-acceleration/operations.md

@@ -10,8 +10,10 @@ The [approved design](../feature-design-data-delivery-acceleration-v1.md) define
 the report envelope. Read the [native transport prerequisites](../mssql-native-transport.md)
 before enabling services. DDA-06 owns shared runtime integration, shared fixtures,
 navigation and activation decisions. An approved application/environment supplies
-the real route factory and authoritative visibility probe. No production command, manifest, wire,
-journal, checkpoint or receipt format changes here. Native SWITCH remains
+the real route factory and authoritative visibility probe. No production command, wire,
+checkpoint or receipt authority changes here. For stage 2 limits and versioned
+run envelopes, follow the [concurrency contract](concurrency.md) and
+[report migration](observations.md#shared-limit-validation). Native SWITCH remains
 publicly rejected; its fixtures exercise an isolated component only.
 
 ## Start without services
@@ -98,6 +100,28 @@ Both tracked and untracked changes affect the dirty flag. Dirty or hermetic
 execution cannot establish performance eligibility. Baseline and candidate use
 the same protocol; no optimization-branch import is needed.
 
+## Measure independent stage policies
+
+The offline eight-field limits example above stays valid and produces a v1 run.
+For an extended policy, copy it to a separate file and add both resolved fields,
+for example `"encoding_parallelism": 2` and `"import_parallelism": 1` while
+keeping `"parallelism": 1`. That canonical ten-field record produces a v2 run;
+a record with both new counts equal to `parallelism` is rejected as noncanonical.
+Unlike authored manifest overrides, exact report inputs require both counts.
+
+Stage 2 (initial minor candidate 0.80.0, release pending) needs its own evidence.
+Run narrow and wide/Unicode workloads with E=2/I=1 and E=1/I=2, retaining one
+warmup and three measured trials per policy, exact typed fidelity and recovery
+receipts, configuration hashes, source/producer identities and environment
+limits. Also retain legacy eight-field execution against the frozen old subject
+without loading new methods. Hermetic or skipped checks do not certify the route.
+
+Keep these policies as separate diagnostic experiments. The comparison gate
+still requires exact configuration equality, including the fallback parallelism.
+Do not relax it to compare a symmetric baseline with an asymmetric candidate or
+claim a certified cross-policy speedup. See the [local runbook](local-docker.md)
+for the approved environment procedure; no stage 2 live result is implied here.
+
 ## Run and observe
 
 Run the following in the candidate checkout after preparing the approved factory:
@@ -119,8 +143,11 @@ identify the same checkout as the imported dpone. Selecting `baseline` in the
 candidate environment fails instead of relabeling current code.
 
 The baseline interpreter must resolve dpone only from the pinned baseline source.
-The current harness uses that source's `NativeChunkLimits` model; it requires no
-candidate-only contract helper. Keep the factory module and generated outputs
+For eight-field input, the current harness constructs that source's
+`NativeChunkLimits` model and serializes the explicit legacy field whitelist. It
+requires no new normalizer or serializer method on that model. Ten-field input
+requires new model capability and must fail before fixture provisioning on an
+old subject. Keep the factory module and generated outputs
 outside both checkouts, and do not add candidate `src` to the baseline import
 path. A hermetic factory can verify this launch path, but its report remains
 UNVERIFIED and supplies no live certification.

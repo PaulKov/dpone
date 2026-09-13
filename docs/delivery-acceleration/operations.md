@@ -24,7 +24,7 @@ the producer. Updating only a checksum cannot repair existing receipt bindings.
 | Prepared verification work | Initial business/full integrity plus independent prepublication integrity | Verify actual iterator counts alongside timings |
 | Metadata projection | Canonical metadata shares the preparation INSERT | Separate it from the mandatory finalizer target-clock UPDATE |
 | Repeated BCP attempts | Each retry has its own attempt identity | Investigate the original error and retained-byte receipt; do not combine attempts into one success interval |
-| Configured parallelism | A resource limit | Inspect observed worker intervals before claiming overlap |
+| Configured encoding/import parallelism | Independent worker limits sharing `max(E, I) + max_pending` retained slots | Inspect observed worker intervals before claiming overlap |
 | Missing SQL/resource metric | Unavailable observation with an explicit reason | Limit the claim; never substitute zero |
 
 Worker clocks in different domains cannot be combined into elapsed time or
@@ -196,3 +196,20 @@ means a failed comparison gate; **2** means invalid arguments, identity, schema,
 retained bytes or file access. Inspect the JSON status before making any claim.
 For a real comparison, use the approved baseline/candidate experiment procedure
 in the [certification guide](certification.md), retaining all attempted trials.
+
+
+## Tune new invocations and preserve recovery bindings
+
+Follow the [concurrency how-to](concurrency.md) to inspect resolved stage limits
+before execution. An invalid override fails before row I/O. A recovery
+resource-limit mismatch means the canonical durable policy differs: restore the
+original eight-field or ten-field record, including the fallback `parallelism`.
+Finish or safely settle old invocations before tuning new ones; never edit
+journal bytes or remove verification to force recovery. Settle extended-policy
+invocations on a supporting version before downgrade.
+
+Upgrade report consumers first; [run envelope migration](observations.md#shared-limit-validation)
+keeps v1 for legacy-effective policies and uses v2 for extended policies. Keep
+tuning results for different policies separate with their original hashes.
+Exact configuration equality remains mandatory for a comparison PASS, so changing
+encoding/import counts cannot establish a certified cross-policy speedup.

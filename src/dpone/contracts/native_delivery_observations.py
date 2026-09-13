@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from types import MappingProxyType
 from typing import Any
 
-from dpone.contracts.mssql_native_chunks import NativeChunkLimits
+from dpone.contracts.mssql_native_chunks import LEGACY_NATIVE_LIMIT_FIELDS, NATIVE_STAGE_LIMIT_FIELDS, NativeChunkLimits
 
 PHASES = frozenset(
     "source_read source_adapt frame_build ipc_submit encode bcp raw_verify prepare_insert metadata_project prepared_verify quality publish evidence checkpoint".split()
@@ -189,16 +189,25 @@ CHECKS_BY_SCOPE = {
 }
 
 
-def normalize_delivery_limits(limits: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate an exact v1 limit record and return canonical, detached values.
+def normalize_delivery_limits(limits: Mapping[str, Any], *, schema_version: int = 1) -> dict[str, Any]:
+    """Validate finite canonical v1/v2 records without filling historical fields.
 
-    Producers preserve ``exact_limits_required`` for a missing or surplus field
-    and the canonical model's value errors. Consumers may translate these errors
-    at their input boundary. No defaults are filled into a retained report.
+    V1 has exactly the eight legacy fields. V2 has both concrete stage counts
+    and represents an extended policy; equal-to-fallback counts remain v1.
     """
-    if set(limits) != set(NativeChunkLimits.__dataclass_fields__):
+    if type(schema_version) is not int or schema_version not in (1, 2):
+        raise ValueError("unsupported_limits_version")
+    expected = set(LEGACY_NATIVE_LIMIT_FIELDS)
+    if schema_version == 2:
+        expected.update(NATIVE_STAGE_LIMIT_FIELDS)
+    if set(limits) != expected:
         raise ValueError("exact_limits_required")
-    return asdict(NativeChunkLimits(**limits))
+    if schema_version == 2 and any(limits[name] is None for name in NATIVE_STAGE_LIMIT_FIELDS):
+        raise ValueError("noncanonical_limits")
+    resolved = NativeChunkLimits(**limits).to_dict()
+    if set(resolved) != expected:
+        raise ValueError("noncanonical_limits")
+    return resolved
 
 
 def comparable_delivery_environment(environment: Mapping[str, Any]) -> dict[str, Any]:
@@ -237,6 +246,11 @@ RUN_SCHEMA = _record(
     status=_STATUS,
     limitations=_LIMITATIONS,
 )
+# Separate root/properties preserve the public v1 schema object unchanged.
+RUN_SCHEMA_V2 = {
+    **RUN_SCHEMA,
+    "properties": {**RUN_SCHEMA["properties"], "schema_version": {"const": 2, "type": "integer"}},
+}
 RECEIPT_SCHEMA = _record(
     schema_version={"const": 1, "type": "integer"},
     kind={"const": "native-delivery-correctness"},

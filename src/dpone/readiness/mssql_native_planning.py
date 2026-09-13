@@ -7,7 +7,6 @@ successful schema/target preflight. Legacy routes retain their existing planners
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict
 from typing import Any
 
 from dpone.manifest.mssql_native_policy import native_limits
@@ -39,7 +38,7 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
         "offset_pagination": False,
         "parallelism_scope": "native_encoding_and_file_import",
         "transport": "bounded_native_files",
-        "limits": asdict(limits),
+        "limits": limits.to_dict(),
         "spool_payload_bound": limits.spool_payload_bound,
         "spool_bound_scope": "encoded_payload_only_excludes_driver_and_server_memory",
         "sql_capacity_policy": "observed_stop_threshold",
@@ -54,6 +53,12 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
             "quality_evidence_state_callbacks",
         ],
     }
+    if "encoding_parallelism" in authored["limits"]:
+        authored["stage_concurrency"] = {
+            "encoding_parallelism": limits.effective_encoding_parallelism,
+            "import_parallelism": limits.effective_import_parallelism,
+            "retained_work_capacity": limits.retained_work_capacity,
+        }
     plan["mssql_native"] = authored
     plan["bulk_path"] = "clickhouse_bounded_mssql_native_bcp"
     # These generic stream/snapshot optimizers do not govern this executor.

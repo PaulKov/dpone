@@ -1,7 +1,6 @@
 """Hermetic producer/consumer fixtures never establish live certification."""
 
 import json
-from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -35,7 +34,7 @@ def run_fixture(root, *, commit="a" * 40, seconds=10, execution="hermetic"):
         subject=dict(commit=commit, dirty=False),
         route=dict(source="clickhouse", sink="mssql", strategy="full_refresh", mode="bounded_native"),
         workload=dict(id="narrow", seed=1, rows=3, columns=2, sha256="d" * 64),
-        configuration=dict(sha256="e" * 64, limits=asdict(NativeChunkLimits(1000000, 2000000))),
+        configuration=dict(sha256="e" * 64, limits=NativeChunkLimits(1000000, 2000000).to_dict()),
         environment=dict(
             sha256="f" * 64, versions={"python": "3.12"}, target_layout_sha256="1" * 64, resource_profile={"cpus": 2}
         ),

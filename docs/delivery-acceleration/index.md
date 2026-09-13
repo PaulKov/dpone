@@ -15,6 +15,11 @@ raw verification boundaries and the independent prepared prepublication check
 remain required. These structural improvements do not establish a measured speed
 increase. Live interoperability and performance remain **UNVERIFIED**.
 
+Stage 2 adds opt-in [independent encoding and import limits](concurrency.md).
+Legacy settings retain their defaults and durable representation; extended
+settings use versioned diagnostic run envelopes. The initial minor candidate is
+0.80.0, with release and stage-specific live evidence pending.
+
 ## First success without database access
 
 From a development checkout with the repository's `uv` environment, inspect the
@@ -76,6 +81,7 @@ describes the immutable scope and ownership of this work.
 
 - Follow the [next release stages](next-stages.md) for source sizing reuse and
   separately scoped future acceleration work.
+- Tune [encoding and import concurrency](concurrency.md) and inspect its offline plan.
 - Read [frame sizing](frames.md) and [preparation integrity](preparation.md) for
   algorithms, bounds and preserved verification boundaries.
 - Add [phase observations](observations.md) using the composition instructions in

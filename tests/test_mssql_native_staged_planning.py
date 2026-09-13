@@ -103,3 +103,21 @@ def test_native_full_refresh_plan_uses_validated_limit_defaults(tmp_path: Path) 
     plan = ExecutionPlanService().plan_manifest(path)
     assert plan["mssql_native"]["publication_scope"] == {"mode": "full_refresh"}
     assert plan["mssql_native"]["limits"]["max_row_bytes"] == 1048576
+
+
+def test_independent_stage_example_plan_and_rendering():
+    plan = ExecutionPlanService().plan_manifest(Path("examples/native/clickhouse-to-mssql-native-concurrency.yaml"))
+    native = plan["mssql_native"]
+    assert native["source_query_count"] == 1
+    assert native["stage_concurrency"] == {
+        "encoding_parallelism": 2,
+        "import_parallelism": 1,
+        "retained_work_capacity": 4,
+    }
+    assert native["spool_payload_bound"] == 5 * 16777216
+    for render in (_render_md, _render_text):
+        assert "encoding_parallelism" in render(plan)
+        assert "import_parallelism" in render(plan)
+    legacy = ExecutionPlanService().plan_manifest(SAMPLE)["mssql_native"]
+    assert "stage_concurrency" not in legacy
+    assert len(legacy["limits"]) == 8

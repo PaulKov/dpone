@@ -60,7 +60,9 @@ values fail; omission means fallback. Existing `chunking.parallelism` stays in
 place and retains its default. Both shipped manifest schemas admit the additions.
 No new CLI flags, exit codes or output destinations. Existing planner output
 keeps its shape for legacy-effective settings; extended policies add a bounded
-`stage_concurrency` explanation with both effective counts and retained capacity.
+`mssql_native.stage_concurrency` object exactly containing `encoding_parallelism`,
+`import_parallelism`, and `retained_work_capacity`, all resolved integers. It is
+present if and only if canonical limits are extended.
 `import_parallelism` bounds concurrent file import/verify tasks, not all target
 connections: parent-side admission and retry settlement may use other contexts.
 
@@ -90,6 +92,11 @@ A symmetric baseline and asymmetric candidate are different experiments; they
 must not obtain a benchmark comparison PASS by relaxing equality. Tuning tables
 retain each configuration and evidence separately and make no certified speedup
 claim. Old consumers reject v2; old v1 producers/consumers retain their behavior.
+The new live harness must also execute eight-field configurations against a frozen
+old subject lacking the new methods. That path constructs the loaded subject model
+and serializes only the explicit legacy whitelist. Ten-field input requires the
+new model capability and fails before fixture provisioning on old subjects. Never
+unconditionally import the new normalizer or call a new method on the old model.
 
 ## Detailed algorithm
 
