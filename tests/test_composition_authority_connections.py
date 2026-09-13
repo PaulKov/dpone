@@ -129,6 +129,31 @@ def test_control_connection_returns_open_owned_handle_after_verified_rollback(au
     assert "raw.close" not in raw.events
 
 
+def test_control_connection_and_service_share_one_verified_binding(authority):
+    instance, raw, calls = authority
+    resolutions = []
+
+    def resolve(context, reference):
+        assert not resolutions, "service pin must not come from a second resolution"
+        resolutions.append((context, reference))
+        return bound()
+
+    instance._inputs.resolve_connection = resolve
+    connection, service = instance.control_connection_with_service(CONTEXT)
+    assert connection is raw and service == SERVICE
+    assert resolutions == [(CONTEXT, "authority")] and len(calls) == 1
+    assert raw.events[-2:] == ["rollback", "cursor.close"]
+    assert "raw.close" not in raw.events
+
+
+def test_control_pair_rejects_observed_service_and_closes_on_failure(authority):
+    instance, raw, _ = authority
+    raw.handle.marker = ((1, 2, "30000000-0000-4000-8000-000000000003"),)
+    with pytest.raises(CompositionAdmissionError, match="authority_endpoint_observation"):
+        instance.control_connection_with_service(CONTEXT)
+    assert raw.events[-3:] == ["rollback", "cursor.close", "raw.close"]
+
+
 def test_control_verification_preserves_driver_owned_transaction(authority):
     """Manual-commit ODBC opens a transaction before executing the first batch."""
     instance, raw, _ = authority

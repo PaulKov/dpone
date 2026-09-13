@@ -136,6 +136,7 @@ def startup(monkeypatch):
         dispatcher_uid=1200,
         dispatcher_gid=1201,
         configuration_sha256=DIGEST,
+        service_policy=None,
         context_root=Path("/etc/dpone/context"),
         authorities={DIGEST: SimpleNamespace(context_sha256="sha256:" + "b" * 64)},
         tls=SimpleNamespace(certificate_file=Path("/etc/dpone/tls/cert"), private_key_file=Path("/etc/dpone/tls/key")),
@@ -319,3 +320,16 @@ def test_partial_signal_installation_failure_closes_and_restores():
     assert service.main(ARGS, build_server=lambda *a, **k: server, signals=signals, stderr=io.StringIO()) == 1
     assert server.events == ["enter", "close-and-join"]
     assert signals.handlers == signals.original
+
+
+def test_legacy_launch_does_not_bypass_policy_bootstrap_lifecycle(startup):
+    config, events, _, _ = startup
+    config.service_policy = object()
+    with pytest.raises(CompositionAdmissionError, match="dispatcher_policy_startup_required"):
+        factory.build_dispatcher_server(
+            Path(ARGS[1]),
+            expected_configuration_sha256=DIGEST,
+            dispatcher_uid=1200,
+            dispatcher_gid=1201,
+        )
+    assert events == ["config"]

@@ -36,3 +36,19 @@ architecture budgets remain release requirements.
 If root-only file custody is mandatory, use a separate privileged capture
 producer with an independently specified protocol and recovery handoff instead.
 Neither privileged workers nor a writable host-facts API are acceptable shortcuts.
+
+
+## Completion amendment: acyclic startup identity
+
+The completed deployment uses a separately hashed immutable service policy,
+versioned policy binding, and administrator-installed protected bootstrap. The
+listener starts with admission closed so its actual process/socket can be
+enrolled before bootstrap activation. Enrollment and release catalogs never
+participate in the policy hash or immutable Docker launch digest.
+
+The specification defines the exact P → registry → runtime → staged context →
+listener → enrollment → bootstrap order, one-way startup latch, protected atomic
+handoff, disjoint deployment-artifact roots and fresh checks before admission.
+Existing binding v1 and service v2 hashes retain their full-byte meaning. This
+explicitly changes bootstrap authentication for the new launch profile; it does
+not weaken legacy checks or make enrollment a runtime provisioning operation.

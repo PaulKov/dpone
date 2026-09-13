@@ -549,3 +549,42 @@ The opt-in test `tests/test_composition_native_profile.py` takes
 `DPONE_NATIVE_PROFILE_TEST_ROOT` and `DPONE_NATIVE_PROFILE_TEST_PROFILES` for
 externally provisioned roots. A passing real Linux/tmpfs observation test proves
 this observer only; it does not certify the complete execution route.
+
+
+### Acyclic policy and bootstrap identities
+
+The service policy and deployment bootstrap have separate meanings. Policy
+`dpone.composition-dispatcher-service-policy.v1` contains stable listener/custody
+settings, the protected bootstrap file coordinate and startup timeout. Binding
+`dpone.composition-dispatcher-binding.v2` pins its complete canonical bytes using
+`service_policy_sha256`. It contains no runtime authority or enrollment digest.
+
+Bootstrap `dpone.composition-dispatcher-service.v3` contains that exact policy,
+`supervisor_enrollment_sha256` and the authority/context catalog. Its complete
+bytes have their own digest. Build policy, signed registry, runtime authority and
+staged context in that order; adding a release rotates the bootstrap without
+requiring the policy to hash its own registry. Legacy binding v1 and service v2
+retain their full-configuration hash and existing decoder behavior.
+
+Developers can decode these originals with
+`decode_dispatcher_service_policy` and `decode_dispatcher_service_config` in the
+corresponding `dpone.app.composition_dispatcher_service_*` modules. For a decoded
+configuration, `configuration_sha256`/`sha256` identify the complete bootstrap;
+`binding_identity_kind`/`binding_identity_sha256` identify the signed binding's
+selected preimage. Staged context selection must explicitly choose `policy`
+identity; a matching digest with the wrong kind is rejected.
+
+The new two-phase startup lifecycle is still required before this profile is
+operational. The legacy `--config` launch rejects v3 before reading TLS credentials
+or binding a socket. Do not launch it with a substituted digest or fabricated
+enrollment. The [approved startup specification](../feature-specs/composition-dispatcher-capture-custody.md#acyclic-service-policy-and-bootstrap-lifecycle)
+defines closed-listener startup, atomic protected bootstrap installation,
+immutable-tree/mount separation and fresh enrollment verification before opening
+admission. This codec checkpoint does not certify that lifecycle or a live route.
+
+The activation connection API also preserves distinct physical identities:
+`control_connection_with_service(context)` returns the verified MSSQL connection
+and its same-resolution signed control-service pin. ClickHouse enrollment uses
+that pin for the control transaction and keeps the ClickHouse service/database
+UUIDs for domain checks. Existing `control_connection(context)` callers keep the
+same handle ownership and cleanup responsibilities.

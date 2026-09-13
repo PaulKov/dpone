@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Literal
 
 from dpone.adapters.composition_dispatcher_context_files import DispatcherContextFiles
 from dpone.app.composition_pack_execution_dispatcher import reopen_composition_plan
@@ -148,8 +148,16 @@ class StagedDispatcherContextLoader:
         configuration_sha256: str,
         staged_authorities: Mapping[str, str],
         runtime_loader: RuntimeConnectionContextLoader | None = None,
+        identity_kind: Literal["configuration", "policy"] = "configuration",
     ) -> None:
-        identity = CompositionDispatcherBinding(dispatcher_id, "dispatcher", configuration_sha256)
+        if identity_kind not in {"configuration", "policy"}:
+            raise CompositionAdmissionError("dispatcher_context")
+        identity = CompositionDispatcherBinding(
+            dispatcher_id,
+            "dispatcher",
+            configuration_sha256 if identity_kind == "configuration" else None,
+            service_policy_sha256=configuration_sha256 if identity_kind == "policy" else None,
+        )
         if not staged_authorities or len(staged_authorities) > 1024:
             raise CompositionAdmissionError("dispatcher_context")
         for selector, original in staged_authorities.items():
@@ -186,7 +194,7 @@ class StagedDispatcherContextLoader:
             context = self._load(
                 runtime_authority_sha256,
                 dispatcher_id=self._identity.dispatcher_id,
-                configuration_sha256=self._identity.service_configuration_sha256,
+                configuration_sha256=self._identity.identity_sha256,
                 plan_sha256=attempt.plan_sha256,
                 target_binding_ref=None,
                 attempt=attempt,
@@ -214,7 +222,7 @@ class StagedDispatcherContextLoader:
                 require_dispatcher_connection_ref(target_binding_ref)
             if (dispatcher_id, configuration_sha256) != (
                 self._identity.dispatcher_id,
-                self._identity.service_configuration_sha256,
+                self._identity.identity_sha256,
             ):
                 raise ValueError
             expected = self._catalog[runtime_authority_sha256]
@@ -267,8 +275,9 @@ class StagedDispatcherContextLoader:
             if target["type"] != "clickhouse":
                 raise ValueError
             binding = CompositionDispatcherBinding.from_mapping(target["connection"]["composition_dispatcher"])
-            if (binding.dispatcher_id, binding.service_configuration_sha256) != (
+            if (binding.dispatcher_id, binding.identity_kind, binding.identity_sha256) != (
                 dispatcher_id,
+                self._identity.identity_kind,
                 configuration_sha256,
             ) or _registry_entry(runtime, binding.connection_ref)["type"] != "api":
                 raise ValueError

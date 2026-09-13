@@ -12,16 +12,25 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from hashlib import sha256
-from ipaddress import ip_address
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Any
 
 from dpone.adapters.composition_dispatcher_context_files import DispatcherContextFiles
 from dpone.adapters.composition_mssql_layout import require_control_schema
+from dpone.app.composition_dispatcher_configuration_values import (
+    DispatcherCaptureRootIdentity,
+    DispatcherListenConfig,
+    DispatcherTlsConfig,
+    _integer,
+    _object,
+    _path,
+    _uuid,
+    settings,
+)
+from dpone.app.composition_dispatcher_service_policy import DispatcherServicePolicy, decode_dispatcher_service_policy
 from dpone.contracts.composition_dispatcher_binding import require_dispatcher_connection_ref
 from dpone.contracts.composition_identity import CompositionAdmissionError, require_digest
-from dpone.contracts.composition_snapshot_materialization import catalog_uuid
 from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 
 SCHEMA = "dpone.composition-dispatcher-service.v2"
@@ -45,33 +54,6 @@ _FIELDS = {
     "max_concurrency",
     "authorities",
 }
-
-
-@dataclass(frozen=True, slots=True)
-class DispatcherCaptureRootIdentity:
-    """Configured inode pin, requiring independent enrollment/facts comparison."""
-
-    device: int
-    inode: int
-    uid: int
-    gid: int
-    mode: int
-
-
-@dataclass(frozen=True, slots=True)
-class DispatcherListenConfig:
-    """One numeric address and port, without resolution or socket creation."""
-
-    address: str
-    port: int
-
-
-@dataclass(frozen=True, slots=True)
-class DispatcherTlsConfig:
-    """Protected credential coordinates; contents are not read by this loader."""
-
-    certificate_file: Path
-    private_key_file: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,43 +92,25 @@ class DispatcherServiceConfig:
     authorities: Mapping[str, DispatcherAuthorityConfig]
     configuration_sha256: str
     document: bytes = field(repr=False)
+    service_policy: DispatcherServicePolicy | None = None
+
+    @property
+    def service_policy_sha256(self) -> str | None:
+        """Stable v3 policy identity, absent for a legacy full-configuration binding."""
+        return self.service_policy.sha256 if self.service_policy is not None else None
+
+    @property
+    def binding_identity_kind(self) -> str:
+        return "policy" if self.service_policy is not None else "configuration"
+
+    @property
+    def binding_identity_sha256(self) -> str:
+        return self.service_policy.sha256 if self.service_policy is not None else self.sha256
 
     @property
     def sha256(self) -> str:
-        """Digest of the retained exact original for signed binding comparison."""
+        """Exact bootstrap digest; use binding_identity_sha256 for the selected binding."""
         return "sha256:" + sha256(self.document).hexdigest()
-
-
-def _object(value: Any, fields: set[str]) -> dict[str, Any]:
-    if type(value) is not dict or set(value) != fields:
-        raise ValueError
-    return value
-
-
-def _integer(value: Any, minimum: int, maximum: int | None = None) -> int:
-    if type(value) is not int or value < minimum or (maximum is not None and value > maximum):
-        raise ValueError
-    return value
-
-
-def _path(value: Any) -> Path:
-    if (
-        type(value) is not str
-        or not 0 < len(value) <= 4096
-        or not value.startswith("/")
-        or value.startswith("//")
-        or str(PurePosixPath(value)) != value
-        or ".." in PurePosixPath(value).parts
-        or any(ord(char) < 32 or ord(char) == 127 for char in value)
-    ):
-        raise ValueError
-    return Path(value)
-
-
-def _uuid(value: Any) -> str:
-    if type(value) is not str:
-        raise ValueError
-    return catalog_uuid(value)
 
 
 def _authorities(value: Any) -> Mapping[str, DispatcherAuthorityConfig]:
@@ -188,46 +152,33 @@ def decode_dispatcher_service_config(
             raise ValueError
         if "sha256:" + sha256(document).hexdigest() != expected_sha256:
             raise ValueError
-        value = _object(strict_json_object(document), _FIELDS)
-        if canonical_json_bytes(value) != document or value["schema"] != SCHEMA:
+        value = strict_json_object(document)
+        if canonical_json_bytes(value) != document:
             raise ValueError
-        uid = _integer(value["dispatcher_uid"], 1, 2147483647)
-        gid = _integer(value["dispatcher_gid"], 1, 2147483647)
-        if (uid, gid) != (bootstrap_uid, bootstrap_gid) or value["capture_custody"] != "dispatcher_owned_v1":
-            raise ValueError
-        identity = _object(value["capture_root_identity"], {"device", "inode", "uid", "gid", "mode"})
-        capture_identity = DispatcherCaptureRootIdentity(
-            _integer(identity["device"], 0),
-            _integer(identity["inode"], 1),
-            _integer(identity["uid"], uid, uid),
-            _integer(identity["gid"], gid, gid),
-            _integer(identity["mode"], 448, 448),
-        )
-        listen = _object(value["listen"], {"address", "port"})
-        address = listen["address"]
-        if type(address) is not str or "%" in address or ip_address(address).is_unspecified:
-            raise ValueError
-        tls = _object(value["tls"], {"certificate_file", "private_key_file"})
+        policy = None
+        if value.get("schema") == "dpone.composition-dispatcher-service.v3":
+            _object(value, {"schema", "policy", "supervisor_enrollment_sha256", "authorities"})
+            policy_original = canonical_json_bytes(value["policy"])
+            policy = decode_dispatcher_service_policy(
+                policy_original,
+                expected_sha256="sha256:" + sha256(policy_original).hexdigest(),
+                bootstrap_uid=bootstrap_uid,
+                bootstrap_gid=bootstrap_gid,
+            )
+            common = settings(strict_json_object(policy.document), bootstrap_uid, bootstrap_gid)
+        else:
+            _object(value, _FIELDS)
+            if value["schema"] != SCHEMA:
+                raise ValueError
+            common = settings(value, bootstrap_uid, bootstrap_gid)
         require_digest(value["supervisor_enrollment_sha256"])
         return DispatcherServiceConfig(
-            _uuid(value["dispatcher_id"]),
-            uid,
-            gid,
-            value["capture_custody"],
-            _path(value["context_root"]),
-            _path(value["host_probe_socket"]),
-            value["supervisor_enrollment_sha256"],
-            _path(value["capture_root"]),
-            capture_identity,
-            DispatcherListenConfig(address, _integer(listen["port"], 1, 65535)),
-            DispatcherTlsConfig(_path(tls["certificate_file"]), _path(tls["private_key_file"])),
-            _path(value["bearer_file"]),
-            _integer(value["accept_timeout_seconds"], 1, 30),
-            _integer(value["execution_timeout_seconds"], 1, 900),
-            _integer(value["max_concurrency"], 1, 64),
-            _authorities(value["authorities"]),
-            expected_sha256,
-            document,
+            **common,
+            supervisor_enrollment_sha256=value["supervisor_enrollment_sha256"],
+            authorities=_authorities(value["authorities"]),
+            configuration_sha256=expected_sha256,
+            document=document,
+            service_policy=policy,
         )
     except (ValueError, TypeError, KeyError, AttributeError, RecursionError, OverflowError):
         raise CompositionAdmissionError("dispatcher_service_config") from None

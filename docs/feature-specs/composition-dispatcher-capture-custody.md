@@ -252,6 +252,87 @@ an invalid or unavailable explicit binding never falls back to local execution.
 Native factory construction is delayed until an actual native request so that
 ordinary remote selection cannot resolve administrative target credentials.
 
+### Acyclic service policy and bootstrap lifecycle
+
+This completion amendment is covered by the maintainer's approval to finish the
+working implementation and release without further approval rounds. Independent
+review confirmed that the previous full-configuration identity creates a hash
+cycle: registry binding → full configuration → runtime authority → registry.
+Enrollment also observes the actual listener inode and Docker configuration, so
+starting the listener only after enrollment is impossible. Constructors and
+mocked digest values cannot establish that provisioning works.
+
+Introduce a distinct `dpone.composition-dispatcher-service-policy.v1` original P.
+Its exact fields are `schema`, `dispatcher_id`, `dispatcher_uid`, `dispatcher_gid`,
+`capture_custody`, `context_root`, `host_probe_socket`, `capture_root`,
+`capture_root_identity`, `listen`, `tls`, `bearer_file`, `accept_timeout_seconds`,
+`execution_timeout_seconds`, `max_concurrency`, `bootstrap_file`, and
+`startup_timeout_seconds`. Existing v2 field validators remain authoritative;
+`bootstrap_file` is a canonical absolute protected-file coordinate and startup
+seconds is an exact integer from 1 to 900. Its canonical full-byte SHA256 is P.
+P contains no enrollment digest or runtime/context authority catalog.
+
+A new `dpone.composition-dispatcher-binding.v2` original contains exactly
+`schema`, `dispatcher_id`, `connection_ref`, `service_policy_sha256`. The existing
+v1 binding retains `service_configuration_sha256` and its exact full-document
+meaning. The Python binding retains the old positional constructor and supports
+exactly one of these two digest fields; `identity_sha256` returns the selected
+identity and `identity_kind` distinguishes `configuration` from `policy`.
+Unknown/mixed fields and version/digest-kind mismatches reject. No existing hash
+silently changes its preimage.
+
+A new `dpone.composition-dispatcher-service.v3` bootstrap B contains exactly
+`schema`, `policy`, `supervisor_enrollment_sha256`, and `authorities`. `policy` is
+the complete validated P document. Authorities keep their current exact closed
+shape and bounds. The bootstrap's full-byte digest and retained document remain
+separate from `service_policy_sha256`; changing a catalog or enrollment changes
+B, while changing policy changes P. Legacy service v2 decoding and launch remain
+compatible and do not acquire new identity semantics.
+
+The deployable sequence is:
+
+1. Externally provision capture/storage coordinates, fixed network addresses,
+   protected TLS/bearer originals and P. Include the canonical bootstrap path in
+   P. Launch arguments/environment may pin P and its fixed file coordinate, but
+   must not contain B or enrollment E. Construct the signed registry, runtime
+   authority and staged context using binding v2 and P, in that order.
+2. Start the actual nonroot TLS listener from P with application admission
+   closed. The process and socket are already observable for enrollment. The
+   startup latch is separate from the irreversible execution shutdown signal;
+   it issues no execution, status-absence or terminal evidence while closed.
+3. The provisioner captures E against this same process/socket, then atomically
+   installs B at the P-pinned path as root:dispatcher with protected permissions.
+   The authenticated handoff is the administrator's protected file installation;
+   B is not self-authorized by an incoming request or an untrusted computed hash.
+4. Startup waits only for an absent file, within one fixed startup deadline.
+   Present malformed, partial, unauthorized or oversized originals fail terminally.
+   Read B using a held no-follow descriptor; pin full bytes and file/path metadata.
+   Validate embedded P against the external launch digest and bootstrap path.
+5. Reopen actual SQL enrollment through each catalog authority's independently
+   signed MSSQL control-service pin, verify E and fresh host facts, and require
+   the same process/listener. Bootstrap/context roots must be disjoint from every
+   enrolled immutable configuration/code tree, including ancestor relationships
+   and filesystem/mount aliases. These deployment artifacts cannot be hashed
+   back into E; immutable policy/code observations remain mandatory.
+6. Immediately before opening admission, recheck the held B descriptor and its
+   protected pathname, deadline and stop signal. Transition once from WAITING
+   through VERIFYING to ACTIVE without replacing the process/socket. Failure or
+   shutdown is terminal; no replacement adoption, catalog hot reload or reset of
+   the stop signal is permitted. Restart requires a new observed enrollment.
+
+`--policy` and `--policy-sha256` select this startup path together, mutually
+exclusive with legacy `--config` and `--configuration-sha256`. Bootstrap location
+comes only from P. Existing dispatcher UID/GID pins remain mandatory. CLI help
+and invalid argument paths remain free of connector/vendor imports.
+
+Validation must build the hash chain with real canonical hashes in producer
+order, demonstrate that catalog/enrollment changes affect B but not P, preserve
+legacy bytes, and reject identity-kind confusion and changed policy. A real
+Linux listener test must demonstrate closed admission before atomic bootstrap
+installation and unchanged process/socket on transition. Stale enrollment,
+partial installation, timeout, alias/overlap, pathname rotation and shutdown
+must never admit work. Full deployed route certification is still separate.
+
 ### Native execution-profile readiness observation
 
 The approved completion includes a side-effect-free observer running in the actual

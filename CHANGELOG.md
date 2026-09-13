@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Keep the independently verified MSSQL control-service identity paired with its
+  connection during ClickHouse activation. Distinct ClickHouse and control UUIDs
+  no longer reject valid enrollment or substitute one service for the other.
 - Preserve exact transfer extraction bytes for independent committed-receipt and
   typed target-content reconciliation; retain scheduler identity across retries
   and mapped tasks, including explicitly configured state process identity.
@@ -19,6 +22,11 @@
 
 ### Added
 
+- Add explicit dispatcher policy bindings and separate policy/bootstrap codecs
+  to remove the configuration-to-runtime hash cycle. Preserve legacy full-byte
+  configuration identity, and reject digest-kind confusion in staged selection
+  and transfer handling. The two-phase listener/bootstrap lifecycle remains
+  required; legacy startup rejects the new bootstrap format before binding.
 - Observe native runner filesystem facts through held protected descriptors and
   fresh root comparisons, with actual Linux root/tmpfs and fixed-deadline checks.
   Reject malformed supervisor projections before filesystem access. These

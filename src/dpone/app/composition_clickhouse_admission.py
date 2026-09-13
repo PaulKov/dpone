@@ -32,11 +32,11 @@ def require_protected_clickhouse_enrollment(
     control = cursor = None
     failure: CompositionAdmissionError | None = None
     try:
-        control = connections.control_connection(context)
+        control, control_service_id = connections.control_connection_with_service(context)
         control.autocommit = False
         cursor = control.cursor()
         ledger = CompositionMssqlLedger(cursor, control_schema)
-        transaction = ledger.begin(domain.service_id)
+        transaction = ledger.begin(control_service_id)
         require_clickhouse_supervisor_schema(cursor, control_schema)
         cursor.execute(
             "SELECT TOP (2) connector,LOWER(CONVERT(char(36),service_id)),physical_subject_sha256 "

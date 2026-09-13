@@ -48,7 +48,7 @@ def test_descriptor_rejects_noncanonical_original():
         CompositionDispatcherBinding.from_document(b" " + canonical_json_bytes(descriptor()))
 
 
-def _staged(monkeypatch, tmp_path):
+def _staged(monkeypatch, tmp_path, *, identity_kind="configuration"):
     from types import SimpleNamespace
 
     from dpone.app import composition_dispatcher_context as module
@@ -111,6 +111,7 @@ def _staged(monkeypatch, tmp_path):
         dispatcher_gid=1234,
         dispatcher_id=DISPATCHER,
         configuration_sha256=SHA,
+        identity_kind=identity_kind,
         staged_authorities={SHA: "sha256:" + sha256(canonical_json_bytes(body)).hexdigest()},
         runtime_loader=runtime_loader,
     )
@@ -247,7 +248,8 @@ def test_protected_tree_rejects_writable_descendant(monkeypatch, tmp_path):
         files.require_tree("authority")
 
 
-def test_real_runtime_loader_verifies_staged_documents(monkeypatch, tmp_path):
+@pytest.mark.parametrize("identity_kind", ["configuration", "policy"])
+def test_real_runtime_loader_verifies_staged_documents(monkeypatch, tmp_path, identity_kind):
     import json
     from hashlib import sha256
     from types import SimpleNamespace
@@ -259,8 +261,10 @@ def test_real_runtime_loader_verifies_staged_documents(monkeypatch, tmp_path):
         RUNTIME_INIT_FETCH_PLAN_SHA256_ENV,
         RuntimeConnectionContextLoader,
     )
+    from tests.test_composition_dispatcher_service_policy import decode_policy
     from tests.test_runtime_connection_context_loader import _replace_plan_descriptor, _runtime_context
 
+    binding_identity = SHA if identity_kind == "configuration" else decode_policy().sha256
     env, context_root = _runtime_context(tmp_path)
     registry_path = context_root / "connection-registry.json"
     registry = json.loads(registry_path.read_bytes())
@@ -268,6 +272,13 @@ def test_real_runtime_loader_verifies_staged_documents(monkeypatch, tmp_path):
     registry["connections"]["sink-registry"]["connection"]["composition_dispatcher"] = descriptor() | {
         "connection_ref": "source-main"
     }
+    if identity_kind == "policy":
+        registry["connections"]["sink-registry"]["connection"]["composition_dispatcher"] = {
+            "schema": "dpone.composition-dispatcher-binding.v2",
+            "dispatcher_id": DISPATCHER,
+            "connection_ref": "source-main",
+            "service_policy_sha256": binding_identity,
+        }
     content = canonical_json_bytes(registry)
     registry_path.write_bytes(content)
     env = _replace_plan_descriptor(env, name="connection_registry", content=content)
@@ -299,11 +310,14 @@ def test_real_runtime_loader_verifies_staged_documents(monkeypatch, tmp_path):
         root=tmp_path,
         dispatcher_gid=1234,
         dispatcher_id=DISPATCHER,
-        configuration_sha256=SHA,
+        configuration_sha256=binding_identity,
+        identity_kind=identity_kind,
         staged_authorities={authority: "sha256:" + sha256(body).hexdigest()},
         runtime_loader=runtime_loader,
     )
-    args = dict(dispatcher_id=DISPATCHER, configuration_sha256=SHA, plan_sha256=SHA, target_binding_ref="sink-main")
+    args = dict(
+        dispatcher_id=DISPATCHER, configuration_sha256=binding_identity, plan_sha256=SHA, target_binding_ref="sink-main"
+    )
     result = loader.load(authority, **args)
     assert result.runtime.authority_subject_sha256 == authority
     assert result.occurrence.deployment_id == runtime.deployment_id
@@ -355,3 +369,22 @@ def test_staging_rejects_foreign_owner(monkeypatch, tmp_path):
     monkeypatch.setattr(module.os, "fstat", foreign)
     with pytest.raises(CompositionAdmissionError):
         files.read("authority/context.json")
+
+
+@pytest.mark.parametrize("identity_kind", ["configuration", "policy"])
+def test_staged_binding_kind_is_not_inferred_from_matching_digest(monkeypatch, tmp_path, identity_kind):
+    loader, arguments, _, runtime, _ = _staged(monkeypatch, tmp_path, identity_kind=identity_kind)
+    binding = runtime.connection_registry["connections"]["registry-target"]["connection"]
+    binding["composition_dispatcher"] = {
+        "schema": "dpone.composition-dispatcher-binding.v2",
+        "dispatcher_id": DISPATCHER,
+        "connection_ref": "api-dispatcher",
+        "service_policy_sha256": SHA,
+    }
+    if identity_kind == "configuration":
+        with pytest.raises(CompositionAdmissionError):
+            loader.load(SHA, **arguments)
+    else:
+        observed = loader.load(SHA, **arguments)
+        assert observed.binding.identity_kind == "policy"
+        assert observed.binding.identity_sha256 == SHA

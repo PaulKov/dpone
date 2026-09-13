@@ -478,3 +478,42 @@ def test_status_sql_failure_cannot_become_absence(monkeypatch):
     with pytest.raises(CompositionAdmissionError, match="dispatcher_transfer_unknown"):
         module.DispatcherTransferHandler(case.config, case.loader)(request, case.budget)
     assert case.events == ["load", "authority"]
+
+
+@pytest.mark.parametrize("kind", ["policy", "configuration"])
+def test_v3_handler_requires_policy_identity_without_relabeling_bootstrap(monkeypatch, kind):
+    case = harness(monkeypatch)
+    body = strict_json_object(case.config.document)
+    enrollment, authorities = body.pop("supervisor_enrollment_sha256"), body.pop("authorities")
+    policy = body | {
+        "schema": "dpone.composition-dispatcher-service-policy.v1",
+        "bootstrap_file": "/var/lib/dpone-bootstrap/startup/bootstrap.json",
+        "startup_timeout_seconds": 120,
+    }
+    case.config = decode(
+        {
+            "schema": "dpone.composition-dispatcher-service.v3",
+            "policy": policy,
+            "supervisor_enrollment_sha256": enrollment,
+            "authorities": authorities,
+        },
+        bootstrap_uid=101,
+        bootstrap_gid=101,
+    )
+    if kind == "policy":
+        case.selected.context.binding = CompositionDispatcherBinding(
+            case.config.dispatcher_id,
+            "dispatcher",
+            service_policy_sha256=case.config.service_policy_sha256,
+        )
+        response = module.DispatcherTransferHandler(case.config, case.loader)(case.request, case.budget)
+        assert response.status == "SUCCEEDED"
+    else:
+        case.selected.context.binding = CompositionDispatcherBinding(
+            case.config.dispatcher_id,
+            "dispatcher",
+            case.config.binding_identity_sha256,
+        )
+        with pytest.raises(CompositionAdmissionError):
+            module.DispatcherTransferHandler(case.config, case.loader)(case.request, case.budget)
+        assert "inspect" not in case.events

@@ -90,8 +90,20 @@ class CompositionAuthorityConnections:
         Verification ends with rollback and cursor close. The returned connection
         remains open for the caller's own protected transaction and readback.
         """
+        return self.control_connection_with_service(context)[0]
+
+    def control_connection_with_service(
+        self, context: CompositionOccurrenceContext
+    ) -> tuple[SqlControlConnection, str]:
+        """Return one verified session and its independently configured service pin.
+
+        Resolve the signed control binding once so the returned identity belongs
+        to the exact endpoint/principal verified by this call. SQL observations
+        validate the expected pin; they never supply it. The caller owns the open
+        connection after verification rolls back and closes its own cursor.
+        """
         connection, service, pin = self._authority(context)
-        return self._open_verified(connection, service, pin, keep_connection=True)
+        return self._open_verified(connection, service, pin, keep_connection=True), service
 
     def require_mssql_target_service(
         self, target: ResolvedBindingConnection, expected_service_id: str, context: CompositionOccurrenceContext

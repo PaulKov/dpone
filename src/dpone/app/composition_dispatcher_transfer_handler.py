@@ -112,7 +112,8 @@ class DispatcherTransferHandler:
             _require(
                 selected.attempt == request.attempt
                 and context.binding.dispatcher_id == self._config.dispatcher_id
-                and context.binding.service_configuration_sha256 == self._config.sha256
+                and context.binding.identity_kind == self._config.binding_identity_kind
+                and context.binding.identity_sha256 == self._config.binding_identity_sha256
                 and context.runtime.authority_subject_sha256 == request.runtime_authority_sha256
                 and context.occurrence.runtime_context_sha256 == request.runtime_authority_sha256
                 and selected.write.connection_ref == context.target_binding_ref

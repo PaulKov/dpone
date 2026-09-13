@@ -176,6 +176,8 @@ def build_dispatcher_server(
         bootstrap_uid=dispatcher_uid,
         bootstrap_gid=dispatcher_gid,
     )
+    if config.service_policy is not None:
+        raise CompositionAdmissionError("dispatcher_policy_startup_required")
     tls, token = _credentials(config)
     loader = StagedDispatcherContextLoader(
         root=config.context_root,

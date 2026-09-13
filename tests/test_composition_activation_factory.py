@@ -188,7 +188,7 @@ def test_same_service_other_database_enrollment_is_clickhouse_enrollment(monkeyp
         require_protected_clickhouse_enrollment(
             domain,
             CONTEXT,
-            connections=SimpleNamespace(control_connection=lambda _context: control),
+            connections=SimpleNamespace(control_connection_with_service=lambda _context: (control, OTHER_SERVICE)),
             control_schema="dpone_control",
         )
 
@@ -231,6 +231,92 @@ class EnrollmentCursor:
 
     def close(self) -> None:
         return None
+
+
+@pytest.fixture
+def protected_clickhouse_case(monkeypatch):
+    """Exercise real ledger identity checks with fixed, distinct service markers."""
+    import dpone.adapters.composition_mssql_store_queries as queries
+    import dpone.app.composition_clickhouse_admission as admission
+
+    domain = clickhouse_physical_domain(SERVICE, DATABASE)
+    body = enrollment_body()
+    body.update(service_id=SERVICE, database_uuid=DATABASE)
+    events = []
+
+    class Cursor(EnrollmentCursor):
+        sql_service = OTHER_SERVICE
+
+        def execute(self, sql, *parameters):
+            events.append(("sql", sql, parameters))
+            if "sp_getapplock" in sql:
+                self.rows = ((0,),)
+            elif "DECLARE @count" in sql:
+                self.rows = ((1, 1, "Exclusive", 71),)
+            elif "composition_authority" in sql:
+                # This observed marker never learns a caller's expected UUID.
+                self.rows = ((1, 2, self.sql_service),)
+            else:
+                super().execute(sql, *parameters)
+
+        def fetchone(self):
+            return self.rows[0] if self.rows else None
+
+        def close(self):
+            events.append("cursor.close")
+
+    cursor = Cursor(domain, enrolled(body))
+    control = SimpleNamespace(
+        autocommit=True,
+        cursor=lambda: cursor,
+        rollback=lambda: events.append("rollback"),
+        close=lambda: events.append("control.close"),
+    )
+    connections = SimpleNamespace(
+        control_connection=lambda context: control,
+        control_connection_with_service=lambda context: (control, OTHER_SERVICE),
+    )
+    monkeypatch.setattr(admission, "require_clickhouse_supervisor_schema", lambda *args: None)
+    monkeypatch.setattr(queries, "require_composition_mssql_schema", lambda *args: None)
+    return SimpleNamespace(
+        domain=domain, body=body, cursor=cursor, control=control, connections=connections, events=events
+    )
+
+
+def test_clickhouse_enrollment_uses_distinct_verified_control_service(protected_clickhouse_case):
+    case = protected_clickhouse_case
+    assert case.domain.service_id != OTHER_SERVICE
+    require_protected_clickhouse_enrollment(
+        case.domain, CONTEXT, connections=case.connections, control_schema="dpone_control"
+    )
+    assert case.events[-3:] == ["rollback", "cursor.close", "control.close"]
+    enrollment_queries = [
+        event for event in case.events if isinstance(event, tuple) and "ch_supervisor_enrollments" in event[1]
+    ]
+    assert len(enrollment_queries) == 1 and enrollment_queries[0][2] == (SERVICE,)
+
+
+def test_clickhouse_enrollment_rejects_ch_uuid_as_sql_marker(protected_clickhouse_case):
+    case = protected_clickhouse_case
+    case.cursor.sql_service = SERVICE
+    with pytest.raises(CompositionAdmissionError, match="control_authority"):
+        require_protected_clickhouse_enrollment(
+            case.domain, CONTEXT, connections=case.connections, control_schema="dpone_control"
+        )
+    assert case.events[-3:] == ["rollback", "cursor.close", "control.close"]
+    assert not any(isinstance(event, tuple) and "ch_supervisor_enrollments" in event[1] for event in case.events)
+
+
+@pytest.mark.parametrize("field", ["service_id", "database_uuid"])
+def test_distinct_control_does_not_weaken_clickhouse_identity(protected_clickhouse_case, field):
+    case = protected_clickhouse_case
+    case.body[field] = OTHER_SERVICE if field == "service_id" else OTHER_DATABASE
+    case.cursor.value = enrolled(case.body)
+    with pytest.raises(CompositionAdmissionError, match="clickhouse_enrollment"):
+        require_protected_clickhouse_enrollment(
+            case.domain, CONTEXT, connections=case.connections, control_schema="dpone_control"
+        )
+    assert case.events[-3:] == ["rollback", "cursor.close", "control.close"]
 
 
 def mssql_materialization_target(*, service_id: str = SERVICE):
