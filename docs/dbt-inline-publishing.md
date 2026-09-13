@@ -49,7 +49,7 @@ dbt --version
 
 `<released-dpone-version>` is a required placeholder: replace it with the exact
 version named in the release notes. The `dbt-mssql` extra selects dbt Core
-`1.10.13` and `dbt-sqlserver` `1.10.1`. The generic `dbt` extra does not install
+`1.12.3` and `dbt-sqlserver` `1.11.1`. The generic `dbt` extra does not install
 or certify a SQL Server adapter.
 
 You also need:

@@ -140,10 +140,10 @@ Production policy names one toolchain:
 
 ```yaml
 runtime:
-  toolchain: dbt-sqlserver-1.10-certified
+  toolchain: dbt-sqlserver-1.11-core-1.12-certified
 ```
 
-That ID maps to dbt Core `1.10.13`, distribution `dbt-sqlserver` `1.10.1`,
+That ID maps to dbt Core `1.12.3`, distribution `dbt-sqlserver` `1.11.1`,
 manifest v12, and run-results v6. The `dpone[dbt-mssql]` installation extra,
 build selection, execution pack, runtime inspector, and evidence all use the
 same contract. Canonical policy cannot also declare separate version strings.

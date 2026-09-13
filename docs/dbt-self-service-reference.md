@@ -23,7 +23,7 @@ uv sync --extra dbt-mssql
 python3 -m pip install "dpone[dbt-mssql]==<released-dpone-version>"
 ```
 
-`dpone[dbt-mssql]` installs dbt Core `1.10.13` and `dbt-sqlserver` `1.10.1`.
+`dpone[dbt-mssql]` installs dbt Core `1.12.3` and `dbt-sqlserver` `1.11.1`.
 `dpone[dbt]` installs only the broad dbt Core `>=1.8,<2` range and is not a
 production adapter or certification claim. Confirm the selected interpreter and
 tools with `python --version`, `dpone --version`, and `dbt --version`.
@@ -70,6 +70,7 @@ consume their documented JSON results rather than importing internal parsers:
 - [publish intent v2](schemas/dbt/dpone.dbt-publish-intent.v2.schema.json)
 - [publish policy v1](schemas/dbt/dpone.dbt-publish-policy.v1.schema.json)
 - [publish policy v2](schemas/dbt/dpone.dbt-publish-policy.v2.schema.json)
+- [publish policy v3](schemas/dbt/dpone.dbt-publish-policy.v3.schema.json) — current ordinary publishing toolchain
 - [invocation context v1](schemas/dbt/dpone.dbt-invocation-context.v1.schema.json)
 - [selection lock v1](schemas/dbt/dpone.dbt-selection-lock.v1.schema.json)
 - [project bundle v1](schemas/dbt/dpone.dbt-project-bundle.v1.schema.json)
@@ -345,7 +346,7 @@ profiles:
       partition_replace:
         require_atomic_capability: true
     runtime:
-      toolchain: dbt-sqlserver-1.10-certified
+      toolchain: dbt-sqlserver-1.11-core-1.12-certified
 ```
 
 Capability discovery must resolve exactly one matching variant with current
@@ -478,7 +479,7 @@ failure. `quality.dbt_warning_policy` defaults to `fail`; `allow` remains
 visible in the execution pack and evidence. Timed-out POSIX execution
 terminates the complete dbt process group within bounded TERM/KILL deadlines.
 
-For `dbt-sqlserver 1.10.1`, every admitted project must contain these exact
+For `dbt-sqlserver 1.11.1`, every admitted project must contain these exact
 literal booleans in `dbt_project.yml`:
 
 ```yaml
@@ -500,7 +501,7 @@ The selected graph is independently fail-closed:
 | Resource | Admitted SQL Server v1 preview behavior |
 | --- | --- |
 | Model | SQL only; `table`, `view`, or `incremental`; enabled; all selected models share the publish-model database/schema; no hooks, grants, or full refresh |
-| Model and test config keys | Only the closed config-key sets emitted by pinned dbt Core `1.10.13` and dbt-sqlserver `1.10.1`; unknown keys fail closed |
+| Model and test config keys | Only the closed config-key sets emitted by pinned dbt Core `1.12.3` and dbt-sqlserver `1.11.1`; unknown keys fail closed |
 | All model adapter options | Explicit `as_columnstore: false`; `indexes` absent/null/empty; `drop_unmanaged_indexes`, `prefer_single_alter_column`, and `auto_provision_aad_principals` absent/null/false; `column_type_expansion_max_rows` absent/null/default |
 | SQL and query overrides | `query_options`, `query_options_raw`, `persist_docs`, `column_types`, `incremental_predicates`, and `predicates` absent/null/empty; `query_tag` and `sql_header` absent/null |
 | Constraints | Model-level constraints absent/empty; column constraints absent/empty or `not_null` only; use admitted data/unit tests for `unique`, primary-key, foreign-key, check, or custom assertions |
@@ -654,8 +655,8 @@ repaired. The CLI-only v1 and legacy-facade timeline are defined in
 into a new empty immutable output root, follow the
 [dbt self-service compatibility migration](compatibility.md#dbt-self-service-compatibility).
 
-The first production certification target is dbt Core `1.10.13` with
-`dbt-sqlserver` `1.10.1`. Other local versions may be useful for preview, but
+The first production certification target is dbt Core `1.12.3` with
+`dbt-sqlserver` `1.11.1`. Other local versions may be useful for preview, but
 they are not production-certified by implication. Exact Airflow/provider and
 optional Cosmos rows are declared test targets in the repository compatibility
 matrix; a row is not a pass without current exact-commit evidence.
