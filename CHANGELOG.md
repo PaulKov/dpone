@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Allow local DDA cleanup to resume after an owned business table was removed;
+  retain ownership verification and unknown-commit refusal.
 - Qualify the original ClickHouse timestamp column in bounded-native window
   predicates so temporal SELECT aliases cannot replace it with integer
   microseconds. Preserve exact half-open UTC boundaries and duplicate rows.
