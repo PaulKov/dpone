@@ -109,7 +109,7 @@ keeping `"parallelism": 1`. That canonical ten-field record produces a v2 run;
 a record with both new counts equal to `parallelism` is rejected as noncanonical.
 Unlike authored manifest overrides, exact report inputs require both counts.
 
-Stage 2 (initial minor candidate 0.80.0, release pending) needs its own evidence.
+Stage 2 (0.80.0) requires its own exact-source evidence.
 Run narrow and wide/Unicode workloads with E=2/I=1 and E=1/I=2, retaining one
 warmup and three measured trials per policy, exact typed fidelity and recovery
 receipts, configuration hashes, source/producer identities and environment

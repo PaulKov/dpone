@@ -1,11 +1,10 @@
 # Tune native encoding and import concurrency
 
 Data engineers can give native encoding and BCP import different worker limits
-while retaining one acquired ClickHouse stream. This how-to covers the approved
-[stage 2 contract](../feature-specs/dda-independent-stage-limits.md), targeting a
-separate minor release (initial candidate **0.80.0**, release pending). Stage 2
-live correctness and performance remain **UNVERIFIED** until evidence for the
-exact source and environment is retained. A larger limit is no speed guarantee.
+while retaining one acquired ClickHouse stream. This how-to covers the
+[stage 2 contract](../feature-specs/dda-independent-stage-limits.md) introduced in
+**0.80.0**. Certify operational correctness and performance against retained
+evidence for the exact source and environment. A larger limit is no speed guarantee.
 
 ## Prepare and inspect a configuration
 
