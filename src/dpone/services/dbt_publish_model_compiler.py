@@ -250,7 +250,7 @@ def _window_options(source_type: str, strategy: Mapping[str, Any]) -> dict[str, 
         "partition_column": column,
         "source_custom_predicate": (
             f"[{escaped}] >= DATEADD(day, -{lookback_days}, "
-            "CONVERT(datetime2, '{{{{ data_interval_start }}}}', 127)) "
+            "CONVERT(datetime2, '{{ data_interval_start }}', 127)) "
             f"AND [{escaped}] < CONVERT(datetime2, '{{{{ data_interval_end }}}}', 127)"
         ),
     }

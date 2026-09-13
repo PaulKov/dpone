@@ -1,0 +1,197 @@
+{
+  "compiler": {
+    "admitted_options_preserved": true,
+    "interval_behavior_status": "FAIL",
+    "interval_bug_reproduced": true,
+    "interval_runtime_predicate": "[event_date] >= DATEADD(day, -1, CONVERT(datetime2, '{{2026-09-01T00:00:00Z}}', 127)) AND [event_date] < CONVERT(datetime2, '2026-09-02T00:00:00Z', 127)",
+    "mssql_sink_projection_only": {
+      "database": "warehouse",
+      "name": "events_target",
+      "schema": "reporting"
+    },
+    "sink_staging": {
+      "schema": "staging"
+    },
+    "sink_table": {
+      "name": "events_target",
+      "schema": "reporting"
+    },
+    "source": {
+      "connection_ref": "mssql_source",
+      "options": {
+        "native_transfer": {
+          "mode": "auto"
+        },
+        "partition_column": "event_date",
+        "source_custom_predicate": "[event_date] >= DATEADD(day, -1, CONVERT(datetime2, '{{{{ data_interval_start }}}}', 127)) AND [event_date] < CONVERT(datetime2, '{{ data_interval_end }}', 127)"
+      },
+      "table": {
+        "database": "warehouse",
+        "name": "events_view",
+        "schema": "mart"
+      },
+      "type": "mssql"
+    },
+    "transformation_pack_plan": {
+      "adapter_runtime": {
+        "adapter_runtime_sha256": "sha256:f443bd37299bdb9c5bcd4dee933956201aa05065cd9f19445a5401d872654cef",
+        "backend": "pyodbc",
+        "login_timeout_seconds": 15,
+        "query_timeout_seconds": 3300,
+        "retries": 1,
+        "schema": "dpone.dbt-sqlserver-runtime-policy.v1"
+      },
+      "connection_ref": "mssql_source",
+      "database": "warehouse",
+      "schema": "mart"
+    }
+  },
+  "registry": [
+    {
+      "accepted": true,
+      "case": "baseline_auto",
+      "expected": true,
+      "issues": []
+    },
+    {
+      "accepted": true,
+      "case": "empty_native_transfer",
+      "expected": true,
+      "issues": []
+    },
+    {
+      "accepted": false,
+      "case": "required_mode",
+      "expected": false,
+      "issues": [
+        {
+          "code": "DPONE_DBT_PROFILES_INVALID",
+          "message": "Invalid policy value at profiles.synthetic_route.source.options.native_transfer.mode (enum)"
+        }
+      ]
+    },
+    {
+      "accepted": false,
+      "case": "off_mode",
+      "expected": false,
+      "issues": [
+        {
+          "code": "DPONE_DBT_PROFILES_INVALID",
+          "message": "Invalid policy value at profiles.synthetic_route.source.options.native_transfer.mode (enum)"
+        }
+      ]
+    },
+    {
+      "accepted": false,
+      "case": "native_execution",
+      "expected": false,
+      "issues": [
+        {
+          "code": "DPONE_DBT_PROFILES_INVALID",
+          "message": "Invalid policy value at profiles.synthetic_route.source.options.native_transfer (additionalProperties)"
+        }
+      ]
+    },
+    {
+      "accepted": false,
+      "case": "native_wire",
+      "expected": false,
+      "issues": [
+        {
+          "code": "DPONE_DBT_PROFILES_INVALID",
+          "message": "Invalid policy value at profiles.synthetic_route.source.options.native_transfer (additionalProperties)"
+        }
+      ]
+    },
+    {
+      "accepted": false,
+      "case": "source_fetch_size",
+      "expected": false,
+      "issues": [
+        {
+          "code": "DPONE_DBT_PROFILES_INVALID",
+          "message": "Invalid policy value at profiles.synthetic_route.source.options (additionalProperties)"
+        }
+      ]
+    },
+    {
+      "accepted": false,
+      "case": "source_encrypt",
+      "expected": false,
+      "issues": [
+        {
+          "code": "DPONE_DBT_PROFILES_INVALID",
+          "message": "Invalid policy value at profiles.synthetic_route.source.options (additionalProperties)"
+        }
+      ]
+    },
+    {
+      "accepted": false,
+      "case": "sink_settings",
+      "expected": false,
+      "issues": [
+        {
+          "code": "DPONE_DBT_PROFILES_INVALID",
+          "message": "Invalid policy value at profiles.synthetic_route.sink.options (additionalProperties)"
+        }
+      ]
+    },
+    {
+      "accepted": false,
+      "case": "sink_bulk",
+      "expected": false,
+      "issues": [
+        {
+          "code": "DPONE_DBT_PROFILES_INVALID",
+          "message": "Invalid policy value at profiles.synthetic_route.sink.options (additionalProperties)"
+        }
+      ]
+    },
+    {
+      "accepted": false,
+      "case": "sink_database",
+      "expected": false,
+      "issues": [
+        {
+          "code": "DPONE_DBT_PROFILES_INVALID",
+          "message": "Invalid policy value at profiles.synthetic_route.sink (additionalProperties)"
+        }
+      ]
+    },
+    {
+      "accepted": false,
+      "case": "old_toolchain_v3",
+      "expected": false,
+      "issues": [
+        {
+          "code": "DPONE_DBT_PROFILES_INVALID",
+          "message": "Invalid policy value at profiles.synthetic_route.runtime.toolchain (const)"
+        }
+      ]
+    }
+  ],
+  "renderer": [
+    {
+      "accepted": true,
+      "case": "complete_boolean_tls"
+    },
+    {
+      "accepted": false,
+      "case": "missing_schema",
+      "error_code": "DPONE_DBT_PROFILE_INVALID"
+    },
+    {
+      "accepted": false,
+      "case": "string_encrypt",
+      "error_code": "DPONE_DBT_PROFILE_INVALID"
+    },
+    {
+      "accepted": false,
+      "case": "wrong_schema",
+      "error_code": "DPONE_DBT_TARGET_IDENTITY_MISMATCH"
+    }
+  ],
+  "schema": "stage-01-baseline-observation.v1",
+  "scope": "synthetic; no dbt subprocess, database, network, or live certification",
+  "source_commit": "46830976b214262c7772800523e832a5a6f6d78f"
+}

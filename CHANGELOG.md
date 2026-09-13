@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed
+
+- Resolve generated dbt MSSQL interval start filters without literal braces and
+  align current setup and recovery guidance with the existing toolchain.
+- Hide overlapping dbt secrets and secret fragments at captured-output retention
+  boundaries while preserving UTF-8 byte limits and subprocess exit behavior.
+- Prevent automatic ClickHouse EXCHANGE metadata-error replay after a possible
+  commit. Block topology preflight when target absence cannot be observed, and
+  preserve authentication and permission failures.
+
 ## 0.80.0 - 2026-09-13
 
 ### Added

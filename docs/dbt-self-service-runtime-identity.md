@@ -79,7 +79,7 @@ in the mutation-relevant graph fingerprint. Data and unit tests participate in
 both selection and result admission. Missing, duplicate, skipped, failed, or
 unknown results block all transfers.
 
-The policy digest binds the generated 131-record framework macro closure and
+The policy digest binds the generated 153-record framework macro closure and
 the distinct seven-record selected-node invocation extension. The graph
 identity also binds the observed macro-authority projection and each selected
 node's macro dependencies. Runtime rejects body, dependency, dispatch-family,
@@ -140,10 +140,10 @@ Production policy names one toolchain:
 
 ```yaml
 runtime:
-  toolchain: dbt-sqlserver-1.10-certified
+  toolchain: dbt-sqlserver-1.11-core-1.12-certified
 ```
 
-That ID maps to dbt Core `1.10.13`, distribution `dbt-sqlserver` `1.10.1`,
+That ID maps to dbt Core `1.12.3`, distribution `dbt-sqlserver` `1.11.1`,
 manifest v12, and run-results v6. The `dpone[dbt-mssql]` installation extra,
 build selection, execution pack, runtime inspector, and evidence all use the
 same contract. Canonical policy cannot also declare separate version strings.

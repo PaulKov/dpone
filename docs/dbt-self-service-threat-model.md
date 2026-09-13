@@ -92,6 +92,24 @@ Connection call.
 | Retry duplicates target writes | Default retry count zero; only certified replay-safe route with durable fence may opt in | Manual reconciliation required |
 | Final commit happened but evidence is missing | Two-axis outcome and `COMMIT_UNKNOWN` | Automatic retry forbidden |
 
+## Bounded dbt output redaction
+
+The subprocess runner drains both stdout and stderr and returns a bounded,
+redacted prefix of each stream. The default limit is 1 MiB per stream. It retains
+additional bytes to recognize a supplied secret crossing the output boundary.
+Before returning text, it masks overlapping occurrences together and masks any
+retained suffix that could be an incomplete secret. An earlier replacement
+therefore cannot expose a secret fragment cut by retention. UTF-8 decoding
+preserves replacement handling for malformed input and omits an incomplete
+character at a truncated retention boundary; final output respects the byte limit.
+
+`stdout_truncated` and `stderr_truncated` indicate that raw output or expanded
+redaction text exceeded the respective limit. A truncated prefix can omit a
+later failure message; it is not a complete execution log. This capture does
+not stream dbt output to the CLI, redact dbt-owned log files, or make those raw
+files safe to share. Only explicitly supplied secret values are matched; this
+is not detection of every possible secret or encoded representation.
+
 ## Tokens and identities
 
 - Dev OIDC signs the checksum subject; it has no prod runtime credentials.

@@ -1,0 +1,110 @@
+{
+  "assessed_source_commit": "46830976b214262c7772800523e832a5a6f6d78f",
+  "observations": [
+    {
+      "case": "retained_boundary_redaction_shrinkage",
+      "exit_code_preserved": true,
+      "filler_bytes": 16,
+      "output_limit_bytes": 64,
+      "property": "No fragment of a known secret is disclosed by truncation.",
+      "status": "FAIL",
+      "synthetic_secret_bytes": 64,
+      "truncation_reported": true,
+      "visible_secret_prefix_bytes": 38
+    },
+    {
+      "case": "secret_spans_64KiB_read_boundary",
+      "status": "PASS"
+    },
+    {
+      "case": "timeout_with_cleanup_failure",
+      "direct_cause": "ProcessSupervisionError",
+      "property": "Cleanup failure does not replace the primary timeout diagnostic.",
+      "public_message": "dbt process cleanup did not complete safely",
+      "status": "FAIL",
+      "timeout_preserved_in_context": true
+    },
+    {
+      "accepted": false,
+      "case": "missing",
+      "status": "PASS"
+    },
+    {
+      "accepted": false,
+      "case": "partial",
+      "status": "PASS"
+    },
+    {
+      "accepted": false,
+      "case": "zero_width",
+      "status": "PASS"
+    },
+    {
+      "accepted": false,
+      "case": "naive",
+      "status": "PASS"
+    },
+    {
+      "accepted": false,
+      "case": "reverse_instant",
+      "status": "PASS"
+    },
+    {
+      "accepted": false,
+      "case": "equal_instant",
+      "status": "PASS"
+    },
+    {
+      "accepted": true,
+      "case": "spring_23h",
+      "elapsed_hours": 23.0,
+      "status": "PASS"
+    },
+    {
+      "accepted": true,
+      "case": "autumn_25h",
+      "elapsed_hours": 25.0,
+      "status": "PASS"
+    },
+    {
+      "accepted": true,
+      "case": "autumn_fold",
+      "elapsed_hours": 0.75,
+      "status": "PASS"
+    },
+    {
+      "case": "manual_identity_without_bounds",
+      "execution_datetime": null,
+      "is_empty": false,
+      "status": "PASS"
+    },
+    {
+      "authored": "2026-09-13T15:45:30+00:00",
+      "case": "aware_start_date_with_timezone",
+      "observed": "2026-09-13T00:00:00+00:00",
+      "property": "Authored timestamp precision is preserved.",
+      "status": "FAIL"
+    },
+    {
+      "case": "canonical_environment_excludes_debug_overrides",
+      "status": "PASS"
+    }
+  ],
+  "producer_status": "PASS",
+  "scope": "Public APIs, injected finite processes and synthetic values; no live execution.",
+  "source_sha256": {
+    "packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_schedule.py": "c25d078f2d45db1250c63a9393c1f6214f77d303b191244e462255c6a95b99fb",
+    "src/dpone/adapters/dbt_process_supervisor.py": "f0fde70a229a030b6793709c74b6651ae16957c8a0f819f834cf404ccddd6421",
+    "src/dpone/adapters/dbt_subprocess.py": "8f1df204ac4c3d47f0635fa36e0c737f16e5b02c9933ab9cacd8f81edfe424bf",
+    "src/dpone/contracts/dbt_invocation.py": "12c31119c417bd95c553656f157de863a31b9e8fd408f3e0a0cb1d83605b5ab3",
+    "src/dpone/contracts/dbt_runtime.py": "86b4ab3603987183ab3c20690faa2e1d4671d23ac8a5719ad62d16b46f0f7a5c",
+    "src/dpone/contracts/run_interval.py": "7c46a25257727c6c753429aa102a99d0dad14cd62f849b0e3cbf3700762cd7de"
+  },
+  "status_meaning": "PASS producer means baseline reproduced; FAIL observations are unresolved defects.",
+  "unverified": [
+    "real Airflow scheduling",
+    "live dbt logs",
+    "peak memory",
+    "dbt-owned log-file redaction and size"
+  ]
+}
