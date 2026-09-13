@@ -1,0 +1,111 @@
+{
+  "meaning": "baseline behavior reproduced; live TLS SKIP",
+  "network_subprocess_blocked": true,
+  "observations": [
+    {
+      "ca_field": false,
+      "mode": "http",
+      "options": {},
+      "port": 8123,
+      "secure": false
+    },
+    {
+      "ca_field": false,
+      "mode": "http",
+      "options": {
+        "secure": true
+      },
+      "port": 8123,
+      "secure": true
+    },
+    {
+      "ca_field": false,
+      "mode": "http",
+      "options": {
+        "port": 8443,
+        "secure": true
+      },
+      "port": 8443,
+      "secure": true
+    },
+    {
+      "ca_field": false,
+      "mode": "http",
+      "options": {
+        "port": 8124,
+        "secure": false
+      },
+      "port": 8124,
+      "secure": false
+    },
+    {
+      "ca_field": false,
+      "mode": "native_tcp",
+      "options": {},
+      "port": 9000,
+      "secure": false
+    },
+    {
+      "ca_field": false,
+      "mode": "native_tcp",
+      "options": {
+        "secure": true
+      },
+      "port": 9000,
+      "secure": true
+    },
+    {
+      "ca_field": false,
+      "mode": "native_tcp",
+      "options": {
+        "port": 9440,
+        "secure": true
+      },
+      "port": 9440,
+      "secure": true
+    },
+    {
+      "ca_field": false,
+      "mode": "native_tcp",
+      "options": {
+        "port": 9001,
+        "secure": false
+      },
+      "port": 9001,
+      "secure": false
+    },
+    {
+      "ca_field": false,
+      "mode": "client",
+      "options": {},
+      "port": 9440,
+      "secure": true
+    },
+    {
+      "ca_field": false,
+      "mode": "client",
+      "options": {
+        "port": 9002,
+        "secure": false
+      },
+      "port": 9002,
+      "secure": false
+    },
+    {
+      "ca_forwarded_to_client": false,
+      "ca_retained_on_connector": true,
+      "driver": "native",
+      "port": 9440,
+      "secure": true
+    },
+    {
+      "ca_forwarded_to_client": true,
+      "ca_retained_on_connector": true,
+      "driver": "http",
+      "port": 8443,
+      "secure": true
+    }
+  ],
+  "source_commit": "228697c084523218c4ff6a889a73277709aee739",
+  "status": "PASS"
+}

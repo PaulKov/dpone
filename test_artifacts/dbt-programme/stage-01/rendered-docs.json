@@ -1,0 +1,41 @@
+{
+  "status": "PASS",
+  "method": "rendered HTML text/link inspection; no screenshot comparison",
+  "pages": [
+    {
+      "page": "dbt-inline-publishing",
+      "current_versions_rendered": true,
+      "old_core_absent": true,
+      "navigation_links_present": true,
+      "policy_v3_link": false
+    },
+    {
+      "page": "dbt-self-service-reference",
+      "current_versions_rendered": true,
+      "old_core_absent": true,
+      "navigation_links_present": true,
+      "policy_v3_link": true
+    },
+    {
+      "page": "dbt-self-service-runtime-identity",
+      "current_versions_rendered": true,
+      "old_core_absent": true,
+      "navigation_links_present": true,
+      "policy_v3_link": false
+    },
+    {
+      "page": "dbt-self-service-errors",
+      "current_versions_rendered": true,
+      "old_core_absent": true,
+      "navigation_links_present": true,
+      "policy_v3_link": false
+    },
+    {
+      "page": "dbt-semantic-refresh-v2",
+      "current_versions_rendered": true,
+      "old_core_absent": true,
+      "navigation_links_present": true,
+      "policy_v3_link": false
+    }
+  ]
+}

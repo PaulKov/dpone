@@ -79,7 +79,7 @@ in the mutation-relevant graph fingerprint. Data and unit tests participate in
 both selection and result admission. Missing, duplicate, skipped, failed, or
 unknown results block all transfers.
 
-The policy digest binds the generated 131-record framework macro closure and
+The policy digest binds the generated 153-record framework macro closure and
 the distinct seven-record selected-node invocation extension. The graph
 identity also binds the observed macro-authority projection and each selected
 node's macro dependencies. Runtime rejects body, dependency, dispatch-family,
