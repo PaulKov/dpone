@@ -25,6 +25,10 @@ covered runs then cannot expose an unfinished secret after earlier shrinkage.
 The internal helper uses KMP prefix lengths: matching and suffix recognition
 take linear work per secret instead of rescanning a long secret for every
 overlap. Prefix-table storage is proportional to the bounded secret length.
+For retained length B, admitted secret count K and total secret length S,
+matching costs O(B × K + S); this is not linear independently of secret count.
+Auxiliary capture/masking storage is O(B + longest secret + output limit), in
+addition to the caller's supplied secret collection.
 
 Output accumulation keeps at most the configured limit plus one byte, allowing
 truncation to remain explicit even when replacement expands text. Final clipping
@@ -46,6 +50,9 @@ Initial baseline/focused probes used locked base and development dependencies.
 Final checks use the isolated all-extras environment documented in [environment.json](environment.json).
 Commands below use `uv run --locked --no-sync` after `uv sync --locked --all-extras`.
 Transient local logs are excluded from the public artifact set.
+This is the candidate-preparation snapshot. Post-commit module validation and
+the exact-commit review disposition are recorded in
+[PR #52](https://github.com/PaulKov/dpone/pull/52) without changing the frozen tree.
 
 | Check | Status | Observation |
 | --- | --- | --- |
@@ -62,7 +69,7 @@ Transient local logs are excluded from the public artifact set.
 | Initial committed module-size gate | FAIL | Candidate dbd26a02 added unbaselined warning debt: 359 SLOC versus warning threshold 350 |
 | Revised focused runner/supervision/runtime suite | PASS | 119 tests, including maximum-size repeated secrets in both streams |
 | Ruff / formatting | PASS | Repository check and format check |
-| Mypy | PASS | 1209 source files |
+| Mypy | PASS | 1210 source files after helper extraction |
 | Import rules / layer metrics | PASS | Existing production boundaries and budgets preserved |
 | Documentation check | PASS | Existing docs contracts accepted |
 | Documentation language tests | PASS | 32 passed |
