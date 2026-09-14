@@ -1256,3 +1256,13 @@ correctly fail loads that previously bypassed the target contract. Upgrading
 prevents this replacement defect; it cannot reconstruct constraints lost by an
 earlier runtime. Restore them from approved DDL using the
 [PostgreSQL recovery runbook](source-sink/postgres-to-postgres.md#recover-a-previously-replaced-target).
+
+## Explicit validated ClickHouse file staging
+
+`stage_validated_file` is additive and requires caller opt-in. Existing `load`,
+`stage_payload`, manifests, route selection and finalizers retain their contracts.
+The original `ContractValidatedFileArtifact` import is a re-export of the same
+class. Optional verification budgets preserve legacy no-budget calls; unsupported
+budgeted authorities fail closed. Binary `none` in this API means raw bytes.
+Stop new calls and reconcile retained attempts before moving caller/package back
+together. See [API and recovery guidance](validated-clickhouse-file-staging.md).

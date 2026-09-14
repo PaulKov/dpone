@@ -5,54 +5,20 @@ from __future__ import annotations
 import http.client
 import os
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, field, replace
-from typing import Any
-from urllib.parse import urlencode
+from dataclasses import dataclass, replace
+from typing import Any as Any
 
 from dpone.contracts.bounded_window import WindowContractError
-
-
-@dataclass(frozen=True)
-class ClickHouseHttpCredentials:
-    """Connection settings for ClickHouse HTTP inserts."""
-
-    host: str
-    port: int
-    database: str
-    user: str
-    password: str = ""
-    secure: bool = False
-
-
-@dataclass(frozen=True)
-class ClickHouseHttpOptions:
-    """Runtime options for ClickHouse HTTP file streaming."""
-
-    input_format: str = "TabSeparated"
-    timeout_seconds: int = 3600
-    chunk_size: int = 1024 * 1024
-    settings: dict[str, Any] = field(default_factory=dict)
-    query_id: str | None = None
-    insert_deduplication_token: str | None = None
-
-    @classmethod
-    def from_bulk_wire_contract(
-        cls,
-        contract: Any,
-        *,
-        base: ClickHouseHttpOptions | None = None,
-    ) -> ClickHouseHttpOptions:
-        """Return options with input format/settings required by a typed wire contract."""
-
-        base_options = base or cls()
-        return cls(
-            input_format=str(getattr(contract, "input_format", base_options.input_format)),
-            timeout_seconds=base_options.timeout_seconds,
-            chunk_size=base_options.chunk_size,
-            settings={**base_options.settings, **dict(contract.delimiter_profile.clickhouse_settings)},
-            query_id=base_options.query_id,
-            insert_deduplication_token=base_options.insert_deduplication_token,
-        )
+from dpone.runtime.connectors.clickhouse_http_request import (
+    ClickHouseHttpCredentials as ClickHouseHttpCredentials,
+)
+from dpone.runtime.connectors.clickhouse_http_request import (
+    ClickHouseHttpOptions as ClickHouseHttpOptions,
+)
+from dpone.runtime.connectors.clickhouse_http_request import (
+    build_insert_query,
+    build_path,
+)
 
 
 @dataclass(frozen=True)
@@ -82,8 +48,7 @@ class ClickHouseHttpBulkRunner:
             self._connection_factory = http.client.HTTPSConnection if credentials.secure else http.client.HTTPConnection
 
     def insert_file(self, table: str, columns: Sequence[str], input_path: str) -> ClickHouseHttpResult:
-        column_sql = ", ".join(f"`{column}`" for column in columns)
-        query = f"INSERT INTO {table} ({column_sql}) FORMAT {self.options.input_format}"
+        query = build_insert_query(table, columns, self.options.input_format)
         url = self.build_insert_url(table, columns, include_password=True, query=query)
         redacted_url = self.build_insert_url(table, columns, include_password=False, query=query)
         connection = self._connection_factory(
@@ -134,8 +99,7 @@ class ClickHouseHttpBulkRunner:
         columns: Sequence[str],
         chunks: Iterable[bytes],
     ) -> ClickHouseHttpResult:
-        column_sql = ", ".join(f"`{column}`" for column in columns)
-        query = f"INSERT INTO {table} ({column_sql}) FORMAT {self.options.input_format}"
+        query = build_insert_query(table, columns, self.options.input_format)
         url = self.build_insert_url(table, columns, include_password=True, query=query)
         redacted_url = self.build_insert_url(table, columns, include_password=False, query=query)
         connection = self._connection_factory(
@@ -177,20 +141,8 @@ class ClickHouseHttpBulkRunner:
         include_password: bool = True,
         query: str | None = None,
     ) -> str:
-        column_sql = ", ".join(f"`{column}`" for column in columns)
-        query = query or f"INSERT INTO {table} ({column_sql}) FORMAT {self.options.input_format}"
+        query = query or build_insert_query(table, columns, self.options.input_format)
         return self._path(query, include_password=include_password)
 
     def _path(self, query: str, *, include_password: bool) -> str:
-        params = {
-            "database": self.credentials.database,
-            "user": self.credentials.user,
-            "password": self.credentials.password if include_password else "***",
-            "query": query,
-        }
-        if self.options.query_id:
-            params["query_id"] = self.options.query_id
-        if self.options.insert_deduplication_token:
-            params["insert_deduplication_token"] = self.options.insert_deduplication_token
-        params.update(self.options.settings)
-        return "/?" + urlencode(params)
+        return build_path(self.credentials, self.options, query, include_password=include_password)

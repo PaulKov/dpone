@@ -6,58 +6,23 @@ can be tested without a running ClickHouse server or local client binary.
 
 from __future__ import annotations
 
-import shlex
 import subprocess
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
+from dpone.runtime.connectors.clickhouse_client_request import (
+    ClickHouseClientCredentials as ClickHouseClientCredentials,
+)
+from dpone.runtime.connectors.clickhouse_client_request import (
+    ClickHouseClientOptions as ClickHouseClientOptions,
+)
+from dpone.runtime.connectors.clickhouse_client_request import (
+    build_base_command,
+    build_insert_query,
+    redact_command,
+)
 from dpone.runtime.process_io import ProcessOutputCapture, ProcessOutputDrainer
-
-
-@dataclass(frozen=True)
-class ClickHouseClientCredentials:
-    """Connection settings used by ``clickhouse-client``."""
-
-    host: str
-    port: int
-    database: str
-    user: str
-    password: str = ""
-    secure: bool = False
-
-
-@dataclass(frozen=True)
-class ClickHouseClientOptions:
-    """Runtime options for native ClickHouse file ingest."""
-
-    client_command: str = "clickhouse-client"
-    input_format: str = "TabSeparated"
-    timeout_seconds: int | None = None
-    max_insert_block_size: int | None = None
-    settings: dict[str, Any] = field(default_factory=dict)
-    query_id: str | None = None
-    insert_deduplication_token: str | None = None
-
-    @classmethod
-    def from_bulk_wire_contract(
-        cls,
-        contract: Any,
-        *,
-        base: ClickHouseClientOptions | None = None,
-    ) -> ClickHouseClientOptions:
-        """Return options with input format/settings required by a typed wire contract."""
-
-        base_options = base or cls()
-        return cls(
-            client_command=base_options.client_command,
-            input_format=str(getattr(contract, "input_format", base_options.input_format)),
-            timeout_seconds=base_options.timeout_seconds,
-            max_insert_block_size=base_options.max_insert_block_size,
-            settings={**base_options.settings, **dict(contract.delimiter_profile.clickhouse_settings)},
-            query_id=base_options.query_id,
-            insert_deduplication_token=base_options.insert_deduplication_token,
-        )
 
 
 @dataclass(frozen=True)
@@ -206,49 +171,19 @@ class ClickHouseClientRunner:
         return result
 
     def build_insert_command(self, table: str, columns: Sequence[str]) -> list[str]:
-        column_sql = ", ".join(f"`{column}`" for column in columns)
-        query = f"INSERT INTO {table} ({column_sql}) FORMAT {self.options.input_format}"
+        query = build_insert_query(table, columns, self.options.input_format)
         return self._base_command() + ["--query", query]
 
+    def build_query_command(self, sql: str) -> list[str]:
+        """Build one identified query without executing or changing runner policy."""
+        return self._base_command() + ["--query", sql]
+
     def _base_command(self) -> list[str]:
-        command = shlex.split(self.options.client_command)
-        command += [
-            "--host",
-            self.credentials.host,
-            "--port",
-            str(self.credentials.port),
-            "--database",
-            self.credentials.database,
-            "--user",
-            self.credentials.user,
-            "--password",
-            self.credentials.password,
-        ]
-        if self.credentials.secure:
-            command.append("--secure")
-        if self.options.max_insert_block_size:
-            command += ["--max_insert_block_size", str(self.options.max_insert_block_size)]
-        for key, value in self.options.settings.items():
-            command += [f"--{key}", str(value)]
-        if self.options.query_id:
-            command += ["--query_id", self.options.query_id]
-        if self.options.insert_deduplication_token:
-            command += ["--insert_deduplication_token", self.options.insert_deduplication_token]
-        return command
+        return build_base_command(self.credentials, self.options)
 
     @staticmethod
     def redact_command(command: Sequence[str]) -> list[str]:
-        redacted: list[str] = []
-        hide_next = False
-        for token in command:
-            if hide_next:
-                redacted.append("***")
-                hide_next = False
-                continue
-            redacted.append(token)
-            if token == "--password":
-                hide_next = True
-        return redacted
+        return redact_command(command)
 
     @staticmethod
     def _decode(value: bytes | str | None) -> str:

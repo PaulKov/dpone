@@ -11,7 +11,6 @@ from __future__ import annotations
 import itertools
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from dataclasses import asdict, dataclass
 from typing import Any
 
 from dpone.runtime.artifact_models import (
@@ -21,26 +20,16 @@ from dpone.runtime.artifact_models import (
     release_artifact_resource_view,
 )
 from dpone.runtime.artifact_protocols import ExtractionArtifact
-from dpone.runtime.etl.file_contract_validation import (
-    FileContractValidationError,
-    FileContractValidationReceipt,
-    require_file_contract_validation,
+from dpone.runtime.etl.validated_file_artifact import (
+    ContractValidatedFileArtifact as ContractValidatedFileArtifact,
+)
+from dpone.runtime.etl.validated_file_artifact import (
+    ContractValidationSummary as ContractValidationSummary,
 )
 from dpone.runtime.extraction_lifecycle import ArtifactTerminalOutcome
 from dpone.runtime.staging import owned_staging_handle
 from dpone.type_system import ContractEnforcementResult, ContractEnforcementService
 from dpone.type_system.models import ConflictPolicy
-
-
-@dataclass(frozen=True, slots=True)
-class ContractValidationSummary:
-    accepted_rows: int = 0
-    rejected_rows: int = 0
-    quarantined_rows: int = 0
-    validation_mode: str = "row_stream"
-
-    def to_dict(self) -> dict[str, object]:
-        return asdict(self)
 
 
 class ContractEnforcedRowsArtifact(BaseExtractionArtifact):
@@ -200,113 +189,6 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
         if iterator is None:
             raise RuntimeError("streaming contract artifact requires row iterator")
         return iterator
-
-
-class ContractValidatedFileArtifact(BaseExtractionArtifact):
-    """Fail-closed wrapper for opaque file fast paths unless prevalidated."""
-
-    def __init__(
-        self,
-        artifact: ExtractionArtifact,
-        *,
-        contract: Any,
-        schema: Sequence[tuple[str, str]] | None = None,
-        run_id: str,
-        load_id: str,
-        prevalidated: bool = False,
-    ) -> None:
-        super().__init__(estimated_rows=getattr(artifact, "estimated_rows", None))
-        self._artifact = artifact
-        self.extraction_completion_mode = getattr(
-            artifact,
-            "extraction_completion_mode",
-            "eager",
-        )
-        self._contract = contract
-        self._run_id = run_id
-        self._load_id = load_id
-        self._legacy_prevalidated_hint = prevalidated
-        self._validation_schema = (
-            tuple((str(name), str(dtype)) for name, dtype in schema) if schema is not None else None
-        )
-        self._receipt: FileContractValidationReceipt | None = None
-        self._validation_error: FileContractValidationError | None = None
-        bind_artifact_resource_view(self, artifact)
-        try:
-            self._receipt = require_file_contract_validation(
-                artifact,
-                contract,
-                schema=self._validation_schema,
-            )
-        except FileContractValidationError as exc:
-            # Keep construction non-mutating while preserving the exact typed
-            # source-receipt blocker for the eventual materialization boundary.
-            self._validation_error = exc
-        self.validation_summary = ContractValidationSummary(validation_mode="opaque_file")
-
-    def materialize(
-        self, staging_manager: Any, load_config: Any, schema: Sequence[tuple[str, str]]
-    ) -> StagingTableArtifact:
-        if self._validation_error is not None:
-            raise self._validation_error
-        if self._receipt is None:
-            raise FileContractValidationError("file_contract_receipt.required")
-        require_file_contract_validation(
-            self._artifact,
-            self._contract,
-            schema=self._validation_schema,
-        )
-        handle = self._artifact.materialize(staging_manager, load_config, schema)
-        self.validation_summary = ContractValidationSummary(
-            accepted_rows=handle.row_count,
-            validation_mode="opaque_file_prevalidated",
-        )
-        return handle
-
-    def cleanup(self) -> None:
-        self.terminate(ArtifactTerminalOutcome.ABORT)
-
-    def _release_for_terminal_outcome(self, outcome: ArtifactTerminalOutcome) -> None:
-        release_artifact_resource_view(self, self._artifact, outcome)
-
-    def _should_release_for_terminal_outcome(self, outcome: ArtifactTerminalOutcome) -> bool:
-        del outcome
-        return True
-
-    @property
-    def columns(self) -> Sequence[str]:
-        return tuple(getattr(self._artifact, "columns", ()))
-
-    def rebind_columns(self, columns: Sequence[str]) -> ContractValidatedFileArtifact:
-        """Rebind positional names while retaining contract validation policy."""
-
-        rebind = getattr(self._artifact, "rebind_columns", None)
-        if not callable(rebind):
-            raise RuntimeError("opaque file artifact cannot rebind positional column identities")
-        return ContractValidatedFileArtifact(
-            rebind(columns),
-            contract=self._contract,
-            schema=self._validation_schema,
-            run_id=self._run_id,
-            load_id=self._load_id,
-            prevalidated=self._legacy_prevalidated_hint,
-        )
-
-    @property
-    def completed_source_authority_artifact(self) -> object:
-        """Expose only the inner artifact that owns completed export counts."""
-
-        return self._artifact
-
-    @property
-    def validated_file_contract_artifact(self) -> object:
-        """Expose the exact inner file only after its contract receipt passed."""
-
-        if self._validation_error is not None:
-            raise self._validation_error
-        if self._receipt is None:
-            raise FileContractValidationError("file_contract_receipt.required")
-        return self._artifact
 
 
 class PartitionedContractValidationArtifact(BaseExtractionArtifact):

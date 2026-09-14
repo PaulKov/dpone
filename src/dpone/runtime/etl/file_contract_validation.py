@@ -11,7 +11,13 @@ from pathlib import Path
 from typing import Any
 
 from dpone.readiness.schema_contracts import SchemaContract
-from dpone.runtime.connectors.bulk_text_codec import BulkTextCodec, is_bulk_text_type
+from dpone.runtime.connectors.bulk_text_codec import (
+    BulkTextCodec,
+    BulkTextFileReadError,
+    decode_wire_value,
+    iter_wire_rows,
+)
+from dpone.runtime.file_artifact_authority import FileVerificationBudget
 
 
 class FileContractValidationError(RuntimeError):
@@ -43,8 +49,13 @@ class FileContractValidationReceipt:
         contract: SchemaContract,
         *,
         schema: tuple[tuple[str, str], ...] | None = None,
+        verification_budget: FileVerificationBudget | None = None,
     ) -> None:
-        integrity = artifact.require_integrity_receipt()
+        integrity = (
+            artifact.require_integrity_receipt()
+            if verification_budget is None
+            else artifact.require_integrity_receipt(verification_budget=verification_budget)
+        )
         if integrity.sha256 != self.artifact_sha256 or integrity.size_bytes != self.artifact_size_bytes:
             raise FileContractValidationError("file_contract_receipt.artifact_identity_mismatch")
         frozen_schema = _normalized_schema(self.validated_schema)
@@ -167,13 +178,17 @@ def require_file_contract_validation(
     contract: SchemaContract,
     *,
     schema: tuple[tuple[str, str], ...] | None = None,
+    verification_budget: FileVerificationBudget | None = None,
 ) -> FileContractValidationReceipt:
     """Verify a source-issued receipt; a configuration boolean is never proof."""
 
     receipt = getattr(artifact, "contract_validation_receipt", None)
     if not isinstance(receipt, FileContractValidationReceipt):
         raise FileContractValidationError("file_contract_receipt.required")
-    receipt.verify(artifact, contract, schema=schema)
+    if verification_budget is None:
+        receipt.verify(artifact, contract, schema=schema)
+    else:
+        receipt.verify(artifact, contract, schema=schema, verification_budget=verification_budget)
     return receipt
 
 
@@ -197,18 +212,10 @@ def _scan_rows(
     required: tuple[int, ...],
     codec: BulkTextCodec,
 ) -> int:
-    field_terminator = codec.field_terminator.encode("utf-8")
-    row_terminator = codec.row_terminator.encode("utf-8")
     rows = 0
     try:
         with path.open("rb") as handle:
-            for raw in handle:
-                if not raw.endswith(row_terminator):
-                    raise FileContractValidationError("file_contract_receipt.row_terminator_mismatch")
-                row = raw.removesuffix(row_terminator)
-                values = row.split(field_terminator)
-                if len(values) != len(schema):
-                    raise FileContractValidationError("file_contract_receipt.row_width_mismatch")
+            for values in iter_wire_rows(handle, len(schema), codec):
                 null_required = next((index for index in required if values[index] == b""), None)
                 if null_required is not None:
                     raise FileContractValidationError(
@@ -236,6 +243,8 @@ def _scan_rows(
                         f"file_contract_receipt.logical_value_violation:{diagnostic.column}:{diagnostic.reason_code}"
                     )
                 rows += 1
+    except BulkTextFileReadError as exc:
+        raise FileContractValidationError(f"file_contract_receipt.{exc.blocker}") from exc
     except OSError as exc:
         raise FileContractValidationError("file_contract_receipt.file_unavailable") from exc
     return rows
@@ -244,23 +253,10 @@ def _scan_rows(
 def _decode_wire_value(raw: bytes, *, dtype: str, codec: BulkTextCodec) -> object:
     """Decode one immutable COPY cell for portable logical validation."""
 
-    if raw == b"":
-        return None
     try:
-        value = raw.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise FileContractValidationError("file_contract_receipt.utf8_invalid") from exc
-    normalized = str(dtype).strip().lower().split("(", 1)[0]
-    if normalized in {"binary", "varbinary", "image"}:
-        try:
-            # Empty ``bytea`` is encoded through the same marker contract as
-            # empty text so it stays distinct from COPY NULL.  Decode the
-            # marker before interpreting the remaining character wire as
-            # style-2 hexadecimal bytes.
-            return bytes.fromhex(codec.decode(value))
-        except ValueError as exc:
-            raise FileContractValidationError("file_contract_receipt.binary_hex_invalid") from exc
-    return codec.decode(value) if is_bulk_text_type(dtype) else value
+        return decode_wire_value(raw, dtype=dtype, codec=codec)
+    except BulkTextFileReadError as exc:
+        raise FileContractValidationError(f"file_contract_receipt.{exc.blocker}") from exc
 
 
 def _require_safe_codec(artifact: Any) -> BulkTextCodec:

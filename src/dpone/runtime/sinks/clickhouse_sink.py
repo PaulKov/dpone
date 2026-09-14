@@ -2,10 +2,25 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from importlib import import_module
+from time import monotonic
 from typing import TYPE_CHECKING, Any
 
+from dpone.runtime.clickhouse_file_stage_contract import (
+    ClickHouseFileStageRunner,
+    ClickHouseValidatedFilePolicy,
+)
+from dpone.runtime.clickhouse_file_stage_contract import (
+    require_transport_profile as require_transport_profile,
+)
+from dpone.runtime.clickhouse_staging_composition import (
+    build_clickhouse_staging_components,
+)
+from dpone.runtime.clickhouse_staging_composition import (
+    build_file_runner as build_file_runner,
+)
+from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.sinks.clickhouse_bulk_mixin import ClickHouseBulkMixin
 from dpone.runtime.sinks.clickhouse_cluster_preflight import ClickHouseClusterPreflightMixin
 from dpone.runtime.sinks.clickhouse_lineage_projection import ClickHouseSinkSideLineageProjector
@@ -17,8 +32,7 @@ from dpone.runtime.sinks.clickhouse_physical_types import (
 )
 from dpone.runtime.sinks.clickhouse_sql_mixin import ClickHouseSqlMixin, ClickHouseTargetCatalogMixin
 from dpone.runtime.sinks.clickhouse_staged_load import ClickHouseStagedLoadService
-from dpone.runtime.sinks.clickhouse_staging_decoder import ClickHouseStagingDecoder
-from dpone.runtime.sinks.clickhouse_staging_finalizer import ClickHouseStagingFinalizer
+from dpone.runtime.sinks.load_payload import LoadPayload
 from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.sink_protocol import AbstractSink
 
@@ -47,6 +61,8 @@ class ClickHouseSink(
         client_runner_cls: Any | None = None,
         http_runner_cls: Any | None = None,
         physical_type_resolver: ClickHousePhysicalColumnTypeResolver | None = None,
+        validated_file_runner_factory: Callable[[LoadConfig, ClickHouseValidatedFilePolicy], ClickHouseFileStageRunner]
+        | None = None,
     ):
         self.connector = connector
         self.state_storage = state_storage
@@ -55,8 +71,12 @@ class ClickHouseSink(
         self._client_runner_cls = client_runner_cls or _default_clickhouse_client_runner()
         self._http_runner_cls = http_runner_cls or _default_clickhouse_http_runner()
         self._physical_type_resolver = physical_type_resolver or DEFAULT_CLICKHOUSE_PHYSICAL_COLUMN_TYPE_RESOLVER
-        self._staging_decoder = ClickHouseStagingDecoder(
+        staging = build_clickhouse_staging_components(
             connector=self.connector,
+            connector_provider=lambda: self.connector,
+            resolver=self._physical_type_resolver,
+            clock=monotonic,
+            validated_file_runner_factory=validated_file_runner_factory,
             table_name=self._table,
             create_staging_table=self._create_staging_table,
             map_type=self._map_type_for_config,
@@ -67,13 +87,12 @@ class ClickHouseSink(
                 schema,
                 if_not_exists=False,
             ),
-        )
-        self._staging_finalizer = ClickHouseStagingFinalizer(
-            connector=self.connector,
-            table_name=self._table,
             count_rows=self._count,
             mutations_sync=self._mutations_sync,
         )
+        self._validated_file_service = staging.validated_file
+        self._staging_decoder = staging.decoder
+        self._staging_finalizer = staging.finalizer
         self._payload_ingestion = ClickHousePayloadIngestionService(self, sink_factory=self._clone_sink)
         self._staged_load = ClickHouseStagedLoadService(
             self,
@@ -87,6 +106,16 @@ class ClickHouseSink(
 
     def stage_payload(self, load_config: LoadConfig, payload: Any) -> Any:
         return self._staged_load.stage(load_config, payload)
+
+    def stage_validated_file(
+        self, load_config: LoadConfig, payload: LoadPayload, *, policy: ClickHouseValidatedFilePolicy
+    ) -> StagedLoadHandle:
+        """Prepare and stage a receipted character file through an explicit transport.
+
+        This additive API owns its preparation and evidence; it does not invoke
+        automatic schema evolution, generic dispatch or source finalization.
+        """
+        return self._validated_file_service.stage(load_config, payload, policy=policy)
 
     def finalize_staged_load(self, load_config: LoadConfig, handle: Any) -> LoadResult:
         frozen_inputs = getattr(handle, "frozen_inputs", None)

@@ -1,0 +1,156 @@
+schema_version: 1
+task_id: DPONE-B02-VALIDATED-CLICKHOUSE-FILE-STAGING
+title: Explicit validated character-file staging in ClickHouse
+goal: Implement exactly the approved finite Python stage API and its evidence boundaries.
+specification: test_artifacts/dbt-programme/stage-02/b02-codec-design-draft.md
+base_commit: 1202d2cf652cf41594abdd21040378204653b656
+integrator: programme-coordinator
+shared_file_owner: programme-coordinator
+acceptance_criteria:
+- Exact independently decoded text/binary/scalar values through both admitted modes.
+- Preparation and all admission denials precede this method's target mutations.
+- Preserve producer grammar, receipt authority, existing imports and generic stage
+  behavior.
+- No successful handle before count, identities, spool cleanup and durable final evidence.
+- Controlled adapters prove bounded I/O and separate local/remote execution outcomes.
+- All specified journal/resource/cancellation/zero-row negative gates pass.
+- Independent fresh-context final exact-commit review resolves every blocking finding.
+- Completion report includes the independent review receipt with exact reviewed commit,
+  findings and dispositions.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - python_api
+  - artifacts
+  - evidence
+  - documentation
+  migration_required: false
+owned_paths:
+- src/dpone/runtime/support/bulk_text_file_reader.py
+- src/dpone/runtime/etl/file_contract_validation.py
+- src/dpone/runtime/etl/validated_file_artifact.py
+- src/dpone/runtime/etl/contract_artifacts.py
+- src/dpone/runtime/sinks/clickhouse_sink.py
+- src/dpone/runtime/sinks/clickhouse_validated_file_models.py
+- src/dpone/runtime/sinks/clickhouse_validated_file_preparation.py
+- src/dpone/runtime/sinks/clickhouse_validated_file_ingestion.py
+- src/dpone/runtime/sinks/clickhouse_validated_file_journal.py
+- src/dpone/runtime/clickhouse_file_stage_contract.py
+- src/dpone/runtime/connectors/clickhouse_file_stage_client.py
+- src/dpone/runtime/connectors/clickhouse_file_stage_http.py
+- src/dpone/runtime/connectors/clickhouse_bulk.py
+- tests/test_file_contract_validation.py
+- tests/test_b02_bulk_text_file_reader.py
+- tests/test_b02_validated_file_attempt.py
+- tests/test_b02_clickhouse_file_policy.py
+- tests/test_b02_clickhouse_file_preparation.py
+- tests/test_b02_clickhouse_file_staging.py
+- tests/test_b02_clickhouse_file_journal.py
+- tests/test_b02_clickhouse_file_client_adapter.py
+- tests/test_b02_clickhouse_file_http_adapter.py
+- tests/test_b02_clickhouse_file_value_oracle.py
+- test_artifacts/b02-codec-certification
+- docs/validated-clickhouse-file-staging.md
+- docs/developer-validated-clickhouse-file-staging.md
+- docs/runtime-fast-path-contracts.md
+- docs/data-contract-runtime.md
+- docs/connector-sdk.md
+- docs/compatibility.md
+- docs/architecture.md
+- docs/quality-metrics.md
+- docs/source-sink/postgres-to-clickhouse.md
+- docs/adr/0064-validated-file-clickhouse-staging.md
+- docs/adr-index.md
+- docs/agent-task-contracts/b02-validated-clickhouse-file-staging.yml
+- src/dpone/runtime/file_artifact_authority.py
+- src/dpone/runtime/file_artifacts.py
+- src/dpone/runtime/artifact_integrity.py
+- src/dpone/runtime/pinned_file_consumer.py
+- src/dpone/runtime/pinned_file_integrity.py
+- tests/test_file_verification_budget.py
+- tests/test_mssql_artifact_integrity.py
+- src/dpone/runtime/connectors/clickhouse_client_request.py
+- src/dpone/runtime/connectors/clickhouse_http_request.py
+- src/dpone/runtime/connectors/clickhouse_file_response.py
+- src/dpone/runtime/connectors/bulk_text_codec.py
+- src/dpone/runtime/connectors/clickhouse_http_bulk.py
+- tests/test_b02_dependency_compatibility.py
+- src/dpone/runtime/clickhouse_staging_composition.py
+integrator_owned_paths:
+- CHANGELOG.md
+- mkdocs.yml
+read_only_paths:
+- AGENTS.md
+- docs/agent-templates/agent-task-contract.yml
+- docs/engineering-standards.md
+- docs/compatibility_registry.yaml
+- docs/benchmarks/quality_budgets.yml
+- src/dpone/runtime/clickhouse_binary_encoding.py
+- src/dpone/runtime/storage_policy.py
+- src/dpone/runtime/process_io.py
+- src/dpone/runtime/immutable_local_tree.py
+- src/dpone/runtime/sinks/clickhouse_payload_ingestion.py
+- src/dpone/runtime/sinks/clickhouse_staged_load.py
+- test_artifacts/dbt-programme/stage-02/b02-codec-design-draft.md
+- test_artifacts/dbt-programme/stage-02/b02-contract-appendix.md
+forbidden_paths:
+- pyproject.toml
+- uv.lock
+- .github/workflows
+- packages
+- src/dpone/contracts
+- src/dpone/manifest
+- src/dpone/dag
+- src/dpone/ports
+- src/dpone/runtime/etl/payload_lifecycle.py
+- tests/conftest.py
+- docs/module_size_baseline.json
+- docs/layer_metrics_baseline.json
+- docs/benchmarks/quality_budgets.yml
+- test_artifacts/dbt-programme/stage-02/evidence
+- tests/test_native_bcp_implicit_time_fidelity.py
+- CHANGELOG.md
+- mkdocs.yml
+dependencies:
+- Maintainer marks the specification APPROVED and accepts the proposed ADR decisions.
+- Coordinator activates this exact path contract against its reconciled base.
+required_checks:
+  focused:
+  - Red-green source compatibility, exact value oracles and public sink boundary tests.
+  - Controlled local client/HTTP fixtures plus journal/resource/cancellation fault
+    matrix.
+  broad:
+  - Change-aware select_checks.py plan and every applicable required check.
+  - Ruff, format, mypy, import rules, layer metrics and exact-commit module-size gate.
+  - Full non-live suite and clean installed-runtime checks on the final candidate.
+  - Docs checks, language contracts, generated reference checks and strict MkDocs
+    build.
+  - Fresh independent exact-commit review after validation and follow-up on fixes.
+  live:
+  - SKIP unless a separate target environment and credentials are expressly authorized.
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Approved specification or active exact path contract is missing or contradicted.
+- Required edit falls outside owned_paths or another writer owns the path.
+- Scope would change generic stage dispatch, schema evolution, source route or terminal
+  authority.
+- A shared reader change would alter existing source-validator admission or receipt
+  grammar.
+- A live check needs unapproved environment or credentials.
+- Required owned module would grow debt or need a budget or baseline relaxation.
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
