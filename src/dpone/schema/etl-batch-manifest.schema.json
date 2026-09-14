@@ -6577,6 +6577,17 @@
         },
         "snapshot": {
           "$ref": "#/definitions/native_transfer_snapshot_policy"
+        },
+        "source_read": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["raw_single_query"]
+            }
+          }
         }
       }
     },

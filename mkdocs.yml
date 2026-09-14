@@ -185,6 +185,7 @@ nav:
           - Prepared metadata and integrity: delivery-acceleration/preparation.md
           - Sized frame handoff: delivery-acceleration/frames.md
           - Independent stage limits: delivery-acceleration/concurrency.md
+          - Raw single-query composition: delivery-acceleration/raw-window-composition.md
           - Isolated partition SWITCH: delivery-acceleration/partition-switch.md
           - Certification experiments: delivery-acceleration/certification.md
           - Operations and recovery: delivery-acceleration/operations.md

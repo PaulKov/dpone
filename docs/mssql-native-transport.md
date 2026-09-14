@@ -36,7 +36,14 @@ omits `strategy.window` and replaces the complete target under its existing
 catalog-preservation policy. Do not combine a native window with legacy
 `partition` options.
 
-Only one local plain `MergeTree` table in an `Atomic` database is admitted. The
+By default, only one local plain `MergeTree` table in an `Atomic` database is admitted.
+Explicit `native_transfer.source_read.mode: raw_single_query` also admits local
+`ReplicatedMergeTree`, `ReplacingMergeTree` and `ReplicatedReplacingMergeTree`.
+It preserves the rows returned by one physical session with query-level `final=0`;
+an inherited `final=1` cannot silently deduplicate the result. Denied overrides
+fail. This is neither a deduplicated business snapshot nor a replica-freshness
+guarantee. See the [raw composition guide](delivery-acceleration/raw-window-composition.md)
+for a synthetic example, exact policy and recovery requirements. The
 mandatory source `schema_guard_factory` must exclude ALTER, RENAME, EXCHANGE,
 DROP/recreate and relevant access-policy changes from metadata admission until
 source cleanup. It does not need to freeze ordinary DML. A no-op context manager
@@ -65,7 +72,9 @@ the independent prepared prepublication check and the finalizer target-clock
 UPDATE remain. Follow [delivery acceleration](delivery-acceleration/index.md) for
 structural evidence, optional observations and measurement instructions. These
 changes establish no measured acceleration and do not enable native partition
-SWITCH. Existing callers need no manifest or recovery migration.
+SWITCH. Existing callers need no manifest or recovery migration. Explicit raw
+mode uses version-2 chunk journals; keep the original mode for recovery and
+settle these invocations before downgrading to a version-1-only reader.
 
 ## Compose the runtime
 

@@ -28,7 +28,7 @@ class Faults:
         self.active_finalizer = True
 
     def arm(self, fault):
-        if fault not in {"after_eof", "before_commit", "lost_ack", "unknown_commit"}:
+        if fault not in {"during_source", "after_eof", "before_commit", "lost_ack", "unknown_commit"}:
             raise ValueError("local_fixture.unsupported_fault")
         if self.armed is not None:
             raise ValueError("local_fixture.fault_already_armed")

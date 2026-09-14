@@ -33,6 +33,8 @@ def load_configuration(value: Inventory) -> LoadConfig:
             },
         },
     }
+    if value.source_read_mode is not None:
+        options["native_transfer"]["source_read"] = {"mode": value.source_read_mode}
     if value.strategy == "partition_replace":
         options["mssql_native_window"] = {"column": "event_at", "anchor": "data_interval_end", "lookback": "P1D"}
         options["interval"] = {"interval_end": "2026-01-02T00:00:00+00:00"}

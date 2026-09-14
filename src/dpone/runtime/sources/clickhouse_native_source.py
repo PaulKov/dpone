@@ -1,4 +1,4 @@
-"""One plain-MergeTree query snapshot for bounded native MSSQL extraction.
+"""One admitted local-MergeTree query observation for bounded native MSSQL extraction.
 
 The injected connector owns a dedicated native-driver session. No table count,
 header probe, offset restart or independent partition query is executed.
@@ -13,7 +13,8 @@ from contextlib import AbstractContextManager
 from typing import Any
 from uuid import UUID, uuid4
 
-from dpone.manifest.mssql_native_policy import native_window, validate_native_config
+from dpone.manifest.mssql_native_policy import native_source_read_mode, native_window, validate_native_config
+from dpone.runtime.sources.clickhouse_native_admission import admit_native_relation
 from dpone.runtime.sources.clickhouse_native_values import projection, restore, temporal
 from dpone.runtime.sources.extract_result import ExtractResult
 from dpone.runtime.streaming_rows import StreamingRowsArtifact
@@ -90,6 +91,7 @@ class ClickHouseNativeSource:
             raise
 
     def _extract_guarded(self, config: Any, guard: AbstractContextManager[Any], query_id: str | None) -> ExtractResult:
+        source_read_mode = native_source_read_mode(config)
         database, table = config.source_schema, config.source_table
         relation = f"{_identifier(database)}.{_identifier(table)}"
         params = {"database": database, "table": table}
@@ -99,8 +101,7 @@ class ClickHouseNativeSource:
             params,
             as_dict=True,
         )
-        if len(tables) != 1 or tables[0]["engine"] != "MergeTree" or tables[0]["database_engine"] != "Atomic":
-            raise ValueError("mssql_native.plain_mergetree_atomic_required")
+        admit_native_relation(tables, source_read_mode)
         source_uuid = str(UUID(tables[0]["uuid"]))
         if UUID(source_uuid).int == 0:
             raise ValueError("mssql_native.source_uuid_required")
@@ -135,7 +136,7 @@ class ClickHouseNativeSource:
                 "end": window.end.strftime("%Y-%m-%d %H:%M:%S.%f"),
             }
         query_id = query_id or "dpone-native-" + uuid4().hex
-        rows = self._rows(query, query_params, query_id, schema)
+        rows = self._rows(query, query_params, query_id, schema, source_read_mode)
 
         def cleanup() -> None:
             try:
@@ -155,7 +156,12 @@ class ClickHouseNativeSource:
         )
 
     def _rows(
-        self, query: str, params: dict[str, Any], query_id: str, schema: tuple[tuple[str, str], ...]
+        self,
+        query: str,
+        params: dict[str, Any],
+        query_id: str,
+        schema: tuple[tuple[str, str], ...],
+        source_read_mode: str | None,
     ) -> Iterator[Mapping[str, object]]:
         stream = self.connector.connection.execute_iter(
             query,
@@ -170,6 +176,7 @@ class ClickHouseNativeSource:
                 "result_overflow_mode": "throw",
                 "timeout_overflow_mode": "throw",
                 "use_query_cache": 0,
+                **({"final": 0} if source_read_mode == "raw_single_query" else {}),
             },
         )
         try:
