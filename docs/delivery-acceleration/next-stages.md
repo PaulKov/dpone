@@ -104,6 +104,41 @@ stage 2. Automatic tuning, dbt and composition changes remain out of scope.
 
 ## Evidence and release acceptance
 
+### Bounded text encoding after wide100 profiling
+
+The first follow-up to the completed 100-column, 100,000-row local diagnostic
+optimizes scalar work inside the existing verification passes. It does not adopt
+the rejected tuple-projection experiment or remove any SQL readback. Small exact
+strings with variable `varchar`/`nvarchar` layouts use strict UTF-8/UTF-16LE
+encoding directly only when four bytes per code point fit in the remaining row
+budget. Actual field and prefix limits are still checked. Other values retain
+the allocation-free scan, including its diagnostic order. The standalone sizing
+API remains allocation-free. No setting, migration or new dependency is needed;
+existing composition and recovery instructions remain applicable.
+
+The implementation is a patch candidate until independent review and required
+checks complete. Local CPU microbenchmarks are distinct from route latency: a
+faster encoder does not establish the same percentage reduction in confirmed
+visibility. The earlier 450-second diagnostic included provisioning and final
+readback; its approximately 299-second visibility interval also included
+independent verification. It is not a transport-only benchmark.
+
+The maintainer's 2026-09-14 follow-up prioritizes these independent milestones:
+
+| Milestone | Release class | Completion requirement |
+| --- | --- | --- |
+| Bounded text encoding | Patch | Identical bytes and error precedence, allocation bounds, retained mutation/recovery tests, measured CPU benefit and scoped route evidence. |
+| Protected staging verification | Minor if authority changes | New design/ADR with SQL-enforced writer exclusion through consumption, object/incarnation binding, reconnect/crash invalidation, tamper tests and fresh recovery verification. An application lock alone is insufficient. |
+| Native partition switching | Minor | Explicitly admitted aligned layouts, atomic old-out/new-in plus receipt, unknown-commit reconciliation, empty-window replacement, reader/lock tests and an executable composition example. The researched initial scope does not admit arbitrary CHECK-based staging or whole-window switching. |
+| Weighted day scheduling | Minor | Frozen authored-day universe including empty days, deterministic volume weights/ties, bounded aggregate resources, source-consistency contract, per-day receipts and explicit cycle visibility/recovery semantics. |
+| Direct typed bulk comparison | Experiment; minor only if selected | Actual driver type/NULL fidelity, bounded memory, independent writer settlement, durable replay design and matched comparison with binary BCP. Retain BCP when benefit is not established. |
+
+Each later milestone needs an implementation-ready specification and task
+contract. Reusing already researched components does not activate a public route.
+These milestones exclude dbt, composition-feature changes and automatic
+changed-window selection; refreshing every authored day does not require the
+separate producer-revision service.
+
 Run the change-aware check selector and required repository checks. Focused tests
 cover UTF-8/native size boundaries, contract/limit mismatch, mutable buffers,
 Mapping/tuple compatibility, one-shot iteration, cancellation and source closure.

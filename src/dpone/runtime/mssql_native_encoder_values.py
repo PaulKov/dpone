@@ -82,6 +82,12 @@ def native_value_size(value: Any, column: NativeWireColumnLayout, remaining: int
             size += _character_width(code, wide=wide)
             if size > remaining:
                 raise ValueError("mssql_native_row_bytes_exceeded")
+    _validate_variable_size(size, column, remaining)
+    return size
+
+
+def _validate_variable_size(size: int, column: NativeWireColumnLayout, remaining: int) -> None:
+    """Apply row, declared field and signed prefix limits in their original order."""
     if size > remaining:
         raise ValueError("mssql_native_row_bytes_exceeded")
     match = re.search(r"\((\d+)\)", column.source_type)
@@ -91,7 +97,6 @@ def native_value_size(value: Any, column: NativeWireColumnLayout, remaining: int
             raise ValueError("mssql_native_field_length_exceeded")
     if column.prefix_width and size >= 2 ** (8 * column.prefix_width - 1):
         raise ValueError("mssql_native_field_length_exceeded")
-    return size
 
 
 def _character_width(code: int, *, wide: bool) -> int:
@@ -105,8 +110,25 @@ def _character_width(code: int, *, wide: bool) -> int:
 
 
 def _variable(value: Any, column: NativeWireColumnLayout, remaining: int) -> bytes:
+    # Both admitted encodings need at most four bytes per Unicode code point.
+    # Prove allocation fits before encoding; near-boundary values retain the
+    # allocation-free scan and its first-invalid-character error precedence.
+    encoding = column.encoding or "utf-8"
+    if (
+        type(value) is str
+        and column.fixed_length is None
+        and (column.storage_type, encoding) in {("varchar", "utf-8"), ("nvarchar", "utf-16le")}
+        and len(value) <= remaining // 4
+    ):
+        try:
+            payload = value.encode(encoding)
+        except UnicodeError:
+            pass  # Preserve the existing scalar diagnostic for invalid surrogates.
+        else:
+            _validate_variable_size(len(payload), column, remaining)
+            return payload
     native_value_size(value, column, remaining)
-    return value if column.storage_type in {"binary", "varbinary"} else value.encode(column.encoding or "utf-8")
+    return value if column.storage_type in {"binary", "varbinary"} else value.encode(encoding)
 
 
 def _coefficient(value: Any, precision: int, scale: int) -> int:

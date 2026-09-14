@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Performance
+
+- Avoid a repeated Python character scan when encoding bounded variable-width
+  native MSSQL text. Preserve native bytes, capacity diagnostics, allocation-free
+  sizing and every independent staging verification and recovery boundary.
+
 ### Fixed
 
 - Resolve generated dbt MSSQL interval start filters without literal braces and
