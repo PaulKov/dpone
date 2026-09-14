@@ -1600,7 +1600,14 @@ def test_raw_wire_is_unbounded_then_normalized_to_indexable_decoded_keys() -> No
         sql for sql in connector.statements if "INSERT INTO" in sql and "delta_raw_decoded_" in sql
     )
     assert "NCHAR(29)" in decode_projection
-    assert decode_projection.count("CASE WHEN (r.[metric_code]) COLLATE Latin1_General_100_BIN2") == 1
+    decoded_key = "CONVERT(NVARCHAR(MAX), r.[metric_code])"
+    empty_marker = "CONVERT(NVARCHAR(MAX), (NCHAR(29) + N'E'))"
+    exact_empty_key = (
+        f"CASE WHEN DATALENGTH({decoded_key}) = DATALENGTH({empty_marker}) "
+        f"AND {decoded_key} COLLATE Latin1_General_100_BIN2 "
+        f"= {empty_marker} COLLATE Latin1_General_100_BIN2 THEN N'' "
+    )
+    assert decode_projection.count(exact_empty_key) == 1
     projection = next(sql for sql in connector.statements if "INSERT INTO" in sql and "delta_raw_native_" in sql)
     assert " WITH (TABLOCK) " in projection
     assert "NCHAR(29)" not in projection
