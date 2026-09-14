@@ -42,9 +42,8 @@ def test_unsupported_source_strategy_and_side_effects_reject_entire_route(mutati
         composition_transfer_cell(manifest)
 
 
-def test_real_native_model_producer_full_refresh_is_classified_without_rewriting():
-    from copy import deepcopy
-
+def test_blocked_native_full_refresh_manifest_is_classified_by_shape_only():
+    """A recognizable cell is not a successfully admitted producer release."""
     from dpone.contracts.composition_execution import composition_generated_transfer_cell
     from dpone.contracts.dbt_publish_models import (
         DbtColumnArtifact,
@@ -91,6 +90,12 @@ def test_real_native_model_producer_full_refresh_is_classified_without_rewriting
             ("full_refresh",), full_refresh_authorized=True, full_refresh_max_source_bytes=1048576
         ),
     )
+    errors = tuple(issue for issue in compiled.warnings if issue.severity == "error")
+    assert len(errors) == 1
+    issue = errors[0]
+    assert issue.code == "DPONE_DBT_STRATEGY_UNRESOLVED" and issue.severity == "error"
+    assert "sink.strategy.max_source_bytes cannot be enforced" in issue.message
+    assert "strategy_policy.full_refresh.max_source_bytes" in issue.message
     original = deepcopy(compiled.manifest)
     assert composition_generated_transfer_cell(compiled.manifest) == "mssql_clickhouse_full_refresh_v1"
     assert compiled.manifest == original

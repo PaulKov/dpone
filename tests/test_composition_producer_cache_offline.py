@@ -8,12 +8,13 @@ Never publish these fixture artifacts as certification or production authority.
 
 All generated source and deployment artifacts remain confined to tmp_path.
 
-The test uses the real logical-outlet producer and closure verifier. It does not
-patch verification or strip source fields before planning and cache activation.
+The tests use the real logical-outlet producer and closure verifier. Original
+merge/partition inputs reach verified cache, but cannot activate the current
+full-refresh-only composition cell. Bounded full refresh fails workspace compile.
+Lower-level activation ordering and membership tests remain separate coverage.
 """
 
 import json
-from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from dpone.contracts.airflow_deployment import canonical_fingerprint
 from dpone.contracts.composition_activation import (
     CompositionActivationOccurrence,
     CompositionActivationReceipt,
+    CompositionAdmissionError,
     CompositionOccurrenceContext,
 )
 from dpone.contracts.composition_physical import CompositionDomainObservation, CompositionPhysicalDomain
@@ -80,7 +82,12 @@ def _full_refresh_snapshot():
 _ORIGINAL_SNAPSHOT = native_helpers.route_snapshot
 
 
-def _native_release(tmp_path, monkeypatch):
+def _tree_bytes(root):
+    return {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+
+
+def test_bounded_full_refresh_workspace_rejects_before_publication(tmp_path, monkeypatch):
+    """Retain the former positive fixture as a real compiler rejection case."""
     root = tmp_path / "workspace"
     native_helpers.prepare_projects(root)
     for name in native_helpers.PROJECTS:
@@ -107,13 +114,34 @@ def _native_release(tmp_path, monkeypatch):
     # source/transport verification. Real compiler and artifact writer run.
     monkeypatch.setattr(native_helpers, "route_snapshot", _full_refresh_snapshot)
     compiled = tmp_path / "compiled"
+    before = _tree_bytes(tmp_path)
+    report = native_helpers.workspace_service(tmp_path / "profiles").compile(root, output_dir=compiled)
+    assert not report.passed and report.exit_code == 2
+    assert report.release_id is report.source_snapshot_sha256 is report.subject_sha256 is None
+    assert {row.project.project_name for row in report.check.projects} == set(native_helpers.PROJECTS)
+    for row in report.check.projects:
+        assert not row.report.passed and row.report.blockers
+        assert not row.report.models
+        for issue in row.report.blockers:
+            assert issue.code == "DPONE_DBT_STRATEGY_UNRESOLVED" and issue.severity == "error"
+            assert "sink.strategy.max_source_bytes cannot be enforced" in issue.message
+            assert "strategy_policy.full_refresh.max_source_bytes" in issue.message
+    assert not compiled.exists()
+    assert _tree_bytes(tmp_path) == before
+
+
+def _native_release(tmp_path):
+    """Compile the unchanged supported merge/partition fixture and route inputs."""
+    root = tmp_path / "workspace"
+    native_helpers.prepare_projects(root)
+    compiled = tmp_path / "compiled"
     report = native_helpers.workspace_service(tmp_path / "profiles").compile(root, output_dir=compiled)
     assert report.passed, [(row.project.project_name, row.report.blockers) for row in report.check.projects]
     native = materialize_compact_pack_release(
         pack_root=compiled, cache_root=tmp_path / "native-cache", xcom_sidecar_image=native_helpers.SIDECAR
     )
     assert native.passed, native.blockers
-    return native
+    return native, report.check
 
 
 def _ordinary_release(tmp_path):
@@ -163,8 +191,8 @@ def _ordinary_release(tmp_path):
 
 
 @pytest.fixture
-def producer_composition(tmp_path, monkeypatch):
-    native = _native_release(tmp_path, monkeypatch)
+def producer_composition(tmp_path):
+    native, check = _native_release(tmp_path)
     ordinary = _ordinary_release(tmp_path)
     service = build_release_composition_service()
     inventory = service.inventory(ordinary, xcom_sidecar_image=native_helpers.SIDECAR)
@@ -182,7 +210,7 @@ def producer_composition(tmp_path, monkeypatch):
         pack_root=request.output_dir, cache_root=tmp_path / ".dpone-cache", xcom_sidecar_image=native_helpers.SIDECAR
     )
     assert installed.passed, installed.blockers
-    return Path(installed.release_dir), installed.release_id
+    return Path(installed.release_dir), installed.release_id, check
 
 
 class OfflineBackend:
@@ -280,18 +308,35 @@ class OfflineProtectedStore:
         raise AssertionError("retirement is outside this offline test")
 
 
-def test_real_producer_to_v3_cache_with_explicit_offline_admission(producer_composition, tmp_path):
-    root, release_id = producer_composition
+def test_real_producer_compile_compose_verified_cache_preserves_closure(producer_composition, tmp_path):
+    root, release_id, check = producer_composition
+    reader = build_composition_source_reader()
+    sources = reader.read_sources(root, expected_release_id=release_id)
+    original = reader.read_sources(tmp_path / "composed", expected_release_id=release_id)
+    assert sources == original
+    assert sources.subject_sha256 == original.subject_sha256
+    expected_models = {model.workload_id: model for row in check.projects for model in row.report.models}
+    assert {model.strategy["mode"] for model in expected_models.values()} == {"incremental_merge", "partition_replace"}
+    manifests = {workload: yaml.safe_load(body) for workload, body in sources.transfer_manifests}
+    assert set(manifests) == set(expected_models) | {"orders"}
+    for workload, model in expected_models.items():
+        assert manifests[workload] == model.manifest
+        assert {"runtime", "quality", "gitops", "state"} <= set(manifests[workload])
+    assert manifests["orders"] == yaml.safe_load((tmp_path / "author/transfer.yaml").read_bytes())
+    assert sources.ordinary.files == _tree_bytes(tmp_path / "ordinary")
+    native_ids = {workload for workload, _ in sources.native.required_workloads}
+    assert native_ids == set(expected_models) | {f"dbt__{name}" for name in native_helpers.PROJECTS}
+    release = json.loads((root / "release-set.json").read_bytes())
+    assert release["schema"] == "dpone.release-set.v3"
+    assert dict(sources.workload_pins) == {row["id"]: row["sha256"] for row in release["artifacts"]["workload_packs"]}
+    assert {workload for workload, _ in sources.workload_pins} == native_ids | {"orders"}
+
+
+def test_real_producer_mixed_activation_rejects_before_physical_or_protected_mutation(producer_composition, tmp_path):
+    root, release_id, _ = producer_composition
     sources = build_composition_source_reader().read_sources(root, expected_release_id=release_id)
-    plan = plan_composition_execution(sources)
-    assert {row.execution_cell for row in plan.workloads} == CELLS
-    assert {row.workload_id for row in plan.workloads} == {key for key, _ in sources.workload_pins}
-    assert {row.constituent_id for row in plan.workloads} == {"native", "standalone"}
-    for workload, body in sources.transfer_manifests:
-        manifest = yaml.safe_load(body)
-        if workload != "orders":
-            assert "state" not in manifest
-            assert manifest["sink"]["strategy"] == {"mode": "full_refresh", "max_source_bytes": MAX_SOURCE_BYTES}
+    with pytest.raises(CompositionAdmissionError, match="bounded_generated_full_refresh_required"):
+        plan_composition_execution(sources)
 
     _write_environment(tmp_path)
     environment = tmp_path / "environments/prod/binding-set.yaml"
@@ -325,7 +370,9 @@ def test_real_producer_to_v3_cache_with_explicit_offline_admission(producer_comp
         stores=store,
     )
     materializer = DeploymentCacheMaterializer(cache, composition_activation_coordinator=coordinator)
-    backend.execution_cells = CELLS - {"mssql_clickhouse_full_refresh_v1"}
+    # Advertising every current cell cannot admit the unchanged merge/partition
+    # producer artifacts. No fake executable cell or verification patch is used.
+    assert backend.execution_cells == CELLS
     with pytest.raises(DeploymentCacheError) as missing:
         materializer.promote(
             projection.deployment_dir,
@@ -334,25 +381,13 @@ def test_real_producer_to_v3_cache_with_explicit_offline_admission(producer_comp
             activation_id=ACTIVATION_ID,
         )
     assert missing.value.code == "DPONE_COMPOSITION_ADMISSION_UNAVAILABLE"
+    # Cache error translation must not hide an unrelated fixture/setup failure.
+    cause = missing.value
+    while cause.__context__ is not None:
+        cause = cause.__context__
+    assert isinstance(cause, CompositionAdmissionError)
+    assert "bounded_generated_full_refresh_required" in str(cause)
     assert store.current is None and not backend.observations
-    assert not (cache / "current").exists()
-    backend.execution_cells = CELLS
-    current = materializer.promote(
-        projection.deployment_dir,
-        environment="prod",
-        expect_current_absent=True,
-        activation_id=ACTIVATION_ID,
-    )
-    assert current.release_id == release_id
-    assert store.current.receipt.state == "ACTIVE"
-    assert store.current.request.source_subject_sha256 == sources.subject_sha256
-    assert store.current.request.workloads == plan.workloads
-    assert events[-2:] == ["prepare", "activate"]
-    assert Counter(connector for connector, _ in backend.observations) == {"mssql": 1, "clickhouse": 1}
-    mssql_writes = next(writes for connector, writes in backend.observations if connector == "mssql")
-    assert {write.connection_ref for write in mssql_writes} >= {"mssql_dwh_stage", "ordinary_writer"}
-    assert any(write.kind != "transfer" for write in mssql_writes)
-    assert any(write.resource_id == "orders" for write in mssql_writes)
-    assert sorted(
-        subject for resource in store.current.request.resources for subject in resource.write_subjects
-    ) == sorted(map(dbt_relation_write_subject, sources.relation_writes))
+    assert events == []
+    assert not (cache / "current").exists() and not (cache / "current").is_symlink()
+    assert not (cache / "current-pointer.json").exists()
