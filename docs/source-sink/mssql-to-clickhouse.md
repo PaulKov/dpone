@@ -1780,6 +1780,11 @@ dpone uses a staging-first, lossless codec for the native MSSQL -> ClickHouse pa
 4. Raw TSV is loaded into a ClickHouse staging table.
 5. Finalization inserts from staging through a decode projection, so the target table receives the original empty string, original sentinel-like values and real `NULL` values.
 
+Only zero-length converted text uses the empty sentinel. One or more spaces,
+including leading or trailing spaces, remain part of the value. Previously
+exported files that collapsed spaces into the empty sentinel must be regenerated;
+see [MSSQL text encoding and recovery](../mssql.md#production-safe-bcp-text-encoding).
+
 ```mermaid
 flowchart LR
   M["MSSQL row"] --> P["bcp-safe SELECT projection"]

@@ -84,8 +84,14 @@ class BulkTextCodec:
             )
         marker = self._mssql_literal(self.marker_prefix)
         binary_value = f"({value_sql}) COLLATE {_MSSQL_CODEC_BINARY_COLLATION}"
+        normalized_value = f"CONVERT(NVARCHAR(MAX), {value_sql})"
+        normalized_empty = f"CONVERT(NVARCHAR(MAX), ({self._mssql_literal(self.empty_string_marker)}))"
+        # SQL Server pads even binary string equality. Compare lengths in the
+        # same Unicode representation before recognizing the exact sentinel.
         return (
-            f"CASE WHEN {binary_value} = {self._mssql_literal(self.empty_string_marker)} THEN N'' "
+            f"CASE WHEN DATALENGTH({normalized_value}) = DATALENGTH({normalized_empty}) "
+            f"AND {normalized_value} COLLATE {_MSSQL_CODEC_BINARY_COLLATION} "
+            f"= {normalized_empty} COLLATE {_MSSQL_CODEC_BINARY_COLLATION} THEN N'' "
             f"WHEN CHARINDEX({marker}, {binary_value}) = 0 "
             f"THEN {value_sql} "
             f"ELSE {expression} END"
@@ -94,14 +100,16 @@ class BulkTextCodec:
     def mssql_encode_expression(self, value_sql: str) -> str:
         """Render a SQL Server expression that encodes a source text column."""
 
-        expression = f"CONVERT(NVARCHAR(MAX), {value_sql})"
+        text_value = f"CONVERT(NVARCHAR(MAX), {value_sql})"
+        expression = text_value
         for char, code in self._ordered_replacements():
             expression = (
                 f"REPLACE({expression}, {self._mssql_literal(char)}, {self._mssql_literal(self.marker_prefix + code)})"
             )
         return (
             f"CASE WHEN {value_sql} IS NULL THEN NULL "
-            f"WHEN {value_sql} = N'' THEN {self._mssql_literal(self.empty_string_marker)} "
+            # Measure serialized text before escaping; padded equality loses spaces.
+            f"WHEN DATALENGTH({text_value}) = 0 THEN {self._mssql_literal(self.empty_string_marker)} "
             f"ELSE {expression} END"
         )
 

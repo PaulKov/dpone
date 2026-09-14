@@ -430,6 +430,7 @@ transport with an explicit reversible text codec whenever the target is MSSQL:
 | --- | --- | --- |
 | `NULL` | Empty bcp field | `NULL` |
 | Empty string `""` | `\x1dE` marker | Empty string `""` |
+| One or more spaces | The same spaces | The same spaces |
 | Tab | `\x1dT` | Tab |
 | LF newline | `\x1dN` | LF newline |
 | CR newline | `\x1dR` | CR newline |
@@ -441,6 +442,18 @@ codec before writing files. Native Postgres `COPY` and MSSQL `bcp queryout`
 paths encode text columns in SQL before export, then MSSQL sink strategies decode
 them with set-based `INSERT ... SELECT` expressions when committing from staging
 to the final/shadow table.
+
+SQL projections distinguish empty converted text from spaces using its byte
+length. Leading and trailing spaces, including padding already present in
+fixed-width source values, remain data. MSSQL decoding recognizes the empty
+marker only when the complete text matches both its binary value and its byte
+length in the same Unicode representation. A marker followed by spaces is not
+an empty string.
+
+If an older export converted spaces to an empty-string marker, that artifact no
+longer contains enough information to restore the spaces. Regenerate it from
+the authoritative source using the normal run and state controls. Do not repair
+values by guessing or resume the old artifact as if it had been corrected.
 
 The MSSQL-target codec is intentionally applied only when the sink is MSSQL.
 MSSQL source exports that feed ClickHouse direct TSV use a separate

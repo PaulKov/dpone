@@ -421,7 +421,12 @@ def test_bulk_text_codec_renders_mssql_decode_expression() -> None:
 
     expression = codec.mssql_decode_expression("s.[comment]")
 
-    assert "CASE WHEN (s.[comment]) COLLATE Latin1_General_100_BIN2 = NCHAR(29) + N'E' THEN N''" in expression
+    assert "CASE WHEN DATALENGTH(CONVERT(NVARCHAR(MAX), s.[comment]))" in expression
+    assert "DATALENGTH(CONVERT(NVARCHAR(MAX), (NCHAR(29) + N'E')))" in expression
+    assert (
+        "CONVERT(NVARCHAR(MAX), s.[comment]) COLLATE Latin1_General_100_BIN2 = "
+        "CONVERT(NVARCHAR(MAX), (NCHAR(29) + N'E')) COLLATE Latin1_General_100_BIN2 THEN N''"
+    ) in expression
     assert "WHEN CHARINDEX(NCHAR(29), (s.[comment]) COLLATE Latin1_General_100_BIN2) = 0 THEN s.[comment]" in expression
     assert "NCHAR(10)" in expression
     assert "NCHAR(9)" in expression
@@ -500,7 +505,13 @@ def test_mssql_staging_commit_decodes_encoded_text_columns_only() -> None:
 
     query = connector.queries[-1][0]
     assert "s.[id]" in query
-    assert "CASE WHEN (s.[comment]) COLLATE Latin1_General_100_BIN2 = NCHAR(29) + N'E' THEN N''" in query
+    assert (
+        "CASE WHEN DATALENGTH(CONVERT(NVARCHAR(MAX), s.[comment])) "
+        "= DATALENGTH(CONVERT(NVARCHAR(MAX), (NCHAR(29) + N'E'))) "
+        "AND CONVERT(NVARCHAR(MAX), s.[comment]) COLLATE Latin1_General_100_BIN2 "
+        "= CONVERT(NVARCHAR(MAX), (NCHAR(29) + N'E')) COLLATE Latin1_General_100_BIN2 THEN N''"
+    ) in query
+    assert "DATALENGTH(CONVERT(NVARCHAR(MAX), s.[id]))" not in query
     assert "AS [comment]" in query
 
 
@@ -662,7 +673,10 @@ def test_clickhouse_tabseparated_codec_renders_mssql_safe_values() -> None:
     expression = ClickHouseTabSeparatedCodec().mssql_select_expression("dpone_src.[comment]")
 
     assert "CASE WHEN dpone_src.[comment] IS NULL THEN N'\\N'" in expression
-    assert "WHEN dpone_src.[comment] = N'' THEN N'__dpone__tsv__empty'" in expression
+    assert (
+        "WHEN DATALENGTH(CONVERT(VARCHAR(MAX), CONVERT(NVARCHAR(MAX), dpone_src.[comment]) "
+        "COLLATE Latin1_General_100_CI_AS_SC_UTF8)) = 0 THEN N'__dpone__tsv__empty'"
+    ) in expression
     assert "N'\\\\'" in expression
     assert "N'\\t'" in expression
     assert "N'\\n'" in expression
@@ -725,6 +739,89 @@ def test_mssql_queryout_export_wraps_all_columns_for_clickhouse_direct_tsv() -> 
     assert "CASE WHEN dpone_src.[id] IS NULL THEN N'\\N'" in query
     assert "CASE WHEN dpone_src.[comment] IS NULL THEN N'\\N'" in query
     assert "CONVERT(VARCHAR(MAX), CONVERT(NVARCHAR(MAX), dpone_src.[comment])" in query
+
+
+@pytest.mark.integration_matrix_mock
+@pytest.mark.parametrize("route", ["mssql", "clickhouse"])
+def test_mssql_extract_selects_text_codec_and_preserves_space_predicate(tmp_path: Path, route: str) -> None:
+    """Capture actual selection/projection; the peer does not execute SQL values."""
+    schema = [
+        ("id", "int"),
+        ("ansi", "varchar(32)"),
+        ("fixed_ansi", "char(4)"),
+        ("unicode", "nvarchar(max)"),
+        ("fixed] unicode", "nchar(4)"),
+    ]
+
+    class ExportConnector(FakeMSSQLConnector):
+        bcp_path = "bcp"
+        trust_server_certificate = "yes"
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.bcp_queries: list[str] = []
+
+        def fetch_schema(self, source_schema, table, *, database=None):
+            assert (source_schema, table) == ("dbo", "orders")
+            return schema
+
+        def build_select_query(self, source_schema, table, columns, *, database=None):
+            selected = ", ".join(self.quote_identifier(column) for column in columns)
+            return f"SELECT {selected} FROM {self.qualified_name(source_schema, table)}"
+
+        def bcp_queryout(self, query, output_path, *, options=None):
+            self.bcp_queries.append(query)
+            Path(output_path).write_bytes(b"")
+            return 0
+
+    class ClickHouseConnector:
+        pass
+
+    source = ExportConnector()
+    sink = (
+        MSSQLConnector(host="sql", port=1433, database="dwh", user="u", password="p")
+        if route == "mssql"
+        else ClickHouseConnector()
+    )
+    config = LoadConfig(
+        source_conn_id="mssql",
+        target_conn_id=route,
+        source_schema="dbo",
+        source_table="orders",
+        target_schema="destination",
+        target_table="orders",
+        load_strategy=LoadStrategy.FULL_REFRESH,
+        options={
+            "mssql_export_mode": "bcp",
+            "mssql_queryout_projection": "inline",
+            "partition_tmp_dir": str(tmp_path),
+            "clickhouse_bulk": {"mode": "http"},
+        },
+    )
+    logger = SimpleNamespace(log_etl_progress=lambda *_args: None, info=lambda *_args: None)
+    extract = MSSQLFullExtractStrategy(source, logger=logger, sink_connector=sink).extract(config, None)
+    try:
+        expected_codec = BulkTextCodec if route == "mssql" else ClickHouseTabSeparatedCodec
+        assert type(extract.artifact.bulk_text_codec) is expected_codec
+        assert extract.schema == schema
+        assert len(source.bcp_queries) == 1
+        query = source.bcp_queries[0]
+        for name, _dtype in schema[1:]:
+            reference = f"dpone_src.{source.quote_identifier(name)}"
+            converted = f"CONVERT(NVARCHAR(MAX), {reference})"
+            if route == "clickhouse":
+                converted = f"CONVERT(VARCHAR(MAX), {converted} COLLATE Latin1_General_100_CI_AS_SC_UTF8)"
+            assert f"WHEN DATALENGTH({converted}) = 0 THEN" in query
+            assert f"WHEN {reference} = N''" not in query
+            assert f"END AS {source.quote_identifier(name)}" in query
+        assert query.count("DATALENGTH(") == 4
+        assert "DATALENGTH(CONVERT(NVARCHAR(MAX), dpone_src.[id]))" not in query
+        if route == "mssql":
+            assert "dpone_src.[id] AS [id]" in query
+        else:
+            assert "CASE WHEN dpone_src.[id] IS NULL THEN N'\\N' ELSE" in query
+    finally:
+        extract.artifact.cleanup()
 
 
 def test_mssql_clickhouse_queryout_projection_view_shortens_wide_bcp_query() -> None:

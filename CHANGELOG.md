@@ -13,6 +13,12 @@
 
 ### Fixed
 
+- Preserve spaces in MSSQL bulk-text and ClickHouse TSV source projections by
+  checking the byte length of converted text. Recognize MSSQL empty-string
+  markers only with matching Unicode byte length and binary value. Existing
+  NULL, nontext and marker formats remain unchanged; regenerate older exports
+  that already collapsed spaces into empty strings.
+
 - Reject extra or missing CSV/TSV fields in ClickHouse Python file ingestion
   before submitting the malformed row; preserve valid conversion and fail staged
   publication instead of silently dropping fields.

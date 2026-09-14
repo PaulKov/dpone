@@ -189,10 +189,10 @@ def test_decoded_stage_materializes_each_text_column_once_and_is_owned() -> None
     assert staging.dropped == [decoded]
     insert = next(query for query in connector.queries if query.startswith("INSERT INTO"))
     assert " WITH (TABLOCK) " in insert
-    assert insert.count("CASE WHEN (r.[name]) COLLATE Latin1_General_100_BIN2") == 1
-    assert insert.count("CASE WHEN (r.[payload]) COLLATE Latin1_General_100_BIN2") == 1
-    assert insert.count("CASE WHEN (r.[amount]) COLLATE Latin1_General_100_BIN2") == 1
-    assert "CASE WHEN r.[__dpone__row_hash]" not in insert
+    assert insert.count("CASE WHEN DATALENGTH(CONVERT(NVARCHAR(MAX), r.[name]))") == 1
+    assert insert.count("CASE WHEN DATALENGTH(CONVERT(NVARCHAR(MAX), r.[payload]))") == 1
+    assert insert.count("CASE WHEN DATALENGTH(CONVERT(NVARCHAR(MAX), r.[amount]))") == 1
+    assert "DATALENGTH(CONVERT(NVARCHAR(MAX), r.[__dpone__row_hash]))" not in insert
     assert re.search(r"stg_events_12345678_decoded_[0-9a-f]{12}", insert)
     capacity = next(query for query in connector.queries if "AS raw_reserved_bytes" in query)
     assert "sys.dm_db_partition_stats" in capacity
@@ -202,6 +202,35 @@ def test_decoded_stage_materializes_each_text_column_once_and_is_owned() -> None
     assert "FILEPROPERTY" in capacity
     assert capacity.startswith("EXEC [DWH_Dev].sys.sp_executesql")
     assert "COUNT_BIG(" not in capacity.upper()
+
+
+@pytest.mark.parametrize("dtype", ["varchar(max)", "nvarchar(max)"])
+def test_decoded_stage_applies_exact_marker_identity_only_to_text_columns(dtype: str) -> None:
+    connector, _staging, strategy, raw = _fixture()
+    raw.column_types["name"] = dtype
+    raw.target_column_types["name"] = dtype
+    raw.column_types["amount"] = "decimal(18, 2)"
+    raw.target_column_types["amount"] = "decimal(18, 2)"
+
+    with MssqlDecodedStagingMaterializer(strategy).materialize(_config(), raw, error_prefix="mssql_native_projection"):
+        pass
+
+    insert = next(query for query in connector.queries if query.startswith("INSERT INTO"))
+    marker = "CONVERT(NVARCHAR(MAX), (NCHAR(29) + N'E'))"
+    for column in ("name", "payload"):
+        value = f"CONVERT(NVARCHAR(MAX), r.[{column}])"
+        assert (
+            insert.count(
+                f"DATALENGTH({value}) = DATALENGTH({marker}) "
+                f"AND {value} COLLATE Latin1_General_100_BIN2 = {marker} COLLATE Latin1_General_100_BIN2"
+            )
+            == 1
+        )
+        assert f"{raw.bulk_text_codec.mssql_decode_expression(f'r.[{column}]')} AS [{column}]" in insert
+    assert "DATALENGTH(CONVERT(NVARCHAR(MAX), r.[amount]))" not in insert
+    assert "DATALENGTH(CONVERT(NVARCHAR(MAX), r.[__dpone__row_hash]))" not in insert
+    assert "r.[amount] AS [amount]" in insert
+    assert "r.[__dpone__row_hash] AS [__dpone__row_hash]" in insert
 
 
 def test_capacity_probe_excludes_free_space_from_non_default_filegroups() -> None:
