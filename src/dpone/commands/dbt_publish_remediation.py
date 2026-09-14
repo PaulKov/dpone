@@ -1,4 +1,4 @@
-"""Safe operator remediation text for dbt runtime failures."""
+"""Safe operator messages and remediation for dbt runtime failures."""
 
 from __future__ import annotations
 
@@ -36,3 +36,11 @@ def runtime_remediation(code: str) -> str:
         "Keep transfers blocked, inspect the durable workload evidence, and "
         "start a new attempt only after the reported cause is corrected."
     )
+
+
+def runtime_message(code: str) -> str:
+    """Describe the known failure boundary without implying an unproven rollback."""
+
+    if code == "COMMIT_UNKNOWN":
+        return "The dbt target outcome is unknown; mutation may have committed."
+    return "The verified dbt execution pack was rejected safely"
