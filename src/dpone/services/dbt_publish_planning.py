@@ -17,6 +17,7 @@ from dpone.contracts.dbt_unique_key_policy import (
     DbtUniqueKeyPolicyReport,
     evaluate_model_dbt_unique_key,
 )
+from dpone.contracts.source_byte_budget_admission import source_byte_budget_rejection
 
 
 class DbtPublishPlanner:
@@ -59,6 +60,14 @@ class DbtPublishPlanner:
             strategy["unique_key"] = list(key_report.keys)
         if mode == "full_refresh":
             strategy["max_source_bytes"] = policy.full_refresh_max_source_bytes
+            if not policy_issues and (budget_rejection := source_byte_budget_rejection(strategy)):
+                policy_issues = (
+                    _blocker(
+                        model,
+                        "DPONE_DBT_STRATEGY_UNRESOLVED",
+                        f"{budget_rejection} Platform policy: strategy_policy.full_refresh.max_source_bytes.",
+                    ),
+                )
         if mode == "partition_replace":
             strategy["partition"] = {
                 "column": intent.partition_key,

@@ -13,6 +13,11 @@
 
 ### Fixed
 
+- Reject explicit `sink.strategy.max_source_bytes` instead of silently discarding
+  its unenforced limit, and block dbt bounded-full-refresh release generation.
+  Loads without this field and separate validated-file staging budgets retain
+  their existing behavior. Rebuild or withdraw affected older releases before
+  deployment; this does not prevent an already deployed upstream dbt build.
 - Resolve generated dbt MSSQL interval start filters without literal braces and
   align current setup and recovery guidance with the existing toolchain.
 - Hide overlapping dbt secrets and secret fragments at captured-output retention

@@ -64,6 +64,43 @@ sink:
 
 ## Runbook
 
+### Source-byte budgets rejected before transfer
+
+For platform owners and manifest authors, an explicit
+`sink.strategy.max_source_bytes` now raises `DagConfigurationError` during
+public load configuration parsing. This field previously disappeared from the
+runtime configuration without enforcing its limit. Any explicit occurrence,
+including null or a value on another strategy, is rejected; loads that omit the
+field keep their existing behavior.
+
+In [dbt inline publishing](dbt-inline-publishing.md), a plan selecting full
+refresh with `strategy_policy.full_refresh.max_source_bytes` fails compilation
+with `DPONE_DBT_STRATEGY_UNRESOLVED`. It cannot emit executable release artifacts.
+An unused full-refresh grant does not block another supported selected strategy.
+The demo's safe strategy allowlist is unchanged.
+
+When the error reports that `sink.strategy.max_source_bytes cannot be enforced`,
+ask the platform owner to select an already supported strategy or wait for an
+approved, enforced budget contract. Do not delete a required limit merely to
+make a bounded load run. This correction introduces no byte measurement:
+source bytes, encoded-file bytes and SQL table allocation are distinct.
+The separately enforced `ClickHouseValidatedFilePolicy.max_source_bytes` Python
+staging limit keeps its existing behavior.
+
+Rebuild or withdraw previously generated bounded-full-refresh releases before
+deployment. Rejecting transfer configuration does not guarantee that an upstream
+dbt build from an already deployed release has not run. The fix does not rewrite
+signed artifacts or change state, cleanup or recovery authority.
+
+Developers: `dpone.contracts.source_byte_budget_admission` supplies one pure
+decision to the public builder and dbt planner; each uses its existing error
+contract. The public regressions in `tests/test_full_refresh_budget_rejection.py`
+and `tests/test_dbt_inline_publishing.py` cover admission, unchanged no-budget
+behavior and refusal to emit executable artifacts. They do not certify a live
+route or implement a runtime byte ceiling.
+
+### Runtime contract failures
+
 | Symptom | Action |
 | --- | --- |
 | `opaque file artifact requires prevalidated contract` | Validate during source export or remove strict runtime contracts for that opaque fast path. |

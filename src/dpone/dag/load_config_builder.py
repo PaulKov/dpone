@@ -18,6 +18,7 @@ from dpone.config.postgres_mssql_wire_contract import (
 from dpone.config.reconciliation import ReconciliationConfigError, normalize_reconciliation
 from dpone.contracts.api_sources import get_api_source_defaults
 from dpone.contracts.connector_declarations import canonical_endpoint_type
+from dpone.contracts.source_byte_budget_admission import source_byte_budget_rejection
 from dpone.dag.errors import DagConfigurationError
 from dpone.dag.export_format_validation import validate_export_format_for_sink
 from dpone.dag.load_config_builder_support import (
@@ -200,6 +201,8 @@ class LoadConfigBuilder:
                     )
 
             strategy_cfg = dict(sink_cfg.get("strategy", {}) or {})
+            if budget_rejection := source_byte_budget_rejection(strategy_cfg):
+                raise DagConfigurationError(budget_rejection)
             unique_key = resolve_unique_key(
                 source_options=source_options,
                 strategy_config=strategy_cfg,
