@@ -25,9 +25,27 @@ def native_requested(config: Any) -> bool:
     wire = value.get("wire", {})
     execution = value.get("execution", {})
     chunking = execution.get("chunking", {}) if isinstance(execution, Mapping) else {}
-    return (isinstance(wire, Mapping) and wire.get("binary_format") == "mssql_native") or (
-        isinstance(chunking, Mapping) and chunking.get("mode") == "bounded_stream"
+    return (
+        "source_read" in value
+        or (isinstance(wire, Mapping) and wire.get("binary_format") == "mssql_native")
+        or (isinstance(chunking, Mapping) and chunking.get("mode") == "bounded_stream")
     )
+
+
+def native_source_read_mode(config: Any) -> str | None:
+    """Parse explicit raw semantics without changing legacy options or identity."""
+    native = _native(config)
+    if "source_read" not in native:
+        return None
+    value = native["source_read"]
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != {"mode"}
+        or type(value["mode"]) is not str
+        or value["mode"] != "raw_single_query"
+    ):
+        raise ValueError("mssql_native.source_read_invalid")
+    return "raw_single_query"
 
 
 def native_limits(config: Any) -> NativeChunkLimits:
@@ -71,6 +89,7 @@ def native_window(config: Any) -> FrozenRollingWindow | None:
 def validate_native_config(config: Any) -> None:
     """Reject unsupported routes and source policies before connector row I/O."""
     value = _native(config)
+    native_source_read_mode(config)
     wire = value.get("wire")
     if (
         not isinstance(wire, Mapping)

@@ -20,11 +20,14 @@ from .session import Session
 class LocalRouteFactory:
     execution = "live"
 
-    def __init__(self, *, configuration, route, environment=None):
+    def __init__(self, *, configuration, route, environment=None, source_read_mode=None):
         if route.get("strategy") not in {"full_refresh", "partition_replace"} or route.get("mode") != "bounded_native":
             raise ValueError("local_fixture.unsupported_route")
         if validate_configuration(configuration["limits"]) != configuration:
             raise ValueError("local_fixture.configuration_digest")
+        if source_read_mode not in (None, "raw_single_query"):
+            raise ValueError("local_fixture.source_read_mode")
+        self.source_read_mode = source_read_mode
         self.configuration, self.route = configuration, route
         self.environment = environment or Environment(
             root=Path(os.environ.get("DPONE_DDA_SPOOL_ROOT", "/dda/artifacts/local-fixtures"))
@@ -61,6 +64,7 @@ class LocalRouteFactory:
             self.configuration,
             {},
             {},
+            source_read_mode=self.source_read_mode,
         )
         self.inventory_store.create(value)
         results = provision(self.environment, self.inventory_store, value)
@@ -73,7 +77,11 @@ class LocalRouteFactory:
         if str(parsed) != invocation_id:
             raise ValueError("local_fixture.canonical_invocation_required")
         value = self.inventory_store.load(parsed.hex)
-        if value.configuration != self.configuration or value.strategy != self.route["strategy"]:
+        if (
+            value.configuration != self.configuration
+            or value.strategy != self.route["strategy"]
+            or value.source_read_mode != self.source_read_mode
+        ):
             raise ValueError("local_fixture.recovery_configuration_changed")
         return Session(self.environment, self.inventory_store, value, DeliveryClock())
 

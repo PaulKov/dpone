@@ -213,3 +213,16 @@ keeps v1 for legacy-effective policies and uses v2 for extended policies. Keep
 tuning results for different policies separate with their original hashes.
 Exact configuration equality remains mandatory for a comparison PASS, so changing
 encoding/import counts cannot establish a certified cross-policy speedup.
+
+## Raw source policy and recovery identity
+
+Explicit `native_transfer.source_read.mode: raw_single_query` is part of the
+invocation identity. Keep it unchanged when resuming. Raw chunk journals use
+version 2; absent-mode journals remain version 1 with unchanged identities. Both
+use the same lookup namespace, so removing the mode cannot hide a prior run.
+Policy mismatches stop before source I/O or publication. Never edit the journal
+to make a mismatch pass. Complete or settle raw-mode invocations before downgrade.
+
+Follow the [raw composition guide](raw-window-composition.md) for same-invocation
+recovery versus the new invocation required after partial extraction. Independent
+source and target authority requirements remain unchanged.
