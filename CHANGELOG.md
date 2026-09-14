@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Opt-in raw single-query ClickHouse native reads for explicitly admitted local
+  MergeTree variants. Preserve duplicate rows with query-level `final=0`, bind
+  the policy to version-2 chunk journals, and reject changed-policy recovery.
+  Legacy admission, identity bytes and transaction receipts remain unchanged.
+  Add synthetic composition guidance; live certification remains environment-specific.
+
 ### Performance
 
 - Avoid a repeated Python character scan when encoding bounded variable-width

@@ -347,6 +347,11 @@ def cmd_plan(args: argparse.Namespace, *, ctx: object, logger: logging.Logger) -
         )
     except ValueError as error:
         code = str(error)
+        if code == "mssql_native.source_read_invalid":
+            raise ManifestConfigurationError(
+                f"{code}: source.options.native_transfer.source_read must contain only "
+                "mode: raw_single_query; omit source_read to preserve legacy admission."
+            ) from error
         if code not in (
             "mssql_native.invalid_limit:encoding_parallelism",
             "mssql_native.invalid_limit:import_parallelism",

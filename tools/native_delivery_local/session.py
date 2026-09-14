@@ -14,7 +14,12 @@ from tools.native_delivery_live_support.profiles import Dataset
 from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
 from dpone.adapters.mssql_native_chunks_journal import NativeChunkJournal
 from dpone.contracts.mssql_native_chunks import NativeChunkPlan
-from dpone.manifest.mssql_native_policy import native_limits, native_window, validate_native_config
+from dpone.manifest.mssql_native_policy import (
+    native_limits,
+    native_source_read_mode,
+    native_window,
+    validate_native_config,
+)
 from dpone.runtime.connector_logging import etl_logger
 from dpone.runtime.connectors.mssql_bulk import BcpOptions
 from dpone.runtime.etl.source_extraction_lifecycle import SourceExtractionLifecycleService
@@ -61,6 +66,7 @@ class Session:
             hashlib.sha256(canonical(window.to_dict() if window else {"strategy": "full_refresh"})).hexdigest(),
             self.wire.schema_hash,
             self.wire.type_layout_hash,
+            source_read_mode=native_source_read_mode(self.config),
         )
         self.journal_key = (
             "mssql-native-chunks-v1/" + hashlib.sha256(canonical([self.plan.target_id, self.plan.run_id])).hexdigest()
@@ -243,7 +249,9 @@ class Session:
             raise AssertionError("local_fixture.poison_source_rows")
         self.clock.source_acquired()
         self.faults.source_queries += 1
-        yield from self._payload.artifact.iter_native_rows()
+        for row in self._payload.artifact.iter_native_rows():
+            yield row
+            self.faults.fire("during_source")
 
     def _quality(self, config, handle, lease):
         self.store.assert_lease(lease)

@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from dpone.manifest.mssql_native_policy import native_limits
+from dpone.manifest.mssql_native_policy import native_limits, native_source_read_mode
 
 
 def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
@@ -17,6 +17,7 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
     native = config.options.get("native_transfer")
     if not isinstance(native, Mapping):
         return
+    source_read_mode = native_source_read_mode(config)
     wire, execution = native.get("wire"), native.get("execution")
     chunking = execution.get("chunking") if isinstance(execution, Mapping) else None
     if not (
@@ -59,6 +60,8 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
             "import_parallelism": limits.effective_import_parallelism,
             "retained_work_capacity": limits.retained_work_capacity,
         }
+    if source_read_mode is not None:
+        authored["source_read_mode"] = source_read_mode
     plan["mssql_native"] = authored
     plan["bulk_path"] = "clickhouse_bounded_mssql_native_bcp"
     # These generic stream/snapshot optimizers do not govern this executor.

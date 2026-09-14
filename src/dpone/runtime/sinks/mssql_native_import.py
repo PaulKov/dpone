@@ -7,7 +7,6 @@ ownership; it must not return while a previous BCP writer remains active.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import asdict
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -60,7 +59,7 @@ class MssqlNativeChunkImporter:
     def table_name(self, plan: NativeChunkPlan, attempt_id: str) -> str:
         """Derive an owned identifier from the complete invocation and attempt."""
 
-        return "dpone_native_" + sha256(repr((asdict(plan), attempt_id)).encode()).hexdigest()[:40]
+        return "dpone_native_" + sha256(repr((plan.to_dict(), attempt_id)).encode()).hexdigest()[:40]
 
     def qualified(self, table: str) -> str:
         return str(self.connector.qualified_name(self.schema, table, database=self.database))
@@ -147,7 +146,7 @@ class MssqlNativeChunkImporter:
             part = evidence.parts[0].to_payload()
             part["native_typed_sum"] = typed_sum
             part["native_object_id"] = object_id
-            part["native_plan_binding"] = stable_hash(asdict(plan))
+            part["native_plan_binding"] = stable_hash(plan.to_dict())
             return NativeChunkReceipt(
                 file.ordinal,
                 attempt_id,
@@ -170,7 +169,7 @@ class MssqlNativeChunkImporter:
             require_prepared_owner(self.connector, self._ownership(plan, receipt.attempt_id))
             part = receipt.consumed_part_evidence
             if (
-                part.get("native_plan_binding") != stable_hash(asdict(plan))
+                part.get("native_plan_binding") != stable_hash(plan.to_dict())
                 or part.get("native_object_id") != self._object_id(table)
                 or part.get("artifact_sha256") != receipt.file_sha256
                 or part.get("declared_rows") != receipt.rows
@@ -248,7 +247,7 @@ class MssqlNativeChunkImporter:
             "database": self.database,
             "schema": self.schema,
             "table": self.table_name(plan, attempt_id),
-            "binding": sha256(repr((asdict(plan), attempt_id)).encode()).hexdigest(),
+            "binding": sha256(repr((plan.to_dict(), attempt_id)).encode()).hexdigest(),
         }
 
     def _object_id(self, table: str) -> int:

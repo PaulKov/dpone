@@ -161,3 +161,13 @@ until its applicable checks, independent review and publication have completed.
 
 Return to [frame sizing](frames.md) for the preserved limits or the
 [operations guide](operations.md) for observation and recovery instructions.
+
+## Explicit raw-source admission
+
+The [approved raw single-query specification](../feature-specs/dda-raw-single-query.md)
+and [ADR 0064](../adr/0064-native-raw-single-query.md) define an opt-in extension
+to local MergeTree variants. Existing BCP streaming, stage-complete recovery and
+transactional publication remain unchanged. The
+[composition guide](raw-window-composition.md) distinguishes offline preparation
+from execution using real authority adapters. This stage does not certify new
+deployments or activate SWITCH, weighted days or a different bulk backend.
