@@ -175,11 +175,10 @@ class LoadConfigBuilder:
             staging_database = optional_text(staging_cfg.get("database"))
             if is_mssql(sink_type) and staging_database is None:
                 staging_database = target_database
-            staging_schema = staging_cfg.get("schema", "staging")
             staging_database, staging_schema = normalize_mssql_schema_label(
                 dialect=sink_type,
                 database=staging_database,
-                schema=staging_schema,
+                schema=staging_cfg.get("schema", "staging"),
                 table=target_table or "staging",
             )
             if parse_tracer:
@@ -272,7 +271,7 @@ class LoadConfigBuilder:
                     operation="default" if "micro_batch_commit" not in source_options else "copy",
                 )
 
-            self._validate_export_format(source_options=source_options, sink_cfg=sink_cfg)
+            validate_export_format_for_sink(source_options=source_options, sink_cfg=sink_cfg)
             options = merge_load_options(
                 source_options=source_options, sink_options=sink_options, parse_tracer=parse_tracer
             )
@@ -370,9 +369,6 @@ class LoadConfigBuilder:
             raise DagConfigurationError(f"Не хватает обязательного параметра в конфигурации: {exc.args[0]}")
         except ReconciliationConfigError as exc:
             raise DagConfigurationError(str(exc)) from exc
-
-    def _validate_export_format(self, *, source_options: dict[str, Any], sink_cfg: dict[str, Any]) -> None:
-        validate_export_format_for_sink(source_options=source_options, sink_cfg=sink_cfg)
 
 
 __all__ = ["LoadConfigBuilder"]
