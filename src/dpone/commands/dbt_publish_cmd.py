@@ -301,7 +301,11 @@ def cmd_execute_pack(args: argparse.Namespace, *, ctx: object, logger: logging.L
                 (
                     DbtPublishIssue(
                         code=code,
-                        message="The verified dbt execution pack was rejected safely",
+                        message=(
+                            "The dbt target outcome is unknown; mutation may have committed."
+                            if code == "COMMIT_UNKNOWN"
+                            else "The verified dbt execution pack was rejected safely"
+                        ),
                         path=args.relative_pack_path,
                         remediation=_runtime_remediation(code),
                     ),
