@@ -152,7 +152,10 @@ class ClickHouseSqlMixin:
 
     @classmethod
     def _coerce_file_row(cls, row: Sequence[str], schema: Sequence[tuple[str, str]]) -> tuple[Any, ...]:
-        return tuple(cls._coerce_file_value(value, dtype) for value, (_, dtype) in zip(row, schema, strict=False))
+        expected, actual = len(schema), len(row)
+        if actual != expected:
+            raise ValueError(f"clickhouse_file_row_width_mismatch: expected={expected}, actual={actual}")
+        return tuple(cls._coerce_file_value(value, dtype) for value, (_, dtype) in zip(row, schema, strict=True))
 
     @classmethod
     def _coerce_file_value(cls, value: str, dtype: str) -> Any:
