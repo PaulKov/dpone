@@ -11,6 +11,8 @@
 - Prevent automatic ClickHouse EXCHANGE metadata-error replay after a possible
   commit. Block topology preflight when target absence cannot be observed, and
   preserve authentication and permission failures.
+- Preserve the default seven-digit MSSQL nullable time precision in Python
+  binary encoders, including the final 100ns digit.
 
 ## 0.80.0 - 2026-09-13
 
