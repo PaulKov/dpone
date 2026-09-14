@@ -131,6 +131,7 @@ class Snapshot:
         if type(self.commit_known) is not bool or type(self.pipeline_complete) is not bool:
             raise ValueError("invalid_observed_state")
         allowed = {
+            "during_source",
             "before_commit",
             "after_eof",
             "lost_ack",
@@ -151,7 +152,7 @@ class RouteSession(Protocol):
 
     def snapshot(self) -> Snapshot: ...
     def arm_fault(self, fault: str) -> None:
-        """Inject after_eof, before_commit, lost_ack, unknown_commit or SWITCH drift."""
+        """Inject during_source, after_eof, commit faults or SWITCH drift."""
         ...
 
     def run(self) -> None:

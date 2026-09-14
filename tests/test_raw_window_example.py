@@ -303,3 +303,17 @@ def test_live_factory_binds_raw_inventory_before_provision(tmp_path, monkeypatch
     opened = factory.open(Dataset("unicode", 32), case="test-only", clock=DeliveryClock())
     assert opened.source_read_mode == "raw_single_query"
     assert observed == ["raw_single_query"]
+
+
+def test_pre_eof_fault_is_a_valid_observation():
+    from tools.native_delivery_live_support.execution import Snapshot
+    from tools.native_delivery_local.faults import Faults
+
+    faults = Faults()
+    faults.arm("during_source")
+    with pytest.raises(RuntimeError, match="local_fixture.injected:during_source"):
+        faults.fire("during_source")
+    observed = Snapshot(rows=(), fault_events=tuple(faults.events))
+    assert observed.fault_events == ("during_source",)
+    assert not observed.pipeline_complete
+    assert observed.publications == 0
