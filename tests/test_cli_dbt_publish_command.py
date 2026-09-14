@@ -337,10 +337,17 @@ def test_execute_pack_errors_explain_safe_recovery(
         logger=logging.getLogger("test.dbt.execute-pack"),
     )
 
-    payload = json.loads(capsys.readouterr().out)
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert captured.err == ""
     assert exit_code == 1
     assert payload["code"] == code
     assert expected in payload["fixes"][0]["description"]
+    assert payload["message"] == (
+        "The dbt target outcome is unknown; mutation may have committed."
+        if code == "COMMIT_UNKNOWN"
+        else "The verified dbt execution pack was rejected safely"
+    )
     assert "private runtime detail" not in json.dumps(payload)
 
 

@@ -78,8 +78,9 @@ The example uses publish profile `mssql_to_clickhouse_mart` and workflow
 connection URIs, Vault paths, runtime images, namespaces, or Kubernetes Secret
 names in model metadata.
 
-For the pinned SQL Server adapter, add the four literal booleans to
-`dbt_project.yml` before parsing:
+Use a project prepared by your platform team. For the pinned SQL Server adapter,
+its `dbt_project.yml` must already contain these four literal flags and safe model
+defaults, with `your_project` replaced by the project's actual name:
 
 ```yaml
 flags:
@@ -96,19 +97,24 @@ models:
     +prefer_single_alter_column: false
 ```
 
-The flags and safe model defaults are required policy, not recommendations or environment-variable
+The platform owns these required defaults; authors keep them unchanged. They are
+policy, not recommendations or environment-variable
 placeholders. A missing flag, quoted value, Jinja expression, duplicate YAML
 key, symlinked project file, or different boolean blocks `check` with
 `DPONE_DBT_SQLSERVER_PROJECT_POLICY_INVALID`. Keep top-level `dispatch` absent
 or empty; project macro routing cannot override the pinned framework
-authority. Selected models and tests may call only the generated 131-macro
+authority. Selected models and tests may call only the generated 153-macro
 dbt/dbt-sqlserver framework closure, the exact seven-macro invocation
 extension for incremental predicates and admitted generic tests, or the pinned
 metadata-only `dpone_publish` helper.
 
 ## 1. Add publishing metadata to one dbt model
 
-Add the smallest direct `meta` declaration:
+Save this complete model as `models/competitive_pricing.sql` in the prepared
+project. The platform's `mssql_to_clickhouse_mart` profile allows merge and
+partition replacement. A table model with only `strategy: auto` has neither an
+incremental key nor a partition window, so this example explicitly requests
+`incremental_merge` with the ordered key `[product_id, date_id]`:
 
 ```sql
 {{ config(
@@ -119,16 +125,68 @@ Add the smallest direct `meta` declaration:
             'publish': {
                 'enabled': true,
                 'profile': 'mssql_to_clickhouse_mart',
-                'workflow': 'competitive_pricing'
+                'workflow': 'competitive_pricing',
+                'strategy': {
+                    'mode': 'incremental_merge',
+                    'unique_key': ['product_id', 'date_id']
+                }
             }
         }
     }
 ) }}
+
+select
+    cast(date_id as date) as date_id,
+    cast(product_id as bigint) as product_id,
+    cast(calculated_price as decimal(18,2)) as calculated_price,
+    cast(price_source as nvarchar(100)) as price_source
+from {{ source('pricing_raw', 'competitive_price_inputs') }}
 ```
 
-Keep the model's columns and data types in `schema.yml`. The platform-owned
-publish profile resolves route and physical policy; the workflow resolves
-Airflow schedule and ownership.
+For a one-model learning project, save the matching `models/schema.yml` below.
+In an existing project, add these entries to the existing schema files instead
+of replacing other models or sources. The platform supplies the source's logical
+database/schema and the `pricing` group; these are not connection credentials.
+
+```yaml
+version: 2
+
+groups:
+  - name: pricing
+    owner:
+      name: pricing-data
+
+sources:
+  - name: pricing_raw
+    database: analytics_demo
+    schema: pricing_raw
+    tables:
+      - name: competitive_price_inputs
+
+models:
+  - name: competitive_pricing
+    columns:
+      - name: date_id
+        data_type: date
+        constraints:
+          - type: not_null
+        data_tests: [not_null]
+      - name: product_id
+        data_type: bigint
+        constraints:
+          - type: not_null
+        data_tests: [not_null]
+      - name: calculated_price
+        data_type: decimal(18,2)
+      - name: price_source
+        data_type: nvarchar(100)
+```
+
+Both merge-key columns need the structural `not_null` constraint as well as the
+data test. `dbt parse` can prepare this model without connecting to the source;
+the source table and its rows are required when the platform runs `dbt build`.
+The publish profile resolves route and physical policy; the workflow resolves
+Airflow schedule and ownership. This example does not authorize a new route.
 
 The selected SQL Server v1 preview graph admits SQL `table`, `view`, and
 `incremental` models. Incremental models must set `incremental_strategy` to
@@ -266,6 +324,20 @@ models:
 A following warning remains visible but does not change that successful
 authoring result. Production `compile` applies the stricter certification and
 release-admission gates described below.
+
+The one-model example above reports `published models: 1; workflows: 1`. Before
+opening the merge request, optionally inspect its resolved decision:
+
+```bash
+dpone dbt explain competitive_pricing --format json
+```
+
+The result names profile `mssql_to_clickhouse_mart`, workflow
+`competitive_pricing`, strategy `incremental_merge`, and ordered key
+`["product_id", "date_id"]`. If the platform sets the profile's target schema to
+the synthetic name `analytics_demo`, the target is
+`analytics_demo.competitive_pricing` in ClickHouse. `check` and `explain` write no
+release files and do not run model SQL; a successful preview is not data delivery.
 
 `check` verifies authoring, policy resolution, and route support. It deliberately
 does not require production-certified route evidence; CI `compile` does. This

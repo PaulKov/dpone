@@ -13,6 +13,20 @@
 
 ### Fixed
 
+- Reject extra or missing CSV/TSV fields in ClickHouse Python file ingestion
+  before submitting the malformed row; preserve valid conversion and fail staged
+  publication instead of silently dropping fields.
+
+- Report an unknown dbt target outcome for `COMMIT_UNKNOWN` instead of claiming
+  safe rejection; preserve the error code, exit status and blocked-retry guidance.
+
+- Reject explicit `sink.strategy.max_source_bytes` instead of silently discarding
+  its unenforced limit, and block dbt bounded-full-refresh release generation.
+  Loads without this field and separate validated-file staging budgets retain
+  their existing behavior. Rebuild or withdraw affected older releases before
+  deployment; this does not prevent an already deployed upstream dbt build.
+  Mixed-composition activation still requires this rejected bounded-full-refresh
+  shape; verified cache installation does not close that capability gap.
 - Resolve generated dbt MSSQL interval start filters without literal braces and
   align current setup and recovery guidance with the existing toolchain.
 - Hide overlapping dbt secrets and secret fragments at captured-output retention
@@ -31,6 +45,9 @@
   Authored null remains invalid; omitted limits retain their existing defaults.
 
 ### Documentation
+
+- Make the first dbt authoring example complete and executable, with real
+  parse/check/explain regression coverage and explicit merge keys.
 
 - Clarify the scoped 0.80.0 local Docker evidence and maintenance factory setup.
 - Record researched DDA resilience, verification, SQL layout, Arrow,

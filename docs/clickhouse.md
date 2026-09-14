@@ -158,6 +158,20 @@ large exports. If `clickhouse_bulk.mode` is set to `python`, `driver`, or
 `native_driver`, dpone does not apply the direct TSV wrapper and the Python file
 reader path is used instead.
 
+The Python CSV/TSV file reader requires every record to have exactly the number
+of fields in the source schema. A short or extra-width record fails with
+`clickhouse_file_row_width_mismatch: expected=2, actual=3`, for example. The
+check runs before value conversion and never includes cell contents in this
+diagnostic. Correct-width records retain their existing conversion behavior.
+
+If this error occurs, check the export's column order, field delimiter and
+quoting against the source schema, then regenerate the malformed export. Do
+not discard extra fields or pad missing fields to make the load pass. The
+malformed record is not submitted for insertion, and the staged load is not
+finalized. Staging DDL and earlier valid batches may already have run; ordinary
+failure cleanup still applies. This check does not promise validation before
+all target mutations or change client/HTTP bulk, native-wire or B02 behavior.
+
 The v0.46 `typed_raw_streaming_staging` route uses `CustomSeparated` control
 delimiters and does not inject MSSQL-side ClickHouse `REPLACE(...)` escaping.
 It is fail-closed under `delimiter_safety: certified_only` until delimiter

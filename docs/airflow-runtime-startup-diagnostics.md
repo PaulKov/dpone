@@ -74,3 +74,12 @@ it without the injected verified plan fails with exit `2` and
 `DPONE_INIT_FETCH_PLAN_INVALID`; it is not a command to repair a failed Pod.
 Restore the configuration/image and rebuild through the documented deployment
 path. Return to the [provider overview](airflow-pack-provider.md).
+
+## Unknown dbt target outcome
+
+When `dpone dbt execute-pack` reports `COMMIT_UNKNOWN`, the target mutation may
+have committed. The CLI reports an unknown outcome, not a safe rejection before
+execution. Preserve the attempt evidence and retained resources; do not retry
+automatically. Ask the platform owner to reconcile the target against the
+original execution evidence before admitting another attempt. Exit code `1`,
+the `COMMIT_UNKNOWN` code and the existing recovery guidance remain unchanged.

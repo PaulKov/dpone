@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from typing import cast
 
-from dpone.commands.dbt_publish_remediation import runtime_remediation as _runtime_remediation
+from dpone.commands import dbt_publish_remediation
 from dpone.contracts.dbt_publish_models import DbtCompileReport, DbtPublishIssue
 from dpone.ports.dbt_publishing import (
     DbtCliExecutionOutcome,
@@ -301,9 +301,9 @@ def cmd_execute_pack(args: argparse.Namespace, *, ctx: object, logger: logging.L
                 (
                     DbtPublishIssue(
                         code=code,
-                        message="The verified dbt execution pack was rejected safely",
+                        message=dbt_publish_remediation.runtime_message(code),
                         path=args.relative_pack_path,
-                        remediation=_runtime_remediation(code),
+                        remediation=dbt_publish_remediation.runtime_remediation(code),
                     ),
                 ),
                 args.format,

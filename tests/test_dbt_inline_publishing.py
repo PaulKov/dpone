@@ -406,13 +406,15 @@ def test_explicit_strategy_is_blocked_when_profile_does_not_allow_it(
     assert "DPONE_DBT_STRATEGY_UNRESOLVED" in {issue.code for issue in report.blockers}
 
 
-def test_authorized_full_refresh_freezes_platform_byte_budget(
+@pytest.mark.parametrize("mode", ["full_refresh", "auto"])
+def test_unenforceable_full_refresh_budget_blocks_executable_artifacts(
     tmp_path: Path,
+    mode: str,
 ) -> None:
     manifest_payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
     for node in manifest_payload["nodes"].values():
         if node.get("resource_type") == "model":
-            node["config"]["meta"]["dpone"]["publish"]["strategy"] = {"mode": "full_refresh"}
+            node["config"]["meta"]["dpone"]["publish"]["strategy"] = {"mode": mode}
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps(manifest_payload), encoding="utf-8")
     profile_payload = yaml.safe_load(PROFILES.read_text(encoding="utf-8"))
@@ -435,8 +437,31 @@ def test_authorized_full_refresh_freezes_platform_byte_budget(
         profiles_path=profile_path,
     )
 
+    assert not report.passed
+    assert {issue.code for issue in report.blockers} == {"DPONE_DBT_STRATEGY_UNRESOLVED"}
+    assert all("max_source_bytes cannot be enforced" in issue.message for issue in report.blockers)
+    assert all("strategy_policy.full_refresh.max_source_bytes" in issue.message for issue in report.blockers)
+    assert not report.models
+    output = tmp_path / "must-not-exist"
+    with pytest.raises(ValueError, match="Cannot write artifacts for a blocked dbt publish compile"):
+        _preview_artifact_writer().write(report, output, project_root=DEMO)
+    assert not output.exists()
+
+
+def test_unused_full_refresh_grant_preserves_supported_selected_strategies(tmp_path: Path) -> None:
+    profile_payload = yaml.safe_load(PROFILES.read_text(encoding="utf-8"))
+    strategy_policy = _strategy_policy(
+        profile_payload, allowed=["incremental_merge", "partition_replace", "full_refresh"]
+    )
+    strategy_policy["full_refresh"] = {"authorized": True, "max_source_bytes": 1_000_000_000}
+    profile_path = tmp_path / "profiles.yml"
+    profile_path.write_text(yaml.safe_dump(profile_payload, sort_keys=False), encoding="utf-8")
+
+    report = build_dbt_dpone_compiler().build(MANIFEST, profiles_path=profile_path)
+
     assert report.passed
-    assert {model.strategy["max_source_bytes"] for model in report.models} == {1_000_000_000}
+    assert {model.strategy["mode"] for model in report.models} == {"incremental_merge", "partition_replace"}
+    assert all("max_source_bytes" not in model.strategy for model in report.models)
 
 
 def test_compiler_resolves_replicated_clickhouse_design() -> None:
