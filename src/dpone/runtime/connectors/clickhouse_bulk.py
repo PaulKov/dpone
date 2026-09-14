@@ -210,6 +210,10 @@ class ClickHouseClientRunner:
         query = f"INSERT INTO {table} ({column_sql}) FORMAT {self.options.input_format}"
         return self._base_command() + ["--query", query]
 
+    def build_query_command(self, sql: str) -> list[str]:
+        """Build one identified query without executing or changing runner policy."""
+        return self._base_command() + ["--query", sql]
+
     def _base_command(self) -> list[str]:
         command = shlex.split(self.options.client_command)
         command += [

@@ -1768,3 +1768,13 @@ available at runtime. Incidental imported model aliases are not additional suppo
 `typing.get_type_hints` callers must supply the appropriate contract namespace.
 This annotation convention does not remove executed type checks or change
 signed document shapes, fingerprints, SQL or execution authority.
+
+## Explicit validated character-file staging
+
+The [validated ClickHouse file API](validated-clickhouse-file-staging.md) composes
+a source-bound wrapper attempt, shared logical reader, bounded RowBinary preparer,
+immutable attempt journal and controlled client/HTTP query port. Adapters depend
+on the runtime port, while the service owns staging/count/cleanup decisions.
+Source terminal authority and target finalization remain with existing owners.
+See the [data-flow and state diagrams](developer-validated-clickhouse-file-staging.md)
+and [ADR 0064](adr/0064-validated-file-clickhouse-staging.md).

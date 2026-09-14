@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from importlib import import_module
+from time import monotonic
 from typing import TYPE_CHECKING, Any
 
+from dpone.runtime.clickhouse_file_stage_contract import ClickHouseFileStageRunner
+from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.sinks.clickhouse_bulk_mixin import ClickHouseBulkMixin
 from dpone.runtime.sinks.clickhouse_cluster_preflight import ClickHouseClusterPreflightMixin
 from dpone.runtime.sinks.clickhouse_lineage_projection import ClickHouseSinkSideLineageProjector
@@ -19,8 +22,15 @@ from dpone.runtime.sinks.clickhouse_sql_mixin import ClickHouseSqlMixin, ClickHo
 from dpone.runtime.sinks.clickhouse_staged_load import ClickHouseStagedLoadService
 from dpone.runtime.sinks.clickhouse_staging_decoder import ClickHouseStagingDecoder
 from dpone.runtime.sinks.clickhouse_staging_finalizer import ClickHouseStagingFinalizer
+from dpone.runtime.sinks.clickhouse_validated_file_ingestion import ClickHouseValidatedFileService
+from dpone.runtime.sinks.clickhouse_validated_file_models import (
+    ClickHouseValidatedFilePolicy,
+    require_transport_profile,
+)
+from dpone.runtime.sinks.load_payload import LoadPayload
 from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.sink_protocol import AbstractSink
+from dpone.runtime.storage_policy import StoragePreflightService
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
@@ -47,6 +57,8 @@ class ClickHouseSink(
         client_runner_cls: Any | None = None,
         http_runner_cls: Any | None = None,
         physical_type_resolver: ClickHousePhysicalColumnTypeResolver | None = None,
+        validated_file_runner_factory: Callable[[LoadConfig, ClickHouseValidatedFilePolicy], ClickHouseFileStageRunner]
+        | None = None,
     ):
         self.connector = connector
         self.state_storage = state_storage
@@ -55,6 +67,13 @@ class ClickHouseSink(
         self._client_runner_cls = client_runner_cls or _default_clickhouse_client_runner()
         self._http_runner_cls = http_runner_cls or _default_clickhouse_http_runner()
         self._physical_type_resolver = physical_type_resolver or DEFAULT_CLICKHOUSE_PHYSICAL_COLUMN_TYPE_RESOLVER
+        self._validated_file_service = ClickHouseValidatedFileService(
+            runner_factory=validated_file_runner_factory
+            or (lambda config, policy: build_file_runner(config, policy, connector=self.connector, clock=monotonic)),
+            resolver=self._physical_type_resolver,
+            storage=StoragePreflightService(),
+            clock=monotonic,
+        )
         self._staging_decoder = ClickHouseStagingDecoder(
             connector=self.connector,
             table_name=self._table,
@@ -87,6 +106,16 @@ class ClickHouseSink(
 
     def stage_payload(self, load_config: LoadConfig, payload: Any) -> Any:
         return self._staged_load.stage(load_config, payload)
+
+    def stage_validated_file(
+        self, load_config: LoadConfig, payload: LoadPayload, *, policy: ClickHouseValidatedFilePolicy
+    ) -> StagedLoadHandle:
+        """Prepare and stage a receipted character file through an explicit transport.
+
+        This additive API owns its preparation and evidence; it does not invoke
+        automatic schema evolution, generic dispatch or source finalization.
+        """
+        return self._validated_file_service.stage(load_config, payload, policy=policy)
 
     def finalize_staged_load(self, load_config: LoadConfig, handle: Any) -> LoadResult:
         frozen_inputs = getattr(handle, "frozen_inputs", None)
@@ -274,3 +303,45 @@ def _default_etl_logger() -> Any:
 def _default_acceptance_metric_probe(connector: ClickHouseConnectorPort) -> Any:
     module = import_module("dpone.runtime.governance.clickhouse_acceptance_metrics")
     return module.ClickHouseAcceptanceMetricProbe(connector)
+
+
+def build_file_runner(
+    config: LoadConfig, policy: ClickHouseValidatedFilePolicy, *, connector: Any, clock: Callable[[], float]
+) -> ClickHouseFileStageRunner:
+    """Composition helper; explicit mode, no environment fallback or legacy runner."""
+    del policy
+    mode, timeout = require_transport_profile(config.options or {})
+    selected = (config.options or {})["clickhouse_bulk"].get(mode, {})
+
+    def setting(name: str, default: Any) -> Any:
+        return selected[name] if name in selected else default
+
+    common = dict(
+        host=setting("host", connector.host),
+        port=setting("port", connector.port if mode == "client" else 8123),
+        database=setting("database", connector.database),
+        user=setting("user", connector.user),
+        password=setting("password", connector.password),
+        secure=setting("secure", connector.secure if mode == "client" else False),
+    )
+    if mode == "client":
+        from dpone.runtime.connectors.clickhouse_bulk import ClickHouseClientCredentials, ClickHouseClientOptions
+        from dpone.runtime.connectors.clickhouse_file_stage_client import ClickHouseFileClientRunner
+
+        return ClickHouseFileClientRunner(
+            ClickHouseClientCredentials(**common),
+            ClickHouseClientOptions(
+                client_command=setting("command", "clickhouse-client"),
+                input_format="RowBinary",
+                timeout_seconds=timeout,
+            ),
+            clock=clock,
+        )
+    from dpone.runtime.connectors.clickhouse_file_stage_http import ClickHouseFileHttpRunner
+    from dpone.runtime.connectors.clickhouse_http_bulk import ClickHouseHttpCredentials, ClickHouseHttpOptions
+
+    return ClickHouseFileHttpRunner(
+        ClickHouseHttpCredentials(**common),
+        ClickHouseHttpOptions(input_format="RowBinary", timeout_seconds=timeout),
+        clock=clock,
+    )
