@@ -38,6 +38,7 @@ from dpone.commands.plan_native_render import (
     render_snapshot_optimization_md,
     render_snapshot_optimization_text,
 )
+from dpone.contracts.configuration_errors import ETLConfigurationError
 from dpone.readiness.managed import ExecutionPlanService
 
 
@@ -337,12 +338,25 @@ def _render_source_impact_md(items: list[dict]) -> list[str]:
 
 def cmd_plan(args: argparse.Namespace, *, ctx: object, logger: logging.Logger) -> int:
     del ctx, logger
-    payload = ExecutionPlanService().plan_manifest(
-        args.path,
-        selector=args.selector,
-        apply_safe_schema=bool(args.apply_safe_schema),
-        explain_strategy=bool(args.explain_strategy),
-    )
+    try:
+        payload = ExecutionPlanService().plan_manifest(
+            args.path,
+            selector=args.selector,
+            apply_safe_schema=bool(args.apply_safe_schema),
+            explain_strategy=bool(args.explain_strategy),
+        )
+    except ValueError as error:
+        code = str(error)
+        if code not in (
+            "mssql_native.invalid_limit:encoding_parallelism",
+            "mssql_native.invalid_limit:import_parallelism",
+        ):
+            raise
+        field = code.split(":", 1)[1]
+        raise ETLConfigurationError(
+            f"{code}: source.options.native_transfer.execution.native_chunks.{field} "
+            "must be an integer in 1..64; omit the field to use chunking.parallelism."
+        ) from error
     if args.format == "json":
         write_json(payload)
     elif args.format == "md":

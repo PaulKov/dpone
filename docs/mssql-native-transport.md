@@ -4,8 +4,13 @@ This opt-in Python composition API loads one ClickHouse query through bounded
 native BCP files, verifies independent staging tables, and publishes once through
 the existing MSSQL transaction finalizer. It supports `full_refresh` and an
 explicit UTC `partition_replace` window. Existing character-spool routes retain
-their defaults. Live interoperability and performance certification are
-**UNVERIFIED**; hermetic tests do not establish a production speed improvement.
+their defaults. Retained evidence for dpone 0.80.0 at commit
+`6ae541d38ac223327d7edb23510859df91173bda` establishes scoped local Docker
+correctness and controlled recovery: six non-binary profiles, 64 rows per
+fidelity cell, full refresh and explicit UTC partition replacement, with
+encoding/import policies 2/1 and 1/2. Production workload performance,
+independent source DDL and target-writer governance, and hard-failure recovery
+remain **UNVERIFIED**. These results do not certify a new deployment.
 
 ## Prepare and configure
 
@@ -183,9 +188,10 @@ when the importer classifies a failure as `WindowTransientError`. Unclassified
 vendor errors stop the run. Cancellation, exhausted
 retries and lease loss cannot manufacture EOF or a target success receipt.
 
-For a first deployment, run synthetic NULL, duplicate, Unicode, binary, decimal,
+For a first deployment, run admitted synthetic NULL, duplicate, Unicode, Decimal,
 empty-window and outside-window invariance cases in an explicitly approved
-disposable environment. Test interrupted imports and lost commit acknowledgements.
+disposable environment. Record authored binary source mapping as unsupported;
+encoder-only binary fixtures do not enable the canonical route. Test interrupted imports and lost commit acknowledgements.
 Record exact source commit, dependency/server versions and observed resources.
 Follow the [approved design](feature-design-clickhouse-mssql-bounded-native-v1.md)
 and [route certification standard](connector-certification.md) before promoting a

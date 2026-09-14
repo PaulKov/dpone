@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Fixed
+
+- Report invalid native encoding/import limits from `dpone plan` as concise
+  configuration errors with exit code 2 instead of an uncaught traceback.
+  Authored null remains invalid; omitted limits retain their existing defaults.
+
+### Documentation
+
+- Clarify the scoped 0.80.0 local Docker evidence and maintenance factory setup.
+- Record researched DDA resilience, verification, SQL layout, Arrow,
+  changed-window and operational-readiness designs with their remaining gates.
+
 ## 0.80.0 - 2026-09-13
 
 ### Added
