@@ -112,7 +112,7 @@ def test_bulk_options_prefer_nested_bcp_config() -> None:
 
     assert resolved.mode == "bcp"
     assert resolved.bcp.batch_size == 100_000
-    assert resolved.bcp.packet_size == 16_384
+    assert resolved.bcp.packet_size == 16_383
     assert resolved.bcp.table_lock is True
     assert resolved.bcp.timeout_seconds == 3600
     assert resolved.deprecated_aliases == ()
@@ -130,7 +130,7 @@ def test_bulk_options_support_flat_legacy_aliases_with_warnings() -> None:
 
     assert resolved.mode == "bcp"
     assert resolved.bcp.batch_size == 50_000
-    assert resolved.bcp.packet_size == 16_384
+    assert resolved.bcp.packet_size == 16_383
     assert resolved.bcp.table_lock is True
     assert "sink.options.bcp_batch_size" in resolved.deprecated_aliases
     assert any("bulk.bcp.batch_size" in warning for warning in resolved.warnings)
@@ -166,7 +166,7 @@ def test_bulk_options_apply_high_throughput_native_transfer_profile() -> None:
     )
 
     assert resolved.bcp.batch_size == 250_000
-    assert resolved.bcp.packet_size == 16_384
+    assert resolved.bcp.packet_size == 16_383
     assert resolved.bcp.timeout_seconds == 3600
 
 
@@ -186,7 +186,7 @@ def test_bulk_options_profile_never_overrides_explicit_bcp_values() -> None:
     )
 
     assert resolved.bcp.batch_size == 10_000
-    assert resolved.bcp.packet_size == 16_384
+    assert resolved.bcp.packet_size == 16_383
     assert resolved.bcp.timeout_seconds == 120
 
 

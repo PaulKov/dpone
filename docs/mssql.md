@@ -174,7 +174,7 @@ sink:
         field_terminator: "\t"
         row_terminator: "\n"
         batch_size: 100000
-        packet_size: 16384
+        packet_size: 16383
 
 state:
   type: mssql
@@ -580,7 +580,7 @@ For `INCREMENTAL_MERGE`, `merge_policy: delete_insert` is the default because it
 
 For `REPLACE`, dpone keeps the shadow-table finalization path for bounded predicate windows. Existing readers should point at the canonical table name.
 
-For encrypted ODBC Driver 18 connections, keep `bulk.bcp.packet_size: 16384` unless you have tested a larger value against your driver/server combination. Larger packet sizes can fail with SSL packet-size errors on macOS/Linux clients.
+dpone caps the effective BCP packet size at **16383 bytes**, the documented maximum for encrypted SQL Server connections. Requests at or above 16384 resolve to 16383; explicitly smaller sizes remain unchanged. This applies to import and queryout, including the default options. Authored configuration and manifest shapes do not change. The finite BCP connection contract does not enable MARS; a separately managed MARS connection requires 16368 bytes or less. See [Microsoft network packet size limits](https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/configure-the-network-packet-size-server-configuration-option?view=sql-server-ver17).
 
 ## Schema evolution
 
@@ -763,7 +763,7 @@ tune the target side first:
 - `MSSQL character bcp is unsafe`: switch MSSQL-to-MSSQL native transfer to
   `source.options.bulk.bcp.file_format: native`, or explicitly certify and
   allow your raw producer with `allow_unsafe_raw_mssql_bulk_files: true`.
-- `SSL Provider: Packet size too large`: lower `bulk.bcp.packet_size` to `16384`.
+- `SSL Provider: Packet size too large`: use `bulk.bcp.packet_size: 4096` and check the negotiated connection settings. Encrypted packets must not exceed 16383 bytes (16368 with MARS); increasing packet size is not a general performance fix.
 - Decimal truncation: ensure Postgres numeric precision/scale are preserved, for example `numeric(18,2)`.
 - Unicode issues: use ODBC Driver 18 and bcp code page `65001`; for older SQL Server/client combinations, prefer NVARCHAR columns.
 - Local Docker: set `trust_server_certificate: yes` because the container certificate is self-signed.
