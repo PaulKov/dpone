@@ -204,3 +204,13 @@ This flow supports the shared dpone type-governance stack:
 - [Physical design](../physical-design.md) for target-specific DDL such as concrete SQL types, indexes, partitioning, compression, ClickHouse `LowCardinality`, and BigQuery clustering.
 
 Use `dpone schema infer --manifest ...` and `dpone schema physical-plan --manifest ...` before enabling new table DDL in production.
+
+## Explicit staging of an already validated character export
+
+Applications that already own a genuine default BulkTextCodec character export and
+its source contract receipt can opt into the separate Python
+[validated-file staging API](../validated-clickhouse-file-staging.md). It prepares
+RowBinary and validates values before its staging mutations. This does not change
+the manifest above, automatically attach receipts to this route, or certify a new
+Postgres-to-ClickHouse transport. The ordinary route and CLI keep their existing
+behavior. Live readback for the explicit API remains unverified.

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "status": "APPROVED",
+  "approval_source": "Current coordinator task user message",
+  "user_message": "\u043e\u0434\u043e\u0431\u0440\u044f\u044e",
+  "recorded_at_utc": "2026-09-14T12:29:16.605752+00:00",
+  "task_id": "01a09be4-2116-77a0-be66-3b1e7e65b2a4",
+  "approved_original_sha256": {
+    "b02-codec-design-draft.md": "47a926b8925c973587a0501b1d000ffc36f4bd1078b0b9621d1e750d47d860d4",
+    "b02-contract-appendix.md": "cfa3434f51049338f3fa96314296eb4f5ed2c91931fcca9b98ea5ac93acd1433",
+    "b02-codec-design-review.md": "c113c78e85d51bb542fea4e224d81c6d185d27e1076cb0fbae53974bb1c1b348"
+  },
+  "implementation_worktree": "/Users/paulkov007/.codex/worktrees/b02v1/dpone-public",
+  "base_commit": "a72e95710352ac96188c45c7fdb067526b86b9f0",
+  "branch": "codex/b02-validated-file-staging",
+  "scope": "Specification and appendix, including proposed ADR and single-integrator path contract",
+  "single_integrator_writer_task": "01a09be4-b055-7730-889a-87c84fa8509d",
+  "role_assignment": "Stage02 acts as the sole programme-coordinator integrator-writer in the implementation worktree; root coordinates read-only acceptance and ownership.",
+  "live_authorized": false,
+  "release_authorized": false,
+  "lifecycle_note": "Approval supersedes historical pre-approval prose in the immutable original package. Only the specification status marker is changed in the working copy.",
+  "approved_working_spec_sha256": "37dfbaf0fb0f8e613fb06b0f53b36a06d54c6dd66b4588a6cba605632461e3bd",
+  "activated_contract_sha256": "03f9a2fb6efdb9c2105569f94c11206b562e0c7c5359c6a64b80a63a91fab789",
+  "contract_materialization": "Same effective owned paths. CHANGELOG/mkdocs represented as integrator-owned exceptions to standard forbidden paths; added exact canonical stop-condition strings required by the existing validator. Original reviewed appendix remains unchanged. Closed schema permits only four required_outputs; mandatory independent review receipt is explicitly included in completion-report acceptance instead. No review requirement removed.",
+  "reconciled_base_commit": "0147dd18ceef025c55cb5f05ee3d43b076a25612",
+  "base_reconciliation": {
+    "prior_base": "a72e95710352ac96188c45c7fdb067526b86b9f0",
+    "merged_base": "0147dd18ceef025c55cb5f05ee3d43b076a25612",
+    "identical_tree": "d0e01c4517ee24dc8acd3cfd6dc596d35b8083af",
+    "method": "Coordinator-authorized soft reset before any own commits; WIP/index preserved",
+    "authorization": "Coordinator message 2026-09-14 after PR55 authorized merge"
+  },
+  "verification_budget_amendment": {
+    "path": "test_artifacts/dbt-programme/stage-02/verification-budget-amendment.md",
+    "sha256": "bbb6e4f7863f32e167cea80dbd2cc0ffef251f4e70d7f565b069ec135316611f",
+    "authority": "Coordinator instruction following independent b02_deadline_contract architecture review",
+    "additional_owned_paths": [
+      "src/dpone/runtime/file_artifact_authority.py",
+      "src/dpone/runtime/file_artifacts.py",
+      "src/dpone/runtime/artifact_integrity.py",
+      "src/dpone/runtime/pinned_file_consumer.py",
+      "src/dpone/runtime/pinned_file_integrity.py",
+      "tests/test_file_verification_budget.py",
+      "tests/test_mssql_artifact_integrity.py"
+    ],
+    "public_stage_policy_change": false
+  }
+}

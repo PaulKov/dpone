@@ -204,6 +204,7 @@ nav:
       - Physical design: physical-design.md
       - Runtime data contracts: data-contract-runtime.md
       - Streaming-safe contracts: runtime-fast-path-contracts.md
+      - Validated ClickHouse file staging: validated-clickhouse-file-staging.md
       - Physical DDL apply: physical-ddl-apply.md
       - Schema migration control: schema-migration-control.md
       - Production profiles: production-profiles.md
@@ -530,6 +531,7 @@ nav:
       - Developer object storage: developer-object-storage.md
       - Developer supply-chain: developer-supply-chain.md
       - Developer connector SDK: developer-connector-sdk.md
+      - Validated file staging contracts: developer-validated-clickhouse-file-staging.md
       - Developer strategy intelligence: developer-strategy-intelligence.md
       - Developer manifest sparse paths: developer-manifest-sparse-paths.md
       - Developer GitOps control plane: developer-gitops-control-plane.md
@@ -638,6 +640,7 @@ nav:
       - ADR 0060: adr/0060-nonproduction-composition-authority.md
       - ADR 0061: adr/0061-shared-composition-physical-ownership.md
       - ADR 0062: adr/0062-isolated-mssql-switch-activation.md
+      - ADR 0064: adr/0064-validated-file-clickhouse-staging.md
 
 extra:
   generator: false

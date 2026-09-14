@@ -7,7 +7,9 @@ import json
 import os
 import stat
 from dataclasses import dataclass, replace
-from typing import Any, NoReturn
+from typing import Any
+
+from dpone.runtime.file_artifact_authority import FileVerificationBudget
 
 
 class ArtifactIntegrityError(RuntimeError):
@@ -269,13 +271,17 @@ class FileArtifactReceipt:
             raise ArtifactIntegrityError("artifact_integrity.rows_exported_immutable")
         return replace(self, rows_exported=rows)
 
-    def verify(self, path: str, *, wire_contract: FileWireContract) -> None:
+    def verify(
+        self, path: str, *, wire_contract: FileWireContract, verification_budget: FileVerificationBudget | None = None
+    ) -> None:
         """Reject byte tampering or a changed interpretation of the bytes."""
 
+        if verification_budget is not None:
+            verification_budget.check()
         if wire_contract.sha256 != self.wire_contract_sha256:
             raise ArtifactIntegrityError("artifact_integrity.wire_contract_mismatch")
         self.owned_scope.verify(path)
-        identity, digest = _file_identity(path)
+        identity, digest = _file_identity(path, verification_budget=verification_budget)
         if not identity.same_object(self.identity):
             raise ArtifactIntegrityError("artifact_integrity.file_identity_mismatch")
         if identity.size != self.size_bytes:
@@ -285,14 +291,20 @@ class FileArtifactReceipt:
         if identity != self.identity:
             raise ArtifactIntegrityError("artifact_integrity.file_identity_mismatch")
 
-    def verify_descriptor(self, descriptor: int, *, wire_contract: FileWireContract) -> None:
+    def verify_descriptor(
+        self,
+        descriptor: int,
+        *,
+        wire_contract: FileWireContract,
+        verification_budget: FileVerificationBudget | None = None,
+    ) -> None:
         """Rehash the same held descriptor without trusting a mutable basename."""
 
         if wire_contract.sha256 != self.wire_contract_sha256:
             raise ArtifactIntegrityError("artifact_integrity.wire_contract_mismatch")
         from dpone.runtime.pinned_file_integrity import descriptor_file_identity
 
-        identity, digest = descriptor_file_identity(descriptor)
+        identity, digest = descriptor_file_identity(descriptor, verification_budget=verification_budget)
         if not identity.same_object(self.identity):
             raise ArtifactIntegrityError("artifact_integrity.file_identity_mismatch")
         if identity.size != self.size_bytes:
@@ -308,78 +320,11 @@ class FileArtifactReceipt:
         return self.rows_exported
 
 
-def _file_identity(path: str) -> tuple[FileIdentity, str]:
-    """Hash one no-follow descriptor and prove its path remained attached."""
+def _file_identity(path: str, *, verification_budget: FileVerificationBudget | None = None) -> tuple[FileIdentity, str]:
+    """Delegate byte acquisition while retaining receipt policy here."""
+    from dpone.runtime.pinned_file_integrity import path_file_identity
 
-    try:
-        path_before = os.lstat(path)
-    except OSError as exc:
-        raise ArtifactIntegrityError("artifact_integrity.file_unavailable") from exc
-    if not stat.S_ISREG(path_before.st_mode):
-        raise ArtifactIntegrityError("artifact_integrity.regular_file_required")
-    path_identity = FileIdentity.from_stat(path_before)
-
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-    flags |= getattr(os, "O_BINARY", 0)
-    try:
-        descriptor = os.open(path, flags)
-    except OSError as exc:
-        _raise_open_failure(path, expected=path_identity, error=exc)
-
-    digest = hashlib.sha256()
-    try:
-        descriptor_before = os.fstat(descriptor)
-        if not stat.S_ISREG(descriptor_before.st_mode):
-            raise ArtifactIntegrityError("artifact_integrity.file_replaced_during_hash")
-        before = FileIdentity.from_stat(descriptor_before)
-        if not before.same_object(path_identity):
-            raise ArtifactIntegrityError("artifact_integrity.file_replaced_during_hash")
-        with os.fdopen(descriptor, "rb", closefd=True) as handle:
-            descriptor = -1
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(chunk)
-            descriptor_after = os.fstat(handle.fileno())
-    except OSError as exc:
-        raise ArtifactIntegrityError("artifact_integrity.file_unavailable") from exc
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-
-    if not stat.S_ISREG(descriptor_after.st_mode):
-        raise ArtifactIntegrityError("artifact_integrity.file_replaced_during_hash")
-    after = FileIdentity.from_stat(descriptor_after)
-    if not after.same_object(before):
-        raise ArtifactIntegrityError("artifact_integrity.file_replaced_during_hash")
-    if after != before:
-        raise ArtifactIntegrityError("artifact_integrity.file_changed_during_hash")
-
-    try:
-        path_after = os.lstat(path)
-    except OSError as exc:
-        raise ArtifactIntegrityError("artifact_integrity.file_replaced_during_hash") from exc
-    if not stat.S_ISREG(path_after.st_mode):
-        raise ArtifactIntegrityError("artifact_integrity.file_replaced_during_hash")
-    final = FileIdentity.from_stat(path_after)
-    if not final.same_object(after):
-        raise ArtifactIntegrityError("artifact_integrity.file_replaced_during_hash")
-    if final != after:
-        raise ArtifactIntegrityError("artifact_integrity.file_changed_during_hash")
-    return final, digest.hexdigest()
-
-
-def _raise_open_failure(path: str, *, expected: FileIdentity, error: OSError) -> NoReturn:
-    """Classify a no-follow open failure without losing replacement evidence."""
-
-    try:
-        current_stat = os.lstat(path)
-    except OSError as exc:
-        raise ArtifactIntegrityError("artifact_integrity.file_unavailable") from exc
-    if not stat.S_ISREG(current_stat.st_mode):
-        raise ArtifactIntegrityError("artifact_integrity.file_replaced_during_hash") from error
-    current = FileIdentity.from_stat(current_stat)
-    if not current.same_object(expected):
-        raise ArtifactIntegrityError("artifact_integrity.file_replaced_during_hash") from error
-    raise ArtifactIntegrityError("artifact_integrity.file_unavailable") from error
+    return path_file_identity(path, verification_budget=verification_budget)
 
 
 def _canonical_parent(path: str) -> str:

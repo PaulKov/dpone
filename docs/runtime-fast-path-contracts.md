@@ -82,3 +82,13 @@ Related docs:
 - [Runtime data contracts](data-contract-runtime.md)
 - [Physical DDL apply](physical-ddl-apply.md)
 - [Performance](performance.md)
+
+## Explicit validated ClickHouse file staging
+
+`ClickHouseSink.stage_validated_file` accepts a genuine validated default-codec
+character export and prepares a separate bounded RowBinary spool. It is an explicit
+Python capability; generic `stage_payload` and ordinary routes do not activate it.
+Source receipts retain their authority, while exact transport/count checks and
+immutable journal events govern only the new staging attempt. See the
+[API guide and recovery procedure](validated-clickhouse-file-staging.md) and
+[developer contract](developer-validated-clickhouse-file-staging.md).

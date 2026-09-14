@@ -23,7 +23,12 @@ from dpone.runtime.artifact_integrity import (
 )
 from dpone.runtime.artifact_models import BaseExtractionArtifact
 from dpone.runtime.extraction_lifecycle import ArtifactTerminalOutcome
-from dpone.runtime.file_artifact_authority import FileIntegrityAuthority, FileReleaseAuthority
+from dpone.runtime.file_artifact_authority import (
+    FileIntegrityAuthority,
+    FileReleaseAuthority,
+    FileVerificationBudget,
+    verify_file_receipt_authority,
+)
 from dpone.runtime.native_transfer_row_authority import require_target_row_count
 from dpone.runtime.staging import owned_staging_handle
 
@@ -187,18 +192,20 @@ class FileExportArtifact(BaseExtractionArtifact):
             bulk_text_codec=self.bulk_text_codec,
         )
 
-    def require_integrity_receipt(self) -> FileArtifactReceipt:
+    def require_integrity_receipt(
+        self, *, verification_budget: FileVerificationBudget | None = None
+    ) -> FileArtifactReceipt:
         """Return a complete receipt and revalidate immutable source bytes."""
 
         if self.integrity_receipt is None:
             raise ArtifactIntegrityError("artifact_integrity.receipt_missing")
-        if self._integrity_authority is None:
-            self.integrity_receipt.verify(self.file_path, wire_contract=self.wire_contract())
-        else:
-            self._integrity_authority.verify_integrity_receipt(
-                self.integrity_receipt,
-                self.wire_contract(),
-            )
+        verify_file_receipt_authority(
+            self._integrity_authority,
+            self.integrity_receipt,
+            self.file_path,
+            self.wire_contract(),
+            verification_budget=verification_budget,
+        )
         self.integrity_receipt.require_rows_exported()
         return self.integrity_receipt
 

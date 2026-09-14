@@ -171,3 +171,13 @@ production route must run in `certified_only` mode.
 | Sink writes directly to final target | Add a staging table/file step and finalizer; connector sinks must be staging-first. |
 | Certification artifact is incomplete | Run `dpone connectors certify --artifact-dir ...` and include the generated report in CI artifacts. |
 | Stream certification is blocked | Add the matching `--native-capability` to the scaffold or update `certification/certification.yaml`, then rerun `dpone connectors certify --profile static --capability native_transfer.stream`. |
+
+## Controlled validated-file staging adapters
+
+ClickHouse exposes an optional constructor-injected `validated_file_runner_factory`
+for its explicit Python staging API. Adapters implement the narrow runtime
+`ClickHouseFileStageRunner` port: bounded identified queries, exact emitted-byte
+observations, endpoint binding and separate local/remote termination evidence.
+They never issue source receipts or target-finalization authority. See
+[developer contracts](developer-validated-clickhouse-file-staging.md) and the
+[finite supported profile](validated-clickhouse-file-staging.md).

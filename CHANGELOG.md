@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Add explicit Python staging of validated character files into ClickHouse through
+  controlled client/HTTP RowBinary, with exact value preparation, finite budgets,
+  original receipt checks and immutable attempt evidence. Unknown execution
+  retains owned resources for manual recovery. Generic routes and finalizers
+  keep their existing behavior; live certification remains unverified.
+
 ### Fixed
 
 - Resolve generated dbt MSSQL interval start filters without literal braces and
