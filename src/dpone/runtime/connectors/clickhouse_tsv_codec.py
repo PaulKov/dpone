@@ -49,6 +49,7 @@ class ClickHouseTabSeparatedCodec:
             )
         else:
             expression = f"CONVERT(VARCHAR(MAX), {value_sql})"
+        text_value = expression
         expression = (
             f"REPLACE({expression}, "
             f"{self._mssql_literal(self.marker_prefix)}, "
@@ -65,7 +66,8 @@ class ClickHouseTabSeparatedCodec:
             return f"CASE WHEN {value_sql} IS NULL THEN N'\\N' ELSE {expression} END"
         return (
             f"CASE WHEN {value_sql} IS NULL THEN N'\\N' "
-            f"WHEN {value_sql} = N'' THEN {self._mssql_literal(self.empty_string_marker)} "
+            # Measure serialized text before escaping; padded equality loses spaces.
+            f"WHEN DATALENGTH({text_value}) = 0 THEN {self._mssql_literal(self.empty_string_marker)} "
             f"ELSE {expression} END"
         )
 
