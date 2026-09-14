@@ -234,39 +234,71 @@ class MssqlGenericTransactionFinalizer:
             self._connector.commit_transaction()
             transaction_started = False
             return result
-        except Exception as exc:
+        except BaseException as exc:
             if commit_attempted:
                 transaction_started = False
-                self._close_target()
-                probed = self._state.probe_receipt_fresh(operation)
-                if probed is not None and _receipt_matches(
-                    probed,
-                    payload_evidence=payload_evidence,
-                    source_lifecycle=source_lifecycle,
-                    mutation_plan=mutation_plan,
-                ):
-                    return _with_target_fence_evidence(
-                        load_result_from_mssql_receipt(
-                            probed,
-                            outcome=AtomicCommitOutcome.COMMITTED_AFTER_RECEIPT_PROBE,
-                        ),
-                        fence_evidence,
-                    )
-                if probed is not None:
-                    raise MssqlGenericCommitOutcomeUnknown() from RuntimeError(
-                        "mssql_transaction.commit_receipt_payload_mismatch"
-                    )
-                raise MssqlGenericCommitOutcomeUnknown() from exc
-            if transaction_started:
+                if not isinstance(exc, Exception):
+                    # Preserve cancellation identity, cause and SystemExit.code.
+                    # A receipt must never turn an interrupted run into success.
+                    setattr(exc, "cleanup_disposition", MssqlCleanupDisposition.PRESERVE_STAGING_EVIDENCE)
+                    close_failure: BaseException | None
+                    try:
+                        close_failure = self._close_target()
+                    except BaseException as close_error:
+                        close_failure = close_error
+                    if close_failure is not None:
+                        exc.add_note(f"mssql_transaction.interrupted_close_failed: {type(close_failure).__name__}")
+                    raise
+                try:
+                    close_failure = self._close_target()
+                    if close_failure is not None:
+                        raise close_failure
+                    probed = self._state.probe_receipt_fresh(operation)
+                    if probed is not None and _receipt_matches(
+                        probed,
+                        payload_evidence=payload_evidence,
+                        source_lifecycle=source_lifecycle,
+                        mutation_plan=mutation_plan,
+                    ):
+                        return _with_target_fence_evidence(
+                            load_result_from_mssql_receipt(
+                                probed,
+                                outcome=AtomicCommitOutcome.COMMITTED_AFTER_RECEIPT_PROBE,
+                            ),
+                            fence_evidence,
+                        )
+                    if probed is not None:
+                        raise MssqlGenericCommitOutcomeUnknown() from RuntimeError(
+                            "mssql_transaction.commit_receipt_payload_mismatch"
+                        )
+                    raise MssqlGenericCommitOutcomeUnknown() from exc
+                except BaseException as recovery_error:
+                    if not isinstance(recovery_error, Exception):
+                        setattr(
+                            recovery_error, "cleanup_disposition", MssqlCleanupDisposition.PRESERVE_STAGING_EVIDENCE
+                        )
+                        raise
+                    if isinstance(recovery_error, MssqlGenericCommitOutcomeUnknown):
+                        raise
+                    raise MssqlGenericCommitOutcomeUnknown() from recovery_error
+            if transaction_started and isinstance(exc, Exception):
                 with suppress(Exception):
                     self._connector.rollback()
             raise
 
-    def _close_target(self) -> None:
-        closer = getattr(self._connector, "close", None)
-        if callable(closer):
-            with suppress(Exception):
+    def _close_target(self) -> Exception | None:
+        """Return ordinary close failure; cancellation keeps its own category.
+
+        Read-only replay may ignore a failed close, but uncertain publication
+        must not recover success unless close and fresh receipt proof complete.
+        """
+        try:
+            closer = getattr(self._connector, "close", None)
+            if callable(closer):
                 closer()
+        except Exception as error:
+            return error
+        return None
 
     def _validate_target_contract(
         self,

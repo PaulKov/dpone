@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import yaml
 
 from dpone.adapters.dbt_workflow_selection import ManifestPreviewSelectionResolver
 from dpone.app.dbt_promotion_composition import RuntimeDbtProjectBundleOperations
@@ -16,32 +17,41 @@ from dpone.services.dbt_project_artifacts import DbtProjectArtifactProjector
 from tests.test_dbt_publish_atomicity import DEMO, _compile, _writer
 
 
-def test_singleton_policy_migration_preserves_all_unaffected_bytes(tmp_path: Path, monkeypatch) -> None:
-    """Keep the historical projector baseline and pin the explicit policy migration.
+def test_singleton_policy_migration_preserves_all_unaffected_bytes(tmp_path: Path) -> None:
+    """Pin policy and interval migrations while retaining every unaffected byte.
 
     The a6669cd parent had the old Python-dispatch authority. Its historical
-    57-file baseline remains unchanged: 53 files still match exactly, while
-    selection policy/graph and their pack/release identities must change. These
-    four fixed hashes were observed through the canonical singleton writer and
-    reviewed for the new 433e19b5 policy, not computed as test expectations.
+    57-file baseline remains unchanged: 50 files still match exactly. The policy
+    migration changes the selection lock and transformation packs; the interval
+    repair changes the transfer manifest and packs. Both affect release identity.
+    The real writer also emits three newer canonical schemas. Fixed hashes come
+    from reviewed producer output, never from the output under assertion. See
+    test_artifacts/dbt-programme/stage-01/artifact-migration.json for the four-file
+    interval-only difference against 46830976 and its unchanged 56-file inventory.
     """
 
     from dpone_airflow_pack.pack_identity import verify_pack_fingerprint
 
     from dpone.contracts.airflow_deployment import release_id
+    from dpone.contracts.dbt_release_workload_binding import runtime_payload_member
     from dpone.contracts.dbt_selection_lock import DbtSelectionLock
     from dpone.contracts.dbt_sqlserver_graph_policy import DBT_SQLSERVER_GRAPH_POLICY_SHA256
-    from dpone.services.dbt_release_assets import canonical_schema_files
 
     migrated = {
         "runtime/dbt/competitive_pricing.selection-lock.json": "d3ae154e3d0ff96af894ec051a532cdb2ee481ead233f7c48b3305f12ec655da",
         "packs/dbt__competitive_pricing.airflow-pack.json": "1d90bac3bdf0b9b9f782b8403e9415bba299f4e1c646bc4bcf40c5b717454903",
         "dbt__competitive_pricing/airflow-pack.json": "1d90bac3bdf0b9b9f782b8403e9415bba299f4e1c646bc4bcf40c5b717454903",
-        "release-set.json": "5d3827fceeaf58bca08280f5c304af919b0a98078d77220ada48b21f903fa269",
+        "_dbt/manifests/dbt_competitive_pricing.yaml": "cc74f3df6fdb2963d6d1a9af854f1012cee984e4fbb6b4d572c858986a022e28",
+        "packs/dbt_competitive_pricing.airflow-pack.json": "6cd7b95e3536531f8406be45db028302b28c922d979edb3ca20d94f748c1c308",
+        "dbt_competitive_pricing/airflow-pack.json": "6cd7b95e3536531f8406be45db028302b28c922d979edb3ca20d94f748c1c308",
+        "release-set.json": "137aeb1fecebcc3a783c1ad2e74fe94b3c13c00d4e31769c0801df3225ee3db6",
+    }
+    additional_schemas = {
+        "schemas/dbt/dpone.dbt-workspace-compile.v1.schema.json": "009b363d765dbaa20ea5477c7fa1cd498b4f6d8d438f140dc6c240ca110a0640",
+        "schemas/dbt/dpone.dbt-execution-pack.v2.schema.json": "51e051882727714a4b5f40b35e6229670d5b2b815828d49ec2e4fe5bf6ab58b1",
+        "schemas/dbt/dpone.dbt-source-snapshot.v2.schema.json": "bd95a63cfbc502db881b398e652c0578f5e53253dcc91bc21683f5b1ca8f4a30",
     }
     baseline = json.loads((Path(__file__).parent / "fixtures/dbt-singleton-pre-projector-sha256.json").read_bytes())
-    schemas = {path: body for path, body in canonical_schema_files().items() if path in baseline}
-    monkeypatch.setattr("dpone.services.dbt_publish_artifact_writer.canonical_schema_files", lambda: schemas)
     output = tmp_path / "singleton"
     assert _writer(producer_version="0.74.28").write(_compile(), output, project_root=DEMO).passed
     observed = {
@@ -49,13 +59,40 @@ def test_singleton_policy_migration_preserves_all_unaffected_bytes(tmp_path: Pat
         for path in output.rglob("*")
         if path.is_file()
     }
-    assert len(baseline) == 57 and set(observed) == set(baseline)
-    assert len(migrated) == 4
+    assert len(baseline) == 57 and set(observed) == baseline.keys() | additional_schemas.keys()
+    assert len(additional_schemas) == 3 and baseline.keys().isdisjoint(additional_schemas)
+    assert len(migrated) == 7
     assert {path for path in baseline if observed[path] != baseline[path]} == set(migrated)
-    assert observed == baseline | migrated
+    assert observed == baseline | migrated | additional_schemas
     canonical_pack = (output / "packs/dbt__competitive_pricing.airflow-pack.json").read_bytes()
     assert canonical_pack == (output / "dbt__competitive_pricing/airflow-pack.json").read_bytes()
     assert verify_pack_fingerprint(canonical_pack)
+    manifest_path = "_dbt/manifests/dbt_competitive_pricing.yaml"
+    manifest_bytes = (output / manifest_path).read_bytes()
+    manifest = yaml.safe_load(manifest_bytes)
+    assert manifest["source"]["options"]["source_custom_predicate"] == (
+        "[date_id] >= DATEADD(day, -44, CONVERT(datetime2, '{{ data_interval_start }}', 127)) "
+        "AND [date_id] < CONVERT(datetime2, '{{ data_interval_end }}', 127)"
+    )
+    transfer_packs = [
+        (output / "packs/dbt_competitive_pricing.airflow-pack.json").read_bytes(),
+        (output / "dbt_competitive_pricing/airflow-pack.json").read_bytes(),
+    ]
+    assert transfer_packs[0] == transfer_packs[1]
+    for body in transfer_packs:
+        assert verify_pack_fingerprint(body)
+        pack = json.loads(body)
+        assert pack["runtime_manifest"]["sha256"] == "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
+        assert (
+            runtime_payload_member(
+                pack,
+                expected_path=manifest_path,
+                max_archive_bytes=4096,
+                max_member_bytes=len(manifest_bytes),
+                label="transfer manifest",
+            )
+            == manifest_bytes
+        )
     lock = DbtSelectionLock.from_mapping(
         json.loads((output / "runtime/dbt/competitive_pricing.selection-lock.json").read_bytes())
     )

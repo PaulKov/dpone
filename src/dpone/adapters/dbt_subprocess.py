@@ -15,6 +15,7 @@ from threading import Event, Thread
 from typing import Any, BinaryIO
 
 from dpone.adapters.dbt_executable import current_environment_dbt_executable
+from dpone.adapters.dbt_output_redaction import _sanitize
 from dpone.adapters.dbt_process_supervisor import (
     DbtProcessSupervisor,
     ManagedProcess,
@@ -326,23 +327,6 @@ def _redactions(values: tuple[str, ...]) -> tuple[str, ...]:
     if any(not isinstance(item, str) or not item or len(item.encode("utf-8")) > 4096 for item in values):
         raise _execution_error("dbt output redaction values are invalid")
     return tuple(sorted(set(values), key=len, reverse=True))
-
-
-def _sanitize(
-    value: bytes,
-    *,
-    total_bytes: int,
-    limit_bytes: int,
-    secrets: tuple[str, ...],
-) -> tuple[str, bool]:
-    text = value.decode("utf-8", errors="replace")
-    for secret in secrets:
-        text = text.replace(secret, "[REDACTED]")
-    encoded = text.encode("utf-8")
-    truncated = total_bytes > limit_bytes or len(encoded) > limit_bytes
-    if len(encoded) > limit_bytes:
-        text = encoded[:limit_bytes].decode("utf-8", errors="ignore")
-    return text, truncated
 
 
 def _environment(cwd: Path) -> dict[str, str]:

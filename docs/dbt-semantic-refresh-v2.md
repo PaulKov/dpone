@@ -106,8 +106,8 @@ flowchart LR
     H --> W["Durable workflow summary"]
 ```
 
-The platform proves the complete selected mutation closure. dbt Core 1.10.13,
-dbt-sqlserver 1.10.1, the runtime image, driver, packages, macro dispatch,
+The platform proves the complete selected mutation closure. dbt Core 1.12.3,
+dbt-sqlserver 1.11.1, the runtime image, driver, packages, macro dispatch,
 adapter lifecycle, engine compatibility, and invocation are one frozen tuple.
 Any drift requires a new release and certification.
 

@@ -1,0 +1,16 @@
+{
+  "python": "3.12.11",
+  "platform": "Darwin arm64",
+  "source_commit": "6ba5b6bc3ad96dd9451e07911bbdc640da931aec",
+  "uv_lock_sha256": "5fea3ae35ae5efe45ba45ff5a9bc116bad75d68eb163a1040a345385505c6cc6",
+  "packages": {
+    "dpone": "0.79.2",
+    "pytest": "9.0.3",
+    "dbt-core": "1.12.3",
+    "dbt-sqlserver": "1.11.1",
+    "pyarrow": "23.0.1",
+    "psycopg": "3.3.4",
+    "google-cloud-bigquery": "3.42.2",
+    "dpone-native-accel": "0.79.2"
+  }
+}

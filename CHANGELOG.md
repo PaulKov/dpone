@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Fixed
+
+- Resolve generated dbt MSSQL interval start filters without literal braces and
+  align current setup and recovery guidance with the existing toolchain.
+- Hide overlapping dbt secrets and secret fragments at captured-output retention
+  boundaries while preserving UTF-8 byte limits and subprocess exit behavior.
+- Prevent automatic ClickHouse EXCHANGE metadata-error replay after a possible
+  commit. Block topology preflight when target absence cannot be observed, and
+  preserve authentication and permission failures.
+- Preserve the default seven-digit MSSQL nullable time precision in Python
+  binary encoders, including the final 100ns digit.
+- Retain staging and source evidence when MSSQL commit or receipt recovery is
+  interrupted. Preserve cancellation and known commit outcomes, and prevent
+  uncommitted cancellation from being recorded as a successful ETL run.
+
 ## 0.80.0 - 2026-09-13
 
 ### Added

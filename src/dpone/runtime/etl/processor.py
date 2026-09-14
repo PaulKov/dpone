@@ -138,6 +138,7 @@ class ETLProcessor(ProcessorPayloadMixin):
         transaction_lease: Any | None = None
         owned_payload_scope: Any | None = None
         replay_result: Any | None = None
+        interrupted = False
 
         try:
             load_record = self.load_identity_service.start(runtime_config, process_name=dag_id)
@@ -265,6 +266,7 @@ class ETLProcessor(ProcessorPayloadMixin):
                     process_name=dag_id,
                 )
         except BaseException as exc:
+            interrupted = not isinstance(exc, Exception)
             committed = runtime.committed_result(owned_payload_scope, replay_result)
             if owned_payload_scope is not None:
                 # The main decision context has unwound on failure. Keep the
@@ -277,8 +279,6 @@ class ETLProcessor(ProcessorPayloadMixin):
                     )
                 result["artifact_terminal"] = terminal_receipt.to_dict()
                 runtime.warn_terminal_cleanup_failure(self.logger, terminal_receipt)
-            if not isinstance(exc, Exception):
-                raise
             runtime.enrich_post_commit_quality_failure_result(result, exc)
             if self.route_capability_orchestrator is not None:
                 with suppress(Exception):
@@ -300,6 +300,10 @@ class ETLProcessor(ProcessorPayloadMixin):
                         runtime.warn_persistence_failure(self.logger, "load_audit_post_commit")
                 with suppress(Exception):
                     self.logger.warning(f"event=dpone.committed_secondary_failed error={safe_error}")
+                if interrupted:
+                    # Preserve cancellation without denying an authoritative
+                    # target commit or turning cancellation into a return.
+                    raise
                 return result
             result["errors"].append(safe_error)
             result["status"] = "error"
@@ -323,15 +327,16 @@ class ETLProcessor(ProcessorPayloadMixin):
             if transaction_lease is not None:
                 with suppress(Exception):
                     transaction_lease.stop()
-            finalization_guard = suppress(Exception) if result["status"] == "error" else nullcontext()
+            finalization_guard = suppress(Exception) if result["status"] == "error" or interrupted else nullcontext()
             with finalization_guard:
                 self._runtime.abort_prepared_source_boundary(runtime_config)
                 result["duration_seconds"] = time.time() - start_time
                 runtime.enrich_throughput(result)
                 result["runtime_decisions"] = decision_lifecycle.summary_json()
                 self.logger.log_etl_end(result)
-            if result["status"] != "error":
-                if not tracker.mark_success_preserving_commit(result):
-                    runtime.warn_persistence_failure(self.logger, "run_state_post_commit")
+            if result["status"] == "success":
+                with finalization_guard:
+                    if not tracker.mark_success_preserving_commit(result):
+                        runtime.warn_persistence_failure(self.logger, "run_state_post_commit")
 
         return result
