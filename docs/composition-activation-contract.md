@@ -201,9 +201,25 @@ the `store` profile supplies no such evidence.
 | Workload | Required route | Base contract | Actual parent execution |
 |---|---|---|---|
 | Native dbt | Verified SQL Server execution-pack.v2 | Full native workflow/model/helper ownership | UNVERIFIED; protected SQL login gate and worker integration pending |
-| Native-generated transfer | MSSQL to ClickHouse full_refresh | Separate producer-aware classifier; positive cumulative max_source_bytes required | UNVERIFIED; protected CH gate, Atomic publication and canonical route evidence pending |
+| Native-generated transfer | MSSQL to ClickHouse full_refresh | Separate producer-aware classifier; positive cumulative max_source_bytes required | BLOCKED for newly compiled releases by budget admission; downstream execution remains UNVERIFIED, including protected CH gate, Atomic publication and canonical route evidence |
 | Ordinary transfer | PostgreSQL to MSSQL full_refresh | Explicit external target_atomic state; table extraction only | UNVERIFIED; parent fence inside the actual target transaction pending |
 | Other cells, including ordinary MSSQL to ClickHouse | Not in this initial matrix | Rejected | Unsupported |
+
+The native-generated transfer row describes the classifier's required shape,
+not a currently producible, admitted release. The compiler now rejects
+`max_source_bytes` because the runtime cannot enforce it. Consequently, no newly
+compiled native transfer currently satisfies this mixed-composition activation
+cell: supported merge/partition inputs can reach composition and verified cache
+installation, but the activation classifier rejects their strategies. This is
+an unresolved user capability gap requiring an approved budget/capability contract.
+Removing the limit, rewriting generated manifests, or advertising backend cells
+does not close it. See the [budget rejection runbook](runtime-fast-path-contracts.md#source-byte-budgets-rejected-before-transfer).
+
+Offline producer/cache tests establish artifact integrity and installation;
+negative admission tests establish refusal before physical observation and
+protected preparation. Neither establishes successful real-producer mixed
+activation. Lower-level activation state-machine tests retain their narrower
+scope.
 
 The required downstream spans SQL Server and ClickHouse. A SQL Server-only
 coordinator or synthetic pass does not satisfy this matrix. The same named

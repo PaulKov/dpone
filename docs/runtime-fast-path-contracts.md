@@ -92,6 +92,14 @@ deployment. Rejecting transfer configuration does not guarantee that an upstream
 dbt build from an already deployed release has not run. The fix does not rewrite
 signed artifacts or change state, cleanup or recovery authority.
 
+This leaves a capability gap in mixed native/ordinary composition activation:
+its current native-transfer classifier requires bounded full refresh, while the
+compiler rejects that unenforced budget. Supported native merge/partition inputs
+can still be compiled, composed and installed in a verified cache, but those
+strategies do not satisfy this activation classifier. Cache installation is not
+activation approval. Do not remove the budget or edit generated artifacts to
+bridge the gap; see the [activation matrix](composition-activation-contract.md#required-downstream-matrix).
+
 Developers: `dpone.contracts.source_byte_budget_admission` supplies one pure
 decision to the public builder and dbt planner; each uses its existing error
 contract. The public regressions in `tests/test_full_refresh_budget_rejection.py`
