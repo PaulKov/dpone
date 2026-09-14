@@ -70,8 +70,9 @@ journal CAS revisions and target load timestamps are also not producer revisions
 
 The external `producer-manifest.schema.json` is a research proposal, not a public
 manifest/schema update. The initial wire proposal is strict JSON with no unknown
-fields. Integers are decimal nonnegative integers; sequence is bounded to signed
-64-bit storage. Timestamps are UTC integer microseconds and observational. Hashes
+fields. Sequence numbers and counters are decimal nonnegative integers; sequence
+is bounded to signed 64-bit storage. Timestamps are signed UTC integer microseconds
+(including pre-epoch values) and observational. Hashes
 are SHA-256 lowercase hexadecimal. Canonical bytes use UTF-8, recursively sorted
 object keys, no whitespace, no floating values, and no Unicode normalization.
 Arrays have defined order. Strings are compared exactly. The manifest hash is
