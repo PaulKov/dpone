@@ -13,6 +13,9 @@
   preserve authentication and permission failures.
 - Preserve the default seven-digit MSSQL nullable time precision in Python
   binary encoders, including the final 100ns digit.
+- Retain staging and source evidence when MSSQL commit or receipt recovery is
+  interrupted. Preserve cancellation and known commit outcomes, and prevent
+  uncommitted cancellation from being recorded as a successful ETL run.
 
 ## 0.80.0 - 2026-09-13
 

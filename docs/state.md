@@ -36,6 +36,27 @@ dpone rejects `state.type: disabled` for stateful strategies and MSSQL sink
 routes because that would make checkpoints, offsets, reconciliation state, or
 the atomic commit authority disappear between runs.
 
+### Run-state outcomes on interruption
+
+`ETLProcessor` writes run-state rows only when a run-state storage port, DAG ID
+and execution date are supplied. Its default constructor has no run-state
+storage, and the generic MSSQL bootstrap uses its transaction receipt catalog
+without installing that optional run-state store.
+
+When run-state tracking is enabled, an uncommitted `KeyboardInterrupt` or
+`SystemExit` records the existing `FAILED` execution state on a best-effort
+basis. The original cancellation and exit code still propagate. Ordinary
+secondary errors from state persistence, final logging or source release do not
+replace that cancellation. Only an explicitly established successful result
+can record `SUCCESS`; a pending result cannot.
+
+`FAILED` describes execution, not proof that the target rolled back. An unknown
+MSSQL commit retains evidence for [receipt reconciliation](mssql.md#interrupted-target-commit).
+An already confirmed target commit or replay remains authoritative after
+cancellation; a blocking governance outcome can still fail the execution
+without undoing that receipt. These rules describe handled runtime exceptions,
+not live-driver, forced-kill or host-failure certification.
+
 ## Backfill campaign journal v2
 
 `backfill.options.state.backend: audit_schema` stores an append-only campaign
