@@ -275,19 +275,37 @@ def test_bcp_runner_uses_explicit_format_without_delimiter_flags() -> None:
     assert "secret" not in command
 
 
-def test_bcp_runner_caps_packet_size_for_odbc18_ssl() -> None:
+@pytest.mark.parametrize("operation", ["import", "queryout"])
+@pytest.mark.parametrize(
+    ("requested", "expected"),
+    [
+        (None, 16_383),
+        (4096, 4096),
+        (16_368, 16_368),
+        (16_382, 16_382),
+        (16_383, 16_383),
+        (16_384, 16_383),
+        (32_768, 16_383),
+        (65_535, 16_383),
+    ],
+)
+def test_bcp_runner_caps_packet_size_for_odbc18_ssl(operation: str, requested: int | None, expected: int) -> None:
     fake_run = FakeRun()
+    options = BcpOptions(bcp_path="/opt/mssql-tools18/bin/bcp", file_format="native")
+    if requested is not None:
+        options = replace(options, packet_size=requested)
     runner = BcpRunner(
         BcpCredentials(host="sql.example.com", port=1433, database="dwh", user="etl", password="secret"),
-        BcpOptions(bcp_path="/opt/mssql-tools18/bin/bcp", packet_size=32_767),
+        options,
         run=fake_run,
     )
-
-    runner.import_file("landing.orders", "/tmp/orders.tsv")
-
+    if operation == "import":
+        runner.import_file("landing.orders", "/tmp/orders.native")
+    else:
+        runner.queryout("SELECT id FROM landing.orders", "/tmp/orders.native")
     command = fake_run.commands[0][0]
-    assert "-a" in command
-    assert command[command.index("-a") + 1] == "16384"
+    assert command[command.index("-a") + 1] == str(expected)
+    assert "-n" in command
 
 
 def test_bcp_runner_uses_private_multisubnet_dsn_for_one_invocation() -> None:
@@ -594,7 +612,7 @@ def test_mssql_staging_load_from_file_uses_canonical_bulk_bcp_options(tmp_path: 
     assert copied == 1
     assert options.bcp_path == "/opt/mssql-tools18/bin/bcp"
     assert options.batch_size == 321
-    assert options.packet_size == 16_384
+    assert options.packet_size == 16_383
     assert options.timeout_seconds == 77
     assert options.table_lock is False
     assert options.keep_nulls is False

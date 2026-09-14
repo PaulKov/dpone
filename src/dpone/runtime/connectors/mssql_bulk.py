@@ -35,8 +35,9 @@ from dpone.runtime.support.mssql_bcp_values import (
     UnsafeBulkValueError,
 )
 
-# ODBC Driver 18 encrypts by default; TLS cannot handle bcp -a above ~16 KiB on Linux/macOS.
-MSSQL_BCP_MAX_PACKET_SIZE_ODBC18 = 16_384
+# ODBC Driver 18 encrypts by default; the SQL Server encrypted-packet ceiling is
+# 16,383 bytes (not 16 KiB). This finite BCP connection contract does not enable MARS.
+MSSQL_BCP_MAX_PACKET_SIZE_ODBC18 = 16_383
 DEFAULT_MSSQL_BCP_TIMEOUT_SECONDS = 3600
 
 

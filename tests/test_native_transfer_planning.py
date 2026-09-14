@@ -315,7 +315,7 @@ def test_mssql_clickhouse_native_plan_applies_optimizer_profile_to_both_legs() -
 
     plan = NativeTransferPlanBuilder().build(request)
 
-    assert plan.native_ingest_settings["bulk"]["bcp"]["packet_size"] == 16_384
+    assert plan.native_ingest_settings["bulk"]["bcp"]["packet_size"] == 16_383
     assert plan.native_ingest_settings["bulk"]["bcp"]["batch_size"] == 250_000
     assert plan.native_ingest_settings["clickhouse_bulk"]["insert_settings"]["async_insert"] == 1
     assert plan.native_ingest_settings["clickhouse_bulk"]["http"]["chunk_size"] == 4 * 1024 * 1024
@@ -421,7 +421,7 @@ def test_postgres_mssql_native_plan_uses_copy_to_bcp_and_delete_insert_default()
     assert plan.finalizer == "delete_insert"
     assert plan.partitioning.load_workers == 4
     assert plan.native_ingest_settings["bulk"]["mode"] == "bcp"
-    assert plan.native_ingest_settings["bulk"]["bcp"]["packet_size"] == 16_384
+    assert plan.native_ingest_settings["bulk"]["bcp"]["packet_size"] == 16_383
     assert plan.transport_contract["route"] == "postgres_to_mssql"
     assert plan.transport_contract["wire_format"] == "mssql-delimited"
     assert plan.transport_contract["text_codec"] == "BulkTextCodec"
