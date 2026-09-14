@@ -54,6 +54,12 @@ for either override. Omit a key to use the fallback. Validation occurs before
 connector row I/O. Import parallelism does not cap all target connections:
 parent-side admission and retry settlement can open other contexts.
 
+For an invalid override, `dpone plan` exits with code 2, leaves stdout empty,
+and reports `mssql_native.invalid_limit:encoding_parallelism` or
+`mssql_native.invalid_limit:import_parallelism` on stderr with the accepted
+range and omission remedy. This diagnostic applies to text, JSON and Markdown
+output requests; a failed plan does not emit a partial plan document.
+
 The Python API accepts `None` as fallback. Both new arguments are keyword-only;
 all eight historical positional arguments and their defaults retain their order:
 `max_total_encoded_bytes`, `stage_allocated_bytes_stop_threshold`, `max_rows`,

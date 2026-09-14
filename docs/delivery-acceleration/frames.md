@@ -12,8 +12,13 @@ without a second scheduler sizing pass. The standalone DDA-03 component commit
 keeps scheduler wiring outside its scope. The integration recipe below records
 the implemented wiring for review and backports.
 
-Live route correctness and throughput remain **UNVERIFIED** until measured in an
-explicitly approved disposable environment. See the
+Retained evidence for dpone 0.80.0 at commit
+`6ae541d38ac223327d7edb23510859df91173bda` establishes scoped local Docker
+correctness and controlled recovery: six non-binary profiles, 64 rows per
+fidelity cell, full refresh and explicit UTC partition replacement, with
+encoding/import policies 2/1 and 1/2. Production workload performance,
+independent source DDL and target-writer governance, and hard-failure recovery
+remain **UNVERIFIED**. These results do not certify a new deployment. See the
 [delivery acceleration plan](../data-delivery-acceleration-tasks.md) and
 [approved design](../feature-design-data-delivery-acceleration-v1.md).
 

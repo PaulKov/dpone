@@ -13,12 +13,27 @@ scope reduces repeated preparation work: reuse frame sizes, project metadata in
 the prepared INSERT, and compute both prepared digests in one iterator. All four
 raw verification boundaries and the independent prepared prepublication check
 remain required. These structural improvements do not establish a measured speed
-increase. Live interoperability and performance remain **UNVERIFIED**.
+increase. Retained evidence for dpone 0.80.0 at commit
+`6ae541d38ac223327d7edb23510859df91173bda` establishes scoped local Docker
+correctness and controlled recovery: six non-binary profiles, 64 rows per
+fidelity cell, full refresh and explicit UTC partition replacement, with
+encoding/import policies 2/1 and 1/2. Production workload performance,
+independent source DDL and target-writer governance, and hard-failure recovery
+remain **UNVERIFIED**. These results do not certify a new deployment.
+
+The maintainer retains the exact-source result in artifact bundle
+`dpone-dda-stage02-20260913/live-C-summary.json`, SHA-256
+`09e1f0293a433d27346d3f10bc200419e1f943833d40d6e95ee4ba6bddfb26c6`,
+with its inventories and original route records. This local evidence is separate
+from [source PR 48](https://github.com/PaulKov/dpone/pull/48) and is not included
+in the package. Request the retained bundle to audit it; source CI or release
+publication alone cannot substitute for the route evidence.
 
 Stage 2 adds opt-in [independent encoding and import limits](concurrency.md).
 Legacy settings retain their defaults and durable representation; extended
-settings use versioned diagnostic run envelopes. The initial minor candidate is
-0.80.0, with release and stage-specific live evidence pending.
+settings use versioned diagnostic run envelopes. Independent stage limits were released in
+0.80.0. Exact-source local correctness and controlled-recovery evidence is
+available; production acceptance remains UNVERIFIED.
 
 ## First success without database access
 

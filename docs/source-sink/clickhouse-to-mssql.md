@@ -21,7 +21,10 @@ state.
 
 For the opt-in bounded native Python composition API, see the
 [native transport guide](../mssql-native-transport.md). It requires explicit
-deployment authorities and has no live certification yet.
+deployment authorities. Retained 0.80.0 native-route evidence covers small local
+Docker correctness and controlled-recovery fixtures; it does not certify this
+guide's character-spool path or production performance. See the native guide
+for the exact source, profiles and remaining governance limitations.
 
 ## When to use this path
 

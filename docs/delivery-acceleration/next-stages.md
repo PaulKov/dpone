@@ -26,6 +26,42 @@ Each can be reverted or released independently; shared benchmarks may be reused
 as tooling, but results belong to the exact tested commit. dbt and the separate
 composition feature remain outside this plan.
 
+## Research decisions after 0.80.0
+
+The following specifications record the 2026-09-14 research against
+`6ae541d38ac223327d7edb23510859df91173bda`. Research completion does not activate
+a backend, change recovery policy, or establish production acceptance. Each
+specification retains its detailed prerequisites and definition of done.
+
+| Workstream | Current decision | Next evidence needed |
+| --- | --- | --- |
+| [Resilience and endurance](../feature-specs/dda-industrial-resilience.md) | Protocol researched; industrial recovery remains unverified. | Real interruption, restart, reconciliation and endurance trials on admitted resources. |
+| [Verification CPU](../feature-specs/dda-industrial-verification.md) | Keep the current implementation; isolated experiments do not demonstrate the required benefit. | Complete route profiling and a measured candidate preserving every integrity boundary. |
+| [SQL layouts and SWITCH](../feature-specs/dda-industrial-sql-publication.md) | Separate future designs; SWITCH remains unregistered. | Explicit layout admission, transaction and ownership integration, then live certification. |
+| [Arrow bulk](../feature-specs/dda-industrial-arrow.md) | Do not adopt the backend yet. | Independent bulk-connection outcome handling, runtime integration and full-route comparison. |
+| [Changed windows](../feature-specs/dda-industrial-changed-windows.md) | Authority model researched; no automatic incremental selection. | A real producer revision/history service with fencing and complete change coverage. |
+| [Operational readiness](../feature-specs/dda-industrial-readiness.md) | Apply documentation corrections; deployment acceptance remains unverified. | Workload-specific performance and failure evidence, plus source/target governance. |
+
+The initial local baseline completed narrow 10,000-row trials, but wide trials
+failed during preparation and later staging admission. Their failed results
+cannot serve as throughput measurements. Retained staging consumes capacity
+across invocations, and preparation needs additional allocation beyond the raw
+payload. A follow-up using a different resource policy is a separate experiment;
+it cannot turn the original failed policy into a pass. Observer overhead and a
+complete matched route comparison are still required before selecting a speed
+optimization.
+
+Maintainer evidence locator: retained artifact bundle
+`dpone-dda-industrial-plan-20260914/P01`, experiment subject
+`6ae541d38ac223327d7edb23510859df91173bda`. Its original
+`artifact-manifest.json` has SHA-256
+`2f989b541ec93f995b432170bad04c1057a3f8495c05ada0bd6be7e5139a4309`;
+`baseline-summary.json`, `diagnosis.md` and `wide-failed-journals.json` describe
+the measurements and failures. Follow-ups are retained separately under
+`P01/followups/`. These local artifacts are not shipped in the package; request
+the bundle from the maintainer to audit the claim. Without the matching bundle,
+independent reproduction remains unverified.
+
 ## Stage 1 implementation contract
 
 - Classification: internal implementation, no public-contract change.
