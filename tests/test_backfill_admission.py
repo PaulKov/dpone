@@ -3,7 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from queue import SimpleQueue
-from threading import Event
+from threading import Event, Lock
 
 import pytest
 
@@ -28,7 +28,23 @@ def test_claim_inside_boundary_finishes_before_competing_closure() -> None:
     gate = _ChunkAdmission()
     claim_entered = Event()
     close_requested = Event()
+    close_lock_entered = Event()
     release_claim = Event()
+
+    class _ObservedLock:
+        def __init__(self):
+            self.lock = Lock()
+
+        def __enter__(self):
+            if close_requested.is_set():
+                close_lock_entered.set()
+            self.lock.acquire()
+
+        def __exit__(self, *_args):
+            self.lock.release()
+
+    gate._lock = _ObservedLock()
+
     order = []
 
     def claim():
@@ -47,7 +63,7 @@ def test_claim_inside_boundary_finishes_before_competing_closure() -> None:
         try:
             assert claim_entered.wait(5)
             closed = pool.submit(close)
-            assert close_requested.wait(5)
+            assert close_lock_entered.wait(5)
             assert not gate.closed
         finally:
             release_claim.set()

@@ -24,6 +24,7 @@ from dpone.backfill.state import (
 )
 from dpone.backfill.worker_runtime import BackfillProcessLaneRuntime, BackfillWorkerChunkRunnerFactory
 from dpone.runtime._backfill_admission import _ChunkAdmission
+from dpone.runtime._backfill_heartbeat_scope import _heartbeat_cleanup
 
 if TYPE_CHECKING:
     from dpone.backfill.models import BackfillChunk
@@ -206,88 +207,63 @@ class BackfillChunkExecutionMixin:
     ) -> bool:
         admission = _admission or _ChunkAdmission()
         with admission.on_failure():
-            return self._execute_one(
-                chunk,
-                load_config,
-                ledger,
-                store,
-                errors,
-                chunk_runner=chunk_runner,
-                coordinator_tick=coordinator_tick,
-                admission=admission,
-            )
-
-    def _execute_one(
-        self,
-        chunk: BackfillChunk,
-        load_config: LoadConfig,
-        ledger: BackfillLedger,
-        store: FileBackfillStateStore,
-        errors: list[str],
-        *,
-        chunk_runner: ChunkRunner | None,
-        coordinator_tick: Callable[[], None] | None,
-        admission: _ChunkAdmission,
-    ) -> bool:
-        record = ledger.chunk(chunk.index)
-        owner = f"dpone-backfill-chunk:{uuid4().hex}"
-        lease_acquired = False
-        try:
-            chunk_lease_expires_at = lease_expires_at(load_config)
-            # Closure and actual durable acquisition share the same boundary.
-            claim = admission.acquire(
-                lambda: store.acquire_chunk_lease(
-                    ledger.run_key,
-                    chunk.index,
-                    owner=owner,
-                    lease_expires_at=chunk_lease_expires_at,
+            record = ledger.chunk(chunk.index)
+            owner = f"dpone-backfill-chunk:{uuid4().hex}"
+            lease_acquired = False
+            try:
+                chunk_lease_expires_at = lease_expires_at(load_config)
+                # Closure and actual durable acquisition share the same boundary.
+                claim = admission.acquire(
+                    lambda: store.acquire_chunk_lease(
+                        ledger.run_key,
+                        chunk.index,
+                        owner=owner,
+                        lease_expires_at=chunk_lease_expires_at,
+                    )
                 )
-            )
-            if claim is None:
-                return False  # Closed admission leaves this pending chunk untouched.
-            lease_acquired = claim
-            if not lease_acquired:
+                if claim is None:
+                    return False  # Closed admission leaves this pending chunk untouched.
+                lease_acquired = claim
+                if not lease_acquired:
+                    current = store.load(ledger.run_key) or ledger
+                    record = current.chunk(chunk.index)
+                    if current.status == "cancel_requested":
+                        errors.append(f"chunk {chunk.index} cancelled before start")
+                    elif record.status != CHUNK_STATUS_SUCCESS:
+                        errors.append(f"chunk {chunk.index} lease is not available")
+                    return False
                 current = store.load(ledger.run_key) or ledger
                 record = current.chunk(chunk.index)
-                if current.status == "cancel_requested":
-                    errors.append(f"chunk {chunk.index} cancelled before start")
-                elif record.status != CHUNK_STATUS_SUCCESS:
-                    errors.append(f"chunk {chunk.index} lease is not available")
-                return False
-            current = store.load(ledger.run_key) or ledger
-            record = current.chunk(chunk.index)
-            lifecycle_context = BackfillChunkLifecycleContext(
-                run_key=ledger.run_key,
-                chunk_index=chunk.index,
-                owner=owner,
-                store=store,
-            )
-            self._lifecycle.before_heartbeat(lifecycle_context)
-
-            def renew_and_report() -> bool:
-                renewed = store.renew_chunk_lease(
-                    ledger.run_key,
-                    chunk.index,
+                lifecycle_context = BackfillChunkLifecycleContext(
+                    run_key=ledger.run_key,
+                    chunk_index=chunk.index,
                     owner=owner,
-                    lease_expires_at=lease_expires_at(load_config),
+                    store=store,
                 )
-                if renewed:
-                    self._log_progress(store, ledger.run_key, event="heartbeat")
-                    if coordinator_tick is not None:
-                        coordinator_tick()
-                return renewed
+                self._lifecycle.before_heartbeat(lifecycle_context)
 
-            heartbeat = self._heartbeat_factory(
-                renew_and_report,
-                initial_expiry=chunk_lease_expires_at,
-                now=lambda: datetime.now(_UTC),
-            )
-            heartbeat.prove_ownership()
-            self._lifecycle.before_chunk_runner(lifecycle_context)
-            heartbeat.start()
-            execution_error: BaseException | None = None
-            try:
-                with admission.on_failure():
+                def renew_and_report() -> bool:
+                    renewed = store.renew_chunk_lease(
+                        ledger.run_key,
+                        chunk.index,
+                        owner=owner,
+                        lease_expires_at=lease_expires_at(load_config),
+                    )
+                    if renewed:
+                        self._log_progress(store, ledger.run_key, event="heartbeat")
+                        if coordinator_tick is not None:
+                            coordinator_tick()
+                    return renewed
+
+                heartbeat = self._heartbeat_factory(
+                    renew_and_report,
+                    initial_expiry=chunk_lease_expires_at,
+                    now=lambda: datetime.now(_UTC),
+                )
+                heartbeat.prove_ownership()
+                self._lifecycle.before_chunk_runner(lifecycle_context)
+                heartbeat.start()
+                with _heartbeat_cleanup(heartbeat.stop, admission.close):
                     result = (chunk_runner or self._chunk_runner)(
                         self.build_chunk_load_config(
                             load_config,
@@ -301,50 +277,35 @@ class BackfillChunkExecutionMixin:
                             ),
                         )
                     )
-            except BaseException as exc:
-                execution_error = exc
-                raise
-            finally:
-                try:
-                    heartbeat.stop()
-                except Exception as cleanup_error:
-                    if execution_error is None:
-                        raise
-                    if isinstance(execution_error, Exception):
-                        raise RuntimeError(
-                            f"{execution_error}; heartbeat cleanup failed: {cleanup_error}"
-                        ) from execution_error
-                    execution_error.add_note(f"Heartbeat cleanup also failed: {cleanup_error}")
-                    raise execution_error
-            heartbeat.assert_healthy()
-            self._lifecycle.before_ledger_completion(lifecycle_context, result)
-        except Exception as exc:
-            admission.close()
-            if not lease_acquired:
-                errors.append(f"chunk {chunk.index} lease acquisition failed: {exc}")
-                return False
-            message = f"chunk {chunk.index} [{chunk.start}..{chunk.end}]: {exc}"
-            errors.append(message)
-            record.status = CHUNK_STATUS_FAILED
-            record.error = str(exc)
-            try:
-                if not store.complete_chunk_if_owned(ledger.run_key, record, owner=owner):
-                    errors.append(f"DPONE_BACKFILL_CHUNK_LEASE_LOST: chunk {chunk.index} lease owner changed")
+                heartbeat.assert_healthy()
+                self._lifecycle.before_ledger_completion(lifecycle_context, result)
+            except Exception as exc:
+                admission.close()
+                if not lease_acquired:
+                    errors.append(f"chunk {chunk.index} lease acquisition failed: {exc}")
                     return False
-                self._log_progress(store, ledger.run_key, event="chunk_failed")
-            except Exception as reporting_error:
-                # A reporting failure does not prove a durable FAILED transition.
-                raise RuntimeError(f"{message}; failure reporting failed: {reporting_error}") from reporting_error
-            return False
-        return self._complete_success(
-            record,
-            result,
-            run_key=ledger.run_key,
-            owner=owner,
-            store=store,
-            errors=errors,
-            _admission=admission,
-        )
+                message = f"chunk {chunk.index} [{chunk.start}..{chunk.end}]: {exc}"
+                errors.append(message)
+                record.status = CHUNK_STATUS_FAILED
+                record.error = str(exc)
+                try:
+                    if not store.complete_chunk_if_owned(ledger.run_key, record, owner=owner):
+                        errors.append(f"DPONE_BACKFILL_CHUNK_LEASE_LOST: chunk {chunk.index} lease owner changed")
+                        return False
+                    self._log_progress(store, ledger.run_key, event="chunk_failed")
+                except Exception as reporting_error:
+                    # A reporting failure does not prove a durable FAILED transition.
+                    raise RuntimeError(f"{message}; failure reporting failed: {reporting_error}") from reporting_error
+                return False
+            return self._complete_success(
+                record,
+                result,
+                run_key=ledger.run_key,
+                owner=owner,
+                store=store,
+                errors=errors,
+                _admission=admission,
+            )
 
     @staticmethod
     def _complete_success(
