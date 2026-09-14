@@ -217,7 +217,7 @@ def _is_datetimeoffset_source(source_type: str) -> bool:
 
 
 def _is_time_source(source_type: str) -> bool:
-    normalized = str(source_type).strip().lower()
+    normalized = re.sub(r"\s+nullable\b", "", str(source_type).strip().lower())
     return normalized == "time" or normalized.startswith("time(")
 
 

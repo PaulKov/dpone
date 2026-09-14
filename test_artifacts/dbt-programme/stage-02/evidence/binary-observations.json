@@ -1,0 +1,253 @@
+{
+  "commit": "46830976b214262c7772800523e832a5a6f6d78f",
+  "decimal_shorthand": {
+    "accelerated": {
+      "explicit_control": {
+        "backend": "native_accelerated",
+        "error": null,
+        "failure": null,
+        "payload_hex": "01010576616c75650d446563696d616c2833382c3029ffffffff3f228a097ac4865aa84c3b4b",
+        "rows": 1,
+        "targets": [
+          "Decimal(38,0)"
+        ]
+      },
+      "shorthand": {
+        "backend": "native_accelerated",
+        "error": "ValueError: native_acceleration_decimal_out_of_range",
+        "failure": "native_wire_transcode_failed",
+        "payload_hex": null,
+        "rows": 0,
+        "targets": [
+          "Decimal(38,9)"
+        ]
+      }
+    },
+    "python_native": {
+      "explicit_control": {
+        "backend": "python_reference",
+        "error": null,
+        "failure": null,
+        "payload_hex": "01010576616c75650d446563696d616c2833382c3029ffffffff3f228a097ac4865aa84c3b4b",
+        "rows": 1,
+        "targets": [
+          "Decimal(38,0)"
+        ]
+      },
+      "shorthand": {
+        "backend": "python_reference",
+        "error": "ValueError: clickhouse_binary_decimal_out_of_range: ClickHouse Decimal precision overflow",
+        "failure": "native_wire_transcode_failed",
+        "payload_hex": null,
+        "rows": 0,
+        "targets": [
+          "Decimal(38,9)"
+        ]
+      }
+    },
+    "rowbinary": {
+      "explicit_control": {
+        "backend": "python_reference",
+        "error": null,
+        "failure": null,
+        "payload_hex": "ffffffff3f228a097ac4865aa84c3b4b",
+        "rows": 1,
+        "targets": [
+          "Decimal(38,0)"
+        ]
+      },
+      "shorthand": {
+        "backend": "python_reference",
+        "error": "ValueError: clickhouse_binary_decimal_out_of_range: ClickHouse Decimal precision overflow",
+        "failure": "native_wire_transcode_failed",
+        "payload_hex": null,
+        "rows": 0,
+        "targets": [
+          "Decimal(38,9)"
+        ]
+      }
+    }
+  },
+  "environment": "synthetic-local",
+  "legacy_temporal_narrowing": {
+    "classification": "documented legacy behavior; requires stage-01 contract decision",
+    "results": {
+      "accelerated": {
+        "backend": "native_accelerated",
+        "error": null,
+        "failure": null,
+        "payload_hex": "01010576616c75650d4461746554696d653634283329e803000000000000",
+        "rows": 1,
+        "targets": [
+          "DateTime64(7)"
+        ]
+      },
+      "python_native": {
+        "backend": "python_reference",
+        "error": null,
+        "failure": null,
+        "payload_hex": "01010576616c75650d4461746554696d653634283329e803000000000000",
+        "rows": 1,
+        "targets": [
+          "DateTime64(7)"
+        ]
+      },
+      "rowbinary": {
+        "backend": "python_reference",
+        "error": null,
+        "failure": null,
+        "payload_hex": "e803000000000000",
+        "rows": 1,
+        "targets": [
+          "DateTime64(7)"
+        ]
+      }
+    },
+    "source_ticks_100ns": 10000001,
+    "target_ticks_ms": 1000
+  },
+  "live_certification": "SKIP: not authorized",
+  "native_temporal_projection": {
+    "error": "native_wire_source_schema_mismatch:re-export_with_matching_schema",
+    "projected_schema": [
+      [
+        "value",
+        "timestamp"
+      ]
+    ],
+    "same_artifact": true,
+    "source_schema": [
+      [
+        "value",
+        "datetimeoffset(7)"
+      ]
+    ]
+  },
+  "nullable_time_backend_divergence": {
+    "accelerated": {
+      "backend": "native_accelerated",
+      "error": null,
+      "exact_match": true,
+      "expected_hex": "0303066265666f726505496e7433320403020114131211242322210576616c7565104e756c6c61626c6528537472696e67290000011030303a30303a30312e303030303030311030303a30303a30322e303030303030390005616674657205496e743332080706051817161528272625",
+      "failure": null,
+      "payload_hex": "0303066265666f726505496e7433320403020114131211242322210576616c7565104e756c6c61626c6528537472696e67290000011030303a30303a30312e303030303030311030303a30303a30322e303030303030390005616674657205496e743332080706051817161528272625",
+      "rows": 3,
+      "targets": [
+        "Int32",
+        "Nullable(String)",
+        "Int32"
+      ]
+    },
+    "python_native": {
+      "backend": "python_reference",
+      "error": null,
+      "exact_match": false,
+      "expected_hex": "0303066265666f726505496e7433320403020114131211242322210576616c7565104e756c6c61626c6528537472696e67290000011030303a30303a30312e303030303030311030303a30303a30322e303030303030390005616674657205496e743332080706051817161528272625",
+      "failure": null,
+      "payload_hex": "0303066265666f726505496e7433320403020114131211242322210576616c7565104e756c6c61626c6528537472696e67290000010830303a30303a30310830303a30303a30320005616674657205496e743332080706051817161528272625",
+      "rows": 3,
+      "targets": [
+        "Int32",
+        "Nullable(String)",
+        "Int32"
+      ]
+    },
+    "rowbinary": {
+      "backend": "python_reference",
+      "error": null,
+      "exact_match": false,
+      "expected_hex": "04030201001030303a30303a30312e303030303030310807060514131211001030303a30303a30322e3030303030303918171615242322210128272625",
+      "failure": null,
+      "payload_hex": "04030201000830303a30303a30310807060514131211000830303a30303a303218171615242322210128272625",
+      "rows": 3,
+      "targets": [
+        "Int32",
+        "Nullable(String)",
+        "Int32"
+      ]
+    }
+  },
+  "per_column_temporal_mapping": {
+    "actual_companion_schema": [
+      [
+        "raw_time",
+        "datetimeoffset(7)"
+      ],
+      [
+        "offset_time",
+        "datetimeoffset(7)"
+      ],
+      [
+        "local_time",
+        "datetimeoffset(7)"
+      ]
+    ],
+    "actual_native_targets": {
+      "local_time": "DateTime64(7, 'UTC')",
+      "offset_time": "DateTime64(7, 'UTC')",
+      "raw_time": "DateTime64(7, 'UTC')"
+    },
+    "authored_effective_modes": {
+      "local_time": "fixed_timezone",
+      "offset_time": "preserve_offset",
+      "raw_time": "preserve_text"
+    }
+  },
+  "planning_temporal_fidelity": {
+    "date": {
+      "planning": {
+        "lossless": true,
+        "native_transport": "ClickHouse-safe temporal text",
+        "reason": "MSSQL date maps to ClickHouse Date",
+        "requires_explicit_contract": false,
+        "schema_evolution_compatible": true,
+        "source_type": "date",
+        "target_type": "Date"
+      },
+      "runtime": {
+        "clickhouse_type": "Date",
+        "column": "value",
+        "lossless": false,
+        "reason": "MSSQL date maps to ClickHouse Date only with an observed 1970-01-01..2149-06-06 range assurance",
+        "source_type": "date"
+      }
+    },
+    "datetime": {
+      "planning": {
+        "lossless": true,
+        "native_transport": "epoch_or_text DateTime64 wire format",
+        "reason": "MSSQL datetime has millisecond-scale precision",
+        "requires_explicit_contract": false,
+        "schema_evolution_compatible": true,
+        "source_type": "datetime",
+        "target_type": "DateTime64(3)"
+      },
+      "runtime": {
+        "clickhouse_type": "DateTime64(3)",
+        "column": "value",
+        "lossless": false,
+        "reason": "preserve MSSQL datetime precision within the governed ClickHouse DateTime64 range",
+        "source_type": "datetime"
+      }
+    },
+    "datetime2(7)": {
+      "planning": {
+        "lossless": true,
+        "native_transport": "epoch_or_text DateTime64 wire format",
+        "reason": "preserve datetime2 fractional precision",
+        "requires_explicit_contract": false,
+        "schema_evolution_compatible": true,
+        "source_type": "datetime2(7)",
+        "target_type": "DateTime64(7)"
+      },
+      "runtime": {
+        "clickhouse_type": "DateTime64(7)",
+        "column": "value",
+        "lossless": false,
+        "reason": "preserve MSSQL datetime2 fractional precision within the governed ClickHouse DateTime64 range",
+        "source_type": "datetime2(7)"
+      }
+    }
+  },
+  "python": "3.12.11"
+}
