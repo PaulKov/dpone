@@ -1,11 +1,12 @@
 # Stage 02: binary types and validated artifacts
 
-Status: **B01/B02 implemented under the coordinator-granted isolated-repair
-exception; remaining findings are deferred**. Operational contract copies and
+Status: **B01 implemented under the coordinator-granted isolated-repair
+exception; B02 is BLOCKED/DRAFT and excluded from integration; other findings
+are deferred**. Operational contract copies and
 transient logs remain untracked. No new feature specification was self-approved.
 Assessed baseline: `46830976b214262c7772800523e832a5a6f6d78f` (0.79.2).
-The scoped candidate changes three runtime files, two new tests and two narrow
-documentation pages. Public signatures, manifests, wire framing and policies
+The final scoped candidate changes one runtime file, one new test module and one
+route documentation page. Public signatures, manifests, wire framing and policies
 remain compatible; no new formats or public artifact capabilities are added.
 Only synthetic public-project fixtures and local recording connectors are used.
 There is no live/database, corporate, credential, composition or DDA evidence.
@@ -13,16 +14,18 @@ There is no live/database, corporate, credential, composition or DDA evidence.
 ## Current repairs and baseline limits
 
 B01 normalizes the already-admitted nullable time spelling before using the
-existing canonical text encoder. B02 adds an internal concrete-file consumption
-boundary to retain ClickHouse dispatch, original source authority, before/after
-receipt checks, count agreement and delayed per-attempt validation summaries.
-Exact public-boundary tests cover changed evidence/bytes, insertion failure,
-source retention, count mismatch and subsequent explicit readmission.
+existing canonical text encoder. B02 was withdrawn after fresh review found that
+dispatching a genuine receipted file could accept encoded text markers and strip
+literal quotes. Receipt and row-count agreement did not prove logical fidelity.
+Both B02 runtime files and the fast-path page were restored to baseline; its
+numeric-only acceptance tests were removed. No codec support is introduced.
 
-The candidate's expanded focused suite passed **746 tests, no skips**. Final
-candidate validation and the still-open combined full gate are recorded in
-[validation.md](validation.md). B03–B08 and the legacy narrowing policy below
-remain outside this repair.
+The rejected B01/B02 candidate passed 746 focused tests but failed independent
+logical-value review and the exact-commit module budget. Those counts are
+historical evidence, not acceptance of the final scope. See
+[the P1 review and disposition](rejected-b02-review.md) and
+[validation.md](validation.md). B02–B08 and the legacy narrowing policy below
+remain outside the B01 repair.
 
 The initial focused baseline suite passed **715 tests, no failures/errors/skips**,
 including the locally installed accelerator. The existing UUID/decimal/numeric
@@ -89,7 +92,7 @@ that behavior needs a compatibility decision; it is not an isolated regression.
 Per-column temporal mapping, native schema projection, partition receipt
 authority and source-to-target rename semantics (B03–B06) remain coordinator and
 stage 01 contract decisions. See the [repair scope and deferred handoff](handoff-draft.md)
-for the granted B01/B02 boundary and remaining approval requirements. Stage 01 and stage 03
+for the retained B01 boundary and remaining approval requirements. Stage 01 and stage 03
 reported no conflicting ownership. No compiler, publication, composition or DDA
 integration is granted by this artifact.
 
@@ -101,7 +104,6 @@ From the repaired repository root:
 uv sync --locked --all-extras
 .venv/bin/python -m pytest \
   tests/test_native_bcp_implicit_time_fidelity.py \
-  tests/test_clickhouse_validated_file_contract.py \
   tests/test_streaming_contracts_and_evidence_pack.py -q
 ```
 
@@ -125,6 +127,13 @@ entrypoint, exact rows, receipt identity and failure/control results.
 Replay on a changed source revision may deliberately fail a baseline assertion;
 do not rewrite expected results to manufacture success.
 
+The separate [rejected B02 codec producer](reproduce_rejected_b02_codec.py) targets
+only rejected commit `69013d51dbdaff578767cee54ae49a2119cebc40`. Run it in a separate
+checkout at that commit using its locked environment; JSON is written to stdout.
+Its [retained output](evidence/rejected-b02-codec-observation.json) records eight
+genuine source-validated rows, silent marker/quote changes and a false successful
+summary. It must not run as a final-candidate acceptance test.
+
 ### Superseded evidence
 
 The initial exploratory B02 control replaced an ingestion instance's
@@ -137,10 +146,10 @@ by either retained producer. Backend selection uses the registry's documented
 
 ## Documentation and completion impact
 
-The assigned fast-path page now explains source receipts, error recovery and the
-unresolved partition authority gap. The route page clarifies implicit nullable
-time precision. `docs/data-contract-runtime.md:204` still has obsolete boolean
-guidance outside this path grant; the coordinator owns that follow-up.
+The route page clarifies implicit nullable time precision. The broader fast-path
+page was restored when B02 was withdrawn. Its boolean guidance and
+`docs/data-contract-runtime.md:204` require separate correction as part of the
+deferred receipt/consumer contract; the coordinator owns that follow-up.
 `docs/temporal-fidelity.md:119` promises the per-column rules involved in B04.
 The candidate does not imply those deferred contracts are fixed.
 
@@ -150,4 +159,6 @@ remain coordinator-owned and **UNVERIFIED** until executed on the frozen combine
 candidate. Live certification, exporter provenance, real target readback and
 database retry/recovery remain **SKIP/UNVERIFIED**. Four read-only roles contributed
 the initial audit; an independent fresh-context review must assess the exact
-repair commit before integration handoff. No merge or release is authorized.
+final B01 commit before integration handoff. The review of the rejected B01/B02
+commit remains CHANGES REQUESTED and does not transfer to the reduced scope.
+No merge or release is authorized.

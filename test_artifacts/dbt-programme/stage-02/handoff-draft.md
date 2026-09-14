@@ -1,122 +1,86 @@
-# B01/B02 repair scope and DRAFT deferred contracts
+# B01 repair scope and BLOCKED/DRAFT deferred contracts
 
-Status: **coordinator-granted isolated repairs implemented; broader contracts DRAFT**.
+Status: **B01 implemented; B02 excluded after blocking review; wider contracts DRAFT**.
 Baseline: `46830976b214262c7772800523e832a5a6f6d78f`.
-This records the concise impact/validation plan for existing-contract repairs,
-not an approved new feature specification. New public interfaces or wider authority
-semantics require an approved specification before implementation.
+This is the concise impact/validation plan for an existing-contract repair,
+not an approved new feature specification. The coordinator narrowed the grant
+after independent review rejected the B02 candidate.
 
 ## B01: implicit nullable time fidelity
 
-Problem: an admitted `time nullable` source is decoded with its default scale 7,
-but Python target text classification misses the nullable suffix and loses the
-100ns remainder. Explicit-scale forms and accelerated Native preserve it.
+An admitted `time nullable` source is decoded at its default scale 7, but Python
+target text classification misses the suffix and loses the 100ns remainder.
+Explicit-scale forms and accelerated Native preserve it.
 
-Granted files:
+Retained implementation scope:
 
 - `src/dpone/runtime/clickhouse_binary_encoding.py`: normalize the admitted
-  nullable source syntax for time classification; retain the existing canonical
-  time-text encoder and authored target/time policies.
-- `tests/test_native_bcp_implicit_time_fidelity.py`: focused public transcoder
-  regression with independent bytes, distinct before/after row sentinels, NULL,
-  implicit and explicit scale, midnight and final fractional tick. Cover
-  RowBinary, Python Native and optional accelerated Native with honest skips.
-- `docs/source-sink/mssql-to-clickhouse.md`: a bounded clarification of implicit
-  time scale/fidelity in the existing native-type reference if assigned.
+  nullable syntax for time classification, then use the existing time-text
+  encoder and authored target/time policies.
+- `tests/test_native_bcp_implicit_time_fidelity.py`: twelve public transcoder
+  cases with independent expected bytes, distinct row sentinels, NULL, midnight,
+  100ns and the final fractional tick. Compare implicit/case/whitespace spelling
+  and explicit scale across RowBinary, Python Native and accelerated Native.
+- `docs/source-sink/mssql-to-clickhouse.md`: clarify implicit time scale and
+  precision without implying a new catalog-derived defect.
 
-No framing table, UUID/decimal prefix, contract hash, acceleration implementation
-or unbounded temporal-narrowing change is proposed. Catalog-derived impact
-remains bounded by canonical metadata. Behavior changes only by restoring exact
-text for an already admitted source spelling. The coordinator granted this
-bounded repair under the documented isolated-regression exception.
+The algorithm only removes the nullable suffix before existing time
+classification. Framing tables, UUID/decimal prefixes, wire hashes, acceleration,
+timezone policy and explicit target narrowing remain unchanged. No public API,
+manifest/schema or capability is added. Normal catalog metadata supplies explicit
+scale; broader production impact has not been established.
 
-Public reproduction mechanism: `build_mssql_bcp_native_contract` →
-`SourceNativeArtifact` → `NativeWireTranscoder.to_clickhouse_binary`.
-`NativeAccelerationRegistry(module_loader=...)` is constructor DI; neither
-provider nor encoding method is replaced.
+Tests use `build_mssql_bcp_native_contract`, `SourceNativeArtifact` and
+`NativeWireTranscoder.to_clickhouse_binary`. Backend selection uses the supported
+`NativeAccelerationRegistry(module_loader=...)` constructor seam. Expected frames
+do not call production encoders. No methods, modules or SDKs are replaced.
 
-## B02: receipted file dispatch
+## B02: dispatch repair withdrawn
 
-Problem: the documented validated single-file fast path loses its concrete
-artifact identity at ClickHouse dispatch. `ClickHouseSink.stage_payload`, with
-a constructor-injected recording connector and explicit Python bulk mode,
-stages the raw two-row file exactly but fails its valid wrapper on missing
-`ClickHouseSink.create`. Both calls execute the real staging/ingestion code.
+The baseline public `ClickHouseSink.stage_payload` can stage a raw two-row integer
+file but rejects its genuine source-receipted wrapper at missing
+`ClickHouseSink.create`. The attempted repair at
+`69013d51dbdaff578767cee54ae49a2119cebc40` added an internal file callback with
+before/after receipt checks, count agreement and delayed summaries.
 
-Granted files:
+Independent review found **P1 silent logical text changes**: the existing loader
+does not decode the source `BulkTextCodec`, and its CSV parser removes literal
+quotes. Genuine receipt and count agreement still allowed incorrect values and
+a successful summary. See [the exact-commit review](rejected-b02-review.md) and
+[generated public-DI observation](evidence/rejected-b02-codec-observation.json).
+The candidate also failed the module-size ratchet. Numeric-only acceptance and
+38/746 passing test selections did not certify logical text fidelity.
 
-- `src/dpone/runtime/etl/contract_artifacts.py`: one explicitly internal
-  consumption operation on `ContractValidatedFileArtifact`, restricted to a
-  concrete `FileExportArtifact` and a typed loader callback.
-- `src/dpone/runtime/sinks/clickhouse_payload_ingestion.py`: an explicit branch
-  for this wrapper, invoking its internal operation and existing file dispatch.
-- `tests/test_clickhouse_validated_file_contract.py`: real public
-  `ClickHouseSink.stage_payload` tests with constructor DI; no method patches,
-  subclass overrides or private test entrypoints.
-- `docs/runtime-fast-path-contracts.md`: correct the single-file receipt and
-  recovery guidance; explicitly leave partition authority unresolved.
+The coordinator therefore excluded B02 production behavior. Both runtime files
+and the fast-path documentation are restored to the baseline, and the newly
+added B02 acceptance module is removed. No marker-only or integer-only admission
+exception is introduced. No new test locks in the incidental `AttributeError`:
+the existing baseline public-DI producer already records rejection before any
+inserted rows. B02 remains **BLOCKED/DRAFT**, not a supported capability.
 
-Implemented internal algorithm:
+A future implementation requires a reviewable **APPROVED** contract covering
+NULL, empty/text values, delimiters, markers, quotes, binary values, and explicit
+Python/client/HTTP transport behavior. Source receipt identity alone does not
+establish that the consumer interprets the same logical values. Decoder changes,
+new formats/capabilities and admission policy are outside this repair grant.
 
-1. Clear any prior attempt's accepted-row summary. Preserve cached construction failures and the existing typed missing-receipt
-   error. Require the concrete file class; do not guess capabilities or
-   recursively unwrap arbitrary objects.
-2. Reverify the original receipt against the frozen source schema/contract and
-   current bytes/wire identity immediately before consumption.
-3. Pass the same artifact to the existing loader exactly once. Do not copy,
-   recreate, rename, reinterpret, retry or terminate it.
-4. After successful consumption, reverify bytes/schema/wire/receipt identity;
-   reject removed or differently bound evidence. Validate the loader count with
-   the existing target-row-count contract and require equality with the original
-   receipt's validated source count.
-5. Update the existing validation summary only after successful postchecks,
-   preserving `opaque_file_prevalidated` and the exact consumed count. Preserve
-   extraction/source-count authority and terminal ownership.
-6. Propagate callback/postcheck failure through existing staging cleanup; return
-   no successful handle/summary. This adds no publication idempotency mechanism.
+## Validation and remaining scope
 
-Acceptance: exact raw/wrapped rows and count; empty-file zero rows; missing
-receipt despite boolean hint; byte/receipt mutation before load; mutation during
-the injected connector callback; connector error preservation; no accepted-row
-summary after failure; source retention until the existing terminal decision;
-existing MSSQL wrapper/quality/opaque-file protections remain passing. No live
-route certification is implied by a recording connector.
+Run focused native/type regressions and the required static, architecture and
+documentation checks on the reduced B01 candidate. After commit, run the module
+budget against full exact SHAs and obtain follow-up review from the independent
+reviewer. [validation.md](validation.md) separates final B01 checks, rejected B02
+evidence and baseline observations. The coordinator owns the mandatory combined
+non-live suite and clean installed-runtime acceptance; both remain UNVERIFIED
+until run on the frozen combined candidate.
 
-Supporting existing contracts: `docs/runtime-fast-path-contracts.md:13,24`
-documents source-validated native file loading;
-`docs/adr/0005-production-runtime-connectors.md:15` requires typed artifacts and
-staging before promotion; current wrapper materialization and
-`tests/test_streaming_contracts_and_evidence_pack.py` enforce receipts.
-`AGENTS.md` and `docs/feature-design-standard.md` permit a concise plan for an
-isolated regression with an existing contract. The coordinator granted this
-internal repair through that exception; a new public
-`load_with` API/capability, new formats, receipt schema, partition admission or
-rename semantics does not automatically fit it.
-
-## Boundaries, checks and approvals
-
-Only the listed source/test/docs and stage artifact paths are granted. Shared
-CHANGELOG, schemas, registries, factories, dependencies and release artifacts
-remain coordinator-owned. No MSSQL staging, decoder, partition or rebind edits
-are justified by the demonstrated B02 case. No compiler/composition/DDA or
-stage 03 query/topology edits are proposed.
-
-Failing public-boundary tests preceded implementation: 18 failed and 12 passed.
-The expanded repaired native/wrapper/quality suite passed 746 tests. A separate
-new-consumption summary regression failed before its correction. Validation
-history distinguishes product failures from an intermediate test enum-name error.
-Obtain independent final-diff review on the exact candidate commit and retain
-the coordinator-owned mandatory combined full gate as open until executed.
-Any widened public-contract impact returns to specification review. Live checks
-remain SKIP unless a separate explicit approved environment/task scope exists.
-
-B03/B04/B05/B06 remain DRAFT contract decisions: ordered source schema and bytes
-must stay bound; authored NULL/timezone choices stay explicit; target naming is
-not source receipt authority; partitions need per-child proof, never a boolean.
+B03–B08 remain deferred. Source schema/bytes must stay bound; NULL/timezone
+choices remain authored; target names are not source receipt authority; partition
+proof cannot come from a boolean. Shared changelog, schemas, factories, dependencies
+and release artifacts remain coordinator-owned. No live, corporate, composition,
+DDA, merge or publication activity is authorized by this stage.
 
 ## Integrator-owned changelog proposal
 
 Preserve default-scale nullable MSSQL time text at 100ns precision across Python
-binary encoders. Retain receipted single-file ClickHouse dispatch with before/after
-integrity checks, rejecting changed validation evidence or mismatched load counts.
-The coordinator owns the shared changelog entry and final combined validation.
+binary encoders. The coordinator owns the shared changelog entry and combined gate.

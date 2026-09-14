@@ -1,11 +1,37 @@
 # Stage 02 validation ledger
 
-This authored ledger records the baseline analysis and subsequent granted B01/B02
-repair validation, starting at `46830976b214262c7772800523e832a5a6f6d78f`.
+This authored ledger separates the final B01 scope from the rejected B01/B02
+attempt and baseline analysis, starting at `46830976b214262c7772800523e832a5a6f6d78f`.
 It is not a route certification receipt. Only the assigned repair paths changed.
 Operational paths, host identities and transient logs are intentionally omitted.
 
-## Repaired candidate
+## Final B01 candidate
+
+B02 production behavior, acceptance tests and fast-path documentation changes
+were withdrawn after the P1 review. Only B01 changes runtime behavior.
+
+| Check | Status | Observed result / scope |
+| --- | --- | --- |
+| B01 before the correction | FAIL (expected RED) | The retained initial run contains six exact-byte failures for the implicit nullable spellings on Python RowBinary/Native; the other six explicit-scale/accelerated controls passed. |
+| Reduced-scope native/type/receipt/quality selection | PASS | 727 tests, no skips: all 715 original cases plus the 12 B01 cases. Direct pytest entrypoint with the unchanged locked environment. |
+| Ruff and formatting | PASS | Global checks; 6,082 files already formatted. |
+| Mypy | PASS | No issues in 1,209 configured source files. |
+| Import rules and layer metrics | PASS | No violations or layer-metric issues. |
+| Architecture fitness | PASS with existing warning | Status OK; average clustering 0.1818679053176943 remains above the 0.180 target. The final runtime change adds no import or graph edge; no budget is changed. |
+| Documentation check and language contracts | PASS | 844 Markdown files, 3,413 links; 32 language tests. |
+| Generated references and strict MkDocs | PASS | 3/3 references in sync; strict build completed. |
+| Exact-commit module-size check and independent follow-up review | Pending frozen commit | Recorded separately in the final coordinator handoff; the rejected candidate verdict below is not carried forward. |
+| Mandatory combined full non-live and clean installed-runtime gates | UNVERIFIED | Coordinator-owned on the frozen combined candidate. |
+
+Historical counts below do not substitute for final B01 validation. Raw logs and
+operational contracts remain outside the public commit.
+
+## Rejected B01/B02 attempt
+
+Commit: `69013d51dbdaff578767cee54ae49a2119cebc40`. Overall **FAIL / CHANGES REQUESTED**.
+The numeric acceptance tests were insufficient to prove logical codec fidelity
+and have been removed from the final scope. Retained PASS entries describe
+individual executed checks, not B02 capability acceptance.
 
 | Check | Status | Observed result / scope |
 | --- | --- | --- |
@@ -14,7 +40,7 @@ Operational paths, host identities and transient logs are intentionally omitted.
 | Corrected original focused selection | PASS | 37 tests. |
 | Previous-success summary regression without the reset | FAIL (expected RED) | One test independently reproduced stale accepted-row evidence on a failed later consumption. |
 | Expanded native/type/receipt/quality regression selection | PASS | 746 tests, no skips; includes all 715 initial cases plus 31 new cases. |
-| Final direct native/wrapper/streaming selection, including failed-attempt readmission assertions | PASS | 38 tests. Same source remains frozen for commit/review. |
+| Direct native/wrapper/streaming selection, including failed-attempt readmission assertions | PASS (insufficient coverage) | 38 tests; the independent reviewer repeated these successfully before reproducing the codec blocker. |
 | Ruff check and formatting | PASS | Global checks and subsequent changed-test/artifact checks passed. |
 | Mypy | PASS | No issues in 1,209 configured source files. |
 | Import rules and layer metrics | PASS | No violations. |
@@ -23,7 +49,9 @@ Operational paths, host identities and transient logs are intentionally omitted.
 | Documentation language contracts | PASS | 32 tests. |
 | Generated references | PASS | 3/3 references in sync. |
 | Strict MkDocs build | PASS | Completed successfully. |
-| Exact-commit module-size check and independent fresh-context review | UNVERIFIED at draft preparation | Execute after commit; record exact commit/status with the coordinator handoff. Earlier baseline module check below does not substitute for it. |
+| Exact-commit module-size check | FAIL | Full baseline/head SHAs: `contract_artifacts.py` introduced unbaselined warning debt at 367 SLOC, above warn_sloc=350. No baseline change is authorized. Earlier invocation with symbolic HEAD was a configuration failure, not this result. |
+| Independent fresh-context review | FAIL / CHANGES REQUESTED | One P1: genuine source-receipted text markers are silently accepted without decoding. Source receipt, bytes and counts agree while logical values differ. [Review and disposition](rejected-b02-review.md). |
+| Extended public-DI codec probe | FAIL (logical fidelity) | Eight accepted rows; empty/TAB/LF/CR/marker text changes and literal quotes disappear. NULL/Unicode controls survive. [Generated observation](evidence/rejected-b02-codec-observation.json). |
 | Mandatory combined full non-live gate and clean installed-runtime acceptance | UNVERIFIED | Coordinator owns one frozen combined candidate and exact included-commit map. No standalone full rerun is required before this stage's integration handoff. |
 
 ## Historical analysis checks

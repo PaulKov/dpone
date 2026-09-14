@@ -1,0 +1,78 @@
+{
+  "assessed_commit": "69013d51dbdaff578767cee54ae49a2119cebc40",
+  "entrypoint": "ClickHouseSink.stage_payload",
+  "mode": "python",
+  "source_receipt_rows": 8,
+  "accepted_rows": 8,
+  "decoded_staging": false,
+  "expected_rows": [
+    [
+      0,
+      ""
+    ],
+    [
+      1,
+      null
+    ],
+    [
+      2,
+      "tab\ttext"
+    ],
+    [
+      3,
+      "line\ntext"
+    ],
+    [
+      4,
+      "carriage\rtext"
+    ],
+    [
+      5,
+      "marker\u001dtext"
+    ],
+    [
+      6,
+      "\"quoted\""
+    ],
+    [
+      7,
+      "Юникод"
+    ]
+  ],
+  "driver_rows": [
+    [
+      0,
+      "\u001dE"
+    ],
+    [
+      1,
+      null
+    ],
+    [
+      2,
+      "tab\u001dTtext"
+    ],
+    [
+      3,
+      "line\u001dNtext"
+    ],
+    [
+      4,
+      "carriage\u001dRtext"
+    ],
+    [
+      5,
+      "marker\u001dPtext"
+    ],
+    [
+      6,
+      "quoted"
+    ],
+    [
+      7,
+      "Юникод"
+    ]
+  ],
+  "logical_fidelity": false,
+  "database_io": false
+}
