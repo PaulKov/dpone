@@ -2,6 +2,7 @@
 
 import hashlib
 import shlex
+import subprocess
 import sys
 from time import monotonic
 
@@ -14,7 +15,7 @@ from dpone.runtime.connectors.clickhouse_file_stage_client import ClickHouseFile
 
 @pytest.fixture
 def runner_factory(tmp_path):
-    def build(behavior="success"):
+    def build(behavior="success", *, clock=monotonic, popen=subprocess.Popen):
         script = tmp_path / f"client_{behavior}.py"
         capture = tmp_path / f"{behavior}.bin"
         script.write_text(
@@ -38,7 +39,7 @@ elif query.startswith('INSERT'):
             timeout_seconds=2,
         )
         runner = ClickHouseFileClientRunner(
-            ClickHouseClientCredentials("127.0.0.1", 9000, "sample", "synthetic"), options, clock=monotonic
+            ClickHouseClientCredentials("127.0.0.1", 9000, "sample", "synthetic"), options, clock=clock, popen=popen
         )
         plan = ClickHouseFilePlan((("v", "int"),), (("v", "Int32"),), "client", "none", 2, "a" * 64, "sample", "rows")
         endpoint = runner.preflight(plan)
@@ -88,3 +89,46 @@ def test_base_exception_from_source_joins_child(runner_factory):
     with pytest.raises(KeyboardInterrupt):
         runner.execute(request, chunks=failing_chunks(), deadline_monotonic=monotonic() + 3)
     assert runner.local_stopped
+
+
+@pytest.mark.parametrize("boundary", ["before_wait", "after_wait"])
+def test_expired_final_wait_cannot_record_completed_query(runner_factory, boundary):
+    """A real exited child does not grant success beyond the absolute deadline."""
+    armed, expired = False, False
+    process = None
+    deadline = 0.0
+
+    def clock():
+        drained = process is not None and all(
+            stream is not None and stream.closed for stream in (process.stdin, process.stdout, process.stderr)
+        )
+        if armed and (expired or (boundary == "before_wait" and drained)):
+            return deadline
+        return monotonic()
+
+    class ObservedChild(subprocess.Popen):
+        def wait(self, timeout=None):
+            nonlocal expired
+            result = super().wait(timeout=timeout)
+            if armed and boundary == "after_wait":
+                expired = True
+            return result
+
+    def popen(*args, **kwargs):
+        nonlocal process
+        process = ObservedChild(*args, **kwargs)
+        return process
+
+    runner, request, capture = runner_factory(clock=clock, popen=popen)
+    process = None  # The completed preflight child is outside this query's deadline.
+    deadline = monotonic() + 3
+    armed = True
+    with pytest.raises(TimeoutError, match="clickhouse file query deadline exceeded"):
+        runner.execute(request, chunks=[b"complete"], deadline_monotonic=deadline)
+    assert capture.read_bytes() == b"complete"
+    assert runner.local_stopped
+    assert process is not None and process.poll() == 0
+    armed = False
+    observation = runner.cancel_and_observe(request.identity, deadline_monotonic=monotonic() + 3)
+    assert observation.local_state == "stopped"
+    assert observation.remote_state == "unknown"

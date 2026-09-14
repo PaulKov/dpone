@@ -20,7 +20,7 @@
   "release_authorized": false,
   "lifecycle_note": "Approval supersedes historical pre-approval prose in the immutable original package. Only the specification status marker is changed in the working copy.",
   "approved_working_spec_sha256": "37dfbaf0fb0f8e613fb06b0f53b36a06d54c6dd66b4588a6cba605632461e3bd",
-  "activated_contract_sha256": "7e3cd99d6536fb5e03dddced95114987b635eaa60eef5b5dc7090e4403942c99",
+  "activated_contract_sha256": "d8bb2e5160d6130cc25740cf58374c0dd57093c2ffc37e465b6bff979de9b577",
   "contract_materialization": "Same effective owned paths. CHANGELOG/mkdocs represented as integrator-owned exceptions to standard forbidden paths; added exact canonical stop-condition strings required by the existing validator. Original reviewed appendix remains unchanged. Closed schema permits only four required_outputs; mandatory independent review receipt is explicitly included in completion-report acceptance instead. No review requirement removed.",
   "reconciled_base_commit": "1202d2cf652cf41594abdd21040378204653b656",
   "base_reconciliation": {
@@ -71,6 +71,29 @@
     {
       "base_commit": "0147dd18ceef025c55cb5f05ee3d43b076a25612",
       "sha256": "03f9a2fb6efdb9c2105569f94c11206b562e0c7c5359c6a64b80a63a91fab789"
+    },
+    {
+      "base_commit": "1202d2cf652cf41594abdd21040378204653b656",
+      "sha256": "7e3cd99d6536fb5e03dddced95114987b635eaa60eef5b5dc7090e4403942c99",
+      "reason": "Before approved architecture responsibility amendment"
     }
-  ]
+  ],
+  "architecture_responsibility_amendment": {
+    "path": "test_artifacts/dbt-programme/stage-02/architecture-responsibility-amendment.md",
+    "sha256": "4634f69d26df3b6309f17666965623f841eaf1103f33d083f6cf713a96a3872c",
+    "authority": "Programme coordinator approved implementation after independent b02_structure_design review",
+    "starting_commit": "5c9d8ff36bb51ab7764b347a7ebc9fb1817681cf",
+    "branch": "codex/b02-validated-file-staging-linear",
+    "additional_owned_paths": [
+      "src/dpone/runtime/connectors/clickhouse_client_request.py",
+      "src/dpone/runtime/connectors/clickhouse_http_request.py",
+      "src/dpone/runtime/connectors/clickhouse_file_response.py",
+      "src/dpone/runtime/connectors/bulk_text_codec.py",
+      "src/dpone/runtime/connectors/clickhouse_http_bulk.py",
+      "tests/test_b02_dependency_compatibility.py"
+    ],
+    "public_policy_change": false,
+    "internal_di_change": "Required storage-bound journal factory replaces service storage argument and default concrete factory",
+    "scope": "Five exact responsibility moves in the immutable amendment; original spec and appendix preserved"
+  }
 }

@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from functools import partial
 from importlib import import_module
 from time import monotonic
 from typing import TYPE_CHECKING, Any
 
-from dpone.runtime.clickhouse_file_stage_contract import ClickHouseFileStageRunner
+from dpone.runtime.clickhouse_file_stage_contract import (
+    ClickHouseFileStageRunner,
+    ClickHouseValidatedFilePolicy,
+    require_transport_profile,
+)
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.sinks.clickhouse_bulk_mixin import ClickHouseBulkMixin
 from dpone.runtime.sinks.clickhouse_cluster_preflight import ClickHouseClusterPreflightMixin
@@ -23,10 +28,7 @@ from dpone.runtime.sinks.clickhouse_staged_load import ClickHouseStagedLoadServi
 from dpone.runtime.sinks.clickhouse_staging_decoder import ClickHouseStagingDecoder
 from dpone.runtime.sinks.clickhouse_staging_finalizer import ClickHouseStagingFinalizer
 from dpone.runtime.sinks.clickhouse_validated_file_ingestion import ClickHouseValidatedFileService
-from dpone.runtime.sinks.clickhouse_validated_file_models import (
-    ClickHouseValidatedFilePolicy,
-    require_transport_profile,
-)
+from dpone.runtime.sinks.clickhouse_validated_file_journal import ClickHouseFileAttemptJournal
 from dpone.runtime.sinks.load_payload import LoadPayload
 from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.sink_protocol import AbstractSink
@@ -71,7 +73,7 @@ class ClickHouseSink(
             runner_factory=validated_file_runner_factory
             or (lambda config, policy: build_file_runner(config, policy, connector=self.connector, clock=monotonic)),
             resolver=self._physical_type_resolver,
-            storage=StoragePreflightService(),
+            journal_factory=partial(ClickHouseFileAttemptJournal, storage=StoragePreflightService()),
             clock=monotonic,
         )
         self._staging_decoder = ClickHouseStagingDecoder(
@@ -325,23 +327,11 @@ def build_file_runner(
         secure=setting("secure", connector.secure if mode == "client" else False),
     )
     if mode == "client":
-        from dpone.runtime.connectors.clickhouse_bulk import ClickHouseClientCredentials, ClickHouseClientOptions
-        from dpone.runtime.connectors.clickhouse_file_stage_client import ClickHouseFileClientRunner
+        from dpone.runtime.connectors.clickhouse_file_stage_client import build_file_client_runner
 
-        return ClickHouseFileClientRunner(
-            ClickHouseClientCredentials(**common),
-            ClickHouseClientOptions(
-                client_command=setting("command", "clickhouse-client"),
-                input_format="RowBinary",
-                timeout_seconds=timeout,
-            ),
-            clock=clock,
+        return build_file_client_runner(
+            **common, timeout=timeout, command=setting("command", "clickhouse-client"), clock=clock
         )
-    from dpone.runtime.connectors.clickhouse_file_stage_http import ClickHouseFileHttpRunner
-    from dpone.runtime.connectors.clickhouse_http_bulk import ClickHouseHttpCredentials, ClickHouseHttpOptions
+    from dpone.runtime.connectors.clickhouse_file_stage_http import build_file_http_runner
 
-    return ClickHouseFileHttpRunner(
-        ClickHouseHttpCredentials(**common),
-        ClickHouseHttpOptions(input_format="RowBinary", timeout_seconds=timeout),
-        clock=clock,
-    )
+    return build_file_http_runner(**common, timeout=timeout, clock=clock)

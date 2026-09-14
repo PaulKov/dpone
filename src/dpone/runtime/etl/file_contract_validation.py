@@ -11,9 +11,13 @@ from pathlib import Path
 from typing import Any
 
 from dpone.readiness.schema_contracts import SchemaContract
-from dpone.runtime.connectors.bulk_text_codec import BulkTextCodec
+from dpone.runtime.connectors.bulk_text_codec import (
+    BulkTextCodec,
+    BulkTextFileReadError,
+    decode_wire_value,
+    iter_wire_rows,
+)
 from dpone.runtime.file_artifact_authority import FileVerificationBudget
-from dpone.runtime.support.bulk_text_file_reader import BulkTextFileReadError, decode_wire_value, iter_wire_rows
 
 
 class FileContractValidationError(RuntimeError):

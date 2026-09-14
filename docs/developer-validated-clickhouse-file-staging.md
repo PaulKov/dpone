@@ -23,17 +23,46 @@ flowchart LR
 call `stage_payload`, schema evolution, source selection or checkpoint services.
 `ClickHouseValidatedFileService` owns the attempt sequence, query ownership and
 failure cleanup. The optional `validated_file_runner_factory(config, policy)` is
-constructor DI; production composition selects one controlled adapter. The narrow
-runtime query port lives in `runtime/clickhouse_file_stage_contract.py`, so adapters
-do not import sink policy. SQL identifiers and literals use explicit escaping.
+constructor DI; production composition selects one controlled adapter. The runtime
+query port, finite admission policy, errors, canonical JSON and journal resource port
+live in `runtime/clickhouse_file_stage_contract.py`. SQL identifiers and literals use
+explicit escaping.
 
-The shared `bulk_text_file_reader` preserves the producer's TAB/LF, UTF-8, control
+The shared reader in `connectors/bulk_text_codec.py` preserves the producer's TAB/LF, UTF-8, control
 marker and hex-whitespace rules. Source validation retains its previous error
 ordering and unlimited legacy reader mode. Only the new preparer supplies record
 and phase budgets. It freezes ordered physical columns and the finite type policy,
 converts every cell and validates all rows before CREATE. A held source descriptor
 and repeated receipt verification establish source identity; a separately sealed
 and rehashed spool establishes derived identity.
+
+## Component ownership and dependency injection
+
+| Component | Responsibility and dependencies |
+| --- | --- |
+| `ClickHouseSink` | Composes controlled adapter factories from resolved scalar settings and binds storage to the concrete journal factory |
+| `ClickHouseValidatedFileService` and preparer | Depend on the runtime query/journal ports and finite policy; own sequencing and preparation, respectively |
+| `clickhouse_client_request.py` and `clickhouse_http_request.py` | Own credentials, options and pure request construction shared by legacy and controlled transports |
+| `bulk_text_codec.py` | Owns the producer codec and its logical reader, including wire grammar and read errors |
+| `clickhouse_file_response.py` | Owns bounded HTTP response framing and raw reads using injected metadata/body limits and remaining-deadline callback; imports only the standard library |
+| `ClickHouseFileAttemptJournal` | Implements private spool storage, immutable event publication and failure inventory |
+
+The internal service constructor requires a bound
+`journal_factory(policy, attempt_id)` and no longer accepts `storage=`. Production
+composition uses `partial(ClickHouseFileAttemptJournal, storage=StoragePreflightService())`.
+A custom factory must return `ClickHouseFileJournalResource`, whose capabilities are
+limited to the attempt directory/ID, context management, identity/reserve checks,
+partial-file creation and sealing, spool release, event recording and failure
+attachment. It cannot select a planner or change preparation policy. The public
+sink constructor and `stage_validated_file` signature remain unchanged.
+
+The historical bulk transport modules retain exact credential/option aliases and
+their own execution methods. Public builder overrides still dispatch through the
+same methods; request extraction does not reroute `execute_query` through another
+public override. The reader facade in `support/bulk_text_file_reader.py` and policy
+facade in `sinks/clickhouse_validated_file_models.py` retain exact aliases. Historical
+class/function metadata, signatures, dataclass behavior and pickle globals remain
+compatible. Internal consumers import the implementation owner directly.
 
 The original `ContractValidatedFileArtifact` import from `contract_artifacts` remains
 the same class, re-exported from `validated_file_artifact`. Its new
@@ -93,6 +122,8 @@ redirects. The caller must exclude load balancing and future endpoint failover.
 
 The HTTP adapter injects its owned response factory through CPython 3.11/3.12's
 `HTTPConnection.response_class` hook, preserving the supplied connection factory.
+The standard-library response module receives the two independent byte limits and
+the adapter's remaining-deadline callback at construction.
 A buffered reader owns the original socket file and checks the same absolute
 deadline before and after each raw receive. Closing a `Connection: close` transport
 therefore does not detach response reads from their deadline. One 64 KiB metadata
@@ -102,6 +133,8 @@ entire declared length. Chunked responses require unsigned hexadecimal sizes,
 exact CRLF data terminators, a zero chunk and the complete trailer terminator.
 Response and connection cleanup both run before completion is recorded. A cleanup
 failure preserves the original error and retains unresolved local ownership.
+The client checks its absolute deadline before and after the final process wait;
+an already-exited process cannot authorize a late successful acknowledgment.
 
 On error, stop/join local I/O separately from confirming server termination.
 Exact-query `KILL ... SYNC` with matching `finished` output or an already observed
@@ -156,6 +189,10 @@ comparison checks the real producer codec against independently authored source
 bytes. Corrupted/reordered/trailing data cannot pass the oracle. Fault tests cover
 source authority, phase deadlines, journal ordering, count rejection, exact-query
 cancellation and retained unknown CREATE/INSERT/DROP state.
+Compatibility characterization also checks historical pickle payloads, signatures,
+resolved type hints, dataclass defaults and public subclass dispatch through real
+child processes and loopback HTTP. These checks distinguish preserved transport
+behavior from the controlled staging adapter's stricter admission policy.
 
 For installed-runtime verification, set `DPONE_TEST_B02_EVIDENCE_ROOT` to an external
 output root and `DPONE_TEST_B02_CANDIDATE` to the exact candidate SHA. The actual

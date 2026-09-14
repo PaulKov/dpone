@@ -69,6 +69,12 @@ owned_paths:
 - src/dpone/runtime/pinned_file_integrity.py
 - tests/test_file_verification_budget.py
 - tests/test_mssql_artifact_integrity.py
+- src/dpone/runtime/connectors/clickhouse_client_request.py
+- src/dpone/runtime/connectors/clickhouse_http_request.py
+- src/dpone/runtime/connectors/clickhouse_file_response.py
+- src/dpone/runtime/connectors/bulk_text_codec.py
+- src/dpone/runtime/connectors/clickhouse_http_bulk.py
+- tests/test_b02_dependency_compatibility.py
 integrator_owned_paths:
 - CHANGELOG.md
 - mkdocs.yml
@@ -78,8 +84,6 @@ read_only_paths:
 - docs/engineering-standards.md
 - docs/compatibility_registry.yaml
 - docs/benchmarks/quality_budgets.yml
-- src/dpone/runtime/connectors/bulk_text_codec.py
-- src/dpone/runtime/connectors/clickhouse_http_bulk.py
 - src/dpone/runtime/clickhouse_binary_encoding.py
 - src/dpone/runtime/storage_policy.py
 - src/dpone/runtime/process_io.py

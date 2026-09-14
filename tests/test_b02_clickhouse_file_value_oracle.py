@@ -16,6 +16,7 @@ import shlex
 import struct
 import sys
 from contextlib import contextmanager
+from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
@@ -526,9 +527,8 @@ def test_one_budget_covers_preparation_and_full_verification(tmp_path, phase, em
         service = ClickHouseValidatedFileService(
             runner_factory=lambda _config, _policy: runner,
             resolver=ClickHousePhysicalColumnTypeResolver(),
-            storage=StoragePreflightService(),
             clock=clock,
-            journal_factory=journal_factory,
+            journal_factory=partial(journal_factory, storage=StoragePreflightService()),
         )
         with pytest.raises(TimeoutError):
             service.stage(config, payload, policy=policy)
@@ -592,9 +592,8 @@ def test_journal_failure_prevents_affected_mutation_or_success(tmp_path, mutatio
         service = ClickHouseValidatedFileService(
             runner_factory=lambda _config, _policy: runner,
             resolver=ClickHousePhysicalColumnTypeResolver(),
-            storage=StoragePreflightService(),
             clock=monotonic,
-            journal_factory=journal_factory,
+            journal_factory=partial(journal_factory, storage=StoragePreflightService()),
         )
         with pytest.raises(FileConsumptionError) as error:
             service.stage(config, payload, policy=policy)

@@ -4,14 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import http.client
-import io
-import re
-import socket
 import sys
 from collections.abc import Callable, Iterable
 from dataclasses import replace
 from functools import partial
-from typing import BinaryIO, cast
 
 from dpone.runtime.clickhouse_file_stage_contract import (
     CHUNK_BYTES,
@@ -21,152 +17,12 @@ from dpone.runtime.clickhouse_file_stage_contract import (
     IdentifiedStageQuery,
     StageQueryResult,
 )
-from dpone.runtime.connectors.clickhouse_http_bulk import (
-    ClickHouseHttpBulkRunner,
+from dpone.runtime.connectors.clickhouse_file_response import _BoundedResponse
+from dpone.runtime.connectors.clickhouse_http_request import (
     ClickHouseHttpCredentials,
     ClickHouseHttpOptions,
+    build_insert_url,
 )
-
-
-class _DeadlineRaw(io.RawIOBase):
-    """Bound each actual receive, retaining SocketIO's descriptor ownership."""
-
-    def __init__(self, sock: socket.socket, remaining: Callable[[], float]) -> None:
-        self._socket, self._remaining = sock, remaining
-        self._raw = cast(BinaryIO, sock.makefile("rb", buffering=0))
-
-    def readable(self) -> bool:
-        return True
-
-    def readinto(self, buffer: object) -> int | None:
-        self._socket.settimeout(self._remaining())
-        count = self._raw.readinto(buffer)  # type: ignore[arg-type]
-        self._remaining()
-        return count
-
-    def close(self) -> None:
-        try:
-            self._raw.close()
-        finally:
-            super().close()
-
-
-class _FramingReader(io.BufferedReader):
-    """One metadata cap across status, headers, chunk framing and trailers."""
-
-    def __init__(self, raw: _DeadlineRaw) -> None:
-        super().__init__(raw)
-        self._metadata_bytes = 0
-
-    def account_metadata(self, size: int) -> None:
-        self._metadata_bytes += size
-        if self._metadata_bytes > MAX_RESPONSE_BYTES:
-            raise RuntimeError("clickhouse_file_response_metadata_limit")
-
-    def readline(self, size: int = -1, /) -> bytes:
-        available = MAX_RESPONSE_BYTES + 1 - self._metadata_bytes
-        line = super().readline(min(size, available) if size >= 0 else available)
-        self.account_metadata(len(line))
-        if not line.endswith(b"\r\n"):
-            raise http.client.IncompleteRead(b"")
-        return line
-
-
-class _ResponseSocket:
-    """Expose only the response constructor's makefile dependency."""
-
-    def __init__(self, reader: _FramingReader) -> None:
-        self.reader = reader
-
-    def makefile(self, _mode: str) -> _FramingReader:
-        return self.reader
-
-
-class _BoundedResponse(http.client.HTTPResponse):
-    """CPython response factory with strict, bounded HTTP body framing.
-
-    The supported 3.11/3.12 connection response_class hook preserves the supplied
-    connection factory. No socket/SDK instance methods are replaced. The owned
-    chunk parser validates terminators that HTTPResponse normally discards.
-    """
-
-    _token = rb"[!#$%&'*+\-.^_`|~0-9A-Za-z]+"
-    _quoted = rb'"(?:[\t !#-\[\]-~\x80-\xff]|\\[\t -~\x80-\xff])*"'
-    _chunk_line = re.compile(
-        rb"([0-9a-fA-F]+)(?:[ \t]*;[ \t]*" + _token + rb"(?:[ \t]*=[ \t]*(?:" + _token + rb"|" + _quoted + rb"))?)*\r\n"
-    )
-    _trailer_line = re.compile(_token + rb":[\t\x20-\x7e\x80-\xff]*\r\n")
-
-    def __init__(
-        self,
-        sock: socket.socket,
-        debuglevel: int = 0,
-        *,
-        method: str | None = None,
-        remaining: Callable[[], float],
-    ) -> None:
-        self._reader = _FramingReader(_DeadlineRaw(sock, remaining))
-        self._chunk_remaining = 0
-        self._chunk_terminator = False
-        self._body_bytes = 0
-        try:
-            super().__init__(cast(socket.socket, _ResponseSocket(self._reader)), debuglevel, method=method)
-        except BaseException:
-            self._reader.close()
-            raise
-
-    def begin(self) -> None:
-        super().begin()
-        assert self.headers is not None
-        if self.headers.defects or any(
-            not self._trailer_line.fullmatch(f"{name}:{value}\r\n".encode("iso-8859-1"))
-            for name, value in self.headers.raw_items()
-        ):
-            raise http.client.HTTPException("clickhouse_file_response_framing")
-        transfers = self.headers.get_all("Transfer-Encoding", [])
-        lengths = self.headers.get_all("Content-Length", [])
-        if transfers and ([value.lower() for value in transfers] != ["chunked"] or lengths):
-            raise http.client.HTTPException("clickhouse_file_response_framing")
-        if lengths and (self.length is None or len(set(lengths)) != 1 or not re.fullmatch(r"[0-9]+", lengths[0])):
-            raise http.client.HTTPException("clickhouse_file_response_framing")
-
-    def read(self, amt: int | None = None) -> bytes:
-        if amt == 0:
-            return b""
-        if amt is None or amt < 1:
-            raise ValueError("file-stage response reads require a positive bound")
-        if not self.chunked:
-            data = super().read(amt)
-            if not data and self.length not in (None, 0):
-                raise http.client.IncompleteRead(b"", self.length)
-            return data
-        if self.fp is None:
-            return b""
-        if not self._chunk_remaining:
-            if self._chunk_terminator:
-                self._reader.account_metadata(2)
-                if self._reader.read(2) != b"\r\n":
-                    raise http.client.IncompleteRead(b"")
-            size = self._chunk_line.fullmatch(self._reader.readline())
-            if size is None:
-                raise http.client.HTTPException("clickhouse_file_response_framing")
-            self._chunk_remaining = int(size[1], 16)
-            if self._chunk_remaining > MAX_RESPONSE_BYTES - self._body_bytes:
-                raise RuntimeError("clickhouse_file_response_limit")
-            if not self._chunk_remaining:
-                while (trailer := self._reader.readline()) != b"\r\n":
-                    if not self._trailer_line.fullmatch(trailer):
-                        raise http.client.HTTPException("clickhouse_file_response_framing")
-                self.close()
-                return b""
-        expected = min(amt, self._chunk_remaining)
-        data = self._reader.read(expected)
-        if len(data) != expected:
-            raise http.client.IncompleteRead(b"", expected - len(data))
-        self._chunk_remaining -= len(data)
-        self._body_bytes += len(data)
-        self._chunk_terminator = True
-        return data
 
 
 class ClickHouseFileHttpRunner(IdentifiedFileRunner):
@@ -202,11 +58,13 @@ class ClickHouseFileHttpRunner(IdentifiedFileRunner):
             query_id=request.identity.query_id,
             insert_deduplication_token=None,
         )
-        builder = ClickHouseHttpBulkRunner(self.credentials, options)
-        url = builder.build_insert_url("", (), query=request.sql)
+        url = build_insert_url(self.credentials, options, "", (), query=request.sql)
         connection = self._connection_factory(self.host, self.port, timeout=self._remaining(deadline_monotonic))
         connection.response_class = partial(  # type: ignore[assignment]
-            _BoundedResponse, remaining=partial(self._remaining, deadline_monotonic)
+            _BoundedResponse,
+            remaining=partial(self._remaining, deadline_monotonic),
+            max_metadata_bytes=MAX_RESPONSE_BYTES,
+            max_body_bytes=MAX_RESPONSE_BYTES,
         )
         response: http.client.HTTPResponse | None = None
         self.local_stopped = False
@@ -286,3 +144,22 @@ class ClickHouseFileHttpRunner(IdentifiedFileRunner):
         connection.timeout = remaining
         if connection.sock is not None:
             connection.sock.settimeout(remaining)
+
+
+def build_file_http_runner(
+    *,
+    host: str,
+    port: int,
+    database: str,
+    user: str,
+    password: str,
+    secure: bool,
+    timeout: int,
+    clock: Callable[[], float],
+) -> ClickHouseFileHttpRunner:
+    """Compose one controlled adapter from already resolved scalar settings."""
+    return ClickHouseFileHttpRunner(
+        ClickHouseHttpCredentials(host, port, database, user, password, secure),
+        ClickHouseHttpOptions(input_format="RowBinary", timeout_seconds=timeout),
+        clock=clock,
+    )

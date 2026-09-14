@@ -13,9 +13,12 @@ from dpone.config.load_config import LoadConfig
 from dpone.runtime.clickhouse_file_stage_contract import (
     CHUNK_BYTES,
     REMOTE_CONFIRMATION_SECONDS,
+    ClickHouseFileJournalResource,
     ClickHouseFilePlan,
     ClickHouseFileStageRunner,
+    ClickHouseValidatedFilePolicy,
     EndpointBinding,
+    FileConsumptionError,
     IdentifiedStageQuery,
     QueryIdentity,
     QueryKind,
@@ -30,11 +33,6 @@ from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.process_io import add_exception_note
 from dpone.runtime.sinks.clickhouse_physical_types import ClickHousePhysicalColumnTypeResolver
 from dpone.runtime.sinks.clickhouse_staged_evidence import staged_handle_metadata
-from dpone.runtime.sinks.clickhouse_validated_file_journal import ClickHouseFileAttemptJournal
-from dpone.runtime.sinks.clickhouse_validated_file_models import (
-    ClickHouseValidatedFilePolicy,
-    FileConsumptionError,
-)
 from dpone.runtime.sinks.clickhouse_validated_file_preparation import (
     ClickHouseValidatedFilePreparer,
     PreparedClickHouseFile,
@@ -42,7 +40,6 @@ from dpone.runtime.sinks.clickhouse_validated_file_preparation import (
     make_plan,
 )
 from dpone.runtime.sinks.load_payload import LoadPayload
-from dpone.runtime.storage_policy import StoragePreflightService
 
 
 class _StageSession:
@@ -51,7 +48,7 @@ class _StageSession:
     def __init__(
         self,
         runner: ClickHouseFileStageRunner,
-        journal: ClickHouseFileAttemptJournal,
+        journal: ClickHouseFileJournalResource,
         plan: ClickHouseFilePlan,
         endpoint: EndpointBinding,
         clock: Callable[[], float],
@@ -247,12 +244,11 @@ class ClickHouseValidatedFileService:
         *,
         runner_factory: Callable[[LoadConfig, ClickHouseValidatedFilePolicy], ClickHouseFileStageRunner],
         resolver: ClickHousePhysicalColumnTypeResolver,
-        storage: StoragePreflightService,
         clock: Callable[[], float],
-        journal_factory: Callable[..., ClickHouseFileAttemptJournal] = ClickHouseFileAttemptJournal,
+        journal_factory: Callable[[ClickHouseValidatedFilePolicy, str], ClickHouseFileJournalResource],
     ) -> None:
         self.runner_factory, self.resolver = runner_factory, resolver
-        self.storage, self.clock, self.journal_factory = storage, clock, journal_factory
+        self.clock, self.journal_factory = clock, journal_factory
         self._retained_local: list[tuple[_StageSession, PreparedClickHouseFile]] = []
         self._retained_probes: list[ClickHouseFileStageRunner] = []
 
@@ -272,7 +268,7 @@ class ClickHouseValidatedFileService:
         with payload.artifact.file_validation_attempt(attempt_id, verification_budget=preparation_budget) as attempt:
             plan = make_plan(load_config, payload.schema, resolver=self.resolver)
             frozen = deepcopy(load_config)
-            with self.journal_factory(policy, attempt_id, storage=self.storage) as journal:
+            with self.journal_factory(policy, attempt_id) as journal:
                 prepared, session = None, None
                 try:
                     prepared = ClickHouseValidatedFilePreparer(clock=self.clock).prepare(
@@ -330,7 +326,7 @@ class ClickHouseValidatedFileService:
         self,
         attempt: FileValidationAttempt,
         prepared: PreparedClickHouseFile,
-        journal: ClickHouseFileAttemptJournal,
+        journal: ClickHouseFileJournalResource,
         config: LoadConfig,
         budget: FileVerificationBudget,
     ) -> None:
@@ -345,7 +341,7 @@ class ClickHouseValidatedFileService:
     def _failure(
         self,
         error: BaseException,
-        journal: ClickHouseFileAttemptJournal,
+        journal: ClickHouseFileJournalResource,
         session: _StageSession | None,
         prepared: PreparedClickHouseFile | None,
     ) -> None:

@@ -11,20 +11,18 @@ from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import Any, BinaryIO
 
-from dpone.runtime.immutable_local_tree import materialize_immutable_local_tree_at
-from dpone.runtime.pinned_directory import PinnedDirectory
-from dpone.runtime.process_io import add_exception_note
-from dpone.runtime.sinks.clickhouse_validated_file_models import (
+from dpone.runtime.clickhouse_file_stage_contract import (
     MAX_EVENT_BYTES,
     ClickHouseValidatedFilePolicy,
     FileConsumptionError,
 )
+from dpone.runtime.clickhouse_file_stage_contract import (
+    canonical_json as canonical_json,
+)
+from dpone.runtime.immutable_local_tree import materialize_immutable_local_tree_at
+from dpone.runtime.pinned_directory import PinnedDirectory
+from dpone.runtime.process_io import add_exception_note
 from dpone.runtime.storage_policy import RuntimeStorageAdmissionError, RuntimeStoragePolicy, StoragePreflightService
-
-
-def canonical_json(value: object) -> bytes:
-    """Stable UTF-8 identities; no NaN, implicit encoders or path serialization."""
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
 class ClickHouseFileAttemptJournal:

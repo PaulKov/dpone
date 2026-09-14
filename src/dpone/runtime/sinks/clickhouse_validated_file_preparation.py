@@ -15,20 +15,21 @@ from typing import BinaryIO
 from dpone.config.load_config import LoadConfig
 from dpone.runtime.artifact_integrity import ArtifactIntegrityError, FileIdentity
 from dpone.runtime.clickhouse_binary_encoding import encode_clickhouse_value, unwrap_nullable
-from dpone.runtime.clickhouse_file_stage_contract import SYNC_SETTINGS, ClickHouseFilePlan
-from dpone.runtime.connectors.bulk_text_codec import BulkTextCodec
+from dpone.runtime.clickhouse_file_stage_contract import (
+    CHUNK_BYTES,
+    SYNC_SETTINGS,
+    ClickHouseFileJournalResource,
+    ClickHouseFilePlan,
+    ClickHouseValidatedFilePolicy,
+    FileConsumptionError,
+    canonical_json,
+    require_transport_profile,
+)
+from dpone.runtime.connectors.bulk_text_codec import BulkTextCodec, BulkTextFileReadError, iter_rows
 from dpone.runtime.etl.validated_file_artifact import FileValidationAttempt, FileValidationBinding
 from dpone.runtime.file_artifact_authority import FileVerificationBudget
 from dpone.runtime.process_io import add_exception_note
 from dpone.runtime.sinks.clickhouse_physical_types import ClickHousePhysicalColumnTypeResolver
-from dpone.runtime.sinks.clickhouse_validated_file_journal import ClickHouseFileAttemptJournal, canonical_json
-from dpone.runtime.sinks.clickhouse_validated_file_models import (
-    CHUNK_BYTES,
-    ClickHouseValidatedFilePolicy,
-    FileConsumptionError,
-    require_transport_profile,
-)
-from dpone.runtime.support.bulk_text_file_reader import BulkTextFileReadError, iter_rows
 from dpone.runtime.support.type_mapping.mssql_clickhouse import MssqlClickHouseTypeMapper, MssqlClickHouseTypePolicy
 
 
@@ -122,7 +123,7 @@ class PreparedClickHouseFile:
     identity: FileIdentity
     semantic_id: str
 
-    def verify_transport(self, journal: ClickHouseFileAttemptJournal, *, check_deadline: Callable[[], None]) -> None:
+    def verify_transport(self, journal: ClickHouseFileJournalResource, *, check_deadline: Callable[[], None]) -> None:
         """Rehash the held file and verify that its sealed pathname still agrees."""
         journal.require_identity()
         path = journal.directory / "transport.rowbinary"
@@ -187,7 +188,7 @@ class ClickHouseValidatedFilePreparer:
         attempt: FileValidationAttempt,
         plan: ClickHouseFilePlan,
         policy: ClickHouseValidatedFilePolicy,
-        journal: ClickHouseFileAttemptJournal,
+        journal: ClickHouseFileJournalResource,
         *,
         verification_budget: FileVerificationBudget | None = None,
     ) -> PreparedClickHouseFile:
@@ -275,7 +276,7 @@ class ClickHouseValidatedFilePreparer:
         plan: ClickHouseFilePlan,
         policy: ClickHouseValidatedFilePolicy,
         target: BinaryIO,
-        journal: ClickHouseFileAttemptJournal,
+        journal: ClickHouseFileJournalResource,
         check: Callable[[], None],
     ) -> tuple[int, int, str]:
         artifact = attempt.binding.artifact

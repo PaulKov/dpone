@@ -20,10 +20,10 @@ from dpone.runtime.clickhouse_file_stage_contract import (
     QueryObservation,
     StageQueryResult,
 )
-from dpone.runtime.connectors.clickhouse_bulk import (
+from dpone.runtime.connectors.clickhouse_client_request import (
     ClickHouseClientCredentials,
     ClickHouseClientOptions,
-    ClickHouseClientRunner,
+    build_query_command,
 )
 from dpone.runtime.process_io import abort_process, add_exception_note
 
@@ -65,14 +65,19 @@ class ClickHouseFileClientRunner(IdentifiedFileRunner):
             query_id=request.identity.query_id,
             insert_deduplication_token=None,
         )
-        command = ClickHouseClientRunner(self.credentials, options).build_query_command(request.sql)
+        command = build_query_command(self.credentials, options, request.sql)
         process = self._popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
         self._process, self._pending_chunks = process, chunks
         self.local_stopped = False
         try:
             body, size, digest = self._pump(process, chunks or (), deadline_monotonic)
-            returncode = process.wait(timeout=max(0.001, deadline_monotonic - self.clock()))
+            remaining = deadline_monotonic - self.clock()
+            if remaining <= 0:
+                raise TimeoutError("clickhouse file query deadline exceeded")
+            returncode = process.wait(timeout=remaining)
             self.local_stopped = True
+            if self.clock() >= deadline_monotonic:
+                raise TimeoutError("clickhouse file query deadline exceeded")
             if returncode != 0:
                 raise RuntimeError(f"clickhouse_file_client_exit:{returncode}")
             return self.completed(request, body, size, digest)
@@ -152,3 +157,23 @@ class ClickHouseFileClientRunner(IdentifiedFileRunner):
             if self.local_stopped:
                 self._pending_chunks = None
         return super().cancel_and_observe(query, deadline_monotonic=deadline_monotonic)
+
+
+def build_file_client_runner(
+    *,
+    host: str,
+    port: int,
+    database: str,
+    user: str,
+    password: str,
+    secure: bool,
+    timeout: int,
+    command: str,
+    clock: Callable[[], float],
+) -> ClickHouseFileClientRunner:
+    """Compose one controlled adapter from already resolved scalar settings."""
+    return ClickHouseFileClientRunner(
+        ClickHouseClientCredentials(host, port, database, user, password, secure),
+        ClickHouseClientOptions(client_command=command, input_format="RowBinary", timeout_seconds=timeout),
+        clock=clock,
+    )
