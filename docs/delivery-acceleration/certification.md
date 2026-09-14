@@ -3,8 +3,10 @@
 Use this guide to prepare reproducible synthetic ClickHouse-to-MSSQL experiments
 and inspect their correctness evidence. It is for platform engineers with an
 explicitly approved disposable environment. The harness is implementation
-infrastructure: **live fidelity, recovery and performance remain UNVERIFIED until
-the real route factory and environment are supplied and exercised**.
+infrastructure. Retained 0.80.0 local evidence covers the scoped functional and
+controlled-recovery cases described in the native guide. Each new environment
+remains UNVERIFIED until its real route factory, authorities and workload are
+exercised; local evidence does not establish production performance.
 
 The [approved design](../feature-design-data-delivery-acceleration-v1.md) defines
 the report envelope. Read the [native transport prerequisites](../mssql-native-transport.md)
@@ -120,7 +122,8 @@ Keep these policies as separate diagnostic experiments. The comparison gate
 still requires exact configuration equality, including the fallback parallelism.
 Do not relax it to compare a symmetric baseline with an asymmetric candidate or
 claim a certified cross-policy speedup. See the [local runbook](local-docker.md)
-for the approved environment procedure; no stage 2 live result is implied here.
+for the approved environment procedure. Retained exact-source stage 2 local
+results do not replace these checks for a new deployment.
 
 ## Run and observe
 
@@ -178,8 +181,10 @@ an explicit boolean `dirty: true` and all the same proofs pass. This allowance
 does not authorize performance certification; clean UNVERIFIED and hermetic
 execution cannot pass the live-test assertion.
 
-Profiles are `narrow`, `wide` (200 columns total), `unicode`, `decimal`, `null`,
-`binary` and `skewed`. All include an integer and UTC temporal column, deterministic
+The generator defines `narrow`, `wide` (200 columns total), `unicode`, `decimal`,
+`null`, `binary` and `skewed`. The canonical native route admits the six non-binary
+profiles. Binary remains an unsupported authored source mapping; record that
+cell separately and do not bypass planner admission. All include an integer and UTC temporal column, deterministic
 seeds and intentional adjacent duplicate rows. Unicode includes supplementary
 characters and distinct normalization forms; Decimal retains precision/scale;
 NULL, empty text and empty binary remain distinct. The description hash binds
@@ -233,24 +238,32 @@ input, factory preparation or file-output failure. A zero exit is not live PASS.
 
 Every opened fixture records its UUID in a `*-owner.json` artifact. That UUID
 locates the factory's durable ownership inventory; the diagnostic report itself
-cannot authorize cleanup. The factory owns its synthetic source, target, raw,
+cannot authorize cleanup. The `inspect` command validates retained report bytes,
+checksums and receipt bindings only. It does not inspect the live journal, source
+or target, or establish the current transaction outcome. The factory owns its synthetic source, target, raw,
 prepared and switch-out objects and spool files. It must reject caller-owned
 objects, a mismatching owner generation and unsupported layouts. It must never
 drop a database or alter shared tables.
 
 Known outcomes receive owned cleanup and connection closure automatically.
 Unknown outcomes retain resources and block replay. Use the recorded UUID as
-`DPONE_DDA_INVOCATION_ID`, with the original reviewed factory/configuration:
+`DPONE_DDA_INVOCATION_ID`, with the original configuration and reviewed
+maintenance factory. For the local fixture, set the dedicated maintenance entry
+point below. Do not reuse `create_benchmark_factory`: it calls
+`prepare_benchmark()` and performs source/version/layout discovery before attach.
+Other deployments must supply a reviewed equivalent that restores target-only
+bindings without benchmark preparation:
 
 ```bash
+export DPONE_DDA_MAINTENANCE_FACTORY=tools.native_delivery_local.factory:create_factory
 uv run python tools/native_delivery_live_benchmark.py recover \
   --invocation-id "$DPONE_DDA_INVOCATION_ID" \
-  --factory "$DPONE_DDA_ROUTE_FACTORY" --limits "$DPONE_DDA_LIMITS_FILE" \
+  --factory "$DPONE_DDA_MAINTENANCE_FACTORY" --limits "$DPONE_DDA_LIMITS_FILE" \
   --strategy partition_replace --mode bounded_native \
   --output /tmp/dpone-dda5/recovery.json
 uv run python tools/native_delivery_live_benchmark.py cleanup \
   --invocation-id "$DPONE_DDA_INVOCATION_ID" \
-  --factory "$DPONE_DDA_ROUTE_FACTORY" --limits "$DPONE_DDA_LIMITS_FILE" \
+  --factory "$DPONE_DDA_MAINTENANCE_FACTORY" --limits "$DPONE_DDA_LIMITS_FILE" \
   --strategy partition_replace --mode bounded_native \
   --output /tmp/dpone-dda5/cleanup.json
 ```
@@ -284,8 +297,10 @@ independently of randomly generated object names.
 Provision outside-window sentinels on both sides of the half-open
 `[2026-01-01T00:00:00Z, 2026-01-02T00:00:00Z)` window, including the exact upper
 boundary, and old in-window rows before each fixture. Read `Dataset.schema()`
-for source/target types; ClickHouse binary String values must reach VARBINARY,
-text must reach NVARCHAR. No key deduplication is permitted.
+for source/target types; admitted text must reach NVARCHAR. The generic binary
+fixture expects VARBINARY, but the canonical ClickHouse String planner does not
+author that mapping: the binary route cell is unsupported and supplies no live
+certification. No key deduplication is permitted.
 
 The session must call `source_acquired()` immediately before acquiring the single
 real source query and `committed_visible()` only after known commit plus an

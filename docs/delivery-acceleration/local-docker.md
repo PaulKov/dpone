@@ -98,7 +98,7 @@ python tools/native_delivery_live_benchmark.py run \
 Create the output parent directory before invoking the harness; it must already
 exist and be private. Use a new output location for each run. Repeat with `partition_replace` and the
 supported profiles `wide`, `unicode`, `decimal`, `null` and `skewed`. The binary
-profile remains UNVERIFIED because the canonical planner does not provide an
+profile is unsupported because the canonical planner does not provide an
 authored ClickHouse String-to-varbinary mapping. Do not bypass that rejection.
 The harness runs exact fidelity and recovery checks before timed trials, then
 one warmup and at least three trials. Inspect with the harness `inspect` command.
@@ -109,8 +109,10 @@ with one warmup and three measured trials, raw observations, correctness and
 recovery receipts, limits, hashes and exact source/environment identities.
 A comparison PASS still requires the same full configuration on both subjects;
 these different-policy runs are diagnostic tuning observations and cannot certify
-a cross-policy speedup. Stage 2's initial candidate is 0.80.0; release and fresh
-live certification remain pending.
+a cross-policy speedup. Independent stage limits were released in 0.80.0. Retained exact-source C
+evidence covers 24 small functional cells and controlled recovery. Earlier H
+tuning uses a different source identity and cannot be relabelled as released-C
+performance. A new deployment still requires its own acceptance evidence.
 
 ## Recover and clean up
 
