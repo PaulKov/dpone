@@ -231,3 +231,12 @@ longer reports false success.
 - [Physical DDL apply](physical-ddl-apply.md)
 - [Streaming-safe contracts](runtime-fast-path-contracts.md)
 - [`dpone ops`](ops-cli.md)
+
+## Explicit ClickHouse staging of validated files
+
+The additive [validated-file API](validated-clickhouse-file-staging.md) uses the
+genuine source contract receipt through a busy-guarded wrapper attempt. It prepares
+exact logical values before CREATE and resets the latest validation summary on
+failure. A derived RowBinary file is separate evidence, not a replacement source
+receipt or checkpoint. Existing wrapper imports and generic runtime behavior remain
+compatible. See [identity and deadlines](developer-validated-clickhouse-file-staging.md).

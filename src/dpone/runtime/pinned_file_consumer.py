@@ -12,6 +12,11 @@ from dpone.runtime.artifact_integrity import (
     FileArtifactReceipt,
     FileWireContract,
 )
+from dpone.runtime.file_artifact_authority import (
+    FileVerificationBudget,
+    FileVerificationTimeout,
+    supports_verification_budget,
+)
 
 
 class PinnedFileIntegrityAuthority(Protocol):
@@ -27,6 +32,8 @@ class PinnedFileIntegrityAuthority(Protocol):
         self,
         receipt: FileArtifactReceipt,
         wire_contract: FileWireContract,
+        *,
+        verification_budget: FileVerificationBudget | None = None,
     ) -> None: ...
 
 
@@ -122,12 +129,23 @@ class PinnedFileConsumer:
         receipt: FileArtifactReceipt,
         *,
         wire_contract: FileWireContract,
+        verification_budget: FileVerificationBudget | None = None,
     ) -> None:
-        """Revalidate bytes through the exact held BCP input identity."""
-
-        with self._lock:
+        """Revalidate the held identity, bounding lock acquisition when requested."""
+        acquired = (
+            self._lock.acquire()
+            if verification_budget is None
+            else self._lock.acquire(timeout=verification_budget.remaining())
+        )
+        if not acquired:
+            raise FileVerificationTimeout("file verification lock deadline exceeded")
+        try:
+            if verification_budget is not None:
+                verification_budget.check()
             self._require_open_locked()
-            self._verify_integrity_locked(receipt, wire_contract=wire_contract)
+            self._verify_integrity_locked(receipt, wire_contract=wire_contract, verification_budget=verification_budget)
+        finally:
+            self._lock.release()
 
     def cleanup(self) -> None:
         """Release the exact file identity and remove only its owned name."""
@@ -170,15 +188,24 @@ class PinnedFileConsumer:
         receipt: FileArtifactReceipt,
         *,
         wire_contract: FileWireContract,
+        verification_budget: FileVerificationBudget | None = None,
     ) -> None:
         if self._integrity_receipt is not None and receipt != self._integrity_receipt:
             raise ArtifactIntegrityError("artifact_integrity.receipt_authority_changed")
         if self._wire_contract is not None and wire_contract != self._wire_contract:
             raise ArtifactIntegrityError("artifact_integrity.wire_contract_mismatch")
         if self._integrity_authority is not None:
-            self._integrity_authority.verify(receipt, wire_contract)
+            if verification_budget is None:
+                self._integrity_authority.verify(receipt, wire_contract)
+            else:
+                if not supports_verification_budget(self._integrity_authority.verify):
+                    raise ArtifactIntegrityError("artifact_integrity.verification_budget_unsupported")
+                self._integrity_authority.verify(receipt, wire_contract, verification_budget=verification_budget)
             return
-        receipt.verify(self.source_path, wire_contract=wire_contract)
+        if verification_budget is None:
+            receipt.verify(self.source_path, wire_contract=wire_contract)
+        else:
+            receipt.verify(self.source_path, wire_contract=wire_contract, verification_budget=verification_budget)
 
 
 def _normalized_path(path: str) -> str:
