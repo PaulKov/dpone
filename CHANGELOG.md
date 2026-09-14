@@ -13,6 +13,11 @@
 
 ### Fixed
 
+- Close threaded backfill admission atomically with lease acquisition before
+  persisting a chunk failure. Already admitted peers may finish; untouched chunks
+  remain pending for resume. Preserve original failures when cleanup or reporting
+  also fails, and never rewrite durable SUCCESS after a progress-reporting error.
+
 - Preserve spaces in MSSQL bulk-text and ClickHouse TSV source projections by
   checking the byte length of converted text. Recognize MSSQL empty-string
   markers only with matching Unicode byte length and binary value. Existing
