@@ -91,6 +91,18 @@ count/hash and later count/identity checks. Client exit zero and HTTP status 200
 alone are insufficient. HTTP rejects endpoint address drift and does not follow
 redirects. The caller must exclude load balancing and future endpoint failover.
 
+The HTTP adapter injects its owned response factory through CPython 3.11/3.12's
+`HTTPConnection.response_class` hook, preserving the supplied connection factory.
+A buffered reader owns the original socket file and checks the same absolute
+deadline before and after each raw receive. Closing a `Connection: close` transport
+therefore does not detach response reads from their deadline. One 64 KiB metadata
+budget covers status/header lines, chunk sizes, data terminators and trailers;
+the response body has its own 64 KiB cap. Fixed-length responses must satisfy their
+entire declared length. Chunked responses require unsigned hexadecimal sizes,
+exact CRLF data terminators, a zero chunk and the complete trailer terminator.
+Response and connection cleanup both run before completion is recorded. A cleanup
+failure preserves the original error and retains unresolved local ownership.
+
 On error, stop/join local I/O separately from confirming server termination.
 Exact-query `KILL ... SYNC` with matching `finished` output or an already observed
 terminal acknowledgment can establish remote completion. Empty/missing output is

@@ -6,7 +6,8 @@
 
 - Add explicit Python staging of validated character files into ClickHouse through
   controlled client/HTTP RowBinary, with exact value preparation, finite budgets,
-  original receipt checks and immutable attempt evidence. Unknown execution
+  original receipt checks and immutable attempt evidence. HTTP enforces absolute
+  response deadlines, complete framing and aggregate metadata bounds. Unknown execution
   retains owned resources for manual recovery. Generic routes and finalizers
   keep their existing behavior; live certification remains unverified.
 

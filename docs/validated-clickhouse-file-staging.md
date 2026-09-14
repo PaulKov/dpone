@@ -173,8 +173,11 @@ values and `None` are rejected. Limits count bytes, not characters.
 
 The selected transport's `timeout_seconds` defaults to 3600 for this API. Control
 confirmation has a separate 30-second bound; local process abort/join uses 5 seconds
-per phase. Buffers are at most 1 MiB per chunk, 64 KiB combined response capture and
-256 KiB per journal event. Capacity is refreshed while writing; external disk use
+per phase. Buffers are at most 1 MiB per chunk, 64 KiB combined client output or
+HTTP response body, and 256 KiB per journal event. HTTP has a separate aggregate
+64 KiB limit for status, headers, chunk framing and trailers. Its absolute deadline
+also bounds slowly arriving responses, including cancellation responses; incomplete
+response framing never acknowledges success. Capacity is refreshed while writing; external disk use
 can still cause failure. Time limits are cooperative around fixed-size file reads,
 including EOF, and bounded lock waits. They cannot preempt a stalled OS filesystem
 call. This limitation also applies to filesystem publication and fsync.
