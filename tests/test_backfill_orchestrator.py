@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from threading import Barrier, Event
+from threading import Barrier, Event, get_ident
 from types import SimpleNamespace
 
 import pytest
@@ -549,14 +549,11 @@ class _WorkerStateSession:
         authority: FileBackfillStateStore,
         *,
         session_id: int,
-        barrier: Barrier | None = None,
         entered: list[tuple[int, int]] | None = None,
     ) -> None:
         self._authority = authority
         self.session_id = session_id
-        self._barrier = barrier
         self._entered = entered
-        self._barrier_used = False
 
     def __getattr__(self, name: str):
         return getattr(self._authority, name)
@@ -564,9 +561,6 @@ class _WorkerStateSession:
     def acquire_chunk_lease(self, run_key, index, *, owner, lease_expires_at):
         if self._entered is not None:
             self._entered.append((self.session_id, index))
-        if self._barrier is not None and not self._barrier_used:
-            self._barrier_used = True
-            self._barrier.wait(timeout=2)
         return self._authority.acquire_chunk_lease(
             run_key,
             index,
@@ -580,7 +574,6 @@ def _worker_store_factory(
     *,
     opened: list[int] | None = None,
     closed: list[int] | None = None,
-    barrier: Barrier | None = None,
     entered: list[tuple[int, int]] | None = None,
 ):
     @contextmanager
@@ -592,7 +585,6 @@ def _worker_store_factory(
             yield _WorkerStateSession(
                 authority,
                 session_id=session_id,
-                barrier=barrier,
                 entered=entered,
             )
         finally:
@@ -1185,7 +1177,14 @@ def test_parallel_worker_state_sessions_overlap_and_close(tmp_path: Path, fail: 
     closed: list[int] = []
     entered: list[tuple[int, int]] = []
     barrier = Barrier(2)
-    runner = _RecordingRunner(fail_on={1} if fail else None)
+
+    class _OverlappingRunner(_RecordingRunner):
+        def __call__(self, chunk_config):
+            if chunk_config.options["backfill"]["chunk_context"]["index"] in (1, 2):
+                barrier.wait(timeout=5)
+            return super().__call__(chunk_config)
+
+    runner = _OverlappingRunner(fail_on={1} if fail else None)
 
     result = BackfillOrchestrator(
         chunk_runner=runner,
@@ -1194,7 +1193,6 @@ def test_parallel_worker_state_sessions_overlap_and_close(tmp_path: Path, fail: 
             store,
             opened=opened,
             closed=closed,
-            barrier=barrier,
             entered=entered,
         ),
     ).run(_config(tmp_path, parallel_workers=2))
@@ -1211,41 +1209,87 @@ def test_parallel_worker_state_sessions_overlap_and_close(tmp_path: Path, fail: 
     assert barrier.broken is False
 
 
-def test_parallel_orchestrator_stops_new_claims_and_resumes_durable_pending_chunks(tmp_path: Path) -> None:
-    failure_durable = Event()
+@pytest.mark.parametrize("hold_at", ["failed_save", "failed_progress"])
+def test_parallel_orchestrator_stops_new_claims_and_resumes_durable_pending_chunks(
+    tmp_path: Path, hold_at: str
+) -> None:
+    failure_held = Event()
+    peer_closed = Event()
+    first_pair = Barrier(2)
+    peer_threads: set[int] = set()
+    claimed: list[int] = []
 
     class _FailureAwareStore(FileBackfillStateStore):
+        failed_progress_thread = None
+
+        def acquire_chunk_lease(self, run_key, index, **kwargs):
+            claimed.append(index)
+            return super().acquire_chunk_lease(run_key, index, **kwargs)
+
         def complete_chunk_if_owned(self, run_key, record, *, owner):
+            # Hold outside the real store lock: the harness must not prevent claims.
+            if record.status == "failed" and hold_at == "failed_save":
+                failure_held.set()
+                assert peer_closed.wait(timeout=5)
             completed = super().complete_chunk_if_owned(run_key, record, owner=owner)
-            if completed and record.status == "failed":
-                failure_durable.set()
+            if completed and record.status == "failed" and hold_at == "failed_progress":
+                self.failed_progress_thread = get_ident()
             return completed
+
+        def load(self, run_key):
+            current = super().load(run_key)
+            if self.failed_progress_thread == get_ident():
+                self.failed_progress_thread = None
+                assert current is not None and current.chunk(1).status == "failed"
+                failure_held.set()
+                assert peer_closed.wait(timeout=5)
+            return current
 
     class _FailingRunner(_RecordingRunner):
         def __call__(self, chunk_config: LoadConfig):
             self.calls.append(chunk_config)
             index = chunk_config.options["backfill"]["chunk_context"]["index"]
+            if index == 2:
+                peer_threads.add(get_ident())
+            if index in (1, 2):
+                first_pair.wait(timeout=5)
             if index == 1:
                 raise RuntimeError("chunk 1 exploded")
             if index == 2:
-                assert failure_durable.wait(timeout=2)
+                assert failure_held.wait(timeout=5)
+                scope = chunk_config.options["__dpone_mssql_operation_scope"]
+                assert store.renew_chunk_lease(
+                    scope["run_key"],
+                    index,
+                    owner=scope["lease_owner"],
+                    lease_expires_at=datetime.now(UTC) + timedelta(minutes=1),
+                )
             return {"extracted_rows": 10, "loaded_rows": 10}
 
     store = _FailureAwareStore(tmp_path / "state")
     runner = _FailingRunner()
-    barrier = Barrier(2)
+
+    @contextmanager
+    def worker_store_factory(worker_id):
+        try:
+            with _worker_store_factory(store)(worker_id) as session:
+                yield session
+        finally:
+            if get_ident() in peer_threads:
+                peer_closed.set()
 
     result = BackfillOrchestrator(
         chunk_runner=runner,
         state_store=store,
-        worker_state_store_factory=_worker_store_factory(store, barrier=barrier),
+        worker_state_store_factory=worker_store_factory,
     ).run(_config(tmp_path, parallel_workers=2))
 
     assert result["status"] == "error"
     assert sorted(call.options["backfill"]["chunk_context"]["index"] for call in runner.calls) == [1, 2]
+    assert sorted(claimed) == [1, 2]
     ledger = store.load(result["backfill"]["run_key"])
     assert ledger is not None
-    assert [ledger.chunk(index).status for index in (3, 4)] == ["pending", "pending"]
+    assert [ledger.chunk(index).status for index in (1, 2, 3, 4)] == ["failed", "success", "pending", "pending"]
 
     resumed = _RecordingRunner()
     resumed_result = BackfillOrchestrator(
@@ -2010,3 +2054,189 @@ class _AuditConnector:
             }
         ]
         return rows if as_dict else [tuple(rows[0].values())]
+
+
+@pytest.mark.parametrize("secondary", ["failed_save", "failed_progress"])
+def test_failed_chunk_keeps_original_diagnostic_when_reporting_fails(tmp_path: Path, secondary: str) -> None:
+    class _ReportingFailureStore(FileBackfillStateStore):
+        failed_read = False
+        observed_run_key = None
+
+        def complete_chunk_if_owned(self, run_key, record, *, owner):
+            self.observed_run_key = run_key
+            if record.status == "failed" and secondary == "failed_save":
+                raise RuntimeError("secondary save failed")
+            completed = super().complete_chunk_if_owned(run_key, record, owner=owner)
+            if record.status == "failed":
+                self.failed_read = True
+            return completed
+
+        def load(self, run_key):
+            if self.failed_read:
+                self.failed_read = False
+                raise RuntimeError("secondary progress failed")
+            return super().load(run_key)
+
+    store = _ReportingFailureStore(tmp_path / "state")
+    runner = _RecordingRunner(fail_on={1})
+    with pytest.raises(RuntimeError) as raised:
+        BackfillOrchestrator(chunk_runner=runner, state_store=store).run(_config(tmp_path))
+    assert "chunk 1 exploded" in str(raised.value)
+    assert "secondary" in str(raised.value)
+    ledger = store.load(store.observed_run_key)
+    assert ledger is not None
+    assert ledger.chunk(1).status == ("running" if secondary == "failed_save" else "failed")
+    assert [ledger.chunk(index).status for index in (2, 3, 4)] == ["pending"] * 3
+    assert len(runner.calls) == 1
+
+
+def test_failed_chunk_keeps_original_diagnostic_when_heartbeat_cleanup_fails(tmp_path: Path) -> None:
+    class _CleanupFailureHeartbeat(BackfillLeaseHeartbeat):
+        def stop(self):
+            super().stop()
+            raise RuntimeError("secondary heartbeat cleanup failed")
+
+    store = FileBackfillStateStore(tmp_path / "state")
+    result = BackfillOrchestrator(
+        chunk_runner=_RecordingRunner(fail_on={1}),
+        state_store=store,
+        heartbeat_factory=_CleanupFailureHeartbeat,
+    ).run(_config(tmp_path))
+    assert result["status"] == "error"
+    assert "chunk 1 exploded" in " ".join(result["errors"])
+    assert "secondary heartbeat cleanup failed" in " ".join(result["errors"])
+    ledger = store.load(result["backfill"]["run_key"])
+    assert ledger is not None
+    assert "chunk 1 exploded" in ledger.chunk(1).error
+    assert [ledger.chunk(index).status for index in (2, 3, 4)] == ["pending"] * 3
+
+
+def test_success_progress_failure_preserves_durable_success_and_resume(tmp_path: Path) -> None:
+    class _SuccessProgressFailureStore(FileBackfillStateStore):
+        failed_read = False
+        injected = False
+        completions = []
+        observed_run_key = None
+
+        def complete_chunk_if_owned(self, run_key, record, *, owner):
+            self.observed_run_key = run_key
+            self.completions.append(record.status)
+            completed = super().complete_chunk_if_owned(run_key, record, owner=owner)
+            if completed and record.status == "success" and not self.injected:
+                self.injected = True
+                self.failed_read = True
+            return completed
+
+        def load(self, run_key):
+            if self.failed_read:
+                self.failed_read = False
+                raise RuntimeError("success progress failed")
+            return super().load(run_key)
+
+    store = _SuccessProgressFailureStore(tmp_path / "state")
+    with pytest.raises(RuntimeError, match="success progress failed"):
+        BackfillOrchestrator(chunk_runner=_RecordingRunner(), state_store=store).run(_config(tmp_path))
+    ledger = store.load(store.observed_run_key)
+    assert ledger is not None
+    assert [ledger.chunk(index).status for index in (1, 2, 3, 4)] == ["success", "pending", "pending", "pending"]
+    assert store.completions == ["success"]
+    resumed = _RecordingRunner()
+    result = BackfillOrchestrator(chunk_runner=resumed, state_store=store).run(_config(tmp_path))
+    assert result["status"] == "success"
+    assert [call.options["backfill"]["chunk_context"]["index"] for call in resumed.calls] == [2, 3, 4]
+
+
+def test_fatal_runner_exception_survives_ordinary_heartbeat_cleanup_failure(tmp_path: Path) -> None:
+    class _FatalRunnerError(BaseException):
+        pass
+
+    fatal = _FatalRunnerError("original fatal runner error")
+
+    class _CleanupFailureHeartbeat(BackfillLeaseHeartbeat):
+        def stop(self):
+            super().stop()
+            raise RuntimeError("secondary stop failed")
+
+    def runner(_config):
+        raise fatal
+
+    with pytest.raises(_FatalRunnerError) as raised:
+        BackfillOrchestrator(chunk_runner=runner, heartbeat_factory=_CleanupFailureHeartbeat).run(_config(tmp_path))
+    assert raised.value is fatal
+    assert any("secondary stop failed" in note for note in fatal.__notes__)
+
+
+@pytest.mark.parametrize("failure", ["rejected", "exception", "fatal"])
+def test_threaded_lease_failure_stops_other_claims_without_fabricating_failed_chunks(
+    tmp_path: Path, failure: str
+) -> None:
+    class _FatalLeaseError(BaseException):
+        pass
+
+    fatal = _FatalLeaseError("lease outcome unknown")
+
+    class _LeaseFailureStore(FileBackfillStateStore):
+        claims = []
+        observed_run_key = None
+
+        def acquire_chunk_lease(self, run_key, index, **kwargs):
+            self.observed_run_key = run_key
+            self.claims.append(index)
+            if failure == "exception":
+                raise RuntimeError("lease provider unavailable")
+            if failure == "fatal":
+                raise fatal
+            return False
+
+    store = _LeaseFailureStore(tmp_path / "state")
+    runner = _RecordingRunner()
+    orchestrator = BackfillOrchestrator(
+        chunk_runner=runner, state_store=store, worker_state_store_factory=_worker_store_factory(store)
+    )
+    if failure == "fatal":
+        with pytest.raises(_FatalLeaseError) as raised:
+            orchestrator.run(_config(tmp_path, parallel_workers=2))
+        assert raised.value is fatal
+    else:
+        result = orchestrator.run(_config(tmp_path, parallel_workers=2))
+        assert result["status"] == "error"
+        assert len(result["errors"]) == 1
+        assert "lease" in result["errors"][0]
+    assert len(store.claims) == 1
+    assert runner.calls == []
+    ledger = store.load(store.observed_run_key)
+    assert ledger is not None
+    assert [ledger.chunk(index).status for index in (1, 2, 3, 4)] == ["pending"] * 4
+
+
+def test_failed_completion_owner_loss_keeps_original_error_and_no_false_failed_receipt(tmp_path: Path) -> None:
+    class _RejectedCompletionStore(FileBackfillStateStore):
+        def complete_chunk_if_owned(self, run_key, record, *, owner):
+            assert record.status == "failed"
+            return False
+
+    store = _RejectedCompletionStore(tmp_path / "state")
+    result = BackfillOrchestrator(chunk_runner=_RecordingRunner(fail_on={1}), state_store=store).run(_config(tmp_path))
+    assert result["status"] == "error"
+    assert "chunk 1 exploded" in " ".join(result["errors"])
+    assert "DPONE_BACKFILL_CHUNK_LEASE_LOST" in " ".join(result["errors"])
+    ledger = store.load(result["backfill"]["run_key"])
+    assert ledger is not None
+    assert [ledger.chunk(index).status for index in (1, 2, 3, 4)] == ["running", "pending", "pending", "pending"]
+
+
+def test_failed_progress_logger_cannot_replace_original_chunk_error(tmp_path: Path, monkeypatch) -> None:
+    import dpone.backfill.runtime_chunk_execution as execution
+
+    original_info = execution._LOG.info
+
+    def fail_failed_progress(message, *args, **kwargs):
+        if args and args[0] == "chunk_failed":
+            raise RuntimeError("secondary logger unavailable")
+        return original_info(message, *args, **kwargs)
+
+    monkeypatch.setattr(execution._LOG, "info", fail_failed_progress)
+    with pytest.raises(RuntimeError) as raised:
+        BackfillOrchestrator(chunk_runner=_RecordingRunner(fail_on={1})).run(_config(tmp_path))
+    assert "chunk 1 exploded" in str(raised.value)
+    assert "secondary logger unavailable" in str(raised.value)

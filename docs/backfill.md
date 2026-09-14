@@ -401,6 +401,30 @@ ledger:
 - `cancel` is cooperative: it blocks new chunks while already-running chunks
   either finish or expire by their lease TTL.
 
+### Threaded fail-fast and recovery
+
+For the threaded executor, a failing lane closes admission for the current run
+before saving FAILED or reporting progress. Already admitted peers may finish
+and renew their leases. Chunks that were not admitted remain PENDING; normal
+`resume` skips durable SUCCESS and retries eligible non-committed chunks. Use
+`doctor` to inspect the ledger after an interrupted save rather than assuming
+that an error message proves FAILED was persisted.
+
+Admission closure and the actual owner-checked lease acquisition share one
+invocation-local lock. A claim already inside that boundary may complete before
+closure; a claim after closure performs no state-store call. The lock is released
+before chunk execution, heartbeat, terminal persistence and reporting, so a slow
+chunk does not serialize already admitted peers. A blocking store call can delay
+closure; this mechanism does not promise a finite provider-independent timeout.
+It does not write a durable campaign cancellation or change retry selection.
+
+If failure reporting or heartbeat cleanup also fails, diagnostics retain the
+original chunk failure and the secondary error. A progress error after a durable
+SUCCESS does not rewrite that chunk as FAILED. Synchronous fatal exceptions keep
+their propagation behavior. Background heartbeat-thread failure propagation and
+the spawned-process executor are separate mechanisms; this ordering correction
+does not certify them or a live source-to-sink route.
+
 ### Operator runbook
 
 | Situation | Command | What moves data |
