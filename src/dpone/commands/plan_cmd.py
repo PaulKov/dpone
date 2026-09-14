@@ -38,7 +38,7 @@ from dpone.commands.plan_native_render import (
     render_snapshot_optimization_md,
     render_snapshot_optimization_text,
 )
-from dpone.contracts.configuration_errors import ETLConfigurationError
+from dpone.manifest.errors import ManifestConfigurationError
 from dpone.readiness.managed import ExecutionPlanService
 
 
@@ -353,7 +353,7 @@ def cmd_plan(args: argparse.Namespace, *, ctx: object, logger: logging.Logger) -
         ):
             raise
         field = code.split(":", 1)[1]
-        raise ETLConfigurationError(
+        raise ManifestConfigurationError(
             f"{code}: source.options.native_transfer.execution.native_chunks.{field} "
             "must be an integer in 1..64; omit the field to use chunking.parallelism."
         ) from error

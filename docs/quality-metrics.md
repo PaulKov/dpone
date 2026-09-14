@@ -200,7 +200,7 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 | `dpone.commands` | 238 | 922 | 583 | 581 | 341 | 2 | 3.87 | 2.45 | 0.630 | 22 | 1 |
 | `dpone.config` | 16 | 33 | 115 | 18 | 15 | 97 | 2.06 | 7.19 | 0.545 | 3 | 10 |
 | `dpone.connector_sdk` | 12 | 9 | 13 | 9 | 0 | 4 | 0.75 | 1.08 | 1.000 | 0 | 1 |
-| `dpone.contracts` | 283 | 668 | 1464 | 657 | 11 | 807 | 2.36 | 5.17 | 0.984 | 5 | 18 |
+| `dpone.contracts` | 283 | 668 | 1463 | 657 | 11 | 806 | 2.36 | 5.17 | 0.984 | 5 | 18 |
 | `dpone.core` | 7 | 8 | 1 | 1 | 7 | 0 | 1.14 | 0.14 | 0.125 | 4 | 0 |
 | `dpone.dag` | 40 | 107 | 115 | 72 | 35 | 43 | 2.67 | 2.88 | 0.673 | 5 | 6 |
 | `dpone.gitops` | 201 | 505 | 587 | 418 | 87 | 169 | 2.51 | 2.92 | 0.828 | 10 | 6 |
@@ -219,7 +219,7 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 | `dpone.lazy_exports` | 1 | 0 | 5 | 0 | 0 | 5 | 0.00 | 5.00 | 1.000 | 0 | 3 |
 | `dpone.lib` | 14 | 25 | 11 | 10 | 15 | 1 | 1.79 | 0.79 | 0.400 | 3 | 1 |
 | `dpone.load_profile` | 5 | 8 | 7 | 5 | 3 | 2 | 1.60 | 1.40 | 0.625 | 2 | 1 |
-| `dpone.manifest` | 122 | 374 | 539 | 312 | 62 | 227 | 3.07 | 4.42 | 0.834 | 7 | 13 |
+| `dpone.manifest` | 122 | 374 | 540 | 312 | 62 | 228 | 3.07 | 4.43 | 0.834 | 7 | 13 |
 | `dpone.metrics` | 23 | 32 | 43 | 28 | 4 | 15 | 1.39 | 1.87 | 0.875 | 1 | 1 |
 | `dpone.observability` | 7 | 2 | 3 | 2 | 0 | 1 | 0.29 | 0.43 | 1.000 | 0 | 1 |
 | `dpone.operations` | 38 | 38 | 0 | 0 | 38 | 0 | 1.00 | 0.00 | 0.000 | 1 | 0 |
