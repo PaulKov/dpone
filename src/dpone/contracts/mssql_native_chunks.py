@@ -97,6 +97,27 @@ class NativeChunkPlan:
     window_fingerprint: str
     schema_fingerprint: str
     wire_fingerprint: str
+    source_read_mode: str | None = field(default=None, kw_only=True)
+
+    def __post_init__(self) -> None:
+        if self.source_read_mode is not None and (
+            type(self.source_read_mode) is not str or self.source_read_mode != "raw_single_query"
+        ):
+            raise ValueError("mssql_native.source_read_invalid")
+
+    def to_dict(self) -> dict[str, str]:
+        """Preserve legacy identity bytes and order; absence is not a default mode."""
+        identity = {
+            "run_id": self.run_id,
+            "target_id": self.target_id,
+            "source_query_id": self.source_query_id,
+            "window_fingerprint": self.window_fingerprint,
+            "schema_fingerprint": self.schema_fingerprint,
+            "wire_fingerprint": self.wire_fingerprint,
+        }
+        if self.source_read_mode is not None:
+            identity["source_read_mode"] = self.source_read_mode
+        return identity
 
 
 @dataclass(frozen=True)

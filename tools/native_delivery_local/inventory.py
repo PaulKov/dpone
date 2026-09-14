@@ -11,7 +11,7 @@ import hashlib
 import json
 import os
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -33,8 +33,11 @@ class Inventory:
     configuration: dict[str, Any]
     authority: dict[str, Any]
     objects: dict[str, Any]
+    source_read_mode: str | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
+        if self.source_read_mode not in (None, "raw_single_query"):
+            raise ValueError("local_fixture.source_read_mode")
         require_invocation(self.invocation_id)
         for name in (self.target_database, self.state_database, self.source_database, self.schema, self.table):
             if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]{0,119}", name):
@@ -95,6 +98,8 @@ class InventoryStore:
 
     def create(self, value: Inventory) -> None:
         payload = asdict(value)
+        if value.source_read_mode is None:
+            payload.pop("source_read_mode")
         _safe(payload)
         directory = self.directory(value.invocation_id)
         directory.mkdir(mode=0o700)

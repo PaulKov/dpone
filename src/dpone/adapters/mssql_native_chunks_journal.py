@@ -54,7 +54,7 @@ class NativeChunkJournal:
     """Persist immutable plan bindings and ordered attempt progress under fencing."""
 
     def __init__(self, store: WindowStore, lease: WindowLease, plan: NativeChunkPlan) -> None:
-        if plan.target_id != lease.target_id or any(not value for value in asdict(plan).values()):
+        if plan.target_id != lease.target_id or any(not value for value in plan.to_dict().values()):
             raise WindowContractError("mssql_native.invalid_plan_identity")
         self.store, self.lease, self.plan = store, lease, plan
         self.key = "mssql-native-chunks-v1/" + _digest([plan.target_id, plan.run_id])
@@ -90,9 +90,17 @@ class NativeChunkJournal:
                 "limits",
             }:
                 raise ValueError("invalid record")
-            if type(value["version"]) is not int or value["version"] != 1:
+            if type(value["version"]) is not int or value["version"] not in (1, 2):
                 raise ValueError("invalid version")
-            if value["identity"] != asdict(self.plan):
+            identity = value["identity"]
+            keys = set(self.plan.to_dict()) - {"source_read_mode"}
+            if value["version"] == 2:
+                keys.add("source_read_mode")
+            if not isinstance(identity, dict) or set(identity) != keys:
+                raise ValueError("invalid identity shape")
+            if value["version"] == 2 and identity["source_read_mode"] != "raw_single_query":
+                raise ValueError("invalid source read mode")
+            if identity != self.plan.to_dict():
                 raise WindowContractError("mssql_native.journal_identity_changed")
             if value["phase"] not in ("staging", "stage_complete", "reextract_required"):
                 raise ValueError("invalid phase")
@@ -134,8 +142,8 @@ class NativeChunkJournal:
             raise WindowContractError("mssql_native.reextract_required")
         self._save(
             dict(
-                version=1,
-                identity=asdict(self.plan),
+                version=1 if self.plan.source_read_mode is None else 2,
+                identity=self.plan.to_dict(),
                 phase="staging",
                 chunks={},
                 complete=None,

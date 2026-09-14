@@ -76,3 +76,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0063: independent native stage limits](adr/0063-independent-native-stage-limits.md)
 
 - [ADR 0064: Explicit validated character-file staging in ClickHouse](adr/0064-validated-file-clickhouse-staging.md)
+
+- [ADR 0065: opt-in native raw single-query reads](adr/0065-native-raw-single-query.md)
