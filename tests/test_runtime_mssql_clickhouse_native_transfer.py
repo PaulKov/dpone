@@ -121,7 +121,7 @@ def test_bcp_queryout_command_includes_native_transfer_safety_options() -> None:
     redacted = runner.redact_command(command)
 
     assert "-b 100000" in joined
-    assert "-a 16384" in joined
+    assert "-a 16383" in joined
     assert "-l 600" in joined
     assert "-e /tmp/orders.err" in joined
     assert "super-secret" not in " ".join(redacted)

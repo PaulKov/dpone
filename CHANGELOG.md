@@ -27,6 +27,11 @@
   deployment; this does not prevent an already deployed upstream dbt build.
   Mixed-composition activation still requires this rejected bounded-full-refresh
   shape; verified cache installation does not close that capability gap.
+
+- Correct the shared encrypted BCP packet ceiling from 16384 to 16383 bytes.
+  Default and oversized import/queryout requests now respect the documented TLS
+  limit; explicitly smaller sizes and authored configuration remain unchanged.
+
 - Resolve generated dbt MSSQL interval start filters without literal braces and
   align current setup and recovery guidance with the existing toolchain.
 - Hide overlapping dbt secrets and secret fragments at captured-output retention
