@@ -75,6 +75,7 @@ owned_paths:
 - src/dpone/runtime/connectors/bulk_text_codec.py
 - src/dpone/runtime/connectors/clickhouse_http_bulk.py
 - tests/test_b02_dependency_compatibility.py
+- src/dpone/runtime/clickhouse_staging_composition.py
 integrator_owned_paths:
 - CHANGELOG.md
 - mkdocs.yml

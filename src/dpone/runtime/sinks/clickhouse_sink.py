@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from functools import partial
 from importlib import import_module
 from time import monotonic
 from typing import TYPE_CHECKING, Any
@@ -11,7 +10,15 @@ from typing import TYPE_CHECKING, Any
 from dpone.runtime.clickhouse_file_stage_contract import (
     ClickHouseFileStageRunner,
     ClickHouseValidatedFilePolicy,
-    require_transport_profile,
+)
+from dpone.runtime.clickhouse_file_stage_contract import (
+    require_transport_profile as require_transport_profile,
+)
+from dpone.runtime.clickhouse_staging_composition import (
+    build_clickhouse_staging_components,
+)
+from dpone.runtime.clickhouse_staging_composition import (
+    build_file_runner as build_file_runner,
 )
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.sinks.clickhouse_bulk_mixin import ClickHouseBulkMixin
@@ -25,14 +32,9 @@ from dpone.runtime.sinks.clickhouse_physical_types import (
 )
 from dpone.runtime.sinks.clickhouse_sql_mixin import ClickHouseSqlMixin, ClickHouseTargetCatalogMixin
 from dpone.runtime.sinks.clickhouse_staged_load import ClickHouseStagedLoadService
-from dpone.runtime.sinks.clickhouse_staging_decoder import ClickHouseStagingDecoder
-from dpone.runtime.sinks.clickhouse_staging_finalizer import ClickHouseStagingFinalizer
-from dpone.runtime.sinks.clickhouse_validated_file_ingestion import ClickHouseValidatedFileService
-from dpone.runtime.sinks.clickhouse_validated_file_journal import ClickHouseFileAttemptJournal
 from dpone.runtime.sinks.load_payload import LoadPayload
 from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.sink_protocol import AbstractSink
-from dpone.runtime.storage_policy import StoragePreflightService
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
@@ -69,15 +71,12 @@ class ClickHouseSink(
         self._client_runner_cls = client_runner_cls or _default_clickhouse_client_runner()
         self._http_runner_cls = http_runner_cls or _default_clickhouse_http_runner()
         self._physical_type_resolver = physical_type_resolver or DEFAULT_CLICKHOUSE_PHYSICAL_COLUMN_TYPE_RESOLVER
-        self._validated_file_service = ClickHouseValidatedFileService(
-            runner_factory=validated_file_runner_factory
-            or (lambda config, policy: build_file_runner(config, policy, connector=self.connector, clock=monotonic)),
-            resolver=self._physical_type_resolver,
-            journal_factory=partial(ClickHouseFileAttemptJournal, storage=StoragePreflightService()),
-            clock=monotonic,
-        )
-        self._staging_decoder = ClickHouseStagingDecoder(
+        staging = build_clickhouse_staging_components(
             connector=self.connector,
+            connector_provider=lambda: self.connector,
+            resolver=self._physical_type_resolver,
+            clock=monotonic,
+            validated_file_runner_factory=validated_file_runner_factory,
             table_name=self._table,
             create_staging_table=self._create_staging_table,
             map_type=self._map_type_for_config,
@@ -88,13 +87,12 @@ class ClickHouseSink(
                 schema,
                 if_not_exists=False,
             ),
-        )
-        self._staging_finalizer = ClickHouseStagingFinalizer(
-            connector=self.connector,
-            table_name=self._table,
             count_rows=self._count,
             mutations_sync=self._mutations_sync,
         )
+        self._validated_file_service = staging.validated_file
+        self._staging_decoder = staging.decoder
+        self._staging_finalizer = staging.finalizer
         self._payload_ingestion = ClickHousePayloadIngestionService(self, sink_factory=self._clone_sink)
         self._staged_load = ClickHouseStagedLoadService(
             self,
@@ -305,33 +303,3 @@ def _default_etl_logger() -> Any:
 def _default_acceptance_metric_probe(connector: ClickHouseConnectorPort) -> Any:
     module = import_module("dpone.runtime.governance.clickhouse_acceptance_metrics")
     return module.ClickHouseAcceptanceMetricProbe(connector)
-
-
-def build_file_runner(
-    config: LoadConfig, policy: ClickHouseValidatedFilePolicy, *, connector: Any, clock: Callable[[], float]
-) -> ClickHouseFileStageRunner:
-    """Composition helper; explicit mode, no environment fallback or legacy runner."""
-    del policy
-    mode, timeout = require_transport_profile(config.options or {})
-    selected = (config.options or {})["clickhouse_bulk"].get(mode, {})
-
-    def setting(name: str, default: Any) -> Any:
-        return selected[name] if name in selected else default
-
-    common = dict(
-        host=setting("host", connector.host),
-        port=setting("port", connector.port if mode == "client" else 8123),
-        database=setting("database", connector.database),
-        user=setting("user", connector.user),
-        password=setting("password", connector.password),
-        secure=setting("secure", connector.secure if mode == "client" else False),
-    )
-    if mode == "client":
-        from dpone.runtime.connectors.clickhouse_file_stage_client import build_file_client_runner
-
-        return build_file_client_runner(
-            **common, timeout=timeout, command=setting("command", "clickhouse-client"), clock=clock
-        )
-    from dpone.runtime.connectors.clickhouse_file_stage_http import build_file_http_runner
-
-    return build_file_http_runner(**common, timeout=timeout, clock=clock)

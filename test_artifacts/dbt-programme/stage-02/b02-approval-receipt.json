@@ -20,7 +20,8 @@
   "release_authorized": false,
   "lifecycle_note": "Approval supersedes historical pre-approval prose in the immutable original package. Only the specification status marker is changed in the working copy.",
   "approved_working_spec_sha256": "37dfbaf0fb0f8e613fb06b0f53b36a06d54c6dd66b4588a6cba605632461e3bd",
-  "activated_contract_sha256": "d8bb2e5160d6130cc25740cf58374c0dd57093c2ffc37e465b6bff979de9b577",
+  "activated_contract_sha256": "16fbed6bf72532e12041d765ea942d23fb4652209b67cb4d65a6fcfabb16b57c",
+  "contract_activation_status": "PASS: canonical task_contract.py returned passed with no errors or warnings before source edits",
   "contract_materialization": "Same effective owned paths. CHANGELOG/mkdocs represented as integrator-owned exceptions to standard forbidden paths; added exact canonical stop-condition strings required by the existing validator. Original reviewed appendix remains unchanged. Closed schema permits only four required_outputs; mandatory independent review receipt is explicitly included in completion-report acceptance instead. No review requirement removed.",
   "reconciled_base_commit": "1202d2cf652cf41594abdd21040378204653b656",
   "base_reconciliation": {
@@ -76,6 +77,11 @@
       "base_commit": "1202d2cf652cf41594abdd21040378204653b656",
       "sha256": "7e3cd99d6536fb5e03dddced95114987b635eaa60eef5b5dc7090e4403942c99",
       "reason": "Before approved architecture responsibility amendment"
+    },
+    {
+      "base_commit": "1202d2cf652cf41594abdd21040378204653b656",
+      "sha256": "d8bb2e5160d6130cc25740cf58374c0dd57093c2ffc37e465b6bff979de9b577",
+      "reason": "Before approved staging composition amendment; previously validated contract"
     }
   ],
   "architecture_responsibility_amendment": {
@@ -95,5 +101,20 @@
     "public_policy_change": false,
     "internal_di_change": "Required storage-bound journal factory replaces service storage argument and default concrete factory",
     "scope": "Five exact responsibility moves in the immutable amendment; original spec and appendix preserved"
+  },
+  "staging_composition_amendment": {
+    "path": "test_artifacts/dbt-programme/stage-02/staging-composition-amendment.md",
+    "sha256": "bca0fafb932a841b2af1b22ed7aa12c974e7752856bd9e396867c5eebd4161ae",
+    "hash_status": "PASS: byte-identical to approved coordinator disk copy",
+    "authority": "Programme coordinator approved second technical amendment after actual full-source and CI architecture failures",
+    "starting_commit": "8182b558d993baf302ed16c9ff3f2b3911083b5d",
+    "branch": "codex/b02-validated-file-staging-linear",
+    "additional_owned_paths": [
+      "src/dpone/runtime/clickhouse_staging_composition.py"
+    ],
+    "public_policy_change": false,
+    "scope": "Construction-only service/decoder/finalizer bundle; actual runner composition; preserve late connector provider, early bound methods, existing lambdas, alias metadata and clone behavior",
+    "production_edit_status": "AUTHORIZED: canonical contract validated before source edits",
+    "prior_acceptance_status": "FAIL: exact 8182 full-source result retained; two deterministic B02 architecture failures confirmed in CI"
   }
 }

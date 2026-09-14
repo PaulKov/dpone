@@ -19,7 +19,7 @@ flowchart LR
     C --> H[Durable staged event and existing staging handle]
 ```
 
-`ClickHouseSink.stage_validated_file` is a thin composition boundary. It does not
+`ClickHouseSink.stage_validated_file` delegates to its constructed service. It does not
 call `stage_payload`, schema evolution, source selection or checkpoint services.
 `ClickHouseValidatedFileService` owns the attempt sequence, query ownership and
 failure cleanup. The optional `validated_file_runner_factory(config, policy)` is
@@ -40,12 +40,28 @@ and rehashed spool establishes derived identity.
 
 | Component | Responsibility and dependencies |
 | --- | --- |
-| `ClickHouseSink` | Composes controlled adapter factories from resolved scalar settings and binds storage to the concrete journal factory |
+| `ClickHouseSink` | Supplies existing connector/callback bindings to the construction boundary and retains the returned collaborators under its existing attributes |
+| `clickhouse_staging_composition.py` | Constructs the validated-file service, decoder and finalizer in order; owns controlled adapter selection and storage-bound journal wiring |
 | `ClickHouseValidatedFileService` and preparer | Depend on the runtime query/journal ports and finite policy; own sequencing and preparation, respectively |
 | `clickhouse_client_request.py` and `clickhouse_http_request.py` | Own credentials, options and pure request construction shared by legacy and controlled transports |
 | `bulk_text_codec.py` | Owns the producer codec and its logical reader, including wire grammar and read errors |
 | `clickhouse_file_response.py` | Owns bounded HTTP response framing and raw reads using injected metadata/body limits and remaining-deadline callback; imports only the standard library |
 | `ClickHouseFileAttemptJournal` | Implements private spool storage, immutable event publication and failure inventory |
+
+`build_clickhouse_staging_components` returns an immutable three-field bundle
+(`validated_file`, `decoder`, `finalizer`). Assembly invokes no supplied callback
+and does not route execution through the bundle. The default file runner factory
+reads the sink's current connector through an explicit provider when invoked;
+decoder and finalizer retain the connector supplied at initialization. Table,
+create, map-type, count and mutation methods keep their original binding, including
+the decoder's map-type signature inspection. Drop/plan/create lambdas keep their
+existing delayed lookup. The sink retains `build_file_runner` as an exact alias
+with its historical signature and metadata.
+
+Existing partition clones still forward only connector, state storage, logger and
+legacy runner classes. They do not acquire new resolver or validated-file factory
+inheritance. Public clone tests cover both transports, parent/child connection use,
+staging cleanup after transport failure and source-file retention.
 
 The internal service constructor requires a bound
 `journal_factory(policy, attempt_id)` and no longer accepts `storage=`. Production

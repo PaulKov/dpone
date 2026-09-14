@@ -26,14 +26,23 @@ existing staging handle. Use constructor DI and a narrow runtime query port.
 Place pure request construction and credential/option models in transport-specific
 request modules shared by legacy and controlled adapters. Keep the producer codec
 and logical reader together. Put finite admission policy, errors, canonical JSON
-and the narrow journal resource port alongside the runtime query contract. The sink
-binds storage to the journal factory; orchestration and preparation depend on its
+and the narrow journal resource port alongside the runtime query contract. The
+staging composition module binds storage to the journal factory; orchestration and preparation depend on its
 resource port. The internal service requires this bound factory rather than a
 storage argument or concrete default. Keep bounded HTTP response parsing in a
 standard-library module with injected metadata/body limits and remaining deadline.
 These ownership changes preserve historical aliases, metadata, pickle globals,
 constructor defaults and public transport dispatch. They introduce no new public
 staging policy or planner/preparer injection point.
+
+Construct the service, existing decoder and existing finalizer in a dedicated
+`runtime/clickhouse_staging_composition.py` boundary, returning an immutable typed
+three-field bundle. The sink keeps the existing collaborator attributes and public
+methods. This removes concrete transport dependencies from the sink and keeps its
+fan-out within the existing local contract. Preserve the default runner's delayed
+connector lookup, initialization-time decoder/finalizer connector, bound method
+signatures and existing callback lambdas. Assembly invokes no callback; the bundle
+is not an execution proxy. Existing clone propagation remains unchanged.
 
 Publish immutable query intents before CREATE/INSERT/DROP and durable final evidence
 after successful verification and spool cleanup. Separate local sender termination
@@ -63,7 +72,7 @@ exactly-once, crash-recovery, live-certification or throughput claim.
 
 ## Evidence and related contracts
 
-The accepted design, verification-budget amendment and responsibility amendment are tracked by
+The accepted design, verification-budget amendment and both responsibility amendments are tracked by
 `docs/agent-task-contracts/b02-validated-clickhouse-file-staging.yml`. Validation uses
 genuine receipts, independent value oracles and real local transport fixtures;
 external live checks require separate authorization. See the

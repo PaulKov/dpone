@@ -20,10 +20,12 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
+from dpone.config.load_config import LoadConfig
 from dpone.runtime.connectors import clickhouse_bulk as client
 from dpone.runtime.connectors import clickhouse_http_bulk as http
 from dpone.runtime.connectors.bulk_text_codec import BulkTextCodec
 from dpone.runtime.sinks.clickhouse_validated_file_models import ClickHouseValidatedFilePolicy
+from dpone.runtime.sinks.load_payload import LoadPayload
 from dpone.runtime.support import bulk_text_file_reader as reader
 
 
@@ -533,6 +535,13 @@ BASELINE = {
         "-> 'StagedLoadHandle'",
         "type_hints": {"existing_unresolved_annotation": "name 'LoadConfig' is not defined"},
     },
+    "dpone.runtime.sinks.clickhouse_sink:build_file_runner": {
+        "module": "dpone.runtime.sinks.clickhouse_sink",
+        "qualname": "build_file_runner",
+        "signature": "(config: 'LoadConfig', policy: 'ClickHouseValidatedFilePolicy', *, connector: 'Any', "
+        "clock: 'Callable[[], float]') -> 'ClickHouseFileStageRunner'",
+        "type_hints": {"existing_unresolved_annotation": "name 'LoadConfig' is not defined"},
+    },
 }
 
 
@@ -789,6 +798,7 @@ def test_reader_preserves_exact_binary_whitespace_empty_null_and_error_boundary(
             ("BulkTextFileReadError", "iter_wire_rows", "decode_wire_value", "iter_rows"),
         ),
         ("sinks.clickhouse_validated_file_journal", "clickhouse_file_stage_contract", ("canonical_json",)),
+        ("sinks.clickhouse_sink", "clickhouse_staging_composition", ("build_file_runner",)),
     ],
 )
 def test_canonical_implementations_keep_identical_legacy_globals_and_pickle_paths(legacy, current, names):
@@ -798,3 +808,244 @@ def test_canonical_implementations_keep_identical_legacy_globals_and_pickle_path
         value = getattr(old_module, name)
         assert getattr(new_module, name) is value
         assert pickle.loads(f"c{value.__module__}\n{value.__qualname__}\n.".encode()) is value
+
+
+@pytest.fixture
+def staging_composition(tmp_path):
+    from dpone.runtime.clickhouse_staging_composition import build_clickhouse_staging_components
+    from dpone.runtime.sinks.clickhouse_physical_types import ClickHousePhysicalColumnTypeResolver
+
+    events = []
+    early = SimpleNamespace(
+        host="early",
+        port=9000,
+        database="db",
+        user="synthetic",
+        password="",
+        secure=False,
+        execute_query=lambda sql: events.append(("early_connector", sql)),
+    )
+    current = SimpleNamespace(connector=early)
+    config = LoadConfig(
+        source_conn_id="source",
+        target_conn_id="target",
+        source_schema="dbo",
+        source_table="rows",
+        target_schema="db",
+        target_table="rows",
+        options={"clickhouse_bulk": {"mode": "client"}},
+    )
+    policy = ClickHouseValidatedFilePolicy(tmp_path / "work", 1_048_576)
+
+    def mapped(dtype, cfg):
+        events.append(("early_map", dtype, cfg))
+        return "String"
+
+    hooks = SimpleNamespace(
+        table=lambda cfg: "early." + cfg.target_table,
+        create=lambda cfg, schema: events.append(("early_create", cfg, schema)),
+        drop=lambda cfg: events.append(("early_drop", cfg)),
+        plan=lambda cfg: replace(cfg, target_table="early_plan"),
+        map=mapped,
+        count=lambda cfg: events.append(("early_count", cfg)) or 17,
+        mutations=lambda cfg: 2,
+    )
+    resolver = ClickHousePhysicalColumnTypeResolver()
+
+    def clock():
+        return 12.0
+
+    def provider():
+        events.append(("connector_provider",))
+        return current.connector
+
+    def build(factory=None):
+        return build_clickhouse_staging_components(
+            connector=early,
+            connector_provider=provider,
+            resolver=resolver,
+            clock=clock,
+            validated_file_runner_factory=factory,
+            table_name=hooks.table,
+            create_staging_table=lambda cfg, _schema: cfg,
+            map_type=hooks.map,
+            drop_staging_table=lambda cfg: hooks.drop(cfg),
+            plan_staging_table=lambda cfg: hooks.plan(cfg),
+            create_planned_staging_table=lambda cfg, schema: hooks.create(cfg, schema),
+            count_rows=hooks.count,
+            mutations_sync=hooks.mutations,
+        )
+
+    return SimpleNamespace(
+        build=build,
+        events=events,
+        hooks=hooks,
+        current=current,
+        early=early,
+        config=config,
+        policy=policy,
+        resolver=resolver,
+        clock=clock,
+    )
+
+
+@pytest.mark.parametrize("mode", ["client", "http"])
+@pytest.mark.parametrize("factory_kind", ["default", "falsey", "supplied"])
+def test_composition_defers_default_connector_and_preserves_factory_fallback(staging_composition, mode, factory_kind):
+    fixture = staging_composition
+    fixture.config.options["clickhouse_bulk"]["mode"] = mode
+    sentinel = object()
+
+    class SuppliedFactory:
+        def __bool__(self):
+            return factory_kind == "supplied"
+
+        def __call__(self, config, policy):
+            fixture.events.append(("supplied_factory", config, policy))
+            return sentinel
+
+    supplied = None if factory_kind == "default" else SuppliedFactory()
+    bundle = fixture.build(supplied)
+    assert fixture.events == []
+    assert not fixture.policy.work_directory.exists()
+    assert bundle.validated_file.resolver is fixture.resolver
+    assert bundle.validated_file.clock is fixture.clock
+    with pytest.raises(FrozenInstanceError):
+        bundle.decoder = None
+    fixture.current.connector = SimpleNamespace(
+        host="late",
+        port=9440,
+        database="later_db",
+        user="later_user",
+        password="",
+        secure=True,
+    )
+    runner = bundle.validated_file.runner_factory(fixture.config, fixture.policy)
+    if factory_kind == "supplied":
+        assert runner is sentinel
+        assert fixture.events == [("supplied_factory", fixture.config, fixture.policy)]
+    else:
+        assert fixture.events == [("connector_provider",)]
+        assert runner.credentials.host == "late"
+        assert runner.credentials.database == "later_db"
+        assert runner.credentials.user == "later_user"
+        assert runner.credentials.port == (9440 if mode == "client" else 8123)
+        assert runner.credentials.secure is (mode == "client")
+        assert runner.clock is fixture.clock
+
+
+def test_composition_preserves_bound_methods_late_callbacks_and_early_decoder_connector(staging_composition):
+    fixture = staging_composition
+    bundle = fixture.build()
+    fixture.current.connector = SimpleNamespace(execute_query=lambda _sql: pytest.fail("late connector used"))
+    fixture.hooks.table = lambda _cfg: "late_table_must_not_replace_bound_callback"
+    fixture.hooks.map = lambda *_args: pytest.fail("late map replaced bound signature")
+    fixture.hooks.count = lambda *_args: pytest.fail("late count replaced bound callback")
+    fixture.hooks.plan = lambda cfg: replace(cfg, target_table="late_plan")
+    fixture.hooks.create = lambda cfg, schema: fixture.events.append(("late_create", cfg, schema))
+    fixture.hooks.drop = lambda cfg: fixture.events.append(("late_drop", cfg))
+    fixture.hooks.mutations = lambda _cfg: 99
+    codec = SimpleNamespace(clickhouse_decode_expression=lambda value: f"decode({value})")
+    payload = LoadPayload(SimpleNamespace(bulk_text_codec=codec), (("text", "nvarchar(max)"),))
+    schema = bundle.decoder.staging_schema(fixture.config, payload)
+    assert schema.columns == [("text", "String")]
+    assert fixture.events == [("early_map", "nvarchar(max)", fixture.config)]
+    fixture.events.clear()
+    source = replace(fixture.config, target_table="source_stage")
+    decoded, _ = bundle.decoder.prepare(fixture.config, source, payload)
+    assert decoded.target_table == "late_plan"
+    assert fixture.events[0] == ("late_create", decoded, payload.schema)
+    assert fixture.events[1] == ("early_map", "nvarchar(max)", fixture.config)
+    assert fixture.events[2][0] == "early_connector"
+    assert "INSERT INTO early.late_plan" in fixture.events[2][1]
+    assert "FROM early.source_stage" in fixture.events[2][1]
+    assert bundle.finalizer.copy_target_to_shadow_excluding_predicate(fixture.config, source) == 17
+    assert fixture.events[-1] == ("early_count", source)
+    bundle.finalizer.mutation_delete_matching_staging_keys(fixture.config, source, ["text"])
+    assert fixture.events[-1][0] == "early_connector"
+    assert fixture.events[-1][1].endswith("SETTINGS mutations_sync = 2")
+
+    def fail_create(_cfg, _schema):
+        raise RuntimeError("late create failure")
+
+    fixture.hooks.create = fail_create
+    with pytest.raises(RuntimeError, match="late create failure"):
+        bundle.decoder.prepare(fixture.config, source, payload)
+    assert fixture.events[-1] == ("late_drop", decoded)
+
+
+@pytest.mark.parametrize("mode", ["client", "http"])
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.parametrize("fails", [False, True])
+def test_public_sink_clone_preserves_transport_and_cleanup_ownership(tmp_path, mode, parallel, fails):
+    from dpone.runtime.file_artifacts import FileExportArtifact, PartitionedFileExportArtifact
+    from dpone.runtime.sinks.clickhouse_sink import ClickHouseSink
+
+    calls, clones = [], []
+    failure = RuntimeError("synthetic transport failure")
+
+    class Connector:
+        port, database, user, password, secure = 9000, "db", "synthetic", "", False
+
+        def __init__(self, host):
+            self.host, self.queries = host, []
+
+        def execute_query(self, query, params=None):
+            self.queries.append(query)
+            return 0
+
+        def get_records(self, *_args, **_kwargs):
+            pytest.fail("stage-only bulk path unexpectedly probed rows")
+
+        def clone_for_partition(self, index):
+            clones.append(index)
+            return child
+
+    def runner_class(selected_mode):
+        class Runner:
+            def __init__(self, credentials, options):
+                self.credentials = credentials
+
+            def insert_file(self, table, columns, path):
+                calls.append((selected_mode, self.credentials.host, table, columns, Path(path).read_bytes()))
+                if fails:
+                    raise failure
+
+        return Runner
+
+    parent, child = Connector("parent.example"), Connector("child.example")
+    sink = ClickHouseSink(parent, client_runner_cls=runner_class("client"), http_runner_cls=runner_class("http"))
+    source = tmp_path / "source.tsv"
+    source.write_bytes(b"1\n2\n")
+    file = FileExportArtifact(str(source), ["id"], format="clickhouse-tsv", estimated_rows=2, rows_exported=2)
+    partitioned = PartitionedFileExportArtifact([file], ["id"], max_workers=2)
+    config = LoadConfig(
+        source_conn_id="source",
+        target_conn_id="target",
+        source_schema="dbo",
+        source_table="rows",
+        target_schema="db",
+        target_table="rows",
+        options={"clickhouse_bulk": {"mode": mode}, "clickhouse_parallel_connections": parallel, "lineage": False},
+    )
+    payload = LoadPayload(partitioned, (("id", "int"),))
+    if fails:
+        with pytest.raises(RuntimeError) as error:
+            sink.stage_payload(config, payload)
+        assert error.value is failure
+    else:
+        handle = sink.stage_payload(config, payload)
+        assert handle.staged_rows == 2
+        assert handle.decoded_config is None
+        assert handle.finalization_config is handle.staging_config
+        assert handle.payload_schema == (("id", "int"),)
+        assert calls[0][2] == f"`db`.`{handle.staging_config.target_table}`"
+        sink.cleanup_staged_load(handle)
+    assert clones == ([0] if parallel else [])
+    assert len(calls) == 1
+    assert calls[0][:2] == (mode, "child.example" if parallel else "parent.example")
+    assert calls[0][3:] == (["id"], b"1\n2\n")
+    assert child.queries == []
+    assert any(query.startswith("CREATE TABLE " + calls[0][2]) for query in parent.queries)
+    assert any(query.startswith("DROP TABLE IF EXISTS " + calls[0][2]) for query in parent.queries)
+    assert source.read_bytes() == b"1\n2\n"
