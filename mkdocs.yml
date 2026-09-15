@@ -509,6 +509,7 @@ nav:
       - Native source admission closure: native-source-admission-closure.md
       - Native generation admission: native-generation-admission.md
       - Trusted native dbt invocation: native-generation-execution.md
+      - Managed SQL catalog wire: dbt-mssql-physical-catalog-wire.md
       - Bounded versioned artifacts: versioned-artifact-store.md
       - Feature design standard: feature-design-standard.md
       - Feature design - agent task contract gate: feature-design-agent-task-contract-gate.md
