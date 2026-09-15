@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Expose the reserved native build bridge through the agreed execution facade while preserving recorder identity and avoiding cyclic imports.
+
 - Add a native profile lease that retains the authenticated directory through evidence publication while removing credential bytes at the inner execution boundary.
 
 - Define the positive native build bridge receipt with complete original references; keep failed and uncertain execution in the explicit error/evidence channel.

@@ -369,3 +369,14 @@ filesystem lease against privileged concurrent mutation. Ordinary
 `TemporaryDbtProfileStore` behavior is unchanged. The new store grants neither
 credentials, command admission nor runtime qualification; the bridge still
 validates its exact recorder before rendering a profile.
+
+
+## Native execution public facade
+
+The approved `runtime.native_generation_execution` import exposes the actual
+reserved build bridge and recorder through identity-preserving re-exports. The
+complete recorder implementation lives in `runtime.native_generation_invocation_recorder`;
+the bridge imports that canonical owner directly, avoiding a facade/bridge cycle.
+No recorder method, timing, locking, dispatch or evidence behavior changes. Public
+import order is checked in fresh processes. This exposes implemented constructors;
+it does not create a final-quality placeholder or qualify the bootstrap.
