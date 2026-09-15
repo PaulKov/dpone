@@ -1,5 +1,6 @@
 """Synthetic Git inputs validate producer logic, not the shipped package."""
 
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -139,6 +140,17 @@ def test_dirty_executable_mode_rejects(source):
     (repo / "packages/dbt-dpone/INSTALL.md").chmod(0o755)
     with pytest.raises(ValueError):
         capture_package_source(repo, revision)
+
+
+def test_source_capture_never_runs_repository_clean_filters(source):
+    repo, revision = source
+    marker = repo / "unexpected-filter-side-effect"
+    (repo / ".gitattributes").write_text("packages/dbt-dpone/INSTALL.md filter=syntheticprobe\n")
+    git(repo, "config", "filter.syntheticprobe.clean", "tee " + shlex.quote(str(marker)))
+    path = repo / "packages/dbt-dpone/INSTALL.md"
+    path.write_bytes(path.read_bytes())
+    assert capture_package_source(repo, revision).revision == revision
+    assert not marker.exists()
 
 
 @pytest.fixture
