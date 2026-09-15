@@ -38,7 +38,9 @@ _MARKER = re.compile(r"@@DPONE_([A-Z_]+)@@")
 # JSON permits literal C1 controls and Unicode line separators, but YAML treats
 # some as invalid characters or folded line breaks. Keep those escaped while
 # retaining supplementary Unicode as actual scalars, not surrogate escapes.
-_YAML_LITERAL_ESCAPES = {codepoint: f"\\u{codepoint:04x}" for codepoint in (*range(0x7F, 0xA0), 0x2028, 0x2029)}
+_YAML_LITERAL_ESCAPES = {
+    codepoint: f"\\u{codepoint:04x}" for codepoint in (*range(0x7F, 0xA0), 0x2028, 0x2029, 0xFFFE, 0xFFFF)
+}
 _TEMPLATE_MARKERS = {
     "dbt_project.yml": {"PROJECT_NAME", "DBT_PROFILE"},
     "profiles/profiles.yml": {"DBT_PROFILE", "DBT_TARGET", "INVOCATION_DATABASE", "INVOCATION_SCHEMA"},
