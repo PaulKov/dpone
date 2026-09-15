@@ -27,3 +27,59 @@ def test_event_decoder_rejects_truncation_or_invalid_sequence(content):
 def test_fixed_target_pending_record_is_valid():
     validate_event({"phase": "APPLYING", "path": RESOURCE_PATHS[0]})
     assert read_events(b'{"phase":"PREPARING","sequence":0}\n') == [{"phase": "PREPARING"}]
+
+
+def rollback_record():
+    return {
+        "path": RESOURCE_PATHS[0],
+        "device": 1,
+        "inode": 2,
+        "directories": [{"path": "src/dpone/_assets/dbt_dpone", "device": 1, "inode": 3}],
+        "removed": True,
+        "preserved": False,
+        "recovery_path": "src/dpone/_assets/dbt_dpone/.dpone-rollback-" + "a" * 32,
+        "directory_recovery_paths": ["src/dpone/_assets/dbt_dpone"],
+    }
+
+
+@pytest.mark.parametrize("metadata", [False, True])
+def test_rollback_codec_accepts_receipt_bound_artifacts(metadata):
+    from tools.dbt_self_service.starter_resource_journal_schema import validate_rollback
+
+    operation = "12345678-1234-1234-1234-123456789abc"
+    record = rollback_record()
+    if metadata:
+        directory = ".dpone-starter-resource-transactions/" + operation
+        record.update(
+            path=directory + "/events.jsonl",
+            directories=[{"path": directory, "device": 1, "inode": 3}],
+            recovery_path=directory + "/.dpone-rollback-" + "a" * 32,
+            directory_recovery_paths=[directory],
+        )
+    validate_rollback(record, operation)
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["foreign_parent", "unknown_sibling", "unowned_directory", "wrong_operation", "traversal", "identity", "flag"],
+)
+def test_rollback_codec_rejects_unbound_artifacts(change):
+    from tools.dbt_self_service.starter_resource_journal_schema import validate_rollback
+
+    record = rollback_record()
+    if change == "foreign_parent":
+        record["recovery_path"] = "foreign/.dpone-rollback-" + "a" * 32
+    elif change == "unknown_sibling":
+        record["recovery_path"] = "src/dpone/_assets/dbt_dpone/unknown"
+    elif change == "unowned_directory":
+        record["directory_recovery_paths"] = ["src"]
+    elif change == "wrong_operation":
+        record["path"] = ".dpone-starter-resource-transactions/00000000-0000-0000-0000-000000000000/events.jsonl"
+    elif change == "traversal":
+        record["path"] = "src/../foreign"
+    elif change == "identity":
+        record["inode"] = True
+    else:
+        record["removed"] = 1
+    with pytest.raises(ValueError):
+        validate_rollback(record, "12345678-1234-1234-1234-123456789abc")
