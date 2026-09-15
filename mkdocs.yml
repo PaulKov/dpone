@@ -512,6 +512,7 @@ nav:
       - Trusted native dbt invocation: native-generation-execution.md
       - Managed SQL catalog wire: dbt-mssql-physical-catalog-wire.md
       - Managed SQL physical plans: dbt-mssql-physical-plans.md
+      - Physical runtime registration: dbt-mssql-physical-registration.md
       - Starter resource generation: dbt-starter-resource-generation.md
       - Bounded versioned artifacts: versioned-artifact-store.md
       - Feature design standard: feature-design-standard.md

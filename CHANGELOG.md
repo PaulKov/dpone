@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add immutable physical runtime registration records and canonical encoding,
+  with database-scoped principal mappings and explicit UTF-16LE definition
+  budgets. The records validate internal consistency only; authenticated
+  resource-bound admission, SQL provisioning and qualification remain unfinished.
+
 - Add immutable SQL Server physical model specs, generation plans and plan-set
   encoding with strict canonical bytes, derived names and separate digest
   inputs. These pure contracts grant no registration or execution authority;
