@@ -89,7 +89,7 @@ matches the [catalog decoder](dbt-mssql-physical-catalog-wire.md) and must not b
 silently converted from UTF-8. Recording a 256-column ceiling does not apply that
 policy to any model: the generic plan codec still performs representation checks.
 
-`ModelSpec.resource_bounds` is not compared with `capacity_authority`. Generation
+`PhysicalModelSpec.resource_bounds` is not compared with `capacity_authority`. Generation
 capacity does not establish physical catalog or dependency limits. Actual
 admission must reject execution until an authenticated physical-bounds original
 or explicit authenticated projection mapping is available.
