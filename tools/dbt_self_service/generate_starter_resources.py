@@ -7,13 +7,18 @@ not macro authority, physical qualification or a dbt-produced dependency lock.
 
 from __future__ import annotations
 
+import argparse
+import json
 import os
 import re
 import shutil
 import stat
 import subprocess
-from dataclasses import dataclass
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, NoReturn
 
 from dpone.adapters.dbt_starter_resources import _PACKAGE_FILES, _STARTER_FILES, _read_inventory
 from dpone.contracts.dbt_contract_validation import DbtPublishingError
@@ -21,6 +26,10 @@ from dpone.manifest.bounded_yaml import BoundedYamlError, load_bounded_yaml
 from dpone.manifest.confined_files import read_confined_file_snapshot
 from dpone.manifest.project_root import inspect_project_root, verify_project_root
 from dpone.runtime.dbt_package_readiness import require_current_package_lock
+
+if TYPE_CHECKING:
+    from tools.dbt_self_service.starter_dependency_generation import DependencyResources
+    from tools.dbt_self_service.starter_resource_transaction import ResourceWriteReceipt
 
 _PACKAGE_PREFIX = "packages/dbt-dpone"
 _ORIGIN = "https://github.com/PaulKov/dpone.git"
@@ -176,3 +185,176 @@ def _git(repo: Path, *arguments: str) -> bytes:
         timeout=30,
     )
     return completed.stdout
+
+
+class _ArgumentError(ValueError):
+    pass
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> NoReturn:
+        raise _ArgumentError()
+
+
+def main(
+    argv: list[str] | None = None, *, generate: Callable[[PackageSource], DependencyResources] | None = None
+) -> int:
+    """Developer CLI only; dependency adapters are composed after argument checks.
+
+    Emit one JSON result, except explicit help. Exit codes: 0 success, 1 failure,
+    2 invalid arguments, 3 recovery required. Captured errors are never printed.
+    Injection supports synthetic tests; it does not establish deps provenance.
+    """
+    parser = _Parser(description="Prepare immutable starter resources; never runs during init.", allow_abbrev=False)
+    parser.add_argument("--source-repo", required=True)
+    parser.add_argument("--revision")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--check", action="store_true", help="Verify offline without writes or dependency downloads.")
+    mode.add_argument("--recovery-report", action="store_true", help="Inspect recovery obligations without repair.")
+    try:
+        args = parser.parse_args(argv)
+        if args.recovery_report:
+            if args.revision is not None:
+                raise _ArgumentError()
+        elif args.revision is None or re.fullmatch(r"[0-9a-f]{40}", args.revision) is None:
+            raise _ArgumentError()
+    except _ArgumentError:
+        print(json.dumps({"status": "INVALID_ARGUMENTS"}))
+        return 2
+    except SystemExit as error:
+        return int(error.code or 0)
+
+    # Lazy imports belong to this concrete CLI composition boundary, not init.
+    from tools.dbt_self_service.starter_dependency_generation import DependencyGenerationError, generate_dependencies
+    from tools.dbt_self_service.starter_resource_recovery import recovery_report
+
+    selected = "recovery-report" if args.recovery_report else "check" if args.check else "generate"
+    result: dict[str, object] = {"mode": selected}
+    try:
+        identity = inspect_project_root(Path(args.source_repo))
+        if identity is None:
+            raise ValueError()
+        root = identity.path
+        report = recovery_report(root)
+        if args.recovery_report or report.pending:
+            result.update(asdict(report))
+            code = 3 if report.pending else 0
+        elif args.check:
+            check_starter_resources(root, str(args.revision))
+            verify_project_root(identity)
+            report = recovery_report(root)
+            result.update(asdict(report) if report.pending else {"status": "PASS", "revision": args.revision})
+            code = 3 if report.pending else 0
+        else:
+            receipt = _generate_resources(root, str(args.revision), generate or generate_dependencies)
+            result.update(asdict(receipt))
+            result["revision"] = args.revision
+            code = 3 if receipt.recovery_required or receipt.unpersisted_recovery_paths else 0 if receipt.passed else 1
+    except DependencyGenerationError as error:
+        retained = error.retained_workspace
+        result.update(status="RECOVERY_REQUIRED" if retained else "FAILED")
+        if retained is not None:
+            result["retained_workspace"] = str(retained)
+        code = 3 if retained else 1
+    except Exception:
+        result["status"] = "FAILED"
+        code = 1
+    print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+    return code
+
+
+def _generate_resources(
+    root: Path, revision: str, generate: Callable[[PackageSource], DependencyResources]
+) -> ResourceWriteReceipt:
+    """Preflight before deps, then revalidate captured inputs under the writer lock."""
+    from tools.dbt_self_service.starter_resource_files import require_snapshot, snapshot
+    from tools.dbt_self_service.starter_resource_journal_schema import MAX_RESOURCE_BYTES, RESOURCE_PATHS
+    from tools.dbt_self_service.starter_resource_transaction import apply_resource_plan
+
+    from dpone.adapters.project_authoring_lock import project_authoring_lock
+
+    identity = inspect_project_root(root)
+    if identity is None:
+        raise ValueError()
+    source = capture_package_source(root, revision)
+    destinations = {path: snapshot(identity, path) for path in RESOURCE_PATHS}
+    starter = "src/dpone/_assets/dbt_starter/v4/"
+    templates = {
+        starter + name: read_confined_file_snapshot(
+            root, starter + name, max_bytes=MAX_RESOURCE_BYTES, root_identity=identity
+        )
+        for name, _ in _STARTER_FILES
+        if name not in {"packages.yml", "package-lock.yml"}
+    }
+    expected = tuple(
+        name
+        for name, _ in _STARTER_FILES
+        if starter + name in templates or destinations.get(starter + name) is not None
+    )
+    mirror = "src/dpone/_assets/dbt_dpone/"
+    inputs = dict(templates)
+    for name, content in source.files:
+        path = _PACKAGE_PREFIX + "/" + name
+        observed = read_confined_file_snapshot(root, path, max_bytes=MAX_RESOURCE_BYTES, root_identity=identity)
+        if observed.content != content:
+            raise ValueError()
+        inputs[path] = observed
+
+    def revalidate_inputs() -> None:
+        verify_project_root(identity)
+        if capture_package_source(root, revision) != source:
+            raise ValueError()
+        for path, previous in inputs.items():
+            if (
+                read_confined_file_snapshot(root, path, max_bytes=MAX_RESOURCE_BYTES, root_identity=identity)
+                != previous
+            ):
+                raise ValueError()
+
+    def revalidate_destinations() -> None:
+        for path, previous in destinations.items():
+            require_snapshot(identity, path, previous)
+        _read_inventory(root / starter, expected)
+        if inspect_project_root(root / mirror, allow_missing=True) is not None:
+            _read_inventory(
+                root / mirror, tuple(name for name in _PACKAGE_FILES if destinations[mirror + name] is not None)
+            )
+
+    @contextmanager
+    def locked(path: Path) -> Iterator[None]:
+        with project_authoring_lock(path):
+            revalidate_inputs()
+            revalidate_destinations()
+            yield
+
+    revalidate_destinations()
+    dependencies = generate(source)
+    files = {mirror + name: content for name, content in source.files}
+    files.update(
+        {
+            starter + "packages.yml": dependencies.packages_yml,
+            starter + "package-lock.yml": dependencies.package_lock_yml,
+        }
+    )
+    revalidate_inputs()
+    revalidate_destinations()
+
+    def validate_result() -> None:
+        check_starter_resources(root, revision)
+        for path, content in files.items():
+            observed = snapshot(identity, path)
+            if observed is None or observed.content != content:
+                raise ValueError()
+
+    return apply_resource_plan(
+        root,
+        files,
+        source_revision=revision,
+        revalidate_inputs=revalidate_inputs,
+        validate_result=validate_result,
+        authoring_lock=locked,
+    )
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
