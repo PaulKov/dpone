@@ -27,6 +27,8 @@ class OriginalRef:
     def __post_init__(self) -> None:
         if type(self.locator) is not str or type(self.sha256) is not str:
             raise DbtPublishingError(_ERROR_CODE, "original reference fields must be strings")
+        if len(self.locator) > 4096:
+            raise DbtPublishingError(_ERROR_CODE, "locator exceeds its UTF-8 byte limit")
         require_relative(self.locator, "locator", _ERROR_CODE)
         require_digest(self.sha256, "sha256", _ERROR_CODE)
         try:

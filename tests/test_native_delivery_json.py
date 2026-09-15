@@ -170,3 +170,31 @@ def test_encoder_permits_primitive_roots_without_weakening_object_decoder():
     assert encode_native_delivery_json([1, True, None]) == b"[1,true,null]"
     with pytest.raises(NativeJsonError):
         decode_native_delivery_json(b"[1,true,null]")
+
+
+@pytest.mark.parametrize(
+    "operation", ["encode_native_delivery_json({'x': value})", "OriginalRef(value, 'sha256:' + 'a' * 64)"]
+)
+def test_oversize_python_input_is_rejected_without_a_proportional_copy(operation):
+    """An isolated allocator probe excludes unrelated pytest/plugin threads."""
+    import subprocess
+    import sys
+
+    script = """
+import tracemalloc
+from dpone.contracts.native_delivery_json import NativeJsonError, encode_native_delivery_json
+from dpone.contracts.native_identity import OriginalRef
+from dpone.contracts.dbt_contract_validation import DbtPublishingError
+value = 'x' * (2 * 1024 * 1024)
+tracemalloc.start()
+try:
+    OPERATION
+except (NativeJsonError, DbtPublishingError):
+    pass
+else:
+    raise AssertionError('oversize value was accepted')
+_, peak = tracemalloc.get_traced_memory()
+assert peak < 128 * 1024, peak
+""".replace("OPERATION", operation)
+    result = subprocess.run([sys.executable, "-c", script], text=True, capture_output=True, check=False)
+    assert result.returncode == 0, result.stderr

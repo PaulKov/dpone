@@ -27,6 +27,9 @@ class NativeJsonError(ValueError):
 
 
 def _string_bytes(value: str) -> int:
+    # Every scalar needs at least one UTF-8 byte; reject before allocating.
+    if len(value) > MAX_NATIVE_JSON_STRING_BYTES:
+        raise NativeJsonError("native JSON string exceeds its UTF-8 byte limit")
     try:
         size = len(value.encode("utf-8"))
     except UnicodeEncodeError as exc:
