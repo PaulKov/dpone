@@ -64,7 +64,16 @@ def test_repeat_noop_and_conflict_preserve_user_sql(tmp_path, capsys, synthetic_
     code, stdout, stderr = run(argv, capsys)
     assert code == 1 and stderr == "" and "PRIVATE_SQL_SENTINEL" not in stdout
     assert model.read_text() == "PRIVATE_SQL_SENTINEL"
-    assert shlex.split(json.loads(stdout)["rerun_command"]) == ["dpone", *argv]
+    from dpone.cli.parser import build_parser
+
+    rerun = build_parser().parse_args(shlex.split(json.loads(stdout)["rerun_command"])[1:])
+    assert (rerun.dbt_path, rerun.dbt_profiles, rerun.dbt_profile, rerun.dbt_workflow, rerun.format) == (
+        str(target),
+        str(policy),
+        "local",
+        "orders",
+        "json",
+    )
 
 
 def test_missing_installed_resources_fail_before_destination(tmp_path, capsys, monkeypatch):
@@ -117,6 +126,53 @@ def test_invalid_policy_has_no_destination(tmp_path, capsys, synthetic_resources
     code, stdout, stderr = run(arguments(target, policy) + ["--format", "json"], capsys)
     assert code == 1 and stderr == "" and not target.exists()
     assert "PRIVATE_SENTINEL" not in stdout
+
+
+@pytest.mark.parametrize("option", ["--profile", "--workflow"])
+def test_invalid_selector_does_not_reappear_in_rerun_command(tmp_path, capsys, synthetic_resources, option):
+    target = tmp_path / "project"
+    argv = arguments(target, starter_policy(tmp_path)) + ["--format", "json"]
+    argv[argv.index(option) + 1] = "PRIVATE_SELECTOR_SENTINEL"
+    code, stdout, stderr = run(argv, capsys)
+    assert code == 1 and stderr == "" and not target.exists()
+    assert "PRIVATE_SELECTOR_SENTINEL" not in stdout
+    assert "rerun_command" not in json.loads(stdout)
+
+
+def test_dry_run_next_command_preserves_dash_prefixed_values(tmp_path, capsys, monkeypatch, synthetic_resources):
+    from dpone.cli.parser import build_parser
+
+    monkeypatch.chdir(tmp_path)
+    policy = starter_policy(tmp_path)
+    value = json.loads(policy.read_text().split("\n", 1)[1])
+    value["profiles"]["-local"] = value["profiles"].pop("local")
+    policy.write_text(json.dumps(value))
+    policy.rename(tmp_path / "-policy.yml")
+    argv = [
+        "init",
+        "dbt",
+        "--profiles=-policy.yml",
+        "--profile=-local",
+        "--workflow=orders",
+        "--dry-run",
+        "--format=json",
+        "--",
+        "-project",
+    ]
+    code, stdout, stderr = run(argv, capsys)
+    assert code == 0 and stderr == ""
+    next_argv = shlex.split(json.loads(stdout)["next_command"])
+    parsed = build_parser().parse_args(next_argv[1:])
+    assert parsed.dbt_profile == "-local" and parsed.dbt_profiles == "-policy.yml"
+    assert not parsed.dbt_dry_run
+    assert run(next_argv[1:], capsys)[0] == 0
+    model = tmp_path / "-project/models/orders.sql"
+    model.write_text("PRIVATE_SQL_SENTINEL")
+    code, stdout, stderr = run(next_argv[1:], capsys)
+    assert code == 1 and stderr == "" and "PRIVATE_SQL_SENTINEL" not in stdout
+    rerun = build_parser().parse_args(shlex.split(json.loads(stdout)["rerun_command"])[1:])
+    assert rerun.dbt_profile == "-local" and rerun.dbt_profiles == "-policy.yml"
+    assert model.read_text() == "PRIVATE_SQL_SENTINEL"
 
 
 def test_public_init_does_not_run_dependencies_network_or_policy_discovery(
