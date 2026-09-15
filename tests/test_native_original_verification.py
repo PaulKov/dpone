@@ -287,3 +287,41 @@ def test_native_transfer_owner_uses_real_release_dag_and_manifest_membership(tmp
         _owner(sources, selected["id"], {**pack, "runtime_payload_ids": list(owner.source.runtime_payload_ids)})
     with pytest.raises(ValueError):
         _owner(replace(sources, relation_writes=()), selected["id"], pack)
+
+
+def test_all_declared_project_archives_are_bounded_before_whole_source_acquisition(tmp_path, monkeypatch):
+    import json
+
+    from dpone.contracts.airflow_deployment import deployment_id, release_id
+
+    fixture = _real_native_projection(tmp_path, monkeypatch)
+    release_path = fixture.release_root / "release-set.json"
+    release = json.loads(release_path.read_bytes())
+    projects = [item for item in release["artifacts"]["runtime_payloads"] if item["kind"] == "dbt_project_bundle"]
+    projects[-1]["bytes"] = 17 * 1024 * 1024
+    release["release_id"] = release_id(release)
+    release_bytes = json.dumps(release, sort_keys=True).encode()
+    release_path.write_bytes(release_bytes)
+    deployment_path = fixture.refs.projection_root / "deployment.json"
+    deployment = json.loads(deployment_path.read_bytes())
+    deployment["release_ref"] = release["release_id"]
+    deployment["deployment_id"] = deployment_id(deployment)
+    deployment_bytes = json.dumps(deployment, sort_keys=True).encode()
+    deployment_path.write_bytes(deployment_bytes)
+    fixture.identity = replace(
+        fixture.identity, release_id=release["release_id"], deployment_id=deployment["deployment_id"]
+    )
+    fixture.refs = replace(
+        fixture.refs,
+        release=replace(fixture.refs.release, sha256="sha256:" + sha256(release_bytes).hexdigest()),
+        deployment=replace(fixture.refs.deployment, sha256="sha256:" + sha256(deployment_bytes).hexdigest()),
+    )
+
+    def reject_read(**kwargs):
+        pytest.fail("whole-source acquisition started before archive admission bounds")
+
+    monkeypatch.setattr(fixture.inputs, "load_sources", reject_read)
+    calls = []
+    with _native_verifier(fixture, calls) as verifier, pytest.raises(ValueError, match="archive"):
+        verifier.resolve(fixture.refs)
+    assert calls == []

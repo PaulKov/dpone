@@ -33,7 +33,8 @@ class NativeOriginalVerifier:
     Constructor capabilities are composed by the trusted application. Reference
     values and local roots provide integrity coordinates, never dispatch authority.
     The pinned active callback is invoked only after all offline preflight checks.
-    Keep this verifier alive while consuming its returned project directory.
+    Keep this invocation-confined, non-thread-safe verifier alive while consuming
+    its returned project directory; do not call resolve and close concurrently.
     """
 
     def __init__(
@@ -101,6 +102,13 @@ class NativeOriginalVerifier:
             raise ValueError("native original content identity differs from the pinned invocation")
         environment = release_text(deployment.get("environment"), "native environment")
         index = DbtReleaseArtifactIndex.from_release(release)
+        # Complete-source verification acquires every project, not only the
+        # selected workload's project. Admit every archive before that first I/O.
+        for payload in index.payloads.values():
+            if payload["kind"] == "dbt_project_bundle":
+                size = payload["bytes"]
+                if type(size) is not int or size > self._bundle_bound:
+                    raise ValueError("native source archive exceeds the configured acquisition bound")
         matches = tuple((key, item) for key, item in index.workloads.items() if item["path"] == refs.pack.locator)
         if len(matches) != 1:
             raise ValueError("native selected pack is not an exact release workload member")

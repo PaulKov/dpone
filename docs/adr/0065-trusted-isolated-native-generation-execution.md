@@ -269,9 +269,9 @@ The verifier compares the returned active request with its earlier validated
 observations. This lookup is read-only and neither activates nor prepares a
 workspace; execution still requires the separate protected admission sequence.
 
-The callback's production wiring and native caller remain implementation work
-until their checks and evidence are recorded. The constructor decision alone is
-not runtime qualification.
+The callback is wired through the production composition and covered by focused
+component checks. Native caller integration and live activation-route qualification
+remain unfinished; constructor and component evidence alone do not qualify a runtime.
 
 The application also supplies an explicit local `release_root`, constructed from
 its configured cache root and pinned release identity. Activation projections

@@ -65,7 +65,9 @@ with verifier:
     # Pass verified originals to separately qualified native application logic.
 ```
 
-Closing the verifier removes its own extracted directories. Do not retain the
+Verifier instances are confined to one invocation and are not thread-safe. Do not
+call `resolve` and `close` concurrently. Closing the verifier removes its own
+extracted directories. Do not retain the
 returned pathname after close or treat a pathname as a lifetime isolation lease.
 The future execution bootstrap must separately protect its execution roots.
 
@@ -76,7 +78,9 @@ The verifier performs these checks in order:
    computed content identities and the pinned release/deployment coordinates.
 2. Check canonical workload descriptor membership and the pack fingerprint.
    Acquire complete sources through the existing source reader, matching their
-   inventory and workload hashes to the same release.
+   inventory and workload hashes to the same release. Every declared project
+   archive must fit the configured archive ceiling before complete-source
+   acquisition starts, including archives belonging to other workflows.
 3. Select exactly one project/workflow owner through the verified DAG. Transfer
    packs use their actual manifest membership and transfer-write owner; workload
    spelling does not define ownership.
