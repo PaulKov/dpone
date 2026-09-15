@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
-from typing import Protocol, get_args
+from typing import Protocol
 
 from dpone.contracts.native_delivery_json import decode_native_delivery_json, encode_native_delivery_json
 from dpone.contracts.native_identity import OriginalRef
@@ -15,6 +15,7 @@ from dpone.contracts.native_originals import (
     decode_native_original_subject,
     encode_native_original_binding,
     encode_native_original_subject,
+    require_native_original_kind,
 )
 from dpone.ports.native_originals import NativeOriginalBindingPort, NativeOriginalReaderPort, NativeOriginalWriterPort
 
@@ -53,8 +54,7 @@ def publish_bound_native_original(
         raise ValueError("max_bytes must be an exact positive integer")
     if type(payload) is not bytes or len(payload) > max_bytes:
         raise ValueError("original payload must be bytes within max_bytes")
-    if type(kind) is not str or kind not in get_args(NativeOriginalKind):
-        raise ValueError("unsupported native original kind")
+    require_native_original_kind(kind)
     if encode_native_delivery_json(decode_native_delivery_json(payload)) != payload:
         raise ValueError("original payload must be canonical JSON bytes")
     if type(storage_authority) is not OriginalRef:

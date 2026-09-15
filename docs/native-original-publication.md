@@ -7,8 +7,9 @@ resolution and exact-version byte comparison. It does not construct providers,
 select credentials or grant source/target execution authority.
 
 The [bounded S3 primitive](versioned-artifact-store.md) is available. Native
-subject-to-object adaptation, authenticated SQL bindings and application composition
-still need implementation, integration and qualification. Existing unbounded legacy readers cannot simply be
+[subject-to-object adaptation](native-original-store.md) is implemented. Authenticated
+SQL bindings and application composition still need implementation, integration
+and qualification. Existing unbounded legacy readers cannot simply be
 wrapped to satisfy the new bounded reader port. The current runtime tests exercise
 injected fault fixtures and are not live provider certification.
 

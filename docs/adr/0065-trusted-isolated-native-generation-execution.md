@@ -171,6 +171,28 @@ composition must select the explicit bounded adapter, not the compatibility mode
 Cooperative checks cannot interrupt a blocking SDK call. Authenticated application
 composition must additionally configure finite SDK connect/read/retry limits and
 provide both clocks. No helper-level retry can replace an uncertain write version.
-Native subject-to-key adaptation, authenticated SQL binding and complete provider
-composition/qualification remain pending. See the
+Native subject-to-key adaptation is implemented as described below; authenticated
+SQL binding and complete provider composition/qualification remain pending. See the
 [bounded artifact reference](../versioned-artifact-store.md) for API use and limits.
+
+
+## Native original object adapter
+
+`adapters.native_original_store.NativeOriginalStore` implements the writer/reader
+ports over the bounded provider. Canonical payload bytes are stored directly under
+`{artifact_prefix}/native-originals/v1/{subject_sha256_hex}/{kind}/{payload_sha256_hex}`.
+The hash segments cover the complete canonical subject and exact payload bytes.
+This concrete spelling is the persistent v1 representation; reads recompute it
+and do not accept prefix-only membership or implicit relocation.
+
+Construction checks authority-reference digest agreement and snapshots the
+authenticated inputs supplied by composition. That check is not authentication.
+Publication permits one create and read-only reconciliation on conflict/lost ACK,
+then independently verifies all six provider coordinates and exact canonical bytes.
+Read narrows the stored attempt allowance and keeps its absolute deadline. Failure
+retains uncertain objects; it does not create a binding or authorize dispatch.
+
+Reusable primitive object-coordinate projection and closed-kind validation remain
+in `contracts.native_originals` and are shared with binding encoding. No fictitious
+binding or replacement provider reference type is introduced. See the
+[native original-store guide](../native-original-store.md) for inputs and recovery.

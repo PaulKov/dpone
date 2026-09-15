@@ -4,6 +4,11 @@
 
 ### Added
 
+- Add native subject-bound object storage with deterministic v1 keys, immutable
+  conflict/lost-acknowledgement reconciliation, full reference/readback proof and
+  a shared absolute I/O deadline. Reuse binding coordinate and kind validation;
+  authenticated SQL bindings and application composition remain pending.
+
 - Share S3 conditional-write and exact-version proof with an explicit bounded
   artifact API, enforcing byte/chunk/deadline limits and response cleanup while
   preserving the legacy adapter and policy imports. Native provider composition

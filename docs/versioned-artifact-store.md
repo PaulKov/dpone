@@ -6,8 +6,9 @@ The adapter shares conditional writes, exact-version metadata checks, KMS,
 retention and version-history verification with the existing semantic-refresh
 S3 adapter. It does not select credentials or authenticate a deployment policy.
 
-The native original-store adapter, authenticated SQL binding adapter and their
-application composition still require implementation and qualification. This
+The [native original-store adapter](native-original-store.md) implements subject-bound
+object publication. Authenticated SQL bindings and application composition still
+require implementation and qualification. This
 primitive does not by itself complete the [native publication journey](native-original-publication.md).
 Unit fault fixtures are not live S3 certification.
 
