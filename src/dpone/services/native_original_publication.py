@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from hashlib import sha256
-from typing import Protocol
 
 from dpone.contracts.native_delivery_json import decode_native_delivery_json, encode_native_delivery_json
 from dpone.contracts.native_identity import OriginalRef
@@ -22,12 +21,6 @@ from dpone.ports.native_originals import NativeOriginalBindingPort, NativeOrigin
 
 class NativeOriginalPublicationError(RuntimeError):
     """Independent binding or byte verification did not establish success."""
-
-
-class BoundNativeOriginalPublisher(Protocol):
-    """Application-bound authority/providers, retaining explicit document identity."""
-
-    def __call__(self, *, kind: NativeOriginalKind, locator: str, payload: bytes, max_bytes: int) -> OriginalRef: ...
 
 
 def publish_bound_native_original(

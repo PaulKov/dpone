@@ -52,3 +52,9 @@ class NativeOriginalBindingPort(Protocol):
     ) -> NativeOriginalBinding:
         """Independently read and authenticate the complete retained binding."""
         ...
+
+
+class BoundNativeOriginalPublisher(Protocol):
+    """Application-bound authority/providers, retaining explicit document identity."""
+
+    def __call__(self, *, kind: NativeOriginalKind, locator: str, payload: bytes, max_bytes: int) -> OriginalRef: ...

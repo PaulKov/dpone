@@ -10,7 +10,7 @@ The [bounded S3 primitive](versioned-artifact-store.md) is available. Native
 [subject-to-object adaptation](native-original-store.md) is implemented. Authenticated
 SQL bindings and application composition still need implementation, integration
 and qualification. Existing unbounded legacy readers cannot simply be
-wrapped to satisfy the new bounded reader port. The current runtime tests exercise
+wrapped to satisfy the new bounded reader port. The current application tests exercise
 injected fault fixtures and are not live provider certification.
 
 See [bindings](native-original-bindings.md), [storage policy](native-original-storage.md)
@@ -30,9 +30,9 @@ underlying identity and recovery contracts.
   also require finite connection, read and retry settings.
 
 Application composition binds those capabilities and the authenticated subject and
-storage-policy reference. `BoundNativeOriginalPublisher` describes the resulting
+storage-policy reference. `dpone.ports.native_originals.BoundNativeOriginalPublisher` describes the resulting
 callable with explicit `kind`, `locator`, `payload` and `max_bytes`. Consumer-local
-wrappers may later bind those coordinates; this runtime does not choose them.
+wrappers may later bind those coordinates; this service does not choose them.
 
 ## Operation order
 
@@ -46,11 +46,11 @@ wrappers may later bind those coordinates; this runtime does not choose them.
 6. Read the verified exact version with the byte limit and compare all payload
    bytes. Return the requested `OriginalRef` only after this comparison succeeds.
 
-The runtime snapshots request/binding identity before crossing capability boundaries
+The service snapshots request/binding identity before crossing capability boundaries
 so an accidental mutation of a passed object cannot change the expected proof.
 
 ```python
-from dpone.runtime.native_original_publication import publish_bound_native_original
+from dpone.services.native_original_publication import publish_bound_native_original
 
 reference = publish_bound_native_original(
     writer=writer,
@@ -87,3 +87,12 @@ locator. Tests in `tests/test_native_original_publication.py` cover call order,
 coordinate substitution, exact replay, ambiguous failures and bounded readback.
 The [testing guide](testing/index.md) distinguishes these unit checks from live
 route qualification and release evidence.
+
+## Application ownership
+
+The application service owns publication, binding and independent readback.
+Composition binds its authenticated providers and subject into the callback
+contract in `dpone.ports.native_originals`; runtime consumers receive that callback
+through injection. This keeps application orchestration out of the execution
+runtime and prevents runtime imports of application services. The callable
+signature and persistent original representations are unchanged.

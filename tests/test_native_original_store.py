@@ -354,7 +354,7 @@ def test_bound_runtime_and_native_adapter_use_actual_shared_s3_proof():
 
     from dpone.adapters.versioned_artifact_s3 import VersionedS3ArtifactStore
     from dpone.contracts.native_originals import NativeOriginalStorageAuthority
-    from dpone.runtime.native_original_publication import publish_bound_native_original
+    from dpone.services.native_original_publication import publish_bound_native_original
     from tests.test_semantic_refresh_artifact_s3 import _clock, _policy
     from tests.test_versioned_artifact_s3 import Client, RecordingBody
 

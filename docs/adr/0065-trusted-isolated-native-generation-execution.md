@@ -196,3 +196,14 @@ Reusable primitive object-coordinate projection and closed-kind validation remai
 in `contracts.native_originals` and are shared with binding encoding. No fictitious
 binding or replacement provider reference type is introduced. See the
 [native original-store guide](../native-original-store.md) for inputs and recovery.
+
+### Native publication application ownership
+
+The unpublished implementation places the publish–bind–resolve–readback use case
+in `dpone.services.native_original_publication`. It coordinates injected
+capabilities and implements no execution engine or source/target dispatch.
+`BoundNativeOriginalPublisher` belongs to `dpone.ports.native_originals`;
+application composition binds the service and injects this exact callback into
+runtime consumers. This supersedes the proposed runtime owner in the planning
+consumer map while retaining the algorithm and public callable signature.
+No released import requires a runtime-to-services compatibility facade.

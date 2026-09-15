@@ -14,7 +14,7 @@ from dpone.contracts.native_originals import (
     encode_native_original_binding,
 )
 from dpone.ports.semantic_refresh_artifact_store import ArtifactObjectRef
-from dpone.runtime.native_original_publication import NativeOriginalPublicationError, publish_bound_native_original
+from dpone.services.native_original_publication import NativeOriginalPublicationError, publish_bound_native_original
 
 D = "sha256:" + "a" * 64
 PAYLOAD = b'{"schema":"synthetic.v1"}'

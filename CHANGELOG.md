@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Place native-original publication orchestration in the application service layer; expose its injected runtime callback through the native-original ports.
+
 ### Added
 
 - Add native subject-bound object storage with deterministic v1 keys, immutable
