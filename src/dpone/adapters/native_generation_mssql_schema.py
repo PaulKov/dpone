@@ -6,7 +6,12 @@ from collections.abc import Callable
 
 from dpone.adapters import dbapi_lifecycle
 from dpone.adapters.native_generation_mssql_queries import generation_procedure_name
-from dpone.adapters.native_generation_mssql_upgrade import GENERATION_ADMISSION_CHECK, upgrade_generation_ledger
+from dpone.adapters.native_generation_mssql_upgrade import (
+    FREEZE_INSPECTION_OPERATIONS,
+    GENERATION_ADMISSION_CHECK,
+    GENERATION_COMPLETION_CHECK,
+    upgrade_generation_ledger,
+)
 from dpone.contracts.mssql_object_name import native_control_schema
 from dpone.contracts.native_identity import OriginalRef
 from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
@@ -76,10 +81,11 @@ class MssqlNativeGenerationSchemaMigration:
                 f"SELECT OBJECT_ID(N'[{self._schema}].[native_generations_v1]',N'U'), "
                 f"COL_LENGTH(N'[{self._schema}].[native_generations_v1]',N'writer_admission'), "
                 f"(SELECT COUNT(*) FROM sys.tables WHERE schema_id=SCHEMA_ID(N'{self._schema}') "
-                "AND name IN ('native_generations_v1','native_generation_capacity_v1','native_generation_profiles_v1'))"
+                "AND name IN ('native_generations_v1','native_generation_capacity_v1','native_generation_profiles_v1')), "
+                f"COL_LENGTH(N'[{self._schema}].[native_generations_v1]',N'phase')"
             )
             layout = dbapi_lifecycle.row(cursor)
-            if layout is None or len(layout) != 3:
+            if layout is None or len(layout) != 4:
                 raise RuntimeError("cannot inspect retained generation layout")
             fresh, legacy = layout[0] is None, layout[1] is None
             if layout[2] != (0 if fresh else 3):
@@ -94,6 +100,10 @@ class MssqlNativeGenerationSchemaMigration:
                 fresh=fresh,
                 legacy_verification=self._verify_tables(extended=False),
                 current_verification=self._verify_tables(extended=True),
+                completed=layout[3] is not None,
+                completion_verification=self._verify_tables(completed=True),
+                freeze_enabled=True,
+                inspection_enabled=True,
             )
             cursor.execute(self._registration(), *self._parameters)
             for table in ("native_generation_capacity_v1", "native_generation_profiles_v1", "native_generations_v1"):
@@ -102,7 +112,7 @@ class MssqlNativeGenerationSchemaMigration:
                     f"OBJECT::[{self._schema}].[{table}] TO {self._principal}"
                 )
             cursor.execute(f"DENY ALTER ON SCHEMA::[{self._schema}] TO {self._principal}")
-            for operation in ("reserve", "bind", "read", "close", "closure_read"):
+            for operation in FREEZE_INSPECTION_OPERATIONS:
                 cursor.execute(
                     f"GRANT EXECUTE ON OBJECT::[{self._schema}].[{generation_procedure_name(operation)}] TO {self._principal}"
                 )
@@ -180,7 +190,7 @@ BEGIN CATCH
 END CATCH;
 IF @overprivileged=1 THROW 51310, 'DPONE_NATIVE_GENERATION_RUNTIME_PRINCIPAL_INVALID', 1;"""
 
-    def _verify_tables(self, *, extended: bool = True) -> str:
+    def _verify_tables(self, *, extended: bool = True, completed: bool = False) -> str:
         """Reject incompatible retained ledgers, including weakened constraints."""
         definitions = {
             "native_generation_capacity_v1": (
@@ -218,7 +228,19 @@ IF @overprivileged=1 THROW 51310, 'DPONE_NATIVE_GENERATION_RUNTIME_PRINCIPAL_INV
                 key_count,
                 "engine_compared",
             )
-        statements = [self._expected_admission_check()] if extended else []
+        if completed:
+            if not extended:
+                raise ValueError("completion table verification requires admission columns")
+            columns, keys, key_count, check = definitions["native_generations_v1"]
+            definitions["native_generations_v1"] = (
+                columns + ",('phase','varchar',8,0),('completion_payload','varbinary',-1,1),"
+                "('completion_locator','varbinary',-1,1),('completion_digest','varbinary',71,1),"
+                "('frozen_payload','varbinary',-1,1),('frozen_locator','varbinary',-1,1),('frozen_digest','varbinary',71,1)",
+                keys,
+                key_count,
+                check,
+            )
+        statements = [self._expected_admission_check(completed=completed)] if extended else []
         for table, (columns, keys, key_count, check) in definitions.items():
             check = check.replace("'", "''")
             if extended and table == "native_generations_v1":
@@ -259,18 +281,27 @@ IF @object IS NULL OR NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s 
         return "\n".join(statement.replace("@object", f"@object_{index}") for index, statement in enumerate(statements))
 
     @staticmethod
-    def _expected_admission_check() -> str:
+    def _expected_admission_check(*, completed: bool = False) -> str:
         """Ask SQL Server to normalize its own predicate without discarding grouping.
 
         The session-local empty table holds no user data and is dropped in the
         same batch. Comparing exact engine-rendered definitions rejects weakened
         AND/OR regroupings that token-only normalization would accept.
         """
+        columns = (
+            ""
+            if not completed
+            else """phase varchar(8) NOT NULL,
+ completion_payload varbinary(max) NULL,completion_locator varbinary(max) NULL,completion_digest varbinary(71) NULL,
+ frozen_payload varbinary(max) NULL,frozen_locator varbinary(max) NULL,frozen_digest varbinary(71) NULL,"""
+        )
+        check = GENERATION_COMPLETION_CHECK if completed else GENERATION_ADMISSION_CHECK
         return f"""CREATE TABLE #dpone_native_admission_check (
  guard_epoch bigint NOT NULL, revision bigint NOT NULL, executor varbinary(max) NULL,
  writer_admission varchar(6) NOT NULL, outcome varchar(7) NOT NULL,
  admission_sequence bigint NOT NULL, admission_closure varbinary(max) NULL,
- CHECK ({GENERATION_ADMISSION_CHECK}));
+ {columns}
+ CHECK ({check}));
 DECLARE @expected_admission_check nvarchar(max)=(SELECT definition FROM tempdb.sys.check_constraints
  WHERE parent_object_id=OBJECT_ID(N'tempdb..#dpone_native_admission_check'));
 DROP TABLE #dpone_native_admission_check;

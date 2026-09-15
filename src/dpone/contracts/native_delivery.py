@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Literal
 from uuid import UUID
 
 from dpone.contracts.dbt_project_bundle import DbtProjectBundle
@@ -111,3 +111,88 @@ class ResolvedNativeOriginals:
 def _absolute_local_directory(value: Path) -> None:
     if not isinstance(value, Path) or not value.is_absolute() or ".." in value.parts:
         raise ValueError("native projection/project directory must be an absolute path without traversal")
+
+
+@dataclass(frozen=True, slots=True)
+class SourceClosureReceipt:
+    """Descriptor of an accepted positive completion snapshot, not admission closure.
+
+    The independently resolved receipt is outside its own canonical payload.
+    Authentication and current physical custody remain the consumer's duty.
+    """
+
+    generation_id: UUID
+    guard_epoch: int
+    revision: int
+    reservation: OriginalRef
+    completion: OriginalRef
+    receipt: OriginalRef
+
+    def __post_init__(self) -> None:
+        GenerationReservation(self.generation_id, self.guard_epoch, self.revision, self.reservation)
+        for reference in (self.completion, self.receipt):
+            if type(reference) is not OriginalRef:
+                raise NativeGenerationContractError("source closure requires exact completion and receipt originals")
+            reference.__post_init__()
+
+
+@dataclass(frozen=True, slots=True)
+class FrozenGeneration:
+    """One immutable freeze descriptor; no read, dispatch or release grant.
+
+    The closure identifies the accepted BUILDING completion revision. Freeze is
+    its next revision and preserves the exact generation, epoch and reservation.
+    """
+
+    generation_id: UUID
+    guard_epoch: int
+    revision: int
+    reservation: OriginalRef
+    closure: SourceClosureReceipt
+    frozen: OriginalRef
+
+    def __post_init__(self) -> None:
+        GenerationReservation(self.generation_id, self.guard_epoch, self.revision, self.reservation)
+        if type(self.closure) is not SourceClosureReceipt or type(self.frozen) is not OriginalRef:
+            raise NativeGenerationContractError("frozen generation requires exact closure and descriptor")
+        self.closure.__post_init__()
+        self.frozen.__post_init__()
+        if (self.generation_id, self.guard_epoch, self.reservation, self.revision) != (
+            self.closure.generation_id,
+            self.closure.guard_epoch,
+            self.closure.reservation,
+            self.closure.revision + 1,
+        ):
+            raise NativeGenerationContractError("freeze must preserve exact closure identity at the next revision")
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationBuildReceipt:
+    """Positive bridge return carrying actual authenticated invocation originals.
+
+    The bridge authenticates these identities before returning this value. Shape
+    alone does not prove completion or authorize custody, dispatch or release.
+    Failed and uncertain execution use the explicit error/evidence channel and
+    cannot substitute missing originals into this positive-only record.
+    """
+
+    generation_id: UUID
+    guard_epoch: int
+    reservation: OriginalRef
+    executor_invocation_id: UUID
+    build_evidence: OriginalRef
+    artifact_inventory: OriginalRef
+    termination: OriginalRef
+    outcome: Literal["SUCCEEDED"]
+
+    def __post_init__(self) -> None:
+        if type(self.generation_id) is not UUID or type(self.executor_invocation_id) is not UUID:
+            raise NativeGenerationContractError("build receipt requires exact generation and invocation identities")
+        if type(self.guard_epoch) is not int or not 1 <= self.guard_epoch <= 9223372036854775807:
+            raise NativeGenerationContractError("build receipt epoch must be a positive SQL bigint")
+        if type(self.outcome) is not str or self.outcome != "SUCCEEDED":
+            raise NativeGenerationContractError("build receipt requires positive successful completion")
+        for reference in (self.reservation, self.build_evidence, self.artifact_inventory, self.termination):
+            if type(reference) is not OriginalRef:
+                raise NativeGenerationContractError("build receipt requires complete exact original references")
+            reference.__post_init__()

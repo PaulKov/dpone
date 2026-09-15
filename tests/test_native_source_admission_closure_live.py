@@ -9,7 +9,11 @@ import pytest
 from dpone.adapters.native_generation_mssql import NativeGenerationAdmissionError, NativeWriterAdmissionUncertain
 from dpone.adapters.native_generation_mssql_queries import generation_procedure, generation_procedure_name
 from dpone.adapters.native_generation_mssql_schema import MssqlNativeGenerationSchemaMigration
-from dpone.adapters.native_generation_mssql_upgrade import GENERATION_ADMISSION_CHECK
+from dpone.adapters.native_generation_mssql_upgrade import (
+    FREEZE_INSPECTION_OPERATIONS,
+    GENERATION_ADMISSION_CHECK,
+    GENERATION_COMPLETION_CHECK,
+)
 from dpone.contracts.native_identity import OriginalRef
 from tests.test_native_generation_admission_live import generations as generations
 from tests.test_native_generation_admission_live import writer
@@ -115,12 +119,13 @@ def test_live_changed_physical_epoch_cannot_close_admission(generations):
 def test_live_regrouped_constraint_is_not_a_recognized_schema(generations):
     _, _, _, admin, migration, _, _ = generations
     bound(generations)
-    weaker = GENERATION_ADMISSION_CHECK.replace("AND ((executor IS NULL", "AND (executor IS NULL", 1)[:-1]
-    assert weaker.replace("(", "").replace(")", "") == GENERATION_ADMISSION_CHECK.replace("(", "").replace(")", "")
+    weaker_admission = GENERATION_ADMISSION_CHECK.replace("AND ((executor IS NULL", "AND (executor IS NULL", 1)[:-1]
+    weaker = GENERATION_COMPLETION_CHECK.replace(f"({GENERATION_ADMISSION_CHECK})", f"({weaker_admission})", 1)
+    assert weaker.replace("(", "").replace(")", "") == GENERATION_COMPLETION_CHECK.replace("(", "").replace(")", "")
     connection = admin()
     try:
         connection.execute(
-            "ALTER TABLE dpone_control.native_generations_v1 DROP CONSTRAINT CK_native_generation_admission_v1"
+            "ALTER TABLE dpone_control.native_generations_v1 DROP CONSTRAINT CK_native_generation_completion_v1"
         )
         connection.execute("ALTER TABLE dpone_control.native_generations_v1 ADD CHECK (" + weaker + ")")
         connection.commit()
@@ -160,17 +165,18 @@ def prepare_retained_initial_layout(admin, principal):
     connection = admin()
     try:
         connection.execute(
-            "ALTER TABLE dpone_control.native_generations_v1 DROP CONSTRAINT CK_native_generation_admission_v1"
+            "ALTER TABLE dpone_control.native_generations_v1 DROP CONSTRAINT CK_native_generation_completion_v1"
         )
         connection.execute(
             "ALTER TABLE dpone_control.native_generations_v1 DROP COLUMN "
-            "writer_admission,outcome,admission_sequence,admission_closure"
+            "writer_admission,outcome,admission_sequence,admission_closure,"
+            "phase,completion_payload,completion_locator,completion_digest,frozen_payload,frozen_locator,frozen_digest"
         )
         connection.execute(
             "ALTER TABLE dpone_control.native_generations_v1 ADD CHECK "
             "(guard_epoch>0 AND revision=CASE WHEN executor IS NULL THEN 1 ELSE 2 END)"
         )
-        for operation in ("reserve", "bind", "read", "close", "closure_read"):
+        for operation in FREEZE_INSPECTION_OPERATIONS:
             name = "[dpone_control].[" + generation_procedure_name(operation) + "]"
             connection.execute("DROP PROCEDURE " + name)
             if operation in {"reserve", "bind", "read"}:

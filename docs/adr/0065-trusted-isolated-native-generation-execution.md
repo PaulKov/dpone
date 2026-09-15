@@ -336,3 +336,16 @@ credential resolution, new retry or dispatch authority is introduced. Path
 observations remain point-in-time checks: the actual bootstrap must hold the
 roots throughout execution. This ownership change neither issues runtime
 qualification nor changes metadata-only freeze recovery.
+
+
+## Positive build bridge result
+
+`GenerationBuildReceipt` is the successful bridge return, containing exact
+generation, reservation, guard epoch, primitive executor invocation identity and
+authenticated build-evidence, inventory and trusted-termination references. The
+bridge must verify the actual writer completion before returning it; constructing
+the record proves no custody or dispatch authority. Failed and uncertain builds
+use their explicit error/evidence channel and cannot return a partial positive
+receipt. This applies the trusted positive-completion contract to the earlier
+bridge design without recreating superseded per-session terminal records. No new
+persisted original kind or codec is introduced for this in-process return value.

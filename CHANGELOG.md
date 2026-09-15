@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Define the positive native build bridge receipt with complete original references; keep failed and uncertain execution in the explicit error/evidence channel.
+
 - Refactor native invocation authentication into pure identity policy and bounded original/path observation owners; preserve historical Python imports and fresh validation order.
 
 - Centralize dbt execution-evidence construction, persistence and outcome creation in one runtime owner; consolidate native project archive capture/read in its adapter and pure document decisions in its contract owner. Preserve record/archive bytes, timestamps, failure semantics and previous producer imports.

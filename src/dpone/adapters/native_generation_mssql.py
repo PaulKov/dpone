@@ -7,22 +7,36 @@ BUILDING snapshot is evidence of an admission, never a second dispatch grant.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from hashlib import sha256
-from typing import Literal, TypeVar, cast
+from typing import TypeVar
 from uuid import UUID
 
 from dpone.adapters import dbapi_lifecycle
+from dpone.adapters.native_generation_mssql_freeze import freeze_parameters
 from dpone.adapters.native_generation_mssql_queries import generation_procedure_name
+from dpone.adapters.native_generation_mssql_rows import decode_admission_row, decode_custody_row
+from dpone.contracts.dbt_contract_validation import DbtPublishingError
 from dpone.contracts.mssql_object_name import native_control_schema
-from dpone.contracts.native_delivery import GenerationReservation
+from dpone.contracts.native_delivery import FrozenGeneration, GenerationReservation
 from dpone.contracts.native_generation_admission import VerifiedGenerationRequest
 from dpone.contracts.native_identity import OriginalRef
-from dpone.contracts.native_source_custody import SourceAdmissionClosure, SourceCustodySnapshot, SourceExecutorBinding
+from dpone.contracts.native_source_custody import (
+    SourceAdmissionClosure,
+    SourceCustodySnapshot,
+    SourceExecutorBinding,
+    SourceTrustedBuildCompletion,
+    require_trusted_build_completion,
+)
 from dpone.contracts.native_source_custody_codec import (
     decode_source_admission_closure,
     decode_source_executor_binding,
+    decode_source_trusted_build_completion,
+    encode_source_admission_closure,
     encode_source_executor_binding,
+    encode_source_trusted_build_completion,
 )
+from dpone.ports.native_source_custody import SourceBuildCompletionVerifier
 from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
 
 _Result = TypeVar("_Result")
@@ -55,12 +69,14 @@ class MssqlNativeGenerationControl:
         connection_factory: Callable[[], SqlControlConnection],
         control_schema: str,
         control_authority: OriginalRef,
+        completion_verifier: SourceBuildCompletionVerifier | None = None,
     ) -> None:
         if type(control_authority) is not OriginalRef:
             raise TypeError("control_authority must be an exact OriginalRef")
         self._authority = OriginalRef(control_authority.locator, control_authority.sha256)
         self._schema = native_control_schema(control_schema)
         self._connect = connection_factory
+        self._completion_verifier = completion_verifier
 
     def reserve(self, request: VerifiedGenerationRequest) -> GenerationReservation:
         """Charge capacity once, retaining it after all ambiguous outcomes."""
@@ -170,7 +186,7 @@ class MssqlNativeGenerationControl:
                         reservation.reservation.locator.encode("utf-8"),
                         reservation.reservation.sha256.encode("ascii"),
                     ),
-                    lambda row: self._decode_closure(row, reservation.generation_id),
+                    lambda row: decode_admission_row(row, reservation.generation_id),
                 )
             except Exception as exc:
                 failure = exc
@@ -188,80 +204,144 @@ class MssqlNativeGenerationControl:
                 failure or exc
             )
 
+    def record_trusted_build_completion(
+        self,
+        reservation: GenerationReservation,
+        closure: SourceAdmissionClosure,
+        completion: SourceTrustedBuildCompletion,
+        completion_ref: OriginalRef,
+        *,
+        expected_revision: int,
+    ) -> SourceCustodySnapshot:
+        """One positive CAS followed by a fresh exact-current-owner read.
+
+        Re-entry may reconcile the same retained request, never dispatch a build.
+        The read procedure revalidates current physical ownership independently;
+        a historical custody row alone cannot prove safe acknowledgement.
+        """
+        if self._completion_verifier is None:
+            raise NativeGenerationAdmissionError("positive completion authentication is not configured")
+        if type(reservation) is not GenerationReservation or type(completion_ref) is not OriginalRef:
+            raise ValueError("positive completion requires exact reservation and descriptor")
+        reservation.__post_init__()
+        if type(expected_revision) is not int or not 3 <= expected_revision < 9223372036854775807:
+            raise ValueError("expected_revision must permit a closed generation's SQL bigint successor")
+        payload = encode_source_trusted_build_completion(completion)
+        accepted = decode_source_trusted_build_completion(payload)
+        reference = OriginalRef(completion_ref.locator, completion_ref.sha256)
+        if reference.sha256 != "sha256:" + sha256(payload).hexdigest():
+            raise ValueError("completion descriptor differs from the supplied canonical payload")
+        admission_payload = encode_source_admission_closure(closure)
+        admission = decode_source_admission_closure(admission_payload, receipt=closure.receipt)
+        before = self.read_custody(reservation.generation_id)
+        require_trusted_build_completion(before, admission, accepted)
+        if (before.guard_epoch, before.reservation) != (reservation.guard_epoch, reservation.reservation):
+            raise ValueError("positive completion differs from the supplied reservation")
+        if self.read_admission_closure(reservation.generation_id) != admission:
+            raise ValueError("positive completion admission differs from retained closure")
+        already_recorded = before.closure is not None
+        if before.revision != expected_revision + already_recorded or (
+            already_recorded and (before.closure != reference or before.outcome != "ACTIVE")
+        ):
+            raise ValueError("positive completion differs from the exact expected revision or original")
+        self._completion_verifier.authenticate(accepted, reference)
+        parameters = (
+            str(reservation.generation_id),
+            expected_revision,
+            admission_payload,
+            payload,
+            reference.locator.encode("utf-8"),
+            reference.sha256.encode("ascii"),
+        )
+        expected = replace(before, revision=expected_revision + 1, closure=reference, outcome="ACTIVE")
+        observed = None
+        failure: Exception | None = None
+        if not already_recorded:
+            try:
+                observed = self._execute("complete", parameters)
+            except Exception as exc:
+                failure = exc
+        try:
+            retained = self._execute("completion_read", parameters)
+            if retained != expected or (observed is not None and observed != retained):
+                raise NativeGenerationAdmissionError("positive completion current readback differs from request")
+            return retained
+        except Exception as exc:
+            raise NativeGenerationAdmissionError("positive completion could not be independently proved") from (
+                failure or exc
+            )
+
+    def inspect_freeze(
+        self,
+        reservation: GenerationReservation,
+        admission: SourceAdmissionClosure,
+        completion: SourceTrustedBuildCompletion,
+        frozen: FrozenGeneration,
+        *,
+        expected_revision: int,
+    ) -> SourceCustodySnapshot:
+        """Read exact metadata preconditions under current ownership, without mutation."""
+        return self._execute(
+            "freeze_inspect",
+            freeze_parameters(
+                reservation,
+                admission,
+                completion,
+                frozen,
+                expected_revision=expected_revision,
+            ),
+        )
+
+    def record_freeze(
+        self,
+        reservation: GenerationReservation,
+        admission: SourceAdmissionClosure,
+        completion: SourceTrustedBuildCompletion,
+        frozen: FrozenGeneration,
+        *,
+        expected_revision: int,
+    ) -> SourceCustodySnapshot:
+        """Attempt the exact freeze CAS; the runtime must independently read back."""
+        return self._execute(
+            "freeze",
+            freeze_parameters(
+                reservation,
+                admission,
+                completion,
+                frozen,
+                expected_revision=expected_revision,
+            ),
+        )
+
+    def read_freeze(
+        self,
+        reservation: GenerationReservation,
+        admission: SourceAdmissionClosure,
+        completion: SourceTrustedBuildCompletion,
+        frozen: FrozenGeneration,
+        *,
+        expected_revision: int,
+    ) -> SourceCustodySnapshot:
+        """Independently prove the full freeze request and current physical owner."""
+        return self._execute(
+            "freeze_read",
+            freeze_parameters(
+                reservation,
+                admission,
+                completion,
+                frozen,
+                expected_revision=expected_revision,
+            ),
+        )
+
     def read_admission_closure(self, generation_id: UUID) -> SourceAdmissionClosure:
         """Resolve the immutable admission descriptor separately from positive completion."""
         if type(generation_id) is not UUID:
             raise TypeError("generation_id must be an exact UUID")
-        return self._query("closure_read", (str(generation_id),), lambda row: self._decode_closure(row, generation_id))
-
-    @staticmethod
-    def _decode_closure(row: tuple[object, ...], generation_id: UUID) -> SourceAdmissionClosure:
-        if len(row) != 3 or any(type(value) is not bytes for value in row):
-            raise NativeGenerationAdmissionError("closure requires exact payload, locator and digest bytes")
-        payload, locator, digest = row
-        assert isinstance(payload, bytes) and isinstance(locator, bytes) and isinstance(digest, bytes)
-        if locator.decode("utf-8") != f"generations/{generation_id}/writer-admission-closure.json":
-            raise NativeGenerationAdmissionError("admission closure locator differs from the requested generation")
-        value = decode_source_admission_closure(
-            payload, receipt=OriginalRef(locator.decode("utf-8"), digest.decode("ascii"))
-        )
-        if value.executor.generation_id != generation_id:
-            raise NativeGenerationAdmissionError("admission closure belongs to another generation")
-        return value
+        return self._query("closure_read", (str(generation_id),), lambda row: decode_admission_row(row, generation_id))
 
     def _execute(self, operation: str, parameters: tuple[object, ...]) -> SourceCustodySnapshot:
-        return self._query(operation, parameters, self._decode_snapshot)
-
-    @staticmethod
-    def _decode_snapshot(row: tuple[object, ...]) -> SourceCustodySnapshot:
-        if len(row) != 10:
-            raise NativeGenerationAdmissionError("custody requires the upgraded ten-column ledger response")
-        generation, epoch, revision, locator, digest, binding, admission, outcome, sequence, closure = row
-        if type(generation) is not str or type(locator) is not bytes or type(digest) is not bytes:
-            raise NativeGenerationAdmissionError("invalid custody identity column types")
-        if binding is not None and type(binding) is not bytes:
-            raise NativeGenerationAdmissionError("invalid custody executor column type")
-        if type(admission) is not str or type(outcome) is not str or type(sequence) is not int:
-            raise NativeGenerationAdmissionError("invalid durable admission column types")
-        if type(epoch) is not int or type(revision) is not int:
-            raise NativeGenerationAdmissionError("custody epoch and revision must be exact integers")
-        if admission not in {"OPEN", "CLOSED"} or outcome not in {"ACTIVE", "FAILED", "UNKNOWN"}:
-            raise NativeGenerationAdmissionError("custody has an unsupported admission or outcome")
-        if str(UUID(generation)) != generation:
-            raise NativeGenerationAdmissionError("custody generation UUID must be canonical")
-        executor = None if binding is None else decode_source_executor_binding(binding)
-        if sequence != (0 if executor is None else 1):
-            raise NativeGenerationAdmissionError("custody sequence differs from the once-only executor")
-        if admission == "CLOSED":
-            if type(closure) is not bytes:
-                raise NativeGenerationAdmissionError("closed admission requires its retained payload")
-            receipt = OriginalRef(
-                f"generations/{generation}/writer-admission-closure.json", "sha256:" + sha256(closure).hexdigest()
-            )
-            retained = decode_source_admission_closure(closure, receipt=receipt)
-            if (
-                retained.executor != executor
-                or retained.revision != revision
-                or retained.admission_sequence != sequence
-            ):
-                raise NativeGenerationAdmissionError("closed admission differs from retained custody")
-        elif closure is not None:
-            raise NativeGenerationAdmissionError("open admission cannot contain a closure payload")
-        return SourceCustodySnapshot(
-            generation_id=UUID(generation),
-            guard_epoch=epoch,
-            revision=revision,
-            executor=executor,
-            reservation=OriginalRef(locator.decode("utf-8"), digest.decode("ascii")),
-            closure=None,
-            frozen=None,
-            quality=None,
-            export_plan=None,
-            active_reads=(),
-            state="RESERVED" if executor is None else "BUILDING",
-            writer_admission=cast(Literal["OPEN", "CLOSED"], admission),
-            outcome=cast(Literal["ACTIVE", "FAILED", "UNKNOWN"], outcome),
-        )
+        return self._query(operation, parameters, decode_custody_row)
 
     def _query(
         self, operation: str, parameters: tuple[object, ...], decoder: Callable[[tuple[object, ...]], _Result]
@@ -278,7 +358,10 @@ class MssqlNativeGenerationControl:
             row = dbapi_lifecycle.row(cursor)
             if row is None or dbapi_lifecycle.row(cursor) is not None:
                 raise NativeGenerationAdmissionError("admission requires exactly one ledger row")
-            decoded = decoder(tuple(row))
+            try:
+                decoded = decoder(tuple(row))
+            except (ValueError, DbtPublishingError) as exc:
+                raise NativeGenerationAdmissionError(str(exc)) from exc
             connection.commit()
             return decoded
         except BaseException:
