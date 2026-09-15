@@ -89,6 +89,15 @@ establish managed build or publication qualification.
 
 ## Diagnose and recover
 
+If `dpone dbt check` reports `DPONE_DBT_MANIFEST_STALE`, run its suggested parse
+command, then repeat the same check. The suggestion includes the selected project
+directory and disables partial parsing. For a regular local
+`profiles/profiles.yml`, it also includes that profile directory, so it works
+from outside the project. Paths are shell-quoted; no command is executed
+automatically and no profile contents are read to construct the suggestion.
+Symlinked profiles are not selected. If your platform uses a different profile
+location, add its approved `--profiles-dir` to the suggested command.
+
 For `DPONE_DBT_STARTER_RESOURCES_INVALID`, ask the platform team to restore the
 complete approved installed distribution. Init has no source-checkout fallback
 and does not repair resources by downloading dependencies. Maintainer preparation

@@ -5,6 +5,7 @@ import copy
 import json
 import logging
 import os
+import shlex
 import shutil
 import sys
 from pathlib import Path
@@ -730,7 +731,8 @@ def test_dbt_check_rejects_default_manifest_older_than_bundle_root_file(
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["code"] == "DPONE_DBT_MANIFEST_STALE"
-    assert payload["fixes"][0]["description"] == "Run `dbt parse`, then retry."
+    command = payload["fixes"][0]["description"].split("`", 2)[1]
+    assert shlex.split(command) == ["dbt", "parse", "--project-dir", str(manifest.parents[1]), "--no-partial-parse"]
 
 
 @pytest.mark.parametrize(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -170,21 +171,25 @@ def stale_default_manifest(
                 return _stale_report(
                     candidate,
                     "dbt source discovery exceeded the 20,000-path limit",
+                    root=root,
                 )
             if path.is_symlink():
                 return _stale_report(
                     candidate,
                     "dbt source discovery found a symbolic link",
+                    root=root,
                 )
             if path.is_file() and path.stat().st_mtime_ns > manifest_mtime:
                 return _stale_report(
                     candidate,
-                    "dbt project inputs changed after target/manifest.json",
+                    "dbt project inputs changed after the selected manifest",
+                    root=root,
                 )
     except OSError:
         return _stale_report(
             candidate,
             "dbt project inputs could not be inspected safely",
+            root=root,
         )
     return None
 
@@ -264,7 +269,16 @@ def public_error_code(code: str) -> str:
     return f"DPONE_DBT_{normalized or 'INTERNAL'}"
 
 
-def _stale_report(path: Path, message: str) -> DbtCompileReport:
+def _stale_report(path: Path, message: str, *, root: Path) -> DbtCompileReport:
+    command = ["dbt", "parse", "--project-dir", str(root), "--no-partial-parse"]
+    profiles = root / "profiles"
+    profile_file = profiles / "profiles.yml"
+    try:
+        local_profile = not profiles.is_symlink() and not profile_file.is_symlink() and profile_file.is_file()
+    except OSError:
+        local_profile = False
+    if local_profile:
+        command.extend(("--profiles-dir", str(profiles)))
     return DbtCompileReport(
         manifest_path=path.as_posix(),
         manifest_schema_version=None,
@@ -273,7 +287,7 @@ def _stale_report(path: Path, message: str) -> DbtCompileReport:
                 code="DPONE_DBT_MANIFEST_STALE",
                 message=message,
                 path=path.as_posix(),
-                remediation="Run `dbt parse`, then retry.",
+                remediation=f"Run `{shlex.join(command)}`, then retry the same dpone command.",
             ),
         ),
     )
