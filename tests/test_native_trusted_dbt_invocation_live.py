@@ -117,6 +117,10 @@ def test_real_dbt_sequence_requires_complete_positive_normal_return(tmp_path, su
             payload = fixture.store.documents[reference.locator]
             completion = decode_trusted_dbt_invocation_completion(payload)
             assert completion.command_count == 3
+            assert 0 < completion.elapsed_microseconds <= fixture.plan.total_termination_budget_seconds * 1000000
+            observed_finish = datetime.now(UTC)
+            recorded_finish = datetime.fromisoformat(completion.finished_at.replace("Z", "+00:00"))
+            assert abs((observed_finish - recorded_finish).total_seconds()) < 60
             assert password.encode() not in payload
             assert [
                 tuple(row) for row in connection.execute(f"SELECT id FROM [{database}].[dbo].[synthetic]").fetchall()
