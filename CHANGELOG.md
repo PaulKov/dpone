@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add `dpone init dbt PATH` with explicit platform policy, profile and workflow,
+  default offline apply, dry-run, conflict-preserving writes and structured
+  recovery guidance. Installed resource completeness and the actual installed
+  authoring journey remain unverified; incomplete distributions fail closed.
+
 - Add developer tooling for offline starter-resource checks, isolated pinned
   dependency generation, recoverable sixteen-file updates and read-only recovery
   reports. Complete managed package inputs remain required; this does not claim

@@ -6,7 +6,8 @@ This developer tool checks or regenerates the package mirror and dependency file
 used by the starter. It does not expose the analyst `dpone init dbt` command,
 provision SQL, qualify a runtime, or publish a release. The complete managed
 package and its immutable revision are still prerequisites; current component
-tests do not establish an installed end-to-end workflow.
+tests do not establish an installed end-to-end workflow. The separate author
+interface is documented in [Create a dbt starter](dbt-starter-authoring.md).
 
 ## Prepare an immutable source
 
