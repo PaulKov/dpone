@@ -10,6 +10,8 @@ from typing import Any
 import yaml
 from jsonschema import Draft202012Validator
 
+from dpone.contracts.dbt_authoring_template import DbtAuthoringTemplate
+from dpone.contracts.dbt_contract_validation import DbtPublishingError
 from dpone.contracts.dbt_publish_models import (
     DbtPublishIssue,
     DbtPublishProfile,
@@ -17,8 +19,14 @@ from dpone.contracts.dbt_publish_models import (
     DbtRouteCertificationProfile,
     DbtWorkflowProfile,
 )
+from dpone.contracts.dbt_publish_schema_contract_v4 import (
+    NATIVE_POLICY_SCHEMA,
+    policy_v4_schema,
+    validate_native_policy_v4,
+)
 from dpone.contracts.dbt_publish_schema_contracts import dbt_schema_contracts
 from dpone.contracts.dbt_toolchain import DBT_SQLSERVER_1_12_CERTIFIED
+from dpone.contracts.native_delivery_json import MAX_NATIVE_JSON_BYTES, encode_native_delivery_json
 from dpone.contracts.semantic_refresh_profile import SemanticRefreshProfilePolicy
 
 PROFILE_KIND = "dpone.dbt-publish-policy.v1"
@@ -39,12 +47,35 @@ class DbtPublishProfileRegistry:
         *,
         source_path: str,
         strategy_policies: Mapping[str, DbtPublishStrategyPolicy] | None = None,
+        native_policy_document: bytes | None = None,
     ) -> None:
         self._profiles = dict(profiles)
         self._workflows = dict(workflows)
         provided = dict(strategy_policies or {})
         self._strategy_policies = {name: provided.get(name, _default_strategy_policy()) for name in self._profiles}
         self.source_path = source_path
+        if native_policy_document is not None:
+            document = validate_native_policy_v4(native_policy_document, max_bytes=MAX_NATIVE_JSON_BYTES)
+            members = {name: _mapping(raw) for name, raw in _mapping(document["profiles"]).items()}
+            expected_profiles = {name: _profile(name, raw, legacy=False, native=True) for name, raw in members.items()}
+            expected_strategies = {
+                name: _strategy_policy(raw, legacy=False, native=True) for name, raw in members.items()
+            }
+            expected_workflows = {
+                name: _workflow(name, _mapping(raw)) for name, raw in _mapping(document["workflows"]).items()
+            }
+            if (
+                self._profiles != expected_profiles
+                or self._strategy_policies != expected_strategies
+                or self._workflows != expected_workflows
+            ):
+                raise ValueError("Native profile retention differs from the policy document")
+        self._native_policy_document = native_policy_document
+
+    @property
+    def native_policy_document(self) -> bytes | None:
+        """Canonical complete v4 policy snapshot, not runtime qualification."""
+        return self._native_policy_document
 
     @classmethod
     def load(
@@ -82,6 +113,7 @@ class DbtPublishProfileRegistry:
             PROFILE_KIND,
             PROFILE_V2_KIND,
             PROFILE_V3_KIND,
+            NATIVE_POLICY_SCHEMA,
             LEGACY_PROFILE_KIND,
         }:
             return None, (_issue("DPONE_DBT_PROFILES_KIND_INVALID", f"Expected schema: {PROFILE_KIND}", path),)
@@ -89,12 +121,18 @@ class DbtPublishProfileRegistry:
         if validation_issues:
             return None, validation_issues
         try:
+            native_document = None
+            native = discriminator == NATIVE_POLICY_SCHEMA
+            if native:
+                native_document = encode_native_delivery_json(payload)
+                payload = validate_native_policy_v4(native_document, max_bytes=MAX_NATIVE_JSON_BYTES)
             profile_payloads = {str(name): _mapping(raw) for name, raw in _mapping(payload.get("profiles")).items()}
             profiles = {
                 name: _profile(
                     name,
                     raw,
                     legacy=discriminator == LEGACY_PROFILE_KIND,
+                    native=native,
                 )
                 for name, raw in profile_payloads.items()
             }
@@ -102,6 +140,7 @@ class DbtPublishProfileRegistry:
                 name: _strategy_policy(
                     raw,
                     legacy=discriminator == LEGACY_PROFILE_KIND,
+                    native=native,
                 )
                 for name, raw in profile_payloads.items()
             }
@@ -109,14 +148,16 @@ class DbtPublishProfileRegistry:
                 str(name): _workflow(str(name), _mapping(raw))
                 for name, raw in _mapping(payload.get("workflows")).items()
             }
-        except (KeyError, TypeError, ValueError) as exc:
-            return None, (_issue("DPONE_DBT_PROFILES_INVALID", str(exc), path),)
+        except (KeyError, TypeError, ValueError, DbtPublishingError) as exc:
+            message = "Native policy validation failed" if discriminator == NATIVE_POLICY_SCHEMA else str(exc)
+            return None, (_issue("DPONE_DBT_PROFILES_INVALID", message, path),)
         return (
             cls(
                 profiles,
                 workflows,
                 source_path=path.as_posix(),
                 strategy_policies=strategy_policies,
+                native_policy_document=native_document,
             ),
             (),
         )
@@ -161,6 +202,7 @@ def _profile(
     raw: Mapping[str, Any],
     *,
     legacy: bool,
+    native: bool = False,
 ) -> DbtPublishProfile:
     source = _mapping(raw["source"])
     sink = _mapping(raw["sink"])
@@ -196,6 +238,13 @@ def _profile(
         semantic_refresh=(
             SemanticRefreshProfilePolicy.from_mapping(_mapping(raw["refresh"])) if "refresh" in raw else None
         ),
+        authoring_template=(
+            DbtAuthoringTemplate.from_mapping(raw["authoring_template"])
+            if native and "authoring_template" in raw
+            else None
+        ),
+        native_policy_schema=NATIVE_POLICY_SCHEMA if native else None,
+        native_profile_payload=encode_native_delivery_json(raw) if native else None,
     )
 
 
@@ -243,6 +292,7 @@ def _strategy_policy(
     raw: Mapping[str, Any],
     *,
     legacy: bool,
+    native: bool = False,
 ) -> DbtPublishStrategyPolicy:
     value = raw.get("strategy_policy")
     if value is None:
@@ -254,13 +304,15 @@ def _strategy_policy(
     full_refresh = _mapping(policy.get("full_refresh"))
     authorized = full_refresh.get("authorized", False)
     max_source_bytes = full_refresh.get("max_source_bytes")
+    serialized_budget = _mapping(full_refresh.get("serialized_payload_budget")).get("max_bytes") if native else None
+    admitted_budget = serialized_budget if native else max_source_bytes
     if "full_refresh" in allowed:
-        if not authorized or max_source_bytes is None:
+        if not authorized or admitted_budget is None:
             raise ValueError(
                 "strategy_policy.full_refresh requires authorized: true and "
                 "positive max_source_bytes when full_refresh is allowlisted"
             )
-    elif authorized or max_source_bytes is not None:
+    elif authorized or admitted_budget is not None:
         raise ValueError("strategy_policy.full_refresh cannot grant a strategy absent from allowed_strategies")
     partition = _mapping(policy.get("partition_replace"))
     return DbtPublishStrategyPolicy(
@@ -268,6 +320,8 @@ def _strategy_policy(
         full_refresh_authorized=authorized,
         full_refresh_max_source_bytes=max_source_bytes,
         partition_replace_requires_atomic_capability=partition.get("require_atomic_capability", True),
+        full_refresh_serialized_payload_max_bytes=serialized_budget,
+        publication_completion_timeout_seconds=policy.get("publication_completion_timeout_seconds") if native else None,
     )
 
 
@@ -296,7 +350,7 @@ def _validation_issues(
     contract_id = (
         str(discriminator) if discriminator in {PROFILE_KIND, PROFILE_V2_KIND, PROFILE_V3_KIND} else PROFILE_KIND
     )
-    schema = dbt_schema_contracts()[contract_id]
+    schema = policy_v4_schema() if discriminator == NATIVE_POLICY_SCHEMA else dbt_schema_contracts()[contract_id]
     errors = sorted(
         Draft202012Validator(schema).iter_errors(payload),
         key=lambda error: tuple(str(item) for item in error.absolute_path),
