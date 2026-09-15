@@ -371,7 +371,15 @@ def test_starter_performs_no_subprocess_or_network_operations(tmp_path: Path, mo
 
 
 @pytest.mark.parametrize(
-    "invocation_database", ["Development", "Development_\U0001f680", "Development_\x7f", "Development_\x9f"]
+    "invocation_database",
+    [
+        "Development",
+        "Development_\U0001f680",
+        "Development_\x7f",
+        "Development_\x9f",
+        "Development_\ufffe",
+        "Development_\uffff",
+    ],
 )
 def test_authored_templates_render_the_managed_analyst_project(tmp_path: Path, invocation_database: str) -> None:
     import yaml
@@ -404,6 +412,7 @@ def test_authored_templates_render_the_managed_analyst_project(tmp_path: Path, i
     policy["profiles"]["local"]["authoring_template"] = template_payload()
     policy["profiles"]["local"]["authoring_template"]["invocation_target"]["database"] = invocation_database
     encoded_policy = json.dumps(policy, ensure_ascii=False).replace("\x7f", r"\u007f").replace("\x9f", r"\u009f")
+    encoded_policy = encoded_policy.replace("\ufffe", r"\ufffe").replace("\uffff", r"\uffff")
     policy_path.write_text(encoded_policy, encoding="utf-8")
     result = service.init(target, profiles=policy_path, profile="local", workflow="orders")
     assert result.passed
@@ -476,7 +485,10 @@ def test_invalid_policy_keys_and_values_do_not_enter_diagnostics(tmp_path: Path,
     assert not (tmp_path / "project").exists()
 
 
-@pytest.mark.parametrize("name", ["local_\U0001f680", 'local_"\\\t', "local_\x7f\x9f", "local_\x85\u2028\u2029"])
+@pytest.mark.parametrize(
+    "name",
+    ["local_\U0001f680", 'local_"\\\t', "local_\x7f\x9f", "local_\x85\u2028\u2029", "local_\ufffe", "local_\uffff"],
+)
 def test_admitted_scalar_literals_roundtrip_through_yaml_and_jinja(name: str) -> None:
     import yaml
     from jinja2 import Environment
