@@ -13,6 +13,42 @@ from dpone.manifest.project_root import inspect_project_root
 from dpone.readiness.airflow_pipeline_source import ConfinedAuthoringFileSystem
 
 
+@pytest.mark.parametrize("failure", [None, "collision", "replaced", "missing", "fsync"])
+def test_sidecar_creation_never_overwrites_or_recreates_operation(tmp_path, monkeypatch, failure):
+    from tools.dbt_self_service.starter_resource_files import write_recovery_sidecar
+
+    operation = str(uuid4())
+    directory = tmp_path / ".dpone-starter-resource-transactions" / operation
+    directory.mkdir(parents=True)
+    root_identity = inspect_project_root(tmp_path)
+    directory_identity = inspect_project_root(directory)
+    target = directory / "recovery.json"
+    if failure == "collision":
+        target.write_bytes(b"foreign")
+    elif failure in {"replaced", "missing"}:
+        directory.rename(tmp_path / "retained-original-operation")
+        if failure == "replaced":
+            directory.mkdir()
+    elif failure == "fsync":
+
+        def fail(descriptor):
+            raise OSError("synthetic fsync failure")
+
+        monkeypatch.setattr(os, "fsync", fail)
+    if failure is None:
+        write_recovery_sidecar(root_identity, operation, directory_identity, b"synthetic")
+        assert target.read_bytes() == b"synthetic"
+    else:
+        with pytest.raises((OSError, ValueError)):
+            write_recovery_sidecar(root_identity, operation, directory_identity, b"synthetic")
+        if failure == "collision":
+            assert target.read_bytes() == b"foreign"
+        elif failure == "missing":
+            assert not directory.exists()
+        elif failure == "replaced":
+            assert list(directory.iterdir()) == []
+
+
 @pytest.mark.parametrize(
     "path",
     [

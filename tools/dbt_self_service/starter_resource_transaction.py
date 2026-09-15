@@ -54,6 +54,7 @@ class ResourceWriteReceipt:
     changed_paths: tuple[str, ...] = ()
     recovery_required: bool = False
     operation: str | None = None
+    unpersisted_recovery_paths: tuple[str, ...] = ()
 
 
 @dataclass
@@ -318,6 +319,7 @@ class _Writer:
             tuple(item.entry.path for item in self.applied if item.owned),
             True,
             None if journal is None else journal.operation,
+            () if journal is None else journal.unpersisted_paths,
         )
 
     def _compensate(self, item: _Applied) -> None:
@@ -389,6 +391,7 @@ class _Writer:
         for created in (journal.log_creation, journal.manifest_creation):
             outcome = journal.filesystem.rollback(created)
             if outcome.preserved or outcome.recovery_path or outcome.directory_recovery_paths:
+                journal.record_cleanup_failure(created, outcome)
                 raise ValueError(_ERROR)
         if recovery_report(self.identity.path).pending:
             raise ValueError(_ERROR)

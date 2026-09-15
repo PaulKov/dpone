@@ -12,13 +12,18 @@ import stat
 from pathlib import Path
 from uuid import UUID
 
-from tools.dbt_self_service.starter_resource_journal_schema import MAX_RESOURCE_BYTES, METADATA_ROOT, RESOURCE_PATHS
+from tools.dbt_self_service.starter_resource_journal_schema import (
+    MAX_EVENT_BYTES,
+    MAX_RESOURCE_BYTES,
+    METADATA_ROOT,
+    RESOURCE_PATHS,
+)
 
 from dpone.manifest.confined_files import ConfinedFileError, ConfinedFileSnapshot, read_confined_leaf
 from dpone.manifest.confined_transaction_journal import transaction_journal_name
 from dpone.manifest.project_root import ProjectRootIdentity
 from dpone.readiness.airflow_authoring_directories import open_confined_parent
-from dpone.readiness.airflow_pipeline_source import ConfinedFileCreation
+from dpone.readiness.airflow_pipeline_source import ConfinedAuthoringFileSystem, ConfinedFileCreation
 
 _ERROR = "Starter resource file is unsafe, changed or outside the fixed inventory."
 
@@ -114,3 +119,25 @@ def _uuid(value: str) -> bool:
         return str(UUID(value)) == value
     except ValueError:
         return False
+
+
+def write_recovery_sidecar(
+    root: ProjectRootIdentity, operation: str, directory: ProjectRootIdentity, content: bytes
+) -> None:
+    """No-clobber creation anchored to the captured, still-existing operation inode."""
+    if (
+        not _uuid(operation)
+        or directory.path != root.path / METADATA_ROOT / operation
+        or len(content) > MAX_EVENT_BYTES
+    ):
+        raise ValueError(_ERROR)
+    parts = (METADATA_ROOT, operation, "recovery.json")
+    with open_confined_parent(root.path, parts, create=False, root_identity=root) as parent:
+        if parent.descriptor is None or not directory.matches(os.fstat(parent.descriptor)):
+            raise ValueError(_ERROR)
+        filesystem = ConfinedAuthoringFileSystem(directory.path, root_identity=directory)
+        if filesystem.create(Path("recovery.json"), content) is None:
+            raise ValueError(_ERROR)
+    with open_confined_parent(root.path, parts, create=False, root_identity=root) as parent:
+        if parent.descriptor is None or not directory.matches(os.fstat(parent.descriptor)):
+            raise ValueError(_ERROR)
