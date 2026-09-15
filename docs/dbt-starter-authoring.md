@@ -97,8 +97,10 @@ is documented separately in [Starter resource generation](dbt-starter-resource-g
 For a conflict, inspect the named path and preserve your work. Use a different
 destination or reconcile the conflicting file deliberately before rerunning.
 For exit `4`, retain the returned journal and recovery paths; automatic retry or
-deleting an entire project is not a recovery procedure. The error catalog covers
-[scaffold and authoring failures](dbt-self-service-errors.md).
+deleting an entire project is not a recovery procedure. Follow the dedicated
+[scaffold recovery](errors/DPONE_SCAFFOLD_APPLY_FAILED.md) or
+[authoring lock diagnosis](errors/DPONE_PROJECT_AUTHORING_LOCK_FAILED.md) page
+for the returned error code.
 
 Existing init targets and recipe profile syntax remain compatible. Return to
 the [dbt integration overview](dbt.md) for authoring and operational references.
