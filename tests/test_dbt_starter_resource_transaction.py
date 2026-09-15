@@ -235,8 +235,21 @@ apply_resource_plan(
     assert (tmp_path / RESOURCE_PATHS[0]).read_bytes() == b"synthetic"
 
 
-def test_third_winner_during_inverse_exchange_is_preserved_and_reported(tmp_path, monkeypatch):
+@pytest.mark.parametrize("append_failure", [None, "before", "after"])
+def test_third_winner_during_inverse_exchange_is_preserved_and_reported(tmp_path, monkeypatch, append_failure):
     from tools.dbt_self_service import starter_resource_transaction as transaction
+    from tools.dbt_self_service.starter_resource_journal import ResourceJournal
+
+    append = ResourceJournal.append
+
+    def fail_append(journal, event):
+        affected = event.get("phase") == "RECOVERY_REQUIRED" and bool(event.get("recovery_paths"))
+        if not affected or append_failure != "before":
+            append(journal, event)
+        if affected and append_failure:
+            raise OSError("synthetic inverse observation failure")
+
+    monkeypatch.setattr(ResourceJournal, "append", fail_append)
 
     first = tmp_path / RESOURCE_PATHS[0]
     first.parent.mkdir(parents=True, exist_ok=True)
@@ -260,8 +273,17 @@ def test_third_winner_during_inverse_exchange_is_preserved_and_reported(tmp_path
     result = apply(tmp_path, phase_hook=fail)
     assert result.recovery_required and first.read_bytes() == b"old"
     report = recovery_report(tmp_path)
-    preserved = [tmp_path / path for path in report.paths if (tmp_path / path).is_file()]
+    paths = report.paths + result.unpersisted_recovery_paths
+    preserved = [tmp_path / path for path in paths if (tmp_path / path).is_file()]
     assert any(path.stat().st_ino == foreign_inode[0] for path in preserved)
+    if append_failure:
+        assert any(
+            (tmp_path / path).stat().st_ino == foreign_inode[0]
+            for path in result.unpersisted_recovery_paths
+            if (tmp_path / path).is_file()
+        )
+    if append_failure != "before":
+        assert (RESOURCE_PATHS[0], False) in report.inverse_outcomes
 
 
 @pytest.mark.parametrize("phase", ["prepared", "before_apply", "after_mutation", "after_observation", "verified"])
@@ -545,3 +567,30 @@ def test_observation_append_failure_keeps_known_paths_in_receipt(tmp_path, monke
     result = apply(tmp_path, phase_hook=fail)
     assert not result.passed and result.recovery_required
     assert retained.relative_to(tmp_path).as_posix() in result.unpersisted_recovery_paths
+
+
+def test_post_exchange_directory_sync_failure_retains_actual_candidate_outcome(tmp_path, monkeypatch):
+    from dpone.manifest import confined_atomic_exchange
+
+    target = tmp_path / RESOURCE_PATHS[0]
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"old")
+    sync = confined_atomic_exchange.sync_directory
+    failed = False
+
+    def fail_once(descriptor):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise OSError("synthetic post-exchange sync failure")
+        sync(descriptor)
+
+    monkeypatch.setattr(confined_atomic_exchange, "sync_directory", fail_once)
+    result = apply(tmp_path)
+    assert failed and not result.passed and result.recovery_required
+    assert target.read_bytes() == payloads()[RESOURCE_PATHS[0]]
+    report = recovery_report(tmp_path)
+    assert (RESOURCE_PATHS[0], True, True) in report.mutation_outcomes
+    candidate = target.with_name(f".{target.name}.{result.operation}.new")
+    assert candidate.read_bytes() == b"old"
+    assert candidate.relative_to(tmp_path).as_posix() in report.paths

@@ -367,15 +367,7 @@ class _Writer:
                 max_bytes=MAX_RESOURCE_BYTES,
             )
         if result.cleanup_required or result.recovery_name:
-            journal.append(
-                {
-                    "phase": "RECOVERY_REQUIRED",
-                    "path": item.entry.path,
-                    "recovery_paths": []
-                    if result.recovery_name is None
-                    else [target.with_name(result.recovery_name).as_posix()],
-                }
-            )
+            journal.observe_inverse(item.entry.path, result)
             raise ValueError(_ERROR)
 
     def _cleanup(self) -> None:

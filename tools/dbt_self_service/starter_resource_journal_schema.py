@@ -139,8 +139,14 @@ def validate_event(event: dict[str, Any], operation: str | None = None) -> None:
         ):
             raise ValueError(_ERROR)
         target = PurePosixPath(event["path"])
+        operation_siblings = set()
+        if operation is not None:
+            if str(UUID(operation)) != operation:
+                raise ValueError(_ERROR)
+            operation_siblings = {f".{target.name}.{operation}.{suffix}" for suffix in ("new", "restore")}
         if parsed.parent != target.parent or (
             parsed.name != f".{target.name}.dpone-transaction.json"
+            and parsed.name not in operation_siblings
             and re.fullmatch(r"\.dpone-(?:rollback|recovery)-[0-9a-f]{32}", parsed.name) is None
         ):
             raise ValueError(_ERROR)

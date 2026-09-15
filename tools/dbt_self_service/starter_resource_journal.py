@@ -9,6 +9,8 @@ budget). Recovery reports are observations, never permission to delete files.
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
@@ -36,6 +38,7 @@ from tools.dbt_self_service.starter_resource_recovery import leaf_recovery_paths
 from tools.dbt_self_service.starter_resource_recovery import recovery_report as recovery_report
 
 from dpone.contracts.strict_json import canonical_json_bytes
+from dpone.manifest.confined_atomic_exchange import ExchangeBackOutcome
 from dpone.manifest.confined_files import ConfinedFileSnapshot, read_confined_leaf, read_stable_descriptor
 from dpone.manifest.confined_mutations import ConfinedMutationError, ConfinedReplaceOutcome
 from dpone.manifest.project_root import ProjectRootIdentity, inspect_project_root
@@ -164,16 +167,39 @@ class ResourceJournal:
             if outcome.recovery_name is None
             else [Path(path).with_name(outcome.recovery_name).as_posix()],
         }
+        self._record_leaf_outcome(event)
+
+    def observe_inverse(self, path: str, outcome: ExchangeBackOutcome) -> None:
+        """Retain inverse-exchange recovery locations before attempting durable append."""
+        self._record_leaf_outcome(
+            {
+                "phase": "RECOVERY_REQUIRED",
+                "path": path,
+                "cleanup_required": outcome.cleanup_required,
+                "recovery_paths": []
+                if outcome.recovery_name is None
+                else [Path(path).with_name(outcome.recovery_name).as_posix()],
+            }
+        )
+
+    def _record_leaf_outcome(self, event: dict[str, Any]) -> None:
         _validate_event(event, self.operation)
-        self.unpersisted_paths = tuple((path, *event["recovery_paths"]))
-        self.append(event)
-        self.unpersisted_paths = ()
+        with self._retaining_paths((event["path"], *event["recovery_paths"])):
+            self.append(event)
+
+    @contextmanager
+    def _retaining_paths(self, paths: tuple[str, ...]) -> Iterator[None]:
+        """A successful later observation must not erase an earlier failed one."""
+        previous = self.unpersisted_paths
+        self.unpersisted_paths = tuple(dict.fromkeys((*previous, *paths)))
+        yield
+        self.unpersisted_paths = previous
 
     def observe_rollback(self, created: ConfinedFileCreation, outcome: ConfinedFileRollbackOutcome) -> None:
         """Record a failed cleanup using the actual creation and rollback receipts."""
         record = self._rollback_record(created, outcome)
         _validate_event({"phase": "RECOVERY_REQUIRED", "rollback": record}, self.operation)
-        self.unpersisted_paths = tuple(
+        paths = tuple(
             dict.fromkeys(
                 (
                     record["path"],
@@ -182,8 +208,8 @@ class ResourceJournal:
                 )
             )
         )
-        self.append({"phase": "RECOVERY_REQUIRED", "rollback": record})
-        self.unpersisted_paths = ()
+        with self._retaining_paths(paths):
+            self.append({"phase": "RECOVERY_REQUIRED", "rollback": record})
 
     def _rollback_record(self, created: ConfinedFileCreation, outcome: ConfinedFileRollbackOutcome) -> dict[str, Any]:
         if outcome.path != created.path:
@@ -217,7 +243,7 @@ class ResourceJournal:
             (self.identity.device, self.identity.inode),
             (self.directory_identity.device, self.directory_identity.inode),
         )
-        self.unpersisted_paths = tuple(
+        paths = tuple(
             dict.fromkeys(
                 (
                     record["path"],
@@ -226,8 +252,8 @@ class ResourceJournal:
                 )
             )
         )
-        write_recovery_sidecar(self.identity, self.operation, self.directory_identity, canonical_json_bytes(value))
-        self.unpersisted_paths = ()
+        with self._retaining_paths(paths):
+            write_recovery_sidecar(self.identity, self.operation, self.directory_identity, canonical_json_bytes(value))
 
     def _verify_log_path(self, snapshot: ConfinedFileSnapshot) -> None:
         with open_confined_parent(
