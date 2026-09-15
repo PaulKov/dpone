@@ -444,3 +444,41 @@ The local model receipt shares its model transaction. Session/transaction values
 are local observations, not durable child-session registrations or restart rights.
 SQL enrollment, signing, model publication and their live qualification remain
 unfinished; this decision fixes the implementation boundary without certifying it.
+
+## Immutable physical runtime registration
+
+The planned `dpone.mssql-physical-runtime-registration.v1` record has an
+independently allocated UUID and an external digest of its complete canonical
+bytes. Upstream policy/profile/toolchain selections, authority references,
+database pins, program hashes and principal mappings precede registration;
+generation, plan, command, reservation and executor identities follow it and
+must not be inputs to its hash. Exact duplicate provisioning may read back the
+same immutable row. Uncertain insertion never permits a replacement UUID.
+
+The closed record contains `schema`, `registration_id`, `platform_subject`,
+`control_authority`, `trusted_profile`, `trusted_toolchain`,
+`qualification_policy_id`, `control_connection_ref`, `model_connection_ref`,
+`service_authority_sha256`, `control_database`, `model_database`,
+`control_schema`, `local_schema`, `program`, `capacity_authority`, `limits`,
+and `principals`. Reference and hash fields are retained inputs, not proof that
+their bytes were authenticated or their SQL permissions provisioned.
+
+Principal IDs and SIDs are scoped to their database pins. Metadata and build
+mappings must differ within each namespace; two mappings of the same database
+must agree. Observer sharing requires an explicit reviewed permission contract
+and retains the actual union of grants; it is not inherently a restricted
+final-quality credential.
+
+Physical definition limits use `max_definition_utf16_bytes`, matching the
+catalog decoder's UTF-16LE byte count. The positive SQL-int representation ceiling
+is independent of the JSON metadata-byte budget; provisioning chooses an explicit
+qualified bound and passes it unchanged to acquisition/decoding. No conversion
+from UTF-8 or default allocation is implied.
+
+`capacity_authority` establishes generation capacity only. Registered physical
+limits are separate. Do not require a model's `resource_bounds` reference to equal
+that capacity reference: no such semantic equivalence has been established.
+The pure registration codec excludes resource-bound admission; later runtime
+admission must fail closed until an actual physical-bounds original or explicit
+authenticated projection mapping is implemented. Original resolution, package
+authority, signing, provisioning and runtime qualification remain unfinished.
