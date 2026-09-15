@@ -4,6 +4,11 @@
 
 ### Added
 
+- Add dependency-light native original references and bounded canonical JSON
+  primitives with exact UTF-8, nesting, token and integer limits. Native schema
+  codecs still own canonical-input and authority checks; existing generic JSON
+  parsing and route execution remain unchanged.
+
 - Add explicit Python staging of validated character files into ClickHouse through
   controlled client/HTTP RowBinary, with exact value preparation, finite budgets,
   original receipt checks and immutable attempt evidence. HTTP enforces absolute
