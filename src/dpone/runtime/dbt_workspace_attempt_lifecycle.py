@@ -133,4 +133,43 @@ class DbtWorkspaceAttemptLifecycle:
         return fallback_code
 
 
+def build_execution_attempt_lifecycle(
+    *,
+    lifecycle: DbtExecutionAttemptLifecycle | None,
+    run_results_reader: DbtRunResultsReader,
+    request_factory: DbtWorkspaceAttemptRequestFactoryPort | None,
+    admission: DbtWorkspaceAttemptAdmissionPort | None,
+) -> DbtExecutionAttemptLifecycle:
+    """Select one explicit owner without silently combining admission policies."""
+    if lifecycle is not None:
+        if request_factory is not None or admission is not None:
+            raise ValueError("explicit lifecycle cannot be combined with workspace admission dependencies")
+        return lifecycle
+    return DbtWorkspaceAttemptLifecycle(
+        run_results_reader=run_results_reader,
+        request_factory=request_factory,
+        admission=admission,
+    )
+
+
+def record_execution_outcome(
+    lifecycle: DbtExecutionAttemptLifecycle,
+    request: DbtWorkspaceAttemptRequest | None,
+    *,
+    state: DbtWorkspaceAttemptTerminalState,
+    fallback_code: str,
+    build_started: bool,
+) -> str:
+    """Normalize owner failure without losing post-dispatch ambiguity evidence."""
+    try:
+        return lifecycle.record_execution_outcome(
+            request,
+            state=state,
+            fallback_code=fallback_code,
+            build_started=build_started,
+        )
+    except Exception:  # noqa: BLE001 - post-dispatch ambiguity still needs evidence
+        return "COMMIT_UNKNOWN" if build_started else fallback_code
+
+
 __all__ = ["DbtWorkspaceAttemptLifecycle"]
