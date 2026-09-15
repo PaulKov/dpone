@@ -51,7 +51,9 @@ def capture_package_source(repo: Path, revision: str) -> PackageSource:
             raise ValueError(_INVALID_SOURCE)
         _git(repo, "merge-base", "--is-ancestor", revision, "HEAD")
         for index_mode in ((), ("--cached",)):
-            _git(repo, "diff", "--quiet", "--no-ext-diff", "--no-textconv", *index_mode, revision, "--", _PACKAGE_PREFIX)
+            _git(
+                repo, "diff", "--quiet", "--no-ext-diff", "--no-textconv", *index_mode, revision, "--", _PACKAGE_PREFIX
+            )
         records = _git(repo, "ls-tree", "-rz", revision, "--", _PACKAGE_PREFIX).split(b"\0")
         blobs: dict[str, str] = {}
         for record in filter(None, records):
