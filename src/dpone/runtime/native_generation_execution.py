@@ -92,6 +92,11 @@ class TrustedDbtInvocationRecorder:
         self._completion: bytes | None = None
         self._publication_attempted = False
 
+    def require_executor(self, executor: SourceExecutorBinding) -> None:
+        """Compare the complete bound identity without I/O or admission authority."""
+        if decode_source_executor_binding(encode_source_executor_binding(executor)) != self._executor:
+            raise NativeSourceCustodyError("invocation executor differs from its bound identity")
+
     def validate_before_credentials(self) -> None:
         """Freshly authenticate retained admission before a caller resolves secrets."""
         with self._sequence:
