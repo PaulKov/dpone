@@ -130,3 +130,14 @@ attempts; it never rewrites original evidence or blindly reverses target operati
 - [Validated character-file staging](0064-validated-file-clickhouse-staging.md)
 - [Native contract primitives](../native-contract-primitives.md)
 - [Original-subject reference](../native-original-subjects.md)
+
+## Storage policy implementation boundary
+
+Original subjects, bindings and native storage metadata retain the public
+`contracts.native_originals` owner. Reusable S3 policy validation belongs in
+`contracts.s3_artifact_store_policy`; the existing adapter reexports its policy
+class with historical constructor and pickle compatibility. Native exact-field
+and capability checks delegate to that policy before authenticated store
+resolution. This dependency direction keeps provider adapters out of contracts
+and avoids duplicating provider validation. See the
+[storage policy reference](../native-original-storage.md) for the exact schema.

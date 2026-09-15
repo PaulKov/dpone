@@ -4,6 +4,11 @@
 
 ### Added
 
+- Add canonical native original bindings preserving complete subject, storage
+  authority and provider-version identity without granting execution authority.
+  Add closed native storage metadata and reuse canonical S3 policy validation
+  while preserving existing resolver imports and pickle compatibility.
+
 - Add closed generation, delivery and platform original-subject contracts with
   canonical JSON codecs and exact workspace-authority fingerprint validation.
   Subject identity does not grant storage access or execution authority.
