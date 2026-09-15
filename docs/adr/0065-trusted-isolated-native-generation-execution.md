@@ -292,3 +292,15 @@ outcome is ephemeral and cannot authorize completion or settlement. No synthetic
 terminal receipt, weakened SQL ownership predicate or persisted-schema migration
 is introduced. See [Native workspace attempt lifecycle](../native-workspace-attempt-lifecycle.md)
 for dependency injection, failure handling and the remaining validation boundary.
+
+
+## Execution evidence ownership
+
+`DbtExecutionOutcomeWriter` owns the complete execution-evidence projection, final
+timestamp, persistence and returned outcome. `DbtExecutionService` supplies the
+execution facts and orchestrates commands and attempt ownership. The same injected
+clock and evidence writer are retained; serialized fields, timestamp ordering,
+write count and post-build exception chaining are unchanged. This replaces a
+split between evidence construction in the service and persistence in a separate
+helper. The existing persistence helper remains compatible. This ownership change
+does not qualify a runtime or make the architecture gates pass by declaration.
