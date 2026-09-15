@@ -37,6 +37,71 @@ def test_create_and_identical_retry_are_clean(tmp_path):
     assert retry.passed and retry.changed_paths == ()
 
 
+@pytest.mark.parametrize("mixed", [False, True])
+def test_pending_leaf_journal_blocks_entire_inventory_without_mutation(tmp_path, mixed):
+    from dpone.manifest.confined_transaction_journal import transaction_journal_name
+
+    for path, content in payloads().items():
+        target = tmp_path / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+    first = tmp_path / RESOURCE_PATHS[0]
+    if mixed:
+        first.write_bytes(b"old")
+    unchanged = tmp_path / RESOURCE_PATHS[-1]
+    journal = unchanged.with_name(transaction_journal_name(unchanged.name))
+    journal.write_bytes(b"unresolved")
+    before = {path: (tmp_path / path).read_bytes() for path in RESOURCE_PATHS}
+    result = apply(tmp_path)
+    assert not result.passed and result.recovery_required
+    report = recovery_report(tmp_path)
+    assert report.pending and journal.relative_to(tmp_path).as_posix() in report.paths
+    assert journal.read_bytes() == b"unresolved"
+    assert {path: (tmp_path / path).read_bytes() for path in RESOURCE_PATHS} == before
+
+
+@pytest.mark.parametrize("identical", [False, True])
+def test_leaf_journal_created_during_result_validation_prevents_success(tmp_path, identical):
+    from dpone.manifest.confined_transaction_journal import transaction_journal_name
+
+    if identical:
+        assert apply(tmp_path).passed
+    target = tmp_path / RESOURCE_PATHS[-1]
+    journal = target.with_name(transaction_journal_name(target.name))
+
+    def validate():
+        journal.write_bytes(b"unresolved")
+
+    result = apply_resource_plan(
+        tmp_path,
+        payloads(),
+        source_revision="a" * 40,
+        revalidate_inputs=lambda: None,
+        validate_result=validate,
+        authoring_lock=project_authoring_lock,
+    )
+    assert not result.passed and result.recovery_required
+    assert journal.read_bytes() == b"unresolved"
+    assert journal.relative_to(tmp_path).as_posix() in recovery_report(tmp_path).paths
+
+
+@pytest.mark.parametrize("kind", ["directory", "symlink"])
+def test_nonregular_leaf_journal_is_reported_without_following_or_removing(tmp_path, kind):
+    from dpone.manifest.confined_transaction_journal import transaction_journal_name
+
+    assert apply(tmp_path).passed
+    target = tmp_path / RESOURCE_PATHS[0]
+    journal = target.with_name(transaction_journal_name(target.name))
+    if kind == "directory":
+        journal.mkdir()
+    else:
+        journal.symlink_to(tmp_path / "absent-foreign-file")
+    report = recovery_report(tmp_path)
+    assert report.pending and journal.relative_to(tmp_path).as_posix() in report.paths
+    assert not apply(tmp_path).passed
+    assert journal.is_symlink() if kind == "symlink" else journal.is_dir()
+
+
 def test_replace_existing_resource_bytes(tmp_path):
     for path in RESOURCE_PATHS:
         target = tmp_path / path

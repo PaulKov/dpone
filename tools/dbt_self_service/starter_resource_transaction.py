@@ -31,6 +31,7 @@ from tools.dbt_self_service.starter_resource_journal import (
     MAX_RESOURCE_BYTES,
     RESOURCE_PATHS,
     ResourceJournal,
+    leaf_recovery_paths,
     recovery_report,
 )
 
@@ -103,6 +104,8 @@ def apply_resource_plan(
             entries = [_Entry(path, captured[path], _snapshot(identity, path)) for path in RESOURCE_PATHS]
             if all(entry.old is not None and entry.old.content == entry.desired for entry in entries):
                 validate_result()
+                if recovery_report(identity.path).pending:
+                    return ResourceWriteReceipt(False, "RECOVERY_REQUIRED", recovery_required=True)
                 return ResourceWriteReceipt(True, "NOOP")
             return _Writer(identity, entries, source_revision, revalidate_inputs, validate_result, phase_hook).run()
     except Exception:
@@ -186,6 +189,8 @@ class _Writer:
             self.validate()
             for applied in self.applied:
                 _require_snapshot(self.identity, applied.entry.path, applied.snapshot)
+            if leaf_recovery_paths(self.identity.path):
+                raise ValueError(_ERROR)
             journal.append({"phase": "VERIFIED"})
             self._hook("verified", None)
             self._cleanup()

@@ -20,6 +20,7 @@ from dpone.adapters.dbt_starter_resources import _PACKAGE_FILES
 from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 from dpone.manifest.bounded_yaml import BoundedYamlLimits
 from dpone.manifest.confined_files import ConfinedFileSnapshot, read_confined_leaf, read_stable_descriptor
+from dpone.manifest.confined_transaction_journal import transaction_journal_name
 from dpone.manifest.project_root import ProjectRootIdentity, inspect_project_root
 from dpone.readiness.airflow_authoring_directories import open_confined_parent
 from dpone.readiness.airflow_pipeline_source import ConfinedAuthoringFileSystem, ConfinedFileCreation
@@ -184,6 +185,38 @@ class ResourceJournal:
 
 
 def recovery_report(root: Path) -> RecoveryReport:
+    """Combine batch observations with all fixed per-leaf recovery obligations."""
+    batch = _batch_report(root)
+    try:
+        paths = leaf_recovery_paths(root)
+    except (OSError, ValueError):
+        return replace(batch, pending=True, status="INVALID")
+    if not paths:
+        return batch
+    return replace(batch, pending=True, status="RECOVERY_REQUIRED", paths=tuple(dict.fromkeys((*batch.paths, *paths))))
+
+
+def leaf_recovery_paths(root: Path) -> tuple[str, ...]:
+    """Observe journal entries without opening, interpreting or recovering them."""
+    identity = inspect_project_root(root)
+    if identity is None:
+        raise ValueError(_ERROR)
+    paths = []
+    for resource in RESOURCE_PATHS:
+        target = Path(resource)
+        with open_confined_parent(root, target.parts, create=False, root_identity=identity) as parent:
+            if parent.descriptor is None:
+                continue
+            name = transaction_journal_name(target.name)
+            try:
+                os.stat(name, dir_fd=parent.descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            paths.append(target.with_name(name).as_posix())
+    return tuple(paths)
+
+
+def _batch_report(root: Path) -> RecoveryReport:
     """Inspect at most one bounded operation; unknown data stays untouched."""
     try:
         identity = inspect_project_root(root)
