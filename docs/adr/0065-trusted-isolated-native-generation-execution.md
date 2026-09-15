@@ -248,3 +248,34 @@ subsequent build/freeze/read/seal transitions remain separate unfinished work;
 the partial provider does not claim to implement the complete source-ledger ports.
 See [native generation admission](../native-generation-admission.md) for composition,
 provisioning, failure semantics and the exact validation scope.
+
+### Pinned activation for original verification
+
+Native original references retain their three immutable release, deployment and
+pack coordinates. They do not identify an activation occurrence: reactivating the
+same deployment creates a new occurrence. The native verifier therefore receives
+an existing `AirflowDeploymentIdentity` from the pinned launch and an
+invocation-bound `require_active` callback instead of the general coordinator.
+The local constructor amendment adds no persisted fields and preserves
+`resolve(refs)`.
+
+The application callback is invoked only after complete policy, project and
+source preflight. It reads the durable activation row by the pinned UUID, checks
+the exact release, deployment, environment, source inventory and runtime authority,
+and obtains the recorded previous deployment before calling the existing
+coordinator's `require_active`. Missing or inactive rows fail closed. The mutable
+current pointer and a default previous deployment cannot supply these values.
+The verifier compares the returned active request with its earlier validated
+observations. This lookup is read-only and neither activates nor prepares a
+workspace; execution still requires the separate protected admission sequence.
+
+The callback's production wiring and native caller remain implementation work
+until their checks and evidence are recorded. The constructor decision alone is
+not runtime qualification.
+
+The application also supplies an explicit local `release_root`, constructed from
+its configured cache root and pinned release identity. Activation projections
+contain deployment files; immutable release archives and packs reside in a
+separate release tree. The verifier must not infer a cache root from projection
+ancestors or escape its confined reader. Both roots remain local locators; exact
+bytes, content identities and source membership bind the observations.
