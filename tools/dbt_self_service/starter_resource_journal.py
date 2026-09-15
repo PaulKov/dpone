@@ -1,7 +1,7 @@
 """Bounded durable observations for the sixteen-file starter resource writer.
 
 One resource is bounded by the existing one-MiB authoring input limit. The
-manifest is bounded by that limit; at most eight events per resource plus eight
+manifest is bounded by that limit; at most nine events per resource plus eight
 batch events are accepted, each at most 4096 bytes (the confined leaf journal
 budget). Recovery reports are observations, never permission to delete files.
 """
@@ -35,6 +35,7 @@ from tools.dbt_self_service.starter_resource_journal_schema import (
 
 from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 from dpone.manifest.confined_files import ConfinedFileSnapshot, read_confined_leaf, read_stable_descriptor
+from dpone.manifest.confined_mutations import ConfinedMutationError, ConfinedReplaceOutcome
 from dpone.manifest.confined_transaction_journal import transaction_journal_name
 from dpone.manifest.project_root import ProjectRootIdentity, inspect_project_root
 from dpone.readiness.airflow_authoring_directories import open_confined_parent
@@ -45,7 +46,12 @@ _ERROR = "Starter resource transaction requires inspection; no recovery files we
 
 @dataclass(frozen=True, slots=True)
 class RecoveryReport:
-    """Only validated relative paths and bounded ownership observations."""
+    """Validated paths and observations, not an exhaustive cleanup inventory.
+
+    Mutation tuples contain path, committed and cleanup_required exactly as
+    observed, not ownership. Every pending report requires discovery: a crash
+    or failed append can leave an unrecorded artifact in the confined scope.
+    """
 
     pending: bool
     status: str
@@ -53,6 +59,8 @@ class RecoveryReport:
     paths: tuple[str, ...] = ()
     unresolved: tuple[str, ...] = ()
     observations: tuple[tuple[str, str, tuple[tuple[str, int], ...]], ...] = ()
+    mutation_outcomes: tuple[tuple[str, bool, bool], ...] = ()
+    discovery_required: bool = False
 
 
 class ResourceJournal:
@@ -154,6 +162,20 @@ class ResourceJournal:
         self._sequence += 1
         self.log_creation = replace(self.log_creation, content=self._content)
 
+    def observe_mutation(self, path: str, outcome: ConfinedMutationError | ConfinedReplaceOutcome) -> None:
+        """Persist the primitive's observation without inferring installed ownership."""
+        self.append(
+            {
+                "phase": "APPLYING",
+                "path": path,
+                "committed": outcome.committed,
+                "cleanup_required": outcome.cleanup_required,
+                "recovery_paths": []
+                if outcome.recovery_name is None
+                else [Path(path).with_name(outcome.recovery_name).as_posix()],
+            }
+        )
+
     def _verify_log_path(self, snapshot: ConfinedFileSnapshot) -> None:
         with open_confined_parent(
             self.root, (*self.directory.parts, "events.jsonl"), create=False, root_identity=self.identity
@@ -179,13 +201,20 @@ class ResourceJournal:
 def recovery_report(root: Path) -> RecoveryReport:
     """Combine batch observations with all fixed per-leaf recovery obligations."""
     batch = _batch_report(root)
+    batch = replace(batch, discovery_required=batch.pending)
     try:
         paths = leaf_recovery_paths(root)
     except (OSError, ValueError):
-        return replace(batch, pending=True, status="INVALID")
+        return replace(batch, pending=True, status="INVALID", discovery_required=True)
     if not paths:
         return batch
-    return replace(batch, pending=True, status="RECOVERY_REQUIRED", paths=tuple(dict.fromkeys((*batch.paths, *paths))))
+    return replace(
+        batch,
+        pending=True,
+        status="RECOVERY_REQUIRED",
+        discovery_required=True,
+        paths=tuple(dict.fromkeys((*batch.paths, *paths))),
+    )
 
 
 def leaf_recovery_paths(root: Path) -> tuple[str, ...]:
@@ -244,7 +273,10 @@ def _batch_report(root: Path) -> RecoveryReport:
         unresolved: set[str] = set()
         observations = []
         recovery_paths = []
+        outcomes = []
         for event in events:
+            if "committed" in event and "cleanup_required" in event and "path" in event:
+                outcomes.append((event["path"], event["committed"], event["cleanup_required"]))
             if event["phase"] in {"APPLYING", "COMPENSATING"} and "path" in event:
                 unresolved.add(event["path"])
             elif event["phase"] in {"APPLIED", "COMPENSATED"}:
@@ -270,6 +302,7 @@ def _batch_report(root: Path) -> RecoveryReport:
             tuple(dict.fromkeys((directory.as_posix(), *RESOURCE_PATHS, *recovery_paths))),
             tuple(sorted(unresolved)),
             tuple(observations),
+            tuple(outcomes),
         )
     except (OSError, ValueError, TypeError, KeyError):
         return RecoveryReport(True, "INVALID", paths=(METADATA_ROOT,))

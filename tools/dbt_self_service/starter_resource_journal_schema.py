@@ -18,7 +18,7 @@ RESOURCE_PATHS = tuple("src/dpone/_assets/dbt_dpone/" + name for name in _PACKAG
     "src/dpone/_assets/dbt_starter/v4/package-lock.yml",
 )
 MAX_RESOURCE_BYTES = BoundedYamlLimits().max_bytes
-MAX_EVENTS = len(RESOURCE_PATHS) * 8 + 8
+MAX_EVENTS = len(RESOURCE_PATHS) * 9 + 8
 MAX_EVENT_BYTES = 4096
 MAX_LOG_BYTES = MAX_EVENTS * MAX_EVENT_BYTES
 METADATA_ROOT = ".dpone-starter-resource-transactions"
