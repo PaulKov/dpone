@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from dpone.contracts.dbt_authoring_template import DbtAuthoringTemplate
 from dpone.contracts.dbt_toolchain import DBT_SQLSERVER_1_12_CERTIFIED
 from dpone.contracts.semantic_refresh_profile import SemanticRefreshProfilePolicy
 
@@ -171,6 +172,9 @@ class DbtPublishProfile:
     quality: Mapping[str, Any] = field(default_factory=dict)
     lineage: Mapping[str, Any] = field(default_factory=dict)
     semantic_refresh: SemanticRefreshProfilePolicy | None = None
+    authoring_template: DbtAuthoringTemplate | None = None
+    native_policy_schema: str | None = None
+    native_profile_payload: bytes | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,6 +185,8 @@ class DbtPublishStrategyPolicy:
     full_refresh_authorized: bool = False
     full_refresh_max_source_bytes: int | None = None
     partition_replace_requires_atomic_capability: bool = True
+    full_refresh_serialized_payload_max_bytes: int | None = None
+    publication_completion_timeout_seconds: int | None = None
 
     def allows(self, strategy: str) -> bool:
         """Return whether policy permits capability evaluation for a strategy."""

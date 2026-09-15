@@ -1,0 +1,17 @@
+{{ config(
+    materialized='dpone_managed_table',
+    contract={'enforced': true},
+    meta={'dpone': {'publish': {
+        'schema': 'dpone.dbt-publish-authoring.v2',
+        'enabled': true,
+        'profile': @@DPONE_PROFILE@@,
+        'workflow': @@DPONE_WORKFLOW@@,
+        'strategy': {'mode': 'full_refresh'},
+        'model_storage': 'rowstore_none'
+    }}}
+) }}
+
+select
+    cast(order_id as bigint) as order_id,
+    cast(order_total as decimal(18,2)) as order_total
+from {{ source('starter', 'orders_source') }}

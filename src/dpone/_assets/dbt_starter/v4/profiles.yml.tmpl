@@ -1,0 +1,17 @@
+# Synthetic offline-parse profile. Never use it to build or publish data.
+@@DPONE_DBT_PROFILE@@:
+  target: @@DPONE_DBT_TARGET@@
+  outputs:
+    @@DPONE_DBT_TARGET@@:
+      type: sqlserver
+      driver: ODBC Driver 18 for SQL Server
+      server: localhost
+      port: 1433
+      database: @@DPONE_INVOCATION_DATABASE@@
+      schema: @@DPONE_INVOCATION_SCHEMA@@
+      authentication: sql
+      user: parse_only_example_user
+      password: parse_only_example_password
+      encrypt: true
+      trust_cert: false
+      threads: 1
