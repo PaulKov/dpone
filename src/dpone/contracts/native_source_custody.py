@@ -68,6 +68,31 @@ class SourceAdmissionClosure:
 
 
 @dataclass(frozen=True, slots=True)
+class SourceTrustedBuildCompletion:
+    """Positive owned build originals; the caller must authenticate every one.
+
+    These references cannot prove success merely by having valid shapes. The
+    consuming recorder resolves the exact profile, command, membership, toolchain,
+    artifacts and normal joined termination before any durable transition.
+    """
+
+    executor: SourceExecutorBinding
+    command: OriginalRef
+    toolchain: OriginalRef
+    build_evidence: OriginalRef
+    artifact_inventory: OriginalRef
+    termination: OriginalRef
+
+    def __post_init__(self) -> None:
+        if type(self.executor) is not SourceExecutorBinding:
+            raise NativeSourceCustodyError("positive completion requires the exact executor")
+        self.executor.__post_init__()
+        _require_originals(self.command, self.toolchain, self.build_evidence, self.artifact_inventory, self.termination)
+        if self.command != self.executor.command:
+            raise NativeSourceCustodyError("positive completion command differs from the admitted executor")
+
+
+@dataclass(frozen=True, slots=True)
 class SourceReadGrant:
     """One retained restricted read capability; its descriptor is external."""
 
@@ -177,6 +202,37 @@ class SourceCustodySnapshot:
                 raise NativeSourceCustodyError("sealed generation lacks complete terminal proof")
         elif self.outcome == "SUCCEEDED":
             raise NativeSourceCustodyError("only a sealed generation can succeed")
+
+
+def require_trusted_build_completion(
+    snapshot: SourceCustodySnapshot,
+    closure: SourceAdmissionClosure,
+    completion: SourceTrustedBuildCompletion,
+) -> None:
+    """Check positive recording identity, never authenticate or mutate originals.
+
+    The admission descriptor keeps its historical revision while custody may
+    advance. The caller verifies that descriptor and every positive original,
+    then compares the current revision and physical owner in its SQL transaction.
+    """
+    if (
+        type(snapshot) is not SourceCustodySnapshot
+        or type(closure) is not SourceAdmissionClosure
+        or type(completion) is not SourceTrustedBuildCompletion
+    ):
+        raise NativeSourceCustodyError("positive completion requires exact custody records")
+    snapshot.__post_init__()
+    closure.__post_init__()
+    completion.__post_init__()
+    if (
+        snapshot.state != "BUILDING"
+        or snapshot.writer_admission != "CLOSED"
+        or snapshot.outcome not in {"ACTIVE", "UNKNOWN"}
+        or snapshot.executor != closure.executor
+        or snapshot.executor != completion.executor
+        or closure.revision > snapshot.revision
+    ):
+        raise NativeSourceCustodyError("positive completion differs from closed current source custody")
 
 
 @dataclass(frozen=True, slots=True)
