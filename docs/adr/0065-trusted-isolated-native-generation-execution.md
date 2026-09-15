@@ -292,3 +292,27 @@ outcome is ephemeral and cannot authorize completion or settlement. No synthetic
 terminal receipt, weakened SQL ownership predicate or persisted-schema migration
 is introduced. See [Native workspace attempt lifecycle](../native-workspace-attempt-lifecycle.md)
 for dependency injection, failure handling and the remaining validation boundary.
+
+
+## Execution evidence ownership
+
+`DbtExecutionOutcomeWriter` owns the complete execution-evidence projection, final
+timestamp, persistence and returned outcome. `DbtExecutionService` supplies the
+execution facts and orchestrates commands and attempt ownership. The same injected
+clock and evidence writer are retained; serialized fields, timestamp ordering,
+write count and post-build exception chaining are unchanged. This replaces a
+split between evidence construction in the service and persistence in a separate
+helper. The existing persistence helper remains compatible. This ownership change
+does not qualify a runtime or make the architecture gates pass by declaration.
+
+
+## Native project document ownership
+
+The native archive adapter owns both capture and bounded reading of generated
+project members through the existing injected archive/file ports. The native
+document contract module owns pure policy admission, selection checks, descriptor
+derivation and generated intent bytes. The former runtime producer import is a
+compatibility re-export of the same adapter class. Actual source immutability,
+asset-path admission, archive verification and round-trip order remain unchanged;
+a comparison against the prior implementation verifies complete archive-byte
+equality. This refactor does not change runtime qualification or delivery policy.

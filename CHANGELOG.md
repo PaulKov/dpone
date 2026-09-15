@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Centralize dbt execution-evidence construction, persistence and outcome creation in one runtime owner; consolidate native project archive capture/read in its adapter and pure document decisions in its contract owner. Preserve record/archive bytes, timestamps, failure semantics and previous producer imports.
 - Add explicit native workspace-attempt lifecycle injection that retains physical ownership through execution evidence, while preserving ordinary dbt terminalization. Add fresh current-owner SQL readback; full native settlement and live qualification remain pending.
 - Place native-original publication orchestration in the application service layer; expose its injected runtime callback through the native-original ports.
 

@@ -12,7 +12,11 @@ complete generation-to-delivery route remain unfinished.
 
 ## Capture complete policy bytes
 
-`NativeProjectDocuments` uses the existing project bundle operations. Supply a
+`dpone.adapters.native_project_documents.NativeProjectDocuments` owns archive
+capture and reading through the existing project bundle operations. The previous
+`dpone.runtime.native_project_documents.NativeProjectDocuments` import remains a
+compatibility re-export of the same class. Pure full-policy, selection and generated
+intent decisions belong to `dpone.contracts.native_project_documents`. Supply a
 validated normalized `DbtPublishIntent` and the complete canonical policy-v4 bytes.
 The native producer validates the selected profile, workflow, model layout and
 strategy. It adds these generated files only to an owned extracted snapshot:

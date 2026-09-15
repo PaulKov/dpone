@@ -112,3 +112,9 @@ def test_reader_rejects_changed_or_unconfined_members(tmp_path, changed):
         (target / NATIVE_POLICY_MEMBER).symlink_to(outside)
     with pytest.raises((ValueError, ConfinedFileError)):
         native.read(target, bundle)
+
+
+def test_legacy_producer_import_is_the_canonical_archive_owner():
+    from dpone.adapters.native_project_documents import NativeProjectDocuments as AdapterDocuments
+
+    assert NativeProjectDocuments is AdapterDocuments
