@@ -406,3 +406,38 @@ rows. Legacy runtime imports and ordinary dbt materializations are unchanged.
 See the maintained [v1 wire reference](../dbt-mssql-physical-catalog-wire.md).
 The SQL provider, enrolled model plans and principal bridge remain unfinished;
 this decision records transport semantics without claiming route qualification.
+
+
+## Physical plan identity graph and enrollment boundary
+
+Physical plan preparation must not introduce a cycle in existing admission v1.
+While holding the existing physical owner P, allocate generation and invocation
+UUIDs, observe the predecessor read-only, and derive immutable model plans.
+Publish the plan-set original before producing the command that cites it; then
+publish the admission request containing that command, reserve G, bind the exact
+executor, and enroll authenticated plan bytes with that separate executor value.
+Revalidate predecessor/namespace facts after G and independently read enrollment
+before dispatch. No model mutation occurs before both P and G are held.
+
+The command's reserved physical vars carry preallocated generation/invocation
+identifiers, plan-set reference and a provisioned registration locator. They
+exclude their own command or reservation reference. SQL admission resolves the
+complete enrolled binding. Plans exclude this build's future executor, receipt,
+completion and enclosing reference; spec/plan digests each omit only their own
+digest field. Metadata replay cannot restore launch entitlement.
+
+Plan codecs validate closed data shapes and canonical identities. They do not
+prove qualification, graph membership, predecessor receipt authenticity or
+registered database equality. Those require explicit authenticated admission.
+The finite original kind is registered only with its actual admission consumer.
+Legacy parsers, command bytes and generation-admission procedures remain intact.
+
+The planned physical-control registration preserves metadata and build principal
+ID/SID separation. An observer may share an identity only through an explicitly
+reviewed permission contract. A registration UUID alone grants no authority.
+Protected cross-database access on the same instance requires caller-preserving
+provisioned permissions; broad cross-database trust is not an alternative.
+The local model receipt shares its model transaction. Session/transaction values
+are local observations, not durable child-session registrations or restart rights.
+SQL enrollment, signing, model publication and their live qualification remain
+unfinished; this decision fixes the implementation boundary without certifying it.
