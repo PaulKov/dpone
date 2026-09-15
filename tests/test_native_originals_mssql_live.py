@@ -87,10 +87,12 @@ def ledger():
         cleanup_errors = []
         statements = []
         if created_database:
-            statements.extend([
-                f"ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE",
-                f"DROP DATABASE [{database}]",
-            ])
+            statements.extend(
+                [
+                    f"ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE",
+                    f"DROP DATABASE [{database}]",
+                ]
+            )
         if created_login:
             statements.append(f"DROP LOGIN [{runtime}]")
         for statement in statements:
