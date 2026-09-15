@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Make stale dbt manifest recovery suggestions project-aware and shell-quoted,
+  including regular local parse profiles without reading credentials or running
+  dbt automatically. Existing error codes and exit behavior are unchanged.
+
 - Add immutable physical runtime registration records and canonical encoding,
   with database-scoped principal mappings and explicit UTF-16LE definition
   budgets. The records validate internal consistency only; authenticated
