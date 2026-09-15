@@ -151,8 +151,8 @@ Do not assume every result has the same field layout.
 | --- | --- |
 | `changed_paths` | Writer-reported owned changes, not an instruction to remove them. |
 | `operation` | Recorded operation UUID when available; null does not prove no pending work. |
-| `paths`, `unresolved` | Known retained locations and unresolved operations; the list may be incomplete. |
-| `observations` | Recorded path/phase/identity observations; current ownership still requires verification. |
+| `paths`, `unresolved` | Known retained locations and unresolved resource paths; the list may be incomplete. |
+| `observations` | Recorded path/artifact-kind/identity observations (`target`, `backup`, `staging`, `candidate`, or `restore`); current ownership still requires verification. |
 | `mutation_outcomes` | Path, committed flag and cleanup-required flag from native replacement. |
 | `rollback_outcomes`, `inverse_outcomes` | Actual recorded rollback/inverse-exchange results. |
 | `unpersisted_recovery_paths` | Known obligations that could not be persisted; preserve them alongside the report. |
