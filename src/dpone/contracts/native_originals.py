@@ -13,7 +13,6 @@ from dpone.contracts.native_delivery_json import (
     decode_native_delivery_json,
     encode_native_delivery_json,
 )
-from dpone.contracts.native_identity import Digest
 
 _SCHEMA = "dpone.native-original-subject.v1"
 _AUTHORITY_FIELDS = frozenset(
@@ -98,8 +97,8 @@ class NativeDeliveryOriginalSubject:
     """Original belonging to one operation/attempt, never an interchangeable run."""
 
     authority: DbtWorkspaceRuntimeAuthority
-    operation_id: Digest
-    attempt_id: Digest
+    operation_id: str
+    attempt_id: str
     schema: ClassVar[str] = _SCHEMA
     scope: ClassVar[Literal["DELIVERY"]] = "DELIVERY"
 
@@ -119,7 +118,7 @@ class NativePlatformOriginalSubject:
     """
 
     authority: DbtWorkspaceRuntimeAuthority
-    platform_policy_sha256: Digest
+    platform_policy_sha256: str
     schema: ClassVar[str] = _SCHEMA
     scope: ClassVar[Literal["PLATFORM"]] = "PLATFORM"
 
