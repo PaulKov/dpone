@@ -387,3 +387,56 @@ def test_failed_outcome_append_reports_unresolved_discovery_obligation(tmp_path,
     assert not result.passed and report.pending and report.discovery_required
     assert RESOURCE_PATHS[0] in report.unresolved
     assert report.mutation_outcomes == ()
+
+
+def test_creation_rollback_reports_retained_file_and_owned_directory(tmp_path, monkeypatch):
+    from dpone.readiness.airflow_pipeline_source import ConfinedAuthoringFileSystem, ConfinedFileRollbackOutcome
+
+    rollback = ConfinedAuthoringFileSystem.rollback
+    target = tmp_path / RESOURCE_PATHS[0]
+    retained = target.with_name(".dpone-rollback-" + "b" * 32)
+
+    def preserve(filesystem, created):
+        if created.path.as_posix() != RESOURCE_PATHS[0]:
+            return rollback(filesystem, created)
+        retained.write_bytes(b"synthetic retained file")
+        return ConfinedFileRollbackOutcome(
+            created.path,
+            False,
+            True,
+            retained.relative_to(tmp_path),
+            tuple(item.path for item in created.created_directories),
+        )
+
+    def fail(phase, path):
+        if phase == "after_mutation":
+            raise OSError("synthetic failure")
+
+    monkeypatch.setattr(ConfinedAuthoringFileSystem, "rollback", preserve)
+    result = apply(tmp_path, phase_hook=fail)
+    assert result.recovery_required
+    report = recovery_report(tmp_path)
+    assert retained.relative_to(tmp_path).as_posix() in report.paths
+    assert (RESOURCE_PATHS[0], False, True) in report.rollback_outcomes
+
+
+def test_prepared_cleanup_reports_retained_metadata_artifact(tmp_path, monkeypatch):
+    from dpone.readiness.airflow_pipeline_source import ConfinedAuthoringFileSystem, ConfinedFileRollbackOutcome
+
+    original = ConfinedAuthoringFileSystem.rollback
+    retained = []
+
+    def preserve(filesystem, created):
+        if created.path.parts[-2:] != ("new", "015.bin"):
+            return original(filesystem, created)
+        path = created.path.with_name(".dpone-rollback-" + "c" * 32)
+        (tmp_path / path).write_bytes(b"synthetic recovery")
+        retained.append(path.as_posix())
+        return ConfinedFileRollbackOutcome(created.path, False, True, path)
+
+    monkeypatch.setattr(ConfinedAuthoringFileSystem, "rollback", preserve)
+    result = apply(tmp_path)
+    report = recovery_report(tmp_path)
+    assert result.recovery_required and retained
+    assert retained[0] in report.paths
+    assert report.status != "INVALID"

@@ -9,7 +9,7 @@ budget). Recovery reports are observations, never permission to delete files.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from itertools import islice
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -39,7 +39,11 @@ from dpone.manifest.confined_mutations import ConfinedMutationError, ConfinedRep
 from dpone.manifest.confined_transaction_journal import transaction_journal_name
 from dpone.manifest.project_root import ProjectRootIdentity, inspect_project_root
 from dpone.readiness.airflow_authoring_directories import open_confined_parent
-from dpone.readiness.airflow_pipeline_source import ConfinedAuthoringFileSystem, ConfinedFileCreation
+from dpone.readiness.airflow_pipeline_source import (
+    ConfinedAuthoringFileSystem,
+    ConfinedFileCreation,
+    ConfinedFileRollbackOutcome,
+)
 
 _ERROR = "Starter resource transaction requires inspection; no recovery files were removed."
 
@@ -61,6 +65,7 @@ class RecoveryReport:
     observations: tuple[tuple[str, str, tuple[tuple[str, int], ...]], ...] = ()
     mutation_outcomes: tuple[tuple[str, bool, bool], ...] = ()
     discovery_required: bool = False
+    rollback_outcomes: tuple[tuple[str, bool, bool], ...] = ()
 
 
 class ResourceJournal:
@@ -134,7 +139,7 @@ class ResourceJournal:
 
     def append(self, event: dict[str, Any]) -> None:
         """Append and fsync one closed event, refusing torn or foreign log bytes."""
-        _validate_event(event)
+        _validate_event(event, self.operation)
         encoded = canonical_json_bytes({"sequence": self._sequence, **event}) + b"\n"
         if len(encoded) > MAX_EVENT_BYTES or self._sequence >= MAX_EVENTS:
             raise ValueError(_ERROR)
@@ -175,6 +180,22 @@ class ResourceJournal:
                 else [Path(path).with_name(outcome.recovery_name).as_posix()],
             }
         )
+
+    def observe_rollback(self, created: ConfinedFileCreation, outcome: ConfinedFileRollbackOutcome) -> None:
+        """Record a failed cleanup using the actual creation and rollback receipts."""
+        if outcome.path != created.path:
+            raise ValueError(_ERROR)
+        record = {
+            "path": created.path.as_posix(),
+            "device": created.device,
+            "inode": created.inode,
+            "directories": [{**asdict(item), "path": item.path.as_posix()} for item in created.created_directories],
+            "removed": outcome.removed,
+            "preserved": outcome.preserved,
+            "recovery_path": None if outcome.recovery_path is None else outcome.recovery_path.as_posix(),
+            "directory_recovery_paths": [path.as_posix() for path in outcome.directory_recovery_paths],
+        }
+        self.append({"phase": "RECOVERY_REQUIRED", "rollback": record})
 
     def _verify_log_path(self, snapshot: ConfinedFileSnapshot) -> None:
         with open_confined_parent(
@@ -268,13 +289,19 @@ def _batch_report(root: Path) -> RecoveryReport:
             )
             _validate_manifest(manifest, operation, identity.device, identity.inode)
             content = read_confined_leaf(parent.descriptor, "events.jsonl", max_bytes=MAX_LOG_BYTES).content
-        events = _read_events(content)
-        _verify_backups(root, directory, manifest, identity)
+        events = _read_events(content, operation)
         unresolved: set[str] = set()
         observations = []
-        recovery_paths = []
+        recovery_paths: list[str] = []
         outcomes = []
+        rollbacks = []
         for event in events:
+            if "rollback" in event:
+                item = event["rollback"]
+                rollbacks.append((item["path"], item["removed"], item["preserved"]))
+                recovery_paths.extend((item["path"], *item["directory_recovery_paths"]))
+                if item["recovery_path"] is not None:
+                    recovery_paths.append(item["recovery_path"])
             if "committed" in event and "cleanup_required" in event and "path" in event:
                 outcomes.append((event["path"], event["committed"], event["cleanup_required"]))
             if event["phase"] in {"APPLYING", "COMPENSATING"} and "path" in event:
@@ -295,6 +322,7 @@ def _batch_report(root: Path) -> RecoveryReport:
                     (event["path"], event.get("artifact", "target"), tuple(sorted(event["identity"].items())))
                 )
             recovery_paths.extend(event.get("recovery_paths", ()))
+        _verify_backups(root, directory, manifest, identity, recovery_paths)
         return RecoveryReport(
             True,
             events[-1]["phase"] if events else "PREPARING",
@@ -303,12 +331,15 @@ def _batch_report(root: Path) -> RecoveryReport:
             tuple(sorted(unresolved)),
             tuple(observations),
             tuple(outcomes),
+            rollback_outcomes=tuple(rollbacks),
         )
     except (OSError, ValueError, TypeError, KeyError):
         return RecoveryReport(True, "INVALID", paths=(METADATA_ROOT,))
 
 
-def _verify_backups(root: Path, directory: Path, manifest: dict[str, Any], identity: ProjectRootIdentity) -> None:
+def _verify_backups(
+    root: Path, directory: Path, manifest: dict[str, Any], identity: ProjectRootIdentity, recovery_paths: list[str]
+) -> None:
     for kind in ("old", "new"):
         expected = {
             f"{index:03d}.bin": entry["old"]["sha256"] if kind == "old" else entry["desired_sha256"]
@@ -320,11 +351,18 @@ def _verify_backups(root: Path, directory: Path, manifest: dict[str, Any], ident
         ) as parent:
             if parent.descriptor is None:
                 continue
+            retained = {
+                PurePosixPath(path).name
+                for path in recovery_paths
+                if PurePosixPath(path).parent == PurePosixPath(directory / kind)
+            }
             with os.scandir(parent.descriptor) as scan:
-                names = [entry.name for entry in islice(scan, len(RESOURCE_PATHS) + 1)]
-            if not set(names) <= set(expected):
+                names = [entry.name for entry in islice(scan, len(RESOURCE_PATHS) + len(retained) + 1)]
+            if not set(names) <= set(expected) | retained:
                 raise ValueError(_ERROR)
             for name in names:
+                if name not in expected:
+                    continue
                 observed = read_confined_leaf(parent.descriptor, name, max_bytes=MAX_RESOURCE_BYTES)
                 if observed.sha256 != expected[name]:
                     raise ValueError(_ERROR)

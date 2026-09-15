@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from pathlib import PurePosixPath
 from typing import Any
+from uuid import UUID
 
 from dpone.adapters.dbt_starter_resources import _PACKAGE_FILES
 from dpone.contracts.strict_json import strict_json_object
@@ -68,7 +69,7 @@ def validate_manifest(value: dict[str, Any], operation: str, device: int, inode:
         raise ValueError(_ERROR)
 
 
-def validate_event(event: dict[str, Any]) -> None:
+def validate_event(event: dict[str, Any], operation: str | None = None) -> None:
     if (
         not isinstance(event.get("phase"), str)
         or set(event)
@@ -82,10 +83,15 @@ def validate_event(event: dict[str, Any]) -> None:
             "owned",
             "directories",
             "recovery_paths",
+            "rollback",
         }
         or event.get("phase") not in _PHASES
     ):
         raise ValueError(_ERROR)
+    if "rollback" in event:
+        if operation is None or event["phase"] != "RECOVERY_REQUIRED":
+            raise ValueError(_ERROR)
+        validate_rollback(event["rollback"], operation)
     if "path" in event and event["path"] not in RESOURCE_PATHS:
         raise ValueError(_ERROR)
     if event["phase"] in {"APPLYING", "APPLIED", "COMPENSATED"} and "path" not in event:
@@ -143,7 +149,73 @@ def _valid_digest(value: object) -> bool:
     return isinstance(value, str) and _DIGEST.fullmatch(value) is not None
 
 
-def read_events(content: bytes) -> list[dict[str, Any]]:
+def validate_rollback(value: object, operation: str) -> None:
+    """Accept only outcomes tied to a captured creation and its directory receipts."""
+    if not isinstance(value, dict) or set(value) != {
+        "path",
+        "device",
+        "inode",
+        "directories",
+        "removed",
+        "preserved",
+        "recovery_path",
+        "directory_recovery_paths",
+    }:
+        raise ValueError(_ERROR)
+    path = _created_path(value["path"], operation)
+    if any(type(value[key]) is not int or value[key] < 0 for key in ("device", "inode")):
+        raise ValueError(_ERROR)
+    if any(type(value[key]) is not bool for key in ("removed", "preserved")):
+        raise ValueError(_ERROR)
+    directories = value["directories"]
+    if not isinstance(directories, list) or len(directories) > 8:
+        raise ValueError(_ERROR)
+    owned = []
+    for directory in directories:
+        if not isinstance(directory, dict) or set(directory) != {"path", "device", "inode"}:
+            raise ValueError(_ERROR)
+        if not isinstance(directory["path"], str) or directory["path"] not in {
+            str(parent) for parent in path.parents if str(parent) != "."
+        }:
+            raise ValueError(_ERROR)
+        if any(type(directory[key]) is not int or directory[key] < 0 for key in ("device", "inode")):
+            raise ValueError(_ERROR)
+        owned.append(directory["path"])
+    unresolved = value["directory_recovery_paths"]
+    if not isinstance(unresolved, list) or len(unresolved) > 8 or any(item not in owned for item in unresolved):
+        raise ValueError(_ERROR)
+    if len(owned) != len(set(owned)):
+        raise ValueError(_ERROR)
+    recovery = value["recovery_path"]
+    if recovery is not None:
+        if not isinstance(recovery, str) or recovery != str(PurePosixPath(recovery)):
+            raise ValueError(_ERROR)
+        parsed = PurePosixPath(recovery)
+        if (
+            parsed.parent != path.parent
+            or re.fullmatch(r"\.dpone-(?:rollback|recovery)-[0-9a-f]{32}", parsed.name) is None
+        ):
+            raise ValueError(_ERROR)
+
+
+def _created_path(value: object, operation: str) -> PurePosixPath:
+    if str(UUID(operation)) != operation or not isinstance(value, str):
+        raise ValueError(_ERROR)
+    directory = PurePosixPath(METADATA_ROOT) / operation
+    allowed = set(RESOURCE_PATHS)
+    allowed.update(str(directory / name) for name in ("manifest.json", "events.jsonl", "recovery.json"))
+    allowed.update(
+        str(directory / kind / f"{index:03d}.bin") for kind in ("old", "new") for index in range(len(RESOURCE_PATHS))
+    )
+    for resource in RESOURCE_PATHS:
+        target = PurePosixPath(resource)
+        allowed.update(str(target.with_name(f".{target.name}.{operation}.{suffix}")) for suffix in ("new", "restore"))
+    if value not in allowed:
+        raise ValueError(_ERROR)
+    return PurePosixPath(value)
+
+
+def read_events(content: bytes, operation: str | None = None) -> list[dict[str, Any]]:
     if content and not content.endswith(b"\n"):
         raise ValueError(_ERROR)
     lines = content.splitlines()
@@ -156,6 +228,6 @@ def read_events(content: bytes) -> list[dict[str, Any]]:
         record = strict_json_object(line)
         if type(record.get("sequence")) is not int or record.pop("sequence") != number:
             raise ValueError(_ERROR)
-        validate_event(record)
+        validate_event(record, operation)
         events.append(record)
     return events

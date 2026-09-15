@@ -328,6 +328,7 @@ class _Writer:
         if item.creation is not None:
             outcome = journal.filesystem.rollback(item.creation)
             if outcome.preserved or outcome.recovery_path or outcome.directory_recovery_paths:
+                journal.observe_rollback(item.creation, outcome)
                 raise ValueError(_ERROR)
             return
         assert item.entry.backup is not None and item.entry.old is not None
@@ -381,6 +382,7 @@ class _Writer:
         for created in reversed(self.prepared):
             outcome = journal.filesystem.rollback(created)
             if outcome.preserved or outcome.recovery_path or outcome.directory_recovery_paths:
+                journal.observe_rollback(created, outcome)
                 raise ValueError(_ERROR)
         journal.append({"phase": "COMPLETE"})
         journal.close()
