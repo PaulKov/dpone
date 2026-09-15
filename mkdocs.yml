@@ -500,6 +500,7 @@ nav:
       - Native contract primitives: native-contract-primitives.md
       - Native original subjects: native-original-subjects.md
       - Native original bindings: native-original-bindings.md
+      - Native original SQL bindings: native-originals-mssql.md
       - Native original storage policy: native-original-storage.md
       - Native original publication: native-original-publication.md
       - Native original object storage: native-original-store.md

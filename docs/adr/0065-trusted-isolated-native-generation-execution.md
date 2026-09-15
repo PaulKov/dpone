@@ -207,3 +207,22 @@ application composition binds the service and injects this exact callback into
 runtime consumers. This supersedes the proposed runtime owner in the planning
 consumer map while retaining the algorithm and public callable signature.
 No released import requires a runtime-to-services compatibility facade.
+
+### Protected native-original SQL index
+
+An explicit administrator migration installs additive V1 objects in the existing
+`dbo`-owned native control schema. It registers an already authenticated authority
+reference with the actual runtime database principal ID and SID, without runtime
+self-enrollment or replacement of retained authority. Caller-context static
+procedures use an ownership chain and check this registration transactionally.
+The runtime principal has execution access but cannot mutate the tables directly
+or alter the schema. Incompatible existing schema/procedure definitions fail
+installation rather than being silently replaced.
+
+The index uses a unique locator hash for lookup and full binary identity plus
+length comparison for proof. It stores complete canonical binding bytes. Bind
+creates if absent under key-range locking; exact replay preserves the row and
+conflicting tuples fail. Commit precedes independent fresh-connection resolution.
+Ambiguous execute/commit results permit only read-only reconciliation; cleanup
+does not establish transaction absence. Automated deployment-member selection
+and platform command wiring remain unfinished application integration.

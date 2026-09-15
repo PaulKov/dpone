@@ -6,10 +6,14 @@
 
 ### Added
 
+- Add immutable SQL native-original bindings with explicit protected installation,
+  caller/authority verification, independent resolution and read-only recovery
+  after ambiguous commit. Local provider checks do not certify a complete route.
+
 - Add native subject-bound object storage with deterministic v1 keys, immutable
   conflict/lost-acknowledgement reconciliation, full reference/readback proof and
   a shared absolute I/O deadline. Reuse binding coordinate and kind validation;
-  authenticated SQL bindings and application composition remain pending.
+  automated authenticated application composition remains pending.
 
 - Share S3 conditional-write and exact-version proof with an explicit bounded
   artifact API, enforcing byte/chunk/deadline limits and response cleanup while

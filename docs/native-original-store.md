@@ -84,7 +84,7 @@ version, deletion or rollback is attempted. Retained orphan objects remain avail
 for authorized investigation. The adapter never fabricates an `OriginalRef` or
 creates a control binding.
 
-The [publication runtime](native-original-publication.md) uses this writer/reader
+The [publication service](native-original-publication.md) uses this writer/reader
 alongside a separately authenticated binding port. It independently resolves the
 complete binding and reads back again before returning the logical original
 reference. Neither layer grants source/target dispatch authority.
