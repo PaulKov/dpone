@@ -404,6 +404,9 @@ completion. Direct DTO constructors remain unchecked; use the decoder for extern
 rows. Legacy runtime imports and ordinary dbt materializations are unchanged.
 
 See the maintained [v1 wire reference](../dbt-mssql-physical-catalog-wire.md).
+The separate pure [physical plan contracts](../dbt-mssql-physical-plans.md)
+document canonical plan bytes, deterministic names and the boundary before
+authenticated SQL enrollment.
 The SQL provider, enrolled model plans and principal bridge remain unfinished;
 this decision records transport semantics without claiming route qualification.
 

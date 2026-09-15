@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add immutable SQL Server physical model specs, generation plans and plan-set
+  encoding with strict canonical bytes, derived names and separate digest
+  inputs. These pure contracts grant no registration or execution authority;
+  SQL enrollment and physical qualification remain separate work.
+
 - Add `dpone init dbt PATH` with explicit platform policy, profile and workflow,
   default offline apply, dry-run, conflict-preserving writes and structured
   recovery guidance. Installed resource completeness and the actual installed
