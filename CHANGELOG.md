@@ -6,6 +6,13 @@
 
 ### Added
 
+- Add native-only full-policy/intent project capture and original verification
+  against exact release membership and pinned workspace activation. Preserve
+  legacy schema registration and archive behavior; runtime qualification and
+  complete native CLI/generation/delivery integration remain pending.
+- Persist native source writer-admission closure with exact revision readback,
+  recognized atomic SQL upgrades and retained UNKNOWN ownership.
+
 - Add an authenticated once-only native dbt invocation recorder with exact BUILD/QUALITY
   command membership, bounded original readback, owned-root checks, latched close
   deadlines and immutable completion reconciliation. Application qualification

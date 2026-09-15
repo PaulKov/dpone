@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
-from typing import ClassVar, Literal, TypeAlias, cast, get_args
+from typing import ClassVar, Literal, TypeAlias, cast
 from uuid import UUID
 
 from dpone.contracts.dbt_contract_validation import DbtPublishingError, require_digest
@@ -15,6 +15,8 @@ from dpone.contracts.native_delivery_json import (
     encode_native_delivery_json,
 )
 from dpone.contracts.native_identity import OriginalRef
+from dpone.contracts.native_original_kinds import NativeOriginalKind as NativeOriginalKind
+from dpone.contracts.native_original_kinds import is_native_original_kind
 from dpone.contracts.s3_artifact_store_policy import S3ArtifactStorePolicy
 from dpone.ports.semantic_refresh_artifact_store import ArtifactObjectRef
 
@@ -212,16 +214,6 @@ def decode_native_original_subject(payload: bytes) -> NativeOriginalSubject:
         raise NativeOriginalSubjectError("invalid original subject document") from exc
 
 
-NativeOriginalKind: TypeAlias = Literal[
-    "generation_storage_root_v1",
-    "generation_stored_file_v1",
-    "generation_seal_resolution_v1",
-    "trusted_dbt_command_plan_v1",
-    "trusted_dbt_invocation_completion_v1",
-    "trusted_dbt_toolchain_v1",
-    "trusted_dbt_qualification_v1",
-    "trusted_dbt_owned_root_v1",
-]
 _BINDING_SCHEMA = "dpone.native-original-binding.v1"
 _BINDING_FIELDS = frozenset(
     {"schema", "subject", "kind", "storage_authority", "object_ref", "payload_sha256", "locator"}
@@ -263,9 +255,9 @@ def native_original_object_payload(value: ArtifactObjectRef) -> dict[str, Native
 
 def require_native_original_kind(value: object) -> NativeOriginalKind:
     """Validate the closed kind before provider effects or binding encoding."""
-    if type(value) is not str or value not in get_args(NativeOriginalKind):
+    if not is_native_original_kind(value):
         raise NativeOriginalBindingError("unsupported original kind")
-    return cast(NativeOriginalKind, value)
+    return value
 
 
 @dataclass(frozen=True, slots=True)

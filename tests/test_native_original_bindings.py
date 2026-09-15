@@ -197,3 +197,15 @@ def test_no_generic_kind_subject_authority_inference():
         kind="generation_storage_root_v1",
     )
     assert decode_native_original_binding(encode_native_original_binding(value)) == value
+
+
+def test_closed_kind_catalog_preserves_public_alias_and_error_contract():
+    from dpone.contracts.native_original_kinds import NativeOriginalKind as CanonicalKind
+    from dpone.contracts.native_original_kinds import is_native_original_kind
+    from dpone.contracts.native_originals import NativeOriginalKind, require_native_original_kind
+
+    assert NativeOriginalKind is CanonicalKind
+    for invalid in (None, True, 1, "unknown", "trusted_dbt_command_plan_v1 "):
+        assert not is_native_original_kind(invalid)
+        with pytest.raises(NativeOriginalBindingError):
+            require_native_original_kind(invalid)

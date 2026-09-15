@@ -504,6 +504,8 @@ nav:
       - Native original storage policy: native-original-storage.md
       - Native original publication: native-original-publication.md
       - Native original object storage: native-original-store.md
+      - Native original verification: native-original-verification.md
+      - Native source admission closure: native-source-admission-closure.md
       - Native generation admission: native-generation-admission.md
       - Trusted native dbt invocation: native-generation-execution.md
       - Bounded versioned artifacts: versioned-artifact-store.md
