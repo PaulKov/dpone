@@ -37,7 +37,7 @@ from tools.dbt_self_service.starter_resource_journal import (
 
 from dpone.manifest.confined_atomic_exchange import exchange_back, get_native_atomic_exchange, same_identity
 from dpone.manifest.confined_files import ConfinedFileSnapshot, read_confined_leaf
-from dpone.manifest.confined_mutations import replace_file_if_digest
+from dpone.manifest.confined_mutations import ConfinedMutationError, replace_file_if_digest
 from dpone.manifest.project_root import ProjectRootIdentity, inspect_project_root
 from dpone.ports.project_authoring_lock import AuthoringLockFactory
 from dpone.readiness.airflow_authoring_directories import open_confined_parent
@@ -265,13 +265,18 @@ class _Writer:
             if parent.descriptor is None:
                 raise ValueError(_ERROR)
             _reject_leaf_journal(parent.descriptor, Path(entry.path).name)
-            outcome = replace_file_if_digest(
-                parent.descriptor,
-                Path(entry.path).name,
-                entry.candidate.path.name,
-                expected_sha256=entry.old.sha256,
-                max_bytes=MAX_RESOURCE_BYTES,
-            )
+            try:
+                outcome = replace_file_if_digest(
+                    parent.descriptor,
+                    Path(entry.path).name,
+                    entry.candidate.path.name,
+                    expected_sha256=entry.old.sha256,
+                    max_bytes=MAX_RESOURCE_BYTES,
+                )
+            except ConfinedMutationError as error:
+                journal.observe_mutation(entry.path, error)
+                raise
+            journal.observe_mutation(entry.path, outcome)
             observed = read_confined_leaf(parent.descriptor, Path(entry.path).name, max_bytes=MAX_RESOURCE_BYTES)
         if (
             not outcome.committed
@@ -279,7 +284,7 @@ class _Writer:
             or not same_identity(observed.identity, entry.candidate_snapshot.identity)
         ):
             raise ValueError(_ERROR)
-        return _Applied(entry, observed, None, True, outcome.cleanup_required)
+        return _Applied(entry, observed, None, True, outcome.cleanup_required or outcome.recovery_name is not None)
 
     def _failed(self) -> ResourceWriteReceipt:
         journal = self.journal

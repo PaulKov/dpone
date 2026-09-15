@@ -311,3 +311,79 @@ def test_cleanup_failure_is_not_claimed_as_success(tmp_path):
     result = apply(tmp_path, phase_hook=fail)
     assert not result.passed and result.recovery_required
     assert recovery_report(tmp_path).pending
+
+
+def test_forward_native_race_reports_retained_third_winner(tmp_path, monkeypatch):
+    import tools.dbt_self_service.starter_resource_transaction as writer
+
+    from dpone.manifest.confined_atomic_exchange import get_native_atomic_exchange
+
+    first = tmp_path / RESOURCE_PATHS[0]
+    first.parent.mkdir(parents=True, exist_ok=True)
+    first.write_bytes(b"old")
+    native = get_native_atomic_exchange()
+    original = writer.replace_file_if_digest
+    winners = []
+
+    def exchange(parent, target, replacement):
+        if len(winners) < 2:
+            foreign = tmp_path / "foreign"
+            foreign.write_bytes(b"first-foreign" if not winners else b"third-winner")
+            winners.append(foreign.stat().st_ino)
+            os.replace(foreign, first)
+        native(parent, target, replacement)
+
+    def replace(*args, **kwargs):
+        return original(*args, **kwargs, atomic_exchange=exchange)
+
+    monkeypatch.setattr(writer, "replace_file_if_digest", replace)
+    result = apply(tmp_path)
+    assert not result.passed and result.recovery_required and len(winners) == 2
+    report = recovery_report(tmp_path)
+    assert any((tmp_path / path).is_file() and (tmp_path / path).stat().st_ino == winners[-1] for path in report.paths)
+    assert report.discovery_required
+    assert (RESOURCE_PATHS[0], False, False) in report.mutation_outcomes
+
+
+def test_committed_native_cleanup_observation_retains_exact_recovery_path(tmp_path, monkeypatch):
+    import tools.dbt_self_service.starter_resource_transaction as writer
+
+    from dpone.manifest.confined_mutations import ConfinedReplaceOutcome
+
+    target = tmp_path / RESOURCE_PATHS[0]
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"old")
+    retained = target.with_name(".dpone-recovery-" + "a" * 32)
+    original = writer.replace_file_if_digest
+
+    def replace(*args, **kwargs):
+        outcome = original(*args, **kwargs)
+        assert outcome.committed
+        retained.write_bytes(b"synthetic retained artifact")
+        return ConfinedReplaceOutcome(True, True, retained.name)
+
+    monkeypatch.setattr(writer, "replace_file_if_digest", replace)
+    result = apply(tmp_path)
+    assert not result.passed and result.recovery_required
+    report = recovery_report(tmp_path)
+    assert retained.relative_to(tmp_path).as_posix() in report.paths
+    assert (RESOURCE_PATHS[0], True, True) in report.mutation_outcomes
+    assert target.read_bytes() == payloads()[RESOURCE_PATHS[0]]
+
+
+def test_failed_outcome_append_reports_unresolved_discovery_obligation(tmp_path, monkeypatch):
+    from tools.dbt_self_service.starter_resource_journal import ResourceJournal
+
+    target = tmp_path / RESOURCE_PATHS[0]
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"old")
+
+    def fail(*args):
+        raise OSError("synthetic observation write failure")
+
+    monkeypatch.setattr(ResourceJournal, "observe_mutation", fail)
+    result = apply(tmp_path)
+    report = recovery_report(tmp_path)
+    assert not result.passed and report.pending and report.discovery_required
+    assert RESOURCE_PATHS[0] in report.unresolved
+    assert report.mutation_outcomes == ()
