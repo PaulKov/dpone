@@ -4,6 +4,15 @@
 
 ### Added
 
+- Share S3 conditional-write and exact-version proof with an explicit bounded
+  artifact API, enforcing byte/chunk/deadline limits and response cleanup while
+  preserving the legacy adapter and policy imports. Native provider composition
+  and live qualification remain pending.
+
+- Add injected native original publication orchestration that verifies the complete
+  binding and exact-version bytes before returning a reference, without automatic
+  write retries or provider construction.
+
 - Add canonical native original bindings preserving complete subject, storage
   authority and provider-version identity without granting execution authority.
   Add closed native storage metadata and reuse canonical S3 policy validation
@@ -26,6 +35,9 @@
   keep their existing behavior; live certification remains unverified.
 
 ### Fixed
+
+- Close acquired S3 response bodies when an exact-version read rejects the
+  returned version, preserving the existing legacy API and error behavior.
 
 - Close threaded backfill admission atomically with lease acquisition before
   persisting a chunk failure. Already admitted peers may finish; untouched chunks

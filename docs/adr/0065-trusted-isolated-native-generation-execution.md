@@ -141,3 +141,36 @@ and capability checks delegate to that policy before authenticated store
 resolution. This dependency direction keeps provider adapters out of contracts
 and avoids duplicating provider validation. See the
 [storage policy reference](../native-original-storage.md) for the exact schema.
+
+## Shared versioned artifact I/O
+
+The shared `adapters.versioned_artifact_s3` implementation owns conditional PUT,
+exact-version HEAD/GET, bucket-capability checks and response-body lifecycle.
+`adapters.versioned_artifact_s3_proof` owns pure response/authority validation,
+including complete native version-history entries before exact-key filtering.
+This separates provider I/O from proof policy without duplicating the legacy
+network algorithm. `ports.versioned_artifact_store` owns the structural policy,
+typed client/store capabilities and `VersionedArtifactIoBudget`.
+
+The budget has exact positive `max_bytes` and `chunk_bytes` integers, with chunk
+size no greater than the byte cap, and a finite float `deadline_monotonic`.
+The caller passes one absolute deadline through the whole logical operation;
+it is not renewed for individual requests or proof steps. Native methods require
+that budget and an actual GET VersionId. Complete bounded consumption, EOF,
+protected metadata, content digest, unambiguous history and body closure are all
+required before success. A malformed history entry is incomplete proof, even
+when another entry appears to identify the expected version.
+
+The existing `S3CreateOnlyArtifactStore` remains a compatibility adapter with its
+historical constructor and method signatures. Shared internal operations preserve
+its unbudgeted read and omitted-GET-VersionId fallback; neither establishes native
+bounded-provider qualification. The legacy structural policy import preserves
+class/pickle identity, and `retention_datetime` keeps its old import path. Native
+composition must select the explicit bounded adapter, not the compatibility mode.
+
+Cooperative checks cannot interrupt a blocking SDK call. Authenticated application
+composition must additionally configure finite SDK connect/read/retry limits and
+provide both clocks. No helper-level retry can replace an uncertain write version.
+Native subject-to-key adaptation, authenticated SQL binding and complete provider
+composition/qualification remain pending. See the
+[bounded artifact reference](../versioned-artifact-store.md) for API use and limits.

@@ -487,3 +487,59 @@ def test_s3_resolver_rejects_provider_policy_swap_before_put(field_name: str) ->
         resolver.resolve(replace(_binding(), **{field_name: value}))
 
     assert client.created is None
+
+
+@pytest.mark.parametrize("returned_version", ["another-version", None, "version-1"])
+def test_s3_acquired_body_closes_even_when_version_is_rejected(returned_version: str | None) -> None:
+    class RecordingBody(BytesIO):
+        def __init__(self) -> None:
+            super().__init__(b"payload")
+            self.close_calls = 0
+            self.read_calls = 0
+
+        def read(self, size: int = -1) -> bytes:
+            self.read_calls += 1
+            return super().read(size)
+
+        def close(self) -> None:
+            self.close_calls += 1
+            super().close()
+
+    body = RecordingBody()
+
+    class Client(_Client):
+        def get_object(self, **kwargs: object) -> dict[str, object]:
+            assert kwargs["VersionId"] == "version-1"
+            response: dict[str, object] = {"Body": body}
+            if returned_version is not None:
+                response["VersionId"] = returned_version
+            return response
+
+    store = _store(Client())
+    if returned_version == "another-version":
+        with pytest.raises(ArtifactStoreUnavailable, match="another VersionId"):
+            store.read_version(key=f"{_PREFIX}/manifest.json", version="version-1")
+        assert body.read_calls == 0
+    else:
+        # The legacy API historically tolerates an omitted GET VersionId.
+        assert store.read_version(key=f"{_PREFIX}/manifest.json", version="version-1") == b"payload"
+    assert body.closed
+    assert body.close_calls == 1
+
+
+@pytest.mark.parametrize("failure_type", [OSError, KeyboardInterrupt])
+def test_s3_read_failure_closes_acquired_body(failure_type: type[BaseException]) -> None:
+    class FailingBody(BytesIO):
+        def read(self, size: int = -1) -> bytes:
+            raise failure_type("interrupted body read")
+
+    body = FailingBody(b"payload")
+
+    class Client(_Client):
+        def get_object(self, **kwargs: object) -> dict[str, object]:
+            return {"Body": body, "VersionId": "version-1"}
+
+    expected_error = ArtifactStoreUnavailable if failure_type is OSError else KeyboardInterrupt
+    with pytest.raises(expected_error):
+        _store(Client()).read_version(key=f"{_PREFIX}/manifest.json", version="version-1")
+    assert body.closed
