@@ -1,0 +1,76 @@
+# Your dbt publishing project
+
+Edit the SQL and column declarations, check them locally, then send the checked
+project through your platform's CI and DEV acceptance process. Local checks do
+not publish data or certify the runtime.
+
+## Before you begin
+
+Use the qualified `dpone[dbt-mssql]` environment supplied by your platform team.
+The team supplies the nonsecret policy, profile and workflow selection, source
+coordinates and approved package version. Runtime credentials are bound
+separately: do not add them to this project or its policy.
+
+The `profiles/profiles.yml` file contains synthetic values for offline parsing
+only. Do not run `dbt build`, `dbt run`, or database commands with this profile.
+The platform prepares the DEV source with `order_id` and `order_total` before
+executing the project in DEV.
+
+## First editing loop
+
+Open a terminal in this project directory. Run:
+
+```bash
+dbt parse --profiles-dir profiles --no-partial-parse
+dpone dbt check .
+```
+
+Both commands must succeed before handoff. Parse writes the manifest under
+`target/`; check reports whether the authored project satisfies the selected
+publishing contract. These commands do not build the source table or load the
+destination.
+
+1. Edit `models/orders.sql` to express the business calculation.
+2. Update `models/schema.yml` to declare every output column and its exact type.
+3. Repeat the two commands above after each change.
+
+For an optional explanation of the model's publishing plan:
+
+```bash
+dpone dbt explain orders --manifest target/manifest.json
+```
+
+The initial model explicitly uses `dpone_managed_table`, full refresh and
+`rowstore_none`. Changing layout or strategy requires the platform policy to
+admit it. Do not add legacy index/columnstore hooks, dispatch overrides or
+database provisioning SQL to work around policy errors.
+
+## Handoff and data acceptance
+
+Send the project source through the platform's existing CI/DEV handoff. Ask for
+the DEV result and data-quality evidence before production promotion. The
+platform owns runtime connections, physical provisioning, qualified execution
+and publication. The policy snapshot is not proof that these checks have run.
+
+## Common problems and safe recovery
+
+- **A local check fails:** read its error and remediation, fix the SQL or column
+  contract, then repeat parse and check. Ask the platform team about policy or
+  qualification errors; do not edit the policy to grant yourself permissions.
+- **Init reports conflicting files:** your edits are preserved. Inspect the
+  reported paths and keep your work; generate a separate project for comparison
+  if necessary. An identical init rerun is a no-op, not a force-overwrite option.
+- **Installed starter resources are invalid:** ask the platform team to repair
+  the approved installed distribution and retry init. Do not invent dependency
+  pins, create empty files or copy package files from an arbitrary checkout.
+- **Bundled dependencies need repair after creation:** `packages.yml` and
+  `package-lock.yml` retain the approved immutable package revision. In an
+  environment that permits dependency retrieval, the platform can explicitly
+  run `dbt deps` to restore that revision. Do not regenerate the lock by hand.
+- **A scaffold write requires recovery:** preserve the reported journal and
+  affected paths for the platform team. Do not delete an entire project or
+  repeatedly retry an ambiguous partial write.
+
+`dbt clean` removes `target/` and `logs/`, not the bundled dependency directory.
+The SQL files inside the dependency's `control/` directory are inert package
+resources; init, parsing and package installation do not execute them.

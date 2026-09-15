@@ -1,0 +1,24 @@
+version: 2
+
+sources:
+  - name: starter
+    database: @@DPONE_SOURCE_DATABASE@@
+    schema: @@DPONE_SOURCE_SCHEMA@@
+    tables:
+      - name: orders_source
+        identifier: @@DPONE_SOURCE_NAME@@
+
+models:
+  - name: orders
+    description: Order identifiers and totals from the platform-provided source.
+    columns:
+      - name: order_id
+        description: Non-null order identifier.
+        data_type: bigint
+        constraints:
+          - type: not_null
+        data_tests:
+          - not_null
+      - name: order_total
+        description: Exact order total with two decimal places.
+        data_type: decimal(18,2)
