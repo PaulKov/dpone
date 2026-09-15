@@ -276,10 +276,7 @@ class NativeOriginalBinding:
     schema: ClassVar[str] = _BINDING_SCHEMA
 
     def __post_init__(self) -> None:
-        try:
-            _binding_payload(self)
-        except (DbtPublishingError, TypeError, ValueError) as exc:
-            raise NativeOriginalBindingError("invalid original binding identity") from exc
+        encode_native_original_binding(self)
 
 
 def _binding_payload(value: NativeOriginalBinding) -> dict[str, NativeJsonValue]:
@@ -300,7 +297,6 @@ def _binding_payload(value: NativeOriginalBinding) -> dict[str, NativeJsonValue]
         "payload_sha256": value.payload_sha256,
         "locator": value.locator,
     }
-    encode_native_delivery_json(payload)
     return payload
 
 
@@ -378,10 +374,7 @@ class NativeOriginalStorageAuthority:
     schema: ClassVar[str] = _STORAGE_SCHEMA
 
     def __post_init__(self) -> None:
-        try:
-            _storage_payload(self)
-        except (TypeError, ValueError, OverflowError) as exc:
-            raise NativeOriginalStorageAuthorityError("invalid native storage authority") from exc
+        encode_native_original_storage_authority(self)
 
 
 def _storage_payload(value: NativeOriginalStorageAuthority) -> dict[str, NativeJsonValue]:

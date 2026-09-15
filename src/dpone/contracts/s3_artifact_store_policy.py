@@ -23,8 +23,6 @@ class S3ArtifactStorePolicy:
     directions; the resolver reexports this exact canonical class object.
     """
 
-    __module__ = "dpone.adapters.semantic_refresh_artifact_s3_resolver"
-
     provider_profile: str
     endpoint_authority_id: str
     bucket_or_container_authority_id: str
@@ -104,5 +102,9 @@ def _utc_timestamp(value: object, field_name: str) -> datetime:
         raise ValueError(f"S3 {field_name} must be canonical UTC")
     return parsed.astimezone(_UTC)
 
+
+# Postponed dataclass annotations must resolve against this canonical module
+# during decoration. Restore the historical pickle identifier only afterwards.
+S3ArtifactStorePolicy.__module__ = "dpone.adapters.semantic_refresh_artifact_s3_resolver"
 
 __all__ = ["S3ArtifactStorePolicy"]

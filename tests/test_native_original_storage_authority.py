@@ -108,3 +108,29 @@ def test_canonical_bytes_and_frozen_revalidation():
     object.__setattr__(value, "conditional_create_authorized", False)
     with pytest.raises(NativeOriginalStorageAuthorityError):
         encode_native_original_storage_authority(value)
+
+
+@pytest.mark.parametrize(
+    "first",
+    [
+        "dpone.contracts.s3_artifact_store_policy",
+        "dpone.contracts.native_originals",
+        "dpone.adapters.semantic_refresh_artifact_s3_resolver",
+    ],
+)
+def test_import_order_and_pickle_in_fresh_interpreter(first):
+    import subprocess
+    import sys
+
+    script = """
+import importlib, pickle, sys
+importlib.import_module(sys.argv[1])
+from dpone.contracts.s3_artifact_store_policy import S3ArtifactStorePolicy
+if sys.argv[1].startswith('dpone.contracts.'):
+    assert 'dpone.adapters.semantic_refresh_artifact_s3_resolver' not in sys.modules
+from dpone.adapters.semantic_refresh_artifact_s3_resolver import S3ArtifactStorePolicy as Legacy
+assert Legacy is S3ArtifactStorePolicy
+assert pickle.loads(pickle.dumps(S3ArtifactStorePolicy)) is Legacy
+"""
+    result = subprocess.run([sys.executable, "-I", "-c", script, first], capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0, result.stderr
