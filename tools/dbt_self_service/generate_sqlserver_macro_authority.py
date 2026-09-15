@@ -4,12 +4,33 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, TypeAlias, TypeGuard
+from typing import Any
+
+# Absolute-script execution (including -I) has no repository import path.
+# Use this script's own checkout, never the caller's working directory.
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from tools.dbt_self_service import sqlserver_macro_authority_graph as _graph
+from tools.dbt_self_service.sqlserver_macro_authority_graph import MacroRecord
+
+INVOCATION_EXTENSION_UNIQUE_IDS = _graph.INVOCATION_EXTENSION_UNIQUE_IDS
+TRUSTED_PACKAGES = _graph.TRUSTED_PACKAGES
+TRUSTED_ROOTS = _graph.TRUSTED_ROOTS
+_assert_acyclic = _graph._assert_acyclic
+_dispatch_protection = _graph._dispatch_protection
+_framework_records = _graph._framework_records
+_invocation_extension_records = _graph._invocation_extension_records
+_is_non_empty_string_sequence = _graph._is_non_empty_string_sequence
+_logical_name = _graph._logical_name
+_macro_record = _graph._macro_record
+_mapping = _graph._mapping
+_sha256 = _graph._sha256
+_text = _graph._text
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = ROOT / "examples" / "dbt-inline-publishing" / "fixtures" / "manifest.v12.json"
@@ -22,39 +43,12 @@ DBT_SQLSERVER_VERSION = "1.11.1"
 MANIFEST_SCHEMA = "v12"
 MANIFEST_SCHEMA_URL = "https://schemas.getdbt.com/dbt/manifest/v12.json"
 ADAPTER_TYPE = "sqlserver"
-TRUSTED_PACKAGES = ("dbt", "dbt_sqlserver")
-TRUSTED_ROOTS = (
-    "macro.dbt_sqlserver.materialization_table_sqlserver",
-    "macro.dbt_sqlserver.materialization_view_sqlserver",
-    "macro.dbt_sqlserver.materialization_incremental_sqlserver",
-    "macro.dbt.get_incremental_append_sql",
-    "macro.dbt.get_incremental_merge_sql",
-    "macro.dbt.materialization_test_default",
-    "macro.dbt.materialization_unit_default",
-    # Admitted materializations reach these roots through Python adapter
-    # methods; manifest macro dependencies alone omit those execution edges.
-    "macro.dbt.drop_relation",
-    "macro.dbt.rename_relation",
-    "macro.dbt.get_columns_in_relation",
-    "macro.dbt.list_relations_without_caching",
-)
-INVOCATION_EXTENSION_UNIQUE_IDS = (
-    "macro.dbt.is_incremental",
-    "macro.dbt.test_not_null",
-    "macro.dbt.default__test_not_null",
-    "macro.dbt.test_unique",
-    "macro.dbt.default__test_unique",
-    "macro.dbt.test_relationships",
-    "macro.dbt.default__test_relationships",
-)
 HELPER_UNIQUE_ID = "macro.dbt_dpone.dpone_publish"
 HELPER_BODY_SHA256 = "sha256:6223548504b32a7670cf7fb8ef7a3f42c9ad144ffae14b8591074de6b0decc83"
 AUTHORITY_DIFF_SCHEMA = "dpone.dbt-sqlserver-macro-authority-diff.v1"
 EXECUTION_CAPABLE_TOKENS = ("run_query", "statement(", "adapter.", "dispatch(", "{% call")
 EXPECTED_FRAMEWORK_RECORD_COUNT = 153
 EXPECTED_INVOCATION_EXTENSION_RECORD_COUNT = 7
-
-MacroRecord: TypeAlias = tuple[str, str, str, str, tuple[str, ...]]
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -346,74 +340,6 @@ def _dependency_path(
     return None
 
 
-def _framework_records(macros: Mapping[str, Any]) -> tuple[MacroRecord, ...]:
-    records: dict[str, MacroRecord] = {}
-    visiting: list[str] = []
-
-    def visit(unique_id: str) -> None:
-        if unique_id in visiting:
-            cycle = " -> ".join((*visiting[visiting.index(unique_id) :], unique_id))
-            raise ValueError(f"framework macro dependencies must be acyclic: {cycle}")
-        if unique_id in records:
-            return
-        raw = macros.get(unique_id)
-        if raw is None:
-            raise ValueError(f"framework macro dependency is missing: {unique_id}")
-        record = _macro_record(unique_id, raw)
-        if record[1] not in TRUSTED_PACKAGES:
-            raise ValueError(f"framework macro belongs to a foreign package: {unique_id}")
-        visiting.append(unique_id)
-        for dependency in record[4]:
-            visit(dependency)
-        visiting.pop()
-        records[unique_id] = record
-
-    for root in TRUSTED_ROOTS:
-        visit(root)
-    return tuple(sorted(records.values()))
-
-
-def _invocation_extension_records(
-    macros: Mapping[str, Any],
-    framework: tuple[MacroRecord, ...],
-) -> tuple[MacroRecord, ...]:
-    extension = tuple(
-        sorted(_macro_record(unique_id, macros.get(unique_id)) for unique_id in INVOCATION_EXTENSION_UNIQUE_IDS)
-    )
-    if any(record[1] != "dbt" for record in extension):
-        raise ValueError("every invocation extension record must belong to the dbt package")
-    authority_ids = {record[0] for record in (*framework, *extension)}
-    for record in extension:
-        foreign_dependencies = set(record[4]) - authority_ids
-        if foreign_dependencies:
-            raise ValueError(
-                f"invocation macro dependencies must terminate in the authority union: {record[0]} -> "
-                f"{sorted(foreign_dependencies)}"
-            )
-    _assert_acyclic((*framework, *extension))
-    return extension
-
-
-def _macro_record(unique_id: str, raw: object) -> MacroRecord:
-    macro = _mapping(raw, unique_id)
-    package_name = _text(macro.get("package_name"), f"{unique_id}.package_name")
-    name = _text(macro.get("name"), f"{unique_id}.name")
-    observed_id = _text(macro.get("unique_id"), f"{unique_id}.unique_id")
-    if observed_id != unique_id or unique_id != f"macro.{package_name}.{name}":
-        raise ValueError(f"macro identity must match its manifest key: {unique_id}")
-    if macro.get("resource_type") != "macro":
-        raise ValueError(f"{unique_id}.resource_type must equal 'macro'")
-    body = _text(macro.get("macro_sql"), f"{unique_id}.macro_sql", allow_empty=True)
-    depends_on = _mapping(macro.get("depends_on"), f"{unique_id}.depends_on")
-    raw_dependencies = depends_on.get("macros")
-    if not _is_non_empty_string_sequence(raw_dependencies):
-        raise ValueError(f"{unique_id}.depends_on.macros must be an array of non-empty strings")
-    dependencies = tuple(sorted(raw_dependencies))
-    if len(dependencies) != len(set(dependencies)):
-        raise ValueError(f"{unique_id}.depends_on.macros must not contain duplicates")
-    return (unique_id, package_name, name, _sha256(body.encode("utf-8")), dependencies)
-
-
 def _helper_record(macros: Mapping[str, Any]) -> MacroRecord:
     body = HELPER_PATH.read_text(encoding="utf-8")
     body_sha256 = _sha256(body.encode("utf-8"))
@@ -431,56 +357,6 @@ def _helper_record(macros: Mapping[str, Any]) -> MacroRecord:
     if manifest_body != body.rstrip("\r\n"):
         raise ValueError("dbt did not preserve the approved dpone_publish helper source")
     return record
-
-
-def _dispatch_protection(
-    records: tuple[MacroRecord, ...],
-    macros: Mapping[str, Any],
-) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...], tuple[str, ...]]:
-    logical_names = {_logical_name(record[2]) for record in records}
-    protected = {candidate for name in logical_names for candidate in (name, f"default__{name}", f"sqlserver__{name}")}
-    by_package_and_name = {(record[1], record[2]): record[0] for record in records}
-    winners: list[tuple[str, str]] = []
-    for name in sorted(logical_names):
-        winner = (
-            by_package_and_name.get(("dbt_sqlserver", f"sqlserver__{name}"))
-            or by_package_and_name.get(("dbt_sqlserver", name))
-            or by_package_and_name.get(("dbt", f"default__{name}"))
-        )
-        if winner is not None:
-            winners.append((name, winner))
-    candidates: list[str] = []
-    for raw_key, raw in sorted(macros.items(), key=lambda item: str(item[0])):
-        if not isinstance(raw_key, str) or not isinstance(raw, Mapping):
-            continue
-        raw_name = raw.get("name")
-        if not isinstance(raw_name, str) or raw_name not in protected:
-            continue
-        record = _macro_record(raw_key, raw)
-        if record[1] not in TRUSTED_PACKAGES:
-            raise ValueError(f"protected dispatch candidate belongs to a foreign package: {raw_key}")
-        candidates.append(raw_key)
-    return tuple(sorted(protected)), tuple(winners), tuple(candidates)
-
-
-def _assert_acyclic(records: tuple[MacroRecord, ...]) -> None:
-    dependencies = {record[0]: record[4] for record in records}
-    complete: set[str] = set()
-    visiting: list[str] = []
-
-    def visit(unique_id: str) -> None:
-        if unique_id in visiting:
-            raise ValueError(f"macro authority union must be acyclic at {unique_id}")
-        if unique_id in complete:
-            return
-        visiting.append(unique_id)
-        for dependency in dependencies[unique_id]:
-            visit(dependency)
-        visiting.pop()
-        complete.add(unique_id)
-
-    for unique_id in sorted(dependencies):
-        visit(unique_id)
 
 
 def _render_module(
@@ -558,37 +434,6 @@ def _jsonable_record(record: MacroRecord) -> dict[str, object]:
 def _fingerprint(value: Mapping[str, Any]) -> str:
     raw = json.dumps(dict(value), allow_nan=False, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode()
     return _sha256(raw)
-
-
-def _sha256(value: bytes) -> str:
-    return "sha256:" + hashlib.sha256(value).hexdigest()
-
-
-def _logical_name(name: str) -> str:
-    for prefix in ("default__", "sqlserver__"):
-        if name.startswith(prefix):
-            return name.removeprefix(prefix)
-    return name
-
-
-def _mapping(value: object, field: str) -> Mapping[str, Any]:
-    if not isinstance(value, Mapping):
-        raise ValueError(f"{field} must be an object")
-    return value
-
-
-def _text(value: object, field: str, *, allow_empty: bool = False) -> str:
-    if not isinstance(value, str) or (not allow_empty and not value):
-        raise ValueError(f"{field} must be a {'string' if allow_empty else 'non-empty string'}")
-    return value
-
-
-def _is_non_empty_string_sequence(value: object) -> TypeGuard[Sequence[str]]:
-    return (
-        isinstance(value, Sequence)
-        and not isinstance(value, (str, bytes, bytearray))
-        and all(isinstance(item, str) and bool(item) for item in value)
-    )
 
 
 if __name__ == "__main__":
