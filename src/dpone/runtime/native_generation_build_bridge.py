@@ -32,7 +32,7 @@ from dpone.ports.native_originals import (
     NativeOriginalReaderPort,
 )
 from dpone.runtime.native_generation_build_evidence import NativeGenerationBuildEvidenceWriter
-from dpone.runtime.native_generation_execution import TrustedDbtInvocationRecorder
+from dpone.runtime.native_generation_invocation_recorder import TrustedDbtInvocationRecorder
 
 
 class NativeGenerationBuildRejected(ValueError):
