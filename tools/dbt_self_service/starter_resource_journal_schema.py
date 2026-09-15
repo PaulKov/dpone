@@ -124,6 +124,8 @@ def validate_event(event: dict[str, Any], operation: str | None = None) -> None:
     paths = event.get("recovery_paths", [])
     if not isinstance(paths, list) or len(paths) > len(RESOURCE_PATHS):
         raise ValueError(_ERROR)
+    if paths and "path" not in event:
+        raise ValueError(_ERROR)
     for path in paths:
         if not isinstance(path, str) or len(path) > 512 or "\\" in path or "\0" in path:
             raise ValueError(_ERROR)
@@ -134,6 +136,12 @@ def validate_event(event: dict[str, Any], operation: str | None = None) -> None:
             or parsed.is_absolute()
             or ".." in parsed.parts
             or str(parsed.parent) not in {str(PurePosixPath(name).parent) for name in RESOURCE_PATHS}
+        ):
+            raise ValueError(_ERROR)
+        target = PurePosixPath(event["path"])
+        if parsed.parent != target.parent or (
+            parsed.name != f".{target.name}.dpone-transaction.json"
+            and re.fullmatch(r"\.dpone-(?:rollback|recovery)-[0-9a-f]{32}", parsed.name) is None
         ):
             raise ValueError(_ERROR)
 
@@ -213,6 +221,23 @@ def _created_path(value: object, operation: str) -> PurePosixPath:
     if value not in allowed:
         raise ValueError(_ERROR)
     return PurePosixPath(value)
+
+
+def validate_sidecar(value: dict[str, Any], operation: str, root: tuple[int, int], directory: tuple[int, int]) -> None:
+    """Bind failure evidence to both the source root and the retained operation directory."""
+    if set(value) != {"schema", "operation", "root", "directory", "rollback"}:
+        raise ValueError(_ERROR)
+    if value["schema"] != "dpone.starter-resource-recovery.v1" or value["operation"] != operation:
+        raise ValueError(_ERROR)
+    for key, expected in (("root", root), ("directory", directory)):
+        identity = value[key]
+        if not isinstance(identity, dict) or set(identity) != {"device", "inode"}:
+            raise ValueError(_ERROR)
+        if any(type(identity[name]) is not int for name in ("device", "inode")):
+            raise ValueError(_ERROR)
+        if (identity["device"], identity["inode"]) != expected:
+            raise ValueError(_ERROR)
+    validate_rollback(value["rollback"], operation)
 
 
 def read_events(content: bytes, operation: str | None = None) -> list[dict[str, Any]]:

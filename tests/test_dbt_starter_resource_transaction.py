@@ -440,3 +440,108 @@ def test_prepared_cleanup_reports_retained_metadata_artifact(tmp_path, monkeypat
     assert result.recovery_required and retained
     assert retained[0] in report.paths
     assert report.status != "INVALID"
+
+
+@pytest.mark.parametrize("leaf", ["events.jsonl", "manifest.json"])
+@pytest.mark.parametrize("sidecar_failure", [None, "call", "fsync", "collision", "lost_parent"])
+def test_final_metadata_cleanup_retains_sidecar_or_unpersisted_paths(tmp_path, monkeypatch, leaf, sidecar_failure):
+    import tools.dbt_self_service.starter_resource_journal as journal_module
+
+    from dpone.readiness.airflow_pipeline_source import ConfinedAuthoringFileSystem, ConfinedFileRollbackOutcome
+
+    original = ConfinedAuthoringFileSystem.rollback
+    write_sidecar = journal_module.write_recovery_sidecar
+    retained = []
+
+    def preserve(filesystem, created):
+        if created.path.name != leaf:
+            return original(filesystem, created)
+        path = created.path.with_name(".dpone-rollback-" + "e" * 32)
+        os.replace(tmp_path / created.path, tmp_path / path)
+        retained.append(path.as_posix())
+        return ConfinedFileRollbackOutcome(created.path, False, True, path)
+
+    def fail(*args):
+        if sidecar_failure == "call":
+            raise OSError("synthetic sidecar persistence failure")
+        directory = args[2].path
+        if sidecar_failure == "collision":
+            (directory / "recovery.json").write_bytes(b"foreign")
+        elif sidecar_failure == "lost_parent":
+            directory.rename(tmp_path / "retained-moved-operation")
+        if sidecar_failure == "fsync":
+
+            def fail_sync(descriptor):
+                raise OSError("synthetic fsync failure")
+
+            with monkeypatch.context() as scoped:
+                scoped.setattr(os, "fsync", fail_sync)
+                write_sidecar(*args)
+        else:
+            write_sidecar(*args)
+
+    monkeypatch.setattr(ConfinedAuthoringFileSystem, "rollback", preserve)
+    if sidecar_failure:
+        monkeypatch.setattr(journal_module, "write_recovery_sidecar", fail)
+    result = apply(tmp_path)
+    assert not result.passed and result.recovery_required and retained
+    if sidecar_failure:
+        assert retained[0] in result.unpersisted_recovery_paths
+    else:
+        report = recovery_report(tmp_path)
+        assert report.status == "RECOVERY_REQUIRED"
+        assert retained[0] in report.paths
+        assert not result.unpersisted_recovery_paths
+    if sidecar_failure == "lost_parent":
+        assert (tmp_path / "retained-moved-operation").is_dir()
+        assert list((tmp_path / ".dpone-starter-resource-transactions").iterdir()) == []
+    else:
+        assert not apply(tmp_path).passed
+
+
+@pytest.mark.parametrize("kind", ["mutation", "rollback"])
+@pytest.mark.parametrize("after_append", [False, True])
+def test_observation_append_failure_keeps_known_paths_in_receipt(tmp_path, monkeypatch, kind, after_append):
+    import tools.dbt_self_service.starter_resource_transaction as writer
+    from tools.dbt_self_service.starter_resource_journal import ResourceJournal
+
+    from dpone.manifest.confined_mutations import ConfinedReplaceOutcome
+    from dpone.readiness.airflow_pipeline_source import ConfinedAuthoringFileSystem, ConfinedFileRollbackOutcome
+
+    target = tmp_path / RESOURCE_PATHS[0]
+    retained = target.with_name(".dpone-recovery-" + "f" * 32)
+    append = ResourceJournal.append
+    replace = writer.replace_file_if_digest
+
+    def replace_with_cleanup(*args, **kwargs):
+        replace(*args, **kwargs)
+        retained.write_bytes(b"synthetic")
+        return ConfinedReplaceOutcome(True, True, retained.name)
+
+    def rollback_with_cleanup(filesystem, created):
+        retained.write_bytes(b"synthetic")
+        return ConfinedFileRollbackOutcome(created.path, False, True, retained.relative_to(tmp_path))
+
+    def append_failure(journal, event):
+        affected = (
+            "rollback" in event if kind == "rollback" else event.get("phase") == "APPLYING" and "committed" in event
+        )
+        if not affected or after_append:
+            append(journal, event)
+        if affected:
+            raise OSError("synthetic append failure")
+
+    def fail(phase, path):
+        if kind == "rollback" and phase == "after_mutation":
+            raise OSError("synthetic")
+
+    if kind == "mutation":
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"old")
+        monkeypatch.setattr(writer, "replace_file_if_digest", replace_with_cleanup)
+    else:
+        monkeypatch.setattr(ConfinedAuthoringFileSystem, "rollback", rollback_with_cleanup)
+    monkeypatch.setattr(ResourceJournal, "append", append_failure)
+    result = apply(tmp_path, phase_hook=fail)
+    assert not result.passed and result.recovery_required
+    assert retained.relative_to(tmp_path).as_posix() in result.unpersisted_recovery_paths

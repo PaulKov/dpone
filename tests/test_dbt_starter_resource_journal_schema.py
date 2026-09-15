@@ -29,6 +29,19 @@ def test_fixed_target_pending_record_is_valid():
     assert read_events(b'{"phase":"PREPARING","sequence":0}\n') == [{"phase": "PREPARING"}]
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "src/dpone/_assets/dbt_dpone/unknown",
+        "src/dpone/_assets/dbt_dpone/.dpone-recovery-nope",
+        "src/dpone/_assets/dbt_dpone/macros/.dpone-recovery-" + "a" * 32,
+    ],
+)
+def test_native_recovery_name_is_bound_to_target_parent(path):
+    with pytest.raises(ValueError):
+        validate_event({"phase": "APPLYING", "path": RESOURCE_PATHS[0], "recovery_paths": [path]})
+
+
 def rollback_record():
     return {
         "path": RESOURCE_PATHS[0],
