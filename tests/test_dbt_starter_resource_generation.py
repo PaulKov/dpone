@@ -1,5 +1,6 @@
 """Synthetic Git inputs validate producer logic, not the shipped package."""
 
+import json
 import shlex
 import subprocess
 from pathlib import Path
@@ -9,6 +10,285 @@ import yaml
 from tools.dbt_self_service.generate_starter_resources import capture_package_source, check_starter_resources
 
 from tests.test_dbt_starter_resources import PACKAGE_FILES
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        [],
+        ["--source-repo", "/missing"],
+        ["--unknown", "PRIVATE_SENTINEL"],
+        ["--source-repo", "/missing", "--revision", "a" * 40, "--recovery-report"],
+        ["--source-repo", "/missing", "--check", "--recovery-report"],
+    ],
+)
+def test_cli_invalid_arguments_are_private_json_without_io(arguments, monkeypatch, capsys):
+    import tools.dbt_self_service.generate_starter_resources as module
+
+    monkeypatch.setattr(module, "inspect_project_root", lambda *a, **k: pytest.fail("unexpected IO"))
+    assert module.main(arguments) == 2
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["status"] == "INVALID_ARGUMENTS"
+    assert "PRIVATE_SENTINEL" not in captured.out + captured.err
+
+
+def test_cli_help_has_no_io(monkeypatch, capsys):
+    import tools.dbt_self_service.generate_starter_resources as module
+
+    monkeypatch.setattr(module, "inspect_project_root", lambda *a, **k: pytest.fail("unexpected IO"))
+    assert module.main(["--help"]) == 0
+    assert "--recovery-report" in capsys.readouterr().out
+
+
+def test_cli_offline_check_and_recovery_do_not_resolve_dependencies(mirrored, capsys):
+    from tools.dbt_self_service.generate_starter_resources import main
+
+    repo, revision, _ = mirrored
+    before = {p.relative_to(repo): p.read_bytes() for p in repo.rglob("*") if p.is_file()}
+
+    def forbidden(source):
+        pytest.fail("offline must not resolve dependencies")
+
+    assert main(["--source-repo", str(repo), "--revision", revision, "--check"], generate=forbidden) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "PASS"
+    assert main(["--source-repo", str(repo), "--recovery-report"], generate=forbidden) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "CLEAR"
+    assert before == {p.relative_to(repo): p.read_bytes() for p in repo.rglob("*") if p.is_file()}
+
+
+def dependency_fixture(starter):
+    from tools.dbt_self_service.starter_dependency_generation import DependencyResources
+
+    return DependencyResources(
+        (starter / "packages.yml").read_bytes(),
+        b"# synthetic generated lock\n" + (starter / "package-lock.yml").read_bytes(),
+    )
+
+
+def test_cli_composed_generation_changes_resources_then_noop(mirrored, capsys):
+    from tools.dbt_self_service.generate_starter_resources import main
+
+    repo, revision, starter = mirrored
+    dependencies = dependency_fixture(starter)
+    argv = ["--source-repo", str(repo), "--revision", revision]
+    assert main(argv, generate=lambda source: dependencies) == 0
+    first = json.loads(capsys.readouterr().out)
+    assert first["passed"] and first["changed_paths"]
+    assert (starter / "package-lock.yml").read_bytes() == dependencies.package_lock_yml
+    assert main(argv, generate=lambda source: dependencies) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "NOOP"
+
+
+def test_cli_creates_missing_generated_resources(mirrored, capsys):
+    from tools.dbt_self_service.generate_starter_resources import main
+
+    repo, revision, starter = mirrored
+    dependencies = dependency_fixture(starter)
+    (starter / "package-lock.yml").unlink()
+    missing = repo / "src/dpone/_assets/dbt_dpone/INSTALL.md"
+    missing.unlink()
+    assert main(["--source-repo", str(repo), "--revision", revision], generate=lambda s: dependencies) == 0
+    assert json.loads(capsys.readouterr().out)["passed"]
+    assert missing.read_bytes() == (repo / "packages/dbt-dpone/INSTALL.md").read_bytes()
+
+
+@pytest.mark.parametrize("compensation_fails", [False, True])
+def test_cli_actual_writer_interruption_reports_outcome(mirrored, monkeypatch, capsys, compensation_fails):
+    import tools.dbt_self_service.starter_resource_transaction as writer
+    from tools.dbt_self_service.generate_starter_resources import main
+
+    repo, revision, starter = mirrored
+    dependencies = dependency_fixture(starter)
+    apply = writer.apply_resource_plan
+
+    def interrupted(*args, **kwargs):
+        def hook(phase, path):
+            if phase == "after_mutation" or compensation_fails and phase == "before_compensate":
+                raise RuntimeError("PRIVATE_SENTINEL")
+
+        return apply(*args, **kwargs, phase_hook=hook)
+
+    monkeypatch.setattr(writer, "apply_resource_plan", interrupted)
+    assert main(["--source-repo", str(repo), "--revision", revision], generate=lambda s: dependencies) == (
+        3 if compensation_fails else 1
+    )
+    result = capsys.readouterr().out
+    assert "PRIVATE_SENTINEL" not in result
+    assert json.loads(result)["recovery_required"] is compensation_fails
+    assert main(["--source-repo", str(repo), "--recovery-report"]) == (3 if compensation_fails else 0)
+    assert json.loads(capsys.readouterr().out)["pending"] is compensation_fails
+
+
+def test_cli_retained_dependency_workspace_is_reported(mirrored, tmp_path, capsys):
+    from tools.dbt_self_service.generate_starter_resources import main
+    from tools.dbt_self_service.starter_dependency_generation import DependencyGenerationError
+
+    repo, revision, _ = mirrored
+    workspace = tmp_path / "synthetic-owned-workspace"
+    workspace.mkdir()
+
+    def generate(source):
+        raise DependencyGenerationError(retained_workspace=workspace)
+
+    assert main(["--source-repo", str(repo), "--revision", revision], generate=generate) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["retained_workspace"] == str(workspace)
+    assert workspace.is_dir()
+
+
+@pytest.mark.parametrize("changed", ["source", "source_inode", "template", "destination", "same_bytes_inode"])
+def test_cli_rejects_drift_during_dependencies_without_overwriting_foreign_file(mirrored, capsys, changed):
+    from tools.dbt_self_service.generate_starter_resources import main
+
+    repo, revision, starter = mirrored
+    dependencies = dependency_fixture(starter)
+    target = (
+        repo / "packages/dbt-dpone/INSTALL.md"
+        if changed in {"source", "source_inode"}
+        else starter / "README.md.tmpl"
+        if changed == "template"
+        else starter / "packages.yml"
+    )
+    before_lock = (starter / "package-lock.yml").read_bytes()
+    foreign = target.read_bytes() if changed in {"same_bytes_inode", "source_inode"} else b"foreign change\n"
+
+    def generate(source):
+        replacement = target.with_name("temporary-replacement")
+        replacement.write_bytes(foreign)
+        replacement.replace(target)
+        return dependencies
+
+    assert main(["--source-repo", str(repo), "--revision", revision], generate=generate) == 1
+    assert json.loads(capsys.readouterr().out)["status"] == "FAILED"
+    assert target.read_bytes() == foreign
+    assert (starter / "package-lock.yml").read_bytes() == before_lock
+
+
+def test_cli_under_lock_destination_drift_is_rejected(mirrored, monkeypatch, capsys):
+    from contextlib import contextmanager
+
+    from tools.dbt_self_service.generate_starter_resources import main
+
+    import dpone.adapters.project_authoring_lock as locks
+
+    repo, revision, starter = mirrored
+    dependencies = dependency_fixture(starter)
+    actual_lock = locks.project_authoring_lock
+
+    @contextmanager
+    def lock(root):
+        with actual_lock(root):
+            target = starter / "packages.yml"
+            replacement = target.with_name("replacement")
+            replacement.write_bytes(target.read_bytes())
+            replacement.replace(target)
+            yield
+
+    monkeypatch.setattr(locks, "project_authoring_lock", lock)
+    assert main(["--source-repo", str(repo), "--revision", revision], generate=lambda s: dependencies) == 1
+    assert not json.loads(capsys.readouterr().out)["passed"]
+    assert (starter / "package-lock.yml").read_bytes() != dependencies.package_lock_yml
+
+
+def test_cli_recovery_pending_blocks_dependency_generation(mirrored, capsys):
+    from tools.dbt_self_service.generate_starter_resources import main
+
+    from dpone.manifest.confined_transaction_journal import transaction_journal_name
+
+    repo, revision, starter = mirrored
+    (starter / transaction_journal_name("packages.yml")).write_bytes(b"invalid journal")
+
+    def forbidden(source):
+        pytest.fail("pending recovery must block generation")
+
+    assert main(["--source-repo", str(repo), "--revision", revision], generate=forbidden) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["pending"] and result["discovery_required"]
+
+
+@pytest.mark.parametrize("failure", ["dependency", "retained", "other", "return"])
+def test_cli_concurrent_recovery_is_not_hidden_by_generation_failure(mirrored, capsys, failure):
+    from tools.dbt_self_service.generate_starter_resources import main
+    from tools.dbt_self_service.starter_dependency_generation import DependencyGenerationError
+
+    from dpone.manifest.confined_transaction_journal import transaction_journal_name
+
+    repo, revision, starter = mirrored
+    dependencies = dependency_fixture(starter)
+    retained = repo.parent / "synthetic-owned-dependency-workspace"
+
+    def generate(source):
+        (starter / transaction_journal_name("packages.yml")).write_bytes(b"malformed")
+        if failure == "dependency":
+            raise DependencyGenerationError()
+        if failure == "retained":
+            retained.mkdir()
+            raise DependencyGenerationError(retained_workspace=retained)
+        if failure == "other":
+            raise ValueError("PRIVATE_SENTINEL")
+        return dependencies
+
+    assert main(["--source-repo", str(repo), "--revision", revision], generate=generate) == 3
+    output = capsys.readouterr().out
+    assert "PRIVATE_SENTINEL" not in output
+    result = json.loads(output)
+    assert result["status"] == "RECOVERY_REQUIRED"
+    assert result["recovery"]["pending"] and result["recovery"]["discovery_required"]
+    if failure == "retained":
+        assert result["retained_workspace"] == str(retained) and retained.is_dir()
+
+
+def test_cli_does_not_inspect_replacement_root_after_failure(mirrored, capsys):
+    from tools.dbt_self_service.generate_starter_resources import main
+
+    repo, revision, _ = mirrored
+    displaced = repo.with_name("displaced-owned-root")
+
+    def generate(source):
+        repo.rename(displaced)
+        repo.mkdir()
+        (repo / "foreign.txt").write_bytes(b"untouched")
+        raise ValueError("PRIVATE_SENTINEL")
+
+    assert main(["--source-repo", str(repo), "--revision", revision], generate=generate) == 3
+    output = capsys.readouterr().out
+    assert "PRIVATE_SENTINEL" not in output
+    assert json.loads(output)["recovery"]["status"] == "ROOT_UNAVAILABLE"
+    assert list(repo.iterdir()) == [repo / "foreign.txt"]
+    assert (repo / "foreign.txt").read_bytes() == b"untouched"
+
+
+@pytest.mark.parametrize("before", [False, True])
+def test_cli_unknown_asset_rejects_before_writer(mirrored, capsys, before):
+    from tools.dbt_self_service.generate_starter_resources import main
+
+    repo, revision, starter = mirrored
+    dependencies = dependency_fixture(starter)
+    unexpected = starter / "foreign.sql"
+    if before:
+        unexpected.write_bytes(b"foreign")
+
+    def generate(source):
+        assert not before, "invalid inventory should reject before dependencies"
+        unexpected.write_bytes(b"foreign")
+        return dependencies
+
+    assert main(["--source-repo", str(repo), "--revision", revision], generate=generate) == 1
+    assert json.loads(capsys.readouterr().out)["status"] == "FAILED"
+    assert unexpected.read_bytes() == b"foreign"
+    assert not (repo / ".dpone-starter-resource-transactions").exists()
+
+
+def test_cli_real_module_entrypoint_help_and_argument_error():
+    import sys
+
+    command = [sys.executable, "-m", "tools.dbt_self_service.generate_starter_resources"]
+    help_result = subprocess.run([*command, "--help"], capture_output=True, text=True, timeout=30)
+    assert help_result.returncode == 0 and "--check" in help_result.stdout
+    invalid = subprocess.run([*command, "--unknown", "PRIVATE_SENTINEL"], capture_output=True, text=True, timeout=30)
+    assert invalid.returncode == 2
+    assert json.loads(invalid.stdout)["status"] == "INVALID_ARGUMENTS"
+    assert "PRIVATE_SENTINEL" not in invalid.stdout + invalid.stderr
 
 
 def git(repo: Path, *args: str) -> str:
