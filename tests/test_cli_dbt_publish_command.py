@@ -676,8 +676,20 @@ def test_dbt_profiles_dir_is_not_advertised_on_read_only_commands(
         )
 
 
-def test_dbt_check_discovers_default_manifest_without_running_dbt(tmp_path: Path, capsys) -> None:
-    _write_dbt_project(tmp_path)
+@pytest.mark.parametrize("target", ["target", "build/dbt"])
+@pytest.mark.parametrize("output_format", ["json", "text"])
+def test_dbt_check_discovers_default_manifest_without_running_dbt(
+    tmp_path: Path,
+    capsys,
+    target: str,
+    output_format: str,
+) -> None:
+    manifest = _write_dbt_project(tmp_path, project_config=f"name: test\nversion: 1.0\ntarget-path: {target}\n")
+    if target != "target":
+        destination = tmp_path / target / "manifest.json"
+        destination.parent.mkdir(parents=True)
+        manifest.rename(destination)
+        manifest.write_text("{invalid")
     with pytest.raises(SystemExit, match="0"):
         cli_main.main(
             [
@@ -688,10 +700,28 @@ def test_dbt_check_discovers_default_manifest_without_running_dbt(tmp_path: Path
                 "--profiles",
                 str(PROFILES),
                 "--format",
-                "json",
+                output_format,
             ]
         )
-    assert json.loads(capsys.readouterr().out)["passed"] is True
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    if output_format == "json":
+        assert json.loads(captured.out)["passed"] is True
+    else:
+        assert "publish: PASS" in captured.out
+
+
+@pytest.mark.parametrize("output_format", ["json", "text"])
+def test_dbt_check_invalid_target_is_actionable(tmp_path: Path, capsys, output_format: str) -> None:
+    _write_dbt_project(tmp_path, project_config="name: test\ntarget-path: ../outside\n")
+    with pytest.raises(SystemExit, match="2"):
+        cli_main.main(["dbt", "check", str(tmp_path), "--format", output_format])
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert "DPONE_DBT_PROJECT_INVALID" in captured.out
+    assert "literal relative target-path" in captured.out
+    if output_format == "json":
+        assert json.loads(captured.out)["schema"] == "dpone.error.v1"
 
 
 @pytest.mark.parametrize(
