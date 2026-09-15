@@ -141,3 +141,88 @@ and capability checks delegate to that policy before authenticated store
 resolution. This dependency direction keeps provider adapters out of contracts
 and avoids duplicating provider validation. See the
 [storage policy reference](../native-original-storage.md) for the exact schema.
+
+## Shared versioned artifact I/O
+
+The shared `adapters.versioned_artifact_s3` implementation owns conditional PUT,
+exact-version HEAD/GET, bucket-capability checks and response-body lifecycle.
+`adapters.versioned_artifact_s3_proof` owns pure response/authority validation,
+including complete native version-history entries before exact-key filtering.
+This separates provider I/O from proof policy without duplicating the legacy
+network algorithm. `ports.versioned_artifact_store` owns the structural policy,
+typed client/store capabilities and `VersionedArtifactIoBudget`.
+
+The budget has exact positive `max_bytes` and `chunk_bytes` integers, with chunk
+size no greater than the byte cap, and a finite float `deadline_monotonic`.
+The caller passes one absolute deadline through the whole logical operation;
+it is not renewed for individual requests or proof steps. Native methods require
+that budget and an actual GET VersionId. Complete bounded consumption, EOF,
+protected metadata, content digest, unambiguous history and body closure are all
+required before success. A malformed history entry is incomplete proof, even
+when another entry appears to identify the expected version.
+
+The existing `S3CreateOnlyArtifactStore` remains a compatibility adapter with its
+historical constructor and method signatures. Shared internal operations preserve
+its unbudgeted read and omitted-GET-VersionId fallback; neither establishes native
+bounded-provider qualification. The legacy structural policy import preserves
+class/pickle identity, and `retention_datetime` keeps its old import path. Native
+composition must select the explicit bounded adapter, not the compatibility mode.
+
+Cooperative checks cannot interrupt a blocking SDK call. Authenticated application
+composition must additionally configure finite SDK connect/read/retry limits and
+provide both clocks. No helper-level retry can replace an uncertain write version.
+Native subject-to-key adaptation is implemented as described below; authenticated
+SQL binding and complete provider composition/qualification remain pending. See the
+[bounded artifact reference](../versioned-artifact-store.md) for API use and limits.
+
+
+## Native original object adapter
+
+`adapters.native_original_store.NativeOriginalStore` implements the writer/reader
+ports over the bounded provider. Canonical payload bytes are stored directly under
+`{artifact_prefix}/native-originals/v1/{subject_sha256_hex}/{kind}/{payload_sha256_hex}`.
+The hash segments cover the complete canonical subject and exact payload bytes.
+This concrete spelling is the persistent v1 representation; reads recompute it
+and do not accept prefix-only membership or implicit relocation.
+
+Construction checks authority-reference digest agreement and snapshots the
+authenticated inputs supplied by composition. That check is not authentication.
+Publication permits one create and read-only reconciliation on conflict/lost ACK,
+then independently verifies all six provider coordinates and exact canonical bytes.
+Read narrows the stored attempt allowance and keeps its absolute deadline. Failure
+retains uncertain objects; it does not create a binding or authorize dispatch.
+
+Reusable primitive object-coordinate projection and closed-kind validation remain
+in `contracts.native_originals` and are shared with binding encoding. No fictitious
+binding or replacement provider reference type is introduced. See the
+[native original-store guide](../native-original-store.md) for inputs and recovery.
+
+### Native publication application ownership
+
+The unpublished implementation places the publish–bind–resolve–readback use case
+in `dpone.services.native_original_publication`. It coordinates injected
+capabilities and implements no execution engine or source/target dispatch.
+`BoundNativeOriginalPublisher` belongs to `dpone.ports.native_originals`;
+application composition binds the service and injects this exact callback into
+runtime consumers. This supersedes the proposed runtime owner in the planning
+consumer map while retaining the algorithm and public callable signature.
+No released import requires a runtime-to-services compatibility facade.
+
+### Protected native-original SQL index
+
+An explicit administrator migration installs additive V1 objects in the existing
+`dbo`-owned native control schema. It registers an already authenticated authority
+reference with the actual runtime database principal ID and SID, without runtime
+self-enrollment or replacement of retained authority. Caller-context static
+procedures use an ownership chain and check this registration transactionally.
+The runtime principal has execution access but cannot mutate the tables directly
+or alter the schema. Incompatible existing schema/procedure definitions fail
+installation rather than being silently replaced.
+
+The index uses a unique locator hash for lookup and full binary identity plus
+length comparison for proof. It stores complete canonical binding bytes. Bind
+creates if absent under key-range locking; exact replay preserves the row and
+conflicting tuples fail. Commit precedes independent fresh-connection resolution.
+Ambiguous execute/commit results permit only read-only reconciliation; cleanup
+does not establish transaction absence. Automated deployment-member selection
+and platform command wiring remain unfinished application integration.

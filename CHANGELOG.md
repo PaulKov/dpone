@@ -2,7 +2,27 @@
 
 ## Unreleased
 
+- Place native-original publication orchestration in the application service layer; expose its injected runtime callback through the native-original ports.
+
 ### Added
+
+- Add immutable SQL native-original bindings with explicit protected installation,
+  caller/authority verification, independent resolution and read-only recovery
+  after ambiguous commit. Local provider checks do not certify a complete route.
+
+- Add native subject-bound object storage with deterministic v1 keys, immutable
+  conflict/lost-acknowledgement reconciliation, full reference/readback proof and
+  a shared absolute I/O deadline. Reuse binding coordinate and kind validation;
+  automated authenticated application composition remains pending.
+
+- Share S3 conditional-write and exact-version proof with an explicit bounded
+  artifact API, enforcing byte/chunk/deadline limits and response cleanup while
+  preserving the legacy adapter and policy imports. Native provider composition
+  and live qualification remain pending.
+
+- Add injected native original publication orchestration that verifies the complete
+  binding and exact-version bytes before returning a reference, without automatic
+  write retries or provider construction.
 
 - Add canonical native original bindings preserving complete subject, storage
   authority and provider-version identity without granting execution authority.
@@ -26,6 +46,9 @@
   keep their existing behavior; live certification remains unverified.
 
 ### Fixed
+
+- Close acquired S3 response bodies when an exact-version read rejects the
+  returned version, preserving the existing legacy API and error behavior.
 
 - Close threaded backfill admission atomically with lease acquisition before
   persisting a chunk failure. Already admitted peers may finish; untouched chunks

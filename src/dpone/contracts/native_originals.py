@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
-from typing import ClassVar, Literal, TypeAlias, cast
+from typing import ClassVar, Literal, TypeAlias, cast, get_args
 from uuid import UUID
 
 from dpone.contracts.dbt_contract_validation import DbtPublishingError, require_digest
@@ -77,10 +77,6 @@ def _decode_authority(value: object) -> DbtWorkspaceRuntimeAuthority:
         raise NativeOriginalSubjectError("workspace authority identity is invalid") from exc
 
 
-def _require_authority(authority: DbtWorkspaceRuntimeAuthority) -> None:
-    _decode_authority(_authority_payload(authority))
-
-
 @dataclass(frozen=True, slots=True)
 class NativeGenerationOriginalSubject:
     """Original belonging to one generation under an exact workspace authority."""
@@ -91,7 +87,7 @@ class NativeGenerationOriginalSubject:
     scope: ClassVar[Literal["GENERATION"]] = "GENERATION"
 
     def __post_init__(self) -> None:
-        _require_authority(self.authority)
+        _decode_authority(_authority_payload(self.authority))
         if type(self.generation_id) is not UUID:
             raise NativeOriginalSubjectError("generation subject requires a UUID")
 
@@ -107,7 +103,7 @@ class NativeDeliveryOriginalSubject:
     scope: ClassVar[Literal["DELIVERY"]] = "DELIVERY"
 
     def __post_init__(self) -> None:
-        _require_authority(self.authority)
+        _decode_authority(_authority_payload(self.authority))
         _digest(self.operation_id)
         _digest(self.attempt_id)
 
@@ -127,7 +123,7 @@ class NativePlatformOriginalSubject:
     scope: ClassVar[Literal["PLATFORM"]] = "PLATFORM"
 
     def __post_init__(self) -> None:
-        _require_authority(self.authority)
+        _decode_authority(_authority_payload(self.authority))
         _digest(self.platform_policy_sha256)
 
 
@@ -224,14 +220,14 @@ _BINDING_FIELDS = frozenset(
     {"schema", "subject", "kind", "storage_authority", "object_ref", "payload_sha256", "locator"}
 )
 _OBJECT_FIELDS = frozenset({"key", "version", "size_bytes", "sha256", "encryption_scope", "retention_until"})
-_KINDS = frozenset({"generation_storage_root_v1", "generation_stored_file_v1", "generation_seal_resolution_v1"})
 
 
 class NativeOriginalBindingError(ValueError):
     """An original binding has malformed or noncanonical identity coordinates."""
 
 
-def _object_payload(value: ArtifactObjectRef) -> dict[str, NativeJsonValue]:
+def native_original_object_payload(value: ArtifactObjectRef) -> dict[str, NativeJsonValue]:
+    """Validate and copy exact provider coordinates without granting authority."""
     if type(value) is not ArtifactObjectRef:
         raise NativeOriginalBindingError("binding requires the existing object reference type")
     payload: dict[str, NativeJsonValue] = {
@@ -258,6 +254,13 @@ def _object_payload(value: ArtifactObjectRef) -> dict[str, NativeJsonValue]:
     return payload
 
 
+def require_native_original_kind(value: object) -> NativeOriginalKind:
+    """Validate the closed kind before provider effects or binding encoding."""
+    if type(value) is not str or value not in get_args(NativeOriginalKind):
+        raise NativeOriginalBindingError("unsupported original kind")
+    return cast(NativeOriginalKind, value)
+
+
 @dataclass(frozen=True, slots=True)
 class NativeOriginalBinding:
     """Exact original/authority/provider-version tuple, without storage admission.
@@ -282,22 +285,20 @@ class NativeOriginalBinding:
 def _binding_payload(value: NativeOriginalBinding) -> dict[str, NativeJsonValue]:
     if type(value) is not NativeOriginalBinding:
         raise NativeOriginalBindingError("unsupported original binding type")
-    if type(value.kind) is not str or value.kind not in _KINDS:
-        raise NativeOriginalBindingError("unsupported original kind")
+    require_native_original_kind(value.kind)
     if type(value.storage_authority) is not OriginalRef:
         raise NativeOriginalBindingError("storage authority must be an OriginalRef")
     value.storage_authority.__post_init__()
     OriginalRef(value.locator, value.payload_sha256)
-    payload: dict[str, NativeJsonValue] = {
+    return {
         "schema": _BINDING_SCHEMA,
         "subject": decode_native_delivery_json(encode_native_original_subject(value.subject)),
         "kind": value.kind,
         "storage_authority": asdict(value.storage_authority),
-        "object_ref": _object_payload(value.object_ref),
+        "object_ref": native_original_object_payload(value.object_ref),
         "payload_sha256": value.payload_sha256,
         "locator": value.locator,
     }
-    return payload
 
 
 def encode_native_original_binding(value: NativeOriginalBinding) -> bytes:

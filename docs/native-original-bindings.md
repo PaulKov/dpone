@@ -89,3 +89,6 @@ qualification is a separate requirement described in the
 
 The [storage policy reference](native-original-storage.md) describes the closed
 policy metadata to which `storage_authority` refers.
+
+Use the [SQL provider installation guide](native-originals-mssql.md) for protected
+persistence and independent resolution of these canonical bindings.
