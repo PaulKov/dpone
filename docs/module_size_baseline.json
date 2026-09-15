@@ -20,16 +20,6 @@
       "target_date": "2026-12-31",
       "target_sloc": 350
     },
-    "src/dpone/commands/airflow_self_service_rendering.py": {
-      "accepted_adr": null,
-      "baseline_commit": "f8c6a4a5e75d167829c05f65d5d3033acb193878",
-      "max_lines": 449,
-      "max_sloc": 384,
-      "owner": "architecture",
-      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
-      "target_date": "2026-12-31",
-      "target_sloc": 350
-    },
     "src/dpone/commands/dbt_promotion_cmd.py": {
       "accepted_adr": null,
       "baseline_commit": "f8c6a4a5e75d167829c05f65d5d3033acb193878",
@@ -45,16 +35,6 @@
       "baseline_commit": "f8c6a4a5e75d167829c05f65d5d3033acb193878",
       "max_lines": 383,
       "max_sloc": 354,
-      "owner": "architecture",
-      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
-      "target_date": "2026-12-31",
-      "target_sloc": 350
-    },
-    "src/dpone/commands/init_parser.py": {
-      "accepted_adr": null,
-      "baseline_commit": "f8c6a4a5e75d167829c05f65d5d3033acb193878",
-      "max_lines": 389,
-      "max_sloc": 358,
       "owner": "architecture",
       "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
       "target_date": "2026-12-31",

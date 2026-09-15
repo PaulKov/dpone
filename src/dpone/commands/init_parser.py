@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
-from typing import Any
 
-BEGINNER_TARGETS = frozenset({"project", "domain", "pipeline", "dag"})
-TRACKED_OPTIONS_ATTR = "_init_options_before_target"
+from dpone.commands.init_option_scope import (
+    _LEGACY_VALUE_OPTIONS,
+    _VALID_TARGETS_BY_OPTION,
+    TRACKED_OPTIONS_ATTR,
+    _InitTargetParsersAction,
+    _RejectInitOption,
+    _TrackedInitOption,
+)
+
+BEGINNER_TARGETS = frozenset({"project", "domain", "pipeline", "dag", "dbt"})
 DEFAULT_RECIPE = "mssql-to-clickhouse-incremental"
 AUTHORING_CHOICES = ("classic", "flow", "folder")
 FORMAT_CHOICES = ("text", "json", "md")
@@ -30,44 +37,6 @@ Domain-first first steps:
 Use `dpone init <target> --help` for target-specific options.
 """
 
-_PROJECT_TARGET = frozenset({"project"})
-_DOMAIN_TARGET = frozenset({"domain"})
-_PIPELINE_TARGET = frozenset({"pipeline"})
-_DAG_TARGET = frozenset({"dag"})
-_AIRFLOW_TARGETS = _PROJECT_TARGET | _PIPELINE_TARGET
-_LEGACY_VALUE_OPTIONS = (
-    "--source-type",
-    "--sink-type",
-    "--source-connection",
-    "--sink-connection",
-    "--source-schema",
-    "--source-table",
-    "--target-schema",
-    "--target-table",
-    "--unique-key",
-    "--out",
-)
-_VALID_TARGETS_BY_OPTION = {
-    **{option: frozenset() for option in (*_LEGACY_VALUE_OPTIONS, "--strategy")},
-    "--airflow": _AIRFLOW_TARGETS,
-    "--no-airflow": _PIPELINE_TARGET,
-    "--recipe": _PIPELINE_TARGET,
-    "--route": _PIPELINE_TARGET,
-    "--profile": _PIPELINE_TARGET,
-    "--answers": _PIPELINE_TARGET,
-    "--authoring": _PIPELINE_TARGET,
-    "--layout": _PROJECT_TARGET,
-    "--owner-team": _DOMAIN_TARGET,
-    "--owner-contact": _DOMAIN_TARGET,
-    "--approver-team": _DOMAIN_TARGET,
-    "--domain": _PIPELINE_TARGET | _DAG_TARGET,
-    "--from": _PIPELINE_TARGET,
-    "--to": _PIPELINE_TARGET,
-    "--key": _PIPELINE_TARGET,
-    "--schedule": _DAG_TARGET,
-    "--pipeline": _DAG_TARGET,
-    "--description": _DAG_TARGET,
-}
 _PROJECT_REJECTED_OPTIONS = (
     *_LEGACY_VALUE_OPTIONS,
     "--strategy",
@@ -120,75 +89,13 @@ _PIPELINE_REJECTED_OPTIONS = (
 )
 
 
-class _TrackedInitOption(argparse.Action):
-    """Record options parsed before an optional beginner target."""
-
-    def __call__(
-        self,
-        parser: argparse.ArgumentParser,
-        namespace: argparse.Namespace,
-        values: object,
-        option_string: str | None = None,
-    ) -> None:
-        value = self.const if self.nargs == 0 else values
-        setattr(namespace, self.dest, value)
-        tracked = getattr(namespace, TRACKED_OPTIONS_ATTR, ())
-        option = option_string or f"--{self.dest.replace('_', '-')}"
-        setattr(namespace, TRACKED_OPTIONS_ATTR, (*tracked, (option, _VALID_TARGETS_BY_OPTION[option])))
-
-
-class _InitTargetParsersAction(argparse._SubParsersAction):
-    """Reject options from another init surface before selecting a target."""
-
-    def __call__(
-        self,
-        parser: argparse.ArgumentParser,
-        namespace: argparse.Namespace,
-        values: str | Sequence[Any] | None,
-        option_string: str | None = None,
-    ) -> None:
-        if values is None or isinstance(values, str) or not values:
-            parser.error("missing init target")
-        target = str(values[0])
-        tracked = getattr(namespace, TRACKED_OPTIONS_ATTR, ())
-        invalid = tuple(dict.fromkeys(option for option, valid_targets in tracked if target not in valid_targets))
-        if invalid:
-            target_parser = self._name_parser_map.get(target, parser)
-            target_parser.error(f"{target} does not accept: {', '.join(invalid)}")
-        super().__call__(parser, namespace, values, option_string)
-
-
-class _RejectInitOption(argparse.Action):
-    """Emit the same target-scoped error regardless of option ordering."""
-
-    def __init__(
-        self,
-        option_strings: Sequence[str],
-        dest: str,
-        *,
-        init_target: str,
-        **kwargs: Any,
-    ) -> None:
-        self._init_target = init_target
-        super().__init__(option_strings, dest, **kwargs)
-
-    def __call__(
-        self,
-        parser: argparse.ArgumentParser,
-        namespace: argparse.Namespace,
-        values: object,
-        option_string: str | None = None,
-    ) -> None:
-        del namespace, values
-        parser.error(f"{self._init_target} does not accept: {option_string or self.option_strings[0]}")
-
-
 def register_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
     from dpone.commands.init_dag_parser import register_dag_parser
+    from dpone.commands.init_dbt_parser import register_dbt_parser
 
     parser = subparsers.add_parser(
         "init",
-        help="Initialize a project, domain, pipeline, dag, or legacy manifest bundle",
+        help="Initialize a project, domain, pipeline, dag, dbt project, or legacy manifest bundle",
         description="Initialize beginner self-service authority or a legacy manifest bundle.",
     )
     airflow_group = parser.add_mutually_exclusive_group()
@@ -246,12 +153,17 @@ def register_parser(subparsers: argparse._SubParsersAction) -> argparse.Argument
         action="init_target_parsers",
         title="beginner targets",
         description="Omit a target to use legacy manifest bundle options.",
-        metavar="[{project,domain,pipeline,dag}]",
+        metavar="[{project,domain,pipeline,dag,dbt}]",
     )
     _register_project_parser(target_parsers)
     _register_domain_parser(target_parsers)
     _register_pipeline_parser(target_parsers)
     register_dag_parser(target_parsers)
+    dbt_parser = register_dbt_parser(target_parsers)
+    setattr(dbt_parser, "_dpone_io_contract", _BEGINNER_IO_CONTRACT)
+    _add_rejected_options(
+        dbt_parser, target="dbt", options=tuple(option for option in _VALID_TARGETS_BY_OPTION if option != "--profile")
+    )
     _register_legacy_options(parser)
     parser.set_defaults(_init_parser=parser)
     return parser

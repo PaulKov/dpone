@@ -145,7 +145,7 @@ def test_init_help_exposes_distinct_legacy_project_and_pipeline_surfaces(
     assert "--out" in legacy_help
     assert "--airflow" not in legacy_help
     assert "--recipe" not in legacy_help
-    assert "[{project,domain,pipeline,dag}]" in legacy_help
+    assert "[{project,domain,pipeline,dag,dbt}]" in legacy_help
     assert "Omit a target to use legacy manifest bundle options." in legacy_help
 
     code, project_help, stderr = _run_cli(["init", "project", "--help"], capsys)
