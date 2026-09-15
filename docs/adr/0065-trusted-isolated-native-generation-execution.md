@@ -349,3 +349,23 @@ use their explicit error/evidence channel and cannot return a partial positive
 receipt. This applies the trusted positive-completion contract to the earlier
 bridge design without recreating superseded per-session terminal records. No new
 persisted original kind or codec is introduced for this in-process return value.
+
+
+## Native profile directory lifetime
+
+`NativeDbtProfileLease` preallocates a private profile directory before constructing
+native command originals and the positive evidence writer. Bootstrap holds its
+outer context through recorder closure and evidence authentication, and passes
+the lease as the bound build's existing profile-store dependency. Materialization
+writes one bounded mode-0600 credential file through the held directory descriptor;
+the inner context removes that exact file while retaining the directory identity.
+Outer cleanup removes only the owned empty directory and closes its descriptors.
+
+Root/ancestor links and replaced identities fail closed. Cleanup checks the opened
+file identity before unlinking and never recursively removes unknown content;
+cleanup errors retain any original execution error as context. These checks assume
+the approved isolated runtime excludes outside writers; they are not a universal
+filesystem lease against privileged concurrent mutation. Ordinary
+`TemporaryDbtProfileStore` behavior is unchanged. The new store grants neither
+credentials, command admission nor runtime qualification; the bridge still
+validates its exact recorder before rendering a profile.

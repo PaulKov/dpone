@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a native profile lease that retains the authenticated directory through evidence publication while removing credential bytes at the inner execution boundary.
+
 - Define the positive native build bridge receipt with complete original references; keep failed and uncertain execution in the explicit error/evidence channel.
 
 - Refactor native invocation authentication into pure identity policy and bounded original/path observation owners; preserve historical Python imports and fresh validation order.
