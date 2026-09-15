@@ -380,3 +380,29 @@ the bridge imports that canonical owner directly, avoiding a facade/bridge cycle
 No recorder method, timing, locking, dispatch or evidence behavior changes. Public
 import order is checked in fresh processes. This exposes implemented constructors;
 it does not create a final-quality placeholder or qualify the bootstrap.
+
+
+## Managed physical catalog transport
+
+The managed physical provider uses nine closed, individually acquired result
+kinds with explicit version, object identity, ordinal and count fields. Empty
+collections require one zero marker; a missing resultset cannot establish absence.
+HEADER, TABLE and COUNT are singletons. Fixed ordered schemas and exact primitive
+representations let both dbt and Python reject partial or unexpected results.
+
+Creation and modification timestamps cross this boundary as canonical ASCII
+`YYYY-MM-DDTHH:MM:SS.fffffff` strings, retaining SQL's seventh fractional digit.
+UUID and bit values require explicit acquisition conversion to exact Python UUID
+and bool. The decoder never coerces values, truncates excess rows, or returns a
+partial result after rejection. Positive row and definition-byte budgets are
+injected; acquisition must enforce its own bounds before materializing tuples.
+
+Immutable transport records are distinct from authenticated physical observations.
+Decoding does not prove metadata visibility, equal before/after headers, actual
+COUNT_BIG execution, current P/G, model authority, transaction commit, or generation
+completion. Direct DTO constructors remain unchecked; use the decoder for external
+rows. Legacy runtime imports and ordinary dbt materializations are unchanged.
+
+See the maintained [v1 wire reference](../dbt-mssql-physical-catalog-wire.md).
+The SQL provider, enrolled model plans and principal bridge remain unfinished;
+this decision records transport semantics without claiming route qualification.

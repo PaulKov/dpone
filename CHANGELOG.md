@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add immutable managed SQL Server catalog transport records and a strict v1
+  decoder for nine result kinds, including lossless seven-digit timestamps and
+  explicit empty markers. SQL acquisition and physical-route qualification remain
+  separate; existing dbt execution behavior is unchanged.
+
 - Expose the reserved native build bridge through the agreed execution facade while preserving recorder identity and avoiding cyclic imports.
 
 - Add a native profile lease that retains the authenticated directory through evidence publication while removing credential bytes at the inner execution boundary.
