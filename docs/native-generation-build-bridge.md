@@ -41,9 +41,10 @@ the existing recovery responsibilities.
 
 ## Reserved execution and result
 
-`ReservedDbtBuildBridge` currently lives in
-`dpone.runtime.native_generation_build_bridge`; the approved compatibility export
-from `native_generation_execution` is an integrator-owned follow-up.
+Import `ReservedDbtBuildBridge` and `TrustedDbtInvocationRecorder` from
+`dpone.runtime.native_generation_execution`. This public facade re-exports the
+same objects as their canonical build-bridge and invocation-recorder modules,
+without a circular dependency.
 The bridge requires the actual trusted recorder as its command runner and an
 actual `NativeGenerationBuildEvidenceWriter`. Before credential rendering it
 compares the full executor descriptor against both owners, checks the reservation
