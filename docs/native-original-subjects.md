@@ -114,3 +114,7 @@ Run `uv run pytest tests/test_native_original_subjects.py` for variant, nested
 fingerprint, canonicality, malformed input and immutability cases. These are
 unit/contract checks. See the [testing overview](testing/overview.md) for the
 separate requirements on actual delivery and replica qualification.
+
+The [trusted execution decision](adr/0065-trusted-isolated-native-generation-execution.md)
+defines the later execution and recovery boundary. Subject encoding alone does not
+authenticate an original or grant execution authority.

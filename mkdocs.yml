@@ -643,6 +643,7 @@ nav:
       - ADR 0061: adr/0061-shared-composition-physical-ownership.md
       - ADR 0062: adr/0062-isolated-mssql-switch-activation.md
       - ADR 0064: adr/0064-validated-file-clickhouse-staging.md
+      - ADR 0065: adr/0065-trusted-isolated-native-generation-execution.md
 
 extra:
   generator: false
