@@ -482,3 +482,8 @@ The pure registration codec excludes resource-bound admission; later runtime
 admission must fail closed until an actual physical-bounds original or explicit
 authenticated projection mapping is implemented. Original resolution, package
 authority, signing, provisioning and runtime qualification remain unfinished.
+
+The pure carrier and codec are documented in the
+[physical registration reference](../dbt-mssql-physical-registration.md).
+Their implementation does not complete the protected insertion or permission
+checks described above.

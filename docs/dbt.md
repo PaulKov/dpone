@@ -11,6 +11,7 @@ with dpone. For a first MSSQL model published to ClickHouse, start with the
 | Publish a first contracted dbt model | [Five-minute self-service tutorial](dbt-inline-publishing.md) |
 | Create an unreleased native starter from explicit platform policy | [Create a dbt starter](dbt-starter-authoring.md) |
 | Integrate immutable managed SQL Server plan records and canonical bytes | [Physical plan contracts](dbt-mssql-physical-plans.md) |
+| Encode physical runtime registration claims and understand their limits | [Registration contracts](dbt-mssql-physical-registration.md) |
 | Evaluate the bounded V2 daily semantic refresh locally | [Semantic refresh V2 (0.74 local preview)](dbt-semantic-refresh-v2.md) |
 | Exercise baseline adoption in a disposable local environment | [V2 baseline adoption preview](dbt-semantic-refresh-v2-baseline.md) |
 | Verify the production block or upgrade the preview schema | [V2 preview platform operations](dbt-semantic-refresh-v2-platform.md) |
