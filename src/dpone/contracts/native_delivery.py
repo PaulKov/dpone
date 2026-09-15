@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Literal
 from uuid import UUID
 
 from dpone.contracts.dbt_project_bundle import DbtProjectBundle
@@ -164,3 +164,35 @@ class FrozenGeneration:
             self.closure.revision + 1,
         ):
             raise NativeGenerationContractError("freeze must preserve exact closure identity at the next revision")
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationBuildReceipt:
+    """Positive bridge return carrying actual authenticated invocation originals.
+
+    The bridge authenticates these identities before returning this value. Shape
+    alone does not prove completion or authorize custody, dispatch or release.
+    Failed and uncertain execution use the explicit error/evidence channel and
+    cannot substitute missing originals into this positive-only record.
+    """
+
+    generation_id: UUID
+    guard_epoch: int
+    reservation: OriginalRef
+    executor_invocation_id: UUID
+    build_evidence: OriginalRef
+    artifact_inventory: OriginalRef
+    termination: OriginalRef
+    outcome: Literal["SUCCEEDED"]
+
+    def __post_init__(self) -> None:
+        if type(self.generation_id) is not UUID or type(self.executor_invocation_id) is not UUID:
+            raise NativeGenerationContractError("build receipt requires exact generation and invocation identities")
+        if type(self.guard_epoch) is not int or not 1 <= self.guard_epoch <= 9223372036854775807:
+            raise NativeGenerationContractError("build receipt epoch must be a positive SQL bigint")
+        if type(self.outcome) is not str or self.outcome != "SUCCEEDED":
+            raise NativeGenerationContractError("build receipt requires positive successful completion")
+        for reference in (self.reservation, self.build_evidence, self.artifact_inventory, self.termination):
+            if type(reference) is not OriginalRef:
+                raise NativeGenerationContractError("build receipt requires complete exact original references")
+            reference.__post_init__()
