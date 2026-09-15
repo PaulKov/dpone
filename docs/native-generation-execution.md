@@ -37,8 +37,10 @@ inventory.
 
 ## Invocation records
 
-The existing `NativeOriginalKind` retains its three storage variants and adds
-five explicit variants:
+The existing `NativeOriginalKind` public import retains its identity through an
+explicit re-export from the closed `contracts.native_original_kinds` catalog.
+Binding validation preserves its existing error contract. The catalog retains
+three storage variants and adds five explicit invocation variants:
 
 | Kind | Payload | Purpose |
 | --- | --- | --- |
