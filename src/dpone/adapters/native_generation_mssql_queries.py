@@ -94,17 +94,24 @@ def generation_procedure_name(operation: str) -> str:
         "reserve": "native_generation_reserve_v1",
         "bind": "native_source_writer_bind_v1",
         "read": "native_source_custody_read_v1",
+        "close": "native_source_writer_close_v1",
+        "closure_read": "native_source_writer_close_read_v1",
     }[operation]
 
 
-def generation_procedure(schema: str, operation: str) -> str:
+def generation_procedure(schema: str, operation: str, *, extended: bool = True) -> str:
     """Render a fixed operation; schema has already passed identifier validation."""
     signatures = {
         "reserve": "@request varbinary(max), @locator varbinary(max), @digest varbinary(max)",
         "bind": "@generation uniqueidentifier, @expected_revision bigint, @executor varbinary(max)",
         "read": "@generation uniqueidentifier",
+        "close": "@generation uniqueidentifier, @expected_revision bigint, @locator varbinary(max), @digest varbinary(max)",
+        "closure_read": "@generation uniqueidentifier",
     }
-    body = {"reserve": _reserve, "bind": _bind, "read": _read}[operation](schema)
+    if operation in {"reserve", "bind", "read"}:
+        body = {"reserve": _reserve, "bind": _bind, "read": _read}[operation](schema, extended=extended)
+    else:
+        body = {"close": _close, "closure_read": _closure_read}[operation](schema)
     return f"""CREATE PROCEDURE [{schema}].[{generation_procedure_name(operation)}]
 @authority_locator varbinary(max), @authority_digest varbinary(max), {signatures[operation]}
 AS
@@ -128,9 +135,10 @@ IF NOT EXISTS (SELECT 1 FROM [{schema}].[native_original_authorities_v1] WITH (H
 END"""
 
 
-def _read(schema: str) -> str:
+def _read(schema: str, *, extended: bool = True) -> str:
+    additional = ", writer_admission, outcome, admission_sequence, admission_closure" if extended else ""
     return f"""SELECT LOWER(CONVERT(char(36),generation_id)), guard_epoch, revision,
- reservation_locator, reservation_digest, executor
+ reservation_locator, reservation_digest, executor{additional}
 FROM [{schema}].[native_generations_v1] WITH (HOLDLOCK)
 WHERE generation_id=@generation AND authority_locator=@authority_locator
  AND DATALENGTH(authority_locator)=DATALENGTH(@authority_locator)
@@ -177,7 +185,9 @@ IF NOT EXISTS (SELECT 1 FROM OPENJSON(@json,'$.workspace_attempt.write_subjects'
 """
 
 
-def _reserve(schema: str) -> str:
+def _reserve(schema: str, *, extended: bool = True) -> str:
+    columns = ",writer_admission,outcome,admission_sequence,admission_closure" if extended else ""
+    values = ",'OPEN','ACTIVE',0,NULL" if extended else ""
     return f"""
 IF @request IS NULL OR @locator IS NULL OR @digest IS NULL OR DATALENGTH(@request) NOT BETWEEN 1 AND 1048576 OR DATALENGTH(@locator) NOT BETWEEN 1 AND 1048576
  OR DATALENGTH(@digest)<>71
@@ -236,19 +246,21 @@ BEGIN
  UPDATE [{schema}].[native_generation_capacity_v1] SET charged_bytes=charged_bytes+@requested
  WHERE guard_hash=HASHBYTES('SHA2_256',CONVERT(varbinary(max),@guard));
  INSERT INTO [{schema}].[native_generations_v1]
- (generation_id,guard_hash,guard_epoch,revision,authority_locator,authority_digest,reservation_locator,reservation_digest,request,executor)
- VALUES (@generation,HASHBYTES('SHA2_256',CONVERT(varbinary(max),@guard)),@epoch,1,@authority_locator,@authority_digest,@locator,@digest,@request,NULL);
+ (generation_id,guard_hash,guard_epoch,revision,authority_locator,authority_digest,reservation_locator,reservation_digest,request,executor{columns})
+ VALUES (@generation,HASHBYTES('SHA2_256',CONVERT(varbinary(max),@guard)),@epoch,1,@authority_locator,@authority_digest,@locator,@digest,@request,NULL{values});
 END
-{_read(schema)}"""
+{_read(schema, extended=extended)}"""
 
 
-def _bind(schema: str) -> str:
+def _bind(schema: str, *, extended: bool = True) -> str:
+    admission = " AND writer_admission='OPEN' AND outcome='ACTIVE'" if extended else ""
+    sequence = ",admission_sequence=1" if extended else ""
     return f"""
 DECLARE @request varbinary(max);
 SELECT @request=request FROM [{schema}].[native_generations_v1] WITH (READCOMMITTEDLOCK)
  WHERE generation_id=@generation AND authority_locator=@authority_locator
  AND DATALENGTH(authority_locator)=DATALENGTH(@authority_locator) AND authority_digest=@authority_digest
- AND revision=@expected_revision AND executor IS NULL;
+ AND revision=@expected_revision AND executor IS NULL{admission};
 IF @request IS NULL OR @expected_revision NOT BETWEEN 1 AND 9223372036854775806
  THROW 51303, 'DPONE_NATIVE_GENERATION_WRITER_ALREADY_BOUND_OR_STALE', 1;
 {_decode_bytes("@request", "@json")}
@@ -283,7 +295,50 @@ IF {_utf8(_scalar("@binding", "$.schema"))}<>CONVERT(varbinary(max),'dpone.nativ
  OR CONVERT(varbinary(max),JSON_QUERY(@binding,'$.command'))<>CONVERT(varbinary(max),JSON_QUERY(@json,'$.command'))
  THROW 51303, 'DPONE_NATIVE_GENERATION_EXECUTOR_MISMATCH', 1;
 {_canonical_executor()}
-UPDATE [{schema}].[native_generations_v1] SET executor=@executor,revision=revision+1
- WHERE generation_id=@generation AND revision=@expected_revision AND executor IS NULL;
+UPDATE [{schema}].[native_generations_v1] SET executor=@executor,revision=revision+1{sequence}
+ WHERE generation_id=@generation AND revision=@expected_revision AND executor IS NULL{admission};
 IF @@ROWCOUNT<>1 THROW 51303, 'DPONE_NATIVE_GENERATION_WRITER_ALREADY_BOUND_OR_STALE', 1;
-{_read(schema)}"""
+{_read(schema, extended=extended)}"""
+
+
+def _close(schema: str) -> str:
+    return f"""
+IF @generation IS NULL OR @expected_revision IS NULL OR @expected_revision NOT BETWEEN 2 AND 9223372036854775806
+ OR @locator IS NULL OR DATALENGTH(@locator) NOT BETWEEN 1 AND 1048576 OR @digest IS NULL OR DATALENGTH(@digest)<>71
+ THROW 51304, 'DPONE_NATIVE_SOURCE_CLOSE_IDENTITY_INVALID', 1;
+DECLARE @request varbinary(max), @executor varbinary(max), @sequence bigint;
+SELECT @request=request,@executor=executor,@sequence=admission_sequence
+ FROM [{schema}].[native_generations_v1] WITH (READCOMMITTEDLOCK)
+ WHERE generation_id=@generation AND authority_locator=@authority_locator
+ AND DATALENGTH(authority_locator)=DATALENGTH(@authority_locator)
+ AND authority_digest=@authority_digest AND DATALENGTH(authority_digest)=DATALENGTH(@authority_digest)
+ AND reservation_locator=@locator AND DATALENGTH(reservation_locator)=DATALENGTH(@locator)
+ AND reservation_digest=@digest AND DATALENGTH(reservation_digest)=DATALENGTH(@digest)
+ AND revision=@expected_revision AND executor IS NOT NULL AND writer_admission='OPEN'
+ AND outcome IN ('ACTIVE','UNKNOWN') AND admission_sequence>0 AND admission_closure IS NULL;
+IF @request IS NULL THROW 51304, 'DPONE_NATIVE_SOURCE_CLOSE_STALE_OR_CLOSED', 1;
+{_decode_bytes("@request", "@json")}
+{_physical_owner(schema)}
+{_decode_bytes("@executor", "@binding")}
+DECLARE @closure nvarchar(max)=CONVERT(nvarchar(max),N'{{"admission_sequence":')+CONVERT(nvarchar(20),@sequence)
+ +N',"executor":'+@binding+N',"revision":'+CONVERT(nvarchar(20),@expected_revision+1)
+ +N',"schema":"dpone.native-source-admission-closure.v1"}}';
+UPDATE [{schema}].[native_generations_v1]
+ SET writer_admission='CLOSED',revision=revision+1,admission_closure={_utf8("@closure")}
+ WHERE generation_id=@generation AND revision=@expected_revision AND guard_epoch=@epoch
+ AND executor=@executor AND DATALENGTH(executor)=DATALENGTH(@executor)
+ AND admission_sequence=@sequence AND writer_admission='OPEN' AND admission_closure IS NULL
+ AND outcome IN ('ACTIVE','UNKNOWN');
+IF @@ROWCOUNT<>1 THROW 51304, 'DPONE_NATIVE_SOURCE_CLOSE_STALE_OR_CLOSED', 1;
+{_closure_read(schema)}"""
+
+
+def _closure_read(schema: str) -> str:
+    locator = "CONVERT(nvarchar(max),N'generations/')+LOWER(CONVERT(nvarchar(36),generation_id))+N'/writer-admission-closure.json'"
+    return f"""SELECT admission_closure, {_utf8(locator)},
+ CONVERT(varbinary(max),'sha256:'+LOWER(CONVERT(varchar(64),HASHBYTES('SHA2_256',admission_closure),2)))
+FROM [{schema}].[native_generations_v1] WITH (HOLDLOCK)
+WHERE generation_id=@generation AND authority_locator=@authority_locator
+ AND DATALENGTH(authority_locator)=DATALENGTH(@authority_locator)
+ AND authority_digest=@authority_digest AND DATALENGTH(authority_digest)=DATALENGTH(@authority_digest)
+ AND writer_admission='CLOSED' AND admission_closure IS NOT NULL;"""

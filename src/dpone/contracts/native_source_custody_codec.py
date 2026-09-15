@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from hashlib import sha256
 from typing import Literal, cast
 from uuid import UUID
 
@@ -13,6 +14,7 @@ from dpone.contracts.native_delivery_json import (
 from dpone.contracts.native_identity import OriginalRef
 from dpone.contracts.native_source_custody import (
     NativeSourceCustodyError,
+    SourceAdmissionClosure,
     SourceExecutorBinding,
     TrustedDbtCommandEntry,
     TrustedDbtCommandPlan,
@@ -62,6 +64,44 @@ def decode_source_executor_binding(payload: bytes) -> SourceExecutorBinding:
     if encode_source_executor_binding(binding) != payload:
         raise NativeSourceCustodyError("writer binding bytes must be canonical")
     return binding
+
+
+def encode_source_admission_closure(value: SourceAdmissionClosure) -> bytes:
+    """Encode the ledger payload, never its enclosing receipt reference."""
+    if type(value) is not SourceAdmissionClosure:
+        raise NativeSourceCustodyError("expected a source admission closure")
+    value.__post_init__()
+    return encode_native_delivery_json(
+        {
+            "schema": "dpone.native-source-admission-closure.v1",
+            "executor": decode_native_delivery_json(encode_source_executor_binding(value.executor)),
+            "admission_sequence": value.admission_sequence,
+            "revision": value.revision,
+        }
+    )
+
+
+def decode_source_admission_closure(payload: bytes, *, receipt: OriginalRef) -> SourceAdmissionClosure:
+    """Verify canonical payload against its independently resolved descriptor.
+
+    The caller must authenticate the descriptor's ledger and locator; matching
+    bytes alone does not grant authority or prove successful build completion.
+    """
+    if type(receipt) is not OriginalRef:
+        raise NativeSourceCustodyError("admission closure requires an exact external receipt")
+    receipt.__post_init__()
+    value = _mapping(decode_native_delivery_json(payload), {"schema", "executor", "admission_sequence", "revision"})
+    if value["schema"] != "dpone.native-source-admission-closure.v1":
+        raise NativeSourceCustodyError("invalid admission closure schema")
+    closure = SourceAdmissionClosure(
+        executor=decode_source_executor_binding(encode_native_delivery_json(value["executor"])),
+        admission_sequence=_integer(value["admission_sequence"]),
+        revision=_integer(value["revision"]),
+        receipt=OriginalRef(receipt.locator, receipt.sha256),
+    )
+    if encode_source_admission_closure(closure) != payload or receipt.sha256 != "sha256:" + sha256(payload).hexdigest():
+        raise NativeSourceCustodyError("admission closure payload differs from canonical bytes or receipt digest")
+    return closure
 
 
 def encode_trusted_dbt_command_plan(value: TrustedDbtCommandPlan) -> bytes:
