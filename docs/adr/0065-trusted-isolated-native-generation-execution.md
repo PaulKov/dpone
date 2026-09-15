@@ -316,3 +316,23 @@ compatibility re-export of the same adapter class. Actual source immutability,
 asset-path admission, archive verification and round-trip order remain unchanged;
 a comparison against the prior implementation verifies complete archive-byte
 equality. This refactor does not change runtime qualification or delivery policy.
+
+
+## Invocation authentication ownership
+
+`contracts.native_generation_invocation` owns the authenticated plan value and
+pure command, qualification, root-identity and argument-template decisions.
+`adapters.native_generation_invocation_auth` owns fresh original acquisition,
+ordered decoding and filesystem observations through the existing injected
+original ports. The runtime recorder retains sequencing, admission locks,
+deadlines, latched failures and completion publication. Its historical
+authentication module re-exports the same four public objects for compatibility.
+
+Each boundary still checks generation and command before reading originals, then
+reads command, toolchain and qualification. Qualification and invocation checks
+precede the three root reads; all roots are acquired before role and distinctness
+validation. Argument checks precede filesystem observations. No read cache,
+credential resolution, new retry or dispatch authority is introduced. Path
+observations remain point-in-time checks: the actual bootstrap must hold the
+roots throughout execution. This ownership change neither issues runtime
+qualification nor changes metadata-only freeze recovery.
