@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add closed generation, delivery and platform original-subject contracts with
+  canonical JSON codecs and exact workspace-authority fingerprint validation.
+  Subject identity does not grant storage access or execution authority.
+
 - Add dependency-light native original references and bounded canonical JSON
   primitives with exact UTF-8, nesting, token and integer limits. Native schema
   codecs still own canonical-input and authority checks; existing generic JSON
