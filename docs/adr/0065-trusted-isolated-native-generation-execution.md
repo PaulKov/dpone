@@ -226,3 +226,25 @@ conflicting tuples fail. Commit precedes independent fresh-connection resolution
 Ambiguous execute/commit results permit only read-only reconciliation; cleanup
 does not establish transaction absence. Automated deployment-member selection
 and platform command wiring remain unfinished application integration.
+
+### Initial protected generation admission
+
+Generation reservation reuses the complete existing workspace attempt and P
+guard rather than acquiring another physical lease. Canonical request bytes bind
+the generation, profile, command, complete attempt and capacity request. SQL
+recomputes the attempt fingerprint and verifies every write subject because guard
+membership alone cannot distinguish different subsets within one database.
+Capacity registration is keyed by the physical guard and shared across trusted
+profiles. Runtime cannot enroll an account, reset charges or release uncertain
+ownership.
+
+The first executable slice implements reserve, the approved writer-bind signature
+and custody read. It installs `native_source_writer_bind_v1` and
+`native_source_custody_read_v1` under the existing protected control schema.
+Only a fresh acknowledged CAS can return normal writer-bind success. Duplicate
+or uncertain binds independently inspect retained state and raise without granting
+redispatch. The generation remains charged. Authenticated outcome persistence and
+subsequent build/freeze/read/seal transitions remain separate unfinished work;
+the partial provider does not claim to implement the complete source-ledger ports.
+See [native generation admission](../native-generation-admission.md) for composition,
+provisioning, failure semantics and the exact validation scope.

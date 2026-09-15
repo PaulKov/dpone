@@ -6,6 +6,11 @@
 
 ### Added
 
+- Add initial protected native generation reservation, shared physical capacity,
+  once-only writer binding and independent custody readback under existing dbt
+  workspace ownership. Ambiguous acknowledgements retain capacity and cannot
+  authorize redispatch. Full source execution and terminal transitions remain pending.
+
 - Add immutable SQL native-original bindings with explicit protected installation,
   caller/authority verification, independent resolution and read-only recovery
   after ambiguous commit. Local provider checks do not certify a complete route.
