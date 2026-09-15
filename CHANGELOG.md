@@ -6,6 +6,11 @@
 
 ### Added
 
+- Add an authenticated once-only native dbt invocation recorder with exact BUILD/QUALITY
+  command membership, bounded original readback, owned-root checks, latched close
+  deadlines and immutable completion reconciliation. Application qualification
+  and durable SQL closure/freeze integration remain pending.
+
 - Add initial protected native generation reservation, shared physical capacity,
   once-only writer binding and independent custody readback under existing dbt
   workspace ownership. Ambiguous acknowledgements retain capacity and cannot

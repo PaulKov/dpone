@@ -139,7 +139,17 @@ def test_invalid_nested_value_does_not_invoke_copy_hooks():
 
 
 @pytest.mark.parametrize(
-    "kind", ["generation_storage_root_v1", "generation_stored_file_v1", "generation_seal_resolution_v1"]
+    "kind",
+    [
+        "generation_storage_root_v1",
+        "generation_stored_file_v1",
+        "generation_seal_resolution_v1",
+        "trusted_dbt_command_plan_v1",
+        "trusted_dbt_invocation_completion_v1",
+        "trusted_dbt_toolchain_v1",
+        "trusted_dbt_qualification_v1",
+        "trusted_dbt_owned_root_v1",
+    ],
 )
 def test_closed_supported_kinds_roundtrip(kind):
     value = replace(binding(), kind=kind)

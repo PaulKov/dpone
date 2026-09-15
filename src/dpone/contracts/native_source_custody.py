@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -151,3 +152,127 @@ class SourceCustodySnapshot:
                 raise NativeSourceCustodyError("sealed generation lacks complete terminal proof")
         elif self.outcome == "SUCCEEDED":
             raise NativeSourceCustodyError("only a sealed generation can succeed")
+
+
+@dataclass(frozen=True, slots=True)
+class TrustedDbtCommandEntry:
+    """One immutable command slot; qualification authenticates its literal argv."""
+
+    position: int
+    verb: Literal["parse", "ls", "build", "test"]
+    argv_template: tuple[str, ...]
+    command_timeout_seconds: int
+    termination_allowance_seconds: int
+
+    def __post_init__(self) -> None:
+        if type(self.position) is not int or self.position < 0:
+            raise NativeSourceCustodyError("command position must be an exact nonnegative integer")
+        if type(self.verb) is not str or self.verb not in {"parse", "ls", "build", "test"}:
+            raise NativeSourceCustodyError("unsupported trusted dbt command verb")
+        if type(self.argv_template) is not tuple or not self.argv_template:
+            raise NativeSourceCustodyError("trusted command requires immutable argv")
+        if any(type(argument) is not str or "\x00" in argument for argument in self.argv_template):
+            raise NativeSourceCustodyError("trusted command arguments must be exact strings without NUL")
+        if self.argv_template[0] != "dbt":
+            raise NativeSourceCustodyError("trusted command must use the qualified dbt entry point")
+        # These are the global switches emitted by the existing command builders.
+        index = 1
+        while index < len(self.argv_template) and self.argv_template[index] in {
+            "--quiet",
+            "--no-use-colors",
+            "--warn-error",
+        }:
+            index += 1
+        if index == len(self.argv_template) or self.argv_template[index] != self.verb:
+            raise NativeSourceCustodyError("command verb differs from its literal argv")
+        for allowance in (self.command_timeout_seconds, self.termination_allowance_seconds):
+            if type(allowance) is not int or allowance <= 0:
+                raise NativeSourceCustodyError("command time bounds must be exact positive integers")
+
+
+@dataclass(frozen=True, slots=True)
+class TrustedDbtCommandPlan:
+    """Finite BUILD or QUALITY membership under authenticated owned roots.
+
+    The recorder substitutes only predefined whole path arguments, after root
+    authentication. This value neither resolves credentials nor grants dispatch.
+    """
+
+    schema: Literal["dpone.trusted-dbt-command-plan.v1"]
+    executor_invocation_id: UUID
+    phase: Literal["BUILD", "QUALITY"]
+    commands: tuple[TrustedDbtCommandEntry, ...]
+    project_root: OriginalRef
+    output_root: OriginalRef
+    profile_root: OriginalRef
+    total_termination_budget_seconds: int
+
+    def __post_init__(self) -> None:
+        if type(self.schema) is not str or self.schema != "dpone.trusted-dbt-command-plan.v1":
+            raise NativeSourceCustodyError("unsupported trusted command plan schema")
+        if type(self.executor_invocation_id) is not UUID:
+            raise NativeSourceCustodyError("trusted plan requires the exact executor invocation UUID")
+        if type(self.phase) is not str or self.phase not in {"BUILD", "QUALITY"}:
+            raise NativeSourceCustodyError("unsupported trusted invocation phase")
+        expected = ("parse", "ls", "build") if self.phase == "BUILD" else ("test",)
+        if type(self.commands) is not tuple or len(self.commands) != len(expected):
+            raise NativeSourceCustodyError("trusted invocation has incomplete or extra command membership")
+        for position, (entry, verb) in enumerate(zip(self.commands, expected, strict=True)):
+            if type(entry) is not TrustedDbtCommandEntry:
+                raise NativeSourceCustodyError("trusted invocation requires exact command entries")
+            entry.__post_init__()
+            if entry.position != position or entry.verb != verb:
+                raise NativeSourceCustodyError("trusted invocation command ordering differs from its phase")
+        _require_originals(self.project_root, self.output_root, self.profile_root)
+        if type(self.total_termination_budget_seconds) is not int or self.total_termination_budget_seconds <= 0:
+            raise NativeSourceCustodyError("total termination budget must be an exact positive integer")
+
+
+@dataclass(frozen=True, slots=True)
+class TrustedDbtInvocationCompletion:
+    """Positive qualified normal return; wall time does not override monotonic time.
+
+    A record is not process observation by itself. Its producer must own the
+    complete admitted command sequence and independently verify publication.
+    """
+
+    schema: Literal["dpone.trusted-dbt-invocation-completion.v1"]
+    executor: SourceExecutorBinding
+    command: OriginalRef
+    toolchain: OriginalRef
+    qualification: OriginalRef
+    started_at: str
+    finished_at: str
+    elapsed_microseconds: int
+    exit_code: Literal[0]
+    command_count: int
+
+    def __post_init__(self) -> None:
+        if type(self.schema) is not str or self.schema != "dpone.trusted-dbt-invocation-completion.v1":
+            raise NativeSourceCustodyError("unsupported trusted completion schema")
+        if type(self.executor) is not SourceExecutorBinding:
+            raise NativeSourceCustodyError("completion requires its exact executor binding")
+        self.executor.__post_init__()
+        _require_originals(self.command, self.toolchain, self.qualification)
+        for timestamp in (self.started_at, self.finished_at):
+            if type(timestamp) is not str:
+                raise NativeSourceCustodyError("completion timestamp must be a canonical UTC string")
+            try:
+                parsed = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+            except ValueError as exc:
+                raise NativeSourceCustodyError("completion timestamp must use UTC microseconds") from exc
+            if parsed.isoformat(timespec="microseconds") + "Z" != timestamp:
+                raise NativeSourceCustodyError("completion timestamp must use canonical UTC microseconds")
+        if type(self.elapsed_microseconds) is not int or self.elapsed_microseconds < 0:
+            raise NativeSourceCustodyError("completion elapsed time must be an exact nonnegative integer")
+        if type(self.exit_code) is not int or self.exit_code != 0:
+            raise NativeSourceCustodyError("completion requires an exact zero exit code")
+        if type(self.command_count) is not int or self.command_count not in {1, 3}:
+            raise NativeSourceCustodyError("completion requires the complete BUILD or QUALITY membership")
+
+
+def _require_originals(*references: OriginalRef) -> None:
+    for reference in references:
+        if type(reference) is not OriginalRef:
+            raise NativeSourceCustodyError("trusted invocation requires exact original references")
+        reference.__post_init__()

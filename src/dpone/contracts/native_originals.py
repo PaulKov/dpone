@@ -213,7 +213,14 @@ def decode_native_original_subject(payload: bytes) -> NativeOriginalSubject:
 
 
 NativeOriginalKind: TypeAlias = Literal[
-    "generation_storage_root_v1", "generation_stored_file_v1", "generation_seal_resolution_v1"
+    "generation_storage_root_v1",
+    "generation_stored_file_v1",
+    "generation_seal_resolution_v1",
+    "trusted_dbt_command_plan_v1",
+    "trusted_dbt_invocation_completion_v1",
+    "trusted_dbt_toolchain_v1",
+    "trusted_dbt_qualification_v1",
+    "trusted_dbt_owned_root_v1",
 ]
 _BINDING_SCHEMA = "dpone.native-original-binding.v1"
 _BINDING_FIELDS = frozenset(
