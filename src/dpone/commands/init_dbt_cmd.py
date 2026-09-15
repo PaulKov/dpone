@@ -27,21 +27,20 @@ def cmd_init_dbt(args: argparse.Namespace, *, emit: Callable[[str, dict[str, obj
         dry_run=args.dbt_dry_run,
     )
     payload = result.to_dict()
+    target = "./" + args.dbt_path if args.dbt_path.startswith("-") else args.dbt_path
     rerun = [
         "dpone",
         "init",
         "dbt",
-        args.dbt_path,
-        "--profiles",
-        args.dbt_profiles,
-        "--profile",
-        args.dbt_profile,
-        "--workflow",
-        args.dbt_workflow,
+        target,
+        "--profiles=" + args.dbt_profiles,
+        "--profile=" + args.dbt_profile,
+        "--workflow=" + args.dbt_workflow,
     ]
-    payload["rerun_command"] = shlex.join(
-        [*rerun, "--format", args.format, *(["--dry-run"] if args.dbt_dry_run else [])]
-    )
+    if any(change.action == "conflict" for change in result.changes):
+        payload["rerun_command"] = shlex.join(
+            [*rerun, "--format", args.format, *(["--dry-run"] if args.dbt_dry_run else [])]
+        )
     if result.passed:
         payload["next_command"] = (
             shlex.join([*rerun, "--format", args.format])
