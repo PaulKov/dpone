@@ -211,3 +211,28 @@ def test_replaced_root_never_redirects_cleanup_to_new_root(tmp_path):
     assert sentinel.read_bytes() == b"foreign"
     assert list(moved.iterdir()) == []
     assert not path.exists()
+
+
+def test_close_failure_still_closes_other_descriptor_without_retry(tmp_path, monkeypatch):
+    lease = NativeDbtProfileLease(tmp_path.resolve(), max_bytes=64)
+    lease.__enter__()
+    child_fd, root_fd = lease._child_fd, lease._root_fd
+    close = os.close
+    attempted = []
+
+    def uncertain_close(descriptor):
+        attempted.append(descriptor)
+        close(descriptor)
+        if descriptor == child_fd:
+            raise OSError("close acknowledgement lost")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "close", uncertain_close)
+        with pytest.raises((DbtPublishingError, OSError)):
+            lease.__exit__(None, None, None)
+        lease.__exit__(None, None, None)
+    assert attempted == [child_fd, root_fd]
+    for descriptor in (child_fd, root_fd):
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
+    assert lease._child_fd == lease._root_fd == -1

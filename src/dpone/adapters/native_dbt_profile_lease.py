@@ -167,10 +167,26 @@ class NativeDbtProfileLease:
         except OSError as exc:
             raise _error("Native profile directory cleanup failed") from exc
         finally:
-            for descriptor in (self._child_fd, self._root_fd):
-                if descriptor >= 0:
-                    os.close(descriptor)
-            self._child_fd = self._root_fd = -1
+            self._close_descriptors()
+
+    def _close_descriptors(self) -> None:
+        descriptors = self._child_fd, self._root_fd
+        self._child_fd = self._root_fd = -1
+        failure: BaseException | None = None
+        for descriptor in descriptors:
+            if descriptor < 0:
+                continue
+            try:
+                os.close(descriptor)
+            except BaseException as exc:
+                # A failed close may already have freed the numeric descriptor.
+                # Never retry it, but still attempt every other owned close.
+                if failure is None:
+                    failure = exc
+        if isinstance(failure, OSError):
+            raise _error("Native profile descriptor cleanup failed") from failure
+        if failure is not None:
+            raise failure
 
 
 def _open_directory(path: Path) -> int:
