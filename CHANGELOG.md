@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add developer tooling for offline starter-resource checks, isolated pinned
+  dependency generation, recoverable sixteen-file updates and read-only recovery
+  reports. Complete managed package inputs remain required; this does not claim
+  an installed analyst workflow or runtime qualification.
+
 - Add immutable managed SQL Server catalog transport records and a strict v1
   decoder for nine result kinds, including lossless seven-digit timestamps and
   explicit empty markers. SQL acquisition and physical-route qualification remain
