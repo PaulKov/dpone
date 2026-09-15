@@ -279,3 +279,16 @@ contain deployment files; immutable release archives and packs reside in a
 separate release tree. The verifier must not infer a cache root from projection
 ancestors or escape its confined reader. Both roots remain local locators; exact
 bytes, content identities and source membership bind the observations.
+
+
+## Native execution and settlement ownership
+
+The optional execution lifecycle capability separates reporting a dbt outcome
+from terminalizing its physical workspace attempt. Ordinary execution keeps its
+existing immediate terminal transition. Native execution reuses the exact retained
+request and RUNNING receipt and independently verifies current physical ownership;
+it retains P until the outer native delivery settlement owner acts. Its local
+outcome is ephemeral and cannot authorize completion or settlement. No synthetic
+terminal receipt, weakened SQL ownership predicate or persisted-schema migration
+is introduced. See [Native workspace attempt lifecycle](../native-workspace-attempt-lifecycle.md)
+for dependency injection, failure handling and the remaining validation boundary.

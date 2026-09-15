@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add explicit native workspace-attempt lifecycle injection that retains physical ownership through execution evidence, while preserving ordinary dbt terminalization. Add fresh current-owner SQL readback; full native settlement and live qualification remain pending.
 - Place native-original publication orchestration in the application service layer; expose its injected runtime callback through the native-original ports.
 
 ### Added

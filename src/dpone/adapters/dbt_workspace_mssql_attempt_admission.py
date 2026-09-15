@@ -89,6 +89,41 @@ class MssqlDbtWorkspaceAttemptAdmission:
             close(cursor)
             close(connection)
 
+    def require_current_running(
+        self,
+        request: DbtWorkspaceAttemptRequest,
+    ) -> DbtWorkspaceAttemptReceipt:
+        """Read current physical ownership in one fresh serializable transaction.
+
+        This is a point-in-time observation, not a lease. Native callers must
+        compare the full returned receipt with their retained admission receipt;
+        later protected mutations must independently recheck their fencing.
+        """
+        request.__post_init__()
+        connection: WorkspaceActivationConnection | None = None
+        cursor: WorkspaceActivationCursor | None = None
+        try:
+            connection = self._connection_factory()
+            connection.autocommit = False
+            cursor = connection.cursor()
+            self._begin(cursor)
+            self._require_active_activation(cursor, request.activation_id)
+            current_guards = self._resolve_guards(cursor, request)
+            receipt = self._read_exact(cursor, request, state="RUNNING")
+            if receipt.guard_epochs != current_guards:
+                raise DbtWorkspaceActivationError("attempt_guard_stale")
+            connection.commit()
+            return receipt
+        except DbtWorkspaceActivationError:
+            rollback(connection)
+            raise
+        except Exception:
+            rollback(connection)
+            raise DbtWorkspaceActivationError("attempt_current_readback") from None
+        finally:
+            close(cursor)
+            close(connection)
+
     def _admit(
         self,
         cursor: WorkspaceActivationCursor,

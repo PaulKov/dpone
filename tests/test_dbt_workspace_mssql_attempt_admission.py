@@ -36,6 +36,7 @@ class _Store:
     guards: dict[str, tuple[Any, ...]] = field(
         default_factory=lambda: {GUARD_ID: (7, f"dbt-workspace:{ACTIVATION_ID}", ACTIVATION_ID, None, "HELD")}
     )
+    physical_epochs: dict[str, int] = field(default_factory=dict)
     attempts: dict[str, tuple[Any, ...]] = field(default_factory=dict)
     attempt_guards: dict[str, dict[str, int]] = field(default_factory=dict)
 
@@ -66,7 +67,18 @@ class _Cursor:
                 if guard_id is None:
                     continue
                 epoch, owner, workflow_id, operation_id, status = self.store.guards[guard_id]
-                self.many.append((subject, guard_id, epoch, owner, workflow_id, operation_id, status, epoch))
+                self.many.append(
+                    (
+                        subject,
+                        guard_id,
+                        epoch,
+                        owner,
+                        workflow_id,
+                        operation_id,
+                        status,
+                        self.store.physical_epochs.get(guard_id, epoch),
+                    )
+                )
             return self
         if normalized.startswith("SELECT TOP (1) attempt.attempt_id"):
             *guard_ids, attempt_id = map(str, parameters)
@@ -203,3 +215,98 @@ def test_attempt_request_fingerprint_is_closed_over_write_subset() -> None:
             "write_subjects": [_digest("1")],
         }
     )
+
+
+def test_current_running_readback_revalidates_physical_owner_without_mutation() -> None:
+    store, request = _Store(), _request()
+    factory = _Factory(store)
+    admission = MssqlDbtWorkspaceAttemptAdmission(factory)
+    expected = admission.admit(request)
+    attempts = dict(store.attempts)
+    assert admission.require_current_running(request) == expected
+    assert store.attempts == attempts
+
+
+@pytest.mark.parametrize("change", ["activation", "owner", "epoch", "subject", "terminal"])
+def test_current_running_rejects_stale_retained_receipt(change: str) -> None:
+    store, request = _Store(), _request()
+    admission = MssqlDbtWorkspaceAttemptAdmission(_Factory(store))
+    admission.admit(request)
+    if change == "activation":
+        store.activation_state = "RETIRED"
+    elif change == "owner":
+        store.guards[GUARD_ID] = (7, "other", ACTIVATION_ID, None, "HELD")
+    elif change == "epoch":
+        store.guards[GUARD_ID] = (8, f"dbt-workspace:{ACTIVATION_ID}", ACTIVATION_ID, None, "HELD")
+    elif change == "subject":
+        store.subjects.clear()
+    else:
+        admission.terminalize(request, state="SUCCEEDED")
+    if change != "terminal":
+        # Historical exact read remains compatible; current-owner read is stricter.
+        assert admission.require(request, state="RUNNING").state == "RUNNING"
+    with pytest.raises(DbtWorkspaceActivationError):
+        admission.require_current_running(request)
+
+
+@pytest.mark.parametrize("extra", [False, True])
+def test_current_running_rejects_missing_or_extra_recorded_guards(extra):
+    store, request = _Store(), _request()
+    admission = MssqlDbtWorkspaceAttemptAdmission(_Factory(store))
+    admission.admit(request)
+    if extra:
+        store.attempt_guards[request.attempt_id]["mssql://service/warehouse/mart/foreign"] = 7
+    else:
+        store.attempt_guards[request.attempt_id].clear()
+    with pytest.raises(DbtWorkspaceActivationError):
+        admission.require_current_running(request)
+
+
+@pytest.mark.parametrize("failure", ["execute", "commit"])
+def test_current_running_failure_closes_one_fresh_transaction(failure):
+    store, request = _Store(), _request()
+    MssqlDbtWorkspaceAttemptAdmission(_Factory(store)).admit(request)
+    events = []
+
+    class Cursor(_Cursor):
+        def execute(self, sql, *parameters):
+            events.append("execute")
+            if failure == "execute":
+                raise TimeoutError("control read timed out")
+            return super().execute(sql, *parameters)
+
+        def close(self):
+            events.append("cursor-close")
+
+    class Connection(_Connection):
+        def cursor(self):
+            return Cursor(store)
+
+        def commit(self):
+            events.append("commit")
+            raise OSError("commit acknowledgement unavailable")
+
+        def rollback(self):
+            events.append("rollback")
+
+        def close(self):
+            events.append("connection-close")
+
+    def factory():
+        events.append("connect")
+        return Connection(store)
+
+    with pytest.raises(DbtWorkspaceActivationError, match="attempt_current_readback"):
+        MssqlDbtWorkspaceAttemptAdmission(factory).require_current_running(request)
+    assert events.count("connect") == 1
+    assert events[-3:] == ["rollback", "cursor-close", "connection-close"]
+    assert store.attempts[request.attempt_id][3] == "RUNNING"
+
+
+def test_current_running_rejects_physical_epoch_different_from_activation_ownership():
+    store, request = _Store(), _request()
+    admission = MssqlDbtWorkspaceAttemptAdmission(_Factory(store))
+    admission.admit(request)
+    store.physical_epochs[GUARD_ID] = 8
+    with pytest.raises(DbtWorkspaceActivationError, match="attempt_guard_stale"):
+        admission.require_current_running(request)

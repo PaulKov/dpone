@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from dpone.contracts.dbt_runtime import DBT_EXECUTION_PACK_SCHEMA_V2, DbtPublishingError
 from dpone.runtime.dbt_preflight import MAX_DBT_PREFLIGHT_MANIFEST_BYTES
@@ -17,6 +17,28 @@ if TYPE_CHECKING:
         DbtWorkspaceAttemptTerminalState,
     )
     from dpone.runtime.dbt_execution_policy import DbtExecutionOutputPaths
+
+
+class DbtExecutionAttemptLifecycle(Protocol):
+    """Invocation owner for admission and execution outcome reporting."""
+
+    def admit(
+        self,
+        pack: DbtExecutionPack,
+        *,
+        output_paths: DbtExecutionOutputPaths,
+        run_identity: AirflowRunIdentity,
+        airflow_attempt: AirflowAttemptCorrelation,
+    ) -> DbtWorkspaceAttemptRequest | None: ...
+
+    def record_execution_outcome(
+        self,
+        request: DbtWorkspaceAttemptRequest | None,
+        *,
+        state: DbtWorkspaceAttemptTerminalState,
+        fallback_code: str,
+        build_started: bool,
+    ) -> str: ...
 
 
 class DbtWorkspaceAttemptLifecycle:
@@ -69,6 +91,22 @@ class DbtWorkspaceAttemptLifecycle:
             )
         return request
 
+    def record_execution_outcome(
+        self,
+        request: DbtWorkspaceAttemptRequest | None,
+        *,
+        state: DbtWorkspaceAttemptTerminalState,
+        fallback_code: str,
+        build_started: bool,
+    ) -> str:
+        """Ordinary execution retains its immediate durable terminal decision."""
+        return self.terminalize(
+            request,
+            state=state,
+            fallback_code=fallback_code,
+            build_started=build_started,
+        )
+
     def terminalize(
         self,
         request: DbtWorkspaceAttemptRequest | None,
@@ -93,6 +131,45 @@ class DbtWorkspaceAttemptLifecycle:
         except Exception:  # noqa: BLE001 - a lost terminal ACK after mutation is ambiguous
             return "COMMIT_UNKNOWN" if build_started else fallback_code
         return fallback_code
+
+
+def build_execution_attempt_lifecycle(
+    *,
+    lifecycle: DbtExecutionAttemptLifecycle | None,
+    run_results_reader: DbtRunResultsReader,
+    request_factory: DbtWorkspaceAttemptRequestFactoryPort | None,
+    admission: DbtWorkspaceAttemptAdmissionPort | None,
+) -> DbtExecutionAttemptLifecycle:
+    """Select one explicit owner without silently combining admission policies."""
+    if lifecycle is not None:
+        if request_factory is not None or admission is not None:
+            raise ValueError("explicit lifecycle cannot be combined with workspace admission dependencies")
+        return lifecycle
+    return DbtWorkspaceAttemptLifecycle(
+        run_results_reader=run_results_reader,
+        request_factory=request_factory,
+        admission=admission,
+    )
+
+
+def record_execution_outcome(
+    lifecycle: DbtExecutionAttemptLifecycle,
+    request: DbtWorkspaceAttemptRequest | None,
+    *,
+    state: DbtWorkspaceAttemptTerminalState,
+    fallback_code: str,
+    build_started: bool,
+) -> str:
+    """Normalize owner failure without losing post-dispatch ambiguity evidence."""
+    try:
+        return lifecycle.record_execution_outcome(
+            request,
+            state=state,
+            fallback_code=fallback_code,
+            build_started=build_started,
+        )
+    except Exception:  # noqa: BLE001 - post-dispatch ambiguity still needs evidence
+        return "COMMIT_UNKNOWN" if build_started else fallback_code
 
 
 __all__ = ["DbtWorkspaceAttemptLifecycle"]
