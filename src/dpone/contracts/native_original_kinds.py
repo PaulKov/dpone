@@ -15,6 +15,14 @@ NativeOriginalKind: TypeAlias = Literal[
     "trusted_dbt_toolchain_v1",
     "trusted_dbt_qualification_v1",
     "trusted_dbt_owned_root_v1",
+    "generation_execution_pack_v1",
+    "dbt_build_evidence_v1",
+    "dbt_build_manifest_v1",
+    "dbt_build_run_results_v1",
+    "native_build_artifact_inventory_v1",
+    "trusted_source_build_completion_v1",
+    "source_closure_receipt_v1",
+    "frozen_generation_v1",
 ]
 
 

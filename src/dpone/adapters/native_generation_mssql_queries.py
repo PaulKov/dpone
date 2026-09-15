@@ -2,30 +2,13 @@
 
 from __future__ import annotations
 
-
-def _utf8(expression: str) -> str:
-    return f"CONVERT(varbinary(max), CONVERT(varchar(max), {expression} COLLATE Latin1_General_100_BIN2_UTF8))"
-
-
-def _decode_bytes(source: str, target: str) -> str:
-    return f"""DECLARE {target}_utf8 TABLE(payload varchar(max) COLLATE Latin1_General_100_BIN2_UTF8);
-INSERT INTO {target}_utf8(payload) VALUES ({source});
-DECLARE {target} nvarchar(max)=(SELECT CONVERT(nvarchar(max),payload) FROM {target}_utf8);"""
-
-
-def _scalar(document: str, path: str) -> str:
-    return f"(SELECT value FROM OPENJSON({document}) WITH (value nvarchar(max) '{path}'))"
-
-
-def _canonical_reference(document: str, path: str) -> str:
-    """Encode a reference with JSON escapes matching the canonical UTF-8 codec."""
-    locator = _scalar(document, path + ".locator")
-    digest = _scalar(document, path + ".sha256")
-    return (
-        f'(CONVERT(nvarchar(max),N\'{{"locator":"\')'
-        f"+REPLACE(STRING_ESCAPE({locator},'json'),NCHAR(92)+N'/',N'/')"
-        f"+N'\",\"sha256\":\"'+REPLACE(STRING_ESCAPE({digest},'json'),NCHAR(92)+N'/',N'/')+N'\"}}')"
-    )
+from dpone.adapters.native_generation_mssql_completion import completion_body
+from dpone.adapters.native_generation_mssql_freeze import freeze_body
+from dpone.adapters.native_generation_mssql_json import canonical_reference as _canonical_reference
+from dpone.adapters.native_generation_mssql_json import decode_bytes as _decode_bytes
+from dpone.adapters.native_generation_mssql_json import scalar as _scalar
+from dpone.adapters.native_generation_mssql_json import shape as _shape
+from dpone.adapters.native_generation_mssql_json import utf8 as _utf8
 
 
 def _canonical_executor() -> str:
@@ -37,15 +20,6 @@ def _canonical_executor() -> str:
  +N',"schema":"dpone.native-source-executor-binding.v1"}}';
 IF {_utf8("@canonical")}<>@executor OR DATALENGTH({_utf8("@canonical")})<>DATALENGTH(@executor)
  THROW 51303, 'DPONE_NATIVE_GENERATION_EXECUTOR_NONCANONICAL', 1;"""
-
-
-def _shape(expression: str, fields: dict[str, int]) -> str:
-    expected = ",".join(f"(N'{name}',{kind})" for name, kind in fields.items())
-    return f"""IF ISJSON({expression},OBJECT)<>1
- OR (SELECT COUNT(*) FROM OPENJSON({expression}))<>{len(fields)}
- OR EXISTS (SELECT 1 FROM (VALUES {expected}) e(name,kind)
- WHERE NOT EXISTS (SELECT 1 FROM OPENJSON({expression}) j WHERE j.[key]=e.name AND j.type=e.kind))
- THROW 51301, 'DPONE_NATIVE_GENERATION_JSON_SHAPE_INVALID', 1;"""
 
 
 def _attempt_identity() -> str:
@@ -96,20 +70,54 @@ def generation_procedure_name(operation: str) -> str:
         "read": "native_source_custody_read_v1",
         "close": "native_source_writer_close_v1",
         "closure_read": "native_source_writer_close_read_v1",
+        "complete": "native_source_writer_completion_record_v1",
+        "completion_read": "native_source_writer_completion_read_v1",
+        "freeze": "native_source_freeze_v1",
+        "freeze_read": "native_source_freeze_read_v1",
+        "freeze_inspect": "native_source_freeze_inspect_v1",
     }[operation]
 
 
-def generation_procedure(schema: str, operation: str, *, extended: bool = True) -> str:
-    """Render a fixed operation; schema has already passed identifier validation."""
+def generation_procedure(schema: str, operation: str, *, extended: bool = True, completed: bool = False) -> str:
+    """Render explicit layouts, preserving exact historical procedure definitions."""
+    if completed and not extended:
+        raise ValueError("completion layout requires admission columns")
+    if operation in {"complete", "completion_read", "freeze", "freeze_read", "freeze_inspect"} and not completed:
+        raise ValueError("positive completion procedures require the completion layout")
     signatures = {
         "reserve": "@request varbinary(max), @locator varbinary(max), @digest varbinary(max)",
         "bind": "@generation uniqueidentifier, @expected_revision bigint, @executor varbinary(max)",
         "read": "@generation uniqueidentifier",
         "close": "@generation uniqueidentifier, @expected_revision bigint, @locator varbinary(max), @digest varbinary(max)",
         "closure_read": "@generation uniqueidentifier",
+        "complete": "@generation uniqueidentifier, @expected_revision bigint, @admission varbinary(max), @completion varbinary(max), @locator varbinary(max), @digest varbinary(max)",
+        "completion_read": "@generation uniqueidentifier, @expected_revision bigint, @admission varbinary(max), @completion varbinary(max), @locator varbinary(max), @digest varbinary(max)",
     }
+    freeze_signature = (
+        "@generation uniqueidentifier, @expected_revision bigint, @admission varbinary(max), "
+        "@completion varbinary(max), @completion_locator varbinary(max), @completion_digest varbinary(max), "
+        "@frozen varbinary(max), @locator varbinary(max), @digest varbinary(max)"
+    )
+    signatures.update(freeze=freeze_signature, freeze_read=freeze_signature, freeze_inspect=freeze_signature)
     if operation in {"reserve", "bind", "read"}:
-        body = {"reserve": _reserve, "bind": _bind, "read": _read}[operation](schema, extended=extended)
+        body = {"reserve": _reserve, "bind": _bind, "read": _read}[operation](
+            schema, extended=extended, completed=completed
+        )
+    elif operation in {"complete", "completion_read"}:
+        body = completion_body(
+            schema,
+            read_only=operation == "completion_read",
+            current_owner_sql=_physical_owner(schema),
+            current_snapshot_sql=_read(schema, completed=True),
+        )
+    elif operation in {"freeze", "freeze_read", "freeze_inspect"}:
+        body = freeze_body(
+            schema,
+            read_only=operation != "freeze",
+            allow_building=operation == "freeze_inspect",
+            current_owner_sql=_physical_owner(schema),
+            current_snapshot_sql=_read(schema, completed=True),
+        )
     else:
         body = {"close": _close, "closure_read": _closure_read}[operation](schema)
     return f"""CREATE PROCEDURE [{schema}].[{generation_procedure_name(operation)}]
@@ -135,8 +143,10 @@ IF NOT EXISTS (SELECT 1 FROM [{schema}].[native_original_authorities_v1] WITH (H
 END"""
 
 
-def _read(schema: str, *, extended: bool = True) -> str:
+def _read(schema: str, *, extended: bool = True, completed: bool = False) -> str:
     additional = ", writer_admission, outcome, admission_sequence, admission_closure" if extended else ""
+    if completed:
+        additional += ", phase, completion_payload, completion_locator, completion_digest, frozen_payload, frozen_locator, frozen_digest"
     return f"""SELECT LOWER(CONVERT(char(36),generation_id)), guard_epoch, revision,
  reservation_locator, reservation_digest, executor{additional}
 FROM [{schema}].[native_generations_v1] WITH (HOLDLOCK)
@@ -185,9 +195,14 @@ IF NOT EXISTS (SELECT 1 FROM OPENJSON(@json,'$.workspace_attempt.write_subjects'
 """
 
 
-def _reserve(schema: str, *, extended: bool = True) -> str:
+def _reserve(schema: str, *, extended: bool = True, completed: bool = False) -> str:
     columns = ",writer_admission,outcome,admission_sequence,admission_closure" if extended else ""
     values = ",'OPEN','ACTIVE',0,NULL" if extended else ""
+    if completed:
+        columns += (
+            ",phase,completion_payload,completion_locator,completion_digest,frozen_payload,frozen_locator,frozen_digest"
+        )
+        values += ",'RESERVED',NULL,NULL,NULL,NULL,NULL,NULL"
     return f"""
 IF @request IS NULL OR @locator IS NULL OR @digest IS NULL OR DATALENGTH(@request) NOT BETWEEN 1 AND 1048576 OR DATALENGTH(@locator) NOT BETWEEN 1 AND 1048576
  OR DATALENGTH(@digest)<>71
@@ -249,12 +264,15 @@ BEGIN
  (generation_id,guard_hash,guard_epoch,revision,authority_locator,authority_digest,reservation_locator,reservation_digest,request,executor{columns})
  VALUES (@generation,HASHBYTES('SHA2_256',CONVERT(varbinary(max),@guard)),@epoch,1,@authority_locator,@authority_digest,@locator,@digest,@request,NULL{values});
 END
-{_read(schema, extended=extended)}"""
+{_read(schema, extended=extended, completed=completed)}"""
 
 
-def _bind(schema: str, *, extended: bool = True) -> str:
+def _bind(schema: str, *, extended: bool = True, completed: bool = False) -> str:
     admission = " AND writer_admission='OPEN' AND outcome='ACTIVE'" if extended else ""
     sequence = ",admission_sequence=1" if extended else ""
+    if completed:
+        admission += " AND phase='RESERVED'"
+        sequence += ",phase='BUILDING'"
     return f"""
 DECLARE @request varbinary(max);
 SELECT @request=request FROM [{schema}].[native_generations_v1] WITH (READCOMMITTEDLOCK)
@@ -298,7 +316,7 @@ IF {_utf8(_scalar("@binding", "$.schema"))}<>CONVERT(varbinary(max),'dpone.nativ
 UPDATE [{schema}].[native_generations_v1] SET executor=@executor,revision=revision+1{sequence}
  WHERE generation_id=@generation AND revision=@expected_revision AND executor IS NULL{admission};
 IF @@ROWCOUNT<>1 THROW 51303, 'DPONE_NATIVE_GENERATION_WRITER_ALREADY_BOUND_OR_STALE', 1;
-{_read(schema, extended=extended)}"""
+{_read(schema, extended=extended, completed=completed)}"""
 
 
 def _close(schema: str) -> str:

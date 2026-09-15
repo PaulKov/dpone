@@ -16,6 +16,7 @@ from dpone.contracts.native_source_custody import (
     NativeSourceCustodyError,
     SourceAdmissionClosure,
     SourceExecutorBinding,
+    SourceTrustedBuildCompletion,
     TrustedDbtCommandEntry,
     TrustedDbtCommandPlan,
     TrustedDbtInvocationCompletion,
@@ -102,6 +103,45 @@ def decode_source_admission_closure(payload: bytes, *, receipt: OriginalRef) -> 
     if encode_source_admission_closure(closure) != payload or receipt.sha256 != "sha256:" + sha256(payload).hexdigest():
         raise NativeSourceCustodyError("admission closure payload differs from canonical bytes or receipt digest")
     return closure
+
+
+def encode_source_trusted_build_completion(value: SourceTrustedBuildCompletion) -> bytes:
+    """Encode positive references, not a caller-controlled success flag."""
+    if type(value) is not SourceTrustedBuildCompletion:
+        raise NativeSourceCustodyError("expected a trusted source build completion")
+    value.__post_init__()
+    return encode_native_delivery_json(
+        {
+            "schema": "dpone.native-source-trusted-build-completion.v1",
+            "executor": decode_native_delivery_json(encode_source_executor_binding(value.executor)),
+            "command": _reference_payload(value.command),
+            "toolchain": _reference_payload(value.toolchain),
+            "build_evidence": _reference_payload(value.build_evidence),
+            "artifact_inventory": _reference_payload(value.artifact_inventory),
+            "termination": _reference_payload(value.termination),
+        }
+    )
+
+
+def decode_source_trusted_build_completion(payload: bytes) -> SourceTrustedBuildCompletion:
+    """Decode closed canonical shape; authenticated resolution belongs to callers."""
+    value = _mapping(
+        decode_native_delivery_json(payload),
+        {"schema", "executor", "command", "toolchain", "build_evidence", "artifact_inventory", "termination"},
+    )
+    if value["schema"] != "dpone.native-source-trusted-build-completion.v1":
+        raise NativeSourceCustodyError("unsupported trusted source build completion schema")
+    completion = SourceTrustedBuildCompletion(
+        executor=decode_source_executor_binding(encode_native_delivery_json(value["executor"])),
+        command=_reference(value["command"]),
+        toolchain=_reference(value["toolchain"]),
+        build_evidence=_reference(value["build_evidence"]),
+        artifact_inventory=_reference(value["artifact_inventory"]),
+        termination=_reference(value["termination"]),
+    )
+    if encode_source_trusted_build_completion(completion) != payload:
+        raise NativeSourceCustodyError("trusted source completion bytes must be canonical")
+    return completion
 
 
 def encode_trusted_dbt_command_plan(value: TrustedDbtCommandPlan) -> bytes:
