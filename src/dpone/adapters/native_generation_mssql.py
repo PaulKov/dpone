@@ -11,7 +11,7 @@ from uuid import UUID
 
 from dpone.adapters import dbapi_lifecycle
 from dpone.adapters.native_generation_mssql_queries import generation_procedure_name
-from dpone.adapters.native_originals_mssql import native_control_schema
+from dpone.contracts.mssql_object_name import native_control_schema
 from dpone.contracts.native_delivery import GenerationReservation
 from dpone.contracts.native_generation_admission import VerifiedGenerationRequest
 from dpone.contracts.native_identity import OriginalRef
