@@ -43,6 +43,31 @@ class SourceExecutorBinding:
 
 
 @dataclass(frozen=True, slots=True)
+class SourceAdmissionClosure:
+    """Durable closed admission; neither normal termination nor build success.
+
+    The receipt describes the independently read ledger payload and is excluded
+    from that payload, avoiding a digest that would need to contain itself.
+    """
+
+    executor: SourceExecutorBinding
+    admission_sequence: int
+    revision: int
+    receipt: OriginalRef
+
+    def __post_init__(self) -> None:
+        if type(self.executor) is not SourceExecutorBinding:
+            raise NativeSourceCustodyError("admission closure requires the exact executor")
+        self.executor.__post_init__()
+        for value in (self.admission_sequence, self.revision):
+            if type(value) is not int or not 1 <= value <= 9223372036854775807:
+                raise NativeSourceCustodyError("closure sequence and revision must be positive SQL bigint values")
+        if type(self.receipt) is not OriginalRef:
+            raise NativeSourceCustodyError("admission closure requires an exact external receipt")
+        self.receipt.__post_init__()
+
+
+@dataclass(frozen=True, slots=True)
 class SourceReadGrant:
     """One retained restricted read capability; its descriptor is external."""
 

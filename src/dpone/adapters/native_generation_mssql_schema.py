@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from dpone.adapters import dbapi_lifecycle
-from dpone.adapters.native_generation_mssql_queries import generation_procedure, generation_procedure_name
+from dpone.adapters.native_generation_mssql_queries import generation_procedure_name
+from dpone.adapters.native_generation_mssql_upgrade import GENERATION_ADMISSION_CHECK, upgrade_generation_ledger
 from dpone.contracts.mssql_object_name import native_control_schema
 from dpone.contracts.native_identity import OriginalRef
 from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
@@ -60,6 +61,7 @@ class MssqlNativeGenerationSchemaMigration:
             runtime_database_principal,
         )
         self._principal = "[" + runtime_database_principal.replace("]", "]]") + "]"
+        self._principal_name = runtime_database_principal
         self._connect = connection_factory
 
     def apply(self) -> None:
@@ -70,19 +72,29 @@ class MssqlNativeGenerationSchemaMigration:
             connection = self._connect()
             connection.autocommit = False
             cursor = connection.cursor()
-            cursor.execute(self._tables())
-            cursor.execute(self._verify_tables())
-            for operation in ("reserve", "bind", "read"):
-                name = f"[{self._schema}].[{generation_procedure_name(operation)}]"
-                definition = generation_procedure(self._schema, operation)
-                cursor.execute("SELECT OBJECT_DEFINITION(OBJECT_ID(?))", name)
-                existing = dbapi_lifecycle.row(cursor)
-                if existing is None or len(existing) != 1:
-                    raise RuntimeError("cannot inspect generation procedure")
-                if existing[0] is None:
-                    cursor.execute(definition)
-                elif existing[0] != definition:
-                    raise RuntimeError("existing generation procedure differs from V1")
+            cursor.execute(
+                f"SELECT OBJECT_ID(N'[{self._schema}].[native_generations_v1]',N'U'), "
+                f"COL_LENGTH(N'[{self._schema}].[native_generations_v1]',N'writer_admission'), "
+                f"(SELECT COUNT(*) FROM sys.tables WHERE schema_id=SCHEMA_ID(N'{self._schema}') "
+                "AND name IN ('native_generations_v1','native_generation_capacity_v1','native_generation_profiles_v1'))"
+            )
+            layout = dbapi_lifecycle.row(cursor)
+            if layout is None or len(layout) != 3:
+                raise RuntimeError("cannot inspect retained generation layout")
+            fresh, legacy = layout[0] is None, layout[1] is None
+            if layout[2] != (0 if fresh else 3):
+                raise RuntimeError("partial generation ledger cannot be silently repaired")
+            cursor.execute(self._runtime_principal_preflight(), *self._parameters[-3:])
+            if fresh:
+                cursor.execute(self._tables())
+            upgrade_generation_ledger(
+                cursor,
+                schema=self._schema,
+                legacy=legacy,
+                fresh=fresh,
+                legacy_verification=self._verify_tables(extended=False),
+                current_verification=self._verify_tables(extended=True),
+            )
             cursor.execute(self._registration(), *self._parameters)
             for table in ("native_generation_capacity_v1", "native_generation_profiles_v1", "native_generations_v1"):
                 cursor.execute(
@@ -90,7 +102,7 @@ class MssqlNativeGenerationSchemaMigration:
                     f"OBJECT::[{self._schema}].[{table}] TO {self._principal}"
                 )
             cursor.execute(f"DENY ALTER ON SCHEMA::[{self._schema}] TO {self._principal}")
-            for operation in ("reserve", "bind", "read"):
+            for operation in ("reserve", "bind", "read", "close", "closure_read"):
                 cursor.execute(
                     f"GRANT EXECUTE ON OBJECT::[{self._schema}].[{generation_procedure_name(operation)}] TO {self._principal}"
                 )
@@ -145,7 +157,30 @@ CREATE TABLE [{s}].[native_generations_v1] (
  CHECK (guard_epoch>0 AND revision=CASE WHEN executor IS NULL THEN 1 ELSE 2 END)
 );"""
 
-    def _verify_tables(self) -> str:
+    def _runtime_principal_preflight(self) -> str:
+        """Verify the retained caller and its effective role before ledger DDL."""
+        principal = self._principal_name.replace("'", "''")
+        return f"""DECLARE @authority_locator varbinary(max)=?,@authority_digest varbinary(71)=?,@principal sysname=?;
+IF NOT EXISTS (SELECT 1 FROM [{self._schema}].[native_original_authorities_v1] a
+ JOIN sys.database_principals p ON p.principal_id=a.runtime_principal_id AND p.sid=a.runtime_principal_sid
+ WHERE p.name=@principal AND a.authority_hash=HASHBYTES('SHA2_256',@authority_locator)
+ AND a.authority_locator=@authority_locator AND DATALENGTH(a.authority_locator)=DATALENGTH(@authority_locator)
+ AND a.authority_digest=@authority_digest AND a.schema_version=1)
+ THROW 51310, 'DPONE_NATIVE_GENERATION_PRINCIPAL_UNREGISTERED', 1;
+DECLARE @overprivileged bit=0;
+EXECUTE AS USER=N'{principal}';
+BEGIN TRY
+ IF IS_MEMBER('db_owner')=1 OR HAS_PERMS_BY_NAME(N'{self._schema}',N'SCHEMA',N'ALTER')=1
+ SET @overprivileged=1;
+ REVERT;
+END TRY
+BEGIN CATCH
+ REVERT;
+ THROW;
+END CATCH;
+IF @overprivileged=1 THROW 51310, 'DPONE_NATIVE_GENERATION_RUNTIME_PRINCIPAL_INVALID', 1;"""
+
+    def _verify_tables(self, *, extended: bool = True) -> str:
         """Reject incompatible retained ledgers, including weakened constraints."""
         definitions = {
             "native_generation_capacity_v1": (
@@ -174,8 +209,28 @@ CREATE TABLE [{s}].[native_generations_v1] (
                 "guard_epoch>0andrevision=casewhenexecutorisnullthen1else2end",
             ),
         }
-        statements = []
+        if extended:
+            columns, keys, key_count, _ = definitions["native_generations_v1"]
+            definitions["native_generations_v1"] = (
+                columns + ",('writer_admission','varchar',6,0),('outcome','varchar',7,0),"
+                "('admission_sequence','bigint',8,0),('admission_closure','varbinary',-1,1)",
+                keys,
+                key_count,
+                "engine_compared",
+            )
+        statements = [self._expected_admission_check()] if extended else []
         for table, (columns, keys, key_count, check) in definitions.items():
+            check = check.replace("'", "''")
+            if extended and table == "native_generations_v1":
+                check_match = (
+                    "CONVERT(varbinary(max),definition)=CONVERT(varbinary(max),@expected_admission_check) "
+                    "AND DATALENGTH(definition)=DATALENGTH(@expected_admission_check)"
+                )
+            else:
+                check_match = (
+                    "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(definition,' ',''),'(',''),')',''),"
+                    f"'[',''),']',''))=N'{check}'"
+                )
             statements.append(f"""DECLARE @object int=OBJECT_ID(N'[{self._schema}].[{table}]',N'U');
 IF @object IS NULL OR NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
  WHERE t.object_id=@object AND COALESCE(t.principal_id,s.principal_id)=1 AND t.temporal_type=0 AND t.is_memory_optimized=0)
@@ -199,9 +254,27 @@ IF @object IS NULL OR NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s 
  OR (SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id=@object)<>1
  OR NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id=@object
  AND is_disabled=0 AND is_not_trusted=0 AND is_not_for_replication=0
- AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(definition,' ',''),'(',''),')',''),'[',''),']',''))=N'{check}')
+ AND {check_match})
  THROW 51310, 'DPONE_NATIVE_GENERATION_EXISTING_SCHEMA_MISMATCH', 1;""")
         return "\n".join(statement.replace("@object", f"@object_{index}") for index, statement in enumerate(statements))
+
+    @staticmethod
+    def _expected_admission_check() -> str:
+        """Ask SQL Server to normalize its own predicate without discarding grouping.
+
+        The session-local empty table holds no user data and is dropped in the
+        same batch. Comparing exact engine-rendered definitions rejects weakened
+        AND/OR regroupings that token-only normalization would accept.
+        """
+        return f"""CREATE TABLE #dpone_native_admission_check (
+ guard_epoch bigint NOT NULL, revision bigint NOT NULL, executor varbinary(max) NULL,
+ writer_admission varchar(6) NOT NULL, outcome varchar(7) NOT NULL,
+ admission_sequence bigint NOT NULL, admission_closure varbinary(max) NULL,
+ CHECK ({GENERATION_ADMISSION_CHECK}));
+DECLARE @expected_admission_check nvarchar(max)=(SELECT definition FROM tempdb.sys.check_constraints
+ WHERE parent_object_id=OBJECT_ID(N'tempdb..#dpone_native_admission_check'));
+DROP TABLE #dpone_native_admission_check;
+IF @expected_admission_check IS NULL THROW 51310, 'DPONE_NATIVE_GENERATION_EXPECTED_CHECK_MISSING', 1;"""
 
     def _registration(self) -> str:
         s = self._schema
