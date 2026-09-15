@@ -222,7 +222,8 @@ def test_collector_failure_still_reaps_process(tmp_path, monkeypatch, method):
     assert processes[0].poll() is not None
 
 
-def test_unverified_process_cleanup_preserves_workspace():
+@pytest.mark.parametrize("successful_parent", [False, True])
+def test_unverified_process_cleanup_preserves_workspace(successful_parent):
     import shutil
 
     from tools.dbt_self_service.starter_dependency_generation import (
@@ -245,7 +246,8 @@ def test_unverified_process_cleanup_preserves_workspace():
             return super().run(**kwargs)
 
     def popen(argv, **kwargs):
-        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], **kwargs)
+        script = "pass" if successful_parent else "import time; time.sleep(30)"
+        process = subprocess.Popen([sys.executable, "-c", script], **kwargs)
         processes.append(process)
         return process
 
@@ -302,3 +304,33 @@ def test_keyboard_interrupt_stops_child_before_propagating(tmp_path):
     with pytest.raises(KeyboardInterrupt):
         PinnedDependencyRunner(popen=popen).run(project=tmp_path, environment={"PATH": os.defpath}, timeout_seconds=5)
     assert processes[0].poll() is not None
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process-group probe")
+def test_zero_exit_parent_cannot_leave_live_descendant(tmp_path):
+    from tools.dbt_self_service.starter_dependency_generation import PinnedDependencyRunner
+
+    from dpone.adapters.dbt_process_supervisor import DbtProcessSupervisor
+
+    pid_path = tmp_path / "orphan.pid"
+    processes = []
+    script = """
+import subprocess, sys
+from pathlib import Path
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+Path(sys.argv[1]).write_text(str(child.pid))
+"""
+
+    def popen(argv, **kwargs):
+        process = subprocess.Popen([sys.executable, "-c", script, str(pid_path)], **kwargs)
+        processes.append(process)
+        return process
+
+    try:
+        PinnedDependencyRunner(popen=popen).run(project=tmp_path, environment={"PATH": os.defpath}, timeout_seconds=5)
+        with pytest.raises(ProcessLookupError):
+            os.kill(int(pid_path.read_text()), 0)
+    finally:
+        for process in processes:
+            DbtProcessSupervisor().terminate(process)

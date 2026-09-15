@@ -118,6 +118,10 @@ class PinnedDependencyRunner:
             if not isinstance(error, Exception):
                 raise
             raise DependencyGenerationError() from None
+        # A successful direct child can leave descendants with closed pipes.
+        # Prove the owned group has stopped before the caller reads or removes
+        # its workspace; unverified cleanup must retain that workspace.
+        self._cleanup(process, tuple(collectors))
 
     def _cleanup(self, process: Any, collectors: tuple[_BoundedCollector, ...]) -> None:
         failed = False
