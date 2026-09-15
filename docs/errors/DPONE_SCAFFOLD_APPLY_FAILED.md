@@ -7,7 +7,10 @@ remove every operation-owned file and returned the complete rollback receipt.
 The original operating-system exception is not exposed because it may contain
 sensitive path or credential-shaped text.
 
-Rerun the same command with `--format json` and inspect:
+Inspect the receipt returned by the failed operation. Select `--format json`
+when initially invoking an init command if you need a machine-readable receipt;
+do not rerun a mutating command just to change its output format before assessing
+the recovery state. Inspect:
 
 - `changes`: each planned file is `rolled_back`, `preserved`, `failed`, or
   `recovery_required`;

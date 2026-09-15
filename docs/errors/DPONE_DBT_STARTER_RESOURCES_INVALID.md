@@ -19,8 +19,9 @@ repair installed resources by copying files from a source checkout or fabricatin
 package pins and lock files. A successful retry proves resource preparation;
 it does not qualify the dbt runtime or certify a publishing route.
 
-This code is reserved for the native starter service under implementation.
-It does not indicate that the complete public starter workflow is available.
+The unreleased [`dpone init dbt`](../dbt-starter-authoring.md) command reports
+this code when its installed resources are incomplete. Complete installed
+workflow and runtime qualification remain separate requirements.
 
 [Self-service error overview](index.md) ·
 [dbt error reference](../dbt-self-service-errors.md)

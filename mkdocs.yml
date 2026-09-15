@@ -147,6 +147,7 @@ nav:
       - OpenLineage and run history: lineage.md
       - dbt integration:
           - Overview: dbt.md
+          - Create a native starter: dbt-starter-authoring.md
           - Author and platform reference: dbt-self-service-reference.md
           - Invocation, selection, and target identity: dbt-self-service-runtime-identity.md
           - Promotion and rollback: dbt-self-service-promotion.md

@@ -25,6 +25,10 @@ from dpone.readiness.managed import ConnectorScaffoldService, ManagedRenderer
 
 def cmd_init(args: argparse.Namespace, *, ctx: object, logger: logging.Logger) -> int:
     del ctx, logger
+    if args.init_target == "dbt":
+        from dpone.commands.init_dbt_cmd import cmd_init_dbt
+
+        return cmd_init_dbt(args, emit=_emit_self_service_result)
     if bool(getattr(args, "airflow", False)) and bool(getattr(args, "no_airflow", False)):
         init_parser = getattr(args, "_init_parser", None)
         if isinstance(init_parser, argparse.ArgumentParser):
