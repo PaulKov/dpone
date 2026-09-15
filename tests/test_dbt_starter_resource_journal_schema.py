@@ -42,6 +42,23 @@ def test_native_recovery_name_is_bound_to_target_parent(path):
         validate_event({"phase": "APPLYING", "path": RESOURCE_PATHS[0], "recovery_paths": [path]})
 
 
+@pytest.mark.parametrize("suffix", ["new", "restore"])
+@pytest.mark.parametrize("current", [False, True])
+def test_operation_sibling_recovery_path_requires_exact_operation(suffix, current):
+    from pathlib import PurePosixPath
+
+    operation = "12345678-1234-1234-1234-123456789abc"
+    other = "00000000-0000-0000-0000-000000000000"
+    target = PurePosixPath(RESOURCE_PATHS[0])
+    path = target.with_name(f".{target.name}.{operation if current else other}.{suffix}")
+    event = {"phase": "APPLYING", "path": RESOURCE_PATHS[0], "recovery_paths": [str(path)]}
+    if current:
+        validate_event(event, operation)
+    else:
+        with pytest.raises(ValueError):
+            validate_event(event, operation)
+
+
 def rollback_record():
     return {
         "path": RESOURCE_PATHS[0],

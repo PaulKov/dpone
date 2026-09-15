@@ -47,6 +47,7 @@ class RecoveryReport:
     mutation_outcomes: tuple[tuple[str, bool, bool], ...] = ()
     discovery_required: bool = False
     rollback_outcomes: tuple[tuple[str, bool, bool], ...] = ()
+    inverse_outcomes: tuple[tuple[str, bool], ...] = ()
 
 
 def recovery_report(root: Path) -> RecoveryReport:
@@ -127,7 +128,10 @@ def _batch_report(root: Path) -> RecoveryReport:
         recovery_paths: list[str] = []
         outcomes = []
         rollbacks = []
+        inverses = []
         for event in events:
+            if event["phase"] == "RECOVERY_REQUIRED" and "path" in event and "cleanup_required" in event:
+                inverses.append((event["path"], event["cleanup_required"]))
             if "rollback" in event:
                 item = event["rollback"]
                 rollbacks.append((item["path"], item["removed"], item["preserved"]))
@@ -164,6 +168,7 @@ def _batch_report(root: Path) -> RecoveryReport:
             tuple(observations),
             tuple(outcomes),
             rollback_outcomes=tuple(rollbacks),
+            inverse_outcomes=tuple(inverses),
         )
     except (OSError, ValueError, TypeError, KeyError):
         return RecoveryReport(True, "INVALID", paths=(METADATA_ROOT,))

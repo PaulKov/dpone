@@ -132,6 +132,32 @@ def test_event_limit_rejects_without_extending_log(tmp_path):
         assert journal.log_path.read_bytes() == before
 
 
+def test_later_observation_does_not_erase_earlier_unpersisted_paths(tmp_path, monkeypatch):
+    from pathlib import PurePosixPath
+
+    from dpone.manifest.confined_atomic_exchange import ExchangeBackOutcome
+    from dpone.manifest.confined_mutations import ConfinedReplaceOutcome
+
+    with ResourceJournal.start(tmp_path, "a" * 40, entries()) as journal:
+        append = journal.append
+        first = True
+
+        def fail_once(event):
+            nonlocal first
+            if first:
+                first = False
+                raise OSError("synthetic append failure")
+            append(event)
+
+        monkeypatch.setattr(journal, "append", fail_once)
+        name = ".dpone-recovery-" + "a" * 32
+        with pytest.raises(OSError):
+            journal.observe_mutation(RESOURCE_PATHS[0], ConfinedReplaceOutcome(True, True, name))
+        expected = str(PurePosixPath(RESOURCE_PATHS[0]).with_name(name))
+        journal.observe_inverse(RESOURCE_PATHS[1], ExchangeBackOutcome(".dpone-recovery-" + "b" * 32))
+        assert expected in journal.unpersisted_paths
+
+
 def test_detached_log_is_not_reported_as_durably_observed(tmp_path, monkeypatch):
     with ResourceJournal.start(tmp_path, "a" * 40, entries()) as journal:
         fsync = os.fsync
