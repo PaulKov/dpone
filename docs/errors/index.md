@@ -16,6 +16,10 @@ authoring problem.
 
 ## Common authoring errors
 
+- [`DPONE_DBT_STARTER_RESOURCES_INVALID`](DPONE_DBT_STARTER_RESOURCES_INVALID.md):
+  native dbt starter resources are incomplete or invalid; restore the approved
+  installed distribution before retrying.
+
 - [`CLICKHOUSE_MSSQL_TARGET_MAX_CURSOR_UNSAFE`](CLICKHOUSE_MSSQL_TARGET_MAX_CURSOR_UNSAFE.md),
   [`MYSQL_MSSQL_TARGET_MAX_CURSOR_UNSAFE`](MYSQL_MSSQL_TARGET_MAX_CURSOR_UNSAFE.md),
   [`MSSQL_MSSQL_TARGET_MAX_CURSOR_UNSAFE`](MSSQL_MSSQL_TARGET_MAX_CURSOR_UNSAFE.md), and
