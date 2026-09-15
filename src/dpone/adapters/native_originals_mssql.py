@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 
 from dpone.adapters import dbapi_lifecycle
+from dpone.contracts.mssql_object_name import native_control_schema as native_control_schema
 from dpone.contracts.native_delivery_json import MAX_NATIVE_JSON_BYTES
 from dpone.contracts.native_identity import OriginalRef
 from dpone.contracts.native_originals import (
@@ -22,13 +22,6 @@ from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
 
 class NativeOriginalBindingError(RuntimeError):
     """The protected ledger did not prove the complete requested binding."""
-
-
-def native_control_schema(value: str) -> str:
-    """Validate an interpolated SQL identifier; values always use parameters."""
-    if type(value) is not str or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", value) is None:
-        raise ValueError("control_schema must be a simple SQL identifier of at most 128 characters")
-    return value
 
 
 class MssqlNativeOriginalBindings:

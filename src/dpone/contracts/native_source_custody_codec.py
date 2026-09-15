@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Literal, cast
 from uuid import UUID
 
 from dpone.contracts.native_delivery_json import (
@@ -10,7 +11,13 @@ from dpone.contracts.native_delivery_json import (
     encode_native_delivery_json,
 )
 from dpone.contracts.native_identity import OriginalRef
-from dpone.contracts.native_source_custody import NativeSourceCustodyError, SourceExecutorBinding
+from dpone.contracts.native_source_custody import (
+    NativeSourceCustodyError,
+    SourceExecutorBinding,
+    TrustedDbtCommandEntry,
+    TrustedDbtCommandPlan,
+    TrustedDbtInvocationCompletion,
+)
 
 _EXECUTOR_SCHEMA = "dpone.native-source-executor-binding.v1"
 _EXECUTOR_FIELDS = frozenset(
@@ -55,6 +62,158 @@ def decode_source_executor_binding(payload: bytes) -> SourceExecutorBinding:
     if encode_source_executor_binding(binding) != payload:
         raise NativeSourceCustodyError("writer binding bytes must be canonical")
     return binding
+
+
+def encode_trusted_dbt_command_plan(value: TrustedDbtCommandPlan) -> bytes:
+    """Encode only a complete fixed phase, preserving every literal argv byte."""
+    if type(value) is not TrustedDbtCommandPlan:
+        raise NativeSourceCustodyError("expected a trusted dbt command plan")
+    value.__post_init__()
+    return encode_native_delivery_json(
+        {
+            "schema": value.schema,
+            "executor_invocation_id": str(value.executor_invocation_id),
+            "phase": value.phase,
+            "commands": [
+                {
+                    "position": entry.position,
+                    "verb": entry.verb,
+                    "argv_template": list(entry.argv_template),
+                    "command_timeout_seconds": entry.command_timeout_seconds,
+                    "termination_allowance_seconds": entry.termination_allowance_seconds,
+                }
+                for entry in value.commands
+            ],
+            "project_root": _reference_payload(value.project_root),
+            "output_root": _reference_payload(value.output_root),
+            "profile_root": _reference_payload(value.profile_root),
+            "total_termination_budget_seconds": value.total_termination_budget_seconds,
+        }
+    )
+
+
+def decode_trusted_dbt_command_plan(payload: bytes) -> TrustedDbtCommandPlan:
+    """Reject extra slots/fields and noncanonical serialized command membership."""
+    value = _mapping(
+        decode_native_delivery_json(payload),
+        {
+            "schema",
+            "executor_invocation_id",
+            "phase",
+            "commands",
+            "project_root",
+            "output_root",
+            "profile_root",
+            "total_termination_budget_seconds",
+        },
+    )
+    if value["schema"] != "dpone.trusted-dbt-command-plan.v1" or type(value["commands"]) is not list:
+        raise NativeSourceCustodyError("invalid trusted command plan wire schema")
+    entries = tuple(_command_entry(entry) for entry in value["commands"])
+    plan = TrustedDbtCommandPlan(
+        schema="dpone.trusted-dbt-command-plan.v1",
+        executor_invocation_id=_uuid(value["executor_invocation_id"]),
+        phase=cast(Literal["BUILD", "QUALITY"], _string(value["phase"])),
+        commands=entries,
+        project_root=_reference(value["project_root"]),
+        output_root=_reference(value["output_root"]),
+        profile_root=_reference(value["profile_root"]),
+        total_termination_budget_seconds=_integer(value["total_termination_budget_seconds"]),
+    )
+    if encode_trusted_dbt_command_plan(plan) != payload:
+        raise NativeSourceCustodyError("trusted command plan bytes must be canonical")
+    return plan
+
+
+def encode_trusted_dbt_invocation_completion(value: TrustedDbtInvocationCompletion) -> bytes:
+    """Encode captured positive facts without adding runtime state or timestamps."""
+    if type(value) is not TrustedDbtInvocationCompletion:
+        raise NativeSourceCustodyError("expected a trusted dbt invocation completion")
+    value.__post_init__()
+    return encode_native_delivery_json(
+        {
+            "schema": value.schema,
+            "executor": decode_native_delivery_json(encode_source_executor_binding(value.executor)),
+            "command": _reference_payload(value.command),
+            "toolchain": _reference_payload(value.toolchain),
+            "qualification": _reference_payload(value.qualification),
+            "started_at": value.started_at,
+            "finished_at": value.finished_at,
+            "elapsed_microseconds": value.elapsed_microseconds,
+            "exit_code": value.exit_code,
+            "command_count": value.command_count,
+        }
+    )
+
+
+def decode_trusted_dbt_invocation_completion(payload: bytes) -> TrustedDbtInvocationCompletion:
+    """Decode a positive-only record; authenticity remains the reader's obligation."""
+    value = _mapping(
+        decode_native_delivery_json(payload),
+        {
+            "schema",
+            "executor",
+            "command",
+            "toolchain",
+            "qualification",
+            "started_at",
+            "finished_at",
+            "elapsed_microseconds",
+            "exit_code",
+            "command_count",
+        },
+    )
+    if value["schema"] != "dpone.trusted-dbt-invocation-completion.v1" or _integer(value["exit_code"]) != 0:
+        raise NativeSourceCustodyError("invalid trusted completion wire schema/outcome")
+    completion = TrustedDbtInvocationCompletion(
+        schema="dpone.trusted-dbt-invocation-completion.v1",
+        executor=decode_source_executor_binding(encode_native_delivery_json(value["executor"])),
+        command=_reference(value["command"]),
+        toolchain=_reference(value["toolchain"]),
+        qualification=_reference(value["qualification"]),
+        started_at=_string(value["started_at"]),
+        finished_at=_string(value["finished_at"]),
+        elapsed_microseconds=_integer(value["elapsed_microseconds"]),
+        exit_code=0,
+        command_count=_integer(value["command_count"]),
+    )
+    if encode_trusted_dbt_invocation_completion(completion) != payload:
+        raise NativeSourceCustodyError("trusted completion bytes must be canonical")
+    return completion
+
+
+def _mapping(value: NativeJsonValue, fields: set[str]) -> dict[str, NativeJsonValue]:
+    if type(value) is not dict or set(value) != fields:
+        raise NativeSourceCustodyError("trusted invocation record has incomplete or extra fields")
+    return value
+
+
+def _integer(value: NativeJsonValue) -> int:
+    if type(value) is not int:
+        raise NativeSourceCustodyError("trusted invocation integer must be exact")
+    return value
+
+
+def _string(value: NativeJsonValue) -> str:
+    if type(value) is not str:
+        raise NativeSourceCustodyError("trusted invocation string must be exact")
+    return value
+
+
+def _command_entry(value: NativeJsonValue) -> TrustedDbtCommandEntry:
+    fields = _mapping(
+        value, {"position", "verb", "argv_template", "command_timeout_seconds", "termination_allowance_seconds"}
+    )
+    arguments = fields["argv_template"]
+    if type(arguments) is not list:
+        raise NativeSourceCustodyError("trusted command argv must be an array")
+    return TrustedDbtCommandEntry(
+        position=_integer(fields["position"]),
+        verb=cast(Literal["parse", "ls", "build", "test"], _string(fields["verb"])),
+        argv_template=tuple(_string(argument) for argument in arguments),
+        command_timeout_seconds=_integer(fields["command_timeout_seconds"]),
+        termination_allowance_seconds=_integer(fields["termination_allowance_seconds"]),
+    )
 
 
 def _reference_payload(value: OriginalRef) -> dict[str, NativeJsonValue]:

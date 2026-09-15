@@ -8,6 +8,19 @@ from dataclasses import dataclass
 _SAFE_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
+def native_control_schema(value: str) -> str:
+    """Validate a native control schema without normalization or SQL execution.
+
+    Control procedures interpolate this identifier and parameterize values.
+    Unlike general object-name helpers, this contract accepts only exact strings
+    containing a simple ASCII identifier of at most 128 characters. The legacy
+    binding adapter reexports this function for existing callers.
+    """
+    if type(value) is not str or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", value) is None:
+        raise ValueError("control_schema must be a simple SQL identifier of at most 128 characters")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class MSSQLObjectName:
     """Immutable SQL Server table identity.
@@ -169,6 +182,7 @@ __all__ = [
     "mssql_dataset_is_safe",
     "mssql_ensure_schema_statement",
     "mssql_sp_rename_statement",
+    "native_control_schema",
     "quote_mssql_identifier",
     "safe_mssql_identifier",
 ]

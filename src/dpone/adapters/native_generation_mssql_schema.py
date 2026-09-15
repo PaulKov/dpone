@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 from dpone.adapters import dbapi_lifecycle
 from dpone.adapters.native_generation_mssql_queries import generation_procedure, generation_procedure_name
-from dpone.adapters.native_originals_mssql import native_control_schema
+from dpone.contracts.mssql_object_name import native_control_schema
 from dpone.contracts.native_identity import OriginalRef
 from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
 
