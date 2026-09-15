@@ -230,6 +230,7 @@ def main(
 
     selected = "recovery-report" if args.recovery_report else "check" if args.check else "generate"
     result: dict[str, object] = {"mode": selected}
+    identity = None
     try:
         identity = inspect_project_root(Path(args.source_repo))
         if identity is None:
@@ -259,6 +260,21 @@ def main(
     except Exception:
         result["status"] = "FAILED"
         code = 1
+    if code in {1, 3} and identity is not None:
+        # Failure before writer entry can race with another interrupted writer.
+        # Observe, never repair; preserve any owned dependency-workspace receipt.
+        try:
+            verify_project_root(identity)
+            report = recovery_report(identity.path)
+            if report.pending:
+                result.update(status="RECOVERY_REQUIRED", recovery=asdict(report))
+                code = 3
+        except Exception:
+            result.update(
+                status="RECOVERY_REQUIRED",
+                recovery={"pending": True, "status": "ROOT_UNAVAILABLE", "discovery_required": True},
+            )
+            code = 3
     print(json.dumps(result, ensure_ascii=True, sort_keys=True))
     return code
 
