@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,12 +51,8 @@ def capture_package_source(repo: Path, revision: str) -> PackageSource:
         if actual != revision:
             raise ValueError(_INVALID_SOURCE)
         _git(repo, "merge-base", "--is-ancestor", revision, "HEAD")
-        for index_mode in ((), ("--cached",)):
-            _git(
-                repo, "diff", "--quiet", "--no-ext-diff", "--no-textconv", *index_mode, revision, "--", _PACKAGE_PREFIX
-            )
         records = _git(repo, "ls-tree", "-rz", revision, "--", _PACKAGE_PREFIX).split(b"\0")
-        blobs: dict[str, str] = {}
+        blobs: dict[str, tuple[str, str]] = {}
         for record in filter(None, records):
             metadata, raw_path = record.split(b"\t", 1)
             mode, kind, oid = metadata.decode("ascii").split()
@@ -65,20 +62,34 @@ def capture_package_source(repo: Path, revision: str) -> PackageSource:
             name = path[len(_PACKAGE_PREFIX) + 1 :]
             if name in blobs:
                 raise ValueError(_INVALID_SOURCE)
-            blobs[name] = oid
+            blobs[name] = (mode, oid)
         if set(blobs) != set(_PACKAGE_FILES):
+            raise ValueError(_INVALID_SOURCE)
+        indexed: dict[str, tuple[str, str]] = {}
+        for record in filter(None, _git(repo, "ls-files", "--stage", "-z", "--", _PACKAGE_PREFIX).split(b"\0")):
+            metadata, raw_path = record.split(b"\t", 1)
+            mode, oid, stage = metadata.decode("ascii").split()
+            path = raw_path.decode("utf-8")
+            if stage != "0" or not path.startswith(_PACKAGE_PREFIX + "/"):
+                raise ValueError(_INVALID_SOURCE)
+            name = path[len(_PACKAGE_PREFIX) + 1 :]
+            if name in indexed:
+                raise ValueError(_INVALID_SOURCE)
+            indexed[name] = (mode, oid)
+        if indexed != blobs:
             raise ValueError(_INVALID_SOURCE)
         package_root = repo / _PACKAGE_PREFIX
         # Reuse the installed inventory contract, including empty extra folders.
         _read_inventory(package_root, _PACKAGE_FILES)
         files: list[tuple[str, bytes]] = []
-        for name, oid in sorted(blobs.items()):
+        for name, (mode, oid) in sorted(blobs.items()):
             expected = _git(repo, "cat-file", "blob", oid)
             expected.decode("utf-8")
             observed = read_confined_file_snapshot(
                 repo, _PACKAGE_PREFIX + "/" + name, max_bytes=len(expected), root_identity=root
             )
-            if observed.content != expected:
+            observed_mode = "100755" if observed.identity.mode & stat.S_IXUSR else "100644"
+            if observed.content != expected or observed_mode != mode:
                 raise ValueError(_INVALID_SOURCE)
             files.append((name, expected))
         project = load_bounded_yaml(dict(files)["dbt_project.yml"])
