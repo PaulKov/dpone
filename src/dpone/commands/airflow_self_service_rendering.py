@@ -245,6 +245,9 @@ def _change_summary(changes: list[dict[str, str]]) -> str:
 def _next_command(title: str, payload: Mapping[str, object]) -> str:
     if payload.get("passed") is not True:
         return ""
+    if title == "dpone init dbt":
+        command = payload.get("next_command")
+        return command if isinstance(command, str) else ""
     if title == "dpone init project":
         if payload.get("layout_mode") == "domain_first":
             return "dpone init domain sales --owner-team <team> --owner-contact <contact> --approver-team <github-team>"
