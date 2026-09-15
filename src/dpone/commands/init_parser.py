@@ -6,7 +6,7 @@ import argparse
 from collections.abc import Sequence
 from typing import Any
 
-BEGINNER_TARGETS = frozenset({"project", "domain", "pipeline", "dag"})
+BEGINNER_TARGETS = frozenset({"project", "domain", "pipeline", "dag", "dbt"})
 TRACKED_OPTIONS_ATTR = "_init_options_before_target"
 DEFAULT_RECIPE = "mssql-to-clickhouse-incremental"
 AUTHORING_CHOICES = ("classic", "flow", "folder")
@@ -185,10 +185,11 @@ class _RejectInitOption(argparse.Action):
 
 def register_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
     from dpone.commands.init_dag_parser import register_dag_parser
+    from dpone.commands.init_dbt_parser import register_dbt_parser
 
     parser = subparsers.add_parser(
         "init",
-        help="Initialize a project, domain, pipeline, dag, or legacy manifest bundle",
+        help="Initialize a project, domain, pipeline, dag, dbt project, or legacy manifest bundle",
         description="Initialize beginner self-service authority or a legacy manifest bundle.",
     )
     airflow_group = parser.add_mutually_exclusive_group()
@@ -246,12 +247,17 @@ def register_parser(subparsers: argparse._SubParsersAction) -> argparse.Argument
         action="init_target_parsers",
         title="beginner targets",
         description="Omit a target to use legacy manifest bundle options.",
-        metavar="[{project,domain,pipeline,dag}]",
+        metavar="[{project,domain,pipeline,dag,dbt}]",
     )
     _register_project_parser(target_parsers)
     _register_domain_parser(target_parsers)
     _register_pipeline_parser(target_parsers)
     register_dag_parser(target_parsers)
+    dbt_parser = register_dbt_parser(target_parsers)
+    setattr(dbt_parser, "_dpone_io_contract", _BEGINNER_IO_CONTRACT)
+    _add_rejected_options(
+        dbt_parser, target="dbt", options=tuple(option for option in _VALID_TARGETS_BY_OPTION if option != "--profile")
+    )
     _register_legacy_options(parser)
     parser.set_defaults(_init_parser=parser)
     return parser
