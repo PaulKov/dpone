@@ -57,7 +57,7 @@ from dpone.runtime.dbt_run_results import (
 from dpone.runtime.dbt_sqlserver_project_policy import (
     validate_runtime_sqlserver_project_policy,
 )
-from dpone.runtime.dbt_workspace_attempt_lifecycle import DbtWorkspaceAttemptLifecycle
+from dpone.runtime.dbt_workspace_attempt_lifecycle import DbtExecutionAttemptLifecycle, DbtWorkspaceAttemptLifecycle
 
 if TYPE_CHECKING:
     from dpone.ports.dbt_workspace_attempt import (
@@ -85,6 +85,7 @@ class DbtExecutionService:
         workspace_attempt_factory: DbtWorkspaceAttemptRequestFactoryPort | None = None,
         workspace_attempt_admission: DbtWorkspaceAttemptAdmissionPort | None = None,
         clock: Callable[[], datetime] | None = None,
+        workspace_attempt_lifecycle: DbtExecutionAttemptLifecycle | None = None,
     ) -> None:
         self._command_runner = command_runner
         self._toolchain_inspector = toolchain_inspector
@@ -94,10 +95,18 @@ class DbtExecutionService:
         self._run_results_validator = run_results_validator
         self._preflight = preflight
         self._evidence_writer = evidence_writer
-        self._workspace_attempts = DbtWorkspaceAttemptLifecycle(
-            run_results_reader=run_results_reader,
-            request_factory=workspace_attempt_factory,
-            admission=workspace_attempt_admission,
+        if workspace_attempt_lifecycle is not None and (
+            workspace_attempt_factory is not None or workspace_attempt_admission is not None
+        ):
+            raise ValueError("explicit lifecycle cannot be combined with workspace admission dependencies")
+        self._workspace_attempts = (
+            workspace_attempt_lifecycle
+            if workspace_attempt_lifecycle is not None
+            else DbtWorkspaceAttemptLifecycle(
+                run_results_reader=run_results_reader,
+                request_factory=workspace_attempt_factory,
+                admission=workspace_attempt_admission,
+            )
         )
         self._clock = clock or (lambda: datetime.now(UTC))
 
@@ -197,7 +206,7 @@ class DbtExecutionService:
                 dbt_exit_code = result.exit_code
         except Exception as exc:  # noqa: BLE001 - failures require durable evidence
             code = "COMMIT_UNKNOWN" if build_started else runtime_failure_code(exc)
-            code = self._workspace_attempts.terminalize(
+            code = self._record_execution_outcome(
                 workspace_attempt,
                 state="COMMIT_UNKNOWN" if build_started else "FAILED",
                 fallback_code=code,
@@ -223,7 +232,7 @@ class DbtExecutionService:
                 validator=self._run_results_validator,
             )
         except Exception:  # noqa: BLE001 - post-build proof failures are ambiguous
-            self._workspace_attempts.terminalize(
+            self._record_execution_outcome(
                 workspace_attempt,
                 state="COMMIT_UNKNOWN",
                 fallback_code="COMMIT_UNKNOWN",
@@ -255,7 +264,7 @@ class DbtExecutionService:
         terminal_state: DbtWorkspaceAttemptTerminalState = (
             "SUCCEEDED" if passed else ("COMMIT_UNKNOWN" if code == "COMMIT_UNKNOWN" else "FAILED")
         )
-        code = self._workspace_attempts.terminalize(
+        code = self._record_execution_outcome(
             workspace_attempt,
             state=terminal_state,
             fallback_code=code,
@@ -276,6 +285,24 @@ class DbtExecutionService:
             build_started=build_started,
             passed=passed,
         )
+
+    def _record_execution_outcome(
+        self,
+        request: DbtWorkspaceAttemptRequest | None,
+        *,
+        state: DbtWorkspaceAttemptTerminalState,
+        fallback_code: str,
+        build_started: bool,
+    ) -> str:
+        try:
+            return self._workspace_attempts.record_execution_outcome(
+                request,
+                state=state,
+                fallback_code=fallback_code,
+                build_started=build_started,
+            )
+        except Exception:  # noqa: BLE001 - post-dispatch ambiguity still needs evidence
+            return "COMMIT_UNKNOWN" if build_started else fallback_code
 
     def _outcome(
         self,

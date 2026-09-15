@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from dpone.contracts.dbt_runtime import DBT_EXECUTION_PACK_SCHEMA_V2, DbtPublishingError
 from dpone.runtime.dbt_preflight import MAX_DBT_PREFLIGHT_MANIFEST_BYTES
@@ -17,6 +17,28 @@ if TYPE_CHECKING:
         DbtWorkspaceAttemptTerminalState,
     )
     from dpone.runtime.dbt_execution_policy import DbtExecutionOutputPaths
+
+
+class DbtExecutionAttemptLifecycle(Protocol):
+    """Invocation owner for admission and execution outcome reporting."""
+
+    def admit(
+        self,
+        pack: DbtExecutionPack,
+        *,
+        output_paths: DbtExecutionOutputPaths,
+        run_identity: AirflowRunIdentity,
+        airflow_attempt: AirflowAttemptCorrelation,
+    ) -> DbtWorkspaceAttemptRequest | None: ...
+
+    def record_execution_outcome(
+        self,
+        request: DbtWorkspaceAttemptRequest | None,
+        *,
+        state: DbtWorkspaceAttemptTerminalState,
+        fallback_code: str,
+        build_started: bool,
+    ) -> str: ...
 
 
 class DbtWorkspaceAttemptLifecycle:
@@ -68,6 +90,22 @@ class DbtWorkspaceAttemptLifecycle:
                 "Workspace task-attempt admission readback differs",
             )
         return request
+
+    def record_execution_outcome(
+        self,
+        request: DbtWorkspaceAttemptRequest | None,
+        *,
+        state: DbtWorkspaceAttemptTerminalState,
+        fallback_code: str,
+        build_started: bool,
+    ) -> str:
+        """Ordinary execution retains its immediate durable terminal decision."""
+        return self.terminalize(
+            request,
+            state=state,
+            fallback_code=fallback_code,
+            build_started=build_started,
+        )
 
     def terminalize(
         self,
