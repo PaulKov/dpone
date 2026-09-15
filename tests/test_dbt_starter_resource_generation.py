@@ -123,6 +123,24 @@ def test_read_only_git_does_not_inherit_command_environment(source, monkeypatch)
     assert capture_package_source(repo, revision).revision == revision
 
 
+def test_dirty_index_rejects_even_when_working_bytes_match(source):
+    repo, revision = source
+    path = repo / "packages/dbt-dpone/INSTALL.md"
+    original = path.read_bytes()
+    path.write_bytes(b"staged synthetic change")
+    git(repo, "add", ".")
+    path.write_bytes(original)
+    with pytest.raises(ValueError):
+        capture_package_source(repo, revision)
+
+
+def test_dirty_executable_mode_rejects(source):
+    repo, revision = source
+    (repo / "packages/dbt-dpone/INSTALL.md").chmod(0o755)
+    with pytest.raises(ValueError):
+        capture_package_source(repo, revision)
+
+
 @pytest.fixture
 def mirrored(source):
     from dpone.runtime.dbt_package_readiness import dbt_package_declaration_sha1
