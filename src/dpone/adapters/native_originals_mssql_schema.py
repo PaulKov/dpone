@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from dpone.adapters import dbapi_lifecycle
-from dpone.adapters.native_originals_mssql import native_control_schema
+from dpone.contracts.mssql_object_name import native_control_schema
 from dpone.contracts.native_identity import OriginalRef
 from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
 
