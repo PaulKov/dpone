@@ -1,0 +1,248 @@
+"""Synthetic real-filesystem resource transaction checks."""
+
+import os
+import stat
+import subprocess
+import sys
+
+import pytest
+from tools.dbt_self_service.starter_resource_journal import RESOURCE_PATHS, recovery_report
+from tools.dbt_self_service.starter_resource_transaction import apply_resource_plan
+
+from dpone.adapters.project_authoring_lock import project_authoring_lock
+
+
+def payloads():
+    return {path: ("synthetic " + path + "\r\n").encode() for path in RESOURCE_PATHS}
+
+
+def apply(root, **overrides):
+    return apply_resource_plan(
+        root,
+        payloads(),
+        source_revision="a" * 40,
+        revalidate_inputs=lambda: None,
+        validate_result=lambda: None,
+        authoring_lock=project_authoring_lock,
+        **overrides,
+    )
+
+
+def test_create_and_identical_retry_are_clean(tmp_path):
+    result = apply(tmp_path)
+    assert result.passed and len(result.changed_paths) == 16
+    assert not recovery_report(tmp_path).pending
+    assert {path: (tmp_path / path).read_bytes() for path in RESOURCE_PATHS} == payloads()
+    retry = apply(tmp_path)
+    assert retry.passed and retry.changed_paths == ()
+
+
+def test_replace_existing_resource_bytes(tmp_path):
+    for path in RESOURCE_PATHS:
+        target = tmp_path / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"old")
+    assert apply(tmp_path).passed
+    assert all((tmp_path / path).read_bytes() == data for path, data in payloads().items())
+    assert not recovery_report(tmp_path).pending
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_caught_failure_compensates_only_owned_writes(tmp_path, existing):
+    if existing:
+        for path in RESOURCE_PATHS:
+            target = tmp_path / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"old")
+
+    def fail(phase, path):
+        if phase == "after_mutation":
+            raise RuntimeError("PRIVATE_SENTINEL")
+
+    result = apply(tmp_path, phase_hook=fail)
+    assert not result.passed
+    assert "PRIVATE_SENTINEL" not in repr(result)
+    for path in RESOURCE_PATHS:
+        if existing:
+            assert (tmp_path / path).read_bytes() == b"old"
+        else:
+            assert not (tmp_path / path).exists()
+
+
+def test_process_death_leaves_pending_observation_and_blocks_retry(tmp_path):
+    def die(phase, path):
+        if phase == "after_mutation":
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        apply(tmp_path, phase_hook=die)
+    report = recovery_report(tmp_path)
+    assert report.pending and report.unresolved
+    before = (tmp_path / RESOURCE_PATHS[0]).read_bytes()
+    assert not apply(tmp_path).passed
+    assert (tmp_path / RESOURCE_PATHS[0]).read_bytes() == before
+
+
+def test_unknown_paths_reject_before_any_write(tmp_path):
+    files = payloads()
+    files["../unknown"] = b"no"
+    result = apply_resource_plan(
+        tmp_path,
+        files,
+        source_revision="a" * 40,
+        revalidate_inputs=lambda: None,
+        validate_result=lambda: None,
+        authoring_lock=project_authoring_lock,
+    )
+    assert not result.passed and list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("rollback", [False, True])
+def test_existing_permission_bits_survive_apply_or_rollback(tmp_path, rollback):
+    first = tmp_path / RESOURCE_PATHS[0]
+    first.parent.mkdir(parents=True, exist_ok=True)
+    first.write_bytes(b"old")
+    first.chmod(0o755)
+
+    def fail(phase, path):
+        if rollback and phase == "after_mutation":
+            raise RuntimeError("synthetic")
+
+    result = apply(tmp_path, phase_hook=fail)
+    assert result.passed is not rollback
+    assert stat.S_IMODE(first.stat().st_mode) == 0o755
+
+
+def test_foreign_identical_inode_is_preserved_during_compensation(tmp_path):
+    first = tmp_path / RESOURCE_PATHS[0]
+    replacement = tmp_path / "foreign"
+
+    def interfere(phase, path):
+        if phase == "after_mutation":
+            replacement.write_bytes(first.read_bytes())
+            os.replace(replacement, first)
+            raise RuntimeError("synthetic")
+
+    result = apply(tmp_path, phase_hook=interfere)
+    assert not result.passed and result.recovery_required
+    assert first.read_bytes() == payloads()[RESOURCE_PATHS[0]]
+    assert recovery_report(tmp_path).pending
+
+
+def test_corrupt_prepared_backup_prevents_first_target_mutation(tmp_path):
+    first = tmp_path / RESOURCE_PATHS[0]
+    first.parent.mkdir(parents=True, exist_ok=True)
+    first.write_bytes(b"old")
+
+    def corrupt(phase, path):
+        if phase == "prepared":
+            metadata = tmp_path / ".dpone-starter-resource-transactions"
+            operation = next(metadata.iterdir())
+            (operation / "old/000.bin").write_bytes(b"foreign")
+
+    result = apply(tmp_path, phase_hook=corrupt)
+    assert not result.passed and result.recovery_required
+    assert first.read_bytes() == b"old"
+
+
+def test_actual_process_exit_retains_pending_operation(tmp_path):
+    script = """
+import os, sys
+from pathlib import Path
+from dpone.adapters.project_authoring_lock import project_authoring_lock
+from tools.dbt_self_service.starter_resource_journal import RESOURCE_PATHS
+from tools.dbt_self_service.starter_resource_transaction import apply_resource_plan
+def die(phase, path):
+    if phase == "after_mutation":
+        os._exit(91)
+apply_resource_plan(
+    Path(sys.argv[1]), {path: b"synthetic" for path in RESOURCE_PATHS},
+    source_revision="a"*40, revalidate_inputs=lambda: None,
+    validate_result=lambda: None, authoring_lock=project_authoring_lock,
+    phase_hook=die,
+)
+"""
+    completed = subprocess.run([sys.executable, "-c", script, str(tmp_path)], capture_output=True, timeout=20)
+    assert completed.returncode == 91
+    report = recovery_report(tmp_path)
+    assert report.pending and report.unresolved == (RESOURCE_PATHS[0],)
+    assert not apply(tmp_path).passed
+    assert (tmp_path / RESOURCE_PATHS[0]).read_bytes() == b"synthetic"
+
+
+def test_third_winner_during_inverse_exchange_is_preserved_and_reported(tmp_path, monkeypatch):
+    from tools.dbt_self_service import starter_resource_transaction as transaction
+
+    first = tmp_path / RESOURCE_PATHS[0]
+    first.parent.mkdir(parents=True, exist_ok=True)
+    first.write_bytes(b"old")
+    exchange = transaction.get_native_atomic_exchange()
+    foreign_inode = []
+
+    def raced_exchange(parent, left, right):
+        foreign = tmp_path / "foreign"
+        foreign.write_bytes(first.read_bytes())
+        foreign_inode.append(foreign.stat().st_ino)
+        os.replace(foreign, first)
+        exchange(parent, left, right)
+
+    monkeypatch.setattr(transaction, "get_native_atomic_exchange", lambda: raced_exchange)
+
+    def fail(phase, path):
+        if phase == "after_mutation":
+            raise RuntimeError("synthetic")
+
+    result = apply(tmp_path, phase_hook=fail)
+    assert result.recovery_required and first.read_bytes() == b"old"
+    report = recovery_report(tmp_path)
+    preserved = [tmp_path / path for path in report.paths if (tmp_path / path).is_file()]
+    assert any(path.stat().st_ino == foreign_inode[0] for path in preserved)
+
+
+@pytest.mark.parametrize("phase", ["prepared", "before_apply", "after_mutation", "after_observation", "verified"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_failure_boundaries_restore_owned_target_bytes(tmp_path, phase, existing):
+    if existing:
+        for path in RESOURCE_PATHS:
+            target = tmp_path / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"old")
+    fired = False
+
+    def fail_once(observed, path):
+        nonlocal fired
+        if observed == phase and not fired:
+            fired = True
+            raise RuntimeError("synthetic")
+
+    result = apply(tmp_path, phase_hook=fail_once)
+    assert fired and not result.passed
+    assert not result.recovery_required
+    assert not recovery_report(tmp_path).pending
+    for path in RESOURCE_PATHS:
+        target = tmp_path / path
+        assert target.read_bytes() == b"old" if existing else not target.exists()
+
+
+def test_crash_during_compensation_is_an_unresolved_observation(tmp_path):
+    def fail(phase, path):
+        if phase == "after_mutation":
+            raise RuntimeError("synthetic")
+        if phase == "after_compensate_mutation":
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        apply(tmp_path, phase_hook=fail)
+    report = recovery_report(tmp_path)
+    assert report.pending and report.unresolved == (RESOURCE_PATHS[0],)
+    assert not (tmp_path / RESOURCE_PATHS[0]).exists()
+
+
+def test_cleanup_failure_is_not_claimed_as_success(tmp_path):
+    def fail(phase, path):
+        if phase == "before_cleanup":
+            raise OSError("synthetic")
+
+    result = apply(tmp_path, phase_hook=fail)
+    assert not result.passed and result.recovery_required
+    assert recovery_report(tmp_path).pending
