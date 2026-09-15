@@ -12,7 +12,7 @@ import stat
 from pathlib import Path
 from uuid import UUID
 
-from tools.dbt_self_service.starter_resource_journal import MAX_RESOURCE_BYTES, METADATA_ROOT, RESOURCE_PATHS
+from tools.dbt_self_service.starter_resource_journal_schema import MAX_RESOURCE_BYTES, METADATA_ROOT, RESOURCE_PATHS
 
 from dpone.manifest.confined_files import ConfinedFileError, ConfinedFileSnapshot, read_confined_leaf
 from dpone.manifest.confined_transaction_journal import transaction_journal_name
