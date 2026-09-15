@@ -1,0 +1,13 @@
+name: @@DPONE_PROJECT_NAME@@
+version: 1.0.0
+config-version: 2
+profile: @@DPONE_DBT_PROFILE@@
+model-paths: [models]
+packages-install-path: dbt_packages
+clean-targets: [target, logs]
+
+flags:
+  dbt_sqlserver_enable_safe_type_expansion: false
+  dbt_sqlserver_use_native_string_types: true
+  dbt_sqlserver_use_dbt_transactions: true
+  dbt_sqlserver_use_default_schema_concat: true
