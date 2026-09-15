@@ -206,6 +206,58 @@ def test_cli_recovery_pending_blocks_dependency_generation(mirrored, capsys):
     assert result["pending"] and result["discovery_required"]
 
 
+@pytest.mark.parametrize("failure", ["dependency", "retained", "other", "return"])
+def test_cli_concurrent_recovery_is_not_hidden_by_generation_failure(mirrored, capsys, failure):
+    from tools.dbt_self_service.generate_starter_resources import main
+    from tools.dbt_self_service.starter_dependency_generation import DependencyGenerationError
+
+    from dpone.manifest.confined_transaction_journal import transaction_journal_name
+
+    repo, revision, starter = mirrored
+    dependencies = dependency_fixture(starter)
+    retained = repo.parent / "synthetic-owned-dependency-workspace"
+
+    def generate(source):
+        (starter / transaction_journal_name("packages.yml")).write_bytes(b"malformed")
+        if failure == "dependency":
+            raise DependencyGenerationError()
+        if failure == "retained":
+            retained.mkdir()
+            raise DependencyGenerationError(retained_workspace=retained)
+        if failure == "other":
+            raise ValueError("PRIVATE_SENTINEL")
+        return dependencies
+
+    assert main(["--source-repo", str(repo), "--revision", revision], generate=generate) == 3
+    output = capsys.readouterr().out
+    assert "PRIVATE_SENTINEL" not in output
+    result = json.loads(output)
+    assert result["status"] == "RECOVERY_REQUIRED"
+    assert result["recovery"]["pending"] and result["recovery"]["discovery_required"]
+    if failure == "retained":
+        assert result["retained_workspace"] == str(retained) and retained.is_dir()
+
+
+def test_cli_does_not_inspect_replacement_root_after_failure(mirrored, capsys):
+    from tools.dbt_self_service.generate_starter_resources import main
+
+    repo, revision, _ = mirrored
+    displaced = repo.with_name("displaced-owned-root")
+
+    def generate(source):
+        repo.rename(displaced)
+        repo.mkdir()
+        (repo / "foreign.txt").write_bytes(b"untouched")
+        raise ValueError("PRIVATE_SENTINEL")
+
+    assert main(["--source-repo", str(repo), "--revision", revision], generate=generate) == 3
+    output = capsys.readouterr().out
+    assert "PRIVATE_SENTINEL" not in output
+    assert json.loads(output)["recovery"]["status"] == "ROOT_UNAVAILABLE"
+    assert list(repo.iterdir()) == [repo / "foreign.txt"]
+    assert (repo / "foreign.txt").read_bytes() == b"untouched"
+
+
 @pytest.mark.parametrize("before", [False, True])
 def test_cli_unknown_asset_rejects_before_writer(mirrored, capsys, before):
     from tools.dbt_self_service.generate_starter_resources import main
