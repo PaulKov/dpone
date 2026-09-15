@@ -130,6 +130,11 @@ class NativeGenerationBuildEvidenceWriter:
         self._completion: SourceTrustedBuildCompletion | None = None
         self._attempted: dict[str, tuple[NativeOriginalKind, bytes, OriginalRef]] = {}
 
+    def require_executor(self, executor: SourceExecutorBinding) -> None:
+        """Compare the complete bound identity without reading or publishing."""
+        if decode_source_executor_binding(encode_source_executor_binding(executor)) != self._executor:
+            raise NativeSourceCustodyError("build writer executor differs from its bound identity")
+
     def write(self, evidence: DbtExecutionEvidence) -> Path:
         """Preserve failed evidence; publish positive documents only after validation."""
         if type(evidence) is not DbtExecutionEvidence:
