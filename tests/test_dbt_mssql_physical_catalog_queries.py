@@ -201,3 +201,24 @@ def test_effective_visibility_checked_before_any_empty_security_result():
         assert sql.index(permission) < rls_position
         assert f"ISNULL({permission},0)<>1" in sql
     assert sql.count("@@TRANCOUNT<>1 OR XACT_STATE()<>1") >= 2
+
+
+@pytest.mark.parametrize("mode", ["SHARE_METADATA", "SHARE_BUILD"])
+def test_shared_observer_registration_is_outside_initial_catalog_cell(mode):
+    from dataclasses import replace
+
+    from dpone.contracts.dbt_mssql_physical_registration_values import SharedObserver
+
+    registration = MssqlPhysicalRuntimeRegistration(**registration_inputs())
+    registration = replace(
+        registration, principals=replace(registration.principals, observer=SharedObserver(mode, "sha256:" + "a" * 64))
+    )
+    with pytest.raises(ValueError, match="dedicated observer"):
+        catalog_procedure(
+            registration,
+            catalog_sql=Path("packages/dbt-dpone/control/sqlserver/physical-v1/catalog.sql").read_bytes(),
+            model_schema="models",
+            model_schema_id=9,
+            model_schema_owner_id=1,
+            catalog_certificate_thumbprint=b"x" * 20,
+        )

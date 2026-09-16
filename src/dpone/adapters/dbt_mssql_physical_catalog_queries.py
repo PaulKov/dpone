@@ -11,6 +11,7 @@ from dpone.adapters.dbt_mssql_physical_catalog_properties import forbidden_prope
 from dpone.contracts import dbt_mssql_physical_catalog_rows as rows
 from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntimeRegistration
 from dpone.contracts.dbt_mssql_physical_registration_codec import physical_runtime_registration_digest
+from dpone.contracts.dbt_mssql_physical_registration_values import DedicatedObserver
 from dpone.contracts.dbt_mssql_physical_validation import require_physical_identifier, require_sql_positive_integer
 from dpone.contracts.mssql_object_name import native_control_schema
 
@@ -149,6 +150,8 @@ def catalog_procedure(
     if type(registration) is not MssqlPhysicalRuntimeRegistration:
         raise ValueError("catalog producer requires exact registration")
     registration.__post_init__()
+    if type(registration.principals.observer) is not DedicatedObserver:
+        raise ValueError("initial catalog cell requires a dedicated observer")
     if type(catalog_sql) is not bytes or not catalog_sql:
         raise ValueError("authenticated catalog package bytes are required")
     local = native_control_schema(registration.local_schema)
