@@ -255,5 +255,5 @@ def test_permission_denies_on_foreign_dependency_objects_fail_before_catalog():
     assert "p.state='D' AND p.class=100" in sql
     assert "'VIEW ANY DEFINITION','VIEW ANY SECURITY DEFINITION','CONTROL SERVER'" in sql
     # No target-only major_id/schema filter: an incoming view can live anywhere.
-    db_deny = sql.split('FROM sys.database_permissions p', 1)[1].split('THROW', 1)[0]
+    db_deny = sql.split("FROM sys.database_permissions p", 1)[1].split("THROW", 1)[0]
     assert "major_id" not in db_deny
