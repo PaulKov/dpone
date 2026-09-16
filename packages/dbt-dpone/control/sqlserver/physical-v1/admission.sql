@@ -51,6 +51,19 @@ IF @guard_epoch IS NULL OR @guard_epoch<=0 OR @source_revision IS NULL OR @sourc
  AND build_control_principal_id=@control_id AND build_control_sid=@control_sid
  AND DATALENGTH(build_control_sid)=DATALENGTH(@control_sid))))
  THROW 51423, 'DPONE_PHYSICAL_SOURCE_FACTS_INVALID', 1;
+{{EXECUTOR_DECODE}}
+{{EXECUTOR_SHAPE}}
+DECLARE @epoch bigint=@guard_epoch;
+{{CANONICAL_EXECUTOR}}
+IF TRY_CONVERT(uniqueidentifier,JSON_VALUE(@binding,'$.invocation_id')) IS NULL
+ OR TRY_CONVERT(uniqueidentifier,JSON_VALUE(@binding,'$.invocation_id'))<>@expected_invocation
+ OR {{BINDING_RESERVATION_LOCATOR}}<>@reservation_locator
+ OR DATALENGTH({{BINDING_RESERVATION_LOCATOR}})<>DATALENGTH(@reservation_locator)
+ OR {{BINDING_RESERVATION_DIGEST}}<>@reservation_digest
+ OR {{BINDING_PROFILE_LOCATOR}}<>{{PROFILE_LOCATOR}}
+ OR DATALENGTH({{BINDING_PROFILE_LOCATOR}})<>DATALENGTH({{PROFILE_LOCATOR}})
+ OR {{BINDING_PROFILE_DIGEST}}<>{{PROFILE_DIGEST}}
+ THROW 51423, 'DPONE_PHYSICAL_SOURCE_EXECUTOR_FACTS_INVALID', 1;
 SELECT CONVERT(smallint,1) AS wire_version,@registration_id AS registration_id,
  @digest AS registration_digest,@generation AS generation_id,@expected_invocation AS executor_invocation_id,
  @guard_epoch AS guard_epoch,@source_revision AS source_revision,

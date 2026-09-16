@@ -29,6 +29,7 @@ def test_exact_modules_and_public_signature():
     assert set(bodies) == {ENTRY, HELPER}
     assert bodies[ENTRY].split("AS\n")[0].count("uniqueidentifier") == 3
     assert "EXEC [control].[native_control].[physical_control_require_source_v1]" in bodies[ENTRY]
+    assert "DPONE_NATIVE_GENERATION_EXECUTOR_NONCANONICAL" in bodies[ENTRY]
     for body in bodies.values():
         assert "{{" not in body
         assert "@@TRANCOUNT<>1 OR XACT_STATE()<>1" in body

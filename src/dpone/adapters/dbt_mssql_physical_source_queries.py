@@ -153,6 +153,8 @@ def source_procedures(
         ("REQUEST_PROFILE_DIGEST", "@json", "$.profile.sha256"),
         ("BINDING_RESERVATION_LOCATOR", "@binding", "$.reservation.locator"),
         ("BINDING_RESERVATION_DIGEST", "@binding", "$.reservation.sha256"),
+        ("BINDING_PROFILE_LOCATOR", "@binding", "$.profile.locator"),
+        ("BINDING_PROFILE_DIGEST", "@binding", "$.profile.sha256"),
     ):
         replacements[name] = utf8(scalar(document, path))
     replacements["REQUEST_SHAPE"] += shape(
