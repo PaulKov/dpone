@@ -314,7 +314,7 @@ For the repository example, the current successful transcript starts with:
 ```text
 dbt -> dpone publish: PASS
 manifest schema: v12
-published models: 2; workflows: 1
+validated publishing models: 2; workflows: 1
 models:
 - model.dpone_dbt_demo.competitive_pricing
 - model.dpone_dbt_demo.competitive_pricing_history
@@ -325,7 +325,9 @@ A following warning remains visible but does not change that successful
 authoring result. Production `compile` applies the stricter certification and
 release-admission gates described below.
 
-The one-model example above reports `published models: 1; workflows: 1`. Before
+The one-model example above reports `validated publishing models: 1; workflows: 1`.
+This means the publishing configuration passed local validation, not that data
+was built or delivered. Before
 opening the merge request, optionally inspect its resolved decision:
 
 ```bash

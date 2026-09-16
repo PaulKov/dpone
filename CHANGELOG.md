@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Label offline dbt check results as validated publishing models, not already
+  published data; JSON reports and execution behavior are unchanged.
+
 - Make stale dbt manifest recovery suggestions project-aware and shell-quoted,
   including regular local parse profiles without reading credentials or running
   dbt automatically. Existing error codes and exit behavior are unchanged.
