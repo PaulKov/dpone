@@ -113,7 +113,7 @@ def test_live_signature_and_permission_damage_respects_topology(source, damage):
                 # observer. It is not a mutation by the read-only bridge.
                 epoch = "semantic_refresh_ddl_epoch"
                 assert repaired[epoch][0][0] == before[epoch][0][0]
-                assert repaired[epoch][0][1] > before[epoch][0][1]
+                assert repaired[epoch][0][1] == before[epoch][0][1] + 3
                 assert repaired[epoch][0][2] == "GRANT_DATABASE"
                 assert {key: rows for key, rows in repaired.items() if key != epoch} == {
                     key: rows for key, rows in before.items() if key != epoch
