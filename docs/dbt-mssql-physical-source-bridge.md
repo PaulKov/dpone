@@ -40,7 +40,15 @@ to privileged provisioning and never enters registration bytes or runtime
 configuration. Each certificate user has no login and no CONNECT grant. Its exact
 object permissions are listed above; a same-database installation uses their
 finite union. Runtime receives EXECUTE on the model entry only; no direct helper grant is added.
-Do not DENY helper EXECUTE to runtime: that also blocks the signed indirect call.
+Do not DENY helper EXECUTE to runtime: provisioning rejects that drift. In the
+two-database layout it also blocks the signed indirect call. In a same-database
+layout the local ownership chain can bypass the helper permission check; neither
+revoking its certificate-user EXECUTE nor adding a caller DENY is a runtime
+revocation mechanism. Both layouts still enforce exact module signatures at runtime.
+Missing expected certificate permissions are restored only by an explicit
+privileged provisioning call; unexpected grants or DENYs are rejected. Runtime
+reads never repair permissions. Use the native source/owner state boundary to
+stop source observations rather than relying on a topology-specific permission hop.
 Existing native table DENYs and metadata authority checks stay in place.
 
 Deployment renders fixed coordinates, the verified certificate thumbprint and the
@@ -159,8 +167,11 @@ compatibility](dbt-mssql-physical-registration.md).
 
 Focused tests cover closed fact identities and deterministic SQL expansion.
 The isolated SQL2022 integration test must use independent real METADATA/BUILD
-connections in two databases, different principal IDs, genuine reserve/bind state,
-and retained platform fixture bytes. It checks missing signatures, direct helper
+connections in both same-database and two-database layouts, genuine reserve/bind
+state and retained platform fixture bytes. The two-database case uses deliberately
+different principal IDs; the same-database case uses one certificate user with
+exactly three object grants (entry VIEW DEFINITION; helper EXECUTE and VIEW DEFINITION).
+It checks missing/foreign/extra signatures, direct helper
 calls, effective permissions, changed registration/principals/state and identical
 native rows/capacity before and after reads. Synthetic SQL acceptance does not
 qualify a production deployment, model admission or a complete native route.
