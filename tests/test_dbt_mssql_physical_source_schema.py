@@ -1,6 +1,8 @@
 """Provisioning contract tests; these do not qualify SQL Server permissions."""
 
+from dataclasses import replace
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
@@ -188,6 +190,36 @@ def test_principal_check_allows_sql2022_public_encryption_metadata_defaults():
     assert "'VIEW ANY COLUMN MASTER KEY DEFINITION'" in sql
     assert "'CONTROL'" in sql
     assert "'IMPERSONATE'" in sql
+
+
+@pytest.mark.parametrize("same_database", [False, True])
+def test_certificate_metadata_is_exact_object_scope_with_same_database_union(monkeypatch, same_database):
+    from dpone.adapters.dbt_mssql_physical_registration_store import MssqlPhysicalRegistrationStore
+
+    monkeypatch.setattr(MssqlPhysicalRegistrationStore, "register", lambda _self, value: value)
+    value = MssqlPhysicalRuntimeRegistration(**registration_inputs())
+    if not same_database:
+        value = replace(
+            value,
+            control_database=replace(
+                value.control_database, database_name="control", database_id=6, database_guid=UUID(int=123)
+            ),
+        )
+    connection = CatalogConnection()
+    provisioner(connection).apply(value)
+    certificate_grants = [
+        sql for sql, _ in connection.statements if sql.startswith("GRANT ") and sql.endswith("TO [bridge_user];")
+    ]
+    assert sorted(certificate_grants) == sorted(
+        [
+            "GRANT VIEW DEFINITION ON OBJECT::[runtime_local].[physical_require_source_v1] TO [bridge_user];",
+            "GRANT EXECUTE ON OBJECT::[runtime_control].[physical_control_require_source_v1] TO [bridge_user];",
+            "GRANT VIEW DEFINITION ON OBJECT::[runtime_control].[physical_control_require_source_v1] TO [bridge_user];",
+        ]
+    )
+    assert sum("CREATE USER [bridge_user]" in sql for sql, _ in connection.statements) == (1 if same_database else 2)
+    checks = [sql for sql, _ in connection.statements if "sys.certificates c ON" in sql]
+    assert checks and all("EXCEPT" in sql and "minor_id" in sql and "state" in sql for sql in checks)
 
 
 @pytest.mark.parametrize("public", [b"", "public", None])

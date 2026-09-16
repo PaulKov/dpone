@@ -159,6 +159,11 @@ class MssqlPhysicalSourceSchemaProvisioner:
                 raise ValueError("source producer must return exactly the finite module pair")
             for namespace in ("control", "model"):
                 self._install(cursor, value, namespace, definitions)
+            for namespace in ("control", "model"):
+                if namespace == "model" and value.model_database == value.control_database:
+                    continue
+                self._context(cursor, value, namespace)
+                self._certificate_user(cursor, value, namespace, create=True)
             # Revisit both inventories after all changes, including same-DB cells.
             for namespace in ("control", "model"):
                 self._verify(cursor, value, namespace, definitions)
@@ -230,23 +235,20 @@ IF NOT EXISTS (SELECT 1 FROM sys.certificates WHERE name=N'{self._certificate}'
             if namespace == "model"
             else f"DATABASE_PRINCIPAL_ID(N'{self._user}')"
         )
-        expected = 2 if namespace == "model" else 1
-        certificate_principal = (
-            f"AND principal_id<>DATABASE_PRINCIPAL_ID(N'{self._user}')"
-            if namespace == "control" or value.model_database == value.control_database
-            else ""
-        )
+        expected = 3 if namespace == "model" else 2
         cursor.execute(f"""IF (SELECT COUNT(*) FROM sys.database_permissions WHERE class=1
  AND major_id=OBJECT_ID(N'[{schema}].[{module}]'))<>{expected}
  OR EXISTS (SELECT 1 FROM sys.database_permissions WHERE class=1
  AND major_id=OBJECT_ID(N'[{schema}].[{module}]') AND NOT
- (grantee_principal_id IN ({principals}) AND minor_id=0 AND state='G' AND permission_name='EXECUTE'))
+ (minor_id=0 AND state='G' AND ((grantee_principal_id IN ({principals}) AND permission_name='EXECUTE')
+ OR (grantee_principal_id=DATABASE_PRINCIPAL_ID(N'{self._user}') AND permission_name='VIEW DEFINITION'))))
  OR EXISTS (SELECT 1 FROM sys.objects WHERE schema_id=SCHEMA_ID(N'{schema}')
  AND COALESCE(principal_id,1)<>1)
  OR EXISTS (SELECT 1 FROM sys.server_principals WHERE sid=
  (SELECT sid FROM sys.certificates WHERE name=N'{self._certificate}'))
  OR EXISTS (SELECT 1 FROM sys.database_principals WHERE sid=
- (SELECT sid FROM sys.certificates WHERE name=N'{self._certificate}') {certificate_principal})
+ (SELECT sid FROM sys.certificates WHERE name=N'{self._certificate}')
+ AND principal_id<>DATABASE_PRINCIPAL_ID(N'{self._user}'))
  THROW 51446, 'DPONE_SOURCE_GRANT_INVENTORY_MISMATCH', 1;""")
 
     def _names(self, cursor: SqlControlCursor, value: MssqlPhysicalRuntimeRegistration, namespace: str) -> list[str]:
@@ -268,7 +270,19 @@ IF NOT EXISTS (SELECT 1 FROM sys.certificates WHERE name=N'{self._certificate}'
             names.append(row[0])
         return names[:2]
 
-    def _certificate_user(self, cursor: SqlControlCursor, schema: str, *, create: bool) -> None:
+    def _certificate_user(
+        self, cursor: SqlControlCursor, value: MssqlPhysicalRuntimeRegistration, namespace: str, *, create: bool
+    ) -> None:
+        grants = [(schema, module, "VIEW DEFINITION") for schema, module, _ in self._modules(value, namespace)]
+        if namespace == "control" or value.model_database == value.control_database:
+            grants.append((value.control_schema, HELPER, "EXECUTE"))
+        expected = ",".join(
+            f"(1,OBJECT_ID(N'[{schema}].[{module}]'),0,N'{permission}',N'G')" for schema, module, permission in grants
+        )
+        actual = (
+            "SELECT class,major_id,minor_id,permission_name,state FROM sys.database_permissions "
+            f"WHERE grantee_principal_id=DATABASE_PRINCIPAL_ID(N'{self._user}')"
+        )
         if create:
             cursor.execute(f"""IF DATABASE_PRINCIPAL_ID(N'{self._user}') IS NULL
 BEGIN
@@ -282,14 +296,13 @@ IF @user IS NULL OR NOT EXISTS (SELECT 1 FROM sys.database_principals p JOIN sys
  OR EXISTS (SELECT 1 FROM sys.database_role_members WHERE member_principal_id=@user)
  OR EXISTS (SELECT 1 FROM sys.schemas WHERE principal_id=@user)
  OR EXISTS (SELECT 1 FROM sys.objects WHERE principal_id=@user)
- OR EXISTS (SELECT 1 FROM sys.database_permissions WHERE grantee_principal_id=@user AND NOT
- (class=1 AND major_id=OBJECT_ID(N'[{schema}].[{HELPER}]') AND minor_id=0 AND permission_name='EXECUTE' AND state='G'))
+ OR EXISTS ({actual} EXCEPT SELECT * FROM (VALUES {expected}) e(class,object_id,minor_id,permission_name,state))
  THROW 51445, 'DPONE_SOURCE_CERTIFICATE_USER_UNSAFE', 1;""")
         if create:
-            cursor.execute(f"GRANT EXECUTE ON OBJECT::[{schema}].[{HELPER}] TO [{self._user}];")
-        cursor.execute(f"""IF NOT EXISTS (SELECT 1 FROM sys.database_permissions
- WHERE grantee_principal_id=DATABASE_PRINCIPAL_ID(N'{self._user}') AND class=1
- AND major_id=OBJECT_ID(N'[{schema}].[{HELPER}]') AND minor_id=0 AND permission_name='EXECUTE' AND state='G')
+            for schema, module, permission in grants:
+                cursor.execute(f"GRANT {permission} ON OBJECT::[{schema}].[{module}] TO [{self._user}];")
+        cursor.execute(f"""IF EXISTS (SELECT * FROM (VALUES {expected}) e(class,object_id,minor_id,permission_name,state)
+ EXCEPT {actual})
  THROW 51445, 'DPONE_SOURCE_CERTIFICATE_USER_UNSAFE', 1;""")
 
     def _install(
@@ -317,9 +330,7 @@ IF @user IS NULL OR NOT EXISTS (SELECT 1 FROM sys.database_principals p JOIN sys
  AND major_id=OBJECT_ID(N'[{schema}].[{module}]') AND crypt_type='{kind}'
  AND thumbprint=(SELECT thumbprint FROM sys.certificates WHERE name=N'{self._certificate}'))
  ADD {counter}SIGNATURE TO OBJECT::[{schema}].[{module}] BY CERTIFICATE [{self._certificate}];""")
-        if namespace == "control":
-            self._certificate_user(cursor, schema, create=True)
-        else:
+        if namespace == "model":
             for name in names:
                 cursor.execute(f"GRANT EXECUTE ON OBJECT::[{schema}].[{module}] TO {quote_mssql_identifier(name)};")
 
@@ -336,5 +347,4 @@ IF @user IS NULL OR NOT EXISTS (SELECT 1 FROM sys.database_principals p JOIN sys
         self._grants(cursor, value, namespace)
         for schema, module, kind in self._modules(value, namespace):
             cursor.execute(module_inventory_sql(schema, module, self._certificate, kind), definitions[module])
-        if namespace == "control":
-            self._certificate_user(cursor, value.control_schema, create=False)
+        self._certificate_user(cursor, value, namespace, create=False)
