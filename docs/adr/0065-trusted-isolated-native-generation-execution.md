@@ -536,3 +536,27 @@ The deployment embeds that verified thumbprint in the finite procedure expansion
 not in the package template hash or registration digest. Exact module definition,
 signature and grant checks remain mandatory; a permission mismatch is not repaired
 by granting broader access.
+
+### Separate signed catalog observation boundary
+
+The post-G existing-object revalidation implementation uses a separate catalog
+certificate and fixed module. Its certificate user has database VIEW DEFINITION,
+SELECT on sys.sql_expression_dependencies, and SELECT on the authenticated
+model-data schema. Runtime METADATA/BUILD receive catalog EXECUTE only. Existing
+source modules, signatures and permissions remain unchanged. Schema deployment
+inputs require external authentication against the retained profile; the control
+schema field and a typed profile reference cannot supply that authentication.
+
+The canonical catalog SQL template is part of the physical-v1 package. One owned
+transaction validates source identity, rejects RLS, takes an exact COUNT_BIG with
+TABLOCK/HOLDLOCK before its first HEADER, acquires all bounded kinds, verifies a
+second HEADER, compares exact physical structure, and settles before returning.
+Acquisition includes extra-resultset rejection and finite driver statement
+budgets. Failure or uncertain settlement yields no accepted observation.
+
+This closes the observation component only: initial P-only discovery, authenticated
+plan membership and resource-bounds admission remain distinct dependencies. The
+first comparison cell rejects all dependencies and forbidden properties. See
+[the catalog acquisition guide](../dbt-mssql-physical-catalog-acquisition.md) for
+permission inventory, APIs, resource accounting and recovery. Live qualification
+must be established by the exact candidate's isolated SQL2022 evidence.

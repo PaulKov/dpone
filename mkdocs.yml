@@ -511,6 +511,7 @@ nav:
       - Native generation admission: native-generation-admission.md
       - Trusted native dbt invocation: native-generation-execution.md
       - Managed SQL catalog wire: dbt-mssql-physical-catalog-wire.md
+      - Managed SQL catalog observation: dbt-mssql-physical-catalog-acquisition.md
       - Managed SQL physical plans: dbt-mssql-physical-plans.md
       - Physical runtime registration: dbt-mssql-physical-registration.md
       - Physical registration SQL storage: dbt-mssql-physical-registration-provisioning.md

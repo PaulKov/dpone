@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add bounded signed SQL Server 2022 catalog observation and exact structural
+  comparison for existing tables, with one transaction, an exact row count and
+  finite certificate permissions. Preserve native FILESTREAM NULL and
+  scale-dependent temporal dimensions. This post-generation observer does not
+  authorize model admission or publication; reusable registration upgrades and
+  complete installed self-service execution remain separate work.
+
 - Add a finite signed SQL Server source-identity bridge, privileged installer and
   bounded transaction reader. Actual caller mappings and current native ownership
   are checked without advancing generation state. Upstream original authentication
@@ -46,8 +53,9 @@
 
 - Add immutable managed SQL Server catalog transport records and a strict v1
   decoder for nine result kinds, including lossless seven-digit timestamps and
-  explicit empty markers. SQL acquisition and physical-route qualification remain
-  separate; existing dbt execution behavior is unchanged.
+  explicit empty markers. The bounded acquisition API is available separately;
+  physical-route qualification remains unfinished and existing dbt execution
+  behavior is unchanged.
 
 - Expose the reserved native build bridge through the agreed execution facade while preserving recorder identity and avoiding cyclic imports.
 
