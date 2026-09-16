@@ -71,7 +71,8 @@ class MssqlPhysicalPlanMembershipReader:
         retention nor activation/G/attempt ownership; resolved originals expose
         no activation identity. Never infer that proof from membership success.
         It never admits the legacy materialization as managed. Character columns
-        fail until their producer-owned complete collation fact is available.
+        require exact collation selection from the authenticated policy; matching
+        that expectation does not prove live SQL availability or helper output.
         """
         if (
             type(refs) is not NativeOriginalsRefV1

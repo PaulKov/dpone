@@ -5,7 +5,10 @@ from typing import Any
 
 from dpone.contracts.dbt_mssql_physical import PhysicalModelPlan, PhysicalPlanSet
 from dpone.contracts.dbt_mssql_physical_registration_values import RegisteredLimits
-from dpone.contracts.dbt_native_execution_policy import require_physical_filegroup_name
+from dpone.contracts.dbt_native_execution_policy import (
+    require_physical_collation_name,
+    require_physical_filegroup_name,
+)
 from dpone.contracts.dbt_publish_models import DbtModelArtifact
 from dpone.contracts.dbt_selection_lock import DbtSelectionLock
 from dpone.contracts.mssql_type_contract import normalize_mssql_physical_type
@@ -17,6 +20,12 @@ class PhysicalPlanMembershipError(ValueError):
 
     def __init__(self, code: str = "DPONE_PHYSICAL_PLAN_MEMBERSHIP_INVALID") -> None:
         self.code = code
+        self.remediation = (
+            "Select native_execution.physical_collation.name in the authenticated policy; "
+            "verify SQL availability before reservation."
+            if code == "DPONE_PHYSICAL_PLAN_COLLATION_UNAVAILABLE"
+            else None
+        )
         super().__init__(code)
 
 
@@ -95,10 +104,10 @@ def require_model_plan_membership(
             tuple((column.name, column.data_type, column.nullable) for column in column_contracts)
             == tuple((column.name, column.dtype, column.nullable) for column in spec.columns)
         )
-        _columns(node, model)
+        _columns(node, model, native)
 
 
-def _columns(node: Mapping[str, Any], model: PhysicalModelPlan) -> None:
+def _columns(node: Mapping[str, Any], model: PhysicalModelPlan, native: Mapping[str, Any]) -> None:
     columns = _mapping(node.get("columns"))
     _require(tuple(columns) == tuple(column.name for column in model.spec.columns))
     for name, expected in zip(columns, model.spec.columns, strict=True):
@@ -121,5 +130,10 @@ def _columns(node: Mapping[str, Any], model: PhysicalModelPlan) -> None:
             not_null = True
         _require(expected.nullable is (not not_null))
         if canonical.partition("(")[0] in {"char", "varchar", "nchar", "nvarchar"}:
-            raise PhysicalPlanMembershipError("DPONE_PHYSICAL_PLAN_COLLATION_UNAVAILABLE")
-        _require(expected.collation is None)
+            try:
+                selected = require_physical_collation_name(native)
+            except ValueError:
+                raise PhysicalPlanMembershipError("DPONE_PHYSICAL_PLAN_COLLATION_UNAVAILABLE") from None
+            _require(expected.collation == selected)
+        else:
+            _require(expected.collation is None)

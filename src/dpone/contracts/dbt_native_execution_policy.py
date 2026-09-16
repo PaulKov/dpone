@@ -12,6 +12,10 @@ from dataclasses import fields
 from hashlib import sha256
 from typing import Any
 
+from dpone.contracts.dbt_mssql_physical_collation import (
+    PHYSICAL_COLLATION_PATTERN,
+    require_physical_collation_token,
+)
 from dpone.contracts.dbt_mssql_physical_validation import require_physical_identifier
 from dpone.contracts.dbt_publish_schema_contract_common import (
     DIGEST,
@@ -131,6 +135,17 @@ def native_execution_schema() -> dict[str, Any]:
             ),
             "limits": object_schema(limit_names, limits),
             "physical_catalog_limits": _physical_catalog_limits_schema(),
+            "physical_collation": object_schema(
+                ("name",),
+                {
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^" + PHYSICAL_COLLATION_PATTERN + "$",
+                    }
+                },
+            ),
             "physical_filegroup": object_schema(
                 ("name",), {"name": {"type": "string", "minLength": 1, "maxLength": 128}}
             ),
@@ -170,6 +185,8 @@ def validate_native_execution_policy(value: dict[str, Any], *, serialized_payloa
         raise ValueError("physical catalog dependency limit exceeds its catalog row ceiling")
     if "physical_filegroup" in value:
         require_physical_filegroup_name(value)
+    if "physical_collation" in value:
+        require_physical_collation_name(value)
     native_control_schema(control["schema"])
     _reference(control["authority"])
     authority_ref = _reference(originals["authority"])
@@ -202,6 +219,18 @@ def require_physical_filegroup_name(native_execution: Mapping[str, Any]) -> str:
     if not isinstance(selection, Mapping) or set(selection) != {"name"}:
         raise ValueError("physical_filegroup requires a closed object with an explicit name")
     return require_physical_identifier(selection["name"], "physical_filegroup.name")
+
+
+def require_physical_collation_name(native_execution: Mapping[str, Any]) -> str:
+    """Read exact selection after authenticating the complete selected policy.
+
+    This accessor validates representation only. It cannot establish SQL catalog
+    availability, helper-output agreement, generation ownership or route authority.
+    """
+    selection = native_execution.get("physical_collation")
+    if not isinstance(selection, Mapping) or set(selection) != {"name"}:
+        raise ValueError("physical_collation requires a closed object with an explicit name")
+    return require_physical_collation_token(selection["name"])
 
 
 def _reference(value: dict[str, str]) -> OriginalRef:

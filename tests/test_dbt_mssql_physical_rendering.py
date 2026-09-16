@@ -321,3 +321,19 @@ def test_documented_preview_is_runnable_without_io(capsys):
     assert namespace["create_sql"].startswith("CREATE TABLE [example].[models].[dpone_c_")
     assert "DATA_COMPRESSION = PAGE, ONLINE = OFF, MAXDOP = 1" in namespace["layout_sql"]
     assert capsys.readouterr().out == namespace["create_sql"] + "\n" + namespace["layout_sql"] + "\n"
+
+
+@pytest.mark.parametrize(
+    "name,message",
+    [
+        ("database_default", "rendering requires a named collation, not database_default"),
+        (" database_default ", "rendering requires a named collation, not database_default"),
+        ("A;--", "rendering requires a collation name containing only ASCII letters, digits and underscores"),
+    ],
+)
+def test_shared_validator_preserves_renderer_error_contract(name, message):
+    value = plan()
+    value = replace(value, spec=replace(value.spec, columns=(MssqlCatalogColumn("v", "varchar(12)", True, name),)))
+    with pytest.raises(PhysicalPlanError) as error:
+        render_candidate_create(value)
+    assert str(error.value) == message

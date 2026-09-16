@@ -187,8 +187,9 @@ def test_pure_character_collation_is_explicitly_unavailable(pure_source):
         raw.update(
             data_type="nvarchar(5)", collation="Latin1_General_100_BIN2", meta={"collation": "Latin1_General_100_BIN2"}
         )
-    with pytest.raises(PhysicalPlanMembershipError, match="^DPONE_PHYSICAL_PLAN_COLLATION_UNAVAILABLE$"):
+    with pytest.raises(PhysicalPlanMembershipError, match="^DPONE_PHYSICAL_PLAN_COLLATION_UNAVAILABLE$") as error:
         compare(data)
+    assert "native_execution.physical_collation.name" in error.value.remediation
 
 
 @pytest.mark.parametrize("field", ["source_graph_sha256", "filegroup", "resource_bounds"])
@@ -268,3 +269,77 @@ def test_retained_schema_errors_are_rejected(tmp_path, monkeypatch):
         claim, plan, *_rest = inputs(verifier, fixture)
         with pytest.raises(PhysicalPlanMembershipError, match="MANIFEST_INVALID"):
             reader(verifier, fixture).require_plan_membership(fixture.refs, registration=claim, plan_set=plan)
+
+
+@pytest.mark.parametrize("dtype", ["char(5)", "varchar(5)", "nchar(5)", "nvarchar(5)"])
+def test_pure_character_expectation_comes_from_selected_policy(pure_source, dtype):
+    data = list(deepcopy(pure_source))
+    name = "Latin1_General_100_BIN2"
+    data[4]["native_execution"]["physical_collation"] = {"name": name}
+    data[1] = with_columns(data[1], (MssqlCatalogColumn("id", dtype, False, name),))
+    for model in data[1].models:
+        data[2]["nodes"][model.spec.model_unique_id]["columns"]["id"]["data_type"] = dtype
+    compare(data)
+    data[4]["native_execution"]["physical_collation"]["name"] = name.lower()
+    with pytest.raises(PhysicalPlanMembershipError):
+        compare(data)
+
+
+def test_pure_selected_collation_does_not_add_noncharacter_requirement(pure_source):
+    data = list(deepcopy(pure_source))
+    data[4]["native_execution"]["physical_collation"] = {"name": "Latin1_General_100_BIN2"}
+    compare(data)
+
+
+def test_pure_mixed_character_collations_reject(pure_source):
+    data = list(deepcopy(pure_source))
+    name = "Latin1_General_100_BIN2"
+    data[4]["native_execution"]["physical_collation"] = {"name": name}
+    columns = (
+        MssqlCatalogColumn("id", "varchar(5)", False, name),
+        MssqlCatalogColumn("other", "nvarchar(5)", True, name.lower()),
+    )
+    data[1] = with_columns(data[1], columns)
+    for model in data[1].models:
+        data[2]["nodes"][model.spec.model_unique_id]["columns"] = {
+            column.name: {
+                "name": column.name,
+                "data_type": column.dtype,
+                "constraints": [] if column.nullable else [{"type": "not_null"}],
+            }
+            for column in columns
+        }
+    with pytest.raises(PhysicalPlanMembershipError):
+        compare(data)
+
+
+@pytest.mark.parametrize("name", ["Latin1_General_100_BIN2", "SQL_Latin1_General_CP1_CI_AS"])
+def test_real_policy_collation_substitution_rejects_authenticated_inventory(retained, name):
+    import json
+
+    from dpone.adapters.native_project_documents import NativeProjectDocumentReader
+    from dpone.contracts.native_project_documents import NATIVE_POLICY_MEMBER
+
+    fixture, verifier, (claim, plan, *_rest) = retained
+    changed_members = []
+
+    def read(root, path, *, max_bytes):
+        payload = read_confined_file(root, path, max_bytes=max_bytes)
+        if path == NATIVE_POLICY_MEMBER:
+            policy = json.loads(payload)
+            policy["profiles"]["local"]["native_execution"]["physical_collation"] = {"name": name}
+            changed_members.append(path)
+            return json.dumps(policy).encode()
+        return payload
+
+    actual = MssqlPhysicalPlanMembershipReader(
+        verifier=verifier,
+        documents=NativeProjectDocumentReader(read_file=read, max_policy_bytes=1024 * 1024),
+        read_file=read_confined_file,
+        release_root=fixture.release_root,
+        max_release_bytes=8 * 1024 * 1024,
+    )
+    with pytest.raises(ValueError, match="verified archive inventory"):
+        actual.require_plan_membership(fixture.refs, registration=claim, plan_set=plan)
+    assert changed_members == [NATIVE_POLICY_MEMBER]
+    assert all(not resolver.calls for resolver in fixture.resolver_factory.resolvers)

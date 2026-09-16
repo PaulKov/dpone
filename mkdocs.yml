@@ -516,6 +516,7 @@ nav:
       - Managed SQL pre-generation discovery: dbt-mssql-physical-discovery.md
       - Managed SQL physical rendering: dbt-mssql-physical-rendering.md
       - Managed SQL plan membership: dbt-mssql-physical-plan-membership.md
+      - Managed SQL collation policy: dbt-mssql-physical-collation.md
       - Managed SQL admission transport: dbt-mssql-managed-admission.md
       - SQL Server graph policy registry: dbt-sqlserver-policy-registry.md
       - Physical runtime registration: dbt-mssql-physical-registration.md

@@ -223,3 +223,36 @@ def test_catalog_policy_limits_accept_explicit_sql_upper_bound():
     for name in ("max_catalog_rows", "max_definition_utf16_bytes", "max_dependency_rows"):
         limits[name] = 2147483647
     assert validate_native_policy_v4(encode_native_delivery_json(value), max_bytes=1024 * 1024) == value
+
+
+@pytest.mark.parametrize("name", ["A", "A" * 128, "Latin1_General_100_BIN2", "Traditional_Spanish_ci_ai"])
+def test_physical_collation_optional_exact_policy(name):
+    value = native_policy()
+    payload = encode_native_delivery_json(value)
+    assert encode_native_delivery_json(validate_native_policy_v4(payload, max_bytes=1024 * 1024)) == payload
+    value["profiles"]["local"]["native_execution"]["physical_collation"] = {"name": name}
+    payload = encode_native_delivery_json(value)
+    assert encode_native_delivery_json(validate_native_policy_v4(payload, max_bytes=1024 * 1024)) == payload
+
+
+@pytest.mark.parametrize(
+    "selection",
+    [
+        None,
+        {},
+        {"name": None},
+        {"name": "A", "extra": True},
+        {"name": "database_default"},
+        {"name": "DaTaBaSe_DeFaUlT"},
+        {"name": " A"},
+        {"name": "A\n"},
+        {"name": "é"},
+        {"name": "A" * 129},
+        {"name": "[A]"},
+    ],
+)
+def test_physical_collation_closed_policy(selection):
+    value = native_policy()
+    value["profiles"]["local"]["native_execution"]["physical_collation"] = selection
+    with pytest.raises(ValueError):
+        validate_native_policy_v4(encode_native_delivery_json(value), max_bytes=1024 * 1024)

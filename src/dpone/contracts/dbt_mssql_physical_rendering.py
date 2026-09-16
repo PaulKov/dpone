@@ -5,10 +5,9 @@ resolve filegroup and collation identities, exclude name collisions, and own the
 required transaction/session. This module does no I/O and settles no transaction.
 """
 
-import re
-
 from dpone.contracts.dbt_contract_validation import DbtPublishingError
 from dpone.contracts.dbt_mssql_physical import PhysicalModelPlan
+from dpone.contracts.dbt_mssql_physical_collation import require_physical_collation_token
 from dpone.contracts.dbt_mssql_physical_validation import PhysicalPlanError
 from dpone.contracts.dbt_mssql_physical_wire import _plan
 from dpone.contracts.mssql_object_name import quote_mssql_identifier
@@ -34,10 +33,13 @@ def _validated(plan: PhysicalModelPlan) -> PhysicalModelPlan:
             raise PhysicalPlanError("MAX types are unsupported by the managed physical policy")
         if column.collation is not None and column.collation.strip().casefold() == "database_default":
             raise PhysicalPlanError("rendering requires a named collation, not database_default")
-        if column.collation is not None and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,127}", column.collation) is None:
-            raise PhysicalPlanError(
-                "rendering requires a collation name containing only ASCII letters, digits and underscores"
-            )
+        if column.collation is not None:
+            try:
+                require_physical_collation_token(column.collation)
+            except ValueError:
+                raise PhysicalPlanError(
+                    "rendering requires a collation name containing only ASCII letters, digits and underscores"
+                ) from None
     return result
 
 

@@ -62,10 +62,14 @@ selection producer and generated macro authority must exist before that becomes
 possible. Pure noncharacter comparison tests establish comparison behavior only;
 they do not establish managed source admission or execution qualification.
 
-Character columns currently fail explicitly. Their collation cannot be borrowed
-from the expected plan, a database default or unapproved manifest metadata. This
-limitation remains until the actual producer supplies an authenticated complete
-column projection. The caller's generation/attempt ownership, immutable storage
+Character columns require the exact `native_execution.physical_collation.name`
+from the authenticated selected policy. Missing selection fails explicitly;
+every character column must match the same selected name. Collation cannot be
+borrowed from the expected plan, a database default or unapproved manifest
+metadata. This establishes the expected value only: actual SQL availability,
+pre-reservation observation and helper-output agreement remain unverified. See
+[physical collation policy](dbt-mssql-physical-collation.md).
+The caller's generation/attempt ownership, immutable storage
 retention, live filegroup IDs, namespace collisions, session/transaction state and
 commit proof remain responsibilities of the original/enrollment/discovery consumers.
 

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add optional explicit physical collation selection to the native publishing
+  policy and compare every character column with that authenticated expectation.
+  Preserve omitted-policy behavior and existing rendered SQL through one strict
+  token validator. Live availability and helper-output checks remain separate
+  prerequisites; no database-default inference or query rewriting is introduced.
+
 - Expose the existing protected catalog-binding verification for composing
   platform provisioners without private discovery subclasses. Preserve exact
   SQL, permissions and caller-owned transaction settlement.
