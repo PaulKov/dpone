@@ -55,12 +55,24 @@ without allowing EXECUTE, CONTROL, impersonation or broader administrative right
 Certificate principal identity uses the full `sys.certificates.sid`, while module
 signatures use `thumbprint`; SQL2022 exposes different values. Creation revokes
 only the new certificate user's automatic CONNECT grant before verifying its
-helper-EXEC-only inventory. Existing users with extra grants are rejected without
+finite object-specific inventory. Existing users with extra grants are rejected without
 automatic repair. Runtime login-mapped users retain their own CONNECT permission.
 
 Only `physical_require_source_v1` is signed; only
-`physical_control_require_source_v1` is countersigned. Control certificate users
-receive only helper EXECUTE; metadata/build receive only model entry EXECUTE.
+`physical_control_require_source_v1` is countersigned. The model certificate user
+receives VIEW DEFINITION on the entry object only. The control certificate user
+receives EXECUTE and VIEW DEFINITION on the helper object only. Same-database
+deployment uses the exact union of these three permissions, with one user and no
+duplicate grants. Metadata/build receive only model entry EXECUTE.
+
+This object-level metadata correction was explicitly approved after the isolated
+SQL2022 probe demonstrated hidden signature catalog rows under the original
+EXECUTE-only contract. VIEW DEFINITION is granted only to the certificate users
+on their exact module objects: never to runtime/public, certificates themselves,
+schemas or databases. It enables each procedure's exact signature self-check
+without granting source table reads or changing native DENYs. All other explicit
+certificate-user permissions still reject. Both modules are created and checked
+before certificate-user grants, supporting the same-database union safely.
 Definition comparisons are exact UTF-16 bytes and lengths, with null EXECUTE AS,
 expected ANSI settings and finite signature/grant inventories. Existing changed
 definitions are rejected without replacing them. Private keys are never serialized.
