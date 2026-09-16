@@ -72,3 +72,55 @@ def test_cross_database_role_swap_rejects():
     altered = replace(facts, observed_control_principal=registration.principals.metadata.control)
     with pytest.raises(ValueError):
         require_source_identity(altered, registration, facts.generation_id, facts.executor_invocation_id)
+
+
+def test_reader_owns_one_bounded_transaction_and_closes():
+    from dpone.adapters.dbt_mssql_physical_source import MssqlPhysicalSourceReader
+
+    registration, facts = source_case()
+    row = (
+        facts.wire_version,
+        facts.registration_id,
+        facts.registration_digest.encode(),
+        facts.generation_id,
+        facts.executor_invocation_id,
+        facts.guard_epoch,
+        facts.source_revision,
+        facts.reservation.locator.encode(),
+        facts.reservation.sha256.encode(),
+        facts.executor_payload,
+        facts.observed_model_principal.principal_id,
+        bytes.fromhex(facts.observed_model_principal.sid_hex),
+        facts.observed_control_principal.principal_id,
+        bytes.fromhex(facts.observed_control_principal.sid_hex),
+    )
+    calls = []
+
+    class Connection:
+        autocommit = True
+
+        def cursor(self):
+            return self
+
+        def execute(self, sql, *parameters):
+            calls.append((sql, parameters))
+            self.rows = iter([row, None])
+
+        def fetchone(self):
+            return next(self.rows)
+
+        def commit(self):
+            calls.append("commit")
+
+        def rollback(self):
+            calls.append("rollback")
+
+        def close(self):
+            calls.append("close")
+
+    connection = Connection()
+    reader = MssqlPhysicalSourceReader(connection_factory=lambda: connection, registration=registration)
+    assert reader.read(facts.generation_id, facts.executor_invocation_id) == facts
+    assert calls[0][0] == "SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRANSACTION"
+    assert calls[1][1] == (registration.registration_id, facts.generation_id, facts.executor_invocation_id)
+    assert calls[-3:] == ["commit", "close", "close"]
