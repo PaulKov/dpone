@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from dpone.commands.dbt_publish_project_inputs import (
     DbtProjectRootError,
+    configured_manifest_path,
 )
 from dpone.commands.dbt_publish_project_inputs import (
     bundle_inputs as _bundle_inputs,
@@ -151,7 +152,7 @@ def relative_pack_path(raw: str) -> str:
 
 def manifest_path(args: argparse.Namespace) -> Path:
     explicit = getattr(args, "manifest", None)
-    return Path(explicit) if explicit else project_root(args) / "target" / "manifest.json"
+    return Path(explicit) if explicit else configured_manifest_path(project_root(args))
 
 
 def stale_default_manifest(
@@ -228,9 +229,12 @@ def project_argument_issue() -> DbtPublishIssue:
 def project_root_issue() -> DbtPublishIssue:
     return DbtPublishIssue(
         code="DPONE_DBT_PROJECT_INVALID",
-        message="The selected dbt project root is missing, unsafe, or does not contain a regular dbt_project.yml",
+        message="The dbt project root or dbt_project.yml is missing, unsafe, malformed, or has an invalid target-path",
         path="command",
-        remediation=("Change to a dbt project or pass its directory explicitly, then run `dbt parse` and retry."),
+        remediation=(
+            "Select a regular dbt project with valid YAML and a literal relative target-path "
+            "(default: target), then run `dbt parse` and retry."
+        ),
     )
 
 

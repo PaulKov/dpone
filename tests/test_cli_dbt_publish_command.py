@@ -61,8 +61,9 @@ def _isolate_release_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         AppContext,
         "build_dbt_publish_compiler",
-        lambda _self, *, root, require_certified_routes: real_builder(
+        lambda _self, *, root, require_certified_routes, profile_project_root=None: real_builder(
             root=root,
+            profile_project_root=profile_project_root,
             require_certified_routes=False,
         ),
     )
@@ -676,8 +677,20 @@ def test_dbt_profiles_dir_is_not_advertised_on_read_only_commands(
         )
 
 
-def test_dbt_check_discovers_default_manifest_without_running_dbt(tmp_path: Path, capsys) -> None:
-    _write_dbt_project(tmp_path)
+@pytest.mark.parametrize("target", ["target", "build/dbt"])
+@pytest.mark.parametrize("output_format", ["json", "text"])
+def test_dbt_check_discovers_default_manifest_without_running_dbt(
+    tmp_path: Path,
+    capsys,
+    target: str,
+    output_format: str,
+) -> None:
+    manifest = _write_dbt_project(tmp_path, project_config=f"name: test\nversion: 1.0\ntarget-path: {target}\n")
+    if target != "target":
+        destination = tmp_path / target / "manifest.json"
+        destination.parent.mkdir(parents=True)
+        manifest.rename(destination)
+        manifest.write_text("{invalid")
     with pytest.raises(SystemExit, match="0"):
         cli_main.main(
             [
@@ -688,10 +701,99 @@ def test_dbt_check_discovers_default_manifest_without_running_dbt(tmp_path: Path
                 "--profiles",
                 str(PROFILES),
                 "--format",
-                "json",
+                output_format,
             ]
         )
-    assert json.loads(capsys.readouterr().out)["passed"] is True
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    if output_format == "json":
+        assert json.loads(captured.out)["passed"] is True
+    else:
+        assert "publish: PASS" in captured.out
+
+
+@pytest.mark.parametrize("output_format", ["json", "text"])
+def test_dbt_check_invalid_target_is_actionable(tmp_path: Path, capsys, output_format: str) -> None:
+    _write_dbt_project(tmp_path, project_config="name: test\ntarget-path: ../outside\n")
+    with pytest.raises(SystemExit, match="2"):
+        cli_main.main(["dbt", "check", str(tmp_path), "--format", output_format])
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert "DPONE_DBT_PROJECT_INVALID" in captured.out
+    assert "literal relative target-path" in captured.out
+    if output_format == "json":
+        assert json.loads(captured.out)["schema"] == "dpone.error.v1"
+
+
+@pytest.mark.parametrize("command", ["check", "explain", "factory"])
+def test_explicit_manifest_retains_artifact_local_policy_discovery(
+    tmp_path: Path,
+    capsys,
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+) -> None:
+    monkeypatch.delenv("DPONE_DBT_PUBLISH_PROFILES", raising=False)
+    manifest = _write_dbt_project(tmp_path)
+    artifact = tmp_path / "artifact/manifest.json"
+    artifact.parent.mkdir()
+    manifest.rename(artifact)
+    policy = artifact.parent / "dpone/dbt-publish-profiles.yml"
+    policy.parent.mkdir()
+    shutil.copyfile(PROFILES, policy)
+    if command == "factory":
+        assert build_dbt_dpone_compiler(root=tmp_path).build(artifact).passed
+        return
+    args = ["dbt", command, "--manifest", str(artifact)]
+    if command == "explain":
+        args.append("competitive_pricing")
+    with pytest.raises(SystemExit, match="0"):
+        cli_main.main([*args, "--format", "json"])
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    payload = json.loads(captured.out)
+    if command == "check":
+        assert payload["passed"] is True
+    else:
+        assert payload["schema"] == "dpone.dbt-publish-explain.v1"
+
+
+@pytest.mark.parametrize("command", ["check", "explain"])
+@pytest.mark.parametrize("target", ["target", "build/dbt"])
+@pytest.mark.parametrize("decoy", [False, True])
+def test_singleton_discovers_project_policy_without_overrides(
+    tmp_path: Path,
+    capsys,
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+    target: str,
+    decoy: bool,
+) -> None:
+    monkeypatch.delenv("DPONE_DBT_PUBLISH_PROFILES", raising=False)
+    manifest = _write_dbt_project(tmp_path, project_config=f"name: test\ntarget-path: {target}\n")
+    if target != "target":
+        destination = tmp_path / target / "manifest.json"
+        destination.parent.mkdir(parents=True)
+        manifest.rename(destination)
+        manifest = destination
+    policy = tmp_path / "dpone" / "dbt-publish-profiles.yml"
+    policy.parent.mkdir()
+    shutil.copyfile(PROFILES, policy)
+    if decoy:
+        artifact_policy = manifest.parent / "dpone" / "dbt-publish-profiles.yml"
+        artifact_policy.parent.mkdir()
+        artifact_policy.write_text("schema: unrelated-artifact-policy\n")
+    args = ["dbt", command, str(tmp_path)]
+    if command == "explain":
+        args.append("competitive_pricing")
+    with pytest.raises(SystemExit, match="0"):
+        cli_main.main([*args, "--format", "json"])
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    payload = json.loads(captured.out)
+    if command == "check":
+        assert payload["passed"] is True
+    else:
+        assert payload["schema"] == "dpone.dbt-publish-explain.v1"
 
 
 @pytest.mark.parametrize(
@@ -1114,9 +1216,9 @@ def test_dbt_compile_always_requires_certified_routes(
     observed: list[bool] = []
     real_builder = build_dbt_dpone_compiler
 
-    def strict_builder(_self, *, root, require_certified_routes):
+    def strict_builder(_self, *, root, require_certified_routes, profile_project_root=None):
         observed.append(require_certified_routes)
-        return real_builder(root=root, require_certified_routes=False)
+        return real_builder(root=root, profile_project_root=profile_project_root, require_certified_routes=False)
 
     monkeypatch.setattr(AppContext, "build_dbt_publish_compiler", strict_builder)
 

@@ -5,6 +5,27 @@ stable dbt publishing and ClickHouse staging failures. JSON output uses
 `dpone.error.v1`; remediation must follow the stable code, not raw exception
 text.
 
+Singleton publishing commands (`dpone dbt check`, `explain`, and `compile`)
+select `<project>/<target-path>/manifest.json` using the literal `target-path`
+in `dbt_project.yml`; when that key is absent, they use `target/manifest.json`.
+For example, `target-path: build/dbt` selects `build/dbt/manifest.json` after
+`dbt parse --project-dir analytics`, and `dpone dbt check analytics` reads that
+artifact without an override. dpone does not run dbt or fetch dependencies to
+discover it. `--manifest PATH` keeps its existing explicit-path behavior.
+With automatic manifest selection, publish-policy discovery uses the selected project root even when its
+manifest is in a custom artifact directory. Keep the policy at
+`<project>/dpone/dbt-publish-profiles.yml` (or the existing `.dpone` alternative);
+policies inside the artifact directory do not replace the project policy.
+Explicit `--profiles` and `DPONE_DBT_PUBLISH_PROFILES` overrides retain precedence.
+With `--manifest`, policy discovery retains its existing manifest-relative rule:
+look beside the manifest, or one level above a directory named `target`.
+
+Automatic discovery uses the same bounded YAML reader and literal relative-path
+validation as workspace discovery. Malformed YAML, duplicate keys, anchors,
+over-limit metadata, dynamic expressions, absolute paths and parent traversal
+fail with `DPONE_DBT_PROJECT_INVALID`; they never fall back to another manifest.
+Correct the project configuration, parse again, and retry the same command.
+
 ## Author and compile errors
 
 | Code | Meaning | Next action | Retry |
@@ -20,8 +41,8 @@ text.
 | `DPONE_DBT_WORKSPACE_TARGET_COLLISION` | Selected materialized models or generated transfers have duplicate literal destination coordinates. | Review both reported project/workflow/resource owners and assign one writer per relation. Renaming a connection alias does not establish physical separation. | After source/policy correction |
 | `DPONE_DBT_WORKSPACE_TARGET_INVALID` | A selected model or generated transfer has incomplete or unsupported write coordinates. | Regenerate the canonical manifest and correct project-local publishing policy. Never edit generated packs or selection locks. | After source/policy correction |
 | `DPONE_DBT_NO_PUBLISH_MODELS` | No model has resolved `publish.enabled: true`. | Check inherited `+meta`; use `--allow-empty` only in an explicit report-only monorepo job. | After source change |
-| `DPONE_DBT_MANIFEST_MISSING` | The selected `target/manifest.json` does not exist. | Run `dbt parse` in the selected project, then retry without moving the generated artifact. | Safe |
-| `DPONE_DBT_MANIFEST_STALE` | dbt source is newer than `target/manifest.json`. | Run `dbt parse`, then retry `dpone dbt check`. | Safe |
+| `DPONE_DBT_MANIFEST_MISSING` | The selected manifest in the configured `target-path` (default `target`) does not exist. | Run `dbt parse` in the selected project, then retry without moving the generated artifact. | Safe |
+| `DPONE_DBT_MANIFEST_STALE` | dbt source is newer than the selected manifest. | Run `dbt parse`, then retry `dpone dbt check`. | Safe |
 | `DPONE_DBT_MANIFEST_INVALID_JSON` | The manifest is not strict JSON or contains duplicate/non-finite values. | Re-run the pinned `dbt parse`; do not repair `manifest.json` by hand. | After clean parse |
 | `DPONE_DBT_MANIFEST_INVALID` | The manifest does not satisfy the supported dbt artifact contract. | Check the pinned dbt version and regenerate the artifact from source. | After clean parse |
 | `DPONE_DBT_MANIFEST_VERSION_UNSUPPORTED` | The manifest schema is outside the declared matrix. | Use an exact supported dbt toolchain or upgrade dpone through its migration guide. | After toolchain change |
@@ -31,7 +52,7 @@ text.
 | `DPONE_DBT_MODEL_AMBIGUOUS` | A short selector matches more than one model. | Retry with the exact dbt `unique_id` or FQN. | Safe |
 | `DPONE_DBT_WORKFLOW_ID_INVALID` | A workflow ID is not a lowercase path-safe identifier matching `[a-z][a-z0-9_]{0,63}`. | Rename the workflow in dbt metadata and platform policy; no artifact was written. | After source/policy change |
 | `DPONE_DBT_PROJECT_ARGUMENT_CONFLICT` | Positional project and `--project-dir` identify conflicting roots. | Keep exactly one project-root form. | Safe |
-| `DPONE_DBT_PROJECT_INVALID` | The selected dbt project root is missing, unsafe, or has no regular `dbt_project.yml`. | Select an existing project directory; do not use a symlinked root or project file. | Safe after path correction |
+| `DPONE_DBT_PROJECT_INVALID` | The project root or `dbt_project.yml` is missing, unsafe, malformed, or has an invalid `target-path`. | Select a regular project, correct YAML and use a literal confined relative `target-path`; parse again. Do not use a symlinked root or project file. | Safe after configuration correction |
 | `DPONE_DBT_SQLSERVER_PROJECT_POLICY_INVALID` | `dbt_project.yml` is unsafe, malformed, ambiguous, lacks the four required literal SQL Server adapter booleans, or redirects adapter macro dispatch. | Restore a regular non-symlinked unique-key YAML file; set safe type expansion `false` and transactions, schema concat, and native string types `true`; remove top-level `dispatch`; run `dbt parse` and `check` again. | After source correction |
 | `DPONE_DBT_SQLSERVER_GRAPH_CAPABILITY_UNSUPPORTED` | The exact selected closure contains a seed, snapshot, ephemeral/Python/custom model, unknown or unsafe config, hooks/grants/operations, storing test failures, or another unlisted SQL Server behavior. | Follow the node/field remediation and documented policy boundary; never edit the manifest or lock. | After source correction; never patch the lock |
 | `DPONE_DBT_SQLSERVER_PHYSICAL_CONSTRAINT_UNSUPPORTED` | A model-level constraint or column constraint other than `not_null` could change physical SQL Server behavior outside the certified v1 boundary. | Remove the physical constraint and express `unique`, primary-key, foreign-key, check, or custom assertions as admitted data/unit tests; regenerate the manifest and release. | After source correction; never patch the lock |

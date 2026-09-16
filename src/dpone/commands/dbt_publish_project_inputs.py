@@ -8,6 +8,10 @@ from pathlib import Path, PurePosixPath
 
 import yaml
 
+from dpone.manifest.bounded_yaml import load_bounded_yaml
+from dpone.manifest.confined_files import read_confined_file
+from dpone.manifest.dbt_workspace_discovery import _configured_path
+
 _BUNDLE_ROOT_FILES = (
     "dbt_project.yml",
     "dependencies.yml",
@@ -32,6 +36,25 @@ class DbtProjectRootError(ValueError):
     """Safe public dbt project configuration error."""
 
     code = "DPONE_DBT_PROJECT_INVALID"
+
+
+def configured_manifest_path(root: Path) -> Path:
+    """Select the singleton artifact with workspace discovery's literal-path policy.
+
+    Reuse its internal canonical validator and bounded, confined YAML primitives
+    so singleton discovery cannot silently fall back on malformed configuration.
+    This reads project metadata only; it never renders Jinja or invokes dbt.
+    """
+
+    try:
+        raw = read_confined_file(root, "dbt_project.yml", max_bytes=1024 * 1024)
+        payload = load_bounded_yaml(raw)
+        if not isinstance(payload, Mapping):
+            raise ValueError("project metadata must be a mapping")
+        target = _configured_path(payload.get("target-path", "target"))
+    except (OSError, ValueError) as exc:
+        raise DbtProjectRootError("dbt_project.yml must contain a safe literal target-path") from exc
+    return root / target / "manifest.json"
 
 
 def bundle_inputs(root: Path) -> Iterator[Path]:
