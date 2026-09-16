@@ -206,7 +206,7 @@ def test_live_freeze_reconciles_only_positive_unknown(generations, outcome):
 def test_live_runtime_freeze_recovery_uses_actual_current_owner_inspection(generations, fault):
     from dpone.contracts.native_source_custody import NativeSourceCustodyError
     from dpone.contracts.native_source_custody_codec import decode_source_trusted_build_completion
-    from dpone.runtime.native_generation_freeze import NativeGenerationFreeze
+    from dpone.services.native_generation_freeze import NativeGenerationFreeze
 
     record, reservation, admission, reference = prepared(generations)
     before = record()
