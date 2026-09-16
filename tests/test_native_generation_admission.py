@@ -18,8 +18,9 @@ from dpone.contracts.native_source_custody import (
     SourceCustodySnapshot,
     SourceExecutorBinding,
     SourceReadGrant,
+    decode_source_executor_binding,
+    encode_source_executor_binding,
 )
-from dpone.contracts.native_source_custody_codec import decode_source_executor_binding, encode_source_executor_binding
 from tests.test_native_original_subjects import authority
 
 

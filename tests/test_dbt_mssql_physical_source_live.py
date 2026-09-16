@@ -9,7 +9,7 @@ import pytest
 
 from dpone.adapters.dbt_mssql_physical_source import PhysicalSourceReadError
 from dpone.adapters.dbt_workspace_mssql_attempt_admission import MssqlDbtWorkspaceAttemptAdmission
-from dpone.contracts.native_source_custody_codec import encode_source_executor_binding
+from dpone.contracts.native_source_custody import encode_source_executor_binding
 from tests.support.dbt_mssql_physical_source_authority import LOCAL, SCHEMA
 from tests.support.dbt_mssql_physical_source_fixture import CERTIFICATE, CERTIFICATE_USER, SourceFixture
 

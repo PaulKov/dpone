@@ -5,6 +5,7 @@ from itertools import permutations
 
 import pytest
 
+from dpone.adapters.native_generation_invocation_auth import InvocationOriginalReader
 from dpone.contracts.native_delivery_json import decode_native_delivery_json, encode_native_delivery_json
 from dpone.contracts.native_source_custody import NativeSourceCustodyError
 from dpone.contracts.native_trusted_dbt_environment_codec import (
@@ -15,7 +16,6 @@ from dpone.contracts.native_trusted_dbt_environment_codec import (
     encode_trusted_dbt_qualification,
     encode_trusted_dbt_toolchain,
 )
-from dpone.runtime.native_generation_invocation_auth import InvocationOriginalReader
 from tests.native_trusted_dbt_fixtures import InvocationFixture
 
 KINDS = (

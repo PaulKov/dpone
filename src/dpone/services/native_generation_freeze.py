@@ -21,8 +21,9 @@ from dpone.contracts.native_delivery_codec import (
 )
 from dpone.contracts.native_identity import OriginalRef
 from dpone.contracts.native_original_kinds import NativeOriginalKind
-from dpone.contracts.native_source_custody import NativeSourceCustodyError, SourceExecutorBinding
-from dpone.contracts.native_source_custody_codec import (
+from dpone.contracts.native_source_custody import (
+    NativeSourceCustodyError,
+    SourceExecutorBinding,
     decode_source_executor_binding,
     encode_source_executor_binding,
     encode_source_trusted_build_completion,

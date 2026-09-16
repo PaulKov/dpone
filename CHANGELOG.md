@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Validate physical plans against bounded retained dbt manifests and the complete
+  selected model set before enrollment. Preserve column order, resolved targets,
+  layout and nullability checks; incomplete managed-source and character-collation
+  authority fail explicitly instead of accepting a caller-supplied proof.
+
+- Align native build orchestration with service ownership and concrete engine
+  wiring with the application layer. Keep custody and invocation codecs with
+  their schema owners. Remove unreleased grouping modules while preserving the
+  released dbt result-parser API, original result classes and pickle identity
+  through explicit adaptation to one canonical parser.
+
 - Keep catalog policy projection and closed source-row decoding with their
   existing contract owners. Preserve real original acquisition, authentication,
   SQL transaction settlement and existing reader error imports in the adapters.

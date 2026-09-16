@@ -26,15 +26,13 @@ from dpone.contracts.native_source_custody import (
     SourceCustodySnapshot,
     SourceExecutorBinding,
     SourceTrustedBuildCompletion,
-    require_trusted_build_completion,
-)
-from dpone.contracts.native_source_custody_codec import (
     decode_source_admission_closure,
     decode_source_executor_binding,
     decode_source_trusted_build_completion,
     encode_source_admission_closure,
     encode_source_executor_binding,
     encode_source_trusted_build_completion,
+    require_trusted_build_completion,
 )
 from dpone.ports.native_source_custody import SourceBuildCompletionVerifier
 from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor

@@ -31,8 +31,8 @@ from dpone.ports.native_originals import (
     NativeOriginalBindingPort,
     NativeOriginalReaderPort,
 )
-from dpone.runtime.native_generation_build_evidence import NativeGenerationBuildEvidenceWriter
-from dpone.runtime.native_generation_invocation_recorder import TrustedDbtInvocationRecorder
+from dpone.services.native_generation_build_evidence import NativeGenerationBuildEvidenceWriter
+from dpone.services.native_generation_invocation_recorder import TrustedDbtInvocationRecorder
 
 
 class NativeGenerationBuildRejected(ValueError):

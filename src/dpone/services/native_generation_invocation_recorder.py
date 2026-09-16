@@ -19,18 +19,18 @@ from dpone.adapters.native_generation_invocation_auth import (
     authenticate_invocation,
     verify_invocation_paths,
 )
-from dpone.contracts.native_generation_invocation import AuthenticatedInvocationPlan
+from dpone.contracts.native_generation_invocation import (
+    AuthenticatedInvocationPlan,
+    TrustedDbtInvocationCompletion,
+    encode_trusted_dbt_invocation_completion,
+)
 from dpone.contracts.native_identity import OriginalRef
 from dpone.contracts.native_originals import NativeOriginalKind, NativeOriginalSubject
 from dpone.contracts.native_source_custody import (
     NativeSourceCustodyError,
     SourceExecutorBinding,
-    TrustedDbtInvocationCompletion,
-)
-from dpone.contracts.native_source_custody_codec import (
     decode_source_executor_binding,
     encode_source_executor_binding,
-    encode_trusted_dbt_invocation_completion,
 )
 from dpone.ports.dbt_publishing import DbtCommandResult, DbtCommandRunner
 from dpone.ports.native_originals import (

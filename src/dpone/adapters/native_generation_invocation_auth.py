@@ -14,6 +14,7 @@ from pathlib import Path
 
 from dpone.contracts.native_generation_invocation import (
     AuthenticatedInvocationPlan,
+    decode_trusted_dbt_command_plan,
     invocation_path_slots,
     require_admitted_command,
     require_owned_root_identities,
@@ -30,7 +31,6 @@ from dpone.contracts.native_originals import (
     encode_native_original_subject,
 )
 from dpone.contracts.native_source_custody import NativeSourceCustodyError, SourceExecutorBinding
-from dpone.contracts.native_source_custody_codec import decode_trusted_dbt_command_plan
 from dpone.contracts.native_trusted_dbt_environment import TrustedDbtOwnedRoot
 from dpone.contracts.native_trusted_dbt_environment_codec import (
     decode_trusted_dbt_owned_root,

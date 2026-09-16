@@ -13,17 +13,13 @@ from typing import Any
 from dpone.contracts.airflow_run_identity import AirflowRunIdentity
 from dpone.contracts.dbt_execution_evidence import DbtExecutionEvidence
 from dpone.contracts.dbt_execution_pack import DbtExecutionPack, dbt_target_identity_sha256
+from dpone.contracts.dbt_run_results import ParsedDbtRunResults, parse_dbt_run_results
 from dpone.contracts.dbt_runtime import dbt_target_binding_sha256, validate_dbt_workload_identity
 from dpone.contracts.dbt_sqlserver_graph_policy_contract import dbt_sqlserver_graph_contract_sha256
+from dpone.contracts.native_generation_invocation import TrustedDbtCommandPlan, TrustedDbtInvocationCompletion
 from dpone.contracts.native_identity import OriginalRef
-from dpone.contracts.native_source_custody import (
-    NativeSourceCustodyError,
-    SourceExecutorBinding,
-    TrustedDbtCommandPlan,
-    TrustedDbtInvocationCompletion,
-)
+from dpone.contracts.native_source_custody import NativeSourceCustodyError, SourceExecutorBinding
 from dpone.ports.dbt_publishing import DbtManifestSchemaValidator, DbtRunResultsSchemaValidator
-from dpone.runtime.dbt_run_results import ParsedDbtRunResults, parse_dbt_run_results
 
 
 def validate_native_build_evidence(

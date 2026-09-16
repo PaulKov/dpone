@@ -9,8 +9,11 @@ from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntime
 from dpone.contracts.dbt_mssql_physical_registration_codec import physical_runtime_registration_digest
 from dpone.contracts.dbt_mssql_physical_source_identity import PhysicalSourceIdentity, require_source_identity
 from dpone.contracts.native_identity import OriginalRef
-from dpone.contracts.native_source_custody import SourceExecutorBinding
-from dpone.contracts.native_source_custody_codec import decode_source_executor_binding, encode_source_executor_binding
+from dpone.contracts.native_source_custody import (
+    SourceExecutorBinding,
+    decode_source_executor_binding,
+    encode_source_executor_binding,
+)
 from tests.support.dbt_mssql_physical_registration import registration_inputs
 
 

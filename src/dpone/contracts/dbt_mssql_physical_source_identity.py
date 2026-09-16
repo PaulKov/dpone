@@ -11,7 +11,7 @@ from dpone.contracts.dbt_mssql_physical_registration import (
 from dpone.contracts.dbt_mssql_physical_registration_values import DatabasePrincipal
 from dpone.contracts.dbt_mssql_physical_validation import require_physical_uuid, require_sql_positive_integer
 from dpone.contracts.native_identity import OriginalRef
-from dpone.contracts.native_source_custody_codec import decode_source_executor_binding
+from dpone.contracts.native_source_custody import decode_source_executor_binding
 
 
 @dataclass(frozen=True, slots=True)

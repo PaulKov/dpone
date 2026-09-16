@@ -41,10 +41,13 @@ the existing recovery responsibilities.
 
 ## Reserved execution and result
 
-Import `ReservedDbtBuildBridge` and `TrustedDbtInvocationRecorder` from
-`dpone.runtime.native_generation_execution`. This public facade re-exports the
-same objects as their canonical build-bridge and invocation-recorder modules,
-without a circular dependency.
+Import `ReservedDbtBuildBridge` from
+`dpone.services.native_generation_build_bridge` and
+`TrustedDbtInvocationRecorder` from
+`dpone.services.native_generation_invocation_recorder`.
+`dpone.app.native_generation_bound_build` owns the concrete engine composition.
+The earlier, unreleased `dpone.runtime.native_generation_execution` grouping
+facade is removed; use the defining owners directly.
 The bridge requires the actual trusted recorder as its command runner and an
 actual `NativeGenerationBuildEvidenceWriter`. Before credential rendering it
 compares the full executor descriptor against both owners, checks the reservation

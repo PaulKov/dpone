@@ -9,8 +9,9 @@ from uuid import UUID
 
 from dpone.contracts.native_delivery_codec import decode_frozen_generation
 from dpone.contracts.native_identity import OriginalRef
-from dpone.contracts.native_source_custody import SourceAdmissionClosure, SourceCustodySnapshot
-from dpone.contracts.native_source_custody_codec import (
+from dpone.contracts.native_source_custody import (
+    SourceAdmissionClosure,
+    SourceCustodySnapshot,
     decode_source_admission_closure,
     decode_source_executor_binding,
     decode_source_trusted_build_completion,

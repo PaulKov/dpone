@@ -16,8 +16,12 @@ from dpone.contracts.native_delivery_json import (
     encode_native_delivery_json,
 )
 from dpone.contracts.native_identity import OriginalRef
-from dpone.contracts.native_source_custody import NativeSourceCustodyError, SourceExecutorBinding
-from dpone.contracts.native_source_custody_codec import decode_source_executor_binding, encode_source_executor_binding
+from dpone.contracts.native_source_custody import (
+    NativeSourceCustodyError,
+    SourceExecutorBinding,
+    decode_source_executor_binding,
+    encode_source_executor_binding,
+)
 
 
 @dataclass(frozen=True, slots=True)

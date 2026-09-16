@@ -324,9 +324,10 @@ equality. This refactor does not change runtime qualification or delivery policy
 pure command, qualification, root-identity and argument-template decisions.
 `adapters.native_generation_invocation_auth` owns fresh original acquisition,
 ordered decoding and filesystem observations through the existing injected
-original ports. The runtime recorder retains sequencing, admission locks,
-deadlines, latched failures and completion publication. Its historical
-authentication module re-exports the same four public objects for compatibility.
+original ports. The service-layer recorder retains sequencing, admission locks,
+deadlines, latched failures and completion publication. The earlier unreleased
+runtime authentication grouping module is removed: callers use the adapter for
+acquisition and the contract owner for `AuthenticatedInvocationPlan`.
 
 Each boundary still checks generation and command before reading originals, then
 reads command, toolchain and qualification. Qualification and invocation checks
@@ -371,15 +372,30 @@ credentials, command admission nor runtime qualification; the bridge still
 validates its exact recorder before rendering a profile.
 
 
-## Native execution public facade
+## Native execution application ownership
 
-The approved `runtime.native_generation_execution` import exposes the actual
-reserved build bridge and recorder through identity-preserving re-exports. The
-complete recorder implementation lives in `runtime.native_generation_invocation_recorder`;
-the bridge imports that canonical owner directly, avoiding a facade/bridge cycle.
-No recorder method, timing, locking, dispatch or evidence behavior changes. Public
-import order is checked in fresh processes. This exposes implemented constructors;
-it does not create a final-quality placeholder or qualify the bootstrap.
+This refinement supersedes the earlier unreleased runtime grouping facade.
+`services.native_generation_build_bridge` and
+`services.native_generation_invocation_recorder` own reserved execution and
+qualified command sequencing. Build-evidence publication and independent
+completion authentication also live in services. The concrete engine remains in
+runtime; `app.native_generation_bound_build` wires it to the build port. Pure
+build validation belongs to contracts. No recorder timing, locking, dispatch,
+credential-admission or evidence algorithm changes with these relocations.
+
+Custody records and their canonical wire codecs share
+`contracts.native_source_custody`; command-plan and termination records/codecs
+share `contracts.native_generation_invocation`. The now-empty unreleased custody
+codec and runtime grouping modules are removed. Existing programme consumers must
+use these defining owners; wire schemas and immutable original bytes do not
+change.
+
+`contracts.dbt_run_results` owns the pure result parser used by native validation.
+The released `runtime.dbt_run_results` API keeps its original dataclass definitions,
+signatures and pickle identities, adapting canonical parsed records explicitly.
+It does not duplicate the parsing or warning-policy algorithm. Compatibility
+tests cover returned types, serialization and resolved annotations. These changes
+do not qualify the installed bootstrap or declare global architecture gates passed.
 
 
 ## Managed physical catalog transport

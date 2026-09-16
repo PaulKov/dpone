@@ -10,7 +10,7 @@ from dpone.contracts.dbt_contract_validation import DbtPublishingError
 from dpone.contracts.dbt_execution_evidence import DbtNodeOutcome
 from dpone.contracts.dbt_execution_pack import dbt_target_identity_sha256
 from dpone.contracts.dbt_runtime import dbt_target_binding_sha256
-from dpone.runtime.native_generation_build_validation import validate_native_build_evidence
+from dpone.contracts.native_generation_build_validation import validate_native_build_evidence
 from tests.test_dbt_dev_evidence_runtime_writer import _evidence
 from tests.test_dbt_runtime_execution import _pack, _preflight_manifest, _run_identity
 
@@ -137,12 +137,12 @@ def test_cohort_rejects_inconsistent_actual_results(mutation):
 
 def writer_fixture(tmp_path, *, wrong_toolchain=False):
     from dpone.adapters.dbt_artifacts import LocalDbtExecutionEvidenceWriter
+    from dpone.adapters.native_generation_invocation_auth import InvocationOriginalReader
     from dpone.contracts.dbt_contract_validation import artifact_json_bytes
     from dpone.contracts.native_identity import OriginalRef
     from dpone.contracts.native_trusted_dbt_environment_codec import decode_trusted_dbt_owned_root
     from dpone.runtime.native_generation_build_artifacts import CapturedBuildArtifactReader
-    from dpone.runtime.native_generation_build_evidence import NativeGenerationBuildEvidenceWriter
-    from dpone.runtime.native_generation_invocation_auth import InvocationOriginalReader
+    from dpone.services.native_generation_build_evidence import NativeGenerationBuildEvidenceWriter
     from tests.native_trusted_dbt_fixtures import InvocationFixture
 
     fixture = InvocationFixture(tmp_path)
@@ -285,11 +285,11 @@ def test_writer_rejects_pack_not_bound_to_admitted_toolchain(tmp_path):
 
 
 def completion_consumer_fixture(tmp_path):
+    from dpone.adapters.native_generation_invocation_auth import InvocationOriginalReader
     from dpone.contracts.native_identity import OriginalRef
-    from dpone.contracts.native_source_custody_codec import encode_source_trusted_build_completion
-    from dpone.runtime.native_generation_completion_auth import NativeGenerationCompletionAuthenticator
-    from dpone.runtime.native_generation_invocation_auth import InvocationOriginalReader
+    from dpone.contracts.native_source_custody import encode_source_trusted_build_completion
     from dpone.services.dbt_dev_evidence_contracts import validate_dbt_execution_evidence_contract
+    from dpone.services.native_generation_completion_auth import NativeGenerationCompletionAuthenticator
 
     writer, fixture, evidence = writer_fixture(tmp_path)
     writer.write(evidence)
@@ -370,7 +370,7 @@ def test_completion_consumer_rejects_rebound_inconsistent_inventory(tmp_path, fi
         encode_native_build_artifact_inventory,
     )
     from dpone.contracts.native_identity import OriginalRef
-    from dpone.contracts.native_source_custody_codec import encode_source_trusted_build_completion
+    from dpone.contracts.native_source_custody import encode_source_trusted_build_completion
 
     consumer, fixture, completion, reference = completion_consumer_fixture(tmp_path)
     inventory = decode_native_build_artifact_inventory(fixture.store.documents[completion.artifact_inventory.locator])
@@ -403,11 +403,11 @@ def test_completion_consumer_checks_rebound_terminal_at_admitted_budget(tmp_path
         decode_native_build_artifact_inventory,
         encode_native_build_artifact_inventory,
     )
-    from dpone.contracts.native_source_custody_codec import (
+    from dpone.contracts.native_generation_invocation import (
         decode_trusted_dbt_invocation_completion,
-        encode_source_trusted_build_completion,
         encode_trusted_dbt_invocation_completion,
     )
+    from dpone.contracts.native_source_custody import encode_source_trusted_build_completion
 
     consumer, fixture, completion, reference = completion_consumer_fixture(tmp_path)
     terminal = decode_trusted_dbt_invocation_completion(fixture.store.documents[completion.termination.locator])

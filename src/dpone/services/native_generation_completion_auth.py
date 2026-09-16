@@ -10,32 +10,30 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from dpone.adapters.native_generation_invocation_auth import InvocationOriginalReader, authenticate_invocation
 from dpone.contracts.airflow_run_identity import AirflowRunIdentity
 from dpone.contracts.dbt_execution_evidence import DbtExecutionEvidence, canonical_dbt_execution_evidence_bytes
 from dpone.contracts.dbt_execution_pack import DbtExecutionPack
 from dpone.contracts.native_generation_build_cohort import decode_native_build_artifact_inventory
+from dpone.contracts.native_generation_build_validation import (
+    validate_native_build_evidence,
+    validate_native_build_termination,
+)
+from dpone.contracts.native_generation_invocation import decode_trusted_dbt_invocation_completion
 from dpone.contracts.native_identity import OriginalRef
 from dpone.contracts.native_original_kinds import NativeOriginalKind
 from dpone.contracts.native_source_custody import (
     NativeSourceCustodyError,
     SourceExecutorBinding,
     SourceTrustedBuildCompletion,
-)
-from dpone.contracts.native_source_custody_codec import (
     decode_source_executor_binding,
     decode_source_trusted_build_completion,
-    decode_trusted_dbt_invocation_completion,
     encode_source_executor_binding,
     encode_source_trusted_build_completion,
 )
 from dpone.contracts.native_trusted_dbt_environment_codec import decode_trusted_dbt_toolchain
 from dpone.contracts.strict_json import strict_json_object
 from dpone.ports.dbt_publishing import DbtManifestSchemaValidator, DbtRunResultsSchemaValidator
-from dpone.runtime.native_generation_build_validation import (
-    validate_native_build_evidence,
-    validate_native_build_termination,
-)
-from dpone.runtime.native_generation_invocation_auth import InvocationOriginalReader, authenticate_invocation
 
 
 class NativeGenerationCompletionAuthenticator:

@@ -4,18 +4,16 @@ from dataclasses import replace
 
 import pytest
 
-from dpone.contracts.native_source_custody import (
-    NativeSourceCustodyError,
+from dpone.contracts.native_generation_invocation import (
     TrustedDbtCommandEntry,
     TrustedDbtCommandPlan,
     TrustedDbtInvocationCompletion,
-)
-from dpone.contracts.native_source_custody_codec import (
     decode_trusted_dbt_command_plan,
     decode_trusted_dbt_invocation_completion,
     encode_trusted_dbt_command_plan,
     encode_trusted_dbt_invocation_completion,
 )
+from dpone.contracts.native_source_custody import NativeSourceCustodyError
 from tests.test_native_generation_admission import executor
 
 

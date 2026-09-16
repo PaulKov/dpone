@@ -5,9 +5,9 @@ from datetime import UTC, datetime
 from hashlib import sha256
 
 from dpone.contracts.dbt_toolchain import DBT_SQLSERVER_1_12_CERTIFIED
+from dpone.contracts.native_generation_invocation import encode_trusted_dbt_command_plan
 from dpone.contracts.native_identity import OriginalRef
 from dpone.contracts.native_originals import NativeOriginalBinding
-from dpone.contracts.native_source_custody_codec import encode_trusted_dbt_command_plan
 from dpone.contracts.native_trusted_dbt_environment import (
     TrustedDbtOwnedRoot,
     TrustedDbtQualification,
@@ -74,7 +74,7 @@ class InvocationFixture:
     def __init__(
         self, tmp_path, phase="BUILD", *, delegate=None, timeout=10, termination=2, clock=None, monotonic_clock=None
     ):
-        from dpone.runtime.native_generation_execution import TrustedDbtInvocationRecorder
+        from dpone.services.native_generation_invocation_recorder import TrustedDbtInvocationRecorder
 
         self.store = SyntheticOriginals()
         self.delegate = SyntheticRunner() if delegate is None else delegate
