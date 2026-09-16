@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add a finite signed SQL Server source-identity bridge, privileged installer and
+  bounded transaction reader. Actual caller mappings and current native ownership
+  are checked without advancing generation state. Upstream original authentication
+  remains a platform prerequisite; this does not enable physical model admission
+  or certify the complete publishing route.
+
 - Add privileged immutable SQL Server physical registration storage with exact
   schema/projection checks, current database/principal validation and independent
   lost-acknowledgement readback. Storage does not authorize managed model execution;

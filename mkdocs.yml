@@ -514,6 +514,7 @@ nav:
       - Managed SQL physical plans: dbt-mssql-physical-plans.md
       - Physical runtime registration: dbt-mssql-physical-registration.md
       - Physical registration SQL storage: dbt-mssql-physical-registration-provisioning.md
+      - Registered source identity: dbt-mssql-physical-source-bridge.md
       - Starter resource generation: dbt-starter-resource-generation.md
       - Bounded versioned artifacts: versioned-artifact-store.md
       - Feature design standard: feature-design-standard.md

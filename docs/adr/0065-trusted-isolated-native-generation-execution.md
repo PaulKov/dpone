@@ -480,8 +480,8 @@ limits are separate. Do not require a model's `resource_bounds` reference to equ
 that capacity reference: no such semantic equivalence has been established.
 The pure registration codec excludes resource-bound admission; later runtime
 admission must fail closed until an actual physical-bounds original or explicit
-authenticated projection mapping is implemented. Original resolution, package
-authority, signed runtime procedures and runtime qualification remain unfinished.
+authenticated projection mapping is implemented. Complete original resolution,
+package authority, model admission and runtime qualification remain unfinished.
 
 The pure carrier and codec are documented in the
 [physical registration reference](../dbt-mssql-physical-registration.md).
@@ -495,3 +495,12 @@ Externally authenticated platform inputs remain prerequisites; control/capacity
 bootstrap authority need not be invented as a new native-original kind. Storage
 does not install signed source procedures or grant model admission. Isolated
 storage tests are not full permission, source-execution or route qualification.
+
+The separate [source-identity bridge](../dbt-mssql-physical-source-bridge.md)
+adds finite signed/countersigned modules and a bounded transaction reader. It
+verifies actual model/control callers and current P-before-G ownership without
+mutating native state. Privileged installation verifies fixed module, certificate
+and grant inventories before invoking registration storage. Authenticated upstream
+inputs and exclusion of concurrent privileged DDL remain explicit platform
+preconditions. A successful source observation is not physical model admission,
+launch entitlement, a completion receipt or complete route qualification.
