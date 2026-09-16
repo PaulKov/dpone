@@ -26,7 +26,19 @@ Construct `MssqlPhysicalSourceSchemaProvisioner` with `connection_factory`, actu
 `admission_sql: bytes`, `certificate_name`, `certificate_public_bytes: bytes`, and
 `certificate_user`. Call `apply(registration)` only after the preparation above.
 The constructor accepts no authentication callback. The registration object is
-the existing closed codec value. The SQL producer accepts coordinates only.
+the existing closed codec value. The SQL producer accepts deployment coordinates,
+including `bridge_certificate_thumbprint: bytes`. The installer verifies expected
+`CERTENCODED` public bytes in both registered databases, then independently reads
+their actual 20-byte certificate thumbprints and requires equality before rendering
+any module or running module DDL. It neither guesses a thumbprint by hashing inputs
+nor embeds registration digests. Missing, malformed, duplicate or differing
+catalog thumbprints fail before installation and registration.
+
+The isolated live negative fixture showed that removing a control countersignature
+alone does not break its local ownership chain. Therefore each rendered module
+also checks its exact own signature inventory and pinned certificate thumbprint
+at runtime. This is a source-read integrity check, not a new admission authority
+or a broader runtime grant. Actual SQL verification belongs to the bridge fixture.
 
 ## Installed state and limitations
 
