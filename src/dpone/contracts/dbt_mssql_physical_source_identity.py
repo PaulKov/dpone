@@ -2,8 +2,10 @@
 
 from dataclasses import dataclass
 
-from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntimeRegistration
-from dpone.contracts.dbt_mssql_physical_registration_codec import physical_runtime_registration_digest
+from dpone.contracts.dbt_mssql_physical_registration import (
+    MssqlPhysicalRuntimeRegistration,
+    physical_runtime_registration_digest,
+)
 from dpone.contracts.dbt_mssql_physical_registration_values import DatabasePrincipal
 from dpone.contracts.dbt_mssql_physical_validation import require_physical_uuid, require_sql_positive_integer
 from dpone.contracts.native_identity import OriginalRef

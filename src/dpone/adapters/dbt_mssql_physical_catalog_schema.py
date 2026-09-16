@@ -17,8 +17,10 @@ from hashlib import sha256
 from dpone.adapters import dbapi_lifecycle
 from dpone.adapters.dbt_mssql_physical_catalog_queries import ENTRY, catalog_procedure
 from dpone.adapters.dbt_mssql_physical_source_schema import module_inventory_sql, principal_inventory_sql
-from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntimeRegistration
-from dpone.contracts.dbt_mssql_physical_registration_codec import encode_physical_runtime_registration
+from dpone.contracts.dbt_mssql_physical_registration import (
+    MssqlPhysicalRuntimeRegistration,
+    encode_physical_runtime_registration,
+)
 from dpone.contracts.dbt_mssql_physical_registration_values import DedicatedObserver
 from dpone.contracts.mssql_object_name import native_control_schema, quote_mssql_identifier
 from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
