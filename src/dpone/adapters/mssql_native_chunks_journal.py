@@ -15,6 +15,7 @@ from dpone.adapters.mssql_native_publication_journal import NativePublicationJou
 from dpone.contracts.bounded_window import WindowContractError, WindowLease
 from dpone.contracts.mssql_native_chunks import (
     EncodedNativeFile,
+    NativeBulkTransportPolicy,
     NativeChunkPlan,
     NativeChunkReceipt,
     NativeStageComplete,
@@ -54,7 +55,7 @@ class NativeChunkJournal:
     """Persist immutable plan bindings and ordered attempt progress under fencing."""
 
     def __init__(self, store: WindowStore, lease: WindowLease, plan: NativeChunkPlan) -> None:
-        if plan.target_id != lease.target_id or any(not value for value in asdict(plan).values()):
+        if plan.target_id != lease.target_id or any(not value for value in plan.to_dict().values()):
             raise WindowContractError("mssql_native.invalid_plan_identity")
         self.store, self.lease, self.plan = store, lease, plan
         self.key = "mssql-native-chunks-v1/" + _digest([plan.target_id, plan.run_id])
@@ -90,9 +91,27 @@ class NativeChunkJournal:
                 "limits",
             }:
                 raise ValueError("invalid record")
-            if type(value["version"]) is not int or value["version"] != 1:
+            if type(value["version"]) is not int or value["version"] not in (1, 3):
                 raise ValueError("invalid version")
-            if value["identity"] != asdict(self.plan):
+            identity = value["identity"]
+            keys = {
+                "run_id",
+                "target_id",
+                "source_query_id",
+                "window_fingerprint",
+                "schema_fingerprint",
+                "wire_fingerprint",
+            }
+            if not isinstance(identity, dict):
+                raise ValueError("invalid identity")
+            if value["version"] == 3:
+                keys.add("transport")
+                policy = NativeBulkTransportPolicy.from_mapping(identity.get("transport"))
+                if policy.to_dict() != identity["transport"]:
+                    raise ValueError("unresolved transport")
+            if set(identity) != keys:
+                raise ValueError("invalid identity shape")
+            if identity != self.plan.to_dict():
                 raise WindowContractError("mssql_native.journal_identity_changed")
             if value["phase"] not in ("staging", "stage_complete", "reextract_required"):
                 raise ValueError("invalid phase")
@@ -134,8 +153,8 @@ class NativeChunkJournal:
             raise WindowContractError("mssql_native.reextract_required")
         self._save(
             dict(
-                version=1,
-                identity=asdict(self.plan),
+                version=1 if self.plan.transport is None else 3,
+                identity=self.plan.to_dict(),
                 phase="staging",
                 chunks={},
                 complete=None,

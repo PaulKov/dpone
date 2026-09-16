@@ -29,6 +29,7 @@ from dpone.commands.plan_contract_render import (
 from dpone.commands.plan_contract_render import (
     render_transport_contract_text as _render_transport_contract_text,
 )
+from dpone.commands.plan_diagnostics import configuration_error
 from dpone.commands.plan_mssql_native_render import render_mssql_native
 from dpone.commands.plan_native_render import (
     render_columnar_fast_path_md,
@@ -38,7 +39,6 @@ from dpone.commands.plan_native_render import (
     render_snapshot_optimization_md,
     render_snapshot_optimization_text,
 )
-from dpone.manifest.errors import ManifestConfigurationError
 from dpone.readiness.managed import ExecutionPlanService
 
 
@@ -346,17 +346,10 @@ def cmd_plan(args: argparse.Namespace, *, ctx: object, logger: logging.Logger) -
             explain_strategy=bool(args.explain_strategy),
         )
     except ValueError as error:
-        code = str(error)
-        if code not in (
-            "mssql_native.invalid_limit:encoding_parallelism",
-            "mssql_native.invalid_limit:import_parallelism",
-        ):
+        diagnostic = configuration_error(error)
+        if diagnostic is None:
             raise
-        field = code.split(":", 1)[1]
-        raise ManifestConfigurationError(
-            f"{code}: source.options.native_transfer.execution.native_chunks.{field} "
-            "must be an integer in 1..64; omit the field to use chunking.parallelism."
-        ) from error
+        raise diagnostic from error
     if args.format == "json":
         write_json(payload)
     elif args.format == "md":

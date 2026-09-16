@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.bounded_window import WindowContractError, WindowLease
 from dpone.contracts.process_types import ProcessResult
-from dpone.manifest.mssql_native_policy import validate_native_config
+from dpone.manifest.mssql_native_policy import native_transport_policy, validate_native_config
 from dpone.ports.bounded_window import WindowStore
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session
@@ -76,6 +76,8 @@ class NativeMssqlRuntime:
             service, context = binding.service, binding.stage_context
             if context.plan.target_id != self.target_id or context.lease != lease or context.cancelled is not lost:
                 raise WindowContractError("mssql_native.binding_lease_mismatch")
+            if getattr(context.plan, "transport", None) != native_transport_policy(load_config):
+                raise WindowContractError("mssql_native.transport_policy_mismatch")
             recovered = service.resume(load_config, context, binding.admission)
             self._check(lease, lost)
             handle = recovered if isinstance(recovered, StagedLoadHandle) else None
