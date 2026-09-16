@@ -7,6 +7,7 @@ IF @@TRANCOUNT<>1 OR XACT_STATE()<>1 OR @registration_id IS NULL
  OR @generation IS NULL OR @expected_invocation IS NULL
  THROW 51420, 'DPONE_PHYSICAL_SOURCE_TRANSACTION_OR_ID_INVALID', 1;
 {{MODEL_CALLER}}
+{{MODEL_SIGNATURE}}
 DECLARE @payload varbinary(max), @digest varbinary(71);
 SELECT @payload=payload,@digest=registration_digest
  FROM [{{LOCAL_SCHEMA}}].[physical_runtime_registrations_v1] WITH (READCOMMITTEDLOCK)
@@ -89,6 +90,7 @@ IF @@TRANCOUNT<>1 OR XACT_STATE()<>1 OR @generation IS NULL OR @expected_invocat
  OR @model_id IS NULL OR @model_id<=4 OR @model_sid IS NULL OR DATALENGTH(@model_sid) NOT BETWEEN 1 AND 85
  THROW 51420, 'DPONE_PHYSICAL_SOURCE_INTERNAL_INPUT_INVALID', 1;
 {{CONTROL_CALLER}}
+{{CONTROL_SIGNATURE}}
 {{REGISTRATION_DECODE}}
 {{CONTROL_PIN}}
 DECLARE @role nvarchar(8);
