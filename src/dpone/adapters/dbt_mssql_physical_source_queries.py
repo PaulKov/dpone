@@ -5,8 +5,9 @@ three UUID inputs; SQL callers cannot select an endpoint, role or payload.
 """
 
 from dpone.adapters.dbt_mssql_physical_registration_schema import COLUMNS
-from dpone.adapters.native_generation_mssql_json import decode_bytes, scalar, utf8
+from dpone.adapters.native_generation_mssql_json import decode_bytes, scalar, shape, utf8
 from dpone.adapters.native_generation_mssql_owner import physical_owner
+from dpone.adapters.native_generation_mssql_queries import _canonical_executor
 from dpone.contracts.dbt_mssql_physical_validation import require_physical_identifier
 from dpone.contracts.mssql_object_name import native_control_schema
 
@@ -87,7 +88,8 @@ def _caller(schema: str) -> str:
     return f"""DECLARE @caller_id int=USER_ID(), @caller_sid varbinary(85);
 SELECT @caller_sid=sid FROM sys.database_principals
  WHERE principal_id=@caller_id AND principal_id>4 AND type='S' AND authentication_type=1;
-IF @caller_sid IS NULL OR @caller_sid<>SUSER_SID() OR DATALENGTH(@caller_sid)<>DATALENGTH(SUSER_SID())
+IF @caller_sid IS NULL OR SUSER_SID() IS NULL OR SUSER_SID(ORIGINAL_LOGIN()) IS NULL
+ OR @caller_sid<>SUSER_SID() OR DATALENGTH(@caller_sid)<>DATALENGTH(SUSER_SID())
  OR SUSER_SID()<>SUSER_SID(ORIGINAL_LOGIN()) OR DATALENGTH(SUSER_SID())<>DATALENGTH(SUSER_SID(ORIGINAL_LOGIN()))
  OR IS_SRVROLEMEMBER('sysadmin')<>0 OR IS_MEMBER('db_owner')<>0
  OR HAS_PERMS_BY_NAME(N'{schema}',N'SCHEMA',N'ALTER')<>0
@@ -130,6 +132,15 @@ def source_procedures(
         "EXECUTOR_DECODE": decode_bytes("@executor", "@binding"),
         "PHYSICAL_OWNER": physical_owner(control),
         "PROJECTION_CHECK": _projections(),
+        "REQUEST_SHAPE": shape(
+            "@json", dict(schema=1, subject=5, workspace_attempt=5, guard=5, profile=5, command=5, requested_bytes=2)
+        ),
+        "EXECUTOR_SHAPE": shape(
+            "@binding",
+            dict(schema=1, generation_id=1, guard_epoch=2, invocation_id=1, reservation=5, profile=5, command=5),
+        ),
+        "CANONICAL_EXECUTOR": _canonical_executor(),
+        "REQUEST_SUBJECT": utf8("JSON_QUERY(@json,'$.subject')"),
     }
     for name, document, path in (
         ("AUTHORITY_LOCATOR", "@registration", "$.control_authority.locator"),
@@ -144,6 +155,14 @@ def source_procedures(
         ("BINDING_RESERVATION_DIGEST", "@binding", "$.reservation.sha256"),
     ):
         replacements[name] = utf8(scalar(document, path))
+    replacements["REQUEST_SHAPE"] += shape(
+        "JSON_QUERY(@json,'$.subject')", dict(schema=1, scope=1, authority=5, generation_id=1)
+    )
+    for document, fields in (("@json", ("profile", "command")), ("@binding", ("profile", "command", "reservation"))):
+        key = "REQUEST_SHAPE" if document == "@json" else "EXECUTOR_SHAPE"
+        replacements[key] += "\n" + "\n".join(
+            shape(f"JSON_QUERY({document},'$.{field}')", dict(locator=1, sha256=1)) for field in fields
+        )
     for name, value in replacements.items():
         template = template.replace("{{" + name + "}}", value)
     if "{{" in template:

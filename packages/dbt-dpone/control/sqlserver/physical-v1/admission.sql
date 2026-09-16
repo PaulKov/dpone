@@ -84,6 +84,8 @@ SELECT @role=role_name FROM (VALUES (N'metadata'),(N'build')) roles(role_name)
  AND @model_sid=TRY_CONVERT(varbinary(max),JSON_VALUE(@registration,'$.principals.'+role_name+'.model.sid_hex'),2)
  AND DATALENGTH(@model_sid)=DATALENGTH(TRY_CONVERT(varbinary(max),JSON_VALUE(@registration,'$.principals.'+role_name+'.model.sid_hex'),2));
 IF @role IS NULL
+ OR TRY_CONVERT(int,JSON_VALUE(@registration,'$.principals.'+@role+'.control.principal_id')) IS NULL
+ OR TRY_CONVERT(varbinary(max),JSON_VALUE(@registration,'$.principals.'+@role+'.control.sid_hex'),2) IS NULL
  OR @caller_id<>TRY_CONVERT(int,JSON_VALUE(@registration,'$.principals.'+@role+'.control.principal_id'))
  OR @caller_sid<>TRY_CONVERT(varbinary(max),JSON_VALUE(@registration,'$.principals.'+@role+'.control.sid_hex'),2)
  OR DATALENGTH(@caller_sid)<>DATALENGTH(TRY_CONVERT(varbinary(max),JSON_VALUE(@registration,'$.principals.'+@role+'.control.sid_hex'),2))
@@ -105,6 +107,7 @@ SELECT @request=request FROM [{{CONTROL_SCHEMA}}].[native_generations_v1] WITH (
 IF @request IS NULL OR DATALENGTH(@request) NOT BETWEEN 1 AND 1048576
  THROW 51425, 'DPONE_PHYSICAL_SOURCE_GENERATION_ABSENT', 1;
 {{REQUEST_DECODE}}
+{{REQUEST_SHAPE}}
 {{PHYSICAL_OWNER}}
 SELECT @guard_epoch=guard_epoch,@source_revision=revision,@reservation_locator=reservation_locator,
  @reservation_digest=reservation_digest,@executor=executor
@@ -124,9 +127,12 @@ IF @executor IS NULL OR DATALENGTH(@executor) NOT BETWEEN 1 AND 1048576
  OR @reservation_digest<>CONVERT(varbinary(71),'sha256:'+LOWER(CONVERT(varchar(64),HASHBYTES('SHA2_256',@request),2)))
  THROW 51425, 'DPONE_PHYSICAL_SOURCE_GENERATION_NOT_ACTIVE', 1;
 {{EXECUTOR_DECODE}}
+{{EXECUTOR_SHAPE}}
+{{CANONICAL_EXECUTOR}}
 IF TRY_CONVERT(uniqueidentifier,JSON_VALUE(@binding,'$.invocation_id')) IS NULL
  OR TRY_CONVERT(uniqueidentifier,JSON_VALUE(@binding,'$.invocation_id'))<>@expected_invocation
  OR TRY_CONVERT(uniqueidentifier,JSON_VALUE(@binding,'$.generation_id'))<>@generation
+ OR TRY_CONVERT(uniqueidentifier,JSON_VALUE(@json,'$.subject.generation_id')) IS NULL
  OR TRY_CONVERT(uniqueidentifier,JSON_VALUE(@json,'$.subject.generation_id'))<>@generation
  OR TRY_CONVERT(bigint,JSON_VALUE(@binding,'$.guard_epoch'))<>@epoch
  OR {{BINDING_RESERVATION_LOCATOR}}<>@reservation_locator
@@ -139,6 +145,14 @@ IF TRY_CONVERT(uniqueidentifier,JSON_VALUE(@binding,'$.invocation_id')) IS NULL
  OR DATALENGTH({{REQUEST_PROFILE_LOCATOR}})<>DATALENGTH({{PROFILE_LOCATOR}})
  OR {{REQUEST_PROFILE_DIGEST}}<>{{PROFILE_DIGEST}}
  THROW 51426, 'DPONE_PHYSICAL_SOURCE_EXECUTOR_MISMATCH', 1;
+IF NOT EXISTS (SELECT 1 FROM [{{CONTROL_SCHEMA}}].[native_original_bindings_v1]
+ WHERE locator_hash=HASHBYTES('SHA2_256',@reservation_locator)
+ AND locator=@reservation_locator AND DATALENGTH(locator)=DATALENGTH(@reservation_locator)
+ AND payload_digest=@reservation_digest AND authority_locator=@authority_locator
+ AND DATALENGTH(authority_locator)=DATALENGTH(@authority_locator) AND authority_digest=@authority_digest
+ AND subject={{REQUEST_SUBJECT}} AND DATALENGTH(subject)=DATALENGTH({{REQUEST_SUBJECT}})
+ AND kind=CONVERT(varbinary(128),'generation_stored_file_v1'))
+ THROW 51426, 'DPONE_PHYSICAL_SOURCE_RESERVATION_UNBOUND', 1;
 IF NOT EXISTS (SELECT 1 FROM [{{CONTROL_SCHEMA}}].[native_generation_profiles_v1]
  WHERE guard_hash=HASHBYTES('SHA2_256',CONVERT(varbinary(max),@guard))
  AND profile_hash=HASHBYTES('SHA2_256',{{PROFILE_LOCATOR}})
