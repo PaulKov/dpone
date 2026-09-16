@@ -13,7 +13,7 @@ from typing import Any
 from dpone.contracts.airflow_run_identity import AirflowRunIdentity
 from dpone.contracts.dbt_execution_evidence import DbtExecutionEvidence, canonical_dbt_execution_evidence_bytes
 from dpone.contracts.dbt_execution_pack import DbtExecutionPack
-from dpone.contracts.native_generation_build_cohort_codec import decode_native_build_artifact_inventory
+from dpone.contracts.native_generation_build_cohort import decode_native_build_artifact_inventory
 from dpone.contracts.native_identity import OriginalRef
 from dpone.contracts.native_original_kinds import NativeOriginalKind
 from dpone.contracts.native_source_custody import (
