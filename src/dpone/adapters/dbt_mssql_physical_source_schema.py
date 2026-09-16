@@ -122,15 +122,6 @@ class MssqlPhysicalSourceSchemaProvisioner:
         permission qualification. No generic proof callback is accepted.
         """
         encode_physical_runtime_registration(value)
-        definitions = source_procedures(
-            admission_sql=self._admission,
-            model_database=value.model_database.database_name,
-            local_schema=value.local_schema,
-            control_database=value.control_database.database_name,
-            control_schema=value.control_schema,
-        )
-        if set(definitions) != {ENTRY, HELPER}:
-            raise ValueError("source producer must return exactly the finite module pair")
         connection: SqlControlConnection | None = None
         cursor: SqlControlCursor | None = None
         try:
@@ -138,6 +129,34 @@ class MssqlPhysicalSourceSchemaProvisioner:
             connection.autocommit = False
             cursor = connection.cursor()
             cursor.execute("SET NOCOUNT ON; SET XACT_ABORT ON; SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON;")
+            thumbprints = []
+            for namespace in ("control", "model"):
+                # Public-byte verification precedes actual deployment identity
+                # acquisition; no hash guess or private key observation is used.
+                self._context(cursor, value, namespace)
+                cursor.execute("SELECT thumbprint FROM sys.certificates WHERE name=?", self._certificate)
+                row = dbapi_lifecycle.row(cursor)
+                if (
+                    row is None
+                    or len(row) != 1
+                    or type(row[0]) is not bytes
+                    or len(row[0]) != 20
+                    or dbapi_lifecycle.row(cursor) is not None
+                ):
+                    raise RuntimeError("source certificate thumbprint is absent, ambiguous or malformed")
+                thumbprints.append(row[0])
+            if thumbprints[0] != thumbprints[1]:
+                raise RuntimeError("source certificate thumbprint differs between registered databases")
+            definitions = source_procedures(
+                admission_sql=self._admission,
+                model_database=value.model_database.database_name,
+                local_schema=value.local_schema,
+                control_database=value.control_database.database_name,
+                control_schema=value.control_schema,
+                bridge_certificate_thumbprint=thumbprints[0],
+            )
+            if set(definitions) != {ENTRY, HELPER}:
+                raise ValueError("source producer must return exactly the finite module pair")
             for namespace in ("control", "model"):
                 self._install(cursor, value, namespace, definitions)
             # Revisit both inventories after all changes, including same-DB cells.
