@@ -72,6 +72,37 @@ def provisioner(connection):
 
 
 @pytest.mark.parametrize("same", [True, False])
+def test_public_binding_context_preserves_caller_lifecycle(same):
+    from dpone.adapters.dbt_mssql_physical_discovery_schema import verify_catalog_binding_context
+
+    registration, binding = fixture(same=same)
+    connection = Connection(registration, binding)
+    verify_catalog_binding_context(connection, registration, binding)
+    assert connection.events == []
+    statements = [sql for sql, _ in connection.statements]
+    assert "DPONE_DISCOVERY_BINDING_DEPLOYMENT_MISMATCH" in statements[-1]
+    assert "WITH (HOLDLOCK)" in statements[-2]
+    assert connection.statements[-1][1] == (
+        binding.model_schema,
+        binding.model_schema_id,
+        binding.model_schema_owner_id,
+        binding.catalog_module_sha256,
+    )
+
+
+@pytest.mark.parametrize("stored", [(), (b"wrong", b"wrong", b"wrong")])
+def test_public_binding_context_rejects_absent_or_changed_binding_without_settlement(stored):
+    from dpone.adapters.dbt_mssql_physical_discovery_schema import verify_catalog_binding_context
+
+    registration, binding = fixture()
+    connection = Connection(registration, binding, stored_binding=stored)
+    with pytest.raises(RuntimeError, match="exact protected catalog binding"):
+        verify_catalog_binding_context(connection, registration, binding)
+    assert connection.events == []
+    assert not any("DPONE_DISCOVERY_BINDING_DEPLOYMENT_MISMATCH" in sql for sql, _ in connection.statements)
+
+
+@pytest.mark.parametrize("same", [True, False])
 def test_actual_producer_pair_and_exact_grants_are_installed_without_registration_mutation(same):
     registration, binding = fixture(same=same)
     connection = Connection(registration, binding)
