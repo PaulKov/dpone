@@ -1,4 +1,4 @@
-"""Opt-in actual two-database source-identity proof, not model/route qualification."""
+"""Opt-in source-identity proof for both layouts, not model/route qualification."""
 
 import json
 import os
@@ -17,14 +17,14 @@ pytestmark = [
     pytest.mark.integration_live,
     pytest.mark.skipif(
         os.environ.get("DPONE_RUN_PHYSICAL_SOURCE_LIVE") != "1",
-        reason="isolated two-database source proof disabled",
+        reason="isolated source proof disabled",
     ),
 ]
 
 
-@pytest.fixture
-def source():
-    fixture = SourceFixture(pytest.importorskip("pyodbc"))
+@pytest.fixture(params=["same_database", "two_database"])
+def source(request):
+    fixture = SourceFixture(pytest.importorskip("pyodbc"), layout=request.param)
     try:
         fixture.install()
         # A rejection is evidence only after this exact fixture proved usable.
@@ -44,7 +44,7 @@ def test_live_actual_login_retains_namespace_identity_and_native_rows(source, ro
     mapping = getattr(source.registration.principals, role)
     assert value.observed_model_principal == mapping.model
     assert value.observed_control_principal == mapping.control
-    assert mapping.model.principal_id != mapping.control.principal_id
+    assert (mapping.model.principal_id == mapping.control.principal_id) == (source.layout == "same_database")
     assert value.reservation == source.request.reservation
     assert value.source_revision == 2 and value.guard_epoch == source.request.guard.fencing_epoch
     assert source.snapshot() == before
@@ -77,7 +77,7 @@ def test_live_direct_helper_and_native_tables_remain_inaccessible(source, role):
 
 
 @pytest.mark.parametrize("damage", ["signature", "countersignature", "cert_grant", "explicit_deny", "entry_altered"])
-def test_live_signature_permission_damage_blocks_without_native_mutation(source, damage):
+def test_live_signature_and_permission_damage_respects_topology(source, damage):
     namespace = "model" if damage in {"signature", "entry_altered"} else "control"
     statements = {
         "signature": f"DROP SIGNATURE FROM OBJECT::{LOCAL}.physical_require_source_v1 BY CERTIFICATE {CERTIFICATE}",
@@ -89,11 +89,95 @@ def test_live_signature_permission_damage_blocks_without_native_mutation(source,
     with source.connection(namespace, autocommit=True) as admin:
         admin.execute(statements[damage])
     before = source.snapshot()
-    with pytest.raises(PhysicalSourceReadError):
-        source.read("build")
+    if source.layout == "same_database" and damage in {"cert_grant", "explicit_deny"}:
+        # A local dbo ownership chain bypasses this permission hop, not the
+        # explicit signature inventory or native source/owner predicates.
+        observed = source.read("build")
+        assert observed.reservation == source.request.reservation
+        assert observed.executor_payload == encode_source_executor_binding(source.executor)
+        assert observed.observed_model_principal == source.registration.principals.build.model
+        assert observed.observed_control_principal == source.registration.principals.build.control
+    else:
+        with pytest.raises(PhysicalSourceReadError):
+            source.read("build")
+    if damage in {"cert_grant", "explicit_deny"}:
+        with source.connection("control", "build") as connection:
+            with pytest.raises(source.pyodbc.Error, match="permission|Permission|denied"):
+                connection.execute(f"EXEC {SCHEMA}.physical_control_require_source_v1")
+        if damage == "cert_grant":
+            assert source.provisioner.apply(source.registration) == source.registration
+            assert_certificate_grants(source)
+            assert source.read("build").reservation == source.request.reservation
+        else:
+            with pytest.raises(Exception, match="RUNTIME_PRINCIPAL_UNSAFE"):
+                source.provisioner.apply(source.registration)
     if damage == "entry_altered":
         with pytest.raises(Exception, match="MODULE_INVENTORY_MISMATCH"):
             source.provisioner.apply(source.registration)
+    assert source.snapshot() == before
+
+
+def assert_certificate_grants(source):
+    """Observe the complete finite grant set, including absence of CONNECT."""
+    entry = (1, LOCAL, "physical_require_source_v1", 0, "VIEW DEFINITION", "G")
+    helper = {
+        (1, SCHEMA, "physical_control_require_source_v1", 0, permission, "G")
+        for permission in ("EXECUTE", "VIEW DEFINITION")
+    }
+    inventory = {}
+    for namespace in ("model", "control"):
+        expected = {entry} | helper if source.layout == "same_database" else {entry} if namespace == "model" else helper
+        with source.connection(namespace) as admin:
+            rows = admin.execute(
+                "SELECT class,OBJECT_SCHEMA_NAME(major_id),OBJECT_NAME(major_id),minor_id,permission_name,state "
+                "FROM sys.database_permissions WHERE grantee_principal_id=DATABASE_PRINCIPAL_ID(?)",
+                CERTIFICATE_USER,
+            ).fetchall()
+        inventory[namespace] = sorted(tuple(row) for row in rows)
+        assert set(inventory[namespace]) == expected
+        assert len(rows) == len(expected)
+    return inventory
+
+
+def test_live_certificate_user_has_exact_topology_grants(source, record_property):
+    before = source.snapshot()
+    record_property("certificate_grants", json.dumps(assert_certificate_grants(source), sort_keys=True))
+    assert source.snapshot() == before
+
+
+def test_live_unexpected_certificate_grant_is_not_repaired(source):
+    before = source.snapshot()
+    with source.connection(autocommit=True) as admin:
+        admin.execute(f"GRANT VIEW DEFINITION ON SCHEMA::{LOCAL} TO {CERTIFICATE_USER}")
+    with pytest.raises(Exception, match="CERTIFICATE_USER_UNSAFE"):
+        source.provisioner.apply(source.registration)
+    with source.connection() as admin:
+        assert (
+            admin.execute(
+                "SELECT COUNT(*) FROM sys.database_permissions WHERE class=3 AND major_id=SCHEMA_ID(?) "
+                "AND grantee_principal_id=DATABASE_PRINCIPAL_ID(?) AND permission_name='VIEW DEFINITION' AND state='G'",
+                LOCAL,
+                CERTIFICATE_USER,
+            ).fetchone()[0]
+            == 1
+        )
+    assert source.snapshot() == before
+
+
+@pytest.mark.parametrize("mode", ["extra", "foreign"])
+def test_live_entry_rejects_non_exact_signature_inventory(source, mode):
+    with source.connection(autocommit=True) as admin:
+        admin.execute("CREATE CERTIFICATE unrelated_fixture_certificate WITH SUBJECT='Unrelated fixture signer'")
+        if mode == "foreign":
+            admin.execute(
+                f"DROP SIGNATURE FROM OBJECT::{LOCAL}.physical_require_source_v1 BY CERTIFICATE {CERTIFICATE}"
+            )
+        admin.execute(
+            f"ADD SIGNATURE TO OBJECT::{LOCAL}.physical_require_source_v1 BY CERTIFICATE unrelated_fixture_certificate"
+        )
+    before = source.snapshot()
+    with pytest.raises(PhysicalSourceReadError):
+        source.read("build")
     assert source.snapshot() == before
 
 

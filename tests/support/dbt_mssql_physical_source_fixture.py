@@ -1,4 +1,4 @@
-"""Unique two-database SQL-auth fixture with strict owned-object cleanup."""
+"""Isolated same/two-database SQL-auth fixtures with owned-object cleanup."""
 
 import os
 import secrets
@@ -38,9 +38,13 @@ def database_pin(connection):
 class SourceFixture:
     """Connections are independently authenticated; never emulate positive login."""
 
-    def __init__(self, pyodbc):
+    def __init__(self, pyodbc, *, layout="two_database"):
         self.pyodbc = pyodbc
+        assert layout in {"same_database", "two_database"}
+        self.layout = layout
         self.databases = {name: "source_" + name + "_" + uuid4().hex for name in ("model", "control")}
+        if layout == "same_database":
+            self.databases["control"] = self.databases["model"]
         self.credentials = {
             role: ("source_" + role + "_" + uuid4().hex, "Aa!9" + secrets.token_hex(24))
             for role in ("metadata", "build", "observer")
@@ -73,7 +77,7 @@ class SourceFixture:
 
     def install(self):
         with self.connection("master", autocommit=True) as admin:
-            for database in self.databases.values():
+            for database in dict.fromkeys(self.databases.values()):
                 admin.execute(f"CREATE DATABASE [{database}]")
                 self.created_databases.append(database)
             for login, secret in self.credentials.values():
@@ -83,11 +87,13 @@ class SourceFixture:
         for namespace, schema in (("model", LOCAL), ("control", SCHEMA)):
             with self.connection(namespace, autocommit=True) as admin:
                 admin.execute(f"CREATE SCHEMA [{schema}] AUTHORIZATION dbo")
-                if namespace == "control":
+                new_database = namespace == "model" or self.layout == "two_database"
+                if namespace == "control" and new_database:
                     admin.execute("CREATE USER namespace_offset WITHOUT LOGIN")
                 principals[namespace] = {}
                 for role, (login, _) in self.credentials.items():
-                    admin.execute(f"CREATE USER [{login}] FOR LOGIN [{login}]")
+                    if new_database:
+                        admin.execute(f"CREATE USER [{login}] FOR LOGIN [{login}]")
                     row = admin.execute(
                         "SELECT principal_id,sid FROM sys.database_principals WHERE name=?", login
                     ).fetchone()
@@ -103,12 +109,16 @@ class SourceFixture:
                     "engine_version": header["engine_version"],
                     "server_collation": header["server_collation"],
                 }
-                admin.execute("CREATE MASTER KEY ENCRYPTION BY PASSWORD='" + "Aa!9" + secrets.token_hex(24) + "'")
+                if new_database:
+                    admin.execute("CREATE MASTER KEY ENCRYPTION BY PASSWORD='" + "Aa!9" + secrets.token_hex(24) + "'")
         mappings = {
             role: DatabaseRoleMapping(principals["control"][role], principals["model"][role])
             for role in self.credentials
         }
-        assert all(mapping.model.principal_id != mapping.control.principal_id for mapping in mappings.values())
+        assert all(
+            (mapping.model.principal_id == mapping.control.principal_id) == (self.layout == "same_database")
+            for mapping in mappings.values()
+        )
         assert services["model"] == services["control"]
         self.registration = self.authority.registration(
             pins["model"],
@@ -144,11 +154,12 @@ class SourceFixture:
                 f"SELECT CERTENCODED(CERT_ID('{CERTIFICATE}')), CERTPRIVATEKEY(CERT_ID('{CERTIFICATE}'), ?)", secret
             ).fetchone()
             public, private = bytes(row[0]), bytes(row[1])
-        with self.connection("control", autocommit=True) as admin:
-            admin.execute(
-                f"CREATE CERTIFICATE [{CERTIFICATE}] FROM BINARY=0x{public.hex()} "
-                f"WITH PRIVATE KEY (BINARY=0x{private.hex()}, DECRYPTION BY PASSWORD='{secret}')"
-            )
+        if self.layout == "two_database":
+            with self.connection("control", autocommit=True) as admin:
+                admin.execute(
+                    f"CREATE CERTIFICATE [{CERTIFICATE}] FROM BINARY=0x{public.hex()} "
+                    f"WITH PRIVATE KEY (BINARY=0x{private.hex()}, DECRYPTION BY PASSWORD='{secret}')"
+                )
         self.provisioner = MssqlPhysicalSourceSchemaProvisioner(
             connection_factory=self.connect,
             admission_sql=ADMISSION.read_bytes(),
@@ -176,7 +187,7 @@ class SourceFixture:
 
     def evidence(self):
         """Observe installed bytes/signatures and engine identity without secrets."""
-        result = {}
+        result = {"layout": self.layout}
         for namespace in ("model", "control"):
             with self.connection(namespace) as admin:
                 result[namespace] = {
