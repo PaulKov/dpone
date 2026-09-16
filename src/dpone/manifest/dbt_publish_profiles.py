@@ -79,9 +79,14 @@ class DbtPublishProfileRegistry:
 
     @classmethod
     def load(
-        cls, manifest_path: str | Path, explicit_path: str | Path | None = None
+        cls, manifest_path: str | Path, explicit_path: str | Path | None = None, *, project_root: Path | None = None
     ) -> tuple[DbtPublishProfileRegistry | None, tuple[DbtPublishIssue, ...]]:
-        path, discovery_issues = _resolve_path(Path(manifest_path), explicit_path)
+        """Load policy from overrides or the selected project root.
+
+        Callers without a project root retain historical manifest-parent discovery.
+        Composition supplies the selected root when artifacts use a custom target.
+        """
+        path, discovery_issues = _resolve_path(Path(manifest_path), explicit_path, project_root=project_root)
         if discovery_issues:
             return None, discovery_issues
         if path is None:
@@ -175,12 +180,15 @@ class DbtPublishProfileRegistry:
 def _resolve_path(
     manifest_path: Path,
     explicit_path: str | Path | None,
+    *,
+    project_root: Path | None = None,
 ) -> tuple[Path | None, tuple[DbtPublishIssue, ...]]:
     env_path = os.environ.get("DPONE_DBT_PUBLISH_PROFILES")
     if explicit_path or env_path:
         candidate = Path(explicit_path or env_path or "")
         return (candidate if candidate.exists() else None), ()
-    project_root = manifest_path.parent.parent if manifest_path.parent.name == "target" else manifest_path.parent
+    if project_root is None:
+        project_root = manifest_path.parent.parent if manifest_path.parent.name == "target" else manifest_path.parent
     matches = [project_root / relative for relative in DEFAULT_PROFILE_PATHS if (project_root / relative).exists()]
     if len(matches) > 1:
         relative_paths = ", ".join(DEFAULT_PROFILE_PATHS)

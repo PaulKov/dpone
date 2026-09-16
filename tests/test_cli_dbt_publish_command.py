@@ -724,6 +724,45 @@ def test_dbt_check_invalid_target_is_actionable(tmp_path: Path, capsys, output_f
         assert json.loads(captured.out)["schema"] == "dpone.error.v1"
 
 
+@pytest.mark.parametrize("command", ["check", "explain"])
+@pytest.mark.parametrize("target", ["target", "build/dbt"])
+@pytest.mark.parametrize("decoy", [False, True])
+def test_singleton_discovers_project_policy_without_overrides(
+    tmp_path: Path,
+    capsys,
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+    target: str,
+    decoy: bool,
+) -> None:
+    monkeypatch.delenv("DPONE_DBT_PUBLISH_PROFILES", raising=False)
+    manifest = _write_dbt_project(tmp_path, project_config=f"name: test\ntarget-path: {target}\n")
+    if target != "target":
+        destination = tmp_path / target / "manifest.json"
+        destination.parent.mkdir(parents=True)
+        manifest.rename(destination)
+        manifest = destination
+    policy = tmp_path / "dpone" / "dbt-publish-profiles.yml"
+    policy.parent.mkdir()
+    shutil.copyfile(PROFILES, policy)
+    if decoy:
+        artifact_policy = manifest.parent / "dpone" / "dbt-publish-profiles.yml"
+        artifact_policy.parent.mkdir()
+        artifact_policy.write_text("schema: unrelated-artifact-policy\n")
+    args = ["dbt", command, str(tmp_path)]
+    if command == "explain":
+        args.append("competitive_pricing")
+    with pytest.raises(SystemExit, match="0"):
+        cli_main.main([*args, "--format", "json"])
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    payload = json.loads(captured.out)
+    if command == "check":
+        assert payload["passed"] is True
+    else:
+        assert payload["schema"] == "dpone.dbt-publish-explain.v1"
+
+
 @pytest.mark.parametrize(
     "root_file",
     [

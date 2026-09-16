@@ -12,6 +12,11 @@ For example, `target-path: build/dbt` selects `build/dbt/manifest.json` after
 `dbt parse --project-dir analytics`, and `dpone dbt check analytics` reads that
 artifact without an override. dpone does not run dbt or fetch dependencies to
 discover it. `--manifest PATH` keeps its existing explicit-path behavior.
+Default publish-policy discovery uses the selected project root even when its
+manifest is in a custom artifact directory. Keep the policy at
+`<project>/dpone/dbt-publish-profiles.yml` (or the existing `.dpone` alternative);
+policies inside the artifact directory do not replace the project policy.
+Explicit `--profiles` and `DPONE_DBT_PUBLISH_PROFILES` overrides retain precedence.
 
 Automatic discovery uses the same bounded YAML reader and literal relative-path
 validation as workspace discovery. Malformed YAML, duplicate keys, anchors,
