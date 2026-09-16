@@ -18,9 +18,10 @@ class CatalogConnection:
 
     autocommit = True
 
-    def __init__(self, *, existing=False, fail=None):
+    def __init__(self, *, existing=False, fail=None, thumbprints=None):
         self.existing, self.fail = existing, fail
         self.statements, self.events, self.rows = [], [], []
+        self.thumbprints = iter(thumbprints if thumbprints is not None else [[(b"c" * 20,)], [(b"c" * 20,)]])
 
     def cursor(self):
         return self
@@ -33,6 +34,8 @@ class CatalogConnection:
             self.rows = [(100 if self.existing else None,)]
         elif "SELECT @name;" in sql:
             self.rows = [("runtime_" + str(parameters[0]),)]
+        elif sql.startswith("SELECT thumbprint FROM sys.certificates"):
+            self.rows = next(self.thumbprints)
         return self
 
     def fetchone(self):
@@ -82,6 +85,7 @@ def test_exact_real_producer_definitions_are_installed_before_registration(monke
         local_schema="runtime_local",
         control_database="example",
         control_schema="runtime_control",
+        bridge_certificate_thumbprint=b"c" * 20,
     )
     created = [sql for sql, _ in connection.statements if sql.startswith("CREATE PROCEDURE")]
     assert set(created) == set(definitions.values())
@@ -95,6 +99,30 @@ def test_exact_real_producer_definitions_are_installed_before_registration(monke
     assert any("REVOKE CONNECT FROM [bridge_user]" in sql for sql, _ in connection.statements)
     grant_checks = [sql for sql, _ in connection.statements if "DPONE_SOURCE_GRANT_INVENTORY_MISMATCH" in sql]
     assert all("SELECT sid FROM sys.certificates" in sql for sql in grant_checks)
+    observations = [
+        index
+        for index, (sql, _) in enumerate(connection.statements)
+        if sql.startswith("SELECT thumbprint FROM sys.certificates")
+    ]
+    assert len(observations) == 2
+    assert all("DPONE_SOURCE_CERTIFICATE_MISMATCH" in connection.statements[index - 1][0] for index in observations)
+    assert observations[-1] < next(
+        index for index, (sql, _) in enumerate(connection.statements) if sql.startswith("CREATE PROCEDURE")
+    )
+
+
+@pytest.mark.parametrize(
+    "rows", [[], [(None,)], [(b"c" * 19,)], [(b"c" * 21,)], [("c" * 20,)], [(b"c" * 20,), (b"c" * 20,)], [(b"d" * 20,)]]
+)
+def test_missing_ambiguous_or_different_certificate_thumbprint_never_installs(monkeypatch, rows):
+    from dpone.adapters.dbt_mssql_physical_registration_store import MssqlPhysicalRegistrationStore
+
+    monkeypatch.setattr(MssqlPhysicalRegistrationStore, "register", lambda *_: pytest.fail("must not register"))
+    connection = CatalogConnection(thumbprints=[[(b"c" * 20,)], rows])
+    with pytest.raises(RuntimeError, match="certificate thumbprint"):
+        provisioner(connection).apply(MssqlPhysicalRuntimeRegistration(**registration_inputs()))
+    assert "rollback" in connection.events
+    assert not any(sql.startswith("CREATE PROCEDURE") or "SIGNATURE TO" in sql for sql, _ in connection.statements)
 
 
 @pytest.mark.parametrize(
