@@ -74,6 +74,18 @@ def test_cross_database_role_swap_rejects():
         require_source_identity(altered, registration, facts.generation_id, facts.executor_invocation_id)
 
 
+@pytest.mark.parametrize("invalid", [None, "not-a-uuid", "00000000000000000000000000000000"])
+def test_reader_rejects_noncanonical_uuid_before_connection(invalid):
+    from dpone.adapters.dbt_mssql_physical_source import MssqlPhysicalSourceReader
+
+    registration, facts = source_case()
+    reader = MssqlPhysicalSourceReader(
+        connection_factory=lambda: pytest.fail("invalid request must not connect"), registration=registration
+    )
+    with pytest.raises(ValueError):
+        reader.read(invalid, facts.executor_invocation_id)
+
+
 @pytest.mark.parametrize(
     "failure",
     [None, "execute", "fetch", "commit", "empty", "extra", "wrong_width", "oversize", "registration", "profile"],
@@ -155,6 +167,6 @@ def test_reader_owns_one_bounded_transaction_and_closes(failure):
         with pytest.raises(PhysicalSourceReadError):
             reader.read(facts.generation_id, facts.executor_invocation_id)
     assert connections == [connection]
-    assert calls[0][0] == "SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRANSACTION"
+    assert calls[0][0].startswith("IF @@TRANCOUNT=0 BEGIN TRANSACTION;")
     assert calls[1][1] == (registration.registration_id, facts.generation_id, facts.executor_invocation_id)
     assert calls[-3:] == ["commit" if failure is None else "rollback", "close", "close"]

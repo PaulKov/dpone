@@ -84,7 +84,13 @@ class MssqlPhysicalSourceReader:
             connection = self._connect()
             connection.autocommit = False
             cursor = connection.cursor()
-            cursor.execute("SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRANSACTION")
+            # ODBC can already have opened the fresh connection's transaction.
+            # Own that transaction rather than nesting an unconditional BEGIN.
+            cursor.execute(
+                "IF @@TRANCOUNT=0 BEGIN TRANSACTION; "
+                "IF @@TRANCOUNT<>1 OR XACT_STATE()<>1 "
+                "THROW 51420, 'DPONE_PHYSICAL_SOURCE_TRANSACTION_INVALID', 1;"
+            )
             cursor.execute(
                 f"EXEC [{self._schema}].[{ENTRY}] @registration_id=?, @generation=?, @expected_invocation=?",
                 self._registration.registration_id,
