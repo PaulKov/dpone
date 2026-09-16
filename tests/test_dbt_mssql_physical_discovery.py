@@ -207,7 +207,6 @@ def test_discovery_statement_uses_fresh_cursor_with_remaining_timeout(setup_seco
     from dpone.adapters.dbt_mssql_physical_discovery import PhysicalDiscoveryReadError
 
     now = [0]
-    created = []
 
     class SnapshotCursor(Cursor):
         def __init__(self, connection, setup):
@@ -233,6 +232,7 @@ def test_discovery_statement_uses_fresh_cursor_with_remaining_timeout(setup_seco
             created.append(cursor)
             return cursor
 
+    created: list[SnapshotCursor] = []
     connection = SnapshotConnection(None)
     if setup_seconds == 10:
         with pytest.raises(PhysicalDiscoveryReadError):
