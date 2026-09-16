@@ -225,9 +225,9 @@ IF NOT EXISTS (SELECT 1 FROM sys.certificates WHERE name=N'{self._certificate}'
  OR EXISTS (SELECT 1 FROM sys.objects WHERE schema_id=SCHEMA_ID(N'{schema}')
  AND COALESCE(principal_id,1)<>1)
  OR EXISTS (SELECT 1 FROM sys.server_principals WHERE sid=
- (SELECT thumbprint FROM sys.certificates WHERE name=N'{self._certificate}'))
+ (SELECT sid FROM sys.certificates WHERE name=N'{self._certificate}'))
  OR EXISTS (SELECT 1 FROM sys.database_principals WHERE sid=
- (SELECT thumbprint FROM sys.certificates WHERE name=N'{self._certificate}') {certificate_principal})
+ (SELECT sid FROM sys.certificates WHERE name=N'{self._certificate}') {certificate_principal})
  THROW 51446, 'DPONE_SOURCE_GRANT_INVENTORY_MISMATCH', 1;""")
 
     def _names(self, cursor: SqlControlCursor, value: MssqlPhysicalRuntimeRegistration, namespace: str) -> list[str]:
@@ -252,9 +252,13 @@ IF NOT EXISTS (SELECT 1 FROM sys.certificates WHERE name=N'{self._certificate}'
     def _certificate_user(self, cursor: SqlControlCursor, schema: str, *, create: bool) -> None:
         if create:
             cursor.execute(f"""IF DATABASE_PRINCIPAL_ID(N'{self._user}') IS NULL
- CREATE USER [{self._user}] FROM CERTIFICATE [{self._certificate}];""")
+BEGIN
+ CREATE USER [{self._user}] FROM CERTIFICATE [{self._certificate}];
+ REVOKE CONNECT FROM [{self._user}];
+END;""")
         cursor.execute(f"""DECLARE @user int=DATABASE_PRINCIPAL_ID(N'{self._user}');
-IF @user IS NULL OR NOT EXISTS (SELECT 1 FROM sys.database_principals p JOIN sys.certificates c ON p.sid=c.thumbprint
+IF @user IS NULL OR NOT EXISTS (SELECT 1 FROM sys.database_principals p JOIN sys.certificates c ON p.sid=c.sid
+ AND DATALENGTH(p.sid)=DATALENGTH(c.sid)
  WHERE p.principal_id=@user AND p.type='C' AND c.name=N'{self._certificate}')
  OR EXISTS (SELECT 1 FROM sys.database_role_members WHERE member_principal_id=@user)
  OR EXISTS (SELECT 1 FROM sys.schemas WHERE principal_id=@user)
