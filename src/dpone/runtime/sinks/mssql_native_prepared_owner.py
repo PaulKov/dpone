@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import asdict, replace
+from dataclasses import replace
 from hashlib import sha256
 from typing import Any
 
@@ -11,7 +11,7 @@ from typing import Any
 def planned_stage(context: Any, config: Any) -> dict[str, str]:
     """Reserve one stable physical object before CREATE, including recovery."""
 
-    binding = sha256(repr(asdict(context.plan)).encode()).hexdigest()
+    binding = sha256(repr(context.plan.to_dict()).encode()).hexdigest()
     database = config.staging_database or config.target_database
     if not database:
         raise ValueError("mssql_native.staging_database_required")

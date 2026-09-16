@@ -14,6 +14,15 @@ remain **UNVERIFIED**. These results do not certify a new deployment.
 
 ## Prepare and configure
 
+BCP remains the default when `native_chunks.transport` is omitted. Explicit
+`mssql_python` and `mssql_sqlclient` policies can be inspected in an offline plan,
+but their production writer integration is not complete. Plans report
+`backend_runtime_unavailable`; execution rejects either policy before preflight
+or source access. It never substitutes BCP for an explicitly requested backend.
+The SqlClient backend additionally requires a separately installed .NET worker;
+installing that runtime alone does not enable execution. Local component tests
+do not certify the complete route or a seven-day production workload.
+
 The platform owner supplies dedicated connections, durable fenced state, source
 DDL exclusion, target writer exclusion, transaction admission, quality checking,
 evidence persistence and source checkpoint persistence. A manifest cannot supply

@@ -4,6 +4,11 @@
 
 ### Added
 
+- Preserve explicit MSSQL native transport policies in offline plans and durable
+  invocation identity. BCP remains the omitted-policy default. Both optional TDS
+  backends report unavailable execution until their production writer adapters
+  are integrated; explicit policies cannot silently fall back to BCP.
+
 - Add canonical native original bindings preserving complete subject, storage
   authority and provider-version identity without granting execution authority.
   Add closed native storage metadata and reuse canonical S3 policy validation
