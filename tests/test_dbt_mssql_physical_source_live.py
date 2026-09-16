@@ -100,12 +100,27 @@ def test_live_signature_and_permission_damage_respects_topology(source, damage):
     else:
         with pytest.raises(PhysicalSourceReadError):
             source.read("build")
+    assert source.snapshot() == before
     if damage in {"cert_grant", "explicit_deny"}:
         with source.connection("control", "build") as connection:
             with pytest.raises(source.pyodbc.Error, match="permission|Permission|denied"):
                 connection.execute(f"EXEC {SCHEMA}.physical_control_require_source_v1")
         if damage == "cert_grant":
             assert source.provisioner.apply(source.registration) == source.registration
+            repaired = source.snapshot()
+            if source.layout == "same_database":
+                # Intentional privileged GRANT DDL advances the native DDL
+                # observer. It is not a mutation by the read-only bridge.
+                epoch = "semantic_refresh_ddl_epoch"
+                assert repaired[epoch][0][0] == before[epoch][0][0]
+                assert repaired[epoch][0][1] > before[epoch][0][1]
+                assert repaired[epoch][0][2] == "GRANT_DATABASE"
+                assert {key: rows for key, rows in repaired.items() if key != epoch} == {
+                    key: rows for key, rows in before.items() if key != epoch
+                }
+            else:
+                assert repaired == before
+            before = repaired
             assert_certificate_grants(source)
             assert source.read("build").reservation == source.request.reservation
         else:
@@ -146,9 +161,9 @@ def test_live_certificate_user_has_exact_topology_grants(source, record_property
 
 
 def test_live_unexpected_certificate_grant_is_not_repaired(source):
-    before = source.snapshot()
     with source.connection(autocommit=True) as admin:
         admin.execute(f"GRANT VIEW DEFINITION ON SCHEMA::{LOCAL} TO {CERTIFICATE_USER}")
+    before = source.snapshot()
     with pytest.raises(Exception, match="CERTIFICATE_USER_UNSAFE"):
         source.provisioner.apply(source.registration)
     with source.connection() as admin:
