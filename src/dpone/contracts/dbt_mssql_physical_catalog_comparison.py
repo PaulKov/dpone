@@ -287,11 +287,13 @@ def require_catalog_match(
                     table.is_edge,
                     table.ledger_type,
                     table.lob_data_space_id,
-                    table.filestream_data_space_id,
                 )
             ),
             "table properties",
         )
+        # SQL2022/Linux reports NULL for the absence of FILESTREAM placement.
+        # Preserve that fact; a synthetic zero is not a qualified absence proof.
+        _require(table.filestream_data_space_id is None, "FILESTREAM placement")
         for kind in ("COLUMN", "INDEX", "INDEX_COLUMN", "PARTITION", "DEPENDENCY", "FORBIDDEN_PROPERTY"):
             _require(getattr(header, kind.lower() + "_count") == len(results[kind]), "header collection count")
         _require(not results["DEPENDENCY"], "unadmitted dependency")

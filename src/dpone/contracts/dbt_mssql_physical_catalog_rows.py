@@ -60,7 +60,7 @@ class TableRow(CatalogRow):
     is_edge: bool = field(metadata={"sql": "bit", "nullable": False})
     ledger_type: int = field(metadata={"sql": "tinyint", "nullable": False})
     lob_data_space_id: int = field(metadata={"sql": "int", "nullable": False})
-    filestream_data_space_id: int = field(metadata={"sql": "int", "nullable": False})
+    filestream_data_space_id: int | None = field(metadata={"sql": "int", "nullable": True})
 
 
 @dataclass(frozen=True, slots=True)

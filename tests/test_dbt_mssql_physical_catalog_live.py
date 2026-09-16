@@ -357,3 +357,96 @@ def test_live_second_registration_cannot_replace_fixed_catalog_module(catalog, c
         )
     assert source.snapshot() == before
     assert catalog.read().results["COUNT"][0].row_count_exact == 3
+
+
+def test_live_bounded_scalar_catalog_dimensions(catalog):
+    """Compare declared scalar plans to real metadata; never derive expectations from it."""
+    source = catalog.source
+    types = [
+        "uniqueidentifier",
+        "money",
+        "smallmoney",
+        "bigint",
+        "int",
+        "smallint",
+        "tinyint",
+        "bit",
+        "date",
+        "datetime",
+        "smalldatetime",
+        "real",
+        "float",
+    ]
+    types += [
+        f"{base}({precision},{scale})"
+        for base in ("decimal", "numeric")
+        for precision in (9, 10, 19, 20, 28, 29, 38)
+        for scale in (0, precision)
+    ]
+    types += [
+        f"{base}({length})"
+        for base in ("char", "nchar", "varchar", "nvarchar", "binary", "varbinary")
+        for length in (1, 37, 255)
+    ]
+    # Total declared payload remains below the SQL row-size limit; no MAX/LOB.
+    types += ["varbinary(1024)", "varchar(1024)", "nchar(512)"]
+    collation = "Latin1_General_100_BIN2"
+    columns, declarations, literals = [], [], []
+    for index, dtype in enumerate(types):
+        base = dtype.split("(", 1)[0]
+        name = f"s{index}"
+        character = base in {"char", "nchar", "varchar", "nvarchar"}
+        columns.append(MssqlCatalogColumn(name, dtype, True, collation if character else None))
+        declarations.append(f"[{name}] {dtype}" + (f" COLLATE {collation}" if character else "") + " NULL")
+        if character:
+            value = "N'x'"
+        elif base in {"binary", "varbinary"}:
+            value = "0x01"
+        elif base == "uniqueidentifier":
+            value = "'10000000-0000-0000-0000-000000000001'"
+        elif base in {"date", "datetime", "smalldatetime"}:
+            value = "'2020-01-02'"
+        else:
+            value = "0"
+        literals.append(f"CAST({value} AS {dtype})")
+    with source.connection(autocommit=True) as admin:
+        admin.execute(f"CREATE TABLE [{MODEL_SCHEMA}].[scalar_probe] (" + ",".join(declarations) + ") ON [PRIMARY]")
+        values = "(" + ",".join(literals) + ")"
+        admin.execute(f"INSERT INTO [{MODEL_SCHEMA}].[scalar_probe] VALUES " + values + "," + values)
+        object_id, created = admin.execute(
+            "SELECT object_id,CONVERT(char(27),CONVERT(datetime2(7),create_date),126) "
+            "FROM sys.tables WHERE schema_id=SCHEMA_ID(?) AND name='scalar_probe'",
+            MODEL_SCHEMA,
+        ).fetchone()
+        observed = [
+            tuple(row)
+            for row in admin.execute(
+                "SELECT name,system_type_id,user_type_id,max_length,precision,scale,is_ansi_padded,collation_name "
+                "FROM sys.columns WHERE object_id=? ORDER BY column_id",
+                object_id,
+            )
+        ]
+    spec = replace(
+        catalog.plan.spec,
+        relation=PhysicalRelation(source.databases["model"], MODEL_SCHEMA, "scalar_probe"),
+        columns=tuple(columns),
+    )
+    plan = PhysicalModelPlan(catalog.plan.generation_id, spec, AbsentPredecessor())
+    reader = MssqlPhysicalCatalogReader(
+        connection_factory=lambda: source.connect("model", "metadata"),
+        registration=source.registration,
+        operation_timeout_seconds=20,
+        clock=time.monotonic,
+    )
+    try:
+        result = reader.read(
+            plan=plan,
+            executor_invocation_id=str(source.executor.invocation_id),
+            object_id=object_id,
+            expected_object_name="scalar_probe",
+            expected_object_create_time=created,
+        )
+    except PhysicalCatalogReadError as error:
+        pytest.fail(f"Synthetic scalar metadata {observed!r}; comparison failed: {error.__cause__}")
+    assert result.results["COUNT"][0].row_count_exact == 2
+    assert result.results["TABLE"][0].filestream_data_space_id is None

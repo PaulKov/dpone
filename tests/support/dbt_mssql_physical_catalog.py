@@ -62,7 +62,7 @@ def catalog_case():
             0,
             0,
         ),
-        "TABLE": (7, "models", "orders", "U ", STAMP, STAMP, False, 0, 0, False, False, False, 0, 0, 0),
+        "TABLE": (7, "models", "orders", "U ", STAMP, STAMP, False, 0, 0, False, False, False, 0, 0, None),
         "COLUMN": (
             1,
             "id",

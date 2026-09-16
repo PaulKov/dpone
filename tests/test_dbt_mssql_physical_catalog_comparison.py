@@ -62,7 +62,7 @@ def example(layout="rowstore_none"):
         ),
         "TABLE": (
             TableRow(
-                *prefix("TABLE"), 5, "data", "fact", "U ", STAMP, STAMP, False, 0, 0, False, False, False, 0, 0, 0
+                *prefix("TABLE"), 5, "data", "fact", "U ", STAMP, STAMP, False, 0, 0, False, False, False, 0, 0, None
             ),
         ),
         "COLUMN": (
@@ -138,6 +138,7 @@ def test_four_exact_layouts(layout):
         ("TABLE", "object_modify_time", STAMP[:-1] + "8"),
         ("TABLE", "schema_name", "DATA"),
         ("TABLE", "is_memory_optimized", True),
+        ("TABLE", "is_filetable", True),
         ("TABLE", "lob_data_space_id", 1),
         ("COLUMN", "name", "ID"),
         ("COLUMN", "column_id", 2),
@@ -187,7 +188,7 @@ def test_cci_membership_is_exact(field, value):
         check(plan, rows)
 
 
-@pytest.mark.parametrize("code", ["CHECK_CONSTRAINT", "UNKNOWN_FUTURE_PROPERTY"])
+@pytest.mark.parametrize("code", ["CHECK_CONSTRAINT", "COLUMN_FILESTREAM", "UNKNOWN_FUTURE_PROPERTY"])
 def test_forbidden_occurrence_rejected(code):
     plan, rows = example()
     rows["HEADER"] = (replace(rows["HEADER"][0], forbidden_property_count=1),)
@@ -304,3 +305,14 @@ def test_tampered_plan_digest_rejected_without_repairing_input():
     with pytest.raises(CatalogComparisonError):
         check(plan, rows)
     assert plan.model_plan_sha256 == "sha256:" + "f" * 64
+
+
+@pytest.mark.parametrize("filestream", [None, 0, 1, -1, False])
+def test_native_filestream_absence_is_explicit(filestream):
+    plan, rows = example()
+    rows["TABLE"] = (replace(rows["TABLE"][0], filestream_data_space_id=filestream),)
+    if filestream is None:
+        check(plan, rows)
+    else:
+        with pytest.raises(CatalogComparisonError):
+            check(plan, rows)
