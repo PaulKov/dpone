@@ -154,7 +154,7 @@ class ArchiveAuthority(FixtureAuthority):
         )
         return self.claim
 
-    def admit(self, registration, admin, runtime, metadata_name):
+    def admit_physical_owner(self, registration, admin, metadata_name):
         from tests.support import dbt_mssql_physical_source_authority as source_module
 
         def build(**fields):
@@ -166,8 +166,12 @@ class ArchiveAuthority(FixtureAuthority):
             self.activation = DbtWorkspaceActivationRequest.build(**fields)
             return self.activation
 
-        with self.monkeypatch.context() as patch, self.reservation_producer():
+        with self.monkeypatch.context() as patch:
             patch.setattr(source_module, "DbtWorkspaceActivationRequest", SimpleNamespace(build=build))
+            return super().admit_physical_owner(registration, admin, metadata_name)
+
+    def admit(self, registration, admin, runtime, metadata_name):
+        with self.reservation_producer():
             return super().admit(registration, admin, runtime, metadata_name)
 
     @contextmanager

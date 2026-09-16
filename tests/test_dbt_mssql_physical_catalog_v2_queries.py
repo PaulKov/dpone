@@ -228,3 +228,27 @@ def test_member_locator_is_exact_fixed_policy_member():
     sql = render()
     assert f"N'{NATIVE_POLICY_MEMBER}' IS NULL" in sql
     assert f"DATALENGTH(N'{NATIVE_POLICY_MEMBER}')" in sql
+
+
+def test_discovery_can_verify_catalog_module_without_changing_existing_catalog_bytes():
+    from hashlib import sha256
+
+    from dpone.adapters.dbt_mssql_physical_catalog_v2_queries import _links
+
+    database = registration_inputs()["model_database"]
+    original = _links(database, "models", 9)
+    discovery = _links(database, "models", 9, catalog_module_schema="runtime_local")
+    fixed_catalog = "OBJECT_ID(N'[runtime_local].[physical_catalog_v2]')"
+    assert discovery == original.replace("@@PROCID", fixed_catalog)
+    assert "@@PROCID" not in discovery
+    assert sha256(render().encode("utf-16-le")).hexdigest() == (
+        "e081afad7b53f578fc0be5af1a9a66a09f98641214cb5d4bf131b21be89f53eb"
+    )
+
+
+@pytest.mark.parametrize("schema", ["x];DROP TABLE x;--", "db.schema", "", 1])
+def test_catalog_binding_module_selection_accepts_only_fixed_local_schema(schema):
+    from dpone.adapters.dbt_mssql_physical_catalog_v2_queries import _links
+
+    with pytest.raises(ValueError):
+        _links(registration_inputs()["model_database"], "models", 9, catalog_module_schema=schema)

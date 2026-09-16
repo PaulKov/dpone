@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add bounded, signed SQL Server pre-generation discovery for explicit filegroups
+  and candidate namespace availability, without reserving a generation or granting
+  execution authority. Add deterministic table/layout SQL for NONE, ROW, PAGE and
+  COLUMNSTORE, using validated literal collation names. Keep graph admission on
+  the exact supported legacy policy identity; full managed execution and installed
+  starter-resource generation remain separate prerequisites.
+
 - Add authenticated reusable SQL Server catalog registrations with immutable
   per-registration bindings and a separately signed v2 observation module.
   Require explicit optional catalog limits from the selected native policy;

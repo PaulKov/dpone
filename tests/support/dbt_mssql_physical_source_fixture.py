@@ -83,7 +83,8 @@ class SourceFixture:
             for login, secret in self.credentials.values():
                 admin.execute(f"CREATE LOGIN [{login}] WITH PASSWORD='{secret}', CHECK_POLICY=OFF")
                 self.created_logins.append(login)
-        principals, pins, services = {}, {}, {}
+        principals: dict[str, dict[str, DatabasePrincipal]] = {}
+        pins, services = {}, {}
         for namespace, schema in (("model", LOCAL), ("control", SCHEMA)):
             with self.connection(namespace, autocommit=True) as admin:
                 admin.execute(f"CREATE SCHEMA [{schema}] AUTHORIZATION dbo")
@@ -126,12 +127,7 @@ class SourceFixture:
             RegisteredPrincipals(mappings["metadata"], mappings["build"], DedicatedObserver(mappings["observer"])),
             services["model"],
         )
-        self.request, self.executor, self.provider, self.reserved = self.authority.admit(
-            self.registration,
-            lambda: self.connect("control"),
-            lambda: self.connect("control", "metadata"),
-            self.credentials["metadata"][0],
-        )
+        self._admit()
         # Preserve native metadata grants, deny direct native table access also to BUILD/OBSERVER.
         with self.connection("control", autocommit=True) as admin:
             tables = admin.execute("SELECT name FROM sys.tables WHERE schema_id=SCHEMA_ID(?)", SCHEMA).fetchall()
@@ -168,6 +164,15 @@ class SourceFixture:
             certificate_user=CERTIFICATE_USER,
         )
         assert self.provisioner.apply(self.registration) == self.registration
+
+    def _admit(self):
+        """Keep the default P/G producer overridable for genuine P-only fixtures."""
+        self.request, self.executor, self.provider, self.reserved = self.authority.admit(
+            self.registration,
+            lambda: self.connect("control"),
+            lambda: self.connect("control", "metadata"),
+            self.credentials["metadata"][0],
+        )
 
     def read(self, role="metadata", *, generation=None, invocation=None):
         return MssqlPhysicalSourceReader(

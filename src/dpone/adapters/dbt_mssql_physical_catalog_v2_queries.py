@@ -115,7 +115,24 @@ def _canonical() -> str:
     return "\n".join(guards)
 
 
-def _links(model_database: MssqlDatabaseAuthorityPin, model_schema: str, schema_id: int) -> str:
+def _links(
+    model_database: MssqlDatabaseAuthorityPin,
+    model_schema: str,
+    schema_id: int,
+    *,
+    catalog_module_schema: str | None = None,
+) -> str:
+    """Check binding links against the catalog, including from another signed module.
+
+    The default preserves the existing catalog's exact SQL bytes. Discovery fixes
+    the known catalog entry under a validated local schema; no SQL expression or
+    caller-selected module name can be supplied through this producer seam.
+    """
+    module = (
+        "@@PROCID"
+        if catalog_module_schema is None
+        else f"OBJECT_ID(N'[{native_control_schema(catalog_module_schema)}].[{ENTRY}]')"
+    )
     value = lambda path: scalar("@binding", "$." + path)  # noqa: E731
     checks = [
         _reject_difference(value("schema"), "N'dpone.mssql-physical-catalog-binding.v1'"),
@@ -134,7 +151,7 @@ def _links(model_database: MssqlDatabaseAuthorityPin, model_schema: str, schema_
         _reject_difference(value("model_schema_owner_id"), "N'1'"),
         _reject_difference(
             value("catalog_module_sha256"),
-            "CONVERT(nvarchar(max),'sha256:'+LOWER(CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(varbinary(max),OBJECT_DEFINITION(@@PROCID))),2)))",
+            f"CONVERT(nvarchar(max),'sha256:'+LOWER(CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(varbinary(max),OBJECT_DEFINITION({module}))),2)))",
         ),
     ]
     for path in ("platform_subject", "trusted_profile.subject"):

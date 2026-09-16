@@ -7,10 +7,12 @@ by their application consumers; a valid mapping grants none of those capabilitie
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import fields
 from hashlib import sha256
 from typing import Any
 
+from dpone.contracts.dbt_mssql_physical_validation import require_physical_identifier
 from dpone.contracts.dbt_publish_schema_contract_common import (
     DIGEST,
     IDENTIFIER,
@@ -129,6 +131,9 @@ def native_execution_schema() -> dict[str, Any]:
             ),
             "limits": object_schema(limit_names, limits),
             "physical_catalog_limits": _physical_catalog_limits_schema(),
+            "physical_filegroup": object_schema(
+                ("name",), {"name": {"type": "string", "minLength": 1, "maxLength": 128}}
+            ),
         },
     )
 
@@ -163,6 +168,8 @@ def validate_native_execution_policy(value: dict[str, Any], *, serialized_payloa
     catalog = value.get("physical_catalog_limits")
     if catalog is not None and catalog["max_dependency_rows"] > catalog["max_catalog_rows"]:
         raise ValueError("physical catalog dependency limit exceeds its catalog row ceiling")
+    if "physical_filegroup" in value:
+        require_physical_filegroup_name(value)
     native_control_schema(control["schema"])
     _reference(control["authority"])
     authority_ref = _reference(originals["authority"])
@@ -181,6 +188,20 @@ def validate_native_execution_policy(value: dict[str, Any], *, serialized_payloa
         raise ValueError("native original chunk limit exceeds its metadata ceiling")
     if serialized_payload_max_bytes is not None and serialized_payload_max_bytes > generation["max_generation_bytes"]:
         raise ValueError("serialized payload ceiling exceeds the generation allocation ceiling")
+
+
+def require_physical_filegroup_name(native_execution: Mapping[str, Any]) -> str:
+    """Require the exact policy-selected name without SQL/default inference.
+
+    Preparation consumers call this only after authenticating the complete policy.
+    This pure accessor proves representation, not original authenticity, database
+    identity, observed data-space ID/type, visibility or permission to allocate.
+    Missing selection rejects instead of choosing PRIMARY or the database default.
+    """
+    selection = native_execution.get("physical_filegroup")
+    if not isinstance(selection, Mapping) or set(selection) != {"name"}:
+        raise ValueError("physical_filegroup requires a closed object with an explicit name")
+    return require_physical_identifier(selection["name"], "physical_filegroup.name")
 
 
 def _reference(value: dict[str, str]) -> OriginalRef:

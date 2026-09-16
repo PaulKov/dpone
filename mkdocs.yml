@@ -513,6 +513,9 @@ nav:
       - Managed SQL catalog wire: dbt-mssql-physical-catalog-wire.md
       - Managed SQL catalog observation: dbt-mssql-physical-catalog-acquisition.md
       - Managed SQL physical plans: dbt-mssql-physical-plans.md
+      - Managed SQL pre-generation discovery: dbt-mssql-physical-discovery.md
+      - Managed SQL physical rendering: dbt-mssql-physical-rendering.md
+      - SQL Server graph policy registry: dbt-sqlserver-policy-registry.md
       - Physical runtime registration: dbt-mssql-physical-registration.md
       - Physical registration SQL storage: dbt-mssql-physical-registration-provisioning.md
       - Registered source identity: dbt-mssql-physical-source-bridge.md

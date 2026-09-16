@@ -5,7 +5,7 @@ integrity, never their own authority. No network artifact provider or production
 trust chain is simulated by the local retained-byte dictionary.
 """
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from hashlib import sha256
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -23,7 +23,7 @@ from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntime
 from dpone.contracts.dbt_mssql_physical_registration_values import PlatformSelection, ProgramAuthority, RegisteredLimits
 from dpone.contracts.dbt_publish_schema_contract_v4 import validate_native_policy_v4
 from dpone.contracts.dbt_workspace_activation import DbtWorkspaceActivationRequest, DbtWorkspacePhysicalResource
-from dpone.contracts.dbt_workspace_attempt import DbtWorkspaceAttemptRequest
+from dpone.contracts.dbt_workspace_attempt import DbtWorkspaceAttemptReceipt, DbtWorkspaceAttemptRequest
 from dpone.contracts.dbt_workspace_runtime_authority import DbtWorkspaceRuntimeAuthority
 from dpone.contracts.native_delivery_json import encode_native_delivery_json
 from dpone.contracts.native_generation_admission import VerifiedGenerationRequest, generation_admission_request_bytes
@@ -41,6 +41,16 @@ ROOT = Path(__file__).resolve().parents[2]
 ADMISSION = ROOT / "packages/dbt-dpone/control/sqlserver/physical-v1/admission.sql"
 SCHEMA = "dpone_control"
 LOCAL = "dpone_physical"
+
+
+@dataclass(frozen=True)
+class PhysicalOwnerAdmission:
+    """Actual fixture admission results; no generation has been reserved yet."""
+
+    resource: DbtWorkspacePhysicalResource
+    command: OriginalRef
+    attempt: DbtWorkspaceAttemptRequest
+    receipt: DbtWorkspaceAttemptReceipt
 
 
 class FixtureAuthority:
@@ -185,8 +195,13 @@ class FixtureAuthority:
             principals=principals,
         )
 
-    def admit(self, registration, admin, runtime, metadata_name):
-        """Execute real protected migrations, P admission, original bind and G bind."""
+    def admit_physical_owner(self, registration, admin, metadata_name):
+        """Run actual workspace admission only; do not create or reserve G.
+
+        This separation lets isolated P-only tests use the same bootstrap as the
+        existing source fixture. Returned values are actual admission outputs;
+        the fixture does not infer durable ownership from their construction.
+        """
         control = registration.control_authority
         MssqlNativeOriginalSchemaMigration(
             connection_factory=admin,
@@ -234,6 +249,13 @@ class FixtureAuthority:
             write_subjects=resource.write_subjects,
         )
         receipt = MssqlDbtWorkspaceAttemptAdmission(admin, control_schema=SCHEMA).admit(attempt)
+        return PhysicalOwnerAdmission(resource, command, attempt, receipt)
+
+    def admit(self, registration, admin, runtime, metadata_name):
+        """Execute the unchanged P admission, then original bind and G bind."""
+        owner = self.admit_physical_owner(registration, admin, metadata_name)
+        resource, command, attempt, receipt = owner.resource, owner.command, owner.attempt, owner.receipt
+        control = registration.control_authority
         MssqlNativeGenerationSchemaMigration(
             connection_factory=admin,
             control_schema=SCHEMA,

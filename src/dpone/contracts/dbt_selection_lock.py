@@ -13,10 +13,7 @@ from dpone.contracts.dbt_contract_validation import (
     require_text,
     require_token,
 )
-from dpone.contracts.dbt_sqlserver_graph_policy import (
-    DBT_SQLSERVER_GRAPH_POLICY_ID,
-    DBT_SQLSERVER_GRAPH_POLICY_SHA256,
-)
+from dpone.contracts.dbt_sqlserver_policy_registry import require_graph_registration
 
 DBT_SELECTION_LOCK_SCHEMA = "dpone.dbt-selection-lock.v1"
 _SELECTION_ERROR = "DPONE_DBT_SELECTION_INVALID"
@@ -94,14 +91,15 @@ class DbtSelectionLock:
             "graph policy sha256",
             _SELECTION_ERROR,
         )
-        if (
-            self.graph_policy_id != DBT_SQLSERVER_GRAPH_POLICY_ID
-            or self.graph_policy_sha256 != DBT_SQLSERVER_GRAPH_POLICY_SHA256
-        ):
+        try:
+            require_graph_registration(
+                graph_policy_id=self.graph_policy_id, graph_policy_sha256=self.graph_policy_sha256
+            )
+        except ValueError:
             raise contract_error(
                 _SELECTION_ERROR,
                 "dbt graph policy does not match the supported SQL Server policy",
-            )
+            ) from None
         require_digest(
             self.graph_contract_sha256,
             "graph contract sha256",
