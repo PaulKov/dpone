@@ -10,7 +10,7 @@ from dpone.contracts.dbt_mssql_physical_registration_codec import physical_runti
 from dpone.contracts.dbt_mssql_physical_source_identity import PhysicalSourceIdentity, require_source_identity
 from dpone.contracts.native_identity import OriginalRef
 from dpone.contracts.native_source_custody import SourceExecutorBinding
-from dpone.contracts.native_source_custody_codec import encode_source_executor_binding
+from dpone.contracts.native_source_custody_codec import decode_source_executor_binding, encode_source_executor_binding
 from tests.support.dbt_mssql_physical_registration import registration_inputs
 
 
@@ -74,8 +74,12 @@ def test_cross_database_role_swap_rejects():
         require_source_identity(altered, registration, facts.generation_id, facts.executor_invocation_id)
 
 
-def test_reader_owns_one_bounded_transaction_and_closes():
-    from dpone.adapters.dbt_mssql_physical_source import MssqlPhysicalSourceReader
+@pytest.mark.parametrize(
+    "failure",
+    [None, "execute", "fetch", "commit", "empty", "extra", "wrong_width", "oversize", "registration", "profile"],
+)
+def test_reader_owns_one_bounded_transaction_and_closes(failure):
+    from dpone.adapters.dbt_mssql_physical_source import MssqlPhysicalSourceReader, PhysicalSourceReadError
 
     registration, facts = source_case()
     row = (
@@ -104,13 +108,32 @@ def test_reader_owns_one_bounded_transaction_and_closes():
 
         def execute(self, sql, *parameters):
             calls.append((sql, parameters))
-            self.rows = iter([row, None])
+            if parameters and failure == "execute":
+                raise RuntimeError("unavailable source")
+            result = row
+            if failure == "wrong_width":
+                result = row + ("unrequested",)
+            if failure == "oversize":
+                result = row[:9] + (b"x" * 1048577,) + row[10:]
+            if failure == "registration":
+                result = row[:2] + (("sha256:" + "0" * 64).encode(),) + row[3:]
+            if failure == "profile":
+                executor = replace(
+                    decode_source_executor_binding(facts.executor_payload),
+                    profile=OriginalRef("profiles/changed", "sha256:" + "0" * 64),
+                )
+                result = row[:9] + (encode_source_executor_binding(executor),) + row[10:]
+            self.rows = iter([None if failure == "empty" else result, row if failure == "extra" else None])
 
         def fetchone(self):
+            if failure == "fetch":
+                raise RuntimeError("response unavailable")
             return next(self.rows)
 
         def commit(self):
             calls.append("commit")
+            if failure == "commit":
+                raise RuntimeError("commit acknowledgement unavailable")
 
         def rollback(self):
             calls.append("rollback")
@@ -119,8 +142,19 @@ def test_reader_owns_one_bounded_transaction_and_closes():
             calls.append("close")
 
     connection = Connection()
-    reader = MssqlPhysicalSourceReader(connection_factory=lambda: connection, registration=registration)
-    assert reader.read(facts.generation_id, facts.executor_invocation_id) == facts
+    connections = []
+
+    def connect():
+        connections.append(connection)
+        return connection
+
+    reader = MssqlPhysicalSourceReader(connection_factory=connect, registration=registration)
+    if failure is None:
+        assert reader.read(facts.generation_id, facts.executor_invocation_id) == facts
+    else:
+        with pytest.raises(PhysicalSourceReadError):
+            reader.read(facts.generation_id, facts.executor_invocation_id)
+    assert connections == [connection]
     assert calls[0][0] == "SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRANSACTION"
     assert calls[1][1] == (registration.registration_id, facts.generation_id, facts.executor_invocation_id)
-    assert calls[-3:] == ["commit", "close", "close"]
+    assert calls[-3:] == ["commit" if failure is None else "rollback", "close", "close"]
