@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add privileged immutable SQL Server physical registration storage with exact
+  schema/projection checks, current database/principal validation and independent
+  lost-acknowledgement readback. Storage does not authorize managed model execution;
+  upstream authentication, signing and runtime qualification remain separate.
+
 - Honor literal dbt target-path for automatic manifest discovery, using the
   selected project's publishing policy while preserving explicit-manifest and
   profile-override compatibility.

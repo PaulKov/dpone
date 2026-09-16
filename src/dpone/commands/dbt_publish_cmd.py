@@ -30,6 +30,7 @@ from .dbt_publish_cli_support import (
     emit_report,
     explain_selector,
     manifest_path,
+    model_selector_issue,
     project_argument_issue,
     project_root,
     project_root_issue,
@@ -175,26 +176,8 @@ def cmd_explain(args: argparse.Namespace, *, ctx: object, logger: logging.Logger
         }
     ]
     if len(matches) != 1:
-        code = "DPONE_DBT_MODEL_NOT_FOUND" if not matches else "DPONE_DBT_MODEL_AMBIGUOUS"
-        message = (
-            f"dbt model is not publish-enabled or does not exist: {selector}"
-            if not matches
-            else f"dbt model selector is ambiguous: {selector}"
-        )
-        remediation = (
-            "Run `dpone dbt check` to list publish-enabled models, then retry with the exact dbt unique_id."
-            if not matches
-            else "Retry with the exact dbt unique_id shown by `dpone dbt check`."
-        )
         emit_failure(
-            (
-                DbtPublishIssue(
-                    code=code,
-                    message=message,
-                    path="manifest.json",
-                    remediation=remediation,
-                ),
-            ),
+            (model_selector_issue(selector, ambiguous=bool(matches)),),
             args.format,
             stage="dbt_explain",
         )

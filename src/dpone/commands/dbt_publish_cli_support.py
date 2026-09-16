@@ -136,6 +136,24 @@ def emit_model(model: dict[str, Any]) -> None:
     print(f"physical design: {model['resolved_physical_design']}")
 
 
+def model_selector_issue(selector: str, *, ambiguous: bool) -> DbtPublishIssue:
+    """Describe a non-unique model selection with its supported recovery action."""
+    return DbtPublishIssue(
+        code="DPONE_DBT_MODEL_AMBIGUOUS" if ambiguous else "DPONE_DBT_MODEL_NOT_FOUND",
+        message=(
+            f"dbt model selector is ambiguous: {selector}"
+            if ambiguous
+            else f"dbt model is not publish-enabled or does not exist: {selector}"
+        ),
+        path="manifest.json",
+        remediation=(
+            "Retry with the exact dbt unique_id shown by `dpone dbt check`."
+            if ambiguous
+            else "Run `dpone dbt check` to list publish-enabled models, then retry with the exact dbt unique_id."
+        ),
+    )
+
+
 def relative_pack_path(raw: str) -> str:
     path = PurePosixPath(raw)
     if (
