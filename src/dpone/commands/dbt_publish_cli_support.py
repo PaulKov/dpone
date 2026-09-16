@@ -33,7 +33,7 @@ def emit_report(report: DbtCompileReport, output_format: str) -> None:
     icon = "PASS" if report.passed else "BLOCKED"
     print(f"dbt -> dpone publish: {icon}")
     print(f"manifest schema: v{report.manifest_schema_version or 'unknown'}")
-    print(f"published models: {len(report.models)}; workflows: {len(report.workflows)}")
+    print(f"validated publishing models: {len(report.models)}; workflows: {len(report.workflows)}")
     if report.models:
         print("models:")
         for item in report.models:
