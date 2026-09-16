@@ -30,23 +30,68 @@ control/capacity authority and actual database/service pins.
 Provision exactly two modules from the retained
 `packages/dbt-dpone/control/sqlserver/physical-v1/admission.sql` bytes:
 
-| Database | Module | Certificate use |
-|---|---|---|
-| Model | `physical_require_source_v1` | Signed entry |
-| Control | `physical_control_require_source_v1` | Matching countersignature |
+| Database | Module | Certificate use | Certificate principal permissions |
+|---|---|---|---|
+| Model | `physical_require_source_v1` | Signed entry | VIEW DEFINITION on this entry only |
+| Control | `physical_control_require_source_v1` | Matching countersignature | EXECUTE and VIEW DEFINITION on this helper only |
 
 The certificate public identity must match in both databases. Key material belongs
 to privileged provisioning and never enters registration bytes or runtime
-configuration. The control certificate user receives EXECUTE on the helper only.
-Runtime receives EXECUTE on the model entry only; no direct helper grant is added.
+configuration. Each certificate user has no login and no CONNECT grant. Its exact
+object permissions are listed above; a same-database installation uses their
+finite union. Runtime receives EXECUTE on the model entry only; no direct helper grant is added.
 Do not DENY helper EXECUTE to runtime: that also blocks the signed indirect call.
 Existing native table DENYs and metadata authority checks stay in place.
 
-Deployment renders only fixed coordinates and the unchanged native physical-owner
-predicate. It verifies exact installed definitions, caller context, ownership,
+Deployment renders fixed coordinates, the verified certificate thumbprint and the
+unchanged native physical-owner predicate. It verifies exact installed definitions, caller context, ownership,
 finite signatures, principal mappings and effective permissions before storing
 the registration. Producer/package hashes and deployed expansion hashes have
 different meanings; neither contains this registration's digest.
+
+Both runtime modules check their own exact signature inventory before reading
+protected state: one expected signature or countersignature and no extra entries.
+This is necessary because the SQL2022 fixture demonstrated that removing only the
+helper countersignature can otherwise leave its local ownership-chain read usable.
+An unrelated countersignature also retained the expected caller certificate token
+in the measured engine cell, so token membership alone could not prove the exact
+counter inventory. The scoped VIEW DEFINITION grants make only each module's own
+cryptographic metadata visible while the signed context is active. They add no
+standing runtime/public grants, database/schema visibility, certificate metadata
+visibility, table access or DDL authority. Outside the signed entry, ordinary
+runtime callers still cannot directly execute the helper or inspect its inventory.
+The installer first checks actual `CERTENCODED` bytes in both databases, then reads
+the actual 20-byte SHA-1 thumbprint for deterministic expansion. It does not guess
+a fingerprint in Python. Certificate principal SIDs are a separate catalog value;
+see [Microsoft's certificate catalog reference](https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-certificates-transact-sql?view=sql-server-ver17).
+
+After the immutable registration storage migration and external authentication,
+the platform invokes the concrete installer. Its connection factory selects the
+model database with privileged authority and opens existing protected keys when
+required. `certificate_public_bytes` is the actual expected `CERTENCODED` public
+value, not a private key or thumbprint substituted for that value:
+
+```python
+from dpone.adapters.dbt_mssql_physical_source_schema import MssqlPhysicalSourceSchemaProvisioner
+
+
+def install_source_bridge(platform_connection_factory, registration, admission_bytes,
+                          certificate_name, certificate_public_bytes, certificate_user):
+    provisioner = MssqlPhysicalSourceSchemaProvisioner(
+        connection_factory=platform_connection_factory,
+        admission_sql=admission_bytes,
+        certificate_name=certificate_name,
+        certificate_public_bytes=certificate_public_bytes,
+        certificate_user=certificate_user,
+    )
+    return provisioner.apply(registration)
+```
+
+The installer verifies SQL inventory and immutable storage readback; the caller
+has already authenticated upstream original/package bytes. Keep the observed
+expansion/signature/grant inventory in platform provisioning evidence. An
+ambiguous installation commit prevents registration and requires independent
+operator inspection before another installation attempt.
 
 ## Read from an actual runtime connection
 
