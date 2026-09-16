@@ -5,8 +5,10 @@ physical runtime registration format. The immutable records and canonical codec
 validate data representation and internal consistency. They do not register a
 runtime, query a server, resolve originals, provision permissions or authorize
 execution. A separate privileged [SQL storage adapter](dbt-mssql-physical-registration-provisioning.md)
-installs and retains registrations. Original authentication, signed runtime
-procedures, physical admission and route qualification remain unfinished.
+installs and retains registrations. The separate [signed source-identity
+bridge](dbt-mssql-physical-source-bridge.md) supplies provisioning and read-only
+current-owner checks. Complete original authentication, physical model admission
+and route qualification remain unfinished.
 
 ## Python interface
 
@@ -127,9 +129,11 @@ replacement or permission changes in place. Both insertion and readback recheck
 the model database pin, role identities and required catalog/schema DENYs.
 Replaying metadata never restores launch entitlement.
 
-Complete provisioning still requires actual original resolution, program authority,
-same-service observation and caller-preserving signed permissions. Codec or storage
-success cannot substitute for these prerequisites. Existing legacy codecs and admission
+Complete provisioning still requires actual original resolution and program authority.
+The source bridge observes same-instance database pins and installs finite
+caller-preserving signatures under those external platform prerequisites. Codec,
+storage or source-observation success cannot substitute for model admission or
+route qualification. Existing legacy codecs and admission
 behavior are unchanged. See [ADR 0065](adr/0065-trusted-isolated-native-generation-execution.md),
 [physical plans](dbt-mssql-physical-plans.md), or return to the
 [dbt integration overview](dbt.md).

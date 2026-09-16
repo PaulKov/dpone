@@ -1,0 +1,234 @@
+"""Provisioning contract tests; these do not qualify SQL Server permissions."""
+
+from dataclasses import replace
+from pathlib import Path
+from uuid import UUID
+
+import pytest
+
+from dpone.adapters.dbt_mssql_physical_source_schema import (
+    MssqlPhysicalSourceSchemaProvisioner,
+    module_inventory_sql,
+    principal_inventory_sql,
+)
+from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntimeRegistration
+from tests.support.dbt_mssql_physical_registration import registration_inputs
+
+
+class CatalogConnection:
+    """Lifecycle fault injection only: SQL semantic qualification remains live."""
+
+    autocommit = True
+
+    def __init__(self, *, existing=False, fail=None, thumbprints=None):
+        self.existing, self.fail = existing, fail
+        self.statements, self.events, self.rows = [], [], []
+        self.thumbprints = iter(thumbprints if thumbprints is not None else [[(b"c" * 20,)], [(b"c" * 20,)]])
+
+    def cursor(self):
+        return self
+
+    def execute(self, sql, *parameters):
+        self.statements.append((sql, parameters))
+        if self.fail and self.fail in sql:
+            raise RuntimeError("catalog mismatch")
+        if sql.startswith("SELECT OBJECT_ID"):
+            self.rows = [(100 if self.existing else None,)]
+        elif "SELECT @name;" in sql:
+            self.rows = [("runtime_" + str(parameters[0]),)]
+        elif sql.startswith("SELECT thumbprint FROM sys.certificates"):
+            self.rows = next(self.thumbprints)
+        return self
+
+    def fetchone(self):
+        return self.rows.pop(0) if self.rows else None
+
+    def commit(self):
+        self.events.append("commit")
+        if self.fail == "commit":
+            raise RuntimeError("unknown commit")
+
+    def rollback(self):
+        self.events.append("rollback")
+
+    def close(self):
+        self.events.append("close")
+
+
+def provisioner(connection):
+    return MssqlPhysicalSourceSchemaProvisioner(
+        connection_factory=lambda: connection,
+        admission_sql=Path("packages/dbt-dpone/control/sqlserver/physical-v1/admission.sql").read_bytes(),
+        certificate_name="bridge",
+        certificate_public_bytes=b"public-certificate",
+        certificate_user="bridge_user",
+    )
+
+
+def test_exact_real_producer_definitions_are_installed_before_registration(monkeypatch):
+    from dpone.adapters.dbt_mssql_physical_registration_store import MssqlPhysicalRegistrationStore
+    from dpone.adapters.dbt_mssql_physical_source_queries import source_procedures
+
+    connection = CatalogConnection()
+    value = MssqlPhysicalRuntimeRegistration(**registration_inputs())
+    registered = []
+
+    def register(self, actual):
+        assert connection.events == ["commit", "close", "close"]
+        assert sum("DPONE_SOURCE_GRANT_INVENTORY_MISMATCH" in sql for sql, _ in connection.statements) == 2
+        registered.append(actual)
+        return actual
+
+    monkeypatch.setattr(MssqlPhysicalRegistrationStore, "register", register)
+    assert provisioner(connection).apply(value) == value
+    definitions = source_procedures(
+        admission_sql=Path("packages/dbt-dpone/control/sqlserver/physical-v1/admission.sql").read_bytes(),
+        model_database="example",
+        local_schema="runtime_local",
+        control_database="example",
+        control_schema="runtime_control",
+        bridge_certificate_thumbprint=b"c" * 20,
+    )
+    created = [sql for sql, _ in connection.statements if sql.startswith("CREATE PROCEDURE")]
+    assert set(created) == set(definitions.values())
+    assert registered == [value]
+    signing = [sql for sql, _ in connection.statements if "ADD " in sql and "SIGNATURE TO" in sql]
+    assert len(signing) == 2
+    assert "ADD COUNTER SIGNATURE TO OBJECT::[runtime_control].[physical_control_require_source_v1]" in signing[0]
+    assert "ADD SIGNATURE TO OBJECT::[runtime_local].[physical_require_source_v1]" in signing[1]
+    user_checks = [sql for sql, _ in connection.statements if "sys.certificates c ON" in sql]
+    assert user_checks and all("p.sid=c.sid" in sql for sql in user_checks)
+    assert any("REVOKE CONNECT FROM [bridge_user]" in sql for sql, _ in connection.statements)
+    grant_checks = [sql for sql, _ in connection.statements if "DPONE_SOURCE_GRANT_INVENTORY_MISMATCH" in sql]
+    assert all("SELECT sid FROM sys.certificates" in sql for sql in grant_checks)
+    observations = [
+        index
+        for index, (sql, _) in enumerate(connection.statements)
+        if sql.startswith("SELECT thumbprint FROM sys.certificates")
+    ]
+    assert len(observations) == 2
+    assert all("DPONE_SOURCE_CERTIFICATE_MISMATCH" in connection.statements[index - 1][0] for index in observations)
+    assert observations[-1] < next(
+        index for index, (sql, _) in enumerate(connection.statements) if sql.startswith("CREATE PROCEDURE")
+    )
+
+
+@pytest.mark.parametrize(
+    "rows", [[], [(None,)], [(b"c" * 19,)], [(b"c" * 21,)], [("c" * 20,)], [(b"c" * 20,), (b"c" * 20,)], [(b"d" * 20,)]]
+)
+def test_missing_ambiguous_or_different_certificate_thumbprint_never_installs(monkeypatch, rows):
+    from dpone.adapters.dbt_mssql_physical_registration_store import MssqlPhysicalRegistrationStore
+
+    monkeypatch.setattr(MssqlPhysicalRegistrationStore, "register", lambda *_: pytest.fail("must not register"))
+    connection = CatalogConnection(thumbprints=[[(b"c" * 20,)], rows])
+    with pytest.raises(RuntimeError, match="certificate thumbprint"):
+        provisioner(connection).apply(MssqlPhysicalRuntimeRegistration(**registration_inputs()))
+    assert "rollback" in connection.events
+    assert not any(sql.startswith("CREATE PROCEDURE") or "SIGNATURE TO" in sql for sql, _ in connection.statements)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "DPONE_SOURCE_DATABASE_UNSAFE",
+        "DPONE_SOURCE_CERTIFICATE_MISMATCH",
+        "DPONE_SOURCE_RUNTIME_PRINCIPAL_UNSAFE",
+        "DPONE_SOURCE_MODULE_INVENTORY_MISMATCH",
+        "DPONE_SOURCE_SIGNATURE_INVENTORY_MISMATCH",
+        "DPONE_SOURCE_CERTIFICATE_USER_UNSAFE",
+        "DPONE_SOURCE_GRANT_INVENTORY_MISMATCH",
+        "commit",
+    ],
+)
+def test_inventory_or_commit_failure_never_registers(monkeypatch, failure):
+    from dpone.adapters.dbt_mssql_physical_registration_store import MssqlPhysicalRegistrationStore
+
+    monkeypatch.setattr(MssqlPhysicalRegistrationStore, "register", lambda *_: pytest.fail("must not register"))
+    connection = CatalogConnection(existing=True, fail=failure)
+    with pytest.raises(RuntimeError):
+        provisioner(connection).apply(MssqlPhysicalRuntimeRegistration(**registration_inputs()))
+    assert "rollback" in connection.events
+    assert connection.events[-2:] == ["close", "close"]
+    assert not any(sql.startswith("CREATE PROCEDURE") or "ALTER PROCEDURE" in sql for sql, _ in connection.statements)
+
+
+def test_inventory_requires_exact_definitions_and_finite_signatures():
+    sql = module_inventory_sql("runtime_local", "physical_require_source_v1", "bridge", "SPVC")
+    for guard in (
+        "execute_as_principal_id IS NULL",
+        "CONVERT(varbinary(max),m.definition)",
+        "sys.crypt_properties",
+        "thumbprint",
+        "crypt_type",
+        "principal_id",
+        "DATALENGTH",
+    ):
+        assert guard in sql
+    assert "ALTER PROCEDURE" not in sql
+
+
+def test_principal_check_rejects_broad_authority_and_identity_reuse():
+    sql = principal_inventory_sql("runtime_local", "physical_require_source_v1", model=True)
+    for guard in (
+        "sys.server_principals",
+        "authentication_type=1",
+        "sys.server_role_members",
+        "sys.database_role_members",
+        "sys.server_permissions",
+        "sys.database_permissions",
+        "p.sid=@sid",
+        "p.principal_id=@principal",
+        "IMPERSONATE",
+        "SCHEMA_ID",
+    ):
+        assert guard in sql
+
+
+def test_principal_check_allows_sql2022_public_encryption_metadata_defaults():
+    sql = principal_inventory_sql("runtime_local", "physical_require_source_v1", model=True)
+    assert "'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION'" in sql
+    assert "'VIEW ANY COLUMN MASTER KEY DEFINITION'" in sql
+    assert "'CONTROL'" in sql
+    assert "'IMPERSONATE'" in sql
+
+
+@pytest.mark.parametrize("same_database", [False, True])
+def test_certificate_metadata_is_exact_object_scope_with_same_database_union(monkeypatch, same_database):
+    from dpone.adapters.dbt_mssql_physical_registration_store import MssqlPhysicalRegistrationStore
+
+    monkeypatch.setattr(MssqlPhysicalRegistrationStore, "register", lambda _self, value: value)
+    value = MssqlPhysicalRuntimeRegistration(**registration_inputs())
+    if not same_database:
+        value = replace(
+            value,
+            control_database=replace(
+                value.control_database, database_name="control", database_id=6, database_guid=UUID(int=123)
+            ),
+        )
+    connection = CatalogConnection()
+    provisioner(connection).apply(value)
+    certificate_grants = [
+        sql for sql, _ in connection.statements if sql.startswith("GRANT ") and sql.endswith("TO [bridge_user];")
+    ]
+    assert sorted(certificate_grants) == sorted(
+        [
+            "GRANT VIEW DEFINITION ON OBJECT::[runtime_local].[physical_require_source_v1] TO [bridge_user];",
+            "GRANT EXECUTE ON OBJECT::[runtime_control].[physical_control_require_source_v1] TO [bridge_user];",
+            "GRANT VIEW DEFINITION ON OBJECT::[runtime_control].[physical_control_require_source_v1] TO [bridge_user];",
+        ]
+    )
+    assert sum("CREATE USER [bridge_user]" in sql for sql, _ in connection.statements) == (1 if same_database else 2)
+    checks = [sql for sql, _ in connection.statements if "sys.certificates c ON" in sql]
+    assert checks and all("EXCEPT" in sql and "minor_id" in sql and "state" in sql for sql in checks)
+
+
+@pytest.mark.parametrize("public", [b"", "public", None])
+def test_certificate_identity_must_be_nonempty_public_bytes(public):
+    with pytest.raises(ValueError, match="public certificate"):
+        MssqlPhysicalSourceSchemaProvisioner(
+            connection_factory=lambda: pytest.fail("must not connect"),
+            admission_sql=Path("packages/dbt-dpone/control/sqlserver/physical-v1/admission.sql").read_bytes(),
+            certificate_name="bridge",
+            certificate_public_bytes=public,
+            certificate_user="bridge_user",
+        )

@@ -365,7 +365,7 @@ def test_completion_consumer_rejects_changed_retained_original(tmp_path, suffix)
 
 @pytest.mark.parametrize("field", ["size", "invocation", "pack", "termination"])
 def test_completion_consumer_rejects_rebound_inconsistent_inventory(tmp_path, field):
-    from dpone.contracts.native_generation_build_cohort_codec import (
+    from dpone.contracts.native_generation_build_cohort import (
         decode_native_build_artifact_inventory,
         encode_native_build_artifact_inventory,
     )
@@ -399,7 +399,7 @@ def test_completion_consumer_rejects_rebound_inconsistent_inventory(tmp_path, fi
 
 @pytest.mark.parametrize("excess", [0, 1])
 def test_completion_consumer_checks_rebound_terminal_at_admitted_budget(tmp_path, excess):
-    from dpone.contracts.native_generation_build_cohort_codec import (
+    from dpone.contracts.native_generation_build_cohort import (
         decode_native_build_artifact_inventory,
         encode_native_build_artifact_inventory,
     )

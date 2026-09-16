@@ -480,8 +480,8 @@ limits are separate. Do not require a model's `resource_bounds` reference to equ
 that capacity reference: no such semantic equivalence has been established.
 The pure registration codec excludes resource-bound admission; later runtime
 admission must fail closed until an actual physical-bounds original or explicit
-authenticated projection mapping is implemented. Original resolution, package
-authority, signed runtime procedures and runtime qualification remain unfinished.
+authenticated projection mapping is implemented. Complete original resolution,
+package authority, model admission and runtime qualification remain unfinished.
 
 The pure carrier and codec are documented in the
 [physical registration reference](../dbt-mssql-physical-registration.md).
@@ -495,3 +495,44 @@ Externally authenticated platform inputs remain prerequisites; control/capacity
 bootstrap authority need not be invented as a new native-original kind. Storage
 does not install signed source procedures or grant model admission. Isolated
 storage tests are not full permission, source-execution or route qualification.
+
+The separate [source-identity bridge](../dbt-mssql-physical-source-bridge.md)
+adds finite signed/countersigned modules and a bounded transaction reader. It
+verifies actual model/control callers and current P-before-G ownership without
+mutating native state. Privileged installation verifies fixed module, certificate
+and grant inventories before invoking registration storage. Authenticated upstream
+inputs and exclusion of concurrent privileged DDL remain explicit platform
+preconditions. A successful source observation is not physical model admission,
+launch entitlement, a completion receipt or complete route qualification.
+
+### Exact signature observation permissions
+
+The source bridge's certificate-mapped users require a finite metadata capability
+in addition to the control helper's EXECUTE grant. In the model database, the
+certificate user receives VIEW DEFINITION on the entry procedure only. In the
+control database, the certificate user receives EXECUTE and VIEW DEFINITION on
+the helper procedure only. A same-database installation uses the union of those
+object-scoped grants. These certificate users have no CONNECT grant, role
+membership, ownership or other permissions. Runtime users retain only entry
+EXECUTE and their existing native permissions and DENYs; no public, schema,
+database or certificate-wide metadata permission is introduced.
+
+This refines the earlier helper-EXECUTE-only provisioning design. Isolated
+SQL Server 2022 probes showed that local ownership chaining can keep a helper
+read working without its countersignature. A foreign countersignature can also
+preserve the caller's certificate token, so token presence or effective EXECUTE
+alone does not prove the expected signature. Runtime users cannot see the needed
+signature catalog by default. The narrow certificate-user metadata grants allow
+each executing module to require exactly its expected signature type and actual
+certificate thumbprint, without exposing protected data or changing caller identity.
+The installer verifies the complete grant inventory, and tests must prove both
+successful baseline reads before checking damaged configurations.
+
+The installer compares actual CERTENCODED bytes with the authenticated expected
+public certificate before obtaining its observed thumbprint from both databases.
+Certificate principal SIDs and signature thumbprints are different coordinates;
+SQL Server documents them separately in [sys.certificates](https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-certificates-transact-sql).
+The deployment embeds that verified thumbprint in the finite procedure expansion,
+not in the package template hash or registration digest. Exact module definition,
+signature and grant checks remain mandatory; a permission mismatch is not repaired
+by granting broader access.

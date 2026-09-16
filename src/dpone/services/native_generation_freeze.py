@@ -10,6 +10,7 @@ from dataclasses import replace
 from hashlib import sha256
 from threading import Lock
 
+from dpone.adapters.native_generation_invocation_auth import InvocationOriginalReader
 from dpone.contracts.native_delivery import FrozenGeneration, GenerationReservation
 from dpone.contracts.native_delivery_codec import (
     decode_frozen_generation,
@@ -29,7 +30,6 @@ from dpone.contracts.native_source_custody_codec import (
 from dpone.ports.native_generation_control import SourceGenerationFreezeLedger
 from dpone.ports.native_originals import BoundNativeOriginalPublisher
 from dpone.ports.native_source_custody import SourceBuildCompletionReader
-from dpone.runtime.native_generation_invocation_auth import InvocationOriginalReader
 
 
 class NativeGenerationFreeze:

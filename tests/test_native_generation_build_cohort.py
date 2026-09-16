@@ -5,8 +5,9 @@ from dataclasses import replace
 
 import pytest
 
-from dpone.contracts.native_generation_build_cohort import NativeBuildArtifact, NativeBuildArtifactInventory
-from dpone.contracts.native_generation_build_cohort_codec import (
+from dpone.contracts.native_generation_build_cohort import (
+    NativeBuildArtifact,
+    NativeBuildArtifactInventory,
     decode_native_build_artifact_inventory,
     encode_native_build_artifact_inventory,
 )
