@@ -277,3 +277,35 @@ def test_signature_inventory_for_new_module_rejects_certificate_reuse():
     apply(connection)
     first = next(sql for sql, _ in connection.statements if "DPONE_CATALOG_SIGNATURE_MISMATCH" in sql)
     assert "OBJECT_ID(N'[runtime_local].[physical_catalog_v1]') IS NULL" in first
+
+
+@pytest.mark.parametrize("mode", ["SHARE_METADATA", "SHARE_BUILD"])
+def test_shared_observer_requires_separate_future_permission_contract(mode):
+    from dataclasses import replace
+
+    from dpone.contracts.dbt_mssql_physical_registration_values import SharedObserver
+
+    value = MssqlPhysicalRuntimeRegistration(**registration_inputs())
+    value = replace(value, principals=replace(value.principals, observer=SharedObserver(mode, "sha256:" + "1" * 64)))
+    connection = Connection()
+    with pytest.raises(ValueError, match="dedicated observer"):
+        provisioner(connection).apply(value, model_schema="models", model_schema_id=7, model_schema_owner_id=1)
+    assert connection.statements == []
+
+
+def test_metadata_deny_inventory_covers_inbound_dependency_visibility():
+    connection = Connection()
+    apply(connection)
+    inventory = next(sql for sql, _ in connection.statements if "DPONE_CATALOG_VISIBILITY_UNSAFE" in sql)
+    assert "permission_name IN ('VIEW DEFINITION','VIEW SECURITY DEFINITION','CONTROL')" in inventory
+    assert "class IN (0,1,3)" in inventory
+    assert "'VIEW ANY DEFINITION','VIEW ANY SECURITY DEFINITION','CONTROL SERVER'" in inventory
+
+
+def test_dedicated_observer_privileges_are_checked_without_granting_execute():
+    connection = Connection()
+    apply(connection)
+    observed = [parameters[0] for sql, parameters in connection.statements if "SELECT @name;" in sql]
+    assert observed.count(7) == 2
+    grants = [sql for sql, _ in connection.statements if sql.startswith("GRANT")]
+    assert not any("[runtime_7]" in sql for sql in grants)

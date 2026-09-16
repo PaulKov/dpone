@@ -19,6 +19,7 @@ from dpone.adapters.dbt_mssql_physical_catalog_queries import ENTRY, catalog_pro
 from dpone.adapters.dbt_mssql_physical_source_schema import module_inventory_sql, principal_inventory_sql
 from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntimeRegistration
 from dpone.contracts.dbt_mssql_physical_registration_codec import encode_physical_runtime_registration
+from dpone.contracts.dbt_mssql_physical_registration_values import DedicatedObserver
 from dpone.contracts.mssql_object_name import native_control_schema, quote_mssql_identifier
 from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
 
@@ -73,9 +74,13 @@ class MssqlPhysicalCatalogSchemaProvisioner:
 
         Schema name/ID/owner must come from the authenticated retained profile
         deployment, not arbitrary caller selection. The first cell requires dbo
-        ownership (principal 1) of an existing dedicated model-data schema.
+        ownership (principal 1) of an existing dedicated model-data schema, and
+        a dedicated observer. Shared observation needs a separately authenticated
+        permission contract accounting for the new catalog EXECUTE grant.
         """
         encode_physical_runtime_registration(registration)
+        if type(registration.principals.observer) is not DedicatedObserver:
+            raise ValueError("catalog deployment first cell requires a dedicated observer")
         model_schema = native_control_schema(model_schema)
         reserved = {
             "dbo",
@@ -196,7 +201,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.certificates WHERE name=N'{self._certificate}' 
 
     def _runtime(self, cursor: SqlControlCursor, value: MssqlPhysicalRuntimeRegistration, schema: str) -> list[str]:
         names = []
-        for mapping in (value.principals.metadata, value.principals.build):
+        mappings = [value.principals.metadata, value.principals.build]
+        if isinstance(value.principals.observer, DedicatedObserver):
+            mappings.append(value.principals.observer.mapping)
+        for mapping in mappings:
             principal = mapping.model
             cursor.execute(
                 principal_inventory_sql(value.local_schema, ENTRY, model=True),
@@ -208,9 +216,15 @@ IF NOT EXISTS (SELECT 1 FROM sys.certificates WHERE name=N'{self._certificate}' 
                 raise RuntimeError("catalog runtime principal name is malformed")
             names.append(name)
             cursor.execute(
-                f"""DECLARE @principal int=?;
-IF EXISTS (SELECT 1 FROM sys.database_permissions p WHERE grantee_principal_id IN (@principal,0)
- AND ((state='D' AND permission_name IN ('SELECT','VIEW DEFINITION','CONTROL','EXECUTE')
+                f"""DECLARE @principal int=?,@login int;
+SELECT @login=l.principal_id FROM sys.server_principals l JOIN sys.database_principals p ON p.sid=l.sid
+ AND DATALENGTH(p.sid)=DATALENGTH(l.sid) WHERE p.principal_id=@principal;
+IF EXISTS (SELECT 1 FROM sys.server_permissions WHERE state='D'
+ AND grantee_principal_id IN (@login,(SELECT principal_id FROM sys.server_principals WHERE name='public' AND type='R'))
+ AND permission_name IN ('VIEW ANY DEFINITION','VIEW ANY SECURITY DEFINITION','CONTROL SERVER'))
+ OR EXISTS (SELECT 1 FROM sys.database_permissions p WHERE grantee_principal_id IN (@principal,0)
+ AND ((state='D' AND permission_name IN ('VIEW DEFINITION','VIEW SECURITY DEFINITION','CONTROL') AND class IN (0,1,3))
+ OR (state='D' AND permission_name IN ('SELECT','EXECUTE')
  AND (class=0 OR (class=3 AND major_id IN (SCHEMA_ID(N'{schema}'),SCHEMA_ID(N'{value.local_schema}'),SCHEMA_ID('sys')))
  OR (class=1 AND (major_id=OBJECT_ID('sys.sql_expression_dependencies') OR major_id IN
  (SELECT object_id FROM sys.objects WHERE schema_id=SCHEMA_ID(N'{schema}'))))))
@@ -218,7 +232,7 @@ IF EXISTS (SELECT 1 FROM sys.database_permissions p WHERE grantee_principal_id I
  THROW 51464,'DPONE_CATALOG_VISIBILITY_UNSAFE',1;""",
                 principal.principal_id,
             )
-        return names
+        return names[:2]
 
     def _signatures(self, cursor: SqlControlCursor, schema: str, *, complete: bool) -> None:
         expected = f"OBJECT_ID(N'[{schema}].[{ENTRY}]')"
