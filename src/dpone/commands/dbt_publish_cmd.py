@@ -352,8 +352,10 @@ def _build(
     stale = stale_default_manifest(args, selected_manifest)
     if stale is not None:
         return stale
+    selected_root = project_root(args)
     return context.build_dbt_publish_compiler(
-        root=project_root(args),
+        root=selected_root,
+        profile_project_root=selected_root if not getattr(args, "manifest", None) else None,
         require_certified_routes=(getattr(args, "dbt_cmd", None) == "compile"),
     ).build(
         selected_manifest,

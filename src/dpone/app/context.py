@@ -45,6 +45,7 @@ class AppContext:
         *,
         root: Path,
         require_certified_routes: bool,
+        profile_project_root: Path | None = None,
     ) -> DbtDponeCompiler:
         """Compose the dbt compiler behind the CLI application boundary."""
 
@@ -53,6 +54,7 @@ class AppContext:
         return build_dbt_dpone_compiler(
             root=root,
             require_certified_routes=require_certified_routes,
+            profile_project_root=profile_project_root,
         )
 
     def build_dbt_artifact_writer(

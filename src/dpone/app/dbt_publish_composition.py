@@ -197,6 +197,7 @@ class LegacyDbtPublishPlanner(CanonicalDbtPublishPlanner):
 def build_dbt_dpone_compiler(
     *,
     root: Path | None = None,
+    profile_project_root: Path | None = None,
     require_certified_routes: bool = False,
     reader: DbtArtifactReaderPort | None = None,
     profile_loader: DbtPublishProfileLoaderPort | None = None,
@@ -205,7 +206,12 @@ def build_dbt_dpone_compiler(
     semantic_refresh_certification_verifier: SemanticRefreshCertificationVerifierPort | None = None,
     semantic_refresh_certification_verification_time: str | None = None,
 ) -> CanonicalDbtDponeCompiler:
-    """Assemble concrete adapters around the injectable compiler service."""
+    """Assemble concrete adapters around the injectable compiler service.
+
+    ``root`` controls capability and project-policy checks. Only an explicit
+    ``profile_project_root`` changes legacy manifest-relative policy discovery;
+    the CLI supplies it when selecting the manifest automatically.
+    """
 
     snapshot = build_capability_discovery_service(
         root=(root or Path.cwd()),
@@ -214,7 +220,9 @@ def build_dbt_dpone_compiler(
         reader=reader if reader is not None else DbtArtifactReader(),
         resolver=DbtPublishIntentResolver(),
         model_compiler=DbtModelToWorkloadCompiler(planner=CanonicalDbtPublishPlanner()),
-        profile_loader=profile_loader if profile_loader is not None else DbtPublishProfileLoader(project_root=root),
+        profile_loader=(
+            profile_loader if profile_loader is not None else DbtPublishProfileLoader(project_root=profile_project_root)
+        ),
         route_capabilities=DbtRouteCapabilityPolicy(
             snapshot,
             require_certified=require_certified_routes,

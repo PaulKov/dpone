@@ -61,8 +61,9 @@ def _isolate_release_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         AppContext,
         "build_dbt_publish_compiler",
-        lambda _self, *, root, require_certified_routes: real_builder(
+        lambda _self, *, root, require_certified_routes, profile_project_root=None: real_builder(
             root=root,
+            profile_project_root=profile_project_root,
             require_certified_routes=False,
         ),
     )
@@ -724,6 +725,38 @@ def test_dbt_check_invalid_target_is_actionable(tmp_path: Path, capsys, output_f
         assert json.loads(captured.out)["schema"] == "dpone.error.v1"
 
 
+@pytest.mark.parametrize("command", ["check", "explain", "factory"])
+def test_explicit_manifest_retains_artifact_local_policy_discovery(
+    tmp_path: Path,
+    capsys,
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+) -> None:
+    monkeypatch.delenv("DPONE_DBT_PUBLISH_PROFILES", raising=False)
+    manifest = _write_dbt_project(tmp_path)
+    artifact = tmp_path / "artifact/manifest.json"
+    artifact.parent.mkdir()
+    manifest.rename(artifact)
+    policy = artifact.parent / "dpone/dbt-publish-profiles.yml"
+    policy.parent.mkdir()
+    shutil.copyfile(PROFILES, policy)
+    if command == "factory":
+        assert build_dbt_dpone_compiler(root=tmp_path).build(artifact).passed
+        return
+    args = ["dbt", command, "--manifest", str(artifact)]
+    if command == "explain":
+        args.append("competitive_pricing")
+    with pytest.raises(SystemExit, match="0"):
+        cli_main.main([*args, "--format", "json"])
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    payload = json.loads(captured.out)
+    if command == "check":
+        assert payload["passed"] is True
+    else:
+        assert payload["schema"] == "dpone.dbt-publish-explain.v1"
+
+
 @pytest.mark.parametrize("command", ["check", "explain"])
 @pytest.mark.parametrize("target", ["target", "build/dbt"])
 @pytest.mark.parametrize("decoy", [False, True])
@@ -1183,9 +1216,9 @@ def test_dbt_compile_always_requires_certified_routes(
     observed: list[bool] = []
     real_builder = build_dbt_dpone_compiler
 
-    def strict_builder(_self, *, root, require_certified_routes):
+    def strict_builder(_self, *, root, require_certified_routes, profile_project_root=None):
         observed.append(require_certified_routes)
-        return real_builder(root=root, require_certified_routes=False)
+        return real_builder(root=root, profile_project_root=profile_project_root, require_certified_routes=False)
 
     monkeypatch.setattr(AppContext, "build_dbt_publish_compiler", strict_builder)
 

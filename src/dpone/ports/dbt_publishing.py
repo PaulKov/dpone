@@ -156,6 +156,7 @@ class DbtPublishComposition(Protocol):
         *,
         root: Path,
         require_certified_routes: bool,
+        profile_project_root: Path | None = None,
     ) -> DbtPublishCompiler: ...
 
     def build_dbt_artifact_writer(
