@@ -2,6 +2,7 @@
 
 from dpone.adapters.dbt_mssql_physical_catalog_queries import _literal
 from dpone.adapters.dbt_mssql_physical_catalog_v2_queries import _canonical, _links, _reject_difference, _shapes
+from dpone.adapters.dbt_mssql_physical_namespace_queries import _canonical_object, _replace_namespace_sql, _shape
 from dpone.adapters.dbt_mssql_physical_source_queries import _caller, _pin, _projections, _quote
 from dpone.adapters.native_generation_mssql_json import decode_bytes, scalar, utf8
 from dpone.adapters.native_generation_mssql_owner import physical_owner
@@ -21,36 +22,6 @@ def _decode(source: str, target: str) -> str:
         + "\nIF "
         + _reject_difference(utf8(target), source)
         + "\n THROW 51480, 'DPONE_DISCOVERY_UTF8_INVALID', 1;"
-    )
-
-
-def _shape(document: str, fields: dict[str, int]) -> str:
-    values = ",".join(f"(N'{key}',{kind})" for key, kind in fields.items())
-    return f"""IF {document} IS NULL OR ISNULL(ISJSON({document},OBJECT),0)<>1
- OR (SELECT COUNT(*) FROM OPENJSON({document}))<>{len(fields)}
- OR EXISTS (SELECT 1 FROM (VALUES {values}) e(name,kind) WHERE NOT EXISTS
- (SELECT 1 FROM OPENJSON({document}) j WHERE CONVERT(varbinary(max),j.[key])=CONVERT(varbinary(max),e.name)
- AND DATALENGTH(j.[key])=DATALENGTH(e.name) AND j.type=e.kind))
- THROW 51480, 'DPONE_DISCOVERY_SHAPE_INVALID', 1;"""
-
-
-def _canonical_object(document: str, fields: dict[str, int]) -> str:
-    parts = ["CONVERT(nvarchar(max),N'{')"]
-    for index, (name, kind) in enumerate(sorted(fields.items())):
-        value = scalar(document, "$." + name)
-        parts.append(f"N'{',' if index else ''}\"{name}\":'")
-        parts.append(
-            f"JSON_QUERY({document},'$.{name}')"
-            if kind in (4, 5)
-            else f"CONVERT(nvarchar(max),TRY_CONVERT(bigint,{value}))"
-            if kind == 2
-            else f"(N'\"'+REPLACE(STRING_ESCAPE({value},'json'),NCHAR(92)+N'/',N'/')+N'\"')"
-        )
-    parts.append("N'}'")
-    return (
-        "IF "
-        + _reject_difference(document, "(" + "+".join(parts) + ")")
-        + "\n THROW 51480, 'DPONE_DISCOVERY_NONCANONICAL', 1;"
     )
 
 
@@ -150,8 +121,6 @@ def discovery_procedures(
         "BINDING_SHAPES": _shapes(),
         "BINDING_CANONICAL": _canonical(),
         "BINDING_LINKS": _links(model_database, model_schema, model_schema_id, catalog_module_schema=local),
-        "OBJECT_SHAPE": _shape("@item", dict(model_unique_id=1, role=1, name=1)),
-        "OBJECT_CANONICAL": _canonical_object("@item", dict(model_unique_id=1, role=1, name=1)),
         "AUTHORITY_LOCATOR": utf8(scalar("@registration", "$.control_authority.locator")),
         "AUTHORITY_DIGEST": utf8(scalar("@registration", "$.control_authority.sha256")),
     }
@@ -162,7 +131,12 @@ def discovery_procedures(
  OR NOT EXISTS (SELECT 1 FROM sys.crypt_properties WHERE class=1 AND major_id=@@PROCID
  AND crypt_type='{kind}' AND thumbprint=0x{discovery_certificate_thumbprint.hex()})
  THROW 51480, 'DPONE_DISCOVERY_SIGNATURE_INVALID', 1;"""
-    result = discovery_sql.decode("utf-8")
+    result = _replace_namespace_sql(
+        discovery_sql=discovery_sql,
+        model_schema=model_schema,
+        model_schema_id=model_schema_id,
+        control_schema=control_schema,
+    )
     for name, value in replacements.items():
         marker = "{{" + name + "}}"
         if marker not in result:
