@@ -447,7 +447,7 @@ unfinished; this decision fixes the implementation boundary without certifying i
 
 ## Immutable physical runtime registration
 
-The planned `dpone.mssql-physical-runtime-registration.v1` record has an
+The `dpone.mssql-physical-runtime-registration.v1` record has an
 independently allocated UUID and an external digest of its complete canonical
 bytes. Upstream policy/profile/toolchain selections, authority references,
 database pins, program hashes and principal mappings precede registration;
@@ -481,9 +481,17 @@ that capacity reference: no such semantic equivalence has been established.
 The pure registration codec excludes resource-bound admission; later runtime
 admission must fail closed until an actual physical-bounds original or explicit
 authenticated projection mapping is implemented. Original resolution, package
-authority, signing, provisioning and runtime qualification remain unfinished.
+authority, signed runtime procedures and runtime qualification remain unfinished.
 
 The pure carrier and codec are documented in the
 [physical registration reference](../dbt-mssql-physical-registration.md).
-Their implementation does not complete the protected insertion or permission
-checks described above.
+The separate [privileged SQL storage adapter](../dbt-mssql-physical-registration-provisioning.md)
+now provides the 53-column immutable catalog, exact schema verification and
+transactional insertion with independent readback of the same UUID. Both write
+and readback revalidate model database identity, model principal IDs/SIDs and
+required direct-access DENYs. Conflicts and incompatible layouts are not repaired.
+Seven-digit SQL timestamps are preserved without Python datetime truncation.
+Externally authenticated platform inputs remain prerequisites; control/capacity
+bootstrap authority need not be invented as a new native-original kind. Storage
+does not install signed source procedures or grant model admission. Isolated
+storage tests are not full permission, source-execution or route qualification.

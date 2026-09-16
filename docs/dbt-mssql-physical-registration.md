@@ -4,7 +4,9 @@ This reference is for dpone developers preparing the unreleased SQL Server
 physical runtime registration format. The immutable records and canonical codec
 validate data representation and internal consistency. They do not register a
 runtime, query a server, resolve originals, provision permissions or authorize
-execution. SQL provisioning, admission and qualification remain unfinished.
+execution. A separate privileged [SQL storage adapter](dbt-mssql-physical-registration-provisioning.md)
+installs and retains registrations. Original authentication, signed runtime
+procedures, physical admission and route qualification remain unfinished.
 
 ## Python interface
 
@@ -117,16 +119,17 @@ collation equivalence is inferred.
 
 ## Provisioning and recovery boundary
 
-This slice has no provisioning or recovery command. Future protected insertion
-must bind the exact UUID, payload, digest and projected columns atomically.
-An identical duplicate permits readback; conflicting bytes must fail. Lost
-acknowledgment requires independent readback of the same UUID rather than
-replacement or permission changes in place. Replaying metadata never restores
-launch entitlement.
+The codec has no provisioning or recovery command. The separate privileged
+storage API binds the exact UUID, payload, digest and projected columns
+atomically. An identical duplicate permits readback; conflicting bytes fail.
+Lost acknowledgment requires independent readback of the same UUID rather than
+replacement or permission changes in place. Both insertion and readback recheck
+the model database pin, role identities and required catalog/schema DENYs.
+Replaying metadata never restores launch entitlement.
 
-These future checks require actual original resolution, program authority,
-database observation, caller-preserving permissions and SQL evidence. Codec
-success cannot substitute for any of them. Existing legacy codecs and admission
+Complete provisioning still requires actual original resolution, program authority,
+same-service observation and caller-preserving signed permissions. Codec or storage
+success cannot substitute for these prerequisites. Existing legacy codecs and admission
 behavior are unchanged. See [ADR 0065](adr/0065-trusted-isolated-native-generation-execution.md),
 [physical plans](dbt-mssql-physical-plans.md), or return to the
 [dbt integration overview](dbt.md).
