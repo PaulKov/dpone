@@ -119,8 +119,9 @@ def source_procedures(
 ) -> dict[str, str]:
     """Expand retained package bytes into the exact two deployed module bodies.
 
-    The provisioner authenticates these package bytes before calling this pure
-    function and records both the producer digest and separate expansion hashes.
+    The platform owner authenticates package bytes and the installer observes the
+    certificate thumbprint before this pure expansion. The platform retains the
+    producer digest and separate deployment expansion hashes as evidence.
     """
     if type(bridge_certificate_thumbprint) is not bytes or len(bridge_certificate_thumbprint) != 20:
         raise ValueError("bridge certificate requires the actual 20-byte SQL thumbprint")
