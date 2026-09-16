@@ -15,8 +15,10 @@ from tests.support.dbt_mssql_physical_registration import registration_inputs
 
 
 def source_case():
-    registration = MssqlPhysicalRuntimeRegistration(**registration_inputs())
-    generation, invocation = UUID(int=101), UUID(int=102)
+    registration = replace(
+        MssqlPhysicalRuntimeRegistration(**registration_inputs()), registration_id=str(UUID(int=0xABCD))
+    )
+    generation, invocation = UUID(int=0xABC), UUID(int=0xDEF)
     reservation = OriginalRef("generations/reservation.json", "sha256:" + "7" * 64)
     executor = SourceExecutorBinding(
         generation,
@@ -88,7 +90,19 @@ def test_reader_rejects_noncanonical_uuid_before_connection(invalid):
 
 @pytest.mark.parametrize(
     "failure",
-    [None, "execute", "fetch", "commit", "empty", "extra", "wrong_width", "oversize", "registration", "profile"],
+    [
+        None,
+        "uppercase",
+        "execute",
+        "fetch",
+        "commit",
+        "empty",
+        "extra",
+        "wrong_width",
+        "oversize",
+        "registration",
+        "profile",
+    ],
 )
 def test_reader_owns_one_bounded_transaction_and_closes(failure):
     from dpone.adapters.dbt_mssql_physical_source import MssqlPhysicalSourceReader, PhysicalSourceReadError
@@ -123,6 +137,8 @@ def test_reader_owns_one_bounded_transaction_and_closes(failure):
             if parameters and failure == "execute":
                 raise RuntimeError("unavailable source")
             result = row
+            if failure == "uppercase":
+                result = (row[0], row[1].upper(), row[2], row[3].upper(), row[4].upper()) + row[5:]
             if failure == "wrong_width":
                 result = row + ("unrequested",)
             if failure == "oversize":
@@ -161,7 +177,8 @@ def test_reader_owns_one_bounded_transaction_and_closes(failure):
         return connection
 
     reader = MssqlPhysicalSourceReader(connection_factory=connect, registration=registration)
-    if failure is None:
+    succeeded = failure in (None, "uppercase")
+    if succeeded:
         assert reader.read(facts.generation_id, facts.executor_invocation_id) == facts
     else:
         with pytest.raises(PhysicalSourceReadError):
@@ -169,4 +186,4 @@ def test_reader_owns_one_bounded_transaction_and_closes(failure):
     assert connections == [connection]
     assert calls[0][0].startswith("IF @@TRANCOUNT=0 BEGIN TRANSACTION;")
     assert calls[1][1] == (registration.registration_id, facts.generation_id, facts.executor_invocation_id)
-    assert calls[-3:] == ["commit" if failure is None else "rollback", "close", "close"]
+    assert calls[-3:] == ["commit" if succeeded else "rollback", "close", "close"]
