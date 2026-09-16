@@ -90,6 +90,11 @@ def test_exact_real_producer_definitions_are_installed_before_registration(monke
     assert len(signing) == 2
     assert "ADD COUNTER SIGNATURE TO OBJECT::[runtime_control].[physical_control_require_source_v1]" in signing[0]
     assert "ADD SIGNATURE TO OBJECT::[runtime_local].[physical_require_source_v1]" in signing[1]
+    user_checks = [sql for sql, _ in connection.statements if "sys.certificates c ON" in sql]
+    assert user_checks and all("p.sid=c.sid" in sql for sql in user_checks)
+    assert any("REVOKE CONNECT FROM [bridge_user]" in sql for sql, _ in connection.statements)
+    grant_checks = [sql for sql, _ in connection.statements if "DPONE_SOURCE_GRANT_INVENTORY_MISMATCH" in sql]
+    assert all("SELECT sid FROM sys.certificates" in sql for sql in grant_checks)
 
 
 @pytest.mark.parametrize(

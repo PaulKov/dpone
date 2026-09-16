@@ -40,6 +40,11 @@ SQL2022's default public `VIEW ANY COLUMN ENCRYPTION KEY DEFINITION` and
 observation rights. The first isolated live run observed both defaults and rejected
 them before module creation; the correction preserves those normal defaults
 without allowing EXECUTE, CONTROL, impersonation or broader administrative rights.
+Certificate principal identity uses the full `sys.certificates.sid`, while module
+signatures use `thumbprint`; SQL2022 exposes different values. Creation revokes
+only the new certificate user's automatic CONNECT grant before verifying its
+helper-EXEC-only inventory. Existing users with extra grants are rejected without
+automatic repair. Runtime login-mapped users retain their own CONNECT permission.
 
 Only `physical_require_source_v1` is signed; only
 `physical_control_require_source_v1` is countersigned. Control certificate users
