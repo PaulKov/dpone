@@ -28,6 +28,7 @@ from dpone.contracts.mssql_object_name import native_control_schema
 from dpone.ports.physical_catalog_connection import PhysicalCatalogConnection, PhysicalCatalogCursor
 
 _KINDS = (
+    "COUNT",
     "HEADER",
     "TABLE",
     "COLUMN",
@@ -36,7 +37,6 @@ _KINDS = (
     "PARTITION",
     "DEPENDENCY",
     "FORBIDDEN_PROPERTY",
-    "COUNT",
 )
 
 
@@ -85,8 +85,8 @@ class MssqlPhysicalCatalogReader:
     ) -> PhysicalCatalogObservation:
         """Return detached matching facts only after successful read settlement.
 
-        Source guard and all catalog calls share one transaction. The installed
-        producer rejects RLS then takes COUNT_BIG TABLOCK,HOLDLOCK before first
+        Source guard and all catalog calls share one transaction. The first COUNT request rejects RLS and takes
+        COUNT_BIG TABLOCK,HOLDLOCK before the first
         HEADER, retaining table/source locks through settlement. Failures and
         deadline expiry return no result and trigger best-effort cleanup; an
         uncertain commit is not silently retried or interpreted as rollback.

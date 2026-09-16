@@ -9,6 +9,7 @@ import importlib
 import json
 import os
 import time
+from dataclasses import replace
 from hashlib import sha256
 
 import pytest
@@ -236,9 +237,13 @@ def test_live_driver_new_cursor_enforces_remaining_statement_timeout(catalog):
     assert catalog.read().results["COUNT"][0].row_count_exact == 3
 
 
-def test_live_catalog_count_lock_is_held_until_caller_settlement(catalog):
-    """A second physical session cannot insert after HEADER until read commit."""
+@pytest.mark.parametrize("empty", [False, True])
+def test_live_catalog_count_lock_is_held_until_caller_settlement(catalog, empty):
+    """A real non-COUNT lock probe retains its table lock, including no rows."""
     source = catalog.source
+    if empty:
+        with source.connection(autocommit=True) as admin:
+            admin.execute(f"DELETE FROM [{MODEL_SCHEMA}].[orders]")
     with source.connection("model", "metadata") as runtime:
         runtime.execute("SET NOCOUNT ON; IF @@TRANCOUNT=0 BEGIN TRANSACTION")
         cursor = runtime.execute(
@@ -260,4 +265,95 @@ def test_live_catalog_count_lock_is_held_until_caller_settlement(catalog):
                 writer.execute(f"INSERT INTO [{MODEL_SCHEMA}].[orders] VALUES (23)")
             runtime.commit()
             writer.execute(f"INSERT INTO [{MODEL_SCHEMA}].[orders] VALUES (23)")
-    assert catalog.read().results["COUNT"][0].row_count_exact == 4
+    assert catalog.read().results["COUNT"][0].row_count_exact == (1 if empty else 4)
+
+
+def test_live_foreign_dependency_metadata_deny_cannot_become_absence(catalog):
+    source = catalog.source
+    with source.connection(autocommit=True) as admin:
+        admin.execute("CREATE SCHEMA catalog_foreign AUTHORIZATION dbo")
+        admin.execute(f"CREATE VIEW catalog_foreign.incoming AS SELECT id FROM [{MODEL_SCHEMA}].[orders]")
+    with pytest.raises(PhysicalCatalogReadError):
+        catalog.read()
+    with source.connection(autocommit=True) as admin:
+        principal = admin.execute(
+            "SELECT name FROM sys.database_principals WHERE principal_id=?",
+            source.registration.principals.metadata.model.principal_id,
+        ).fetchone()[0]
+        quoted = "[" + principal.replace("]", "]]") + "]"
+        admin.execute("DENY VIEW DEFINITION ON OBJECT::catalog_foreign.incoming TO " + quoted)
+    # The incoming view may now be filtered from dependency catalog visibility.
+    # Runtime token DENY inventory must reject instead of claiming no dependency.
+    with pytest.raises(PhysicalCatalogReadError):
+        catalog.read()
+
+
+def test_live_temporal_and_float_catalog_dimensions(catalog):
+    """Real sys.columns settles storage-versus-catalog type dimension assumptions."""
+    source = catalog.source
+    types = [f"{base}({scale})" for base in ("time", "datetime2", "datetimeoffset") for scale in range(8)]
+    types.extend(f"float({precision})" for precision in (1, 24, 25, 53))
+    names = [f"c{index}" for index in range(len(types))]
+    ddl = ",".join(f"[{name}] {dtype} NULL" for name, dtype in zip(names, types, strict=True))
+    with source.connection(autocommit=True) as admin:
+        admin.execute(f"CREATE TABLE [{MODEL_SCHEMA}].[type_probe] ({ddl}) ON [PRIMARY]")
+        object_id, created = admin.execute(
+            "SELECT object_id,CONVERT(char(27),CONVERT(datetime2(7),create_date),126) "
+            "FROM sys.tables WHERE schema_id=SCHEMA_ID(?) AND name='type_probe'",
+            MODEL_SCHEMA,
+        ).fetchone()
+        observed = [
+            tuple(row)
+            for row in admin.execute(
+                "SELECT name,max_length,precision,scale FROM sys.columns WHERE object_id=? ORDER BY column_id",
+                object_id,
+            )
+        ]
+    spec = replace(
+        catalog.plan.spec,
+        relation=PhysicalRelation(source.databases["model"], MODEL_SCHEMA, "type_probe"),
+        columns=tuple(MssqlCatalogColumn(name, dtype, True) for name, dtype in zip(names, types, strict=True)),
+    )
+    plan = PhysicalModelPlan(catalog.plan.generation_id, spec, AbsentPredecessor())
+    reader = MssqlPhysicalCatalogReader(
+        connection_factory=lambda: source.connect("model", "metadata"),
+        registration=source.registration,
+        operation_timeout_seconds=20,
+        clock=time.monotonic,
+    )
+    try:
+        result = reader.read(
+            plan=plan,
+            executor_invocation_id=str(source.executor.invocation_id),
+            object_id=object_id,
+            expected_object_name="type_probe",
+            expected_object_create_time=created,
+        )
+    except PhysicalCatalogReadError as error:
+        pytest.fail(f"Synthetic SQL catalog dimensions {observed!r}; comparison failed: {error.__cause__}")
+    assert result.results["COUNT"][0].row_count_exact == 0
+
+
+@pytest.mark.parametrize("changed_profile", [False, True])
+def test_live_second_registration_cannot_replace_fixed_catalog_module(catalog, changed_profile):
+    """Current lifecycle limitation is explicit; no silent ALTER or new namespace."""
+    from uuid import uuid4
+
+    from dpone.contracts.native_identity import OriginalRef
+
+    source = catalog.source
+    second = replace(source.registration, registration_id=str(uuid4()))
+    if changed_profile:
+        second = replace(
+            second,
+            trusted_profile=replace(
+                second.trusted_profile, reference=OriginalRef("synthetic/second-profile", "sha256:" + "9" * 64)
+            ),
+        )
+    before = source.snapshot()
+    with pytest.raises(source.pyodbc.Error, match="MODULE|INVENTORY"):
+        catalog.provisioner.apply(
+            second, model_schema=MODEL_SCHEMA, model_schema_id=catalog.schema_id, model_schema_owner_id=1
+        )
+    assert source.snapshot() == before
+    assert catalog.read().results["COUNT"][0].row_count_exact == 3

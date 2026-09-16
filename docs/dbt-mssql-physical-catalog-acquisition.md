@@ -23,6 +23,11 @@ The current implementation does not resolve these originals on the caller's
 behalf. See [registration provisioning](dbt-mssql-physical-registration-provisioning.md)
 and the [source bridge](dbt-mssql-physical-source-bridge.md).
 
+The first cell requires a dedicated observer registration. Shared-observer modes
+remain unsupported because adding catalog execution to their shared identity would
+change its retained permission contract. No catalog grant is added to the
+dedicated observer.
+
 The initial engine cell is SQL Server 2022 on Linux x86-64 with the qualified ODBC
 connection boundary. Other catalog shapes have no fallback. Live certification
 must use the exact candidate, server build and driver versions; mocked tests do
@@ -121,11 +126,13 @@ sequenceDiagram
     participant SQL as Signed catalog module
     Caller->>Reader: Existing-object plan and registered generation
     Reader->>SQL: Source guard in one fresh transaction
-    Reader->>SQL: HEADER request
+    Reader->>SQL: COUNT request
     SQL->>SQL: Verify identity and visibility; reject RLS
     SQL->>SQL: COUNT_BIG with TABLOCK,HOLDLOCK
+    SQL-->>Reader: Exact count retained by reader
+    Reader->>SQL: First HEADER request
     SQL-->>Reader: Complete bounded HEADER
-    loop TABLE and six collections, then COUNT
+    loop TABLE and six collections
         Reader->>SQL: Fixed kind request, same transaction
         SQL-->>Reader: One complete bounded rowset
     end
@@ -136,7 +143,11 @@ sequenceDiagram
 ```
 
 The SQL producer revalidates the source on each request and keeps the count's
-shared table lock until transaction settlement. It checks every finite forbidden
+shared table lock until transaction settlement. COUNT runs once per acquisition;
+other kind calls use a real TOP(1) assignment with TABLOCK/HOLDLOCK to retain a
+safe lock when called independently, including on an empty table. Only HEADER
+materializes all collection counts; detail calls materialize their own collection.
+It checks every finite forbidden
 predicate before an empty marker can mean zero. Constraints, triggers, permissions,
 extended properties, user statistics, fulltext, change tracking, row security,
 legacy defaults/rules and unsupported table/column/index/partition state are
@@ -192,3 +203,19 @@ The complete journey still requires initial P-only preparation, authenticated
 bounds and plan membership, enrollment/materialization and independent receipts.
 See [physical plans](dbt-mssql-physical-plans.md) and
 [ADR 0065](adr/0065-trusted-isolated-native-generation-execution.md).
+
+## Current deployment lifetime limitation
+
+The fixed catalog module embeds one immutable registration ID/digest and its
+bounds. Repeating the same installation verifies it without repair. A second
+registration, even with the same policy, produces a different module definition
+and is rejected in the same control namespace. Changing the selected profile
+also rejects. The installer does not silently ALTER the module or create a
+schema per run.
+
+Consequently this component does not yet provide reusable multi-registration
+profile upgrades in one namespace. Do not prescribe namespace creation as an
+upgrade workaround. Closing the complete self-service journey requires an
+approved-compatible protected per-registration deployment projection or a finite
+versioned program/deployment lifecycle, with actual authentication and migration
+consumer tests. That integration decision is separate from this bounded reader.

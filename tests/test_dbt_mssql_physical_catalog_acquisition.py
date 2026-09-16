@@ -241,3 +241,21 @@ def test_each_statement_gets_new_cursor_with_remaining_driver_timeout():
     assert [cursor.timeout for cursor in created] == list(range(30, 18, -1))
     assert all(cursor.closed for cursor in created)
     assert ("commit",) in connection.events
+
+
+def test_exact_count_runs_once_before_first_header_in_same_transaction():
+    reader, connection, plan = make_reader()
+    read(reader, plan)
+    kinds = [event[2][-1] for event in connection.events if event[0] == "execute" and "physical_catalog_v1" in event[1]]
+    assert kinds == [
+        "COUNT",
+        "HEADER",
+        "TABLE",
+        "COLUMN",
+        "INDEX",
+        "INDEX_COLUMN",
+        "PARTITION",
+        "DEPENDENCY",
+        "FORBIDDEN_PROPERTY",
+        "HEADER",
+    ]
