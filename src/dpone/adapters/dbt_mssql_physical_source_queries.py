@@ -109,13 +109,21 @@ def _pin(namespace: str, schema: str) -> str:
 
 
 def source_procedures(
-    *, admission_sql: bytes, model_database: str, local_schema: str, control_database: str, control_schema: str
+    *,
+    admission_sql: bytes,
+    model_database: str,
+    local_schema: str,
+    control_database: str,
+    control_schema: str,
+    bridge_certificate_thumbprint: bytes,
 ) -> dict[str, str]:
     """Expand retained package bytes into the exact two deployed module bodies.
 
     The provisioner authenticates these package bytes before calling this pure
     function and records both the producer digest and separate expansion hashes.
     """
+    if type(bridge_certificate_thumbprint) is not bytes or len(bridge_certificate_thumbprint) != 20:
+        raise ValueError("bridge certificate requires the actual 20-byte SQL thumbprint")
     local, control = native_control_schema(local_schema), native_control_schema(control_schema)
     template = admission_sql.decode("utf-8")
     replacements = {
@@ -157,6 +165,12 @@ def source_procedures(
         ("BINDING_PROFILE_DIGEST", "@binding", "$.profile.sha256"),
     ):
         replacements[name] = utf8(scalar(document, path))
+    for namespace, kind in (("MODEL", "SPVC"), ("CONTROL", "CPVC")):
+        replacements[namespace + "_SIGNATURE"] = f"""IF
+ (SELECT COUNT(*) FROM sys.crypt_properties WHERE class=1 AND major_id=@@PROCID)<>1
+ OR NOT EXISTS (SELECT 1 FROM sys.crypt_properties WHERE class=1 AND major_id=@@PROCID
+ AND crypt_type='{kind}' AND thumbprint=0x{bridge_certificate_thumbprint.hex()})
+ THROW 51428, 'DPONE_PHYSICAL_SOURCE_SIGNATURE_INVALID', 1;"""
     replacements["REQUEST_SHAPE"] += shape(
         "JSON_QUERY(@json,'$.subject')", dict(schema=1, scope=1, authority=5, generation_id=1)
     )

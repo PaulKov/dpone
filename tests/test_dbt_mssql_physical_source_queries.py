@@ -19,6 +19,7 @@ def modules(**changes):
         local_schema="local_control",
         control_database="control",
         control_schema="native_control",
+        bridge_certificate_thumbprint=b"\x11" * 20,
     )
     arguments.update(changes)
     return source_procedures(**arguments)
@@ -34,6 +35,9 @@ def test_exact_modules_and_public_signature():
         assert "{{" not in body
         assert "@@TRANCOUNT<>1 OR XACT_STATE()<>1" in body
         assert "ORIGINAL_LOGIN()" in body
+        assert "major_id=@@PROCID" in body
+        assert "thumbprint=0x" + "11" * 20 in body
+        assert "DPONE_PHYSICAL_SOURCE_SIGNATURE_INVALID" in body
         assert "EXECUTE AS" not in body
         assert re.search(r"\b(COMMIT|ROLLBACK)\b|BEGIN TRANSACTION", body) is None
 
@@ -58,3 +62,5 @@ def test_coordinate_escaping_and_determinism():
         modules(control_schema="evil]; DROP TABLE x")
     with pytest.raises(ValueError):
         modules(admission_sql=b"{{unrecognized}}")
+    with pytest.raises(ValueError):
+        modules(bridge_certificate_thumbprint=b"short")
