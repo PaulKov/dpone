@@ -99,7 +99,7 @@ class _DiscoveryBoundary(MssqlPhysicalSourceSchemaProvisioner):
             cursor = connection.cursor()
             cursor.execute("SET NOCOUNT ON; SET XACT_ABORT ON; SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON;")
             self._context(cursor, value, "model")
-            self._binding(cursor, value, binding)
+            verify_catalog_binding_context(cursor, value, binding)
             thumbprints, existing = [], []
             for namespace in ("control", "model"):
                 self._context(cursor, value, namespace)
@@ -178,40 +178,6 @@ class _DiscoveryBoundary(MssqlPhysicalSourceSchemaProvisioner):
         cursor.execute(f"""IF ISNULL(HAS_PERMS_BY_NAME(NULL,NULL,'CONTROL SERVER'),0)<>1
  OR EXISTS (SELECT 1 FROM sys.server_principals WHERE sid=(SELECT sid FROM sys.certificates WHERE name=N'{self._certificate}'))
  THROW 51490,'DPONE_DISCOVERY_CONTEXT_UNSAFE',1;""")
-
-    def _binding(
-        self, cursor: SqlControlCursor, value: MssqlPhysicalRuntimeRegistration, binding: CatalogRegistrationBinding
-    ) -> None:
-        verify_registration_context(cursor, value, value.local_schema, write=False)
-        cursor.execute(verify_binding_table_sql(value.local_schema))
-        cursor.execute(verify_binding_protection_sql(value.local_schema, value))
-        cursor.execute(
-            f"SELECT registration_digest,payload,binding_digest FROM [{value.local_schema}].[{TABLE}] WITH (HOLDLOCK) WHERE registration_id=?",
-            value.registration_id,
-        )
-        row = dbapi_lifecycle.row(cursor)
-        expected = (
-            binding.registration_sha256.encode("ascii"),
-            encode_catalog_binding(binding),
-            catalog_binding_digest(binding).encode("ascii"),
-        )
-        if row != expected or dbapi_lifecycle.row(cursor) is not None:
-            raise RuntimeError("discovery requires the exact protected catalog binding")
-        cursor.execute(
-            f"""DECLARE @schema sysname=?,@id int=?,@owner int=?,@hash varchar(71)=?;
-IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE schema_id=@id AND principal_id=@owner
- AND CONVERT(varbinary(max),name)=CONVERT(varbinary(max),@schema) AND DATALENGTH(name)=DATALENGTH(@schema))
- OR SCHEMA_ID(N'{value.local_schema}')=@id OR SCHEMA_ID(N'{value.control_schema}')=@id OR @id IN (1,3,4)
- OR NOT EXISTS (SELECT 1 FROM sys.procedures p JOIN sys.sql_modules m ON m.object_id=p.object_id
- JOIN sys.schemas s ON s.schema_id=p.schema_id WHERE p.object_id=OBJECT_ID(N'[{value.local_schema}].[physical_catalog_v2]',N'P')
- AND s.principal_id=1 AND COALESCE(p.principal_id,s.principal_id)=1 AND m.execute_as_principal_id IS NULL
- AND 'sha256:'+LOWER(CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(varbinary(max),m.definition)),2))=@hash)
- THROW 51491,'DPONE_DISCOVERY_BINDING_DEPLOYMENT_MISMATCH',1;""",
-            binding.model_schema,
-            binding.model_schema_id,
-            binding.model_schema_owner_id,
-            binding.catalog_module_sha256,
-        )
 
     def _names(self, cursor: SqlControlCursor, value: MssqlPhysicalRuntimeRegistration, namespace: str) -> list[str]:
         schema, module = self._location(value, namespace)
@@ -308,3 +274,46 @@ IF @user IS NULL OR NOT EXISTS (SELECT 1 FROM sys.database_principals p JOIN sys
  OR EXISTS (SELECT * FROM (VALUES {expected}) e(u,p,s,m) EXCEPT {actual})
  OR EXISTS (SELECT 1 FROM sys.objects WHERE schema_id=SCHEMA_ID(N'{schema}') AND COALESCE(principal_id,1)<>1)
  THROW 51494,'DPONE_DISCOVERY_GRANT_INVENTORY_MISMATCH',1;""")
+
+
+def verify_catalog_binding_context(
+    cursor: SqlControlCursor, value: MssqlPhysicalRuntimeRegistration, binding: CatalogRegistrationBinding
+) -> None:
+    """Verify protected registration/binding bytes and pinned schema/catalog body.
+
+    The caller supplies a privileged pinned model-DB cursor and authenticated
+    expectations; constructed arguments confer no authority. Registration
+    preflight preserves its SET and conditional BEGIN behavior. Retained read
+    locks belong to the caller's transaction; this helper neither commits nor
+    closes it. It grants nothing and leaves all existing inventories unchanged.
+    """
+    verify_registration_context(cursor, value, value.local_schema, write=False)
+    cursor.execute(verify_binding_table_sql(value.local_schema))
+    cursor.execute(verify_binding_protection_sql(value.local_schema, value))
+    cursor.execute(
+        f"SELECT registration_digest,payload,binding_digest FROM [{value.local_schema}].[{TABLE}] WITH (HOLDLOCK) WHERE registration_id=?",
+        value.registration_id,
+    )
+    row = dbapi_lifecycle.row(cursor)
+    expected = (
+        binding.registration_sha256.encode("ascii"),
+        encode_catalog_binding(binding),
+        catalog_binding_digest(binding).encode("ascii"),
+    )
+    if row != expected or dbapi_lifecycle.row(cursor) is not None:
+        raise RuntimeError("discovery requires the exact protected catalog binding")
+    cursor.execute(
+        f"""DECLARE @schema sysname=?,@id int=?,@owner int=?,@hash varchar(71)=?;
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE schema_id=@id AND principal_id=@owner
+ AND CONVERT(varbinary(max),name)=CONVERT(varbinary(max),@schema) AND DATALENGTH(name)=DATALENGTH(@schema))
+ OR SCHEMA_ID(N'{value.local_schema}')=@id OR SCHEMA_ID(N'{value.control_schema}')=@id OR @id IN (1,3,4)
+ OR NOT EXISTS (SELECT 1 FROM sys.procedures p JOIN sys.sql_modules m ON m.object_id=p.object_id
+ JOIN sys.schemas s ON s.schema_id=p.schema_id WHERE p.object_id=OBJECT_ID(N'[{value.local_schema}].[physical_catalog_v2]',N'P')
+ AND s.principal_id=1 AND COALESCE(p.principal_id,s.principal_id)=1 AND m.execute_as_principal_id IS NULL
+ AND 'sha256:'+LOWER(CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(varbinary(max),m.definition)),2))=@hash)
+ THROW 51491,'DPONE_DISCOVERY_BINDING_DEPLOYMENT_MISMATCH',1;""",
+        binding.model_schema,
+        binding.model_schema_id,
+        binding.model_schema_owner_id,
+        binding.catalog_module_sha256,
+    )

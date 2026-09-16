@@ -19,7 +19,7 @@ show the rendering API; it is not an executable enrollment or provisioning input
 ```python
 from hashlib import sha256
 
-from dpone.adapters.dbt_mssql_physical_rendering import (
+from dpone.contracts.dbt_mssql_physical_rendering import (
     render_candidate_create,
     render_candidate_layout,
 )

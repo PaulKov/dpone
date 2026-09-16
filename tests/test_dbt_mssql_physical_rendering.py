@@ -4,8 +4,8 @@ from dataclasses import replace
 
 import pytest
 
-from dpone.adapters.dbt_mssql_physical_rendering import render_candidate_create, render_candidate_layout
 from dpone.contracts.dbt_mssql_physical import PhysicalFilegroup, PhysicalRelation
+from dpone.contracts.dbt_mssql_physical_rendering import render_candidate_create, render_candidate_layout
 from dpone.contracts.dbt_mssql_physical_validation import PhysicalPlanError
 from dpone.contracts.dbt_mssql_physical_wire import decode_physical_plan_set
 from dpone.contracts.mssql_type_contract import MssqlCatalogColumn

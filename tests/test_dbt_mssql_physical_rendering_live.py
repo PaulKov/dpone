@@ -16,7 +16,6 @@ from uuid import uuid4
 
 import pytest
 
-from dpone.adapters.dbt_mssql_physical_rendering import render_candidate_create, render_candidate_layout
 from dpone.contracts.dbt_mssql_physical import (
     AbsentPredecessor,
     PhysicalFilegroup,
@@ -24,6 +23,7 @@ from dpone.contracts.dbt_mssql_physical import (
     PhysicalModelSpec,
     PhysicalRelation,
 )
+from dpone.contracts.dbt_mssql_physical_rendering import render_candidate_create, render_candidate_layout
 from dpone.contracts.mssql_object_name import quote_mssql_identifier
 from dpone.contracts.mssql_type_contract import MssqlCatalogColumn
 from dpone.contracts.native_identity import OriginalRef

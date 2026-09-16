@@ -34,6 +34,16 @@ is `physical_control_require_owner_v1`. The helper has OUTPUT parameters only.
 Installation coordinates are authenticated by the platform owner; passing typed
 Python values to the renderer does not authenticate them.
 
+Platform provisioners can reuse `verify_catalog_binding_context(cursor, value,
+binding)` from `dpone.adapters.dbt_mssql_physical_discovery_schema`. Supply a
+privileged cursor already pinned to the model database and authenticated
+registration/binding expectations. The helper checks protected registration and
+binding bytes, their existing permission inventories, the model schema and the
+installed catalog-v2 digest. It preserves the registration preflight's SET and
+conditional BEGIN behavior; the caller retains the locks and owns commit,
+rollback and connection cleanup. It neither installs objects nor grants rights,
+and constructed inputs do not establish upstream authentication.
+
 ## Construct and read a request
 
 The following function accepts already authenticated application inputs. Its

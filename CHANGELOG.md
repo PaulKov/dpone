@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Expose the existing protected catalog-binding verification for composing
+  platform provisioners without private discovery subclasses. Preserve exact
+  SQL, permissions and caller-owned transaction settlement.
+
 - Validate physical plans against bounded retained dbt manifests and the complete
   selected model set before enrollment. Preserve column order, resolved targets,
   layout and nullability checks; incomplete managed-source and character-collation
