@@ -263,3 +263,44 @@ def test_cancellation_is_not_retried_or_returned_as_acknowledged_deployment():
     with pytest.raises(KeyboardInterrupt):
         real_provisioner(connection).apply(registration, binding)
     assert connection.events == ["commit", "rollback", "close", "close"]
+
+
+@pytest.mark.parametrize(
+    "identities",
+    [(b"e" * 20,) * 4, (b"e" * 20, b"c" * 20, b"x" * 20, b"c" * 20), (b"e" * 20, b"c" * 20, b"e" * 20, b"x" * 20)],
+)
+def test_full_apply_conflicting_certificate_identities_reject_before_ddl(identities):
+    registration, binding = installed_fixture()
+    connection = deployment_connection(registration, binding, thumbprints=[[(value,)] for value in identities])
+    with pytest.raises(RuntimeError, match="identities"):
+        real_provisioner(connection).apply(registration, binding)
+    assert connection.events == ["rollback", "close", "close"]
+    assert not any(sql.startswith(("CREATE", "GRANT", "ADD")) for sql, _ in connection.statements)
+
+
+@pytest.mark.parametrize("mutation", ["registration", "binding-absent", "binding-conflict"])
+def test_full_apply_requires_actual_protected_rows_before_any_ddl(mutation):
+    registration, binding = installed_fixture()
+    options = (
+        {"stored_registration": ("other",)}
+        if mutation == "registration"
+        else {"stored_binding": () if mutation == "binding-absent" else (b"wrong", b"wrong", b"wrong")}
+    )
+    connection = deployment_connection(registration, binding, **options)
+    with pytest.raises(RuntimeError):
+        real_provisioner(connection).apply(registration, binding)
+    assert connection.events == ["rollback", "close", "close"]
+    assert not any(sql.startswith(("CREATE", "GRANT", "ADD")) for sql, _ in connection.statements)
+
+
+def test_full_apply_table_inventory_drift_prevents_acknowledgement():
+    from tests.test_dbt_mssql_physical_enrollment_tables import inventory
+
+    registration, binding = installed_fixture()
+    connection = deployment_connection(registration, binding, existing=True)
+    rows = inventory()
+    rows[1].pop()
+    connection.table_rows = iter(rows)
+    with pytest.raises(RuntimeError, match="table inventory"):
+        real_provisioner(connection).apply(registration, binding)
+    assert connection.events == ["rollback", "close", "close"]
