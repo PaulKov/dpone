@@ -151,7 +151,8 @@ def test_tutorial_model_passes_real_parse_check_and_explain(tmp_path: Path) -> N
     assert text.returncode == 0, text.stdout + text.stderr
     assert text.stderr == ""
     assert "dbt -> dpone publish: PASS" in text.stdout
-    assert "published models: 1; workflows: 1" in text.stdout
+    assert "validated publishing models: 1; workflows: 1" in text.stdout
+    assert "published models:" not in text.stdout
     assert _tree_hashes(project) == before
 
 
