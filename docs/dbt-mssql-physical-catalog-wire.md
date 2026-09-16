@@ -183,3 +183,10 @@ from a baseline-valid case. No synthetic test is SQL visibility/transaction proo
 
 [Native execution overview](native-generation-execution.md) ·
 [Architecture decision](adr/0065-trusted-isolated-native-generation-execution.md)
+
+## Executable acquisition and comparison
+
+The [catalog acquisition guide](dbt-mssql-physical-catalog-acquisition.md) describes
+the separate signed SQL producer, bounded incremental reader, exact structural
+comparison and operator recovery. These consumers enforce additional invariants;
+wire decoding alone still grants no visibility, admission or execution authority.
