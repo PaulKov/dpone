@@ -52,6 +52,8 @@ class MssqlPhysicalCatalogReader:
     authentication. The factory supplies a fresh ordinary METADATA/BUILD login,
     qualified finite connect timeout and nextset/statement-timeout capability.
     No observer, administrator or impersonated connection is admitted.
+    The default version 1 preserves existing deployments. Explicit version 2
+    requires the new protected binding and selected profile resource reference.
 
     The supplied local plan is compared, not authenticated for membership or
     resource authority. This post-G reader cannot prepare the P-only plan that
@@ -65,11 +67,16 @@ class MssqlPhysicalCatalogReader:
         registration: MssqlPhysicalRuntimeRegistration,
         operation_timeout_seconds: int,
         clock: Callable[[], float],
+        catalog_version: int = 1,
     ) -> None:
         if type(registration) is not MssqlPhysicalRuntimeRegistration:
             raise ValueError("catalog requires an exact registration")
         registration.__post_init__()
         require_sql_positive_integer(operation_timeout_seconds, "operation_timeout_seconds")
+        if type(catalog_version) is not int or catalog_version not in (1, 2):
+            raise ValueError("catalog version must explicitly select 1 or 2")
+        self._entry = f"physical_catalog_v{catalog_version}"
+        self._version = catalog_version
         self._connect, self._registration = connection_factory, registration
         self._timeout, self._clock = operation_timeout_seconds, clock
         self._schema = native_control_schema(registration.local_schema)
@@ -100,6 +107,8 @@ class MssqlPhysicalCatalogReader:
         require_physical_timestamp(expected_object_create_time, "expected_object_create_time")
         if plan.spec.relation.database != self._registration.model_database.database_name:
             raise ValueError("plan database differs from registered database")
+        if self._version == 2 and plan.spec.resource_bounds != self._registration.trusted_profile.reference:
+            raise ValueError("catalog resource bounds differ from the selected profile projection")
         limits = self._registration.limits
         budget = CatalogReadBudget(self._clock() + self._timeout, limits.max_metadata_bytes, self._clock)
         connection: PhysicalCatalogConnection | None = None
@@ -137,7 +146,7 @@ class MssqlPhysicalCatalogReader:
                 connection.timeout = budget.seconds()
                 cursor = connection.cursor()
                 cursor.execute(
-                    f"EXEC [{self._schema}].[physical_catalog_v1] @registration_id=?, @generation=?, "
+                    f"EXEC [{self._schema}].[{self._entry}] @registration_id=?, @generation=?, "
                     "@expected_invocation=?, @object_id=?, @kind=?",
                     self._registration.registration_id,
                     plan.generation_id,

@@ -166,3 +166,60 @@ def test_native_template_reuses_invocation_target_rejection(invalid):
     }
     with pytest.raises((ValueError, DbtPublishingError)):
         validate_native_policy_v4(encode_native_delivery_json(value), max_bytes=1024 * 1024)
+
+
+def catalog_policy():
+    value = native_policy()
+    value["profiles"]["local"]["native_execution"]["physical_catalog_limits"] = {
+        "max_catalog_rows": 1000,
+        "max_definition_utf16_bytes": 65536,
+        "max_dependency_rows": 1000,
+        "max_columns": 256,
+    }
+    return value
+
+
+def test_explicit_catalog_limits_are_optional_and_retained_without_defaults():
+    legacy = native_policy()
+    decoded = validate_native_policy_v4(encode_native_delivery_json(legacy), max_bytes=1024 * 1024)
+    assert "physical_catalog_limits" not in decoded["profiles"]["local"]["native_execution"]
+    value = catalog_policy()
+    assert validate_native_policy_v4(encode_native_delivery_json(value), max_bytes=1024 * 1024) == value
+
+
+@pytest.mark.parametrize(
+    "field", ["max_catalog_rows", "max_definition_utf16_bytes", "max_dependency_rows", "max_columns"]
+)
+@pytest.mark.parametrize("invalid", [None, True, 0, -1, 2147483648])
+def test_catalog_policy_limits_require_explicit_sql_integers(field, invalid):
+    value = catalog_policy()
+    value["profiles"]["local"]["native_execution"]["physical_catalog_limits"][field] = invalid
+    with pytest.raises(ValueError):
+        validate_native_policy_v4(encode_native_delivery_json(value), max_bytes=1024 * 1024)
+
+
+@pytest.mark.parametrize("mode", ["missing", "unknown", "dependencies", "columns", "null"])
+def test_catalog_policy_limits_are_closed_and_cross_checked(mode):
+    value = catalog_policy()
+    native = value["profiles"]["local"]["native_execution"]
+    limits = native["physical_catalog_limits"]
+    if mode == "missing":
+        del limits["max_catalog_rows"]
+    elif mode == "unknown":
+        limits["unbounded"] = True
+    elif mode == "dependencies":
+        limits["max_dependency_rows"] = limits["max_catalog_rows"] + 1
+    elif mode == "columns":
+        limits["max_columns"] = 255
+    else:
+        native["physical_catalog_limits"] = None
+    with pytest.raises(ValueError):
+        validate_native_policy_v4(encode_native_delivery_json(value), max_bytes=1024 * 1024)
+
+
+def test_catalog_policy_limits_accept_explicit_sql_upper_bound():
+    value = catalog_policy()
+    limits = value["profiles"]["local"]["native_execution"]["physical_catalog_limits"]
+    for name in ("max_catalog_rows", "max_definition_utf16_bytes", "max_dependency_rows"):
+        limits[name] = 2147483647
+    assert validate_native_policy_v4(encode_native_delivery_json(value), max_bytes=1024 * 1024) == value

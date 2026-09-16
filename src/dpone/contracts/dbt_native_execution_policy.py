@@ -128,8 +128,19 @@ def native_execution_schema() -> dict[str, Any]:
                 },
             ),
             "limits": object_schema(limit_names, limits),
+            "physical_catalog_limits": _physical_catalog_limits_schema(),
         },
     )
+
+
+def _physical_catalog_limits_schema() -> dict[str, Any]:
+    """Explicit platform allocation choices; presence does not certify a route."""
+    properties = {
+        name: {**_POSITIVE, "maximum": 2147483647}
+        for name in ("max_catalog_rows", "max_definition_utf16_bytes", "max_dependency_rows")
+    }
+    properties["max_columns"] = {"type": "integer", "const": 256}
+    return object_schema(tuple(properties), properties)
 
 
 def validate_native_execution_policy(value: dict[str, Any], *, serialized_payload_max_bytes: int | None) -> None:
@@ -149,6 +160,9 @@ def validate_native_execution_policy(value: dict[str, Any], *, serialized_payloa
             "limits",
         )
     )
+    catalog = value.get("physical_catalog_limits")
+    if catalog is not None and catalog["max_dependency_rows"] > catalog["max_catalog_rows"]:
+        raise ValueError("physical catalog dependency limit exceeds its catalog row ceiling")
     native_control_schema(control["schema"])
     _reference(control["authority"])
     authority_ref = _reference(originals["authority"])

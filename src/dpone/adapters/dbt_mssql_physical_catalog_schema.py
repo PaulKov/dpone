@@ -1,7 +1,7 @@
 """Privileged deployment of the separate finite catalog permission boundary.
 
-Before calling apply, the platform owner MUST authenticate retained profile
-bytes/digest and their model-schema selection against the registration's profile
+Before calling apply, the platform owner MUST authenticate the retained policy
+projection and its model-schema selection against the registration's profile
 reference and PLATFORM subject. DTO validation cannot establish that authority.
 The owner also excludes concurrent privileged DDL and supplies a fresh CONTROL
 SERVER connection with the pre-existing catalog certificate private key usable.
@@ -17,8 +17,10 @@ from hashlib import sha256
 from dpone.adapters import dbapi_lifecycle
 from dpone.adapters.dbt_mssql_physical_catalog_queries import ENTRY, catalog_procedure
 from dpone.adapters.dbt_mssql_physical_source_schema import module_inventory_sql, principal_inventory_sql
-from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntimeRegistration
-from dpone.contracts.dbt_mssql_physical_registration_codec import encode_physical_runtime_registration
+from dpone.contracts.dbt_mssql_physical_registration import (
+    MssqlPhysicalRuntimeRegistration,
+    encode_physical_runtime_registration,
+)
 from dpone.contracts.dbt_mssql_physical_registration_values import DedicatedObserver
 from dpone.contracts.mssql_object_name import native_control_schema, quote_mssql_identifier
 from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
@@ -45,6 +47,8 @@ class MssqlPhysicalCatalogSchemaProvisioner:
     Commit uncertainty produces no report and is never retried automatically.
     """
 
+    _entry = ENTRY
+
     def __init__(
         self,
         *,
@@ -70,10 +74,45 @@ class MssqlPhysicalCatalogSchemaProvisioner:
         model_schema_id: int,
         model_schema_owner_id: int,
     ) -> CatalogDeploymentObservation:
+        """Install absent or verify existing exact inventory without repair."""
+        return self._apply(
+            registration,
+            model_schema=model_schema,
+            model_schema_id=model_schema_id,
+            model_schema_owner_id=model_schema_owner_id,
+            allow_create=True,
+        )
+
+    def verify(
+        self,
+        registration: MssqlPhysicalRuntimeRegistration,
+        *,
+        model_schema: str,
+        model_schema_id: int,
+        model_schema_owner_id: int,
+    ) -> CatalogDeploymentObservation:
+        """Read-only independent inventory observation; absence never installs."""
+        return self._apply(
+            registration,
+            model_schema=model_schema,
+            model_schema_id=model_schema_id,
+            model_schema_owner_id=model_schema_owner_id,
+            allow_create=False,
+        )
+
+    def _apply(
+        self,
+        registration: MssqlPhysicalRuntimeRegistration,
+        *,
+        model_schema: str,
+        model_schema_id: int,
+        model_schema_owner_id: int,
+        allow_create: bool,
+    ) -> CatalogDeploymentObservation:
         """Observe deployment only after external authentication and acknowledged commit.
 
-        Schema name/ID/owner must come from the authenticated retained profile
-        deployment, not arbitrary caller selection. The first cell requires dbo
+        Schema selection must come from the authenticated retained policy; ID/owner
+        come from its observed deployment, not arbitrary caller selection. The first cell requires dbo
         ownership (principal 1) of an existing dedicated model-data schema, and
         a dedicated observer. Shared observation needs a separately authenticated
         permission contract accounting for the new catalog EXECUTE grant.
@@ -106,32 +145,37 @@ class MssqlPhysicalCatalogSchemaProvisioner:
             thumbprint = self._one(cursor)
             if type(thumbprint) is not bytes or len(thumbprint) != 20:
                 raise RuntimeError("catalog certificate thumbprint is malformed")
-            definition = catalog_procedure(
+            definition = self._definition(
                 registration,
-                catalog_sql=self._sql,
                 model_schema=model_schema,
                 model_schema_id=model_schema_id,
                 model_schema_owner_id=model_schema_owner_id,
                 catalog_certificate_thumbprint=thumbprint,
             )
             schema = registration.local_schema
-            cursor.execute("SELECT OBJECT_ID(?)", f"[{schema}].[{ENTRY}]")
+            cursor.execute("SELECT OBJECT_ID(?)", f"[{schema}].[{self._entry}]")
             existing = self._one(cursor) is not None
+            if not existing and not allow_create:
+                raise RuntimeError("catalog deployment is absent during read-only verification")
             names = self._runtime(cursor, registration, model_schema)
             self._signatures(cursor, schema, complete=existing)
             if not existing:
                 cursor.execute(definition)
-            cursor.execute(module_inventory_sql(schema, ENTRY, self._certificate, "SPVC"), definition)
+            cursor.execute(module_inventory_sql(schema, self._entry, self._certificate, "SPVC"), definition)
             self._certificate_user(cursor, model_schema, create=not existing)
             if not existing:
-                cursor.execute(f"ADD SIGNATURE TO OBJECT::[{schema}].[{ENTRY}] BY CERTIFICATE [{self._certificate}];")
+                cursor.execute(
+                    f"ADD SIGNATURE TO OBJECT::[{schema}].[{self._entry}] BY CERTIFICATE [{self._certificate}];"
+                )
                 for name in names:
-                    cursor.execute(f"GRANT EXECUTE ON OBJECT::[{schema}].[{ENTRY}] TO {quote_mssql_identifier(name)};")
+                    cursor.execute(
+                        f"GRANT EXECUTE ON OBJECT::[{schema}].[{self._entry}] TO {quote_mssql_identifier(name)};"
+                    )
             self._signatures(cursor, schema, complete=True)
             self._grants(cursor, registration)
             self._certificate_user(cursor, model_schema, create=False)
             self._runtime(cursor, registration, model_schema)
-            cursor.execute(module_inventory_sql(schema, ENTRY, self._certificate, "SPVC"), definition)
+            cursor.execute(module_inventory_sql(schema, self._entry, self._certificate, "SPVC"), definition)
             connection.commit()
             return CatalogDeploymentObservation(
                 model_schema,
@@ -146,6 +190,25 @@ class MssqlPhysicalCatalogSchemaProvisioner:
         finally:
             dbapi_lifecycle.close(cursor)
             dbapi_lifecycle.close(connection)
+
+    def _definition(
+        self,
+        registration: MssqlPhysicalRuntimeRegistration,
+        *,
+        model_schema: str,
+        model_schema_id: int,
+        model_schema_owner_id: int,
+        catalog_certificate_thumbprint: bytes,
+    ) -> str:
+        """Select immutable v1 rendering; v2 overrides this finite program seam."""
+        return catalog_procedure(
+            registration,
+            catalog_sql=self._sql,
+            model_schema=model_schema,
+            model_schema_id=model_schema_id,
+            model_schema_owner_id=model_schema_owner_id,
+            catalog_certificate_thumbprint=catalog_certificate_thumbprint,
+        )
 
     @staticmethod
     def _one(cursor: SqlControlCursor) -> object:
@@ -207,7 +270,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.certificates WHERE name=N'{self._certificate}' 
         for mapping in mappings:
             principal = mapping.model
             cursor.execute(
-                principal_inventory_sql(value.local_schema, ENTRY, model=True),
+                principal_inventory_sql(value.local_schema, self._entry, model=True),
                 principal.principal_id,
                 bytes.fromhex(principal.sid_hex),
             )
@@ -235,7 +298,7 @@ IF EXISTS (SELECT 1 FROM sys.server_permissions WHERE state='D'
         return names[:2]
 
     def _signatures(self, cursor: SqlControlCursor, schema: str, *, complete: bool) -> None:
-        expected = f"OBJECT_ID(N'[{schema}].[{ENTRY}]')"
+        expected = f"OBJECT_ID(N'[{schema}].[{self._entry}]')"
         missing = (
             f"OR NOT EXISTS (SELECT 1 FROM sys.crypt_properties WHERE class=1 AND major_id={expected} AND crypt_type='SPVC' AND thumbprint=@thumbprint)"
             if complete
@@ -273,7 +336,7 @@ IF @user IS NULL OR NOT EXISTS (SELECT 1 FROM sys.database_principals p JOIN sys
     def _grants(self, cursor: SqlControlCursor, value: MssqlPhysicalRuntimeRegistration) -> None:
         principals = f"{value.principals.metadata.model.principal_id},{value.principals.build.model.principal_id}"
         cursor.execute(f"""IF (SELECT COUNT(*) FROM sys.database_permissions WHERE class=1
- AND major_id=OBJECT_ID(N'[{value.local_schema}].[{ENTRY}]'))<>2
- OR EXISTS (SELECT 1 FROM sys.database_permissions WHERE class=1 AND major_id=OBJECT_ID(N'[{value.local_schema}].[{ENTRY}]')
+ AND major_id=OBJECT_ID(N'[{value.local_schema}].[{self._entry}]'))<>2
+ OR EXISTS (SELECT 1 FROM sys.database_permissions WHERE class=1 AND major_id=OBJECT_ID(N'[{value.local_schema}].[{self._entry}]')
  AND NOT (minor_id=0 AND state='G' AND permission_name='EXECUTE' AND grantee_principal_id IN ({principals})))
  THROW 51467,'DPONE_CATALOG_GRANT_MISMATCH',1;""")

@@ -119,7 +119,7 @@ class CatalogConnection:
         if "physical_require_source_v1" in sql:
             self.kind = "SOURCE"
             self.pending = iter([self.source])
-        elif "physical_catalog_v1" in sql:
+        elif "physical_catalog_v1" in sql or "physical_catalog_v2" in sql:
             self.kind = parameters[-1]
             if self.failure == self.kind:
                 raise RuntimeError("synthetic query fault")

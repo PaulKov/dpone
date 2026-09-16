@@ -11,13 +11,13 @@ from uuid import UUID
 
 from tools.dbt_self_service.starter_resource_journal_schema import (
     MAX_EVENT_BYTES,
-    MAX_LOG_BYTES,
     MAX_RESOURCE_BYTES,
     METADATA_ROOT,
     RESOURCE_PATHS,
+    manifest_log_limit,
+    read_manifest_events,
     validate_sidecar,
 )
-from tools.dbt_self_service.starter_resource_journal_schema import read_events as _read_events
 from tools.dbt_self_service.starter_resource_journal_schema import validate_manifest as _validate_manifest
 
 from dpone.contracts.strict_json import strict_json_object
@@ -63,7 +63,7 @@ def recovery_report(root: Path) -> RecoveryReport:
     return replace(
         batch,
         pending=True,
-        status="RECOVERY_REQUIRED",
+        status="INVALID" if batch.status == "INVALID" else "RECOVERY_REQUIRED",
         discovery_required=True,
         paths=tuple(dict.fromkeys((*batch.paths, *paths))),
     )
@@ -121,8 +121,11 @@ def _batch_report(root: Path) -> RecoveryReport:
                 read_confined_leaf(parent.descriptor, "manifest.json", max_bytes=MAX_RESOURCE_BYTES).content
             )
             _validate_manifest(manifest, operation, identity.device, identity.inode)
-            content = read_confined_leaf(parent.descriptor, "events.jsonl", max_bytes=MAX_LOG_BYTES).content
-        events = _read_events(content, operation)
+            content = read_confined_leaf(
+                parent.descriptor, "events.jsonl", max_bytes=manifest_log_limit(manifest["schema"])
+            ).content
+        events = read_manifest_events(content, operation, manifest["schema"])
+        resource_indices = {entry["path"]: index for index, entry in enumerate(manifest["entries"])}
         unresolved: set[str] = set()
         observations = []
         recovery_paths: list[str] = []
@@ -146,7 +149,7 @@ def _batch_report(root: Path) -> RecoveryReport:
                 unresolved.discard(event["path"])
             if "identity" in event:
                 artifact = event.get("artifact", "target")
-                index = next(index for index, entry in enumerate(manifest["entries"]) if entry["path"] == event["path"])
+                index = resource_indices[event["path"]]
                 target = PurePosixPath(event["path"])
                 if artifact in {"backup", "staging"}:
                     kind = "old" if artifact == "backup" else "new"
@@ -163,7 +166,7 @@ def _batch_report(root: Path) -> RecoveryReport:
             True,
             events[-1]["phase"] if events else "PREPARING",
             operation,
-            tuple(dict.fromkeys((directory.as_posix(), *RESOURCE_PATHS, *recovery_paths))),
+            tuple(dict.fromkeys((directory.as_posix(), *resource_indices, *recovery_paths))),
             tuple(sorted(unresolved)),
             tuple(observations),
             tuple(outcomes),
@@ -216,7 +219,7 @@ def _verify_backups(
                 if PurePosixPath(path).parent == PurePosixPath(directory / kind)
             }
             with os.scandir(parent.descriptor) as scan:
-                names = [entry.name for entry in islice(scan, len(RESOURCE_PATHS) + len(retained) + 1)]
+                names = [entry.name for entry in islice(scan, len(manifest["entries"]) + len(retained) + 1)]
             if not set(names) <= set(expected) | retained:
                 raise ValueError(_ERROR)
             for name in names:

@@ -40,7 +40,7 @@ def test_real_service_dry_run_and_apply_outputs(tmp_path, capsys, synthetic_reso
     assert "synthetic package fixture" not in stdout
     if fmt == "json":
         payload = json.loads(stdout)
-        assert payload["passed"] and len(payload["changes"]) == 23
+        assert payload["passed"] and len(payload["changes"]) == 24
         assert payload["dry_run"] is dry_run
         if dry_run:
             assert shlex.split(payload["next_command"])[0:4] == ["dpone", "init", "dbt", str(target)]

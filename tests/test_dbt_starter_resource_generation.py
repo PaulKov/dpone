@@ -317,7 +317,7 @@ def test_exact_committed_inventory_and_bytes(source):
     captured = capture_package_source(repo, revision)
     assert captured.revision == revision
     assert dict(captured.files) == {name: (repo / "packages/dbt-dpone" / name).read_bytes() for name in PACKAGE_FILES}
-    assert len(captured.files) == 14
+    assert len(captured.files) == 15
     assert git(repo, "status", "--porcelain") == ""
 
 
@@ -355,7 +355,7 @@ def test_executable_regular_blob_is_supported(source):
     (repo / "packages/dbt-dpone/INSTALL.md").chmod(0o755)
     git(repo, "add", ".")
     git(repo, "commit", "-qm", "Synthetic executable regular blob")
-    assert len(capture_package_source(repo, git(repo, "rev-parse", "HEAD")).files) == 14
+    assert len(capture_package_source(repo, git(repo, "rev-parse", "HEAD")).files) == 15
 
 
 def test_unrelated_working_changes_do_not_invalidate_package(source):

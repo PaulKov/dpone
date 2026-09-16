@@ -28,6 +28,7 @@ _PACKAGE_FILES = (
     "control/sqlserver/physical-v1/admission.sql",
     "control/sqlserver/physical-v1/catalog.sql",
     "control/sqlserver/physical-v1/receipt.sql",
+    "control/sqlserver/physical-v1/catalog-v2.sql",
 )
 _STARTER_FILES = (
     ("dbt_project.yml.tmpl", "dbt_project.yml"),
@@ -43,11 +44,11 @@ _INVALID = "The installed dbt starter resource inventory is incomplete or invali
 
 
 class InstalledDbtStarterResources:
-    """Read 22 immutable resources into their intended project-relative paths.
+    """Read 23 immutable resources into their intended project-relative paths.
 
     The six template outputs remain unrendered. The authoring service performs
     explicit placeholder substitution and adds the supplied policy snapshot as
-    the twenty-third file. Construction performs no lookup or I/O.
+    the twenty-fourth file. Construction performs no lookup or I/O.
     """
 
     def files(self) -> tuple[ScaffoldFile, ...]:

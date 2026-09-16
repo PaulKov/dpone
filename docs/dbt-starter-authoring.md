@@ -51,8 +51,8 @@ dpone init dbt ./orders-project \
   --workflow=orders --format=json
 ```
 
-A complete successful plan covers 23 files: six rendered starter files,
-`packages.yml`, `package-lock.yml`, fourteen files under
+A complete successful plan covers 24 files: six rendered starter files,
+`packages.yml`, `package-lock.yml`, fifteen files under
 `dbt_packages/dbt_dpone`, and the captured policy at
 `dpone/dbt-publish-profiles.yml`. The supplied policy bytes are retained. Existing
 identical files are no-ops; a differing file rejects the whole planned write

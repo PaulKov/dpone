@@ -86,7 +86,7 @@ def apply_resource_plan(
     authoring_lock: AuthoringLockFactory,
     phase_hook: PhaseHook | None = None,
 ) -> ResourceWriteReceipt:
-    """Apply exactly sixteen bounded resource files; never accept arbitrary paths."""
+    """Apply exactly seventeen bounded resource files; never accept arbitrary paths."""
     try:
         captured = dict(files)
         if set(captured) != set(RESOURCE_PATHS) or re.fullmatch(r"[0-9a-f]{40}", source_revision) is None:

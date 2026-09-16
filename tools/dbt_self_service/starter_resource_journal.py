@@ -1,4 +1,4 @@
-"""Bounded durable observations for the sixteen-file starter resource writer.
+"""Bounded durable observations for the versioned starter resource writer.
 
 One resource is bounded by the existing one-MiB authoring input limit. The
 manifest is bounded by that limit; at most nine events per resource plus eight
@@ -76,7 +76,7 @@ class ResourceJournal:
             raise ValueError(_ERROR)
         operation = str(uuid4())
         manifest = {
-            "schema": "dpone.starter-resource-transaction.v1",
+            "schema": "dpone.starter-resource-transaction.v2",
             "operation": operation,
             "revision": revision,
             "root": {"device": identity.device, "inode": identity.inode},
@@ -231,7 +231,7 @@ class ResourceJournal:
 
         record = self._rollback_record(created, outcome)
         value = {
-            "schema": "dpone.starter-resource-recovery.v1",
+            "schema": "dpone.starter-resource-recovery.v2",
             "operation": self.operation,
             "root": {"device": self.identity.device, "inode": self.identity.inode},
             "directory": {"device": self.directory_identity.device, "inode": self.directory_identity.inode},

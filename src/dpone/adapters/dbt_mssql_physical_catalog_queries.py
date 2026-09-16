@@ -9,8 +9,10 @@ from dataclasses import fields
 
 from dpone.adapters.dbt_mssql_physical_catalog_properties import forbidden_property_query
 from dpone.contracts import dbt_mssql_physical_catalog_rows as rows
-from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntimeRegistration
-from dpone.contracts.dbt_mssql_physical_registration_codec import physical_runtime_registration_digest
+from dpone.contracts.dbt_mssql_physical_registration import (
+    MssqlPhysicalRuntimeRegistration,
+    physical_runtime_registration_digest,
+)
 from dpone.contracts.dbt_mssql_physical_registration_values import DedicatedObserver
 from dpone.contracts.dbt_mssql_physical_validation import require_physical_identifier, require_sql_positive_integer
 from dpone.contracts.mssql_object_name import native_control_schema

@@ -259,3 +259,48 @@ def test_exact_count_runs_once_before_first_header_in_same_transaction():
         "FORBIDDEN_PROPERTY",
         "HEADER",
     ]
+
+
+@pytest.mark.parametrize("version", [0, 3, True, "v2"])
+def test_unknown_catalog_version_rejects_before_connect(version):
+    registration, _, _, _ = catalog_case()
+    with pytest.raises(ValueError, match="catalog version"):
+        MssqlPhysicalCatalogReader(
+            connection_factory=lambda: pytest.fail("must not connect"),
+            registration=registration,
+            operation_timeout_seconds=30,
+            clock=lambda: 0.0,
+            catalog_version=version,
+        )
+
+
+def test_v2_read_explicitly_selects_binding_checked_entry():
+    from dataclasses import replace
+
+    registration, plan, source, rows = catalog_case()
+    plan = replace(plan, spec=replace(plan.spec, resource_bounds=registration.trusted_profile.reference))
+    connection = CatalogConnection(source, rows)
+    reader = MssqlPhysicalCatalogReader(
+        connection_factory=lambda: connection,
+        registration=registration,
+        operation_timeout_seconds=30,
+        clock=lambda: 0.0,
+        catalog_version=2,
+    )
+    read(reader, plan)
+    sql = [event[1] for event in connection.events if event[0] == "execute"]
+    assert any("physical_catalog_v2" in statement for statement in sql)
+    assert not any("physical_catalog_v1" in statement for statement in sql)
+
+
+def test_v2_bounds_reference_mismatch_rejects_before_connect():
+    registration, plan, _, _ = catalog_case()
+    reader = MssqlPhysicalCatalogReader(
+        connection_factory=lambda: pytest.fail("must not connect"),
+        registration=registration,
+        operation_timeout_seconds=30,
+        clock=lambda: 0.0,
+        catalog_version=2,
+    )
+    with pytest.raises(ValueError, match="resource bounds"):
+        read(reader, plan)

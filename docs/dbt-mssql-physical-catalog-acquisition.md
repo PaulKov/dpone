@@ -19,8 +19,9 @@ are released when the read transaction ends. Mutation requires fresh admission.
 The platform owner must authenticate the retained profile, registration and
 model-schema deployment binding before installation or acquisition. Passing a
 `MssqlPhysicalRuntimeRegistration` or an `OriginalRef` does not authenticate it.
-The current implementation does not resolve these originals on the caller's
-behalf. See [registration provisioning](dbt-mssql-physical-registration-provisioning.md)
+The direct reader and v1 installer do not resolve these originals on the caller's
+behalf. The v2 lifecycle below uses the actual native verifier for its selected
+policy projection. See [registration provisioning](dbt-mssql-physical-registration-provisioning.md)
 and the [source bridge](dbt-mssql-physical-source-bridge.md).
 
 The first cell requires a dedicated observer registration. Shared-observer modes
@@ -204,7 +205,7 @@ bounds and plan membership, enrollment/materialization and independent receipts.
 See [physical plans](dbt-mssql-physical-plans.md) and
 [ADR 0065](adr/0065-trusted-isolated-native-generation-execution.md).
 
-## Current deployment lifetime limitation
+## V1 deployment lifetime limitation
 
 The fixed catalog module embeds one immutable registration ID/digest and its
 bounds. Repeating the same installation verifies it without repair. A second
@@ -235,3 +236,119 @@ SQL2022 reports these byte lengths:
 These are column catalog dimensions. A fixed-width in-memory or serialized
 representation must not substitute for them. The opt-in temporal live probe
 checks all 24 combinations; unit vectors alone do not qualify a SQL route.
+
+### Authenticate the catalog policy projection
+
+Platform provisioning can use `MssqlPhysicalCatalogPolicyReader` from
+`dpone.adapters.dbt_mssql_physical_catalog_policy` to authenticate the selected
+release, archive, full policy member and intent before persisting a catalog
+binding. Supply the application's real `NativeOriginalVerifier` and
+`NativeProjectDocumentReader`; keep the verifier open while reading its extracted
+project. The returned projection records policy membership, profile selection
+and model schema. It does not authenticate SQL registration storage or install
+the catalog module.
+
+The selected v4 profile needs an explicit `authoring_template.invocation_target`
+and this optional section under `native_execution`:
+
+```yaml
+physical_catalog_limits:
+  max_catalog_rows: 1000
+  max_definition_utf16_bytes: 65536
+  max_dependency_rows: 1000
+  max_columns: 256
+```
+
+These are illustrative platform choices, not defaults or qualified capacity
+recommendations. The platform must select and validate limits for its deployment.
+All four values are mandatory when the section exists. Values must be positive
+SQL integers, dependency rows cannot exceed catalog rows, and columns are fixed
+at 256 for this cell. The consumer compares all four and the existing metadata
+and generation limits exactly with the registration. It also checks the selected
+PLATFORM subject, retained profile selection and database/schema mapping.
+
+Older v4 policies remain structurally valid without this section. The new
+consumer rejects missing catalog configuration before SQL writes; obtain an
+updated platform policy and create a new immutable registration when authority
+facts change. It applies no fallback from the control schema or ambient profile.
+`resource_bounds` identifies the selected profile projection, while
+`capacity_authority` continues to identify generation allocation authority.
+
+The policy projection alone does not install a binding or admit model execution.
+Use the explicit v2 lifecycle below to reuse the installed module.
+
+### Reuse a v2 deployment
+
+`MssqlPhysicalCatalogRegistrationLifecycle` composes the policy reader, existing
+`MssqlPhysicalRegistrationStore`, new binding schema/store, and
+`MssqlPhysicalCatalogV2SchemaProvisioner`. The platform application supplies
+these dependencies and fresh bounded privileged connections to the model
+database. It authenticates the package `physical-v1/catalog-v2.sql` and prepares
+a **separate v2 certificate and certificate user**. Reusing the v1 certificate
+would violate its exact one-module signature inventory. No credentials belong
+in the registration, policy, binding or evidence.
+
+```python
+# Dependencies are composed by the trusted platform application.
+binding = lifecycle.apply(original_refs, registration=registered_claim)
+```
+
+The operation performs actual release/archive/member authentication, checks the
+effective execution adapter, connection alias, database and schema, then
+independently resolves the existing protected registration. It observes schema
+ID/dbo ownership, installs or verifies companion storage and the v2 module,
+writes the immutable binding, and independently reads back binding and module
+inventory before returning. A caller-created projection is not an alternative
+input. The registration and complete source deployment must already exist through
+their source provisioning path. The lifecycle verifies catalog deployment
+inventory; it does not independently verify every source module, signature or
+permission. Preserve that prerequisite and the source guard's own runtime checks.
+
+The companion `physical_catalog_bindings_v1` has a registration UUID, exact
+registration digest, canonical payload and payload digest. It adds no foreign key
+and no duplicate numeric limit authority. All six limits remain in the existing
+registration. Runtime principals have explicit direct-access DENYs; the signed
+module accesses protected rows through the existing ownership boundary.
+
+For a second registration in the same supported cohort, run the same operation
+with its own authenticated originals and immutable registration. Existing schema,
+module text, signatures and grants must match exactly; the second registration
+adds only its binding row. The cohort retains the same database/schema pins,
+source deployment and METADATA/BUILD/dedicated-observer principals. Changes to
+that cohort reject and require an explicitly provisioned deployment. Existing
+registrations and bindings remain immutable and independently readable. Generation
+execution still obeys existing activation, owned-footprint and exclusion rules;
+reusable provisioning does not authorize concurrent uncontrolled writes.
+
+Select v2 explicitly when constructing the catalog reader:
+
+```python
+reader = MssqlPhysicalCatalogReader(
+    connection_factory=runtime_connection_factory,
+    registration=registration,
+    operation_timeout_seconds=operation_budget,
+    clock=time.monotonic,
+    catalog_version=2,
+)
+```
+
+The default remains v1. V2 rejects missing/substituted bindings before observing
+the model object and requires `plan.spec.resource_bounds` to identify the
+registered trusted-profile projection. It verifies source identity first, then
+registration/binding bytes, selected policy/profile linkage, schema pins and the
+actual executing module hash within the same transaction. It reads all numeric
+bounds from the protected registration. This does not grant plan membership,
+model enrollment, publication authority or qualification of a live route.
+
+Installation steps commit separately. A failure can leave protected storage or
+a module installed but returns no accepted binding. Retry the same authenticated
+inputs explicitly: exact existing state is verified, conflicting state is never
+repaired. An uncertain binding write gets one independent read-only reconciliation
+with the same UUID and complete expected bytes. Missing, unreadable or different
+state remains failure; there is no automatic second insert or replacement UUID.
+Final module verification is read-only and never creates a missing procedure.
+
+The canonical binding must fit the registered metadata ceiling, including both
+full PLATFORM subjects. A too-small ceiling rejects; the lifecycle does not raise
+it implicitly. Obtain a new platform-authorized policy/registration when limits
+need to change.

@@ -24,6 +24,7 @@ PACKAGE_FILES = (
     "control/sqlserver/physical-v1/admission.sql",
     "control/sqlserver/physical-v1/catalog.sql",
     "control/sqlserver/physical-v1/receipt.sql",
+    "control/sqlserver/physical-v1/catalog-v2.sql",
 )
 STARTER_OUTPUTS = {
     "dbt_project.yml.tmpl": "dbt_project.yml",
@@ -58,7 +59,7 @@ def test_complete_inventory_preserves_exact_utf8_bytes(installed: Path) -> None:
     expected.update(
         {out: (installed / "_assets/dbt_starter/v4" / name).read_bytes() for name, out in STARTER_OUTPUTS.items()}
     )
-    assert len(actual) == 22
+    assert len(actual) == 23
     assert actual == expected
     assert tuple(actual) == tuple(sorted(actual))
 
@@ -131,7 +132,7 @@ def test_zip_traversable_without_filesystem_checkout(
     with ZipFile(archive) as package:
         monkeypatch.setattr(resource_module.resources, "files", lambda name: ZipPath(package, "dpone/"))
         files = InstalledDbtStarterResources().files()
-    assert len(files) == 22
+    assert len(files) == 23
     assert all("\r\n" in file.text for file in files)
 
 

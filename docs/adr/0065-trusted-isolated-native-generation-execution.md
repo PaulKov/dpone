@@ -560,3 +560,33 @@ first comparison cell rejects all dependencies and forbidden properties. See
 [the catalog acquisition guide](../dbt-mssql-physical-catalog-acquisition.md) for
 permission inventory, APIs, resource accounting and recovery. Live qualification
 must be established by the exact candidate's isolated SQL2022 evidence.
+
+### Authenticated catalog policy projection
+
+The reusable catalog lifecycle consumes the selected full v4 policy through
+`NativeOriginalVerifier` and `NativeProjectDocumentReader`. The selected
+`authoring_template.invocation_target` explicitly supplies the model database
+and model-data schema. Missing target configuration rejects; the control schema
+and ambient dbt profile cannot supply defaults. Live schema ID and dbo ownership
+remain separate deployment observations. The opaque trusted-profile reference
+identifies this selected projection; no separate profile payload is inferred.
+
+The optional closed `native_execution.physical_catalog_limits` object contains
+`max_catalog_rows`, `max_definition_utf16_bytes`, `max_dependency_rows` and
+`max_columns`. All four are explicit positive SQL integers, dependencies cannot
+exceed catalog rows, and this cell fixes columns at 256. The new catalog consumer
+requires the section and compares all six registration limits exactly against
+the selected policy: these four plus metadata and generation ceilings. Earlier
+v4 documents remain valid without the section, but cannot use this consumer.
+There is no new original kind, registration codec change or implicit default.
+
+This mapping proves platform-selected bounds, selected policy membership, retained
+profile subject/reference and schema selection. It does not prove empirically
+qualified capacity, model-plan membership or SQL route qualification. Model
+`resource_bounds` identifies the selected trusted-profile projection; generation
+`capacity_authority` remains separate. Protected registration readback and an
+immutable companion binding are subsequent lifecycle checks, not substitutes for
+authenticating the selected policy. The companion must not add a foreign key to
+existing registration storage, whose exact verifier rejects inbound and outbound
+foreign keys. Its insert/read path must instead lock and validate the referenced
+registration UUID and digest in the same local transaction.

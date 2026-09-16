@@ -309,3 +309,16 @@ def test_dedicated_observer_privileges_are_checked_without_granting_execute():
     assert observed.count(7) == 2
     grants = [sql for sql, _ in connection.statements if sql.startswith("GRANT")]
     assert not any("[runtime_7]" in sql for sql in grants)
+
+
+def test_readonly_inventory_does_not_install_missing_module():
+    connection = Connection()
+    with pytest.raises(RuntimeError, match="absent during read-only"):
+        provisioner(connection).verify(
+            MssqlPhysicalRuntimeRegistration(**registration_inputs()),
+            model_schema="models",
+            model_schema_id=7,
+            model_schema_owner_id=1,
+        )
+    assert not any(sql.startswith(("CREATE", "GRANT", "ADD SIGNATURE")) for sql, _ in connection.statements)
+    assert "commit" not in connection.events
