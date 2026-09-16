@@ -125,6 +125,12 @@ def observe_source(model_connection_factory, registration, generation_id, invoca
 one bounded transaction and closes its connection. A later model transaction must
 perform its own current checks; this result is a point-in-time observation.
 
+The source-identity contract owns the closed fourteen-field decoder shared by
+source and catalog readers. Readers retain rowset cardinality, current identity
+matching, transactions and cleanup. Decoding a row alone is neither authenticated
+observation nor permission to execute a model; the existing reader error import
+continues to identify the same shared exception class.
+
 The public SQL entry accepts exactly registration UUID, generation UUID and expected
 invocation UUID. It reads the real protected registration, verifies its complete
 digest and all 53 typed projections, checks the actual model pin and caller, then

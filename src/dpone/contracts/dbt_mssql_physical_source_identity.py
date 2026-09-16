@@ -1,6 +1,8 @@
 """Point-in-time source facts; never a receipt, qualification or mutation grant."""
 
 from dataclasses import dataclass
+from typing import cast
+from uuid import UUID
 
 from dpone.contracts.dbt_mssql_physical_registration import (
     MssqlPhysicalRuntimeRegistration,
@@ -87,3 +89,47 @@ def require_source_identity(
     ):
         raise ValueError("source caller mappings do not identify the same admitted role")
     return facts
+
+
+class PhysicalSourceReadError(RuntimeError):
+    """No accepted source observation; no retry, mutation or release is implied."""
+
+
+def _bytes(value: object, maximum: int) -> bytes:
+    if type(value) not in {bytes, bytearray, memoryview}:
+        raise PhysicalSourceReadError("source fact binary field has an invalid representation")
+    result = bytes(cast(bytes | bytearray | memoryview, value))
+    if not 0 < len(result) <= maximum:
+        raise PhysicalSourceReadError("source fact binary field exceeds its bound")
+    return result
+
+
+def _uuid(value: object) -> str:
+    # SQL uniqueidentifier drivers may use uppercase hex. Normalize this driver
+    # representation only; public request strings remain strictly canonical.
+    normalized = str(value) if type(value) is UUID else value.lower() if type(value) is str else value
+    return require_physical_uuid(normalized, "source UUID")
+
+
+def decode_physical_source_row(row: tuple[object, ...] | None) -> PhysicalSourceIdentity:
+    """Decode the closed driver row without acquiring or authenticating SQL facts.
+
+    Preserve driver UUID normalization and exact binary-field bounds. Both
+    readers must still enforce rowset cardinality, request/registration matching
+    and successful transaction settlement before returning an observation.
+    """
+    if row is None or len(row) != 14:
+        raise PhysicalSourceReadError("source read requires exactly one closed fact row")
+    return PhysicalSourceIdentity(
+        wire_version=cast(int, row[0]),
+        registration_id=_uuid(row[1]),
+        registration_digest=_bytes(row[2], 71).decode("ascii"),
+        generation_id=_uuid(row[3]),
+        executor_invocation_id=_uuid(row[4]),
+        guard_epoch=cast(int, row[5]),
+        source_revision=cast(int, row[6]),
+        reservation=OriginalRef(_bytes(row[7], 4096).decode("utf-8"), _bytes(row[8], 71).decode("ascii")),
+        executor_payload=_bytes(row[9], 1048576),
+        observed_model_principal=DatabasePrincipal(cast(int, row[10]), _bytes(row[11], 85).hex()),
+        observed_control_principal=DatabasePrincipal(cast(int, row[12]), _bytes(row[13], 85).hex()),
+    )

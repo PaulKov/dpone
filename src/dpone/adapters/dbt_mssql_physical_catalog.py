@@ -10,14 +10,13 @@ from dpone.adapters.dbt_mssql_physical_catalog_fetch import (
     fetch_catalog_result,
     require_final_rowset,
 )
-from dpone.adapters.dbt_mssql_physical_source import _facts
 from dpone.adapters.dbt_mssql_physical_source_queries import ENTRY as SOURCE_ENTRY
 from dpone.contracts.dbt_mssql_physical import PhysicalModelPlan
 from dpone.contracts.dbt_mssql_physical_catalog_comparison import require_catalog_match
 from dpone.contracts.dbt_mssql_physical_catalog_observation import PhysicalCatalogObservation
 from dpone.contracts.dbt_mssql_physical_catalog_rows import CatalogRow, HeaderRow
 from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntimeRegistration
-from dpone.contracts.dbt_mssql_physical_source_identity import require_source_identity
+from dpone.contracts.dbt_mssql_physical_source_identity import decode_physical_source_row, require_source_identity
 from dpone.contracts.dbt_mssql_physical_validation import (
     require_physical_identifier,
     require_physical_timestamp,
@@ -134,7 +133,7 @@ class MssqlPhysicalCatalogReader:
                 plan.generation_id,
                 executor_invocation_id,
             )
-            source = _facts(dbapi_lifecycle.row(cursor))
+            source = decode_physical_source_row(dbapi_lifecycle.row(cursor))
             if dbapi_lifecycle.row(cursor) is not None:
                 raise ValueError("source read returned extra facts")
             require_final_rowset(cursor)

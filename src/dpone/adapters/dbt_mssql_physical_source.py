@@ -1,56 +1,21 @@
 """Fresh-connection reader for the signed, caller-preserving source bridge."""
 
 from collections.abc import Callable
-from typing import cast
-from uuid import UUID
 
 from dpone.adapters import dbapi_lifecycle
 from dpone.adapters.dbt_mssql_physical_source_queries import ENTRY
 from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntimeRegistration
-from dpone.contracts.dbt_mssql_physical_registration_values import DatabasePrincipal
-from dpone.contracts.dbt_mssql_physical_source_identity import PhysicalSourceIdentity, require_source_identity
+from dpone.contracts.dbt_mssql_physical_source_identity import (
+    PhysicalSourceIdentity,
+    PhysicalSourceReadError,
+    decode_physical_source_row,
+    require_source_identity,
+)
+from dpone.contracts.dbt_mssql_physical_source_identity import _bytes as _bytes
+from dpone.contracts.dbt_mssql_physical_source_identity import _uuid as _uuid
 from dpone.contracts.dbt_mssql_physical_validation import require_physical_uuid
 from dpone.contracts.mssql_object_name import native_control_schema
-from dpone.contracts.native_identity import OriginalRef
 from dpone.ports.sql_connection import SqlControlConnection, SqlControlCursor
-
-
-class PhysicalSourceReadError(RuntimeError):
-    """No accepted source observation; no retry, mutation or release is implied."""
-
-
-def _bytes(value: object, maximum: int) -> bytes:
-    if type(value) not in {bytes, bytearray, memoryview}:
-        raise PhysicalSourceReadError("source fact binary field has an invalid representation")
-    result = bytes(cast(bytes | bytearray | memoryview, value))
-    if not 0 < len(result) <= maximum:
-        raise PhysicalSourceReadError("source fact binary field exceeds its bound")
-    return result
-
-
-def _uuid(value: object) -> str:
-    # SQL uniqueidentifier drivers may use uppercase hex. Normalize this driver
-    # representation only; public request strings remain strictly canonical.
-    normalized = str(value) if type(value) is UUID else value.lower() if type(value) is str else value
-    return require_physical_uuid(normalized, "source UUID")
-
-
-def _facts(row: tuple[object, ...] | None) -> PhysicalSourceIdentity:
-    if row is None or len(row) != 14:
-        raise PhysicalSourceReadError("source read requires exactly one closed fact row")
-    return PhysicalSourceIdentity(
-        wire_version=cast(int, row[0]),
-        registration_id=_uuid(row[1]),
-        registration_digest=_bytes(row[2], 71).decode("ascii"),
-        generation_id=_uuid(row[3]),
-        executor_invocation_id=_uuid(row[4]),
-        guard_epoch=cast(int, row[5]),
-        source_revision=cast(int, row[6]),
-        reservation=OriginalRef(_bytes(row[7], 4096).decode("utf-8"), _bytes(row[8], 71).decode("ascii")),
-        executor_payload=_bytes(row[9], 1048576),
-        observed_model_principal=DatabasePrincipal(cast(int, row[10]), _bytes(row[11], 85).hex()),
-        observed_control_principal=DatabasePrincipal(cast(int, row[12]), _bytes(row[13], 85).hex()),
-    )
 
 
 class MssqlPhysicalSourceReader:
@@ -100,7 +65,7 @@ class MssqlPhysicalSourceReader:
                 generation_id,
                 executor_invocation_id,
             )
-            facts = _facts(dbapi_lifecycle.row(cursor))
+            facts = decode_physical_source_row(dbapi_lifecycle.row(cursor))
             if dbapi_lifecycle.row(cursor) is not None:
                 raise PhysicalSourceReadError("source read returned extra facts")
             require_source_identity(facts, self._registration, generation_id, executor_invocation_id)

@@ -248,6 +248,11 @@ project. The returned projection records policy membership, profile selection
 and model schema. It does not authenticate SQL registration storage or install
 the catalog module.
 
+The binding contract owns the detached projection record and pure selected-policy
+comparisons. The adapter retains original authentication, archive acquisition and
+exact member-byte comparison, in that order. Calling the pure projection helper
+directly establishes no authority and cannot replace that acquisition boundary.
+
 The selected v4 profile needs an explicit `authoring_template.invocation_target`
 and this optional section under `native_execution`:
 

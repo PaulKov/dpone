@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Keep catalog policy projection and closed source-row decoding with their
+  existing contract owners. Preserve real original acquisition, authentication,
+  SQL transaction settlement and existing reader error imports in the adapters.
+
+- Add SQL Server managed attach and transaction-check macro transport with fixed
+  endpoints, bounded closed-result validation and no automatic begin, commit or
+  retry. These helpers do not enable managed materialization: protected server
+  procedures, receipts and complete installed-package qualification are still
+  required.
+
 - Add bounded, signed SQL Server pre-generation discovery for explicit filegroups
   and candidate namespace availability, without reserving a generation or granting
   execution authority. Add deterministic table/layout SQL for NONE, ROW, PAGE and

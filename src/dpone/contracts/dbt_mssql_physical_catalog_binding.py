@@ -7,12 +7,16 @@ observations. Neither a digest nor this DTO substitutes for either operation.
 
 from dataclasses import dataclass, fields
 from hashlib import sha256
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntimeRegistration
-from dpone.contracts.dbt_mssql_physical_registration_codec import physical_runtime_registration_digest
+from dpone.contracts.dbt_execution_pack import SUPPORTED_DBT_ADAPTER
+from dpone.contracts.dbt_mssql_physical_registration import (
+    MssqlPhysicalRuntimeRegistration,
+    physical_runtime_registration_digest,
+)
 from dpone.contracts.dbt_mssql_physical_registration_values import (
     PlatformSelection,
+    RegisteredLimits,
     platform_subject_payload,
     reference_payload,
     require_registration_digest,
@@ -32,6 +36,9 @@ from dpone.contracts.native_delivery_json import (
 from dpone.contracts.native_identity import OriginalRef
 from dpone.contracts.native_originals import NativePlatformOriginalSubject, decode_native_original_subject
 from dpone.contracts.native_project_documents import NATIVE_POLICY_MEMBER
+
+if TYPE_CHECKING:
+    from dpone.contracts.native_delivery import ResolvedNativeOriginals
 
 BINDING_SCHEMA = "dpone.mssql-physical-catalog-binding.v1"
 
@@ -153,3 +160,129 @@ def require_catalog_binding_registration(
         or len(encode_catalog_binding(value)) > registration.limits.max_metadata_bytes
     ):
         raise ValueError("catalog binding differs from its complete registration or metadata budget")
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogPolicyProjection:
+    """Detached policy selection, never an independently authenticating token.
+
+    ``resource_bounds`` identifies the selected opaque profile projection. It is
+    not capacity authority and no profile payload is decoded. Bounds are explicit
+    platform-authorized policy choices, not an empirical qualification result.
+    """
+
+    registration_id: str
+    registration_sha256: str
+    platform_subject: NativePlatformOriginalSubject
+    trusted_profile: PlatformSelection
+    profile_name: str
+    workflow_id: str
+    policy_member: OriginalRef
+    project_archive_sha256: str
+    model_database_name: str
+    model_schema: str
+    resource_bounds: OriginalRef
+
+
+def project_catalog_policy(
+    *,
+    original: "ResolvedNativeOriginals",
+    policy_bytes: bytes,
+    intent: dict[str, Any],
+    registration: MssqlPhysicalRuntimeRegistration,
+) -> CatalogPolicyProjection:
+    """Compare selected policy with registration; acquire no authentication authority.
+
+    The policy reader must first validate the exact registration, authenticate
+    originals, read the actual archive members and compare full policy bytes.
+    This pure projection consumes those values without I/O. Direct invocation
+    or construction of its result cannot substitute for the reader or the
+    independent protected SQL registration and deployment observations.
+    """
+    policy = cast(dict[str, Any], decode_native_delivery_json(policy_bytes))
+    # The concrete member reader has already validated the full v4 schema
+    # and exact selected intent. Decode solely to project authenticated fields.
+    profile = policy["profiles"][intent["profile"]]
+    native = profile["native_execution"]
+    catalog = native.get("physical_catalog_limits")
+    if catalog is None:
+        raise ValueError("catalog provisioning requires native_execution.physical_catalog_limits")
+    target = profile.get("authoring_template", {}).get("invocation_target")
+    if target is None:
+        raise ValueError("catalog provisioning requires authoring_template.invocation_target")
+    subject = NativePlatformOriginalSubject(original.authority, original.policy_sha256)
+    selected = _selection(native["trusted_execution"]["profile"], subject)
+    limits = RegisteredLimits(
+        max_metadata_bytes=native["limits"]["max_metadata_bytes"],
+        max_generation_bytes=native["generation"]["max_generation_bytes"],
+        **catalog,
+    )
+    if registration.platform_subject != subject:
+        raise ValueError("catalog registration PLATFORM subject differs from selected policy")
+    if registration.trusted_profile != selected:
+        raise ValueError("catalog registration profile reference or subject differs from selected policy")
+    if registration.limits != limits:
+        raise ValueError("catalog registration limits differ from selected policy")
+    control = native["control"]
+    if (
+        registration.control_authority != OriginalRef(**control["authority"])
+        or registration.control_connection_ref != control["connection_ref"]
+        or registration.control_schema != control["schema"]
+    ):
+        raise ValueError("catalog registration control selection differs from selected policy")
+    if registration.capacity_authority != OriginalRef(**native["generation"]["capacity_authority"]):
+        raise ValueError("catalog registration capacity authority differs from selected policy")
+    if registration.trusted_toolchain != _selection(native["trusted_execution"]["toolchain"], subject):
+        raise ValueError("catalog registration toolchain selection differs from selected policy")
+    if registration.qualification_policy_id != native["trusted_execution"]["qualification_policy_id"]:
+        raise ValueError("catalog registration qualification policy differs from selected policy")
+    database = require_physical_identifier(target["database"], "model_database")
+    schema = native_control_schema(target["schema"])
+    if schema.lower() in {
+        "dbo",
+        "sys",
+        "information_schema",
+        registration.local_schema.lower(),
+        registration.control_schema.lower(),
+    }:
+        raise ValueError("catalog model schema must be dedicated and distinct from control schemas")
+    if registration.model_database.database_name != database:
+        raise ValueError("catalog registration model database differs from selected invocation target")
+    owners = tuple(
+        item
+        for item in original.sources.workflows
+        if item.project.project_bundle_sha256 == original.project_bundle.archive_sha256
+        and item.source.workflow_id == intent["workflow"]
+    )
+    if len(owners) != 1:
+        raise ValueError("catalog policy requires one authenticated execution owner")
+    effective = owners[0].execution.invocation_profile()
+    if effective.adapter_type != SUPPORTED_DBT_ADAPTER:
+        raise ValueError("catalog execution requires the supported SQL Server adapter")
+    if registration.model_connection_ref != effective.connection_ref:
+        raise ValueError("catalog registration model connection differs from authenticated execution profile")
+    if (effective.database, effective.schema) != (database, schema):
+        raise ValueError("catalog policy differs from the effective execution target")
+    return CatalogPolicyProjection(
+        registration.registration_id,
+        physical_runtime_registration_digest(registration),
+        subject,
+        registration.trusted_profile,
+        intent["profile"],
+        intent["workflow"],
+        OriginalRef(NATIVE_POLICY_MEMBER, original.policy_sha256),
+        original.project_bundle.archive_sha256,
+        database,
+        schema,
+        selected.reference,
+    )
+
+
+def _selection(value: dict[str, Any], subject: NativePlatformOriginalSubject) -> PlatformSelection:
+    retained = value["subject"]
+    selected_subject = (
+        subject if retained is None else decode_native_original_subject(encode_native_delivery_json(retained))
+    )
+    if type(selected_subject) is not NativePlatformOriginalSubject:
+        raise ValueError("catalog selection requires a PLATFORM subject")
+    return PlatformSelection(OriginalRef(**value["reference"]), selected_subject)

@@ -215,6 +215,83 @@ def test_no_caller_created_resolved_dto_or_proof_callback_is_accepted():
         MssqlPhysicalCatalogPolicyReader(verifier=lambda: True, documents=None)
 
 
+def test_invalid_registration_rejects_before_original_acquisition(tmp_path, monkeypatch):
+    from dpone.adapters.native_delivery_originals import NativeOriginalVerifier
+
+    fixture = _fixture(tmp_path, monkeypatch)
+    with _native_verifier(fixture, []) as verifier:
+
+        def forbidden_acquisition(*args, **kwargs):
+            pytest.fail("invalid registration must not acquire originals")
+
+        monkeypatch.setattr(NativeOriginalVerifier, "resolve", forbidden_acquisition)
+        with pytest.raises(ValueError, match="exact physical registration"):
+            _reader(verifier).read(fixture.refs, registration=object())
+
+
+def test_changed_member_bytes_reject_before_pure_projection(tmp_path, monkeypatch):
+    from dpone.adapters import dbt_mssql_physical_catalog_policy as policy_adapter
+
+    fixture = _fixture(tmp_path, monkeypatch)
+    with _native_verifier(fixture, []) as verifier:
+        claim = _claim(verifier, fixture)
+        read_member = NativeProjectDocumentReader.read
+        documents = NativeProjectDocumentReader(read_file=read_confined_file, max_policy_bytes=1024 * 1024)
+        reader = MssqlPhysicalCatalogPolicyReader(verifier=verifier, documents=documents)
+
+        def changed_member(self, *args, **kwargs):
+            payload, intent = read_member(self, *args, **kwargs)
+            return (payload + b" " if self is documents else payload), intent
+
+        def forbidden_projection(**kwargs):
+            pytest.fail("changed member bytes must not reach projection")
+
+        monkeypatch.setattr(NativeProjectDocumentReader, "read", changed_member)
+        monkeypatch.setattr(policy_adapter, "project_catalog_policy", forbidden_projection)
+        with pytest.raises(ValueError, match="member changed after original verification"):
+            reader.read(fixture.refs, registration=claim)
+
+
+def test_projection_follows_real_authentication_and_member_read(tmp_path, monkeypatch):
+    from dpone.adapters import dbt_mssql_physical_catalog_policy as policy_adapter
+    from dpone.adapters.native_delivery_originals import NativeOriginalVerifier
+    from dpone.contracts.dbt_mssql_physical_catalog_binding import CatalogPolicyProjection
+
+    fixture = _fixture(tmp_path, monkeypatch)
+    with _native_verifier(fixture, []) as verifier:
+        claim = _claim(verifier, fixture)
+        events = []
+        resolve = NativeOriginalVerifier.resolve
+        read_member = NativeProjectDocumentReader.read
+        project = policy_adapter.project_catalog_policy
+        documents = NativeProjectDocumentReader(read_file=read_confined_file, max_policy_bytes=1024 * 1024)
+        reader = MssqlPhysicalCatalogPolicyReader(verifier=verifier, documents=documents)
+
+        def acquire(self, *args, **kwargs):
+            result = resolve(self, *args, **kwargs)
+            events.append("authenticated")
+            return result
+
+        def members(self, *args, **kwargs):
+            result = read_member(self, *args, **kwargs)
+            if self is documents:
+                events.append("members")
+            return result
+
+        def projection(**kwargs):
+            assert events == ["authenticated", "members"]
+            assert kwargs["policy_bytes"] == kwargs["original"].policy_document
+            events.append("projection")
+            return project(**kwargs)
+
+        monkeypatch.setattr(NativeOriginalVerifier, "resolve", acquire)
+        monkeypatch.setattr(NativeProjectDocumentReader, "read", members)
+        monkeypatch.setattr(policy_adapter, "project_catalog_policy", projection)
+        result = reader.read(fixture.refs, registration=claim)
+        assert type(result) is CatalogPolicyProjection
+        assert events == ["authenticated", "members", "projection"]
+
+
 def test_policy_target_must_match_actual_effective_execution_target(tmp_path, monkeypatch):
     fixture = _fixture(
         tmp_path,

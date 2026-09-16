@@ -49,6 +49,68 @@ def test_exact_source_facts():
     assert require_source_identity(facts, registration, facts.generation_id, facts.executor_invocation_id) is facts
 
 
+def _source_row(facts):
+    return (
+        facts.wire_version,
+        facts.registration_id,
+        facts.registration_digest.encode(),
+        facts.generation_id,
+        facts.executor_invocation_id,
+        facts.guard_epoch,
+        facts.source_revision,
+        facts.reservation.locator.encode(),
+        facts.reservation.sha256.encode(),
+        facts.executor_payload,
+        facts.observed_model_principal.principal_id,
+        bytes.fromhex(facts.observed_model_principal.sid_hex),
+        facts.observed_control_principal.principal_id,
+        bytes.fromhex(facts.observed_control_principal.sid_hex),
+    )
+
+
+@pytest.mark.parametrize("representation", [bytes, bytearray, memoryview])
+def test_source_decoder_detaches_driver_binary_representations(representation):
+    from dpone.contracts.dbt_mssql_physical_source_identity import decode_physical_source_row
+
+    _, facts = source_case()
+    row = tuple(representation(value) if type(value) is bytes else value for value in _source_row(facts))
+    assert decode_physical_source_row(row) == facts
+
+
+@pytest.mark.parametrize("row", [None, (), (None,) * 13, (None,) * 15])
+def test_source_decoder_rejects_nonclosed_rows(row):
+    from dpone.contracts.dbt_mssql_physical_source_identity import PhysicalSourceReadError, decode_physical_source_row
+
+    with pytest.raises(PhysicalSourceReadError, match="exactly one closed fact row"):
+        decode_physical_source_row(row)
+
+
+@pytest.mark.parametrize("position,maximum", [(2, 71), (7, 4096), (8, 71), (9, 1048576), (11, 85), (13, 85)])
+@pytest.mark.parametrize("damage", ["text", "empty", "oversized"])
+def test_source_decoder_preserves_each_binary_field_bound(position, maximum, damage):
+    from dpone.contracts.dbt_mssql_physical_source_identity import PhysicalSourceReadError, decode_physical_source_row
+
+    _, facts = source_case()
+    row = list(_source_row(facts))
+    row[position] = "invalid" if damage == "text" else b"" if damage == "empty" else b"x" * (maximum + 1)
+    with pytest.raises(PhysicalSourceReadError, match="binary field"):
+        decode_physical_source_row(tuple(row))
+
+
+def test_existing_reader_imports_and_annotations_retain_canonical_identity():
+    from typing import get_type_hints
+
+    from dpone.adapters import dbt_mssql_physical_source as reader
+    from dpone.contracts import dbt_mssql_physical_source_identity as identity
+
+    assert reader.PhysicalSourceReadError is identity.PhysicalSourceReadError
+    assert reader._bytes is identity._bytes
+    assert reader._uuid is identity._uuid
+    assert get_type_hints(reader.MssqlPhysicalSourceReader.read)["return"] is PhysicalSourceIdentity
+    assert get_type_hints(identity.decode_physical_source_row)["return"] is PhysicalSourceIdentity
+    assert get_type_hints(PhysicalSourceIdentity)["reservation"] is OriginalRef
+
+
 @pytest.mark.parametrize(
     "field,value",
     [
@@ -108,22 +170,7 @@ def test_reader_owns_one_bounded_transaction_and_closes(failure):
     from dpone.adapters.dbt_mssql_physical_source import MssqlPhysicalSourceReader, PhysicalSourceReadError
 
     registration, facts = source_case()
-    row = (
-        facts.wire_version,
-        facts.registration_id,
-        facts.registration_digest.encode(),
-        facts.generation_id,
-        facts.executor_invocation_id,
-        facts.guard_epoch,
-        facts.source_revision,
-        facts.reservation.locator.encode(),
-        facts.reservation.sha256.encode(),
-        facts.executor_payload,
-        facts.observed_model_principal.principal_id,
-        bytes.fromhex(facts.observed_model_principal.sid_hex),
-        facts.observed_control_principal.principal_id,
-        bytes.fromhex(facts.observed_control_principal.sid_hex),
-    )
+    row = _source_row(facts)
     calls = []
 
     class Connection:
