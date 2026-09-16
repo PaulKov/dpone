@@ -29,7 +29,10 @@ def _bytes(value: object, maximum: int) -> bytes:
 
 
 def _uuid(value: object) -> str:
-    return require_physical_uuid(str(value) if type(value) is UUID else value, "source UUID")
+    # SQL uniqueidentifier drivers may use uppercase hex. Normalize this driver
+    # representation only; public request strings remain strictly canonical.
+    normalized = str(value) if type(value) is UUID else value.lower() if type(value) is str else value
+    return require_physical_uuid(normalized, "source UUID")
 
 
 def _facts(row: tuple[object, ...] | None) -> PhysicalSourceIdentity:
