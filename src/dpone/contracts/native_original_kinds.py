@@ -11,6 +11,7 @@ NativeOriginalKind: TypeAlias = Literal[
     "generation_stored_file_v1",
     "generation_seal_resolution_v1",
     "trusted_dbt_command_plan_v1",
+    "mssql_physical_plan_set_v1",
     "trusted_dbt_invocation_completion_v1",
     "trusted_dbt_toolchain_v1",
     "trusted_dbt_qualification_v1",
