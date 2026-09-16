@@ -112,9 +112,12 @@ def _materialize(kind: str, query: str) -> str:
     limit = "@dependency_limit" if kind == "DEPENDENCY" else "@column_limit" if kind == "COLUMN" else "@row_limit"
     # TOP has no ORDER BY: the bounded overflow sample need not be deterministic.
     # Only a complete, within-budget collection is sorted and exposed afterwards.
-    return f"""SELECT TOP (CONVERT(bigint,{limit})+1) * INTO #catalog_{kind} FROM ({query}) facts;
+    return f"""IF @kind IN ('HEADER','{kind}')
+BEGIN
+SELECT TOP (CONVERT(bigint,{limit})+1) * INTO #catalog_{kind} FROM ({query}) facts;
 IF (SELECT COUNT_BIG(*) FROM #catalog_{kind})>{limit}
- THROW 51463, 'DPONE_CATALOG_ROW_BOUND_EXCEEDED', 1;"""
+ THROW 51463, 'DPONE_CATALOG_ROW_BOUND_EXCEEDED', 1;
+END"""
 
 
 def _emit(kind: str, record: type[rows.CatalogRow], order: str) -> str:

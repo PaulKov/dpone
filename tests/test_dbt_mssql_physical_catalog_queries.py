@@ -176,7 +176,7 @@ def test_exact_signature_no_extra_resultset_or_implicit_transaction_settlement()
     assert "crypt_type='SPVC' AND thumbprint=0x" + (b"x" * 20).hex() in sql
     assert "SET NOCOUNT ON" in sql
     assert "SELECT * FROM @source" not in sql
-    assert sql.count("IF @kind=") == 9
+    assert sql.count("ELSE SELECT 1,") == 6
     assert "SET XACT_ABORT" not in sql
 
 
@@ -222,3 +222,38 @@ def test_shared_observer_registration_is_outside_initial_catalog_cell(mode):
             model_schema_owner_id=1,
             catalog_certificate_thumbprint=b"x" * 20,
         )
+
+
+def test_count_scan_occurs_only_for_count_kind_and_probe_locks_other_kinds():
+    sql = render()
+    count = sql.index("IF @kind='COUNT'\nBEGIN\n SET @count_sql")
+    scan = sql.index("COUNT_BIG(*) FROM '")
+    probe = sql.index("SELECT TOP (1) @probe=1 FROM '")
+    assert count < scan < probe
+    assert "@probe int OUTPUT',@probe=@lock_probe OUTPUT" in sql
+    assert "WHERE 1=0" not in sql and "WHERE 0=1" not in sql
+    assert "t.create_date)=@object_create_time" in sql
+    assert "t.modify_date)=@object_modify_time" in sql
+
+
+def test_only_header_and_selected_collection_materialize_rows():
+    sql = render()
+    first_materialization = sql.index("INTO #catalog_COLUMN")
+    assert sql.index("SELECT 1,'TABLE'") < first_materialization
+    assert sql.index("SELECT 1,'COUNT'") < first_materialization
+    for kind in ("COLUMN", "INDEX", "INDEX_COLUMN", "PARTITION", "DEPENDENCY", "FORBIDDEN_PROPERTY"):
+        assert f"IF @kind IN ('HEADER','{kind}')\nBEGIN\nSELECT TOP" in sql
+
+
+def test_permission_denies_on_foreign_dependency_objects_fail_before_catalog():
+    sql = render()
+    deny = sql.index("p.grantee_principal_id IN (SELECT principal_id FROM sys.user_token)")
+    assert deny < sql.index("IF EXISTS (SELECT 1 FROM sys.security_predicates")
+    assert "p.state='D' AND p.class IN (0,1,3)" in sql
+    assert "p.permission_name IN ('VIEW DEFINITION','VIEW SECURITY DEFINITION','CONTROL')" in sql
+    assert "p.grantee_principal_id IN (SELECT principal_id FROM sys.login_token)" in sql
+    assert "p.state='D' AND p.class=100" in sql
+    assert "'VIEW ANY DEFINITION','VIEW ANY SECURITY DEFINITION','CONTROL SERVER'" in sql
+    # No target-only major_id/schema filter: an incoming view can live anywhere.
+    db_deny = sql.split('FROM sys.database_permissions p', 1)[1].split('THROW', 1)[0]
+    assert "major_id" not in db_deny
