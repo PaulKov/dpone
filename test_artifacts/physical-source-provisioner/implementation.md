@@ -35,6 +35,11 @@ memberships or broad permissions, disabled guest/trustworthy/chaining, dbo local
 ownership chains, and full privileged catalog visibility. Existing finite native
 object permissions remain separate. Dedicated observers are checked but receive
 no source entry grant. Shared observers use their existing metadata/build mapping.
+SQL2022's default public `VIEW ANY COLUMN ENCRYPTION KEY DEFINITION` and
+`VIEW ANY COLUMN MASTER KEY DEFINITION` permissions are allowed as finite metadata
+observation rights. The first isolated live run observed both defaults and rejected
+them before module creation; the correction preserves those normal defaults
+without allowing EXECUTE, CONTROL, impersonation or broader administrative rights.
 
 Only `physical_require_source_v1` is signed; only
 `physical_control_require_source_v1` is countersigned. Control certificate users

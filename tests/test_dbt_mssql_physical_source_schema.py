@@ -149,6 +149,14 @@ def test_principal_check_rejects_broad_authority_and_identity_reuse():
         assert guard in sql
 
 
+def test_principal_check_allows_sql2022_public_encryption_metadata_defaults():
+    sql = principal_inventory_sql("runtime_local", "physical_require_source_v1", model=True)
+    assert "'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION'" in sql
+    assert "'VIEW ANY COLUMN MASTER KEY DEFINITION'" in sql
+    assert "'CONTROL'" in sql
+    assert "'IMPERSONATE'" in sql
+
+
 @pytest.mark.parametrize("public", [b"", "public", None])
 def test_certificate_identity_must_be_nonempty_public_bytes(public):
     with pytest.raises(ValueError, match="public certificate"):

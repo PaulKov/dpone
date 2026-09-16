@@ -72,7 +72,8 @@ IF @name IS NULL OR @login IS NULL
  AND state IN ('G','W') AND NOT
  ((class=100 AND permission_name IN ('CONNECT SQL','VIEW ANY DATABASE')) OR (class=105 AND permission_name='CONNECT')))
  OR EXISTS (SELECT 1 FROM sys.database_permissions WHERE grantee_principal_id IN (@principal,0)
- AND state IN ('G','W') AND ((class=0 AND permission_name NOT IN ('CONNECT','VIEW DEFINITION'))
+ AND state IN ('G','W') AND ((class=0 AND permission_name NOT IN ('CONNECT','VIEW DEFINITION',
+ 'VIEW ANY COLUMN ENCRYPTION KEY DEFINITION','VIEW ANY COLUMN MASTER KEY DEFINITION'))
  OR (class=3 AND major_id=SCHEMA_ID(N'{schema}')) OR class=4
  OR permission_name IN ('IMPERSONATE','CONTROL','ALTER','TAKE OWNERSHIP')))
  OR EXISTS (SELECT 1 FROM sys.database_permissions WHERE grantee_principal_id IN (@principal,0)
