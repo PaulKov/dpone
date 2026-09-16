@@ -9,6 +9,10 @@
   the exact supported legacy policy identity; full managed execution and installed
   starter-resource generation remain separate prerequisites.
 
+- Refresh the SQL Server discovery cursor after transaction setup so the driver
+  uses the remaining operation timeout instead of retaining its initial timeout.
+  Expired setup budgets prevent discovery dispatch without changing settlement.
+
 - Add authenticated reusable SQL Server catalog registrations with immutable
   per-registration bindings and a separately signed v2 observation module.
   Require explicit optional catalog limits from the selected native policy;

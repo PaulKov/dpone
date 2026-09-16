@@ -108,7 +108,10 @@ class MssqlPhysicalDiscoveryReader:
                 "THROW 51500, 'DPONE_DISCOVERY_TRANSACTION_INVALID', 1;"
             )
             require_final_rowset(cursor)
+            cursor.close()
+            cursor = None
             connection.timeout = budget.seconds()
+            cursor = connection.cursor()
             cursor.execute(
                 f"EXEC [{self._schema}].[{ENTRY}] @registration_id=?, @request=?", registration.registration_id, payload
             )

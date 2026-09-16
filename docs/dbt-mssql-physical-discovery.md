@@ -105,6 +105,9 @@ UUID/digest, request digest, database ID/GUID, schema ID/name/owner, P epoch,
 object count, filegroup ID/name/type and both actual caller ID/SID pairs. Python
 compares all expected identities, enforces registered metadata/object bounds and
 a finite operation deadline, rejects extra rows/result sets, then commits.
+The setup cursor is closed before the remaining statement timeout is applied to
+a fresh discovery cursor on the same connection and transaction. An expired
+setup budget prevents discovery dispatch; it never becomes an infinite timeout.
 Only an acknowledged commit returns an observation. Cursor and connection cleanup
 is best effort. The commit ends this read transaction; it does not release or
 renew the separately managed durable P lease. Upstream must continue to own P and

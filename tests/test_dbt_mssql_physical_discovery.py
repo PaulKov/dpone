@@ -202,6 +202,51 @@ def test_expired_connection_deadline_never_executes_or_commits():
     assert not cursor.calls and connection.commits == 0 and connection.rollbacks == 1
 
 
+@pytest.mark.parametrize("setup_seconds", [6, 10])
+def test_discovery_statement_uses_fresh_cursor_with_remaining_timeout(setup_seconds):
+    from dpone.adapters.dbt_mssql_physical_discovery import PhysicalDiscoveryReadError
+
+    now = [0]
+    created = []
+
+    class SnapshotCursor(Cursor):
+        def __init__(self, connection, setup):
+            super().__init__([] if setup else [row()])
+            self.connection = connection
+            self.setup = setup
+            # Qualified ODBC drivers snapshot the statement timeout on creation.
+            self.statement_timeout = connection.timeout
+
+        def execute(self, sql, *args):
+            assert not self.closed
+            assert self.statement_timeout == self.connection.timeout
+            result = super().execute(sql, *args)
+            if self.setup:
+                now[0] = setup_seconds
+            return result
+
+    class SnapshotConnection(Connection):
+        def cursor(self):
+            if created:
+                assert created[-1].closed
+            cursor = SnapshotCursor(self, setup=not created)
+            created.append(cursor)
+            return cursor
+
+    connection = SnapshotConnection(None)
+    if setup_seconds == 10:
+        with pytest.raises(PhysicalDiscoveryReadError):
+            reader(connection, lambda: now[0]).read(request())
+        assert len(created) == 1
+        assert connection.commits == 0 and connection.rollbacks == 1
+    else:
+        assert reader(connection, lambda: now[0]).read(request()).filegroup_name == "DATA"
+        assert [cursor.statement_timeout for cursor in created] == [10, 4]
+        assert connection.commits == 1 and connection.rollbacks == 0
+    assert all(cursor.closed for cursor in created)
+    assert connection.closed
+
+
 @pytest.mark.parametrize("subject_count,accepted", [(1211, True), (1212, False)])
 def test_native_token_ceiling_matches_closed_shape_at_nearest_valid_boundaries(subject_count, accepted):
     import re
