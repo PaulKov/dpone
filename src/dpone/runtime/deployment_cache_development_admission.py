@@ -103,7 +103,7 @@ def require_development_activation_admission(
             target_trust_tier=trust_tier,
             now=checked_at,
         )
-    except (AttributeError, TypeError, ValueError) as exc:
+    except Exception as exc:  # noqa: BLE001 - authority adapter failures must fail closed.
         raise DeploymentCacheError(
             "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED",
             "DEV-only activation requires current authority for the exact non-production target",

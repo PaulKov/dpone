@@ -146,7 +146,7 @@ class DeploymentCacheMaterializer:
                     deployment_id=str(deployment["deployment_id"]),
                     previous_deployment_id=previous_deployment_id,
                 )
-                self._development_admission_gate.require(activation.projection, environment=environment)
+                self._require_verified_activation(deployment_path, environment=environment)
                 current, pointer_path = self._commit_promotion(
                     deployment_path=deployment_path,
                     pointer=pointer,
@@ -244,7 +244,7 @@ class DeploymentCacheMaterializer:
                     deployment_id=str(deployment["deployment_id"]),
                     previous_deployment_id=previous_deployment_id,
                 )
-                self._development_admission_gate.require(activation.projection, environment=environment)
+                self._require_verified_activation(deployment_path, environment=environment)
                 current, pointer_path = self._commit_promotion(deployment_path=deployment_path, pointer=pointer)
                 self._workspace_activation.activate_occurrence(workspace_occurrence, projection_root=deployment_path)
         except DeploymentCacheError as exc:
@@ -305,7 +305,16 @@ class DeploymentCacheMaterializer:
                 deployment_id=current_projection.deployment_id,
                 previous_deployment_id=_optional_string(pointer.get("previous_deployment_id")),
             )
+            current_projection = self.validate_current_details(
+                current_target,
+                environment=environment,
+            )
             self._development_admission_gate.require(current_projection, environment=environment)
+            if (
+                current_projection.deployment_id != active_id
+                or pointer.get("release_id") != current_projection.release_id
+            ):
+                raise control_state_recovery_required(self._cache_root / "current")
             audit_payload = dict(pointer)
             audit_payload["recovery"] = {
                 "actor": recovery_actor,
@@ -344,6 +353,15 @@ class DeploymentCacheMaterializer:
                 "current deployment changed before promotion",
                 path=(self._cache_root / "current-pointer.json").as_posix(),
             )
+
+    def _require_verified_activation(self, deployment_path: Path, *, environment: str) -> None:
+        """Revalidate sealed projection bytes and authority immediately before commit."""
+
+        projection = self._projection_validator.validate_activation_details(
+            deployment_path,
+            environment=environment,
+        )
+        self._development_admission_gate.require(projection, environment=environment)
 
     def _commit_promotion(self, *, deployment_path: Path, pointer: dict[str, Any]) -> tuple[Path, Path]:
         """Delegate the commit protocol through the stable test seam."""

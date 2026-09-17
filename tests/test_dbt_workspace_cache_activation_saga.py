@@ -40,9 +40,18 @@ def _digest(character: str) -> str:
 
 
 class _Coordinator:
-    def __init__(self, *, activate_failure=False, foreign_prepare=False):
+    def __init__(
+        self,
+        *,
+        activate_failure=False,
+        foreign_prepare=False,
+        prepare_action=None,
+        require_active_action=None,
+    ):
         self.activate_failure = activate_failure
         self.foreign_prepare = foreign_prepare
+        self.prepare_action = prepare_action
+        self.require_active_action = require_active_action
         self.events = []
         self.requests = {}
 
@@ -81,6 +90,8 @@ class _Coordinator:
         request = self._request(**coordinates)
         self.requests[request.activation_id] = request
         self.events.append(("prepare", request.activation_id))
+        if self.prepare_action is not None:
+            self.prepare_action()
         return DbtWorkspacePreparedActivation(request, self._receipt(request, "PREPARED"))
 
     def activate(self, prepared, *, projection_root):
@@ -94,11 +105,15 @@ class _Coordinator:
         assert projection_root.is_dir()
         request = self.requests[coordinates["activation_id"]]
         self.events.append(("require_active", request.activation_id))
+        if self.require_active_action is not None:
+            self.require_active_action()
         return DbtWorkspaceActiveActivation(request, self._receipt(request, "ACTIVE"))
 
 
 class _CompositionCoordinator:
-    def __init__(self) -> None:
+    def __init__(self, *, prepare_action=None, require_active_action=None) -> None:
+        self.prepare_action = prepare_action
+        self.require_active_action = require_active_action
         self.events = []
         self.requests = {}
 
@@ -126,6 +141,8 @@ class _CompositionCoordinator:
         request = replace(template, context=context)
         self.requests[request.activation_id] = request
         self.events.append(("prepare", request.activation_id))
+        if self.prepare_action is not None:
+            self.prepare_action()
         return self._occurrence(request, "PREPARED")
 
     def activate(self, prepared, *, projection_root):
@@ -137,7 +154,30 @@ class _CompositionCoordinator:
         assert projection_root.is_dir()
         request = self.requests[coordinates["activation_id"]]
         self.events.append(("require_active", request.activation_id))
+        if self.require_active_action is not None:
+            self.require_active_action()
         return self._occurrence(request, "ACTIVE")
+
+
+class _UnavailableOnCallVerifier:
+    def __init__(self, delegate, *, fail_on_call: int) -> None:
+        self._delegate = delegate
+        self._fail_on_call = fail_on_call
+        self.calls = 0
+
+    def require_current(self, admission, *, now) -> None:
+        self.calls += 1
+        if self.calls == self._fail_on_call:
+            raise OSError("protected authority store unavailable")
+        self._delegate.require_current(admission, now=now)
+
+
+def _corrupt_release_artifact(cache: Path, release_id: str) -> None:
+    release_root = cache / "releases" / release_id.replace(":", "-", 1)
+    release = json.loads((release_root / "release-set.json").read_text(encoding="utf-8"))
+    artifact = release_root / release["artifacts"]["workload_packs"][0]["path"]
+    artifact.chmod(0o644)
+    artifact.write_bytes(artifact.read_bytes() + b"corrupt")
 
 
 def test_promote_prepares_before_pointer_and_requires_active_after_commit(projected_workspace):
@@ -312,6 +352,33 @@ def test_development_activation_rejects_release_changed_after_snapshot(tmp_path:
     assert not (cache / "current-pointer.json").exists()
 
 
+@pytest.mark.parametrize("composed", [False, True])
+def test_development_activation_revalidates_artifacts_after_snapshot(tmp_path: Path, composed: bool) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=composed)
+    deployment = cache / "deployments" / "development" / deployment_id.replace(":", "-", 1)
+    coordinator = _CompositionCoordinator() if composed else _Coordinator()
+
+    with pytest.raises(DeploymentCacheError) as denied:
+        DeploymentCacheMaterializer(
+            cache,
+            workspace_activation=None if composed else coordinator,
+            composition_activation_coordinator=coordinator if composed else None,
+            development_admission=_admission(authority, "activate", release_id, deployment_id),
+            development_admission_verifier=_admission_verifier(authority),
+            clock=_clock,
+        ).promote(
+            deployment,
+            environment="development",
+            precommit_check=lambda: _corrupt_release_artifact(cache, release_id),
+        )
+
+    assert denied.value.code == "DPONE_CACHE_ARTIFACT_SIZE_MISMATCH"
+    assert denied.value.details == {"state_may_have_changed": True, "recovery_required": True}
+    assert not (cache / "current").exists()
+    assert not (cache / "current-pointer.json").exists()
+
+
 def test_development_activation_rechecks_grant_time_after_release_verification(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -410,6 +477,103 @@ def test_development_recovery_reports_prepared_state_when_final_admission_is_rev
 
 
 @pytest.mark.parametrize("composed", [False, True])
+def test_development_recovery_revalidates_artifacts_after_prepare(tmp_path: Path, composed: bool) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=composed)
+    deployment = cache / "deployments" / "development" / deployment_id.replace(":", "-", 1)
+
+    def corrupt() -> None:
+        _corrupt_release_artifact(cache, release_id)
+
+    coordinator = _CompositionCoordinator(prepare_action=corrupt) if composed else _Coordinator(prepare_action=corrupt)
+
+    with pytest.raises(DeploymentCacheError) as denied:
+        DeploymentCacheMaterializer(
+            cache,
+            workspace_activation=None if composed else coordinator,
+            composition_activation_coordinator=coordinator if composed else None,
+            development_admission=_admission(authority, "activate", release_id, deployment_id),
+            development_admission_verifier=_admission_verifier(authority),
+            clock=_clock,
+        ).recover(
+            deployment,
+            environment="development",
+            promoted_by="test://platform",
+            expected_current_deployment_id=None,
+        )
+
+    assert denied.value.code == "DPONE_CACHE_ARTIFACT_SIZE_MISMATCH"
+    assert denied.value.details == {"state_may_have_changed": True, "recovery_required": True}
+    assert not (cache / "current").exists()
+    assert not (cache / "current-pointer.json").exists()
+
+
+@pytest.mark.parametrize("composed", [False, True])
+@pytest.mark.parametrize("operation", ["promote", "recover"])
+def test_development_activation_closes_final_authority_verifier_failure(
+    tmp_path: Path,
+    composed: bool,
+    operation: str,
+) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=composed)
+    deployment = cache / "deployments" / "development" / deployment_id.replace(":", "-", 1)
+    coordinator = _CompositionCoordinator() if composed else _Coordinator()
+    verifier = _UnavailableOnCallVerifier(_admission_verifier(authority), fail_on_call=2)
+    materializer = DeploymentCacheMaterializer(
+        cache,
+        workspace_activation=None if composed else coordinator,
+        composition_activation_coordinator=coordinator if composed else None,
+        development_admission=_admission(authority, "activate", release_id, deployment_id),
+        development_admission_verifier=verifier,
+        clock=_clock,
+    )
+
+    with pytest.raises(DeploymentCacheError) as denied:
+        if operation == "promote":
+            materializer.promote(deployment, environment="development")
+        else:
+            materializer.recover(
+                deployment,
+                environment="development",
+                promoted_by="test://platform",
+                expected_current_deployment_id=None,
+            )
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED"
+    assert denied.value.details == {"state_may_have_changed": True, "recovery_required": True}
+    assert verifier.calls == 2
+    assert not (cache / "current").exists()
+    assert not (cache / "current-pointer.json").exists()
+
+
+@pytest.mark.parametrize("composed", [False, True])
+def test_development_activation_closes_initial_authority_verifier_failure(tmp_path: Path, composed: bool) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=composed)
+    deployment = cache / "deployments" / "development" / deployment_id.replace(":", "-", 1)
+    coordinator = _CompositionCoordinator() if composed else _Coordinator()
+    verifier = _UnavailableOnCallVerifier(_admission_verifier(authority), fail_on_call=1)
+
+    with pytest.raises(DeploymentCacheError) as denied:
+        DeploymentCacheMaterializer(
+            cache,
+            workspace_activation=None if composed else coordinator,
+            composition_activation_coordinator=coordinator if composed else None,
+            development_admission=_admission(authority, "activate", release_id, deployment_id),
+            development_admission_verifier=verifier,
+            clock=_clock,
+        ).promote(deployment, environment="development")
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED"
+    assert denied.value.details == {}
+    assert verifier.calls == 1
+    assert coordinator.events == []
+    assert not (cache / "activations").exists()
+    assert not (cache / "current").exists()
+
+
+@pytest.mark.parametrize("composed", [False, True])
 def test_development_audit_repair_rechecks_admission_before_readback(tmp_path: Path, composed: bool) -> None:
     authority = _development_authority()
     cache, release_id, deployment_id = _development_projection(tmp_path, composed=composed)
@@ -459,3 +623,77 @@ def test_development_audit_repair_rechecks_admission_before_readback(tmp_path: P
     assert repaired.deployment_id == deployment_id
     assert coordinator.events == [("require_active", current.activation_id)]
     assert (cache / "current-pointer-audit.jsonl").is_file()
+
+
+@pytest.mark.parametrize("composed", [False, True])
+def test_development_audit_repair_revalidates_artifacts_after_readback(tmp_path: Path, composed: bool) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=composed)
+    deployment = cache / "deployments" / "development" / deployment_id.replace(":", "-", 1)
+    coordinator = _CompositionCoordinator() if composed else _Coordinator()
+    materializer = DeploymentCacheMaterializer(
+        cache,
+        workspace_activation=None if composed else coordinator,
+        composition_activation_coordinator=coordinator if composed else None,
+        development_admission=_admission(authority, "activate", release_id, deployment_id),
+        development_admission_verifier=_admission_verifier(authority),
+        clock=_clock,
+    )
+    current = materializer.promote(deployment, environment="development")
+    audit = cache / "current-pointer-audit.jsonl"
+    audit.unlink()
+    coordinator.events.clear()
+    coordinator.require_active_action = lambda: _corrupt_release_artifact(cache, release_id)
+
+    with pytest.raises(DeploymentCacheError) as denied:
+        materializer.repair_audit(
+            environment="development",
+            recovery_actor="test://platform",
+            expected_current_deployment_id=current.deployment_id,
+        )
+
+    assert denied.value.code == "DPONE_CACHE_ARTIFACT_SIZE_MISMATCH"
+    assert coordinator.events == [("require_active", current.activation_id)]
+    assert not audit.exists()
+
+
+@pytest.mark.parametrize("composed", [False, True])
+def test_development_audit_repair_closes_final_authority_verifier_failure(tmp_path: Path, composed: bool) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=composed)
+    deployment = cache / "deployments" / "development" / deployment_id.replace(":", "-", 1)
+    coordinator = _CompositionCoordinator() if composed else _Coordinator()
+    admission = _admission(authority, "activate", release_id, deployment_id)
+    materializer = DeploymentCacheMaterializer(
+        cache,
+        workspace_activation=None if composed else coordinator,
+        composition_activation_coordinator=coordinator if composed else None,
+        development_admission=admission,
+        development_admission_verifier=_admission_verifier(authority),
+        clock=_clock,
+    )
+    current = materializer.promote(deployment, environment="development")
+    audit = cache / "current-pointer-audit.jsonl"
+    audit.unlink()
+    coordinator.events.clear()
+    verifier = _UnavailableOnCallVerifier(_admission_verifier(authority), fail_on_call=2)
+
+    with pytest.raises(DeploymentCacheError) as denied:
+        DeploymentCacheMaterializer(
+            cache,
+            workspace_activation=None if composed else coordinator,
+            composition_activation_coordinator=coordinator if composed else None,
+            development_admission=admission,
+            development_admission_verifier=verifier,
+            clock=_clock,
+        ).repair_audit(
+            environment="development",
+            recovery_actor="test://platform",
+            expected_current_deployment_id=current.deployment_id,
+        )
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED"
+    assert denied.value.details == {}
+    assert verifier.calls == 2
+    assert coordinator.events == [("require_active", current.activation_id)]
+    assert not audit.exists()
