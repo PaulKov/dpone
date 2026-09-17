@@ -8,14 +8,16 @@ from dpone.runtime.sinks.clickhouse_full_refresh_catalog import ClickHouseFullRe
 class _Connector:
     def __init__(self) -> None:
         self.queries: list[str] = []
+        self.query_ids: list[str | None] = []
         self.rows: list[Any] = []
 
     def get_records(self, query: str) -> list[Any]:
         self.queries.append(query)
         return self.rows
 
-    def execute_query(self, query: str) -> None:
+    def execute_query(self, query: str, *, query_id: str | None = None) -> None:
         self.queries.append(query)
+        self.query_ids.append(query_id)
 
 
 def test_catalog_projects_database_and_table_identity() -> None:
@@ -38,8 +40,8 @@ def test_catalog_renders_single_non_retried_publication_statements() -> None:
     catalog = ClickHouseFullRefreshCatalog(connector)
 
     catalog.create_marker("analytics", "marker", '{"operation_id":"one"}')
-    catalog.exchange("analytics", "target", "candidate")
-    catalog.rename("analytics", "candidate", "target")
+    catalog.exchange("analytics", "target", "candidate", query_id="exchange-id")
+    catalog.rename("analytics", "candidate", "target", query_id="rename-id")
     catalog.drop("analytics", "candidate")
 
     assert connector.queries == [
@@ -48,3 +50,4 @@ def test_catalog_renders_single_non_retried_publication_statements() -> None:
         "RENAME TABLE `analytics`.`candidate` TO `analytics`.`target`",
         "DROP TABLE `analytics`.`candidate`",
     ]
+    assert connector.query_ids == [None, "exchange-id", "rename-id", None]

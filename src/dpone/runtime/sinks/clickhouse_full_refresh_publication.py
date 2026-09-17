@@ -236,6 +236,10 @@ class ClickHouseFullRefreshPublicationService:
                     "DPONE_CLICKHOUSE_FULL_REFRESH_PUBLICATION_IN_FLIGHT",
                     "the previous publication query is still active",
                 )
+            raise ClickHouseFullRefreshOutcomeUnknown(
+                "DPONE_CLICKHOUSE_FULL_REFRESH_REDISPATCH_FORBIDDEN",
+                "only the atomic marker creator may dispatch publication DDL",
+            )
         raised = False
         try:
             if marker.predecessor_uuid is None:

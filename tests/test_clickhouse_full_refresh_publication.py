@@ -41,6 +41,7 @@ class _Catalog:
         self.fail_quiescence = False
         self.active_query_ids: set[str] = set()
         self.last_query_id: str | None = None
+        self.after_marker_created: Any | None = None
 
     @staticmethod
     def _table(name: str, uuid: str, *, engine: str = "MergeTree", comment: str = "") -> ClickHousePublicationTable:
@@ -61,6 +62,8 @@ class _Catalog:
         self.records[marker] = self._table(
             marker, "33333333-3333-3333-3333-333333333333", engine="TinyLog", comment=comment
         )
+        if self.after_marker_created is not None:
+            self.after_marker_created()
 
     def exchange(self, database: str, target: str, candidate: str, *, query_id: str) -> None:
         assert database == "analytics"
@@ -183,7 +186,7 @@ def test_uncommitted_exchange_error_is_not_retried_in_same_attempt() -> None:
     assert publication_marker_name("target") in catalog.records
 
 
-def test_same_run_retry_resumes_pending_marker_before_source_io() -> None:
+def test_same_run_retry_never_redispatches_a_pending_marker() -> None:
     catalog = _Catalog()
     catalog.fail_exchange = "before"
     service = ClickHouseFullRefreshPublicationService(catalog)
@@ -191,15 +194,34 @@ def test_same_run_retry_resumes_pending_marker_before_source_io() -> None:
         service.publish(_config(), _candidate(_config()), staged_rows=9)
 
     catalog.fail_exchange = None
-    admitted = service.prepare_admission(_config())
-    replay = service.replay_result(admitted)
+    with pytest.raises(ClickHouseFullRefreshOutcomeUnknown, match="marker creator"):
+        service.prepare_admission(_config())
 
-    assert replay is not None
-    assert replay.inserted_rows == 9
-    assert replay.total_rows == 9
-    assert replay.commit_outcome is not None
-    assert catalog.exchange_calls == 2
-    assert set(catalog.records) == {"target"}
+    assert catalog.exchange_calls == 1
+    assert catalog.records["target"].uuid == _OLD
+
+
+def test_atomic_marker_creator_is_the_only_dispatcher_during_two_worker_race() -> None:
+    catalog = _Catalog()
+    first = ClickHouseFullRefreshPublicationService(catalog)
+    second = ClickHouseFullRefreshPublicationService(catalog)
+    second_errors: list[Exception] = []
+
+    def race_second_worker() -> None:
+        try:
+            second.prepare_admission(_config())
+        except Exception as exc:  # noqa: BLE001 - capture the exact competing worker outcome
+            second_errors.append(exc)
+
+    catalog.after_marker_created = race_second_worker
+    receipt = first.publish(_config(), _candidate(_config()), staged_rows=9)
+
+    assert len(second_errors) == 1
+    assert isinstance(second_errors[0], ClickHouseFullRefreshOutcomeUnknown)
+    assert "REDISPATCH_FORBIDDEN" in str(second_errors[0])
+    assert catalog.exchange_calls == 1
+    assert catalog.records["target"].uuid == _NEW
+    first.cleanup(receipt)
 
 
 def test_retry_waits_for_ambiguous_server_query_then_reconciles_without_second_exchange() -> None:
@@ -372,7 +394,7 @@ def test_runtime_hook_delegates_prepare_and_replay() -> None:
     assert runtime.replay_result(prepared) is replay
 
 
-def test_runtime_identity_survives_fresh_audit_records_and_resumes_before_source_io() -> None:
+def test_runtime_identity_survives_fresh_audit_records_without_granting_redispatch() -> None:
     from dpone.contracts.run_context import RunContext
     from dpone.runtime.sinks.clickhouse_sink import ClickHouseSink
 
@@ -393,14 +415,14 @@ def test_runtime_identity_survives_fresh_audit_records_and_resumes_before_source
         service.publish(first, _candidate(first), staged_rows=9)
 
     catalog.fail_exchange = None
-    second = ClickHouseSink.prepare_runtime_admission(
-        sink,
-        _config(run_id="audit-attempt-2"),
-        run_context=context,
-        load_record=SimpleNamespace(run_id="audit-attempt-2"),
-        dag_id="workflow",
-    )
+    with pytest.raises(ClickHouseFullRefreshOutcomeUnknown, match="marker creator"):
+        ClickHouseSink.prepare_runtime_admission(
+            sink,
+            _config(run_id="audit-attempt-2"),
+            run_context=context,
+            load_record=SimpleNamespace(run_id="audit-attempt-2"),
+            dag_id="workflow",
+        )
 
-    assert service.replay_result(second) is not None
-    assert catalog.exchange_calls == 2
-    assert set(catalog.records) == {"target"}
+    assert catalog.exchange_calls == 1
+    assert publication_marker_name("target") in catalog.records
