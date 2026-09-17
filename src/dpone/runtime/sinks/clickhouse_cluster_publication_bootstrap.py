@@ -7,7 +7,7 @@ from collections import Counter
 from collections.abc import Sequence
 from typing import Any
 
-from dpone.contracts import clickhouse_cluster_publication as contracts
+from dpone.ports.clickhouse_cluster_publication import contracts
 
 _KEEPER_PATH = "/dpone_cluster_publication_authority"
 _COLUMNS = (

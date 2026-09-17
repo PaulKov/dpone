@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from dpone.contracts import clickhouse_cluster_publication as contracts
+from dpone.ports.clickhouse_cluster_publication import contracts
 from dpone.runtime.sinks.clickhouse_full_refresh_contract import FullRefreshPublicationMarker
 
 CLUSTER_RECEIPT_VERSION = "dpone.clickhouse.cluster-full-refresh-receipt.v1"

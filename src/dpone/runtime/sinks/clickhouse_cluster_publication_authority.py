@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from dpone.contracts import clickhouse_cluster_publication as contracts
+from dpone.ports.clickhouse_cluster_publication import contracts
 
 AUTHORITY_TABLE = contracts.AUTHORITY_TABLE
 _MUTATION_SETTINGS = {"keeper_map_strict_mode": 1, "insert_keeper_max_retries": 0}
