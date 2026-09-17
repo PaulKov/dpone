@@ -13,6 +13,10 @@ from dpone.ports.clickhouse_cluster_publication import (
     ClusterPublicationCatalogPort,
     ClusterPublicationDdlPort,
     contracts,
+    require_exact_ddl_entry,
+)
+from dpone.ports.clickhouse_cluster_publication import (
+    require_verified_mutation as _require_verified,
 )
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
 from dpone.runtime.sinks.clickhouse_full_refresh_contract import (
@@ -190,7 +194,14 @@ class ClickHouseClusterFullRefreshPublicationService:
             return
         inventory = self._catalog.inventory(resolved.cluster)
         _require_inventory(current.record, inventory)
-        self._require_publication_entry(current.record, resolved.cluster)
+        require_exact_ddl_entry(
+            self._ddl,
+            resolved.cluster,
+            entry_id=current.record.ddl_entry,
+            token=current.record.ddl_correlation_token,
+            query_digest=current.record.ddl_query_digest,
+            error_code="DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN",
+        )
         if current.record.predecessor is None:
             if current.record.phase is not AuthorityPhase.COMMITTED:
                 raise ClusterPublicationError(
@@ -248,7 +259,14 @@ class ClickHouseClusterFullRefreshPublicationService:
         hosts: tuple[str, ...],
         states: tuple[ReplicaPublicationState, ...],
     ) -> None:
-        entry = self._require_cleanup_entry(current.record, cluster)
+        entry = require_exact_ddl_entry(
+            self._ddl,
+            cluster,
+            entry_id=current.record.cleanup_entry,
+            token=current.record.cleanup_correlation_token,
+            query_digest=current.record.cleanup_query_digest,
+            error_code="DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNKNOWN",
+        )
         if entry.state_for(hosts) not in {
             QueueState.TERMINAL_SUCCESS,
             QueueState.TERMINAL_FAILURE,
@@ -275,7 +293,14 @@ class ClickHouseClusterFullRefreshPublicationService:
         inventory = self._catalog.inventory(cluster)
         _require_inventory(record, inventory)
         hosts = inventory.hosts
-        entry = self._require_publication_entry(record, cluster)
+        entry = require_exact_ddl_entry(
+            self._ddl,
+            cluster,
+            entry_id=record.ddl_entry,
+            token=record.ddl_correlation_token,
+            query_digest=record.ddl_query_digest,
+            error_code="DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN",
+        )
         queue_state = entry.state_for(hosts)
         observed = self._catalog.generations(cluster, record.database, record.target, record.candidate, hosts)
         states = tuple(
@@ -310,48 +335,6 @@ class ClickHouseClusterFullRefreshPublicationService:
         return ClusterFullRefreshReceipt(
             marker=marker, authority=current.record, authority_version=current.version, cluster=cluster
         )
-
-    def _require_publication_entry(self, record: AuthorityRecord, cluster: str) -> Any:
-        return self._require_exact_entry(
-            cluster,
-            entry_id=record.ddl_entry,
-            token=record.ddl_correlation_token,
-            query_digest=record.ddl_query_digest,
-            error_code="DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN",
-        )
-
-    def _require_cleanup_entry(self, record: AuthorityRecord, cluster: str) -> Any:
-        return self._require_exact_entry(
-            cluster,
-            entry_id=record.cleanup_entry,
-            token=record.cleanup_correlation_token,
-            query_digest=record.cleanup_query_digest,
-            error_code="DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNKNOWN",
-        )
-
-    def _require_exact_entry(
-        self,
-        cluster: str,
-        *,
-        entry_id: str | None,
-        token: str | None,
-        query_digest: str | None,
-        error_code: str,
-    ) -> Any:
-        if not token or not query_digest:
-            raise ClusterPublicationError(error_code, "DDL identity is incomplete")
-        entries: tuple[Any, ...]
-        if entry_id:
-            entry = self._ddl.read_entry(cluster, entry_id)
-            entries = () if entry is None else (entry,)
-        else:
-            entries = self._ddl.find_entries(cluster, token)
-        if len(entries) != 1:
-            raise ClusterPublicationError(error_code, "exactly one queue entry required")
-        entry = entries[0]
-        if entry.correlation_token != token or entry.query_digest != query_digest:
-            raise ClusterPublicationError(error_code, "queue entry does not match the fenced DDL identity")
-        return entry
 
     def _revalidate_pre_dispatch(self, cluster: str, record: AuthorityRecord) -> None:
         inventory = self._catalog.inventory(cluster)
@@ -397,17 +380,6 @@ class ClickHouseClusterFullRefreshPublicationService:
             return
         completed = replace(current.record, phase=AuthorityPhase.COMPLETED)
         _require_verified(authority.compare_and_swap(current, completed), permit=False)
-
-
-def _require_verified(result: Any, *, permit: bool) -> VersionedAuthorityRecord:
-    if result.status is not AuthorityMutationStatus.VERIFIED or result.observed is None:
-        code = "DPONE_CLICKHOUSE_CLUSTER_CAS_UNKNOWN"
-        if result.status is AuthorityMutationStatus.CONFLICT:
-            code = "DPONE_CLICKHOUSE_CLUSTER_CAS_CONFLICT"
-        raise ClusterPublicationError(code, "KeeperMap mutation was not acknowledged and verified")
-    if permit and result.permit is None:
-        raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_CAS_UNKNOWN", "dispatch permit was not issued")
-    return result.observed
 
 
 def _operation_id(load_config: Any) -> str:
