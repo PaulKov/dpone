@@ -23,6 +23,31 @@ class ClusterFullRefreshReceipt:
     cluster: str
     schema_version: str = CLUSTER_RECEIPT_VERSION
 
+    @classmethod
+    def from_authority(
+        cls,
+        current: contracts.VersionedAuthorityRecord,
+        cluster: str,
+    ) -> ClusterFullRefreshReceipt:
+        """Build the stable receipt from the currently verified authority row."""
+
+        record = current.record
+        marker = FullRefreshPublicationMarker.create(
+            operation_id=record.operation_id,
+            database=record.database,
+            target=record.target,
+            candidate=record.candidate,
+            predecessor_uuid=record.predecessor.uuid if record.predecessor else None,
+            desired_uuid=record.desired.uuid,
+            staged_rows=record.staged_rows,
+        )
+        return cls(
+            marker=marker,
+            authority=record,
+            authority_version=current.version,
+            cluster=cluster,
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
