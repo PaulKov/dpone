@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from dpone.contracts.development_delivery_authority import (
     DevelopmentAuthorityError,
+    DevelopmentAuthorityReceipt,
     DevelopmentExecutionSubject,
     development_release_authority_projection,
     require_development_runtime_authority,
@@ -44,6 +45,8 @@ def authorize_development_runtime(
         if not isinstance(result, DevelopmentRuntimeAuthorization):
             raise DevelopmentAuthorityError("runtime_authorization")
         receipt = result.authority
+        if type(receipt) is not DevelopmentAuthorityReceipt:
+            raise DevelopmentAuthorityError("runtime_authorization")
         if receipt.environment != plan.environment:
             raise DevelopmentAuthorityError("environment")
         receipt.require_current(

@@ -74,6 +74,16 @@ class _RegistryFactory:
         raise AssertionError("registry construction must follow authorization")
 
 
+class _FakeReceipt:
+    environment = "dev"
+
+    def require_current(self, **_kwargs):
+        raise AssertionError("malformed receipt methods must not be called")
+
+    def allows_execution(self, _subject):
+        raise AssertionError("malformed receipt methods must not be called")
+
+
 def _receipt(*, subjects: tuple[DevelopmentExecutionSubject, ...]) -> DevelopmentAuthorityReceipt:
     return DevelopmentAuthorityReceipt(
         policy_sha256="sha256:" + "1" * 64,
@@ -165,6 +175,53 @@ def test_both_runtime_processes_deny_before_registry_or_ready_access(tmp_path) -
         assert exc_info.value.code == "DPONE_DEVELOPMENT_RUNTIME_AUTHORITY_REQUIRED"
 
     assert len(verifier.requests) == 2
+    assert registry_factory.called is False
+    assert not (tmp_path / "missing-artifacts").exists()
+
+
+@pytest.mark.parametrize(
+    "execution",
+    (
+        RuntimeExecutionSelection(
+            kind="runtime",
+            selector="orders",
+            scope="workload",
+            hook_execution="externalized",
+        ),
+        RuntimeExecutionSelection(
+            kind="pre_hook",
+            selector="orders",
+            scope="process",
+            process_selector="orders",
+            hook_name="prepare_orders",
+            hook_execution="externalized",
+        ),
+    ),
+)
+def test_malformed_inner_receipt_is_denied_before_registry(execution, tmp_path) -> None:
+    plan = replace(_plan(), execution=execution, development_authority_required=True)
+    payload = canonical_runtime_init_fetch_plan_bytes(plan)
+    environment = {
+        PLAN_B64_ENV: base64.b64encode(payload).decode("ascii"),
+        PLAN_SHA256_ENV: runtime_init_fetch_plan_sha256(plan),
+    }
+    registry_factory = _RegistryFactory()
+    malformed = DevelopmentRuntimeAuthorization(
+        authority=_FakeReceipt(),
+        checked_at=_NOW,
+        current_revocation_epoch=7,
+    )
+    service = AirflowRuntimeInitFetchService(
+        development_runtime_authority=_Authority(malformed),
+        registry_factory=registry_factory,
+        artifact_root=tmp_path / "missing-artifacts",
+        worktree_root=tmp_path / "missing-worktree",
+    )
+
+    with pytest.raises(InitFetchError) as exc_info:
+        service.init_fetch(environment)
+
+    assert exc_info.value.code == "DPONE_DEVELOPMENT_RUNTIME_AUTHORITY_REQUIRED"
     assert registry_factory.called is False
     assert not (tmp_path / "missing-artifacts").exists()
 
