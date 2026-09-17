@@ -225,9 +225,9 @@ def _require_supported_transfer(manifest: Mapping[str, Any]) -> None:
     hooks = options.get("hooks") if isinstance(options, Mapping) else None
     if hooks is None:
         return
-    if not isinstance(hooks, Mapping) or set(hooks) - {"pre_hook"}:
-        raise OrdinaryReleaseInventoryError("ordinary composition permits only SQL pre-hooks")
-    pre_hooks = hooks.get("pre_hook")
+    if not isinstance(hooks, Mapping) or set(hooks) - {"pre_hook", "post_hook"}:
+        raise OrdinaryReleaseInventoryError("ordinary composition permits only SQL hooks")
+    pre_hooks = hooks.get("pre_hook", [])
     if not isinstance(pre_hooks, list):
         raise OrdinaryReleaseInventoryError("ordinary pre-hook declaration is invalid")
     for hook in pre_hooks:
@@ -239,6 +239,17 @@ def _require_supported_transfer(manifest: Mapping[str, Any]) -> None:
             or execution.get("airflow") != "separate_task"
         ):
             raise OrdinaryReleaseInventoryError("ordinary composition requires separately scheduled SQL pre-hooks")
+    post_hooks = hooks.get("post_hook", [])
+    if not isinstance(post_hooks, list):
+        raise OrdinaryReleaseInventoryError("ordinary post-hook declaration is invalid")
+    for hook in post_hooks:
+        execution = hook.get("execution") if isinstance(hook, Mapping) else None
+        if (
+            not isinstance(hook, Mapping)
+            or hook.get("type") != "sql"
+            or (isinstance(execution, Mapping) and execution.get("airflow") == "separate_task")
+        ):
+            raise OrdinaryReleaseInventoryError("ordinary composition permits only inline SQL post-hooks")
 
 
 def _require_source_family(manifest: Mapping[str, Any], *, workload_id: str) -> None:

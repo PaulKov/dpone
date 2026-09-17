@@ -67,16 +67,19 @@ compatible while authority remains distinct.
 
 ## Materialize and compose
 
-Materialize the complete workspace with the existing immutable release
-materializer. It detects the development schema and adds promotion profile
-`development_workspace_delivery_v1`:
+Materialize the complete workspace through the authenticated Python boundary.
+The public CLI has no verifier injection and therefore rejects this release
+family. The materializer adds profile `development_workspace_delivery_v1`:
 
-```bash
-dpone gitops airflow release-materialize \
-  --pack-root .dpone/development-workspace \
-  --cache-root .dpone-cache \
-  --xcom-sidecar-image registry.example/xcom@sha256:<digest> \
-  --format json
+```python
+from dpone.readiness.airflow_compact_pack_release import materialize_compact_pack_release
+
+materialized = materialize_compact_pack_release(
+    pack_root=compiled_root,
+    cache_root=cache_root,
+    xcom_sidecar_image=xcom_sidecar_image,
+    development_authority=verified_receipt,
+)
 ```
 
 The Python composition request must use the same profile when ordinary
@@ -87,6 +90,7 @@ from dpone.contracts.development_delivery_authority import (
     DEVELOPMENT_COMPOSITION_PROFILE,
 )
 from dpone.contracts.release_composition import ReleaseCompositionRequest
+from dpone.app.release_composition import build_release_composition_service
 
 request = ReleaseCompositionRequest(
     native_root=native_release_root,
@@ -97,26 +101,26 @@ request = ReleaseCompositionRequest(
     xcom_sidecar_image=xcom_sidecar_image,
     profile=DEVELOPMENT_COMPOSITION_PROFILE,
 )
+report = build_release_composition_service(
+    development_authority=verified_receipt,
+).compose(request)
 ```
 
 The parent remains `dpone.release-set.v3`. Its promotion profile and native
 child schema identify development authority; no constituent is relabeled as a
 production release.
 
-## Runtime authority
+## Runtime status
 
-Delivery is not execution permission. Before a development dbt task starts,
-the runtime entrypoint must receive the current externally verified receipt and
-check all of the following again:
+Delivery is not execution permission. The standard dpone runtime deliberately
+rejects development releases in this increment, even when the delivery receipt
+contains execution subjects. This prevents artifact delivery from becoming an
+implicit credential or writer grant.
 
-1. the receipt projection exactly matches the immutable release;
-2. the current revocation epoch equals the receipt epoch;
-3. the current time is inside the bounded validity window;
-4. the exact workload and command kind appear in `execution_subjects`.
-
-A missing current receipt fails before credential resolution, source access, or
-writer issuance. A delivered workspace with an empty `execution_subjects` list
-is intentionally dormant.
+A later runtime feature must inject a current externally verified receipt before
+init-fetch, credential resolution or source access and bind it to the exact
+workload and command kind. Until that protected entrypoint exists, the delivered
+workspace is intentionally dormant and cannot be described as runnable.
 
 ## Ordinary flow constraints
 

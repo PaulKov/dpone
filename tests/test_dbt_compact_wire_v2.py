@@ -76,10 +76,19 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
     assert source["development_authority"] == authority.release_projection()
     assert source["provenance"]["route_certifications"] == []
 
+    denied = materialize_compact_pack_release(
+        pack_root=compiled,
+        cache_root=tmp_path / "unauthorized-cache",
+        xcom_sidecar_image=SIDECAR,
+    )
+    assert not denied.passed
+    assert not (tmp_path / "unauthorized-cache").exists()
+
     materialized = materialize_compact_pack_release(
         pack_root=compiled,
         cache_root=tmp_path / "cache",
         xcom_sidecar_image=SIDECAR,
+        development_authority=authority,
     )
     assert materialized.passed, materialized.blockers
     release = json.loads(Path(materialized.release_dir, "release-set.json").read_bytes())

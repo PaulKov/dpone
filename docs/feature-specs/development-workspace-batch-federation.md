@@ -50,10 +50,11 @@ release and source closure.
 
 - a distinct development-native release schema and composition profile over the
   stable V2 artifact wire, never accepted as production authority;
-- an externally pinned development authority for an isolated nonproduction
-  deployment, with exact source-read and target-write participants and limits;
-- delivery-only native membership, with execution denied unless an exact
-  workload execution grant is supplied;
+- an externally pinned development delivery authority for an isolated
+  nonproduction deployment, with exact repository, commit, workload membership
+  and aggregate source-byte limits;
+- delivery-only native membership; the standard runtime remains fail-closed
+  for development releases in this increment;
 - a development composition parent containing a complete native workspace and
   ordinary flow/batch workloads;
 - ordinary DAG selectors and exact workload membership;
@@ -76,13 +77,14 @@ release and source closure.
 - arbitrary commands, custom runners, cross-constituent dependencies, implicit
   scheduling, or live production certification;
 - making a successful offline build evidence that a data route executed.
+- wiring development authority into the standard runtime launcher; that needs
+  a separately reviewed protected-entrypoint contract before live execution.
 
 ### Assumptions and constraints
 
 - development authority is externally signed and independently pinned;
-- source participants may be read-only shared systems only when explicitly
-  enrolled; target and control participants must be isolated nonproduction
-  systems;
+- physical source and target participant authorization remains outside this
+  delivery-only increment and cannot be inferred from release membership;
 - the source archive contains no credentials and stays within existing bounded
   extraction limits;
 - connection projection contains aliases and binding shape only; physical
@@ -113,8 +115,9 @@ development workspace writer and a development composition service from:
 - an ordinary flow closure verifier;
 - an integrity service and immutable publisher.
 
-Pure contracts classify authority families and workload execution eligibility.
-Adapters acquire files, signatures, registry bindings and clocks.
+Pure contracts classify authority families. Adapters acquire files, signatures,
+registry bindings and clocks. The standard runtime does not consume this
+development authority and therefore cannot execute these releases.
 
 ### Manifest/schema
 

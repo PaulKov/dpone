@@ -64,10 +64,11 @@ def test_public_composition_preserves_sources_and_exact_retry(composition_reques
 def test_development_workspace_and_ordinary_flow_compose_without_production_relabeling(tmp_path):
     prepare_projects(tmp_path / "workspace")
     compiled = tmp_path / "compiled"
+    authority = _development_authority()
     assert (
         workspace_service(
             tmp_path / "profiles",
-            development_authority=_development_authority(),
+            development_authority=authority,
         )
         .compile(tmp_path / "workspace", output_dir=compiled)
         .passed
@@ -76,10 +77,11 @@ def test_development_workspace_and_ordinary_flow_compose_without_production_rela
         pack_root=compiled,
         cache_root=tmp_path / "native-cache",
         xcom_sidecar_image=SIDECAR,
+        development_authority=authority,
     )
     assert native.passed, native.blockers
     ordinary = ordinary_root(tmp_path)
-    service = build_release_composition_service()
+    service = build_release_composition_service(development_authority=authority)
     inventory = service.inventory(ordinary, xcom_sidecar_image=SIDECAR)
     request = ReleaseCompositionRequest(
         native_root=Path(native.release_dir),
@@ -90,6 +92,10 @@ def test_development_workspace_and_ordinary_flow_compose_without_production_rela
         xcom_sidecar_image=SIDECAR,
         profile=DEVELOPMENT_COMPOSITION_PROFILE,
     )
+
+    denied = build_release_composition_service().compose(request)
+    assert not denied.passed
+    assert not request.output_dir.exists()
 
     report = service.compose(request)
     assert report.passed, report.blockers

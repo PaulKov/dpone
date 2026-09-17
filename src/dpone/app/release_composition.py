@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from dpone.app.dbt_promotion_composition import build_dbt_release_source_reader
+from dpone.contracts.development_delivery_authority import DevelopmentAuthorityReceipt
 from dpone.contracts.release_composition_ordinary import OrdinaryReleaseInventoryError
 from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
 from dpone.gitops.workload_dependencies import WorkloadDependencyResolver
@@ -26,7 +27,9 @@ from dpone.services.release_composition import ReleaseCompositionService, Verifi
 from dpone.version import installed_version
 
 
-def build_release_composition_service() -> ReleaseCompositionService:
+def build_release_composition_service(
+    *, development_authority: DevelopmentAuthorityReceipt | None = None
+) -> ReleaseCompositionService:
     """Construct the same mandatory verifiers for public CLI and Python callers."""
     native = build_dbt_release_source_reader()
     ordinary = build_ordinary_release_inventory_reader()
@@ -42,6 +45,7 @@ def build_release_composition_service() -> ReleaseCompositionService:
         read_file=read_confined_file,
         producer_version=installed_version(),
         durability_error=ImmutableLocalTreeDurabilityError,
+        development_authority=development_authority,
     )
 
 

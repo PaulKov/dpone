@@ -12,6 +12,7 @@ from dpone.contracts.dbt_relation_writes import require_distinct_logical_writes
 from dpone.contracts.development_delivery_authority import (
     DEVELOPMENT_COMPOSITION_PROFILE,
     DEVELOPMENT_RELEASE_SCHEMA,
+    DevelopmentAuthorityReceipt,
 )
 from dpone.contracts.release_composition import (
     COMPOSITION_PROFILE,
@@ -54,11 +55,13 @@ class ReleaseCompositionService:
         read_file: ConfinedReleaseFileReader,
         producer_version: str,
         durability_error: type[Exception],
+        development_authority: DevelopmentAuthorityReceipt | None = None,
     ) -> None:
         self._native, self._ordinary = native, ordinary
         self._integrity, self._publish, self._read = integrity, publisher, read_file
         self._version, self._durability_error = producer_version, durability_error
         self._capture = capture
+        self._development_authority = development_authority
 
     def inventory(self, root: Path, *, xcom_sidecar_image: str) -> Mapping[str, Any]:
         """Produce a verified source-only digest without publication or source writes."""
@@ -107,11 +110,24 @@ class ReleaseCompositionService:
             raise ValueError("composition source and destination cache must be disjoint")
         payload = self._read(root, "release-set.json", max_bytes=8 * 1024 * 1024)
         release = strict_json_object(payload)
+        native = next(row for row in release["constituents"] if row["id"] == "native")
+        if release.get("promotion", {}).get("profile") == DEVELOPMENT_COMPOSITION_PROFILE and (
+            self._development_authority is None
+            or self._development_authority.release_projection() != native["release"].get("development_authority")
+        ):
+            raise ValueError("development installation requires externally verified authority")
         files = self._capture.capture_verified_files(
             root, release_payload=payload, expected_release_id=release["release_id"]
         )
+        if (
+            self._development_authority is not None
+            and release.get("promotion", {}).get("profile") == DEVELOPMENT_COMPOSITION_PROFILE
+        ):
+            self._development_authority.require_release_budget(
+                workload_ids=tuple(sorted(item["id"] for item in release["artifacts"]["workload_packs"])),
+                source_bytes=sum(len(body) for body in files.values()),
+            )
         destination = cache_root / "releases" / release["release_id"].replace(":", "-", 1)
-        native = next(row for row in release["constituents"] if row["id"] == "native")
         ordinary = next(row for row in release["constituents"] if row["id"] == "standalone")
         request = ReleaseCompositionRequest(
             native_root=root,
@@ -164,6 +180,11 @@ class ReleaseCompositionService:
             raise ValueError("native input must already use the supported compact transport")
         if validate_release_set(native).failure is not None:
             raise ValueError("native input violates its public schema")
+        if request.profile == DEVELOPMENT_COMPOSITION_PROFILE:
+            if self._development_authority is None or self._development_authority.release_projection() != native.get(
+                "development_authority"
+            ):
+                raise ValueError("development composition requires externally verified authority")
         captured = self._native.capture_verified_files(
             native_root, release_payload=payload, expected_release_id=request.expected_release_id
         )
@@ -178,6 +199,12 @@ class ReleaseCompositionService:
             profile=request.profile,
         )
         release = strict_json_object(files["release-set.json"])
+        if self._development_authority is not None and request.profile == DEVELOPMENT_COMPOSITION_PROFILE:
+            workload_ids = tuple(sorted(item["id"] for item in release["artifacts"]["workload_packs"]))
+            self._development_authority.require_release_budget(
+                workload_ids=workload_ids,
+                source_bytes=sum(len(body) for body in files.values()),
+            )
         if validate_release_set(release).failure is not None:
             raise ValueError("composed release violates its public schema")
         self._integrity.require_capture_budget(len(body) for body in files.values())

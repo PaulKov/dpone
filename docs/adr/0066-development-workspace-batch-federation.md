@@ -21,12 +21,12 @@ from being tested without granting every native workload access to credentials.
 Add a closed development authority and release family defined by the approved
 [development workspace and batch federation specification](../feature-specs/development-workspace-batch-federation.md).
 The approved specification SHA-256 is
-`aaeb477cf17d0781ab082a432ae7fa47603e097a8e45bdd4c388de773f67c722`.
+`1ce4bf43e24cd3846f31a249fbfea5e8c05468e667a8b5c3243f60db20b0f260`.
 
 Development delivery authority permits an immutable deployment to contain the
-complete verified workspace. It does not permit any workload to execute. At task
-start, runtime must verify a separate exact workload execution subject before it
-resolves credentials, reads a source, runs a hook or issues a writer capability.
+complete verified workspace. It does not permit any workload to execute. The
+standard runtime remains fail-closed until a separately approved protected
+entrypoint can verify current authority before init-fetch or credential access.
 
 Production, development and isolated-synthetic documents have distinct authority
 schemas or profiles. Development and production dbt releases share the stable V2
@@ -50,7 +50,7 @@ workload can execute only under its own bounded grant. Delivery evidence cannot
 be reported as execution evidence.
 
 The feature adds an explicit authority path through compilation, release
-assembly, composition, cache, deployment and runtime admission. Older readers
+assembly, composition and cache delivery. Older readers
 reject the new documents. Existing production and synthetic release identities,
 validation results and runtime behavior do not change.
 

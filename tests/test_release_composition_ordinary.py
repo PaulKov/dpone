@@ -27,6 +27,7 @@ def ordinary_root(
     flow: bool = False,
     connection_projection: dict[str, object] | None = None,
     hook_phase: str | None = None,
+    hook_execution: str | None = "separate_task",
     second_process: bool = False,
 ) -> Path:
     """Use the public deterministic producers, never hand-assert producer identity."""
@@ -43,18 +44,21 @@ def ordinary_root(
             "  table:\n    schema: public\n    name: source_orders\n",
         )
         if hook_phase is not None:
-            transfer = transfer.replace(
-                "sink:\n",
+            execution = (
+                f"          execution:\n            airflow: {hook_execution}\n" if hook_execution is not None else ""
+            )
+            hook = (
                 "  options:\n    hooks:\n"
                 f"      {hook_phase}:\n"
                 "        - id: refresh_source\n"
                 "          kind: source_refresh\n"
                 "          type: sql\n"
                 "          sql: SELECT 1\n"
-                "          mutates_source: true\n"
-                "          execution:\n"
-                "            airflow: separate_task\n"
+                "          mutates_source: true\n" + execution + "sink:\n"
+            )
+            transfer = transfer.replace(
                 "sink:\n",
+                hook,
             )
         process_sources = [transfer]
         if second_process:
@@ -213,8 +217,20 @@ def test_capture_rejects_separate_post_hook(tmp_path: Path) -> None:
         hook_phase="post_hook",
     )
 
-    with pytest.raises(ValueError, match="pre-hooks"):
+    with pytest.raises(ValueError, match="inline SQL post-hooks"):
         _capture(root)
+
+
+def test_capture_preserves_inline_post_hook(tmp_path: Path) -> None:
+    root = ordinary_root(
+        tmp_path,
+        flow=True,
+        connection_projection=_alias_projection(),
+        hook_phase="post_hook",
+        hook_execution=None,
+    )
+
+    assert _capture(root).relation_writes[0].relation == "orders"
 
 
 def test_capture_rejects_resigned_projection_with_secret_material(tmp_path: Path) -> None:
