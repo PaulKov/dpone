@@ -15,6 +15,7 @@ from dpone.runtime.clickhouse_file_stage_contract import (
     require_transport_profile as require_transport_profile,
 )
 from dpone.runtime.clickhouse_staging_composition import (
+    ClickHouseFullRefreshPublicationMixin,
     build_clickhouse_staging_components,
 )
 from dpone.runtime.clickhouse_staging_composition import (
@@ -23,7 +24,6 @@ from dpone.runtime.clickhouse_staging_composition import (
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.sinks.clickhouse_bulk_mixin import ClickHouseBulkMixin
 from dpone.runtime.sinks.clickhouse_cluster_preflight import ClickHouseClusterPreflightMixin
-from dpone.runtime.sinks.clickhouse_full_refresh_publication import ClickHouseFullRefreshPublicationService
 from dpone.runtime.sinks.clickhouse_lineage_projection import ClickHouseSinkSideLineageProjector
 from dpone.runtime.sinks.clickhouse_nullability_policy import ClickHouseNullInsertPolicy
 from dpone.runtime.sinks.clickhouse_payload_ingestion import ClickHousePayloadIngestionService
@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 
 
 class ClickHouseSink(
+    ClickHouseFullRefreshPublicationMixin,
     ClickHouseTargetCatalogMixin,
     ClickHouseClusterPreflightMixin,
     ClickHouseBulkMixin,
@@ -94,37 +95,14 @@ class ClickHouseSink(
         self._validated_file_service = staging.validated_file
         self._staging_decoder = staging.decoder
         self._staging_finalizer = staging.finalizer
+        self._full_refresh_publication = staging.full_refresh_publication
         self._payload_ingestion = ClickHousePayloadIngestionService(self, sink_factory=self._clone_sink)
-        self._full_refresh_publication = ClickHouseFullRefreshPublicationService.from_connector(self.connector)
         self._staged_load = ClickHouseStagedLoadService(
             self,
             plan_staging_table=lambda config: self._operation_table_config(config, "staging"),
             create_planned_staging_table=self._create_planned_payload_staging_table,
         )
         self.lineage_projector = ClickHouseSinkSideLineageProjector(self)
-
-    def prepare_runtime_admission(
-        self,
-        load_config: LoadConfig,
-        *,
-        run_context: Any,
-        load_record: Any,
-        dag_id: str | None,
-    ) -> LoadConfig:
-        """Preflight or reconcile full-refresh publication before source I/O."""
-
-        del load_record
-        identified = self._full_refresh_publication.bind_runtime_identity(
-            load_config,
-            scheduler_run_id=str(getattr(run_context, "run_id", "") or ""),
-            process_id=str(dag_id or ""),
-        )
-        return self._full_refresh_publication.prepare_admission(identified)
-
-    def replay_result(self, load_config: LoadConfig) -> LoadResult | None:
-        """Return a catalog-reconciled source-free publication result."""
-
-        return self._full_refresh_publication.replay_result(load_config)
 
     def load(self, load_config: LoadConfig, payload: Any) -> LoadResult:
         return self._staged_load.load(load_config, payload)
@@ -280,9 +258,6 @@ class ClickHouseSink(
                 f"RENAME TABLE {self._table(replacement_config)} TO {self._table(load_config)}{cluster_clause}"
             )
         return None
-
-    def _cleanup_full_refresh_publication(self, receipt: Any) -> None:
-        self._full_refresh_publication.cleanup(receipt)
 
     def _insert_from_table(self, source_config: LoadConfig, target_config: LoadConfig) -> int:
         settings_clause = ClickHouseNullInsertPolicy.from_load_config(target_config).insert_select_settings_clause()
