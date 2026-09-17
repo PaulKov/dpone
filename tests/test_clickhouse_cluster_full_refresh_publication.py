@@ -105,6 +105,7 @@ class _Ddl:
         self.drift_after_dispatch = drift_after_dispatch
         self.unhealthy_target_after_dispatch = unhealthy_target_after_dispatch
         self.last_token = None
+        self.cleanup_dispatches = 0
 
     def publication_query_digest(self, record, *, cluster):
         return "digest"
@@ -139,7 +140,7 @@ class _Ddl:
         return self.find_entries(cluster, self.last_token)[0]
 
     def drop_predecessor(self, record, permit, *, cluster):
-        return None
+        self.cleanup_dispatches += 1
 
 
 class _Bootstrap:
@@ -228,3 +229,19 @@ def test_cleanup_revalidates_inventory_and_bound_publication_digest() -> None:
     ddl.publication_entry_digest = "changed-query-digest"
     with pytest.raises(ClusterPublicationError, match="DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN"):
         service.cleanup(receipt)
+
+
+def test_tampered_mapping_receipt_cannot_authorize_predecessor_drop() -> None:
+    catalog, authority = _Catalog(), _Authority()
+    ddl = _Ddl(catalog)
+    service = ClickHouseClusterFullRefreshPublicationService(catalog, lambda database: authority, ddl, _Bootstrap())
+    receipt = service.publish(_config(), _Candidate(), staged_rows=2)
+    tampered = receipt.to_dict()
+    tampered["authority"]["candidate"] = "unrelated_table"
+
+    with pytest.raises(ClusterPublicationError, match="DPONE_CLICKHOUSE_CLUSTER_RECEIPT_INVALID"):
+        service.cleanup(tampered)
+
+    assert ddl.cleanup_dispatches == 0
+    assert authority.current is not None
+    assert authority.current.record.phase.value == "COMMITTED"

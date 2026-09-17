@@ -57,6 +57,30 @@ class ClusterFullRefreshReceipt:
             "cluster": self.cluster,
         }
 
+    def validate_for_authority(self, current: contracts.VersionedAuthorityRecord) -> None:
+        """Reject stale or modified receipt identity before cleanup side effects."""
+
+        supplied, authoritative = self.authority, current.record
+        expected_target_key = contracts.digest_payload(
+            {
+                "cluster": self.cluster,
+                "database": authoritative.database,
+                "target": authoritative.target,
+            }
+        )
+        supplied_identity = _immutable_authority_identity(supplied)
+        authoritative_identity = _immutable_authority_identity(authoritative)
+        expected_marker = self.from_authority(current, self.cluster).marker
+        if (
+            expected_target_key != authoritative.target_key
+            or supplied_identity != authoritative_identity
+            or self.marker != expected_marker
+        ):
+            raise contracts.ClusterPublicationError(
+                "DPONE_CLICKHOUSE_CLUSTER_RECEIPT_INVALID",
+                "receipt identity does not match Keeper authority",
+            )
+
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> ClusterFullRefreshReceipt:
         if value.get("schema_version") != CLUSTER_RECEIPT_VERSION:
@@ -79,6 +103,23 @@ def authority_from_mapping(value: dict[str, Any]) -> contracts.AuthorityRecord:
     if value.get("predecessor") is not None:
         value["predecessor"] = contracts.GenerationIdentity(**_mapping(value["predecessor"]))
     return contracts.AuthorityRecord(**value)
+
+
+def _immutable_authority_identity(record: contracts.AuthorityRecord) -> tuple[Any, ...]:
+    return (
+        record.schema_version,
+        record.target_key,
+        record.operation_id,
+        record.fence_token,
+        record.inventory_digest,
+        record.plan_digest,
+        record.database,
+        record.target,
+        record.candidate,
+        record.desired,
+        record.predecessor,
+        record.staged_rows,
+    )
 
 
 def _mapping(value: Any) -> dict[str, Any]:

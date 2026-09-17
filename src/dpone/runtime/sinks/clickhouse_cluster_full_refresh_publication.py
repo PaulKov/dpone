@@ -184,11 +184,13 @@ class ClickHouseClusterFullRefreshPublicationService:
             if isinstance(receipt, ClusterFullRefreshReceipt)
             else ClusterFullRefreshReceipt.from_mapping(receipt)
         )
-        record = resolved.authority
-        authority = self._authority_factory(record.database)
-        current = authority.read_versioned(record.target_key)
-        if current is None or current.record.operation_id != record.operation_id:
+        supplied = resolved.authority
+        authority = self._authority_factory(supplied.database)
+        current = authority.read_versioned(supplied.target_key)
+        if current is None:
             raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "authority changed")
+        resolved.validate_for_authority(current)
+        record = current.record
         if current.record.phase is AuthorityPhase.COMPLETED:
             return
         inventory = self._catalog.inventory(resolved.cluster)
