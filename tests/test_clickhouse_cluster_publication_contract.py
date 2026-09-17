@@ -19,6 +19,7 @@ from dpone.contracts.clickhouse_cluster_publication import (
     classify_replica,
 )
 from dpone.runtime.sinks.clickhouse_cluster_publication_authority import ClickHouseKeeperMapAuthority
+from dpone.runtime.sinks.clickhouse_cluster_publication_catalog import ClickHouseClusterPublicationCatalog
 
 
 def _identity(uuid: str) -> GenerationIdentity:
@@ -158,3 +159,38 @@ def test_dispatch_permit_requires_exact_next_keeper_version() -> None:
     )
     assert result.status is AuthorityMutationStatus.CONFLICT
     assert result.permit is None
+
+
+def test_catalog_preserves_mixed_replica_facts_for_post_dispatch_classification() -> None:
+    class MixedConnector:
+        def get_records(self, query, params=None):
+            if "FROM clusterAllReplicas" in query and "system.tables" in query:
+                engine_old = "ReplicatedMergeTree('/tables/old', '{replica}')"
+                engine_new = "ReplicatedMergeTree('/tables/new', '{replica}')"
+                return [
+                    ("node1", "candidate", "old", engine_old, 1),
+                    ("node1", "target", "new", engine_new, 2),
+                    ("node2", "candidate", "new", engine_new, 2),
+                    ("node2", "target", "old", engine_old, 1),
+                ]
+            if "system.columns" in query:
+                columns = (("id", "UInt64", "", "", 1),)
+                return [(host, table, columns) for host in ("node1", "node2") for table in ("candidate", "target")]
+            if "system.replicas" in query:
+                return [
+                    ("node1", "candidate", "default", "/tables/old", 0, 0, 0, 2, 2, "", ""),
+                    ("node1", "target", "default", "/tables/new", 0, 0, 0, 2, 2, "", ""),
+                    ("node2", "candidate", "default", "/tables/new", 0, 0, 0, 2, 2, "", ""),
+                    ("node2", "target", "default", "/tables/old", 0, 0, 0, 2, 2, "", ""),
+                ]
+            raise AssertionError(query)
+
+    facts = ClickHouseClusterPublicationCatalog(MixedConnector()).generations(
+        "cluster", "analytics", "target", "candidate", ("node1", "node2")
+    )
+    old, new = facts[0].candidate, facts[0].target
+    assert old is not None and new is not None
+    assert tuple(classify_replica(item, desired=new, predecessor=old) for item in facts) == (
+        ReplicaPublicationState.COMMITTED,
+        ReplicaPublicationState.PENDING,
+    )

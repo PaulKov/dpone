@@ -43,6 +43,13 @@
 
 ### Fixed
 
+- Preserve mixed per-replica generation facts after a distributed ClickHouse
+  cutover so the publication state machine can distinguish active partial work
+  from terminal partial failure. Add pinned two-replica Docker evidence for
+  convergence on the original queue entry, terminal fail-closed retention, and
+  the exhaustive queue-status/exact-host matrix. Cluster admission remains
+  disabled while broader topology-drift certification is incomplete.
+
 - Close threaded backfill admission atomically with lease acquisition before
   persisting a chunk failure. Already admitted peers may finish; untouched chunks
   remain pending for resume. Preserve original failures when cleanup or reporting

@@ -105,8 +105,6 @@ class ClickHouseClusterPublicationCatalog:
             )
             for host, values in sorted(by_host.items())
         )
-        _require_consistent_generation(result, role="target")
-        _require_consistent_generation(result, role="candidate")
         return result
 
     def _replication_facts(
@@ -183,15 +181,6 @@ class ClickHouseClusterPublicationCatalog:
 
 def _normalize_engine(value: str) -> str:
     return " ".join(value.split())
-
-
-def _require_consistent_generation(rows: Sequence[contracts.ReplicaGeneration], *, role: str) -> None:
-    values = [getattr(row, role) for row in rows]
-    present = [value for value in values if value is not None]
-    if present and (len(present) != len(values) or len(set(present)) != 1):
-        raise contracts.ClusterPublicationError(
-            "DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED", f"{role} identity differs across replicas"
-        )
 
 
 def _queue_entries(rows: Sequence[Any]) -> tuple[contracts.QueueEntry, ...]:
