@@ -11,7 +11,6 @@ from dpone.gitops.schema_contract_primitives import (
     documented_contract,
     string_schema,
 )
-from dpone.gitops.schema_development_release import development_release_set_contract
 from dpone.gitops.schema_release_composition import release_composition_contract, release_composition_manifest_contract
 from dpone.gitops.schema_release_deployment_definitions import (
     identity_schema,
@@ -26,6 +25,7 @@ from dpone.gitops.schema_release_deployment_definitions import (
 from dpone.gitops.schema_release_deployment_v2_contracts import (
     airflow_deployment_index_v2_contract,
     deployment_set_v2_contract,
+    development_release_set_contract,
 )
 from dpone.gitops.schema_release_deployment_v3_contracts import (
     airflow_deployment_index_v3_contract,
