@@ -219,6 +219,9 @@ def test_real_five_modules_and_tables_install_or_exact_replay(same, existing):
         assert "CROSS APPLY OPENJSON(models.document)" in joined
         assert "model_identity.model_unique_id" in joined
         assert "STRING_ESCAPE((SELECT value FROM OPENJSON(models.document)" not in joined
+        assert "FOR XML PATH" not in joined
+        assert "ROW_NUMBER() OVER(ORDER BY CONVERT(varchar(max),[key]" in joined
+        assert joined.count("STRING_AGG(") == 2
 
 
 @pytest.mark.parametrize(

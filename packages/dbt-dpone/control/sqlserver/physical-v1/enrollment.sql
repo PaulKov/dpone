@@ -318,7 +318,8 @@ IF @enrollment IS NULL OR ISNULL(ISJSON(@enrollment,OBJECT),0)<>1
 DECLARE @documents TABLE(id int IDENTITY(1,1) PRIMARY KEY,document nvarchar(max),depth int,kind int);
 INSERT @documents(document,depth,kind) VALUES(@enrollment,1,5);
 DECLARE @document_id int=1,@document nvarchar(max),@depth int,@kind int,@tokens bigint=0,
- @members bigint,@scalars bigint,@canonical_document nvarchar(max);
+ @members bigint,@scalars bigint,@canonical_document nvarchar(max),@canonical_position int,
+ @canonical_key nvarchar(4000),@canonical_value nvarchar(max),@canonical_kind int;
 DECLARE @members_table TABLE(ordinal int,[key] nvarchar(4000),value nvarchar(max),kind int);
 WHILE EXISTS(SELECT 1 FROM @documents WHERE id=@document_id)
 BEGIN
@@ -340,14 +341,30 @@ BEGIN
    OR (kind=2 AND (value IS NULL OR value COLLATE Latin1_General_100_BIN2 LIKE N'%[^0-9-]%'
     OR DATALENGTH(REPLACE(value,N'-',N''))>256)))
   THROW 51600, 'DPONE_ENROLLMENT_INPUT_INVALID', 1;
- SELECT @canonical_document=CASE WHEN @kind=5 THEN N'{' ELSE N'[' END
-  +COALESCE(STRING_AGG(CONVERT(nvarchar(max),CASE WHEN @kind=5 THEN N'"'
-   +REPLACE(STRING_ESCAPE([key],'json'),NCHAR(92)+N'/',N'/')+N'":' ELSE N'' END)
-   +CASE WHEN kind=0 THEN N'null' WHEN kind=1 THEN N'"'
-    +REPLACE(STRING_ESCAPE(value,'json'),NCHAR(92)+N'/',N'/')+N'"' WHEN kind=2 AND value=N'-0' THEN N'0' ELSE value END,N',')
-   WITHIN GROUP(ORDER BY CASE WHEN @kind=4 THEN ordinal END,
-    CASE WHEN @kind=5 THEN CONVERT(varchar(max),[key] COLLATE Latin1_General_100_BIN2_UTF8) END COLLATE Latin1_General_100_BIN2_UTF8),N'')
-  +CASE WHEN @kind=5 THEN N'}' ELSE N']' END FROM @members_table;
+ IF @kind=5
+ BEGIN
+  ;WITH ordered AS
+  (SELECT ordinal,ROW_NUMBER() OVER(ORDER BY CONVERT(varchar(max),[key] COLLATE Latin1_General_100_BIN2_UTF8) COLLATE Latin1_General_100_BIN2_UTF8)-1 AS position
+   FROM @members_table)
+  UPDATE ordered SET ordinal=position;
+ END;
+ SET @canonical_document=CASE WHEN @kind=5 THEN N'{' ELSE N'[' END;
+ SET @canonical_position=0;
+ WHILE @canonical_position<@members
+ BEGIN
+  SELECT @canonical_key=NULL,@canonical_value=NULL,@canonical_kind=NULL;
+  SELECT @canonical_key=[key],@canonical_value=value,@canonical_kind=kind
+   FROM @members_table WHERE ordinal=@canonical_position;
+  IF @canonical_key IS NULL OR @canonical_kind IS NULL
+   THROW 51600, 'DPONE_ENROLLMENT_INPUT_INVALID', 1;
+  SET @canonical_document+=CASE WHEN @canonical_position=0 THEN N'' ELSE N',' END
+   +CASE WHEN @kind=5 THEN N'"'+REPLACE(STRING_ESCAPE(@canonical_key,'json'),NCHAR(92)+N'/',N'/')+N'":' ELSE N'' END
+   +CASE WHEN @canonical_kind=0 THEN N'null' WHEN @canonical_kind=1 THEN N'"'
+    +REPLACE(STRING_ESCAPE(@canonical_value,'json'),NCHAR(92)+N'/',N'/')+N'"'
+    WHEN @canonical_kind=2 AND @canonical_value=N'-0' THEN N'0' ELSE @canonical_value END;
+  SET @canonical_position+=1;
+ END;
+ SET @canonical_document+=CASE WHEN @kind=5 THEN N'}' ELSE N']' END;
  {{NATIVE_CANONICAL_CHECK}}
  INSERT @documents(document,depth,kind) SELECT value,@depth+1,kind FROM @members_table WHERE kind IN(4,5);
  IF (SELECT COUNT_BIG(*) FROM @documents)>{{NATIVE_MAX_TOKENS}}
