@@ -136,6 +136,20 @@ removes attempt staging, and leaves the published target unchanged. The limit
 counts emitted source bytes, before ClickHouse encoding and storage
 compression; it resets for every load attempt.
 
+For the bounded dbt route, publication is recoverable on a local ClickHouse
+`Atomic` or `Shared` database. dpone creates one target-local marker only after
+staging and blocking validation complete, records the exact target/candidate
+UUIDs, and uses one `EXCHANGE TABLES` for an existing target or one `RENAME
+TABLE` for initial publication. A lost client response is reconciled through
+`system.tables`; neither statement is blindly retried. Cleanup verifies the
+predecessor UUID before dropping it.
+
+Cluster-wide, `Distributed`, `Replicated*`, cross-database, and non-Atomic/Shared
+publication fail before mutation with a stable
+`DPONE_CLICKHOUSE_FULL_REFRESH_*` error. Legacy unbounded full refresh keeps its
+compatibility path and is not certified by this bounded protocol. Offline tests
+do not certify a live topology; see [connector certification](../connector-certification.md).
+
 ## Runtime algorithm
 
 ClickHouse implements `StagedLoadPort`, so this route records

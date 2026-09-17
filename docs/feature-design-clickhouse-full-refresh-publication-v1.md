@@ -8,7 +8,7 @@
 
 ## Executive summary
 
-Generic ClickHouse `full_refresh` currently replaces an existing target with a
+Bounded ClickHouse `full_refresh` currently replaces an existing target with a
 multi-table `RENAME` and immediately drops the predecessor. ClickHouse does not
 make a multi-entity rename atomic, and retrying an atomic exchange after an
 unknown reply can restore the old generation. This design replaces that path
@@ -40,10 +40,11 @@ blocked while unresolved authority remains.
 
 ### In scope
 
-- Existing-target publication with one `EXCHANGE TABLES` on admitted Atomic or
+- Bounded existing-target publication with one `EXCHANGE TABLES` on admitted Atomic or
   Shared database engines.
 - Absent-target publication with one `RENAME TABLE` and catalog reconciliation.
-- Deterministic operation/candidate identity for the same scheduler run.
+- Retry-stable operation identity plus the exact persisted attempt candidate for
+  the same scheduler run.
 - A target-local ClickHouse marker with strict versioned JSON metadata.
 - Exact `system.tables` observation of names, UUIDs, engines and marker comment.
 - Lost-response recovery, concurrent dpone attempt fencing and exact cleanup.
@@ -57,6 +58,8 @@ blocked while unresolved authority remains.
 - Retrofitting other load strategies or destination connectors.
 - Providing rollback after a later writer has changed the published target.
 - Certifying a live route from offline tests.
+- Changing legacy unbounded full refresh; it retains its compatibility path and
+  remains separate backlog until migrated deliberately.
 
 ### Assumptions and constraints
 
@@ -101,11 +104,13 @@ must not automatically repeat an unresolved exchange.
 
 ## Detailed algorithm
 
-1. Derive `operation_id = sha256(version, scheduler run identity, endpoint,
-   database, target, strategy, normalized plan identity)`; exclude worker try
-   number and random load IDs.
-2. Use deterministic candidate and fixed per-target marker names for full
-   refresh only. Keep random operation names for other strategies.
+1. Derive `operation_id = sha256(version, scheduler run identity, database,
+   target)`; exclude worker try number and random load IDs. The immutable marker
+   digest separately binds the exact candidate, predecessor/desired UUIDs and
+   staged row count for that operation.
+2. Keep the attempt-local candidate name and derive a fixed per-target marker
+   name. The immutable marker records the exact candidate and both UUIDs; a retry
+   never searches by prefix or creates a replacement candidate.
 3. Complete staging, byte-budget admission, schema/data validation and row-count
    evidence before publication authority is acquired.
 4. Probe the database engine, topology, target, candidate and marker. Reject
@@ -123,8 +128,9 @@ must not automatically repeat an unresolved exchange.
      candidate is absent for the absent-target branch;
    - unknown: every other mapping, missing observation or inconsistent replica.
 9. Acknowledged pending is a failure. Raised-but-committed is recovered success.
-   Raised-and-pending may retry the DDL only after query quiescence is proven;
-   V1 conservatively reports pending for the orchestration retry to reconcile.
+   Raised-and-pending is reported as unknown for the current attempt. A later
+   orchestration retry may execute the DDL once only after pre-source catalog
+   reconciliation proves the exact original pending UUID mapping.
 10. After verified commit, drop only the exact predecessor candidate whose UUID
     matches the marker, then drop the exact marker. Cleanup failure is
     `CLEANUP_PENDING`, not failed publication.
@@ -135,7 +141,7 @@ must not automatically repeat an unresolved exchange.
 ### Pseudocode
 
 ```text
-candidate = deterministic_candidate(run, target)
+candidate = validated_attempt_candidate
 marker = fixed_marker(target)
 prepare_and_validate(candidate)
 observation = inspect_catalog(target, candidate, marker)
@@ -197,7 +203,7 @@ Alternatives rejected: multi-rename (not atomic), blind repeated exchange (can
 restore old data), worker-local file/SQLite marker (not shared across workers),
 mandatory PostgreSQL journal (deployment dependency absent for many users), and
 name/age-based cleanup (does not prove ownership). ADR 0057 already establishes
-UUID reconciliation and no-blind-replay; this design specializes it for generic
+UUID reconciliation and no-blind-replay; this design specializes it for bounded
 full refresh without changing that decision.
 
 Quality target: focused modules stay below 350 SLOC where practicable and never

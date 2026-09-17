@@ -50,6 +50,12 @@
   slice, or certified BCP-stream evidence before ClickHouse target publication.
   Invalid, misplaced, exceeded, incomplete, or unmeasurable budgets now fail
   closed and clean attempt staging instead of being silently ignored.
+- Publish bounded ClickHouse full refresh through a target-local, UUID-bound
+  marker and one non-retried EXCHANGE/RENAME on admitted local Atomic/Shared
+  databases. Reconcile lost replies from catalog truth, fence another run, and
+  verify predecessor identity before cleanup. Unsupported clustered,
+  Distributed, Replicated, cross-database, or legacy unbounded paths are not
+  promoted by this change.
 - Resolve generated dbt MSSQL interval start filters without literal braces and
   align current setup and recovery guidance with the existing toolchain.
 - Hide overlapping dbt secrets and secret fragments at captured-output retention

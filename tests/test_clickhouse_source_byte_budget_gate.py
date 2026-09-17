@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
 from dpone.config.load_config import LoadConfig
 from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
+from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.sinks.clickhouse_staged_evidence import SourceByteBudgetError
 from dpone.runtime.sinks.clickhouse_staged_load import ClickHouseStagedLoadService
 
@@ -21,6 +23,8 @@ class _Sink:
         self._staging_decoder = _Decoder()
         self.dropped: list[str] = []
         self.swapped = False
+        self.publication_cleanup: Any | None = None
+        self.publication_receipt: Any | None = None
 
     def _create_payload_staging_table(self, load_config, payload):  # noqa: ANN001
         del payload
@@ -41,6 +45,15 @@ class _Sink:
     def _swap_table_into_target(self, load_config, replacement):  # noqa: ANN001
         del load_config, replacement
         self.swapped = True
+        return self.publication_receipt
+
+    @staticmethod
+    def _count(load_config):  # noqa: ANN001
+        del load_config
+        return 1
+
+    def _cleanup_full_refresh_publication(self, receipt):  # noqa: ANN001
+        self.publication_cleanup = receipt
 
 
 def _config(maximum: int) -> LoadConfig:
@@ -88,3 +101,28 @@ def test_exact_budget_is_admitted_and_receipted() -> None:
         "measurement": "source_emitted_bytes",
         "schema_version": "dpone.runtime.source-byte-budget.v1",
     }
+
+
+def test_full_refresh_cleanup_is_delegated_to_uuid_bound_publication_receipt() -> None:
+    publication = {
+        "marker": {"candidate": "stage"},
+        "marker_table": "published_model__dpone_full_refresh_publication",
+        "recovered_after_error": False,
+    }
+    receipt = SimpleNamespace(
+        marker=SimpleNamespace(operation_id="operation"),
+        to_dict=lambda: publication,
+    )
+    sink = _Sink()
+    sink.publication_receipt = receipt
+    service = ClickHouseStagedLoadService(sink)
+    staging = SimpleNamespace(target_schema="technical", target_table="stage")
+    handle = StagedLoadHandle(staging_config=staging, payload_schema=(), staged_rows=1, metadata={})
+
+    result = service._full_refresh(_config(10), handle)
+    service.cleanup(handle)
+
+    assert result.commit_receipt_id == "operation"
+    assert handle.metadata["full_refresh_publication"] == publication
+    assert sink.dropped == []
+    assert sink.publication_cleanup == publication
