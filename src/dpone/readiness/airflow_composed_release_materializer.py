@@ -1,19 +1,18 @@
 """Build-plane readmission of native and composed workspace releases."""
 
-import json
-from collections.abc import Sequence
-from pathlib import Path
-from typing import Any
+from __future__ import annotations
 
-from dpone.contracts.development_delivery_authority import DevelopmentAuthorityReceipt
+import json
+from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from dpone.contracts.development_delivery_authority import DevelopmentAuthorityReceipt
 from dpone.contracts.strict_json import strict_json_object
 from dpone.gitops.release_set_validation import validate_release_set
 from dpone.manifest.confined_files import read_confined_file
 from dpone.readiness.airflow_compact_pack_release_models import CompactPackReleaseError, CompactPackReleaseReport
-from dpone.readiness.airflow_local_release import (
-    ImmutableLocalReleaseDurabilityError,
-    materialize_immutable_local_release,
-)
 
 
 def read_workspace_release_descriptor(root: Path) -> dict[str, Any]:
@@ -80,6 +79,8 @@ def materialize_native_workspace_release(
     xcom_sidecar_image: str,
     dag_ids: Sequence[str] | None,
     development_authority: DevelopmentAuthorityReceipt | None,
+    publisher: Callable[[Path, Mapping[str, bytes]], None],
+    durability_error: type[Exception],
 ) -> CompactPackReleaseReport:
     """Materialize one authenticated native workspace into the immutable cache."""
     from dpone.app.dbt_promotion_composition import build_dbt_compact_workspace_release_builder
@@ -108,8 +109,8 @@ def materialize_native_workspace_release(
         ) from exc
     release_dir = cache / "releases" / release["release_id"].replace(":", "-", 1)
     try:
-        materialize_immutable_local_release(release_dir, files)
-    except ImmutableLocalReleaseDurabilityError as exc:
+        publisher(release_dir, files)
+    except durability_error as exc:
         raise CompactPackReleaseError(
             "DPONE_COMPACT_PACK_RELEASE_DURABILITY_UNCERTAIN",
             "complete release is visible but durable publication is unproven; retry identical inputs after storage recovery",

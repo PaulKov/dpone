@@ -40,6 +40,7 @@ from dpone.readiness.airflow_compact_pack_runtime_payloads import (
 )
 from dpone.readiness.airflow_deployment_projection import compute_release_id
 from dpone.readiness.airflow_local_release import (
+    ImmutableLocalReleaseDurabilityError,
     ImmutableLocalReleaseError,
     materialize_immutable_local_release,
 )
@@ -323,6 +324,8 @@ def _materialize_workspace(
         xcom_sidecar_image=xcom_sidecar_image,
         dag_ids=dag_ids,
         development_authority=development_authority,
+        publisher=materialize_immutable_local_release,
+        durability_error=ImmutableLocalReleaseDurabilityError,
     )
 
 
