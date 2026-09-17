@@ -64,5 +64,17 @@ def test_attach_uses_current_model_namespace_and_commits_durable_child_before_at
     assert sql.index("INSERT [dpone_physical].[physical_model_sessions_v1]") < sql.index("COMMIT TRANSACTION;")
     assert "DPONE_SESSION_ALREADY_REGISTERED" in sql
     assert "DATALENGTH(@retained_model)<>DATALENGTH(@model_bytes)" in sql
-    assert "JSON_QUERY(@enrollment,'$.executor'),@selected_model" in sql
+    assert "JSON_QUERY(@enrollment,'$.executor') AS [executor_json],@selected_model AS [plan_json]" in sql
     assert "{{" not in sql
+
+
+def test_attach_projection_names_match_actual_managed_macro_wire():
+    import re
+
+    from tests.test_dbt_mssql_managed_admission_macros import harness
+
+    context, calls = harness(execute=False)
+    expected = context["dpone_managed_columns"]("attach")
+    projection = RESOURCE.read_text().rsplit(" COMMIT TRANSACTION;", 1)[1].split("END TRY", 1)[0]
+    assert re.findall(r"\bAS \[([a-z0-9_]+)\]", projection) == expected
+    assert calls == []

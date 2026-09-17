@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add immutable SQL Server physical-plan enrollment and durable BUILD-session
+  attachment. The signed procedures authenticate retained plan, command,
+  reservation, registration and source identity, preserve exact one- and
+  two-database permission inventories, and independently read enrollment after
+  commit. This slice does not enable transaction binding, receipts, terminal
+  release or the complete managed route.
+
 - Add optional explicit physical collation selection to the native publishing
   policy and compare every character column with that authenticated expectation.
   Preserve omitted-policy behavior and existing rendered SQL through one strict

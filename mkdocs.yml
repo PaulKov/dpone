@@ -517,6 +517,8 @@ nav:
       - Managed SQL physical rendering: dbt-mssql-physical-rendering.md
       - Managed SQL plan membership: dbt-mssql-physical-plan-membership.md
       - Managed SQL collation policy: dbt-mssql-physical-collation.md
+      - Managed SQL plan enrollment: dbt-mssql-physical-enrollment.md
+      - Managed SQL enrollment qualification: dbt-mssql-physical-enrollment-qualification.md
       - Managed SQL admission transport: dbt-mssql-managed-admission.md
       - SQL Server graph policy registry: dbt-sqlserver-policy-registry.md
       - Physical runtime registration: dbt-mssql-physical-registration.md

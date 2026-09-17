@@ -95,11 +95,17 @@ BEGIN TRY
    @connection_id,@connect_time,@session_id,@login_time,@caller_id,@caller_sid,
    @control_id,@control_sid,SYSUTCDATETIME());
  COMMIT TRANSACTION;
- SELECT CONVERT(smallint,1),LOWER(CONVERT(varchar(36),@registration_id)),CONVERT(varchar(71),@registration_digest),
-  LOWER(CONVERT(varchar(36),@generation)),LOWER(CONVERT(varchar(36),@expected_invocation)),CONVERT(varchar(71),@plan_set_sha256),
-  @model_unique_id,CONVERT(varchar(71),@selected_digest),LOWER(CONVERT(varchar(36),@session_registration_id)),
-  @session_id,@guard_epoch,@source_revision,CONVERT(varchar(71),JSON_VALUE(@registration,'$.program.control_program_sha256')),
-  JSON_QUERY(@enrollment,'$.executor'),@selected_model;
+ SELECT CONVERT(smallint,1) AS [wire_version],
+  LOWER(CONVERT(varchar(36),@registration_id)) AS [registration_id],
+  CONVERT(varchar(71),@registration_digest) AS [registration_digest],
+  LOWER(CONVERT(varchar(36),@generation)) AS [generation_id],
+  LOWER(CONVERT(varchar(36),@expected_invocation)) AS [executor_invocation_id],
+  CONVERT(varchar(71),@plan_set_sha256) AS [plan_set_sha256],
+  @model_unique_id AS [model_unique_id],CONVERT(varchar(71),@selected_digest) AS [model_plan_sha256],
+  LOWER(CONVERT(varchar(36),@session_registration_id)) AS [session_registration_id],
+  @session_id AS [session_id],@guard_epoch AS [guard_epoch],@source_revision AS [source_revision],
+  CONVERT(varchar(71),JSON_VALUE(@registration,'$.program.control_program_sha256')) AS [control_program_sha256],
+  JSON_QUERY(@enrollment,'$.executor') AS [executor_json],@selected_model AS [plan_json];
 END TRY
 BEGIN CATCH
  IF XACT_STATE()<>0 ROLLBACK TRANSACTION;

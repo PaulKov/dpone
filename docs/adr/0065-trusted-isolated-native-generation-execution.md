@@ -606,3 +606,28 @@ authenticating the selected policy. The companion must not add a foreign key to
 existing registration storage, whose exact verifier rejects inbound and outbound
 foreign keys. Its insert/read path must instead lock and validate the referenced
 registration UUID and digest in the same local transaction.
+
+### Physical-plan enrollment and durable session identity
+
+The first managed SQL Server cell records one immutable enrollment per generation
+after authenticating the retained plan, command, reservation, registration,
+catalog binding and current source identity. A fresh bounded connection reads the
+complete enrollment after commit. Lost acknowledgement or failed readback remains
+unresolved; it does not authorize another generation, mutation retry or capacity
+release.
+
+BUILD attachment records a server-generated child identity together with the
+actual connection ID, connect time, SPID, login time, principals, enrollment and
+selected model bytes. The connection facts are observed by a self-only helper
+signed with a certificate separate from enrollment, source, catalog and discovery.
+Its certificate login receives only SQL Server 2022 `VIEW SERVER PERFORMANCE
+STATE`; runtime principals receive neither that server permission nor direct
+helper access. The enrollment certificate has only its closed table/module and
+cross-database control capabilities. Existing certificate inventories and runtime
+DENYs remain unchanged.
+
+This durable child does not yet prove once-only transaction binding, successful
+model completion or safe release. Pool reset, rollback, receipts, protected read
+closure and irreversible terminal settlement remain separate required mechanisms.
+See [physical enrollment](../dbt-mssql-physical-enrollment.md) and its
+[isolated qualification procedure](../dbt-mssql-physical-enrollment-qualification.md).
