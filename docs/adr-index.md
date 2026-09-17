@@ -80,3 +80,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0065: Trusted isolated native generation execution](adr/0065-trusted-isolated-native-generation-execution.md)
 
 - [ADR 0066: Separate development delivery from workload execution (Accepted)](adr/0066-development-workspace-batch-federation.md)
+
+- [ADR 0067: Development runtime authority is image-installed and rechecked per process (Accepted)](adr/0067-image-installed-development-runtime-authority.md)

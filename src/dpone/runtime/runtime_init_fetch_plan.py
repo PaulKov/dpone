@@ -22,10 +22,12 @@ from dpone.runtime.runtime_init_fetch_execution import (
     RuntimeExecutionSelection,
     require_execution_token,
 )
+from dpone.runtime.runtime_init_fetch_schema import runtime_init_fetch_schema
 
 RUNTIME_INIT_FETCH_PLAN_SCHEMA = "dpone.airflow-runtime-init-fetch-plan.v1"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2 = "dpone.airflow-runtime-init-fetch-plan.v2"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3 = "dpone.airflow-runtime-init-fetch-plan.v3"
+RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4 = "dpone.airflow-runtime-init-fetch-plan.v4"
 MAX_RUNTIME_INIT_FETCH_PLAN_BYTES = 16 * 1024
 MAX_SELECTED_RUNTIME_PAYLOADS = 16
 
@@ -33,10 +35,9 @@ _ENVIRONMENT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 _CONTEXT_DIGEST_DIR_RE = re.compile(r"^sha256-[0-9a-f]{64}$")
 
 
+# Exact content descriptor without an execution-level logical id.
 @dataclass(frozen=True, slots=True)
 class RuntimeArtifactDescriptor:
-    """Exact content descriptor without an execution-level logical id."""
-
     artifact_ref: str
     sha256: str
     bytes: int
@@ -81,10 +82,9 @@ class RuntimeWorkloadPackRef:
         }
 
 
+# Exact external runtime payload fetched from the pinned release.
 @dataclass(frozen=True, slots=True)
 class RuntimePayloadDescriptor:
-    """Exact external runtime payload fetched from the pinned release."""
-
     id: str
     kind: str
     artifact_ref: str
@@ -140,6 +140,7 @@ class RuntimeInitFetchPlan:
     execution: RuntimeExecutionSelection
     verify: Mapping[str, str]
     runtime_payloads: tuple[RuntimePayloadDescriptor, ...] = ()
+    development_authority_required: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -188,12 +189,11 @@ class RuntimeInitFetchPlan:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        is_v3 = self.execution.hook_execution is not None
         payload: dict[str, Any] = {
-            "schema": (
-                RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3
-                if is_v3
-                else (RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2 if self.runtime_payloads else RUNTIME_INIT_FETCH_PLAN_SCHEMA)
+            "schema": runtime_init_fetch_schema(
+                self.development_authority_required,
+                self.execution.hook_execution is not None,
+                bool(self.runtime_payloads),
             ),
             "environment": self.environment,
             "trust_tier": self.trust_tier,
@@ -218,8 +218,10 @@ class RuntimeInitFetchPlan:
             "execution": self.execution.to_dict(),
             "verify": dict(self.verify),
         }
-        if is_v3 or self.runtime_payloads:
+        if self.execution.hook_execution or self.runtime_payloads or self.development_authority_required:
             payload["runtime_payloads"] = [item.to_dict() for item in self.runtime_payloads]
+        if self.development_authority_required:
+            payload["development_authority_required"] = True
         return payload
 
 
@@ -262,6 +264,10 @@ def runtime_init_fetch_plan_sha256(plan: RuntimeInitFetchPlan) -> str:
 
 
 def _validate_plan(plan: RuntimeInitFetchPlan) -> None:
+    if type(plan.development_authority_required) is not bool:
+        raise ValueError("development_authority_required must be boolean")
+    if plan.development_authority_required and plan.execution.hook_execution is None:
+        raise ValueError("development authority requires explicit hook execution")
     if not _ENVIRONMENT_RE.fullmatch(plan.environment):
         raise ValueError("environment must be a bounded lowercase logical name")
     if plan.trust_tier not in {"production", "non_production"}:
@@ -389,6 +395,7 @@ __all__ = [
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA",
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2",
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3",
+    "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4",
     "RuntimeArtifactDescriptor",
     "RuntimeExecutionSelection",
     "RuntimeInitFetchPlan",

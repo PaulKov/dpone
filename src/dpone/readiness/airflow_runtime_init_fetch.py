@@ -13,12 +13,16 @@ if TYPE_CHECKING:
         AirflowDeploymentAttestationVerifier,
     )
     from dpone.ports.artifact_registry import ArtifactRegistryReader
+    from dpone.ports.development_runtime_authority import DevelopmentRuntimeAuthority
     from dpone.ports.runtime_artifact_attestation import (
         RuntimeArtifactAttestationVerifier,
     )
     from dpone.runtime.runtime_init_fetch_plan import RuntimeInitFetchPlan
     from dpone.runtime.verified_pack_launcher import VerifiedPackCommand
 
+from dpone.adapters.development_runtime_authority import (
+    load_development_runtime_authority,
+)
 from dpone.readiness.airflow_artifact_delivery import (
     AirflowArtifactDeliveryError,
     ArtifactRegistryOptions,
@@ -41,6 +45,10 @@ from dpone.readiness.airflow_runtime_init_fetch_config import (
 )
 from dpone.readiness.airflow_runtime_init_fetch_config import (
     registry_configuration as parse_registry_configuration,
+)
+from dpone.readiness.development_runtime_authorization import (
+    authorize_development_runtime,
+    require_fetched_development_authority,
 )
 from dpone.runtime.init_fetch_contract import InitFetchError
 from dpone.runtime.runtime_init_fetch_plan_codec import decode_runtime_init_fetch_plan
@@ -119,6 +127,7 @@ class AirflowRuntimeInitFetchService:
         artifact_root: Path = DEFAULT_ARTIFACT_ROOT,
         worktree_root: Path = DEFAULT_WORKTREE_ROOT,
         dev_evidence_bootstrap_root: Path = (DEFAULT_DEV_EVIDENCE_BOOTSTRAP_ROOT),
+        development_runtime_authority: DevelopmentRuntimeAuthority | None = None,
     ) -> None:
         self._registry_factory = registry_factory or WorkloadIdentityRegistryFactory()
         self._attestation_verifier = attestation_verifier
@@ -129,6 +138,7 @@ class AirflowRuntimeInitFetchService:
         self._artifact_root = artifact_root
         self._worktree_root = worktree_root
         self._dev_evidence_bootstrap_root = dev_evidence_bootstrap_root
+        self._development_runtime_authority = development_runtime_authority
 
     def init_fetch(self, environment: Mapping[str, str] | None = None) -> Mapping[str, Any]:
         _ensure_dev_evidence_spool(
@@ -136,6 +146,10 @@ class AirflowRuntimeInitFetchService:
             expected_root=self._dev_evidence_bootstrap_root,
         )
         plan, plan_sha256 = _plan_from_environment(environment)
+        development_authorization = authorize_development_runtime(
+            plan,
+            authority=self._runtime_authority(plan),
+        )
         authority = trusted_attestation_authority(
             plan,
             path=self._trust_policy_path,
@@ -192,6 +206,13 @@ class AirflowRuntimeInitFetchService:
             attestation_verifier=release_verifier,
             deployment_attestation_verifier=deployment_verifier,
             trusted_attestation_required=trusted_required,
+            development_release_validator=(
+                lambda payload, runtime_plan: require_fetched_development_authority(
+                    payload,
+                    plan=runtime_plan,
+                    authorization=development_authorization,
+                )
+            ),
         ).execute(plan, plan_sha256=plan_sha256)
         return ready.to_dict()
 
@@ -253,13 +274,33 @@ class AirflowRuntimeInitFetchService:
         environment: Mapping[str, str] | None = None,
     ) -> VerifiedPackCommand:
         plan, plan_sha256 = _plan_from_environment(environment)
+        development_authorization = authorize_development_runtime(
+            plan,
+            authority=self._runtime_authority(plan),
+        )
         return VerifiedPackLauncher(
             artifact_root=self._artifact_root,
             worktree_root=self._worktree_root,
         ).prepare(
             plan,
             plan_sha256=plan_sha256,
+            development_authorization=development_authorization,
+            development_release_validator=(
+                lambda payload, runtime_plan: require_fetched_development_authority(
+                    payload,
+                    plan=runtime_plan,
+                    authorization=development_authorization,
+                )
+            ),
         )
+
+    def _runtime_authority(
+        self,
+        plan: RuntimeInitFetchPlan,
+    ) -> DevelopmentRuntimeAuthority | None:
+        if not plan.development_authority_required:
+            return None
+        return self._development_runtime_authority or load_development_runtime_authority()
 
 
 def _ensure_dev_evidence_spool(

@@ -29,6 +29,7 @@ from dpone.gitops.schema_release_deployment_v2_contracts import (
 )
 from dpone.gitops.schema_release_deployment_v3_contracts import (
     airflow_deployment_index_v3_contract,
+    airflow_deployment_index_v4_contract,
     deployment_set_v3_contract,
 )
 from dpone.gitops.schema_release_set_promotion import (
@@ -56,6 +57,7 @@ def release_deployment_schema_contracts() -> tuple[GitOpsSchemaContract, ...]:
         deployment_set_v3_contract(),
         airflow_deployment_index_v2_contract(),
         airflow_deployment_index_v3_contract(),
+        airflow_deployment_index_v4_contract(),
         mssql_asset_outlet_projection_contract(),
         current_pointer_contract(),
     )

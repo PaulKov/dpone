@@ -11,7 +11,8 @@ from dpone_airflow_pack.deployment_index_errors import AirflowDeploymentIndexErr
 _INDEX_SCHEMA_V1 = "dpone.airflow-deployment-index.v1"
 _INDEX_SCHEMA_V2 = "dpone.airflow-deployment-index.v2"
 _INDEX_SCHEMA_V3 = "dpone.airflow-deployment-index.v3"
-_EXECUTABLE_INDEX_SCHEMAS = frozenset({_INDEX_SCHEMA_V2, _INDEX_SCHEMA_V3})
+_INDEX_SCHEMA_V4 = "dpone.airflow-deployment-index.v4"
+_EXECUTABLE_INDEX_SCHEMAS = frozenset({_INDEX_SCHEMA_V2, _INDEX_SCHEMA_V3, _INDEX_SCHEMA_V4})
 _DELIVERY_MODES = frozenset({"local_preview", "init_fetch", "shared_pvc", "embedded_bundle", "csi_volume", "inline"})
 
 
