@@ -18,7 +18,7 @@ from dpone.runtime.clickhouse_file_stage_contract import (
 )
 from dpone.runtime.connectors.clickhouse_file_stage_client import build_file_client_runner
 from dpone.runtime.connectors.clickhouse_file_stage_http import build_file_http_runner
-from dpone.runtime.sinks.clickhouse_full_refresh_publication import ClickHouseFullRefreshPublicationService
+from dpone.runtime.sinks.clickhouse_full_refresh_router import ClickHouseFullRefreshPublicationRouter
 from dpone.runtime.sinks.clickhouse_physical_types import ClickHousePhysicalColumnTypeResolver
 from dpone.runtime.sinks.clickhouse_staging_decoder import ClickHouseStagingDecoder
 from dpone.runtime.sinks.clickhouse_staging_finalizer import ClickHouseStagingFinalizer
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 class ClickHouseFullRefreshPublicationMixin:
     """Expose publication lifecycle hooks through the sink's narrow service."""
 
-    _full_refresh_publication: ClickHouseFullRefreshPublicationService
+    _full_refresh_publication: ClickHouseFullRefreshPublicationRouter
 
     def prepare_runtime_admission(
         self,
@@ -71,7 +71,7 @@ class ClickHouseStagingComponents:
     validated_file: ClickHouseValidatedFileService
     decoder: ClickHouseStagingDecoder
     finalizer: ClickHouseStagingFinalizer
-    full_refresh_publication: ClickHouseFullRefreshPublicationService
+    full_refresh_publication: ClickHouseFullRefreshPublicationRouter
 
 
 def build_clickhouse_staging_components(
@@ -119,7 +119,7 @@ def build_clickhouse_staging_components(
         count_rows=count_rows,
         mutations_sync=mutations_sync,
     )
-    full_refresh_publication = ClickHouseFullRefreshPublicationService.from_connector(connector)
+    full_refresh_publication = ClickHouseFullRefreshPublicationRouter.from_connector(connector)
     return ClickHouseStagingComponents(validated_file, decoder, finalizer, full_refresh_publication)
 
 
