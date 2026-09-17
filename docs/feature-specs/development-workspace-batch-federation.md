@@ -18,9 +18,9 @@ release.
 
 This feature adds a separate development release family. It preserves complete
 source authority while allowing a development deployment to contain dormant dbt
-workloads and independently executable ordinary flow workloads. A workload is
-executable only when its own authority is present. The production and synthetic
-families retain their current schemas, validation and runtime behavior.
+and ordinary flow workloads. This increment grants no workload execution. The
+production and synthetic families retain their current schemas, validation and
+runtime behavior.
 
 All public examples and fixtures are synthetic and organization-neutral. Source
 repositories may consume the generic contract with private configuration, but
@@ -31,18 +31,16 @@ outside this repository.
 
 | Persona | Goal | Current pain | Success signal |
 |---|---|---|---|
-| Data engineer | Validate a flow in an isolated development deployment | A native dbt workspace elsewhere in the same release blocks publication | The selected flow runs without granting dormant dbt workloads execution authority |
+| Data engineer | Deliver a flow to an isolated development deployment | A native dbt workspace elsewhere in the same release blocks publication | The complete selected flow installs while every development workload remains dormant |
 | Platform engineer | Preserve one immutable deployment and exact source closure | Legacy compact merging loses native workspace authority | One verified parent binds native and ordinary sources, selectors, resources and hooks |
 | Operator | Diagnose and safely retry a manual development run | Delivery and execution authority are conflated | The release reports delivery authority separately from workload execution authority |
 
 The engineer authors a native workspace and ordinary flow sources. CI compiles
 both, verifies their complete inputs, and creates one development parent. The
-platform builds and installs the immutable deployment. Airflow may parse every
-DAG, but a task obtains credentials and starts a process only after runtime has
-verified authority for that exact workload and attempt. An unauthorized dormant
-workload fails before source access. A failed separately scheduled pre-hook
-fails its Airflow task and never writes XCom. Retry reopens the same immutable
-release and source closure.
+platform publishes and installs the immutable deployment through an authenticated
+Python adapter. Airflow may parse every DAG, but the standard runtime rejects all
+development tasks before init-fetch, credential resolution, source access or
+writer issuance. Retry reopens the same immutable release and source closure.
 
 ## Scope
 
@@ -130,9 +128,9 @@ The additive documents are:
   `development_workspace_delivery_v1`.
 
 All are closed, bounded canonical JSON. Identity-bearing scope includes purpose,
-trust tier, exact source commit, native and ordinary membership, read/write
-participants, limits, policy and authority digests. Local paths and credentials
-never enter identity.
+trust tier, exact source commit, native and ordinary membership, delivery limits,
+policy and authority digests. Physical read/write participant authorization is
+outside this increment. Local paths and credentials never enter identity.
 
 The ordinary source descriptor binds:
 
@@ -148,10 +146,9 @@ The ordinary source descriptor binds:
 ### Artifacts and evidence
 
 The parent records native and ordinary constituent IDs, exact source sidecars,
-an integrity subject, authority family, policy/grant digests, delivery status and
-per-workload execution eligibility. Delivery evidence never reports workload
-execution as passed. Runtime evidence names the exact release, deployment,
-workload, attempt, command kind, hook identity, exit status and cleanup result.
+an integrity subject, authority family, policy/grant digests and delivery status.
+Delivery evidence never reports workload execution as passed. This increment
+produces no successful development runtime evidence.
 
 ### Compatibility and migration
 
@@ -166,10 +163,10 @@ not reinterpret the new release with old readers.
 
 1. Discover every publishing dbt project and ordinary flow workload.
 2. Parse and verify the external development policy and authority against the
-   exact source commit, participant enrollment, validity, revocation and limits.
+   exact source repository, commit, validity, revocation and delivery limits.
 3. Compile dbt selection and packs from exact manifest/project/profile inputs.
-   Mark each native workload delivery-only unless the authority includes its
-   exact execution subject.
+   Preserve any declared future execution subjects as identity-bearing metadata;
+   they grant no execution in this increment.
 4. Reacquire all native inputs and assemble the distinct development-native
    release. Verify complete membership and source closure before publication.
 5. Capture ordinary DAGs and selector membership. Reject cross-constituent or
@@ -185,19 +182,13 @@ not reinterpret the new release with old readers.
    and ordinary source sidecars without rewriting their authority family.
 9. Assemble the development parent, verify it from a private stage, write the
    integrity subject, reread every byte, and publish atomically.
-10. Build and install one immutable nonproduction deployment. Parsing exposes
-    all DAGs but grants no credentials.
-11. At task start, reopen the parent, deployment, externally verified current
-    authority and exact
-    workload membership. Deny dormant or revoked workloads before init-fetch,
-    source reads or writer issuance.
-12. For a separate pre-hook, select the unique verified hook step, resolve
-    connection aliases from the sealed deployment, run the canonical hook
-    command, propagate its child exit code, publish no XCom and stop downstream
-    runtime on failure.
-13. For runtime, enforce source-byte and time limits, perform the declared load,
-    verify outcome/quality gates, clean staging and publish terminal evidence.
-14. Identical retry reuses the release and authority identities. Changed source,
+10. Publish and install one immutable nonproduction deployment through the same
+    injected receipt boundary. Reapply combined workload and byte budgets before
+    the first registry write and before local cache installation.
+11. Parsing may expose all DAGs, but the standard runtime denies every
+    development task before init-fetch, credential resolution, source access or
+    writer issuance.
+12. Identical retry reuses the release and authority identities. Changed source,
     projection, command or grant produces a different identity or fails closed.
 
 ### Pseudocode
@@ -212,15 +203,8 @@ require_no_logical_write_collisions(native, ordinary)
 parent = compose_development_release(native, ordinary, grant)
 verify_complete_parent(parent)
 publish_immutable(parent)
-
-on_task_start(task):
-    occurrence = reopen_deployment_and_authority(task.release_id)
-    require_workload_execution_subject(occurrence, task.workload_id, task.kind)
-    if task.kind == PRE_HOOK:
-        command = select_unique_verified_pre_hook(task)
-        exit(command, publish_xcom=false, exit_code=child)
-    else:
-        execute_bounded_runtime(task)
+install_immutable(parent, verified_delivery_receipt)
+assert standard_runtime_admission(parent) == DENIED
 ```
 
 ### State machine
@@ -231,11 +215,8 @@ stateDiagram-v2
     Checked --> Composed: complete source verification
     Composed --> Published: immutable durable write
     Published --> Installed: nonproduction deployment
-    Installed --> Denied: workload authority absent or revoked
-    Installed --> Running: exact workload authority admitted
-    Running --> Succeeded: outcome and cleanup complete
-    Running --> Failed: hook/runtime/gate failure
-    Failed --> Running: identical safe retry
+    Installed --> Denied: standard runtime rejects development family
+    Denied --> Installed: identical delivery retry changes no bytes
 ```
 
 ### Edge cases
@@ -246,10 +227,14 @@ stateDiagram-v2
 - Duplicate selectors, pack IDs, hook IDs or logical writes reject.
 - Unknown fields, null authority, symlinks, archive traversal and digest drift
   reject before publication.
+- Remote publication and cache materialization reject direct and composed
+  development releases without the exact injected receipt and combined budget.
+- Public delivery CLI commands cannot turn embedded release metadata into
+  development authority.
 - A connection projection containing credential material rejects.
 - Resource request greater than limit or outside policy rejects.
-- Pre-hook success without runtime is not pipeline success; pre-hook failure
-  blocks runtime and produces no XCom.
+- Pre-hook task shape preserves `publish_xcom=false`, but the development family
+  cannot start that task in the standard runtime.
 - Partial publication reports durability uncertainty and never success.
 - Expiry or revocation blocks new attempts; historical evidence stays readable.
 
@@ -283,14 +268,14 @@ synthetic fixtures. Live route qualification remains separate.
 | Development workspace assembly | New | Reuse dbt projections under distinct authority family | Existing project projector and source reader |
 | Ordinary flow source verifier | Extended | Rebuild selectors, resources, aliases and pre-hooks from exact sources | Manifest loader, dependency resolver, pack builder |
 | Development composition service | New | Verify complete union and publish one immutable parent | Source readers, integrity, publisher |
-| Deployment/runtime admission | Extended | Separate delivery membership from workload execution authority | Deployment cache and protected authority reader |
-| Airflow provider/pack | Extended | Preserve exact task kind and hook identity | Existing verified launcher contract |
+| Remote delivery admission | Extended | Require the injected receipt and combined budget at registry/cache boundaries | Artifact publisher and materializer |
+| Airflow provider/pack | Unchanged runtime admission | Preserve exact task kind and hook identity while development execution remains denied | Existing verified launcher contract |
 
 ### Ports, adapters, and composition root
 
 Contracts and services never read environment variables, credentials or clocks.
-Ports expose policy bytes, signature verification, participant enrollment,
-registry binding and immutable publication. Application roots inject adapters.
+Ports expose policy bytes, signature verification, registry binding and
+immutable publication. Application roots inject adapters.
 Provider and CLI remain thin consumers of the same services.
 
 ### Data and control flow
@@ -303,10 +288,9 @@ flowchart LR
     P --> D
     C --> E[Development composition]
     D --> E
-    E --> F[Immutable deployment]
-    F --> G{Exact workload authority?}
-    G -->|yes| H[Verified pre-hook or runtime]
-    G -->|no| I[Fail before credentials]
+    E --> F[Authenticated publication]
+    F --> G[Immutable cache installation]
+    G --> H[Standard runtime denies development tasks]
 ```
 
 ### Alternatives and tradeoffs
@@ -317,7 +301,7 @@ flowchart LR
 | Reuse synthetic campaign | Existing signed contracts | Forbids real development data and shared read-only sources | Rejected |
 | Merge descriptor-less compact packs | Small adapter | Loses workspace source authority | Rejected |
 | Require every delivered workload to be executable | Simpler activation | Blocks unrelated development flows and over-grants dbt | Rejected |
-| Separate delivery and workload execution authority | Least privilege and one immutable deployment | More explicit contracts and runtime checks | Adopted |
+| Separate delivery from future workload execution authority | Least privilege and one immutable deployment | Runtime support requires a separate contract | Adopted for delivery only |
 
 ### ADR requirement
 
@@ -353,17 +337,17 @@ axis: least-privilege mixed development delivery
 scenario: one complete native workspace plus ordinary flow workloads in one immutable deployment
 baseline: all delivered workloads require production authority or the release fails
 metric: unauthorized workload processes or credential issuances
-target: 0, while one explicitly authorized ordinary flow completes
-procedure: build a synthetic mixed parent, parse all DAGs, attempt one dormant native workload, then run one authorized flow with a separate pre-hook
-artifact: development-release acceptance report with deployment, denial, hook, runtime and cleanup receipts
+target: 0, while the complete mixed parent publishes and installs
+procedure: build a synthetic mixed parent, publish and install it with an injected delivery receipt, then attempt native, ordinary and pre-hook runtime admission
+artifact: development-release acceptance report with immutable delivery identity and fail-closed runtime denials
 limitations: offline and synthetic acceptance does not certify a live connector route
 ```
 
 ## Security, privacy, and operations
 
-Policies pin signer, environment, participants, source commit, validity,
-revocation and limits. Alias projection never contains secrets. Source access is
-read-only and independently enrolled; target/control systems are nonproduction.
+Policies pin signer, environment, source repository, source commit, validity,
+revocation and delivery limits. Alias projection never contains secrets. This
+increment does not authorize physical source or target participants.
 All examples use generated synthetic identifiers and rows. Logs sanitize SQL,
 credentials and private filesystem roots. Operators can inspect denial reason,
 authority expiry, selected workload, resource admission and cleanup evidence.
@@ -374,15 +358,15 @@ authority expiry, selected workload, resource admission and cleanup evidence.
 |---|---|---|---|
 | Unit | Closed authority parsing, family dispatch, limits, selector/hook closure | Offline synthetic | Contract reports |
 | Contract | Compile native delivery-only plus ordinary flow with resources/aliases/pre-hook | Offline synthetic | Exact release trees and negative fixtures |
-| Integration | Build, install, parse; deny dormant dbt; execute authorized flow | Isolated synthetic services | Deployment and attempt receipts |
-| Live certification | Representative source read and nonproduction target write | Explicitly approved isolated environment | Route-specific evidence; never inferred from unit tests |
+| Integration | Build, publish, install and parse; deny native, ordinary and pre-hook execution | Isolated synthetic services | Delivery report and denial receipts |
+| Live certification | N/A for delivery-only scope; runtime route qualification is a separate feature | N/A | No route evidence claimed |
 | Performance | Large bounded source archive and maximum membership | Offline/isolated | Time/memory/byte report |
 | Compatibility | Existing production v2, v3 composition and synthetic family unchanged | Offline | Golden vectors |
 
 Tests cover expired/revoked grants, unknown fields, policy drift, missing source
 files, archive traversal, projection credentials, resource overflow, selector
-collision, hook tampering, hook failure, no-XCom behavior, unauthorized native
-execution, identical retry, conflicting retry and cleanup failure.
+collision, hook tampering, serialized no-XCom policy, unauthorized development
+execution, identical retry and conflicting retry.
 
 ## Documentation plan
 
@@ -394,10 +378,10 @@ Generated CLI/schema references must be regenerated from code.
 ## Rollout and rollback
 
 Ship as an additive 0.81.0 family. Consumers must update the four coordinated
-packages and rebuild releases. Start with offline synthetic acceptance, then an
-explicitly approved isolated live environment. Roll back by selecting the prior
-immutable deployment. Any authority ambiguity, credential issuance to a dormant
-workload, source-closure mismatch or incomplete cleanup blocks rollout.
+packages and rebuild releases. Validate only offline synthetic and isolated
+registry/cache delivery in this increment. Roll back by selecting the prior
+immutable deployment. Any authority ambiguity, attempted credential issuance to
+a dormant workload or source-closure mismatch blocks rollout.
 
 ## Agent execution plan
 

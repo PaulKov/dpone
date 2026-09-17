@@ -14,14 +14,14 @@ shared read-only development sources or ordinary business-shaped workloads.
 Treating release membership as execution permission would also make dormant dbt
 workloads executable merely because their artifacts must be delivered with the
 deployment. That coupling is unsafe and prevents a selected ordinary workload
-from being tested without granting every native workload access to credentials.
+from being delivered without granting every native workload access to credentials.
 
 ## Decision
 
 Add a closed development authority and release family defined by the approved
 [development workspace and batch federation specification](../feature-specs/development-workspace-batch-federation.md).
 The approved specification SHA-256 is
-`1ce4bf43e24cd3846f31a249fbfea5e8c05468e667a8b5c3243f60db20b0f260`.
+`6d45bb9582c75b8716b7502e22c658fd1c5abe2517cc60987ff0bc9c71905f80`.
 
 Development delivery authority permits an immutable deployment to contain the
 complete verified workspace. It does not permit any workload to execute. The
@@ -45,9 +45,9 @@ semantics and fingerprints remain mandatory.
 ## Consequences
 
 Operators can install and parse a complete development workspace while dormant
-native workloads remain unable to acquire runtime authority. A selected ordinary
-workload can execute only under its own bounded grant. Delivery evidence cannot
-be reported as execution evidence.
+native and ordinary workloads remain unable to acquire runtime authority. No
+development workload executes in this increment. Delivery evidence cannot be
+reported as execution evidence.
 
 The feature adds an explicit authority path through compilation, release
 assembly, composition and cache delivery. Older readers
@@ -69,10 +69,10 @@ without changing the generic public contract.
 ## Rollout and rollback
 
 Ship the compiler, runtime, Airflow pack, provider and accelerator as one exact
-version set. First validate pure contracts, deterministic pack reconstruction and
-negative authority boundaries. Then qualify the supported development route with
-isolated public fixtures. Live execution evidence is required before claiming
-route support.
+version set. First validate pure contracts, deterministic pack reconstruction,
+authenticated remote delivery and negative runtime boundaries with isolated
+public fixtures. A separately approved runtime feature and live execution
+evidence are required before claiming route support.
 
 Rollback disables new development admissions and selects the previous immutable
 deployment. It does not reinterpret development artifacts as production or

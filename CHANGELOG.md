@@ -9,7 +9,9 @@
   be composed with selector-scoped ordinary flow and batch workloads while
   delivery remains separate from exact, current workload execution authority.
   Ordinary composition now verifies public resources, alias-only connection
-  projection, declarative SQL dependencies and separate SQL pre-hooks.
+  projection, declarative SQL dependencies and separate SQL pre-hooks. Remote
+  publication and cache materialization require the same injected receipt and
+  combined delivery budget; public CLI paths remain unable to self-authorize.
 
 - Add canonical native original bindings preserving complete subject, storage
   authority and provider-version identity without granting execution authority.

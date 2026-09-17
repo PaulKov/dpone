@@ -182,12 +182,11 @@ def render_dbt_promotion_ci_report(
     )
 
 
-def build_dbt_compact_workspace_release_builder(*, development: bool = False):
+def build_dbt_compact_workspace_release_builder(*, promotion_profile: str | None = None):
     """Compose the native compact path with required source and transport checks."""
     from dpone_airflow_pack.init_fetch_contract import InitFetchProviderError
     from dpone_airflow_pack.xcom_sidecar import require_strict_xcom_sidecar_image
 
-    from dpone.contracts.development_delivery_authority import DEVELOPMENT_COMPOSITION_PROFILE
     from dpone.gitops.schema_release_set_promotion import COMPACT_PROMOTION_PROFILE, COMPACT_PROMOTION_SCHEMA
     from dpone.manifest.dbt_compact_release import CompactWorkspaceReleaseBuilder
     from dpone.readiness.airflow_compact_pack_release_helpers import rewrite_strict_init_fetch_dag_spec
@@ -213,7 +212,7 @@ def build_dbt_compact_workspace_release_builder(*, development: bool = False):
         rewriter=Rewriter(),
         promotion={
             "schema": COMPACT_PROMOTION_SCHEMA,
-            "profile": DEVELOPMENT_COMPOSITION_PROFILE if development else COMPACT_PROMOTION_PROFILE,
+            "profile": promotion_profile or COMPACT_PROMOTION_PROFILE,
         },
     )
 

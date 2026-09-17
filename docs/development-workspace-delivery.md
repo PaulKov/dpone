@@ -110,6 +110,14 @@ The parent remains `dpone.release-set.v3`. Its promotion profile and native
 child schema identify development authority; no constituent is relabeled as a
 production release.
 
+Remote registry publication and cache materialization use the same injected
+receipt boundary. `AirflowArtifactPublisher` and `AirflowArtifactMaterializer`
+reject both a direct development release and a composed development parent when
+the receipt is absent or differs from the embedded projection. They reapply the
+workload and source-byte limits before the first registry write or local cache
+installation. The public `dpone airflow publish` and `cache-materialize`
+commands cannot inject a receipt and therefore fail closed for this family.
+
 ## Runtime status
 
 Delivery is not execution permission. The standard dpone runtime deliberately

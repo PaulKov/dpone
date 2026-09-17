@@ -97,9 +97,9 @@ def materialize_native_workspace_release(
             "development materialization requires externally verified authority",
         )
     try:
-        files = build_dbt_compact_workspace_release_builder(development=development).build(
-            root, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids
-        )
+        files = build_dbt_compact_workspace_release_builder(
+            promotion_profile=("development_workspace_delivery_v1" if development else None)
+        ).build(root, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
         release = json.loads(files["release-set.json"])
         validate_release_set_schema(release, path=root / "release-set.json")
     except (ValueError, OSError, TypeError, KeyError, RecursionError) as exc:
