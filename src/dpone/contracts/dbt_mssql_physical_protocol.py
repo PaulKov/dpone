@@ -13,9 +13,8 @@ from dpone.contracts.dbt_mssql_physical_validation import (
     require_physical_uuid,
     require_sql_positive_integer,
 )
-from dpone.contracts.dbt_mssql_physical_wire import _plan
+from dpone.contracts.dbt_mssql_physical_wire import decode_physical_model_plan
 from dpone.contracts.dbt_physical_transport_delivery import PhysicalTransportDelivery
-from dpone.contracts.native_delivery_json import decode_native_delivery_json, encode_native_delivery_json
 from dpone.contracts.native_source_custody import decode_source_executor_binding
 
 ATTACH_COLUMNS = tuple(
@@ -100,10 +99,7 @@ def require_attach_row(
         raise ValueError("physical attach payloads require exact text")
     executor = decode_source_executor_binding(cast(str, value["executor_json"]).encode("utf-8"))
     plan_bytes = cast(str, value["plan_json"]).encode("utf-8")
-    plan_raw = decode_native_delivery_json(plan_bytes)
-    if encode_native_delivery_json(plan_raw) != plan_bytes:
-        raise ValueError("physical attach model requires canonical bytes")
-    plan = _plan(plan_raw)
+    plan = decode_physical_model_plan(plan_bytes)
     if (
         str(executor.generation_id) != raw["generation_id"]
         or str(executor.invocation_id) != raw["executor_invocation_id"]
