@@ -21,7 +21,7 @@ from being delivered without granting every native workload access to credential
 Add a closed development authority and release family defined by the approved
 [development workspace and batch federation specification](../feature-specs/development-workspace-batch-federation.md).
 The approved specification SHA-256 is
-`6d45bb9582c75b8716b7502e22c658fd1c5abe2517cc60987ff0bc9c71905f80`.
+`6a466d62f898f8cbe434e6cb361a4b8caea5f2c3ef71ce35b8d1b18e18b4b2ed`.
 
 Development delivery authority permits an immutable deployment to contain the
 complete verified workspace. It does not permit any workload to execute. The
@@ -82,6 +82,21 @@ grant dormant workloads execution permission.
 Publication remains governed by the release controller. This ADR authorizes
 implementation of the approved contract; it does not authorize a package upload
 or a production qualification claim.
+
+Target admission is a separate authority from the embedded release projection.
+Every development publication, installation, activation and activation recovery
+must present a current operation-specific receipt bound to the exact release,
+deployment, protected target environment and `non_production` tier. The receipt
+identifies the independently trusted target policy and current revocation epoch.
+At each operation boundary an injected current-target verifier reopens those two
+protected values; a receipt issued before revocation or policy replacement is
+rejected. Activation recovery includes audit-only repair before coordinator
+readback or durable audit mutation.
+An artifact environment label, database name, CLI option or copied descriptor is
+never sufficient authority. Unknown or production-tier targets fail before
+external writes or pointer mutation. Production promotion requires a new
+production-certified build from reviewed source; the development artifact is
+never relabelled or promoted in place.
 
 ## Related contracts
 

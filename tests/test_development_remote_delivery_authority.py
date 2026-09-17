@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from dpone.app.release_composition import build_release_composition_service
 from dpone.contracts.development_delivery_authority import DEVELOPMENT_COMPOSITION_PROFILE
+from dpone.contracts.development_target_admission import DevelopmentTargetAdmission
 from dpone.contracts.release_composition import ReleaseCompositionRequest
 from dpone.readiness.airflow_artifact_delivery import (
     ArtifactRegistryOptions,
@@ -17,6 +20,7 @@ from dpone.readiness.airflow_artifact_delivery import (
 )
 from dpone.readiness.airflow_compact_pack_release import materialize_compact_pack_release
 from dpone.readiness.airflow_deployment_projection import AirflowDeploymentProjectionService
+from dpone.readiness.airflow_deployment_projection_errors import AirflowDeploymentProjectionError
 from dpone.runtime.airflow_artifact_delivery import (
     AirflowArtifactDeliveryError,
     AirflowArtifactMaterializer,
@@ -39,7 +43,7 @@ def test_remote_development_delivery_requires_injected_authority(tmp_path: Path,
         cache_root=cache,
         release_id=release_id,
         deployment_id=deployment_id,
-        environment="prod",
+        environment="development",
         artifact_registry_ref="synthetic-artifacts",
         publication_mode="exact",
     )
@@ -48,9 +52,20 @@ def test_remote_development_delivery_requires_injected_authority(tmp_path: Path,
         AirflowArtifactPublisher(registry=registry).publish(publish_request)
     assert denied_publish.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
 
+    with pytest.raises(AirflowArtifactDeliveryError) as denied_stale_state:
+        AirflowArtifactPublisher(
+            registry=registry,
+            development_admission=_admission(authority, "publish", release_id, deployment_id),
+            clock=_clock,
+        ).publish(publish_request)
+    assert denied_stale_state.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert not (tmp_path / "registry" / "releases").exists()
+
     published = AirflowArtifactPublisher(
         registry=registry,
-        development_authority=authority,
+        development_admission=_admission(authority, "publish", release_id, deployment_id),
+        development_admission_verifier=_admission_verifier(authority),
+        clock=_clock,
     ).publish(publish_request)
     assert published.status == "published"
 
@@ -58,7 +73,7 @@ def test_remote_development_delivery_requires_injected_authority(tmp_path: Path,
         cache_root=tmp_path / "remote-cache",
         release_id=release_id,
         deployment_id=deployment_id,
-        environment="prod",
+        environment="development",
         artifact_registry_ref="synthetic-artifacts",
     )
     with pytest.raises(AirflowArtifactDeliveryError) as denied_materialize:
@@ -68,9 +83,189 @@ def test_remote_development_delivery_requires_injected_authority(tmp_path: Path,
 
     installed = AirflowArtifactMaterializer(
         registry=registry,
-        development_authority=authority,
+        development_admission=_admission(authority, "materialize", release_id, deployment_id),
+        development_admission_verifier=_admission_verifier(authority),
+        clock=_clock,
     ).materialize(materialize_request)
     assert installed.projection_verified
+
+
+def test_development_release_rejects_production_target_projection(tmp_path: Path) -> None:
+    authority = _development_authority()
+    workspace = tmp_path / "workspace"
+    prepare_projects(workspace)
+    compiled = tmp_path / "compiled"
+    assert (
+        workspace_service(tmp_path / "profiles", development_authority=authority)
+        .compile(workspace, output_dir=compiled)
+        .passed
+    )
+    native = materialize_compact_pack_release(
+        pack_root=compiled,
+        cache_root=tmp_path / ".dpone-cache",
+        xcom_sidecar_image=SIDECAR,
+        development_authority=authority,
+    )
+    assert native.passed
+    _write_environment(tmp_path)
+
+    with pytest.raises(AirflowDeploymentProjectionError, match="DEV-only releases require"):
+        AirflowDeploymentProjectionService(root=tmp_path).materialize(
+            release_id=native.release_id,
+            environment="prod",
+            trust_tier="production",
+            runtime_image_ref=IMAGE,
+            runtime_image_digest=IMAGE.split("@")[-1],
+            artifact_registry_ref="synthetic-artifacts",
+            registry_config_ref=_config_map_ref("registry", "1"),
+            trust_policy_ref=_config_map_ref("policy", "2"),
+            airflow_bundle_ref="git:" + "d" * 40,
+        )
+
+
+@pytest.mark.parametrize("mismatch", ["target", "operation"])
+def test_unknown_target_or_operation_rejects_before_registry_write(tmp_path: Path, mismatch: str) -> None:
+    authority = _development_authority()
+    target_environment = "qa" if mismatch == "target" else "development"
+    cache, release_id, deployment_id = _development_projection(
+        tmp_path,
+        composed=False,
+        target_environment=target_environment,
+    )
+    registry = _registry(tmp_path)
+    request = PublishRequest(
+        cache_root=cache,
+        release_id=release_id,
+        deployment_id=deployment_id,
+        environment=target_environment,
+        artifact_registry_ref="synthetic-artifacts",
+        publication_mode="exact",
+    )
+    admission = _admission(
+        authority,
+        "materialize" if mismatch == "operation" else "publish",
+        release_id,
+        deployment_id,
+        environment="development",
+    )
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied:
+        AirflowArtifactPublisher(
+            registry=registry,
+            development_admission=admission,
+            development_admission_verifier=_admission_verifier(authority),
+            clock=_clock,
+        ).publish(request)
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert not (tmp_path / "registry" / "releases").exists()
+
+
+@pytest.mark.parametrize("changed_state", ["policy", "revocation"])
+def test_post_issuance_target_state_change_rejects_before_registry_write(
+    tmp_path: Path,
+    changed_state: str,
+) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=False)
+    registry = _registry(tmp_path)
+    verifier = _admission_verifier(
+        authority,
+        target_policy_sha256="sha256:" + ("7" if changed_state == "policy" else "6") * 64,
+        current_revocation_epoch=authority.revocation_epoch + int(changed_state == "revocation"),
+    )
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied:
+        AirflowArtifactPublisher(
+            registry=registry,
+            development_admission=_admission(authority, "publish", release_id, deployment_id),
+            development_admission_verifier=verifier,
+            clock=_clock,
+        ).publish(
+            PublishRequest(
+                cache_root=cache,
+                release_id=release_id,
+                deployment_id=deployment_id,
+                environment="development",
+                artifact_registry_ref="synthetic-artifacts",
+                publication_mode="exact",
+            )
+        )
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert not (tmp_path / "registry" / "releases").exists()
+
+
+def test_publish_rechecks_revocation_after_preparation_before_first_write(tmp_path: Path) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=True)
+    registry = _registry(tmp_path)
+    verifier = _admission_verifier(authority, revoke_after_successes=2)
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied:
+        AirflowArtifactPublisher(
+            registry=registry,
+            development_admission=_admission(authority, "publish", release_id, deployment_id),
+            development_admission_verifier=verifier,
+            clock=_clock,
+        ).publish(
+            PublishRequest(
+                cache_root=cache,
+                release_id=release_id,
+                deployment_id=deployment_id,
+                environment="development",
+                artifact_registry_ref="synthetic-artifacts",
+                publication_mode="exact",
+            )
+        )
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert verifier.calls == 2
+    assert not (tmp_path / "registry" / "releases").exists()
+
+
+def test_materialize_rechecks_revocation_immediately_before_install(tmp_path: Path) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=True)
+    registry = _registry(tmp_path)
+    AirflowArtifactPublisher(
+        registry=registry,
+        development_admission=_admission(authority, "publish", release_id, deployment_id),
+        development_admission_verifier=_admission_verifier(authority),
+        clock=_clock,
+    ).publish(
+        PublishRequest(
+            cache_root=cache,
+            release_id=release_id,
+            deployment_id=deployment_id,
+            environment="development",
+            artifact_registry_ref="synthetic-artifacts",
+            publication_mode="exact",
+        )
+    )
+    destination = tmp_path / "revoked-cache"
+    verifier = _admission_verifier(authority, revoke_after_successes=2)
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied:
+        AirflowArtifactMaterializer(
+            registry=registry,
+            development_admission=_admission(authority, "materialize", release_id, deployment_id),
+            development_admission_verifier=verifier,
+            clock=_clock,
+        ).materialize(
+            MaterializeRequest(
+                cache_root=destination,
+                release_id=release_id,
+                deployment_id=deployment_id,
+                environment="development",
+                artifact_registry_ref="synthetic-artifacts",
+            )
+        )
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert verifier.calls == 2
+    assert not (destination / "releases").exists()
+    assert not (destination / "deployments").exists()
 
 
 def test_public_cli_cannot_self_authorize_development_delivery(tmp_path: Path) -> None:
@@ -84,19 +279,21 @@ def test_public_cli_cannot_self_authorize_development_delivery(tmp_path: Path) -
         cache_root=cache,
         release_id=release_id,
         deployment_id=deployment_id,
-        environment="prod",
+        environment="development",
         artifact_registry_ref="synthetic-artifacts",
         publication_mode="exact",
     )
     AirflowArtifactPublisher(
         registry=options.build(),
-        development_authority=authority,
+        development_admission=_admission(authority, "publish", release_id, deployment_id),
+        development_admission_verifier=_admission_verifier(authority),
+        clock=_clock,
     ).publish(request)
     published = publish_command_result(
         cache_root=str(cache),
         release_id=release_id,
         deployment_id=deployment_id,
-        environment="prod",
+        environment="development",
         artifact_registry_ref="synthetic-artifacts",
         max_object_bytes=64 * 1024 * 1024,
         max_total_bytes=512 * 1024 * 1024,
@@ -110,7 +307,7 @@ def test_public_cli_cannot_self_authorize_development_delivery(tmp_path: Path) -
         cache_root=str(tmp_path / "cli-cache"),
         release_id=release_id,
         deployment_id=deployment_id,
-        environment="prod",
+        environment="development",
         artifact_registry_ref="synthetic-artifacts",
         max_object_bytes=64 * 1024 * 1024,
         max_total_bytes=512 * 1024 * 1024,
@@ -120,7 +317,12 @@ def test_public_cli_cannot_self_authorize_development_delivery(tmp_path: Path) -
     assert materialized.errors[0]["code"] == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
 
 
-def _development_projection(tmp_path: Path, *, composed: bool) -> tuple[Path, str, str]:
+def _development_projection(
+    tmp_path: Path,
+    *,
+    composed: bool,
+    target_environment: str = "development",
+) -> tuple[Path, str, str]:
     authority = _development_authority()
     workspace = tmp_path / "workspace"
     prepare_projects(workspace)
@@ -168,10 +370,10 @@ def _development_projection(tmp_path: Path, *, composed: bool) -> tuple[Path, st
     )
     assert installed.passed, installed.blockers
     release = json.loads(Path(installed.release_dir, "release-set.json").read_bytes())
-    _write_environment(tmp_path)
+    _write_target_environment(tmp_path, target_environment)
     projection = AirflowDeploymentProjectionService(root=tmp_path).materialize(
         release_id=release["release_id"],
-        environment="prod",
+        environment=target_environment,
         trust_tier="non_production",
         runtime_image_ref=IMAGE,
         runtime_image_digest=IMAGE.split("@")[-1],
@@ -181,3 +383,82 @@ def _development_projection(tmp_path: Path, *, composed: bool) -> tuple[Path, st
         airflow_bundle_ref="git:" + "d" * 40,
     )
     return cache, release["release_id"], projection.deployment["deployment_id"]
+
+
+def _write_target_environment(root: Path, environment: str) -> None:
+    _write_environment(root)
+    if environment == "prod":
+        return
+    source = root / "environments" / "prod"
+    target = root / "environments" / environment
+    shutil.copytree(source, target)
+    for path in target.iterdir():
+        path.write_text(path.read_text(encoding="utf-8").replace("prod", environment), encoding="utf-8")
+    registry = root / "platform" / "connection-registries"
+    body = (registry / "prod.yaml").read_text(encoding="utf-8").replace("prod", environment)
+    (registry / f"{environment}.yaml").write_text(body, encoding="utf-8")
+
+
+def _admission(
+    authority,
+    operation,
+    release_id: str,
+    deployment_id: str,
+    *,
+    environment: str = "development",
+) -> DevelopmentTargetAdmission:
+    return DevelopmentTargetAdmission(
+        authority=authority,
+        operation=operation,
+        release_id=release_id,
+        deployment_id=deployment_id,
+        target_environment=environment,
+        target_trust_tier="non_production",
+        target_policy_sha256="sha256:" + "6" * 64,
+        checked_at=datetime(2026, 9, 17, 12, 0, tzinfo=UTC),
+        current_revocation_epoch=authority.revocation_epoch,
+    )
+
+
+def _clock() -> datetime:
+    return datetime(2026, 9, 17, 12, 0, tzinfo=UTC)
+
+
+class _CurrentTargetVerifier:
+    def __init__(
+        self,
+        *,
+        target_policy_sha256: str,
+        current_revocation_epoch: int,
+        revoke_after_successes: int | None = None,
+    ) -> None:
+        self._target_policy_sha256 = target_policy_sha256
+        self._current_revocation_epoch = current_revocation_epoch
+        self._revoke_after_successes = revoke_after_successes
+        self.calls = 0
+
+    def require_current(self, admission: DevelopmentTargetAdmission, *, now: datetime) -> None:
+        admission.require_current_target(
+            target_policy_sha256=self._target_policy_sha256,
+            current_revocation_epoch=self._current_revocation_epoch,
+            now=now,
+        )
+        self.calls += 1
+        if self.calls == self._revoke_after_successes:
+            self._current_revocation_epoch += 1
+
+
+def _admission_verifier(
+    authority,
+    *,
+    target_policy_sha256: str = "sha256:" + "6" * 64,
+    current_revocation_epoch: int | None = None,
+    revoke_after_successes: int | None = None,
+) -> _CurrentTargetVerifier:
+    return _CurrentTargetVerifier(
+        target_policy_sha256=target_policy_sha256,
+        current_revocation_epoch=(
+            authority.revocation_epoch if current_revocation_epoch is None else current_revocation_epoch
+        ),
+        revoke_after_successes=revoke_after_successes,
+    )
