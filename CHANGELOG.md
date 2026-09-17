@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add a preparatory, separately installed `dbt-dpone-sqlserver` adapter with the
+  distinct `dpone_sqlserver` identity and a finite, fail-closed physical protocol.
+  Pass its authenticated launch packet through an anonymous inherited descriptor
+  owned by the existing supervised dbt runner. The public method remains disabled
+  until exact toolchain/profile/source identity, recorder delivery and live driver
+  qualification are complete; ordinary `sqlserver` profiles are unchanged.
+
 - Add immutable SQL Server physical-plan enrollment and durable BUILD-session
   attachment. The signed procedures authenticate retained plan, command,
   reservation, registration and source identity, preserve exact one- and
