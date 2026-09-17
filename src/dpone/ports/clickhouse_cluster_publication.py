@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Protocol
+from typing import Any, Protocol
 
 from dpone.contracts import clickhouse_cluster_publication as contracts
 
@@ -39,3 +39,48 @@ class ClusterPublicationDdlPort(Protocol):
     def drop_predecessor(
         self, record: contracts.AuthorityRecord, permit: contracts.DispatchPermit, *, cluster: str
     ) -> None: ...
+
+
+def require_exact_ddl_entry(
+    ddl: ClusterPublicationDdlPort,
+    cluster: str,
+    *,
+    entry_id: str | None,
+    token: str | None,
+    query_digest: str | None,
+    error_code: str,
+) -> contracts.QueueEntry:
+    """Resolve evidence only when queue entry, token, and query are identical."""
+
+    if not token or not query_digest:
+        raise contracts.ClusterPublicationError(error_code, "DDL identity is incomplete")
+    entries: tuple[contracts.QueueEntry, ...]
+    if entry_id:
+        entry = ddl.read_entry(cluster, entry_id)
+        entries = () if entry is None else (entry,)
+    else:
+        entries = ddl.find_entries(cluster, token)
+    if len(entries) != 1:
+        raise contracts.ClusterPublicationError(error_code, "exactly one queue entry required")
+    entry = entries[0]
+    if entry.correlation_token != token or entry.query_digest != query_digest:
+        raise contracts.ClusterPublicationError(
+            error_code,
+            "queue entry does not match the fenced DDL identity",
+        )
+    return entry
+
+
+def require_verified_mutation(result: Any, *, permit: bool) -> contracts.VersionedAuthorityRecord:
+    """Reject ambiguous KeeperMap outcomes and missing dispatch permits."""
+
+    if result.status is not contracts.AuthorityMutationStatus.VERIFIED or result.observed is None:
+        code = "DPONE_CLICKHOUSE_CLUSTER_CAS_UNKNOWN"
+        if result.status is contracts.AuthorityMutationStatus.CONFLICT:
+            code = "DPONE_CLICKHOUSE_CLUSTER_CAS_CONFLICT"
+        raise contracts.ClusterPublicationError(code, "KeeperMap mutation was not acknowledged and verified")
+    if permit and result.permit is None:
+        raise contracts.ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_CAS_UNKNOWN", "dispatch permit was not issued"
+        )
+    return result.observed
