@@ -19,6 +19,7 @@ from dpone.runtime.airflow_artifact_delivery_models import (
 from dpone.runtime.airflow_artifact_delivery_support import (
     ArtifactRegistry,
     ArtifactRegistryError,
+    DevelopmentDeliveryAuthority,
     download,
     from_cache_error,
     registry_unavailable,
@@ -26,7 +27,10 @@ from dpone.runtime.airflow_artifact_delivery_support import (
     require_registry_scope,
     verify_download,
 )
-from dpone.runtime.airflow_artifact_inventory import build_publish_inventory
+from dpone.runtime.airflow_artifact_publication_preparation import (
+    prepare_publication,
+    require_exact_publication_projection,
+)
 from dpone.runtime.airflow_artifact_publication_receipt import build_publication_commitment
 from dpone.runtime.deployment_cache_common import (
     DeploymentCacheError,
@@ -39,11 +43,17 @@ from dpone.runtime.deployment_cache_projection_validator import DeploymentCacheP
 class AirflowArtifactPublisher:
     """Publish one already verified local release/deployment without overwrite."""
 
-    def __init__(self, *, registry: ArtifactRegistry) -> None:
+    def __init__(
+        self,
+        *,
+        registry: ArtifactRegistry,
+        development_authority: DevelopmentDeliveryAuthority | None = None,
+    ) -> None:
         self._registry = registry
+        self._development_authority = development_authority
 
     def publish(self, request: PublishRequest) -> PublishReport:
-        inventory = prepare_publication(request)
+        inventory = prepare_publication(request, development_authority=self._development_authority)
         if request.publication_mode == "compatible":
             return self._publish_compatible(request, inventory)
         return self._publish_exact(request, inventory)
@@ -246,24 +256,6 @@ class AirflowArtifactPublisher:
         return False
 
 
-def _validate_local_projection(request: PublishRequest) -> ValidatedDeploymentProjection:
-    deployment_dir = request.cache_root / "deployments" / request.environment / request.deployment_dir_name
-    try:
-        projection = DeploymentCacheProjectionValidator(
-            request.cache_root,
-            max_artifact_bytes=request.max_object_bytes,
-        ).validate_details(deployment_dir, environment=request.environment)
-    except DeploymentCacheError as exc:
-        raise from_cache_error(exc) from exc
-    if projection.release_id != request.release_id or projection.deployment_id != request.deployment_id:
-        raise AirflowArtifactDeliveryError(
-            "DPONE_DEPLOYMENT_ID_MISMATCH",
-            "validated deployment does not match the requested release/deployment pins",
-        )
-    _require_exact_projection(request, projection)
-    return projection
-
-
 def _validate_remote_projection(
     root: Path,
     *,
@@ -282,40 +274,13 @@ def _validate_remote_projection(
             "DPONE_DEPLOYMENT_ID_MISMATCH",
             "remote read-back projection does not match the requested exact identities",
         )
-    _require_exact_projection(request, projection)
+    require_exact_publication_projection(request, projection)
     require_registry_ref(
         projection.deployment,
         projection.airflow_index,
         request.artifact_registry_ref,
     )
     return projection
-
-
-def _require_exact_projection(
-    request: PublishRequest,
-    projection: ValidatedDeploymentProjection,
-) -> None:
-    if request.publication_mode != "exact":
-        return
-    if (projection.deployment.get("schema"), projection.airflow_index.get("schema")) not in {
-        ("dpone.deployment-set.v2", "dpone.airflow-deployment-index.v2"),
-        ("dpone.deployment-set.v3", "dpone.airflow-deployment-index.v3"),
-    }:
-        raise AirflowArtifactDeliveryError(
-            "DPONE_EXACT_PUBLICATION_PROJECTION_REQUIRED",
-            "exact publication requires matching deployment-set/index v2 or v3",
-        )
-
-
-def prepare_publication(request: PublishRequest) -> ArtifactInventory:
-    """Validate and inventory all local bytes without registry or credential I/O."""
-
-    projection = _validate_local_projection(request)
-    require_registry_ref(projection.deployment, projection.airflow_index, request.artifact_registry_ref)
-    try:
-        return build_publish_inventory(request, projection)
-    except DeploymentCacheError as exc:
-        raise from_cache_error(exc) from exc
 
 
 @contextmanager

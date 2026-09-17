@@ -9,12 +9,18 @@ from typing import Any
 from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
 from dpone.contracts.dbt_release import (
     DBT_RELEASE_WIRE_CONTRACT,
+    dbt_development_release_authority_violation,
     dbt_release_authority_violation,
     dbt_release_runtime_wire_contract,
     is_workspace_dbt_wire,
 )
+from dpone.contracts.development_delivery_authority import DEVELOPMENT_RELEASE_SCHEMA
 from dpone.contracts.release_composition import COMPOSITION_ADMISSION, COMPOSITION_SCHEMA
 from dpone.contracts.release_composition_policy import validate_composition_metadata
+
+RELEASE_SET_SCHEMAS = frozenset(
+    {"dpone.release-set.v1", "dpone.release-set.v2", DEVELOPMENT_RELEASE_SCHEMA, COMPOSITION_SCHEMA}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +41,7 @@ class ReleaseSetValidation:
 
 def release_schema_kind_failure(kind: object) -> ReleaseSetValidationFailure | None:
     """Reject unknown envelopes before an adapter chooses a registered schema."""
-    if kind not in {"dpone.release-set.v1", "dpone.release-set.v2", COMPOSITION_SCHEMA}:
+    if kind not in RELEASE_SET_SCHEMAS:
         return ReleaseSetValidationFailure("DPONE_RELEASE_SCHEMA_INVALID", "release-set schema is invalid")
     return None
 
@@ -76,7 +82,12 @@ def admit_release_authority(release: Mapping[str, Any]) -> ReleaseSetValidation:
         if kind == "dpone.release-set.v1":
             if wire == DBT_RELEASE_WIRE_CONTRACT:
                 return ReleaseSetValidation(dbt_runtime_wire_contract=wire)
-        elif dbt_release_authority_violation(release, expected_wire_contract=wire) is None:
+        elif kind == DEVELOPMENT_RELEASE_SCHEMA and dbt_development_release_authority_violation(release) is None:
+            return ReleaseSetValidation(dbt_runtime_wire_contract=wire)
+        elif (
+            kind == "dpone.release-set.v2"
+            and dbt_release_authority_violation(release, expected_wire_contract=wire) is None
+        ):
             return ReleaseSetValidation(dbt_runtime_wire_contract=wire)
     except ValueError:
         pass

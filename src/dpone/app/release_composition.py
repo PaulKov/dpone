@@ -4,11 +4,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from dpone.app.dbt_promotion_composition import build_dbt_release_source_reader
+from dpone.contracts.development_delivery_authority import DevelopmentAuthorityReceipt
 from dpone.contracts.release_composition_ordinary import OrdinaryReleaseInventoryError
 from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
 from dpone.gitops.workload_dependencies import WorkloadDependencyResolver
 from dpone.manifest.confined_files import read_confined_file
-from dpone.manifest.loader import SingleYamlManifestLoader
+from dpone.manifest.loader import ManifestLoaderRouter
 from dpone.manifest.release_composition_ordinary import OrdinaryReleaseInventoryReader
 from dpone.manifest.release_composition_ordinary_closure import OrdinaryPackClosureVerifier
 from dpone.runtime.immutable_local_tree import (
@@ -26,7 +27,9 @@ from dpone.services.release_composition import ReleaseCompositionService, Verifi
 from dpone.version import installed_version
 
 
-def build_release_composition_service() -> ReleaseCompositionService:
+def build_release_composition_service(
+    *, development_authority: DevelopmentAuthorityReceipt | None = None
+) -> ReleaseCompositionService:
     """Construct the same mandatory verifiers for public CLI and Python callers."""
     native = build_dbt_release_source_reader()
     ordinary = build_ordinary_release_inventory_reader()
@@ -42,6 +45,7 @@ def build_release_composition_service() -> ReleaseCompositionService:
         read_file=read_confined_file,
         producer_version=installed_version(),
         durability_error=ImmutableLocalTreeDurabilityError,
+        development_authority=development_authority,
     )
 
 
@@ -52,13 +56,13 @@ def _publish_composition(destination, files):
 
 
 def build_ordinary_release_inventory_reader(*, read_file=read_confined_file) -> OrdinaryReleaseInventoryReader:
-    """Wire the mandatory plain-transfer closure policy explicitly."""
+    """Wire the mandatory declarative transfer closure policy explicitly."""
     return OrdinaryReleaseInventoryReader(
         read_file=read_file,
         closure=OrdinaryPackClosureVerifier(
             dependencies=WorkloadDependencyResolver(),
             builder=AirflowCompactPackBuilder(),
-            manifest_loader=SingleYamlManifestLoader(),
+            manifest_loader=ManifestLoaderRouter(),
             unpack_verified=_unpack_verified,
         ),
     )

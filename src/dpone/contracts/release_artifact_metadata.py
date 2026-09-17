@@ -10,6 +10,7 @@ from typing import Any
 
 from dpone.contracts.airflow_deployment import is_canonical_sha256_digest, is_sha256_digest, release_id
 from dpone.contracts.airflow_release_artifacts import ReleaseArtifactLocatorError, release_artifact_path
+from dpone.contracts.release_set_authority import RELEASE_SET_SCHEMAS
 
 
 class ReleaseArtifactMetadataError(ValueError):
@@ -66,7 +67,7 @@ def parse_release_artifact_pin(
 
 def require_release_metadata_identity(release: Mapping[str, Any], *, requested_release_id: str) -> None:
     """Check envelope, claimed digest, content identity and requested identity in order."""
-    if release.get("schema") not in {"dpone.release-set.v1", "dpone.release-set.v2", "dpone.release-set.v3"}:
+    if release.get("schema") not in RELEASE_SET_SCHEMAS:
         raise ReleaseArtifactMetadataError("DPONE_RELEASE_SCHEMA_INVALID", "release-set schema is invalid")
     claimed = release.get("release_id")
     if not is_canonical_sha256_digest(claimed):

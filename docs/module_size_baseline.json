@@ -290,16 +290,6 @@
       "target_date": "2026-12-31",
       "target_sloc": 350
     },
-    "src/dpone/runtime/airflow_artifact_publication.py": {
-      "accepted_adr": null,
-      "baseline_commit": "f8c6a4a5e75d167829c05f65d5d3033acb193878",
-      "max_lines": 388,
-      "max_sloc": 358,
-      "owner": "architecture",
-      "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
-      "target_date": "2026-12-31",
-      "target_sloc": 350
-    },
     "src/dpone/runtime/credentials/binding_resolver.py": {
       "accepted_adr": null,
       "baseline_commit": "f8c6a4a5e75d167829c05f65d5d3033acb193878",

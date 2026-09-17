@@ -25,6 +25,7 @@ from dpone.gitops.schema_release_deployment_definitions import (
 from dpone.gitops.schema_release_deployment_v2_contracts import (
     airflow_deployment_index_v2_contract,
     deployment_set_v2_contract,
+    development_release_set_contract,
 )
 from dpone.gitops.schema_release_deployment_v3_contracts import (
     airflow_deployment_index_v3_contract,
@@ -44,7 +45,11 @@ def release_deployment_schema_contracts() -> tuple[GitOpsSchemaContract, ...]:
     return (
         release_set_contract(),
         release_set_v2_contract(),
-        release_composition_contract(release_set_v2_contract().schema),
+        development_release_set_contract(),
+        release_composition_contract(
+            release_set_v2_contract().schema,
+            development_release_set_contract().schema,
+        ),
         release_composition_manifest_contract(),
         deployment_set_contract(),
         deployment_set_v2_contract(),

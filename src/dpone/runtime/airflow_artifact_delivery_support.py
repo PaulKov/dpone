@@ -11,7 +11,7 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
 from dpone.ports.artifact_registry import (
@@ -25,6 +25,90 @@ from dpone.ports.artifact_registry import (
 )
 from dpone.runtime.airflow_artifact_delivery_models import AirflowArtifactDeliveryError, MaterializeRequest
 from dpone.runtime.deployment_cache_common import DeploymentCacheError
+
+_DEVELOPMENT_RELEASE_SCHEMA = "dpone.dbt-release-set.development.v1"
+_DEVELOPMENT_COMPOSITION_PROFILE = "development_workspace_delivery_v1"
+
+
+class DevelopmentDeliveryAuthority(Protocol):
+    """Capability injected only after external development-policy verification."""
+
+    def release_projection(self) -> dict[str, Any]: ...
+
+    def require_release_budget(self, *, workload_ids: tuple[str, ...], source_bytes: int) -> None: ...
+
+
+def require_development_delivery_authority(
+    release: Mapping[str, object],
+    *,
+    authority: DevelopmentDeliveryAuthority | None,
+    source_bytes: int | None = None,
+) -> None:
+    """Require matching injected authority and combined delivery budgets."""
+
+    try:
+        projection = _development_authority_projection(release)
+        if projection is None:
+            return
+        if authority is None or authority.release_projection() != projection:
+            raise ValueError("current external authority is required")
+        if source_bytes is not None:
+            authority.require_release_budget(
+                workload_ids=_development_workload_ids(release),
+                source_bytes=_development_budget_bytes(release, delivered_bytes=source_bytes),
+            )
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise AirflowArtifactDeliveryError(
+            "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED",
+            "development artifact delivery requires matching externally verified authority",
+        ) from exc
+
+
+def _development_authority_projection(release: Mapping[str, object]) -> object | None:
+    if release.get("schema") == _DEVELOPMENT_RELEASE_SCHEMA:
+        return release.get("development_authority")
+    promotion = release.get("promotion")
+    if not isinstance(promotion, Mapping) or promotion.get("profile") != _DEVELOPMENT_COMPOSITION_PROFILE:
+        return None
+    constituents = release.get("constituents")
+    if not isinstance(constituents, list):
+        raise ValueError("development constituents are invalid")
+    native = tuple(item for item in constituents if isinstance(item, Mapping) and item.get("id") == "native")
+    if len(native) != 1 or not isinstance(native[0].get("release"), Mapping):
+        raise ValueError("development native constituent is invalid")
+    return native[0]["release"].get("development_authority")
+
+
+def _development_workload_ids(release: Mapping[str, object]) -> tuple[str, ...]:
+    artifacts = release.get("artifacts")
+    packs = artifacts.get("workload_packs") if isinstance(artifacts, Mapping) else None
+    if not isinstance(packs, list):
+        raise ValueError("development workload inventory is invalid")
+    identifiers = tuple(
+        sorted(str(item.get("id")) for item in packs if isinstance(item, Mapping) and isinstance(item.get("id"), str))
+    )
+    if len(identifiers) != len(packs):
+        raise ValueError("development workload inventory is invalid")
+    return identifiers
+
+
+def _development_budget_bytes(release: Mapping[str, object], *, delivered_bytes: int) -> int:
+    if release.get("schema") != _DEVELOPMENT_RELEASE_SCHEMA:
+        return delivered_bytes
+    artifacts = release.get("artifacts")
+    if not isinstance(artifacts, Mapping):
+        raise ValueError("development artifact inventory is invalid")
+    total = 0
+    for section in ("dag_specs", "workload_packs", "runtime_payloads"):
+        rows = artifacts.get(section)
+        if not isinstance(rows, list):
+            raise ValueError("development artifact inventory is invalid")
+        for row in rows:
+            size = row.get("bytes") if isinstance(row, Mapping) else None
+            if type(size) is not int or size < 0:
+                raise ValueError("development artifact inventory is invalid")
+            total += size
+    return total
 
 
 def require_registry_ref(
