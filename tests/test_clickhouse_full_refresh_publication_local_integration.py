@@ -142,8 +142,7 @@ def test_runtime_connector_applies_deterministic_query_id(driver: str, port: int
         connector.execute_query("SELECT 1", query_id=query_id)
         connector.execute_query("SYSTEM FLUSH LOGS")
         rows = connector.get_records(
-            "SELECT count() FROM system.query_log "
-            f"WHERE query_id = '{query_id}' AND type = 'QueryFinish'"
+            f"SELECT count() FROM system.query_log WHERE query_id = '{query_id}' AND type = 'QueryFinish'"
         )
         assert rows == [(1,)]
     finally:

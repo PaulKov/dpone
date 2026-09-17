@@ -385,6 +385,7 @@ class ClickHouseFullRefreshPublicationService:
             target=str(load_config.target_table),
         )
 
+
 __all__ = [
     "REPLAY_OPTION",
     "SCHEDULER_IDENTITY_OPTION",
