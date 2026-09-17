@@ -56,7 +56,7 @@ class DevelopmentActivationAdmissionGate:
             environment=environment,
             admission=self._admission,
             admission_verifier=self._admission_verifier,
-            checked_at=self._clock(),
+            clock=self._clock,
         )
 
 
@@ -67,7 +67,7 @@ def require_development_activation_admission(
     environment: str,
     admission: DevelopmentTargetAdmission | None,
     admission_verifier: DevelopmentTargetAdmissionVerifier | None,
-    checked_at: datetime,
+    clock: Callable[[], datetime],
 ) -> None:
     """Require a current operation receipt before activation staging or CAS."""
 
@@ -92,6 +92,7 @@ def require_development_activation_admission(
         trust_tier = projection.deployment.get("trust_tier")
         if admission is None or admission_verifier is None or not isinstance(trust_tier, str):
             raise ValueError("development target admission is absent")
+        checked_at = clock()
         admission_verifier.require_current(admission, now=checked_at)
         admission.require(
             authority_projection=authority_projection,
