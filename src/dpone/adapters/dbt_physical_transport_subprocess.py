@@ -6,14 +6,18 @@ This resource validates representation and OS ownership, not policy authority.
 
 import os
 import stat
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from threading import Event, Lock
 from time import monotonic_ns
 from uuid import uuid4
 
+from dpone.adapters.dbt_process_supervisor import ManagedProcess
 from dpone.contracts.dbt_physical_transport_delivery import PhysicalTransportDelivery
 from dpone.ports.dbt_physical_transport import PhysicalTransportLaunchContext
+
+_WAIT_POLL_SECONDS = 0.05
 
 
 def open_physical_transport_directory(path: Path) -> int:
@@ -33,6 +37,35 @@ def open_physical_transport_directory(path: Path) -> int:
     except BaseException:
         os.close(fd)
         raise
+
+
+def wait_for_physical_transport_process(
+    process: ManagedProcess,
+    *,
+    context: PhysicalTransportLaunchContext,
+    timeout_seconds: int,
+    executable: str,
+    monotonic_ns_clock: Callable[[], int] = monotonic_ns,
+) -> int:
+    """Wait within both command and authenticated absolute bounds.
+
+    Cancellation and expiry are surfaced as the runner's existing timeout path,
+    which owns process-tree cleanup.  This helper never terminates, retries or
+    replaces the process itself.
+    """
+
+    deadline = min(
+        monotonic_ns_clock() + timeout_seconds * 1_000_000_000,
+        context.deadline_monotonic_ns,
+    )
+    while True:
+        remaining_ns = deadline - monotonic_ns_clock()
+        if context.cancellation.is_set() or remaining_ns <= 0:
+            raise subprocess.TimeoutExpired((executable,), timeout_seconds)
+        try:
+            return process.wait(timeout=min(_WAIT_POLL_SECONDS, remaining_ns / 1_000_000_000))
+        except subprocess.TimeoutExpired:
+            continue
 
 
 class PhysicalTransportLaunchLease:

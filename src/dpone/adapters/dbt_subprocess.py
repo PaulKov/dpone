@@ -16,6 +16,7 @@ from typing import Any, BinaryIO
 
 from dpone.adapters.dbt_executable import current_environment_dbt_executable
 from dpone.adapters.dbt_output_redaction import _sanitize
+from dpone.adapters.dbt_physical_transport_subprocess import wait_for_physical_transport_process
 from dpone.adapters.dbt_process_supervisor import (
     DbtProcessSupervisor,
     ManagedProcess,
@@ -29,7 +30,6 @@ from dpone.ports.dbt_publishing import DbtCommandResult, DbtInstalledToolchain
 
 DEFAULT_DBT_OUTPUT_LIMIT_BYTES = 1024 * 1024
 DEFAULT_DBT_COLLECTOR_JOIN_TIMEOUT_SECONDS = 5.0
-_PHYSICAL_WAIT_POLL_SECONDS = 0.05
 
 
 class DistributionDbtToolchainInspector:
@@ -119,7 +119,17 @@ class SubprocessDbtCommandRunner:
             stdout.start()
             stderr.start()
             try:
-                exit_code = self._wait(process, timeout_seconds=timeout_seconds, launch_context=launch_context)
+                exit_code = (
+                    process.wait(timeout=timeout_seconds)
+                    if launch_context is None
+                    else wait_for_physical_transport_process(
+                        process,
+                        context=launch_context,
+                        timeout_seconds=timeout_seconds,
+                        executable=self._dbt_executable,
+                        monotonic_ns_clock=self._monotonic_ns,
+                    )
+                )
             except subprocess.TimeoutExpired as exc:
                 cleanup_started = True
                 self._cleanup_process(process, collectors)
@@ -196,26 +206,6 @@ class SubprocessDbtCommandRunner:
             start_new_session=self._process_supervisor.start_new_session,
             **inherited,
         )
-
-    def _wait(
-        self,
-        process: ManagedProcess,
-        *,
-        timeout_seconds: int,
-        launch_context: PhysicalTransportLaunchContext | None,
-    ) -> int:
-        if launch_context is None:
-            return process.wait(timeout=timeout_seconds)
-        runner_deadline = self._monotonic_ns() + timeout_seconds * 1_000_000_000
-        deadline = min(runner_deadline, launch_context.deadline_monotonic_ns)
-        while True:
-            remaining_ns = deadline - self._monotonic_ns()
-            if launch_context.cancellation.is_set() or remaining_ns <= 0:
-                raise subprocess.TimeoutExpired((self._dbt_executable,), timeout_seconds)
-            try:
-                return process.wait(timeout=min(_PHYSICAL_WAIT_POLL_SECONDS, remaining_ns / 1_000_000_000))
-            except subprocess.TimeoutExpired:
-                continue
 
     def _cleanup_process(
         self,
