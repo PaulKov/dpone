@@ -165,9 +165,38 @@ below `max_query_size` and contains no identifiers, credentials, or source data.
 
 `create_if_absent` is an `INSERT` of the complete row with
 `keeper_map_strict_mode = 1`; an existing key is a conflict. A lost create
-response grants no effect permit. A later worker may read and validate the exact
-`PREPARED` record, but it still needs a new acknowledged-and-verified phase CAS
-before publication dispatch.
+response is `CAS_OUTCOME_UNKNOWN` for that invocation. A later recovery may read
+and validate the exact `PREPARED` record, but it still needs a fresh
+acknowledged-and-verified phase CAS before publication dispatch.
+
+Both `create_if_absent` and `compare_and_swap` use a dedicated authority adapter
+whose mutation method is explicitly one-shot. It bypasses the connector's
+generic retry decorator, disables driver reconnect/query replay for this call,
+and invokes the transport exactly once. Its request contract is:
+
+```text
+query_id = opaque authority mutation ID, passed through the driver's dedicated field
+settings.keeper_map_strict_mode = 1
+settings.insert_keeper_max_retries = 0
+redirect/reconnect/query retry = disabled
+transport call count = 1
+```
+
+The native adapter calls the low-level driver `execute` once with separate
+`settings` and `query_id` arguments. The HTTP adapter sends one POST with the
+same setting and query ID parameters and a client session with automatic method
+retry and redirects disabled. Neither calls the generic `execute_query` retry
+path. An acknowledged Keeper conflict is classified normally; timeout,
+connection loss, cancellation after send, or any other ambiguous response is
+`CAS_OUTCOME_UNKNOWN` and is never retried inside the invocation.
+
+This boundary is required even with exact post-read verification. If a hidden
+retry repeated a committed first CAS, the second execution could be an
+acknowledged stale no-op and the post-read could still match the first write.
+Treating that sequence as one acknowledged CAS would incorrectly issue a second
+dispatch permit. The adapter contract and tests therefore assert mutation
+transport `call_count == 1`; a higher count is a correctness failure, not a
+recoverable warning.
 
 ### Compatibility and migration
 
@@ -246,7 +275,8 @@ produce different physical parts for the same logical data.
 4. Bind inventory digest, predecessor/desired identities, candidate, and row
    count in phase `PREPARED`.
 5. Immediately before dispatch, re-read catalogs and authority. Execute this
-   logical CAS with `keeper_map_strict_mode = 1`:
+   logical CAS through the one-shot/no-retry authority adapter with
+   `keeper_map_strict_mode = 1`:
 
    ```sql
    ALTER TABLE control
@@ -276,6 +306,9 @@ produce different physical parts for the same logical data.
    read shows the requested value. The write may still be in flight, and a
    read cannot prove that this caller has the sole right to perform the external
    DDL effect. The operation remains fenced for explicit reconciliation.
+9. The service never catches an ambiguous authority error and calls the mutation
+   adapter again. Recovery starts with read-only observation in a later
+   invocation and, where allowed, a new CAS from the newly observed version.
 
 There is no lease expiry or automatic ownership transfer. A crash after CAS but
 before a provable queue entry intentionally leaves an unknown operation rather
@@ -339,6 +372,38 @@ After `DISPATCHING`, zero matches, multiple matches, a changed query digest, or
 an entry removed before terminal proof produces `OUTCOME_UNKNOWN`. Missing queue
 state is never interpreted as proof that the command was not enqueued.
 
+#### Pinned queue-status normalization
+
+The pinned 24.8 system table returns one status row per queue entry and host.
+Before aggregation, require exactly one row for every expected inventory host
+and no other host. Missing, extra, or duplicate host rows are
+`OUTCOME_UNKNOWN`, even when the remaining rows are `Finished`.
+
+Normalize each row exhaustively:
+
+| Raw `status` | Exception evidence | Normalized result |
+|---|---|---|
+| `Inactive` or `Active` | Both exception fields are NULL | `IN_PROGRESS` |
+| `Finished` | `exception_code = 0` and exception text is empty | `TERMINAL_SUCCESS` |
+| `Finished` | `exception_code > 0` and exception text is non-empty | `TERMINAL_FAILURE` |
+| `Finished` | NULL, negative, unparseable, or contradictory exception fields | `OUTCOME_UNKNOWN` |
+| `Removing` or `Unknown` | Any | `OUTCOME_UNKNOWN` |
+| NULL or an unrecognized status | Any | `OUTCOME_UNKNOWN` |
+| `Inactive` or `Active` | Any non-NULL exception field | `OUTCOME_UNKNOWN` |
+
+The entry is terminal only when every expected host row is a well-formed
+`Finished` row. It is terminal success when all are `TERMINAL_SUCCESS`, and
+terminal failure when at least one is `TERMINAL_FAILURE` and all others are a
+well-formed terminal result. If at least one row is `IN_PROGRESS` and none is
+unknown, the entry remains in progress. Any unknown row dominates the aggregate
+and prohibits cleanup.
+
+`Removing` is not treated as historical success: it can no longer provide the
+complete proof required by this operation. Only a terminal receipt already CAS-
+persisted in the authority record before removal may survive later queue
+retention. A current `Removing`, missing, or garbage-collected entry cannot
+reconstruct that receipt.
+
 ### 5. Reconcile every replica
 
 Existing-target state per replica:
@@ -360,12 +425,12 @@ Aggregate catalog state with the exact queue entry:
 | Replica result | Queue result | Classification and action |
 |---|---|---|
 | All pending, phase `PREPARED` | No entry | First dispatch is permitted after CAS |
-| All committed | Terminal on all expected members | Commit proven; proceed to cleanup |
-| Pending/committed mix | Active or inactive anywhere | `PARTIAL_IN_PROGRESS`; wait for the original entry only |
-| Pending/committed mix | Terminal everywhere | `PARTIAL_TERMINAL`; fail closed and retain both generations |
-| All pending after dispatch | Terminal failure everywhere | V1 fails closed; retry policy needs separate review |
+| All committed | Exact host set is terminal success or terminal failure | Commit proven from catalog plus terminal receipt; proceed to cleanup |
+| Pending/committed mix | Exact host set is in progress | `PARTIAL_IN_PROGRESS`; wait for the original entry only |
+| Pending/committed mix | Exact host set is terminal | `PARTIAL_TERMINAL`; fail closed and retain both generations |
+| All pending after dispatch | Exact host set is terminal failure | V1 fails closed; retry policy needs separate review |
 | Any unknown identity or unavailable member | Any | `OUTCOME_UNKNOWN`; prohibit DDL and cleanup |
-| Any post-dispatch state | Entry absent, ambiguous, or changed | `OUTCOME_UNKNOWN`; prohibit DDL and cleanup |
+| Any post-dispatch state | Queue row/status is unknown, absent, ambiguous, or changed | `OUTCOME_UNKNOWN`; prohibit DDL and cleanup |
 
 The service may poll the bound entry with bounded backoff and cancellation.
 Cancellation stops polling but does not cancel or replay DDL. A task retry
@@ -379,7 +444,9 @@ members. That capability is outside V1.
 ### 6. Cleanup and completion
 
 Cleanup begins only after every replica is committed, the exact publication
-entry is terminal, and replication health is complete.
+entry has a complete terminal receipt for the exact host set, and replication
+health is complete. `Removing`, `Unknown`, NULL/unparseable status, or partial
+host evidence never authorizes cleanup.
 
 For an existing target:
 
@@ -487,7 +554,7 @@ stateDiagram-v2
 | Cluster publication contracts | New | Identities, phases, classifiers, digests | Contracts only |
 | Cluster publication ports | New | Inventory, Keeper CAS, DDL queue and catalog boundaries | Contracts only |
 | Strict cluster catalog adapter | New | Complete system-table facts and normalized identity | ClickHouse connector |
-| KeeperMap authority adapter | New | Strict create/read/versioned CAS | ClickHouse connector |
+| KeeperMap authority adapter | New | Strict reads plus one-shot/no-retry create and versioned CAS | Raw ClickHouse transport without generic retry |
 | Cluster publication service | New | Fencing, dispatch, reconciliation and cleanup | New narrow ports |
 | Strategy selector | Existing, extended | Select local or cluster publisher | Composition root |
 
@@ -507,11 +574,13 @@ unrelated routes.
 ### Ports, adapters, and composition root
 
 The authority port exposes only `create_if_absent`, `read_versioned`, and
-`compare_and_swap`. Its CAS result distinguishes acknowledged-and-verified,
-conflict, and outcome-unknown; only the first variant can carry a non-serializable
-dispatch permit. The DDL port exposes one-shot execution and queue lookup; it
-does not expose a generic publication retry. The catalog port returns typed
-facts rather than policy. The service owns the aggregate classifier.
+`compare_and_swap`. Its mutation adapter owns a raw one-shot transport boundary;
+it cannot depend on the generic retried query executor. Its result distinguishes
+acknowledged-and-verified, conflict, and outcome-unknown; only the first variant
+can carry a non-serializable dispatch permit. The DDL port exposes one-shot
+execution and queue lookup; it does not expose a generic publication retry. The
+catalog port returns typed facts rather than policy. The service owns the
+aggregate classifier.
 
 Runtime orchestration depends inward on contracts and ports. ClickHouse adapters
 implement the ports, and the composition root constructs the cluster publisher
@@ -581,7 +650,8 @@ entry from `queryToString(AST)` and then captures changed settings
 the entry serializer persists those settings
 ([DDL entry source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Interpreters/DDLTask.cpp#L71-L109));
 and `system.distributed_ddl_queue` exposes both normalized query and settings
-([system-table source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/System/StorageSystemDDLWorkerQueue.cpp#L49-L60)).
+along with the pinned status enum and nullable execution fields
+([system-table source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/System/StorageSystemDDLWorkerQueue.cpp#L34-L68)).
 
 For KeeperMap, the same pinned source defines the virtual `_version`
 ([virtual-column source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/StorageKeeperMap.cpp#L350-L365)),
@@ -589,6 +659,9 @@ captures it with mutated rows, and passes it to Keeper `set` in strict mode
 ([versioned-set source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/StorageKeeperMap.cpp#L158-L229));
 UPDATE returns all columns and executes the versioned sink synchronously
 ([mutation source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/StorageKeeperMap.cpp#L1433-L1460)).
+The pinned settings expose a separate KeeperMap mutation retry limit, allowing
+the authority request to set `insert_keeper_max_retries = 0`
+([settings source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Core/Settings.h#L859-L864)).
 
 A disposable Docker check against server `24.8.14.39` confirmed both behaviors:
 a leading DDL comment was absent from the queue `query`, while an
@@ -644,7 +717,10 @@ limitations: Docker evidence does not certify production topology, permissions, 
 | Unit | Authority codec and versions | Malformed fields and stale versions block |
 | Contract | Two workers from the same prior version | One acknowledged-and-verified CAS permit and at most one dispatch; the loser has no permit |
 | Contract | CAS succeeds but its response is discarded | `CAS_OUTCOME_UNKNOWN`; post-read cannot create a dispatch permit |
+| Contract | Authority transport would normally retry a timeout | Dedicated adapter calls the mutation transport exactly once; no second INSERT/UPDATE occurs |
 | Contract | Queue active, terminal, absent, duplicate, changed | Only the exact active entry is waited |
+| Unit | Every pinned queue status/exception combination | Only well-formed `Finished` is terminal; malformed, NULL, `Removing`, and `Unknown` map to unknown |
+| Unit | Missing, extra, duplicate, or contradictory host rows | Aggregate is unknown and cleanup is prohibited |
 | Contract | Two queue entries reuse one correlation token | Collision is unknown; newest entry is never selected |
 | Contract | Cleanup partial or reply lost | Only exact predecessor can be dropped |
 | Compatibility | Local bounded and legacy unbounded paths | Existing behavior remains unchanged |
@@ -669,8 +745,9 @@ Required scenarios:
 6. Execute KeeperMap CAS on the pinned server with key, `_version`, operation,
    fence, and phase predicates; prove one version increment and a stale no-op.
 7. Discard an actually committed CAS response in the client fault wrapper;
-   prove the runtime emits `CAS_OUTCOME_UNKNOWN` and sends no DDL even though an
-   independent read observes the new record.
+   prove the authority transport call count remains one, the runtime emits
+   `CAS_OUTCOME_UNKNOWN`, and no DDL is sent even though an independent read
+   observes the new record.
 8. Submit a DDL with both a leading comment and unique `log_comment`; assert the
    comment is absent from queue `query`, the setting is present unchanged, and
    exactly one distinct queue `entry` is bound.
@@ -679,6 +756,9 @@ Required scenarios:
 10. Lose cleanup response; reconcile and complete exact idempotent cleanup.
 11. Change UUID, engine, schema, Keeper path, or membership; block before mutation.
 12. Partially create the control facade; reconcile safe absence but block mismatch.
+13. Inject every pinned queue status, NULL/malformed exception evidence, and
+    missing/extra/duplicate host rows; prove unknown evidence never reaches
+    cleanup.
 
 The compose fixture is opt-in locally and an explicit CI job. Certification must
 pin ClickHouse version, configuration, permissions, topology, exact commit, and
@@ -723,8 +803,10 @@ separate branch and task only after this specification becomes `APPROVED`.
 - [ ] Database, engine, UUID, schema, Keeper path, and replica identities agree.
 - [ ] Every replica observes one KeeperMap record and version for the target.
 - [ ] One acknowledged-and-post-verified CAS winner dispatches; stale workers and lost CAS responses cannot create permission.
+- [ ] Every KeeperMap mutation uses the one-shot/no-retry authority adapter and has transport call count exactly one.
 - [ ] Every publication binds exactly one distributed-DDL entry through the exact stored `log_comment` setting.
 - [ ] Missing or duplicate correlation entries fail closed; leading SQL comments are never identity evidence.
+- [ ] Only complete, well-formed `Finished` rows for the exact host set are terminal; `Removing`, `Unknown`, NULL/unparseable, missing, extra, or duplicate rows are unknown.
 - [ ] Lost response never causes blind `EXCHANGE` replay.
 - [ ] Active partial waits; terminal mixed fails closed.
 - [ ] Unknown identity, queue, or topology prohibits DDL and cleanup.
