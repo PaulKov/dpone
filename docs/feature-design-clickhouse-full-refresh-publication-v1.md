@@ -16,10 +16,11 @@ with an engine-gated, identity-reconciled publication protocol whose durable
 coordination state lives in ClickHouse itself. It does not require PostgreSQL or
 another shared state service.
 
-The measurable outcome is binary: after a lost publication response, a retry
-must classify the exact target and candidate UUID mapping and prove that the
-deterministic prior query ID is absent from `system.processes` before doing any
-DDL; it must never blindly exchange the pair again.
+The measurable outcome is binary: the worker that atomically creates the marker
+is the only worker allowed to dispatch publication DDL. After a lost response, a
+retry classifies the exact target and candidate UUID mapping and observes the
+deterministic prior query ID for diagnostics, but never redispatches a pending
+exchange.
 
 ## Personas and customer journey
 
@@ -34,8 +35,9 @@ Journey: configure bounded full refresh → preflight target engine and topology
 stage and validate the complete candidate → acquire the target-local publication
 marker → bind target/candidate UUIDs → publish once → reconcile catalog truth →
 clean the predecessor and marker only after verified commit. A retry with the
-same orchestration run identity resumes the same operation. A different run is
-blocked while unresolved authority remains.
+same orchestration run identity recovers committed publication or cleanup, but
+an unresolved pending mapping remains fail-closed. A different run is blocked
+while unresolved authority remains.
 
 ## Scope
 
@@ -118,8 +120,10 @@ must not automatically repeat an unresolved exchange.
    evidence before publication authority is acquired.
 4. Probe the database engine, topology, target, candidate and marker. Reject
    unsupported or inconsistent observations.
-5. Atomically create the marker. If it already exists, parse it and require the
-   exact same operation/plan; a different operation is fenced.
+5. Atomically create the marker. Only the successful creator receives dispatch
+   authority. If it already exists, parse it and require the exact same
+   operation/plan, but do not grant dispatch authority; a different operation is
+   fenced.
 6. Observe and bind predecessor and desired UUIDs. Re-observe immediately before
    DDL. Any drift is unknown/conflict, never permission to overwrite.
 7. Existing target: execute one non-retried `EXCHANGE TABLES target AND
@@ -133,10 +137,11 @@ must not automatically repeat an unresolved exchange.
 9. Acknowledged pending is a failure. Raised-but-committed is recovered success.
    Raised-and-pending is reported as unknown for the current attempt. Publication
    uses a deterministic ClickHouse `query_id`. A later orchestration retry may
-   execute the DDL once only after pre-source catalog reconciliation proves the
-   exact original pending UUID mapping and `system.processes` proves that query
-   ID is no longer active. An unavailable or failed quiescence observation
-   blocks the retry.
+   recover committed or cleanup-pending state, but it never redispatches DDL from
+   a pending marker: absence from `system.processes` is not an atomic dispatch
+   fence. Active or unobservable server state receives a more specific stable
+   failure, while inactive pending state remains fail-closed for operator
+   resolution.
 10. After verified commit, drop only the exact predecessor candidate whose UUID
     matches the marker, then drop the exact marker. The state where the desired
     UUID is already at the target, the predecessor candidate is absent and the
@@ -156,6 +161,7 @@ authority = create_or_reconcile_marker(observation, plan)
 state = classify(authority, inspect_catalog(...))
 if state == committed: return recovered_success
 if state != pending: fail_unknown
+if this worker did not atomically create marker: fail_redispatch_forbidden
 revalidate_engine_topology_and_uuids()
 execute_exactly_once_without_driver_retry(exchange_or_rename)
 state = classify(authority, inspect_catalog(...))
@@ -174,7 +180,7 @@ stateDiagram-v2
     Authorized --> Pending: predecessor and desired UUIDs unchanged
     Pending --> CommitUnknown: DDL reply lost or catalog inconsistent
     Pending --> Committed: catalog proves desired UUID at target
-    CommitUnknown --> Pending: catalog proves no commit
+    CommitUnknown --> Fenced: catalog remains pending; redispatch forbidden
     CommitUnknown --> CommitUnknown: deterministic query ID is still active
     CommitUnknown --> Committed: catalog proves commit
     Committed --> CleanupPending: exact cleanup fails
@@ -190,7 +196,8 @@ stateDiagram-v2
 - Schema drift after staging blocks at the existing validation boundary.
 - Cancellation before DDL removes only the exact owned candidate/marker.
 - Cancellation or process crash after DDL is reconciled from catalog identity;
-  a still-running server query fences redispatch.
+  committed state is recovered, while pending state fences redispatch whether
+  or not the old query is still visible.
 - A crash between predecessor deletion and marker deletion resumes as exact
   marker-only cleanup.
 - Two different runs cannot own one fixed target marker concurrently.
@@ -261,7 +268,7 @@ schema drop exists.
 |---|---|---|---|
 | Unit | marker codec and all UUID mappings | In-memory | classifier tests |
 | Contract | existing/absent target, foreign marker, engine/topology rejection | Fake connector | publication service tests |
-| Failure injection | delayed lost reply, repeated retry with fresh audit identity, cleanup crash | Fake connector | zero concurrent/double exchange and marker-only cleanup proof |
+| Failure injection | deterministic two-worker race, delayed lost reply, fresh audit identity, cleanup crash | Fake connector | marker creator is sole dispatcher, zero double exchange and marker-only cleanup proof |
 | Integration | Atomic ClickHouse with concurrent reader and two workers | Docker | integration receipt |
 | Live certification | exact production-like topology and permissions | Approved environment | signed route evidence; initially UNVERIFIED |
 | Compatibility | non-full-refresh names/behavior unchanged | Offline suite | regression results |
