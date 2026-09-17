@@ -70,6 +70,16 @@ def test_exchange_pre_effect_error_is_not_assumed_safe_to_retry() -> None:
     assert client.identities == ("old-generation", "new-generation")
 
 
+def test_publication_rename_uncertain_response_is_dispatched_once() -> None:
+    original = RuntimeError("Code: 517. Metadata on replica is not up to date")
+    client = _ExchangeClient(original)
+
+    with pytest.raises(RuntimeError, match="Code: 517"):
+        _query_service(client).execute_query("RENAME TABLE `synthetic`.`candidate` TO `synthetic`.`target`")
+
+    assert len(client.calls) == 1
+
+
 def test_successful_exchange_keeps_parameters_and_ddl_settings() -> None:
     client = _ExchangeClient(None)
     query = "EXCHANGE TABLES `synthetic`.`items` AND `synthetic`.`generation` ON CLUSTER `synthetic_cluster`"

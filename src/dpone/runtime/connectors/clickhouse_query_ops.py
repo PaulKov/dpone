@@ -252,10 +252,11 @@ class ClickHouseQueryOps:
 
 
 def _should_retry_ddl(query: Any, exc: Exception, *, attempt: int, attempts: int) -> bool:
-    # EXCHANGE can have committed before an error is observed; replay swaps back.
+    # Publication EXCHANGE/RENAME may commit before an error is observed. Their
+    # caller must reconcile catalog identity before deciding whether to retry.
     return (
         attempt < attempts
-        and _statement_kind(query) != "EXCHANGE"
+        and _statement_kind(query) not in {"EXCHANGE", "RENAME"}
         and _is_ddl_like(query)
         and _is_retryable_cluster_metadata_error(exc)
     )
