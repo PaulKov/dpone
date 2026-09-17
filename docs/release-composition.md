@@ -11,13 +11,11 @@ deployment, or certify a live route. See the [contract reference](release-compos
 for supported inputs and [operations guide](release-composition-operations.md)
 for recovery, delivery, and upgrades.
 
-Verified cache installation does not establish activation eligibility. In the
-current mixed-composition activation matrix, native-generated transfers require
-bounded full refresh, which the compiler rejects because its byte budget is
-unenforced. Supported native merge/partition inputs remain usable for artifact
-preparation, but cannot satisfy that activation cell. Review the
-[activation capability gap](composition-activation-contract.md#required-downstream-matrix)
-before planning a deployment; do not remove required limits to proceed.
+Verified cache installation does not establish activation eligibility.
+Native-generated transfers that select full refresh must carry the platform-owned
+`max_source_bytes` contract; runtime enforces it before target publication.
+Review the [activation matrix](composition-activation-contract.md#required-downstream-matrix)
+and route evidence before planning a deployment.
 
 ## Prepare the workspace and toolchain
 

@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import replace
 from typing import Any
 
-from dpone.config.load_strategy import LoadStrategy
+from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
 from dpone.runtime.governance.ports import (
     StagedLoadHandle,
     StagedLoadPostCommitCleanupError,
@@ -15,7 +15,7 @@ from dpone.runtime.governance.ports import (
 )
 from dpone.runtime.process_io import add_exception_note
 from dpone.runtime.sinks.clickhouse_production_finalize import ClickHouseProductionFinalizer
-from dpone.runtime.sinks.clickhouse_staged_evidence import staged_handle_metadata
+from dpone.runtime.sinks.clickhouse_staged_evidence import enforce_source_byte_budget, staged_handle_metadata
 from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.merge_policy import (
     MergePolicy,
@@ -46,10 +46,14 @@ class ClickHouseStagedLoadService:
     def stage(self, load_config: Any, payload: Any) -> StagedLoadHandle:
         load_config = self._effective_config(load_config)
         staging_config = self._create_staging(load_config, payload)
-        finalization_config = None
-        decoded_config = None
+        finalization_config = decoded_config = None
         try:
             staged_rows = self._sink._insert_payload(staging_config, payload)
+            source_byte_budget = enforce_source_byte_budget(
+                payload,
+                maximum_bytes=(getattr(load_config, "options", {}) or {}).get(SOURCE_BYTE_BUDGET_OPTION),
+                full_refresh=load_config.load_strategy is LoadStrategy.FULL_REFRESH,
+            )
             finalization_config, decoded_config = self._sink._staging_decoder.prepare(
                 load_config,
                 staging_config,
@@ -65,13 +69,16 @@ class ClickHouseStagedLoadService:
             except Exception as cleanup_error:
                 add_exception_note(error, f"raw staging cleanup failed: {type(cleanup_error).__name__}")
             raise
+        metadata = staged_handle_metadata(load_config, staging_config, finalization_config, decoded_config, payload)
+        if source_byte_budget is not None:
+            metadata["source_byte_budget"] = source_byte_budget.to_dict()
         return StagedLoadHandle(
             staging_config=staging_config,
             payload_schema=tuple(getattr(payload, "schema", ())),
             staged_rows=staged_rows,
             finalization_config=finalization_config,
             decoded_config=decoded_config,
-            metadata=staged_handle_metadata(load_config, staging_config, finalization_config, decoded_config, payload),
+            metadata=metadata,
         )
 
     def load(self, load_config: Any, payload: Any) -> LoadResult:
@@ -157,8 +164,6 @@ class ClickHouseStagedLoadService:
         )
 
     def _effective_config(self, load_config: Any) -> Any:
-        """Map ``backfill`` to its configured inner strategy for staging/finalize."""
-
         if load_config.load_strategy != LoadStrategy.BACKFILL:
             return load_config
         return replace(load_config, load_strategy=backfill_inner_strategy(load_config))

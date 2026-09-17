@@ -120,6 +120,22 @@ MSSQL CDC is a source capability, not a load strategy. It uses typed CDC
 offsets and advances source state only after sink success; certify the exact
 route and environment before enabling it.
 
+### Bounded full refresh
+
+Platform-owned dbt publish profiles authorize `full_refresh` with a positive
+`max_source_bytes`. The compiler preserves that limit as a reserved runtime
+contract; endpoint `options` cannot override it. After the complete source
+payload reaches attempt-local staging, dpone sums unique source-wire parts by
+their stable part identity and digest. An exact retry of the same part is not
+counted twice.
+
+The ClickHouse target is finalized only when measurement is complete and the
+aggregate is at or below the limit. Exceeded, conflicting, incomplete, or
+unmeasurable evidence raises a stable `DPONE_SOURCE_BYTE_BUDGET_*` error,
+removes attempt staging, and leaves the published target unchanged. The limit
+counts emitted source bytes, before ClickHouse encoding and storage
+compression; it resets for every load attempt.
+
 ## Runtime algorithm
 
 ClickHouse implements `StagedLoadPort`, so this route records

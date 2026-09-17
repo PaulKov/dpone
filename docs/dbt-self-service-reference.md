@@ -56,6 +56,14 @@ production evidence; `compile` always requires it and returns
 The complete authority schema is in
 [Connector certification](connector-certification.md#project-evidence-authority).
 
+For an authorized `full_refresh`, the platform profile must provide a positive
+`strategy_policy.full_refresh.max_source_bytes`. Generated manifests carry the
+resolved value in `sink.strategy.max_source_bytes`; authors must not repeat it
+in source or sink `options`. Runtime measures the complete deduplicated source
+wire payload before target publication. If evidence is unavailable, incomplete,
+conflicting, or above the limit, the attempt fails with a
+`DPONE_SOURCE_BYTE_BUDGET_*` code and the existing target remains unchanged.
+
 ## Published JSON Schemas
 
 The checked-in schemas define the machine-readable structural contract used by

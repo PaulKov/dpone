@@ -91,11 +91,7 @@ def test_blocked_native_full_refresh_manifest_is_classified_by_shape_only():
         ),
     )
     errors = tuple(issue for issue in compiled.warnings if issue.severity == "error")
-    assert len(errors) == 1
-    issue = errors[0]
-    assert issue.code == "DPONE_DBT_STRATEGY_UNRESOLVED" and issue.severity == "error"
-    assert "sink.strategy.max_source_bytes cannot be enforced" in issue.message
-    assert "strategy_policy.full_refresh.max_source_bytes" in issue.message
+    assert errors == ()
     original = deepcopy(compiled.manifest)
     assert composition_generated_transfer_cell(compiled.manifest) == "mssql_clickhouse_full_refresh_v1"
     assert compiled.manifest == original
