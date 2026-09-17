@@ -148,13 +148,7 @@ class SubprocessDbtCommandRunner:
             if process is not None and not cleanup_started:
                 self._cleanup_process(process, collectors)
             raise
-        except (
-            FileNotFoundError,
-            PermissionError,
-            OSError,
-            RuntimeError,
-            ValueError,
-        ) as exc:
+        except (FileNotFoundError, PermissionError, OSError, RuntimeError, ValueError) as exc:
             if process is not None and not cleanup_started:
                 self._cleanup_process(process, collectors)
             raise _execution_error("dbt executable is unavailable or unsafe") from exc
