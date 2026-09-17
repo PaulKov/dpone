@@ -76,9 +76,12 @@ def wait_for_physical_transport_process(
         if context.cancellation.is_set() or remaining_ns <= 0:
             raise subprocess.TimeoutExpired((executable,), timeout_seconds)
         try:
-            return process.wait(timeout=min(_WAIT_POLL_SECONDS, remaining_ns / 1_000_000_000))
+            result = process.wait(timeout=min(_WAIT_POLL_SECONDS, remaining_ns / 1_000_000_000))
         except subprocess.TimeoutExpired:
             continue
+        if context.cancellation.is_set() or monotonic_ns_clock() >= deadline:
+            raise subprocess.TimeoutExpired((executable,), timeout_seconds)
+        return result
 
 
 class PhysicalTransportLaunchLease:

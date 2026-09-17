@@ -34,11 +34,18 @@ class _Launch:
 class _Process:
     pid = 123
 
-    def __init__(self, *, launch: _Launch, cancellation: Event | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        launch: _Launch,
+        cancellation: Event | None = None,
+        cancel_on_success: bool = False,
+    ) -> None:
         self.stdout = io.BytesIO()
         self.stderr = io.BytesIO()
         self.launch = launch
         self.cancellation = cancellation
+        self.cancel_on_success = cancel_on_success
         self.wait_calls = 0
         self.terminate_calls = 0
 
@@ -47,8 +54,12 @@ class _Process:
         self.wait_calls += 1
         if self.cancellation is None:
             return 0
+        if self.cancel_on_success:
+            self.cancellation.set()
+            return 0
         if self.wait_calls == 1:
             self.cancellation.set()
+            assert timeout is not None
             raise subprocess.TimeoutExpired(("dbt",), timeout)
         return 0
 
@@ -97,6 +108,46 @@ def test_owner_cancellation_uses_existing_supervised_cleanup_without_retry(tmp_p
         dbt_executable="/runtime/bin/dbt",
         physical_transport_launch=launch,
         monotonic_ns_clock=lambda: 1_000_000_000,
+        process_supervisor=DbtProcessSupervisor(posix=False),
+    )
+
+    with pytest.raises(DbtPublishingError, match="timed out"):
+        runner.run(_args(tmp_path), cwd=tmp_path, timeout_seconds=10, redactions=())
+
+    assert process.wait_calls == 2
+    assert process.terminate_calls == 1
+
+
+def test_success_return_after_owner_cancellation_is_not_accepted(tmp_path: Path) -> None:
+    cancellation = Event()
+    context = PhysicalTransportLaunchContext((9,), 20_000_000_000, cancellation)
+    launch = _Launch(context)
+    process = _Process(launch=launch, cancellation=cancellation, cancel_on_success=True)
+    runner = SubprocessDbtCommandRunner(
+        popen_factory=lambda *_args, **_kwargs: process,
+        dbt_executable="/runtime/bin/dbt",
+        physical_transport_launch=launch,
+        monotonic_ns_clock=lambda: 1_000_000_000,
+        process_supervisor=DbtProcessSupervisor(posix=False),
+    )
+
+    with pytest.raises(DbtPublishingError, match="timed out"):
+        runner.run(_args(tmp_path), cwd=tmp_path, timeout_seconds=10, redactions=())
+
+    assert process.wait_calls == 2
+    assert process.terminate_calls == 1
+
+
+def test_success_return_after_absolute_delivery_deadline_is_not_accepted(tmp_path: Path) -> None:
+    context = PhysicalTransportLaunchContext((9,), 2_000_000_000, Event())
+    launch = _Launch(context)
+    process = _Process(launch=launch)
+    observed_times = iter((1_000_000_000, 1_000_000_000, 3_000_000_000))
+    runner = SubprocessDbtCommandRunner(
+        popen_factory=lambda *_args, **_kwargs: process,
+        dbt_executable="/runtime/bin/dbt",
+        physical_transport_launch=launch,
+        monotonic_ns_clock=lambda: next(observed_times),
         process_supervisor=DbtProcessSupervisor(posix=False),
     )
 
