@@ -1,0 +1,22 @@
+services:
+  keeper:
+    image: clickhouse/clickhouse-server:24.8.14.39
+    command: ["clickhouse-keeper", "--config-file=/etc/clickhouse-keeper/keeper.xml"]
+    volumes:
+      - ./config/keeper/keeper.xml:/etc/clickhouse-keeper/keeper.xml:ro
+  node1:
+    image: clickhouse/clickhouse-server:24.8.14.39
+    hostname: node1
+    depends_on: [keeper]
+    environment: {CLICKHOUSE_SKIP_USER_SETUP: "1"}
+    ports: ["19000:9000", "18123:8123"]
+    volumes:
+      - ./config/node1/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+  node2:
+    image: clickhouse/clickhouse-server:24.8.14.39
+    hostname: node2
+    depends_on: [keeper]
+    environment: {CLICKHOUSE_SKIP_USER_SETUP: "1"}
+    ports: ["29000:9000", "28123:8123"]
+    volumes:
+      - ./config/node2/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
