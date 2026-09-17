@@ -52,13 +52,11 @@
 - Report an unknown dbt target outcome for `COMMIT_UNKNOWN` instead of claiming
   safe rejection; preserve the error code, exit status and blocked-retry guidance.
 
-- Reject explicit `sink.strategy.max_source_bytes` instead of silently discarding
-  its unenforced limit, and block dbt bounded-full-refresh release generation.
-  Loads without this field and separate validated-file staging budgets retain
-  their existing behavior. Rebuild or withdraw affected older releases before
-  deployment; this does not prevent an already deployed upstream dbt build.
-  Mixed-composition activation still requires this rejected bounded-full-refresh
-  shape; verified cache installation does not close that capability gap.
+- Preserve the dbt `full_refresh.max_source_bytes` policy through runtime
+  compilation and enforce it against deduplicated source-file, physical-chunk,
+  slice, or certified BCP-stream evidence before ClickHouse target publication.
+  Invalid, misplaced, exceeded, incomplete, or unmeasurable budgets now fail
+  closed and clean attempt staging instead of being silently ignored.
 - Resolve generated dbt MSSQL interval start filters without literal braces and
   align current setup and recovery guidance with the existing toolchain.
 - Hide overlapping dbt secrets and secret fragments at captured-output retention

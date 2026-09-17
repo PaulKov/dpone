@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dpone.config.load_config import LoadConfig
-from dpone.config.load_strategy import LoadStrategy
+from dpone.config.load_strategy import LoadStrategy, inject_source_budget, validate_endpoint_option_ownership
 from dpone.config.mssql_strategy_contract import (
     MSSQLStrategyContractError,
     normalize_mssql_authoring_strategy,
@@ -18,7 +18,6 @@ from dpone.config.postgres_mssql_wire_contract import (
 from dpone.config.reconciliation import ReconciliationConfigError, normalize_reconciliation
 from dpone.contracts.api_sources import get_api_source_defaults
 from dpone.contracts.connector_declarations import canonical_endpoint_type
-from dpone.contracts.source_byte_budget_admission import source_byte_budget_rejection
 from dpone.dag.errors import DagConfigurationError
 from dpone.dag.export_format_validation import validate_export_format_for_sink
 from dpone.dag.load_config_builder_support import (
@@ -193,15 +192,7 @@ class LoadConfigBuilder:
             sink_options = dict(sink_cfg.get("options", {}) or {})
             if sink_cfg.get("type") == "kafka" and target_table:
                 sink_options = {**sink_options, "topic": target_table}
-            for endpoint, endpoint_options in (("source", source_options), ("sink", sink_options)):
-                if "quality" in endpoint_options:
-                    raise DagConfigurationError(
-                        f"{endpoint}.options.quality is misplaced; author quality at the process or manifest root"
-                    )
-
             strategy_cfg = dict(sink_cfg.get("strategy", {}) or {})
-            if budget_rejection := source_byte_budget_rejection(strategy_cfg):
-                raise DagConfigurationError(budget_rejection)
             unique_key = resolve_unique_key(
                 source_options=source_options,
                 strategy_config=strategy_cfg,
@@ -276,6 +267,11 @@ class LoadConfigBuilder:
                 source_options=source_options, sink_options=sink_options, parse_tracer=parse_tracer
             )
             options.update({"source_options": dict(source_options), "sink_options": dict(sink_options)})
+            try:
+                validate_endpoint_option_ownership(source_options, sink_options)
+                inject_source_budget(options, strategy_cfg, canonical_sink_type, source_options, sink_options)
+            except ValueError as exc:
+                raise DagConfigurationError(str(exc)) from exc
             reconciliation_policy = inject_runtime_contract_options(
                 config=config,
                 runtime_config=runtime_cfg,

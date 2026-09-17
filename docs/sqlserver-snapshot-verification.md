@@ -17,8 +17,8 @@ and live certification. Audience: reviewers and maintainers. Return to the
 | Check | Status | Observed result / limits |
 |---|---|---|
 | Applicable instructions, feature template, targeted code/standards trace | PASS | Baseline fixed before edits; only planning documents written |
-| Budget compiler/runtime synthetic mapping | PASS reproduction of defect | Compiled max_source_bytes retained; LoadConfig loses it |
-| Public strategy sub-schema validation | PASS reproduction of defect | max_source_bytes rejected as additional property; no universal runtime barrier inferred |
+| Budget compiler/runtime synthetic mapping | PASS | Compiled max_source_bytes reaches runtime admission and blocks publication on breach |
+| Public strategy sub-schema validation | PASS | max_source_bytes validates in the bounded full-refresh manifest contract |
 | Five bounded-policy schema cases | PASS | Existing policy admission/rejection tests; not runtime enforcement |
 | Native physical contracts/capability/reconciliation and dbt physical authority | PASS | 79 existing offline cases |
 | Generic ClickHouse lifecycle/finalize/namespace and MSSQL staging lifecycle | PASS | 32 existing offline cases; no crash/transaction live proof |

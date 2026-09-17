@@ -64,48 +64,25 @@ sink:
 
 ## Runbook
 
-### Source-byte budgets rejected before transfer
+### Source-byte budget admission
 
 For platform owners and manifest authors, an explicit
-`sink.strategy.max_source_bytes` now raises `DagConfigurationError` during
-public load configuration parsing. This field previously disappeared from the
-runtime configuration without enforcing its limit. Any explicit occurrence,
-including null or a value on another strategy, is rejected; loads that omit the
-field keep their existing behavior.
+`sink.strategy.max_source_bytes` is a positive Int64-sized limit for
+`full_refresh`. The public builder preserves it as a reserved runtime contract;
+null, malformed, misplaced and non-full-refresh occurrences fail before I/O.
+The dbt planner freezes the platform-owned value into generated manifests.
 
-In [dbt inline publishing](dbt-inline-publishing.md), a plan selecting full
-refresh with `strategy_policy.full_refresh.max_source_bytes` fails compilation
-with `DPONE_DBT_STRATEGY_UNRESOLVED`. It cannot emit executable release artifacts.
-An unused full-refresh grant does not block another supported selected strategy.
-The demo's safe strategy allowlist is unchanged.
+At the ClickHouse staged-load boundary, dpone sums complete, deduplicated
+source-emitted byte evidence from validated files, physical chunks, transfer
+slices, or the certified MSSQL BCP stream. Publication proceeds only when the
+measurement is complete and does not exceed the limit. Otherwise staging is
+cleaned and the published target remains unchanged. An empty completed snapshot
+is a measurable zero-byte input.
 
-When the error reports that `sink.strategy.max_source_bytes cannot be enforced`,
-ask the platform owner to select an already supported strategy or wait for an
-approved, enforced budget contract. Do not delete a required limit merely to
-make a bounded load run. This correction introduces no byte measurement:
-source bytes, encoded-file bytes and SQL table allocation are distinct.
 The separately enforced `ClickHouseValidatedFilePolicy.max_source_bytes` Python
-staging limit keeps its existing behavior.
-
-Rebuild or withdraw previously generated bounded-full-refresh releases before
-deployment. Rejecting transfer configuration does not guarantee that an upstream
-dbt build from an already deployed release has not run. The fix does not rewrite
-signed artifacts or change state, cleanup or recovery authority.
-
-This leaves a capability gap in mixed native/ordinary composition activation:
-its current native-transfer classifier requires bounded full refresh, while the
-compiler rejects that unenforced budget. Supported native merge/partition inputs
-can still be compiled, composed and installed in a verified cache, but those
-strategies do not satisfy this activation classifier. Cache installation is not
-activation approval. Do not remove the budget or edit generated artifacts to
-bridge the gap; see the [activation matrix](composition-activation-contract.md#required-downstream-matrix).
-
-Developers: `dpone.contracts.source_byte_budget_admission` supplies one pure
-decision to the public builder and dbt planner; each uses its existing error
-contract. The public regressions in `tests/test_full_refresh_budget_rejection.py`
-and `tests/test_dbt_inline_publishing.py` cover admission, unchanged no-budget
-behavior and refusal to emit executable artifacts. They do not certify a live
-route or implement a runtime byte ceiling.
+staging limit keeps its existing behavior. Neither limit represents compressed
+ClickHouse allocation. See [dbt inline publishing](dbt-inline-publishing.md) and
+the [MSSQL to ClickHouse route](source-sink/mssql-to-clickhouse.md#bounded-full-refresh).
 
 ### Runtime contract failures
 

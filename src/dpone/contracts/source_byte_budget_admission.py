@@ -1,26 +1,31 @@
-"""Admission for the currently unenforced strategy-level source-byte budget.
+"""Compatibility surface for the source-byte budget rejection gate.
 
-This rule concerns only ``sink.strategy.max_source_bytes``. It does not define
-byte measurement or alter independently enforced file-staging policy limits.
+The ClickHouse runtime now enforces bounded full refresh directly. The legacy
+predicate remains fail-closed because external callers may still use it before
+they have negotiated an enforcing sink capability.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 
+SOURCE_BYTE_BUDGET_FIELD = "max_source_bytes"
+
 
 def source_byte_budget_rejection(strategy: Mapping[str, object]) -> str | None:
-    """Return an actionable rejection for any explicit strategy budget.
+    """Reject an explicit budget when no enforcing capability was negotiated.
 
-    Presence includes null and malformed values: none may silently become an
-    omitted safety limit. An absent field preserves legacy admission. Callers
-    translate this pure decision into their existing error or issue contract.
+    Canonical builders do not call this compatibility predicate after they have
+    selected the ClickHouse enforcing runtime. Existing external callers retain
+    the previous safe default instead of silently losing their admission gate.
     """
 
-    if "max_source_bytes" not in strategy:
+    if SOURCE_BYTE_BUDGET_FIELD not in strategy:
         return None
     return (
-        "sink.strategy.max_source_bytes cannot be enforced by this runtime; "
-        "this configuration is rejected before transfer execution. "
-        "Use an already supported strategy or wait for a release with an approved source-byte budget contract."
+        "sink.strategy.max_source_bytes requires a negotiated enforcing runtime; "
+        "this configuration is rejected before transfer execution"
     )
+
+
+__all__ = ["SOURCE_BYTE_BUDGET_FIELD", "source_byte_budget_rejection"]

@@ -407,7 +407,7 @@ def test_explicit_strategy_is_blocked_when_profile_does_not_allow_it(
 
 
 @pytest.mark.parametrize("mode", ["full_refresh", "auto"])
-def test_unenforceable_full_refresh_budget_blocks_executable_artifacts(
+def test_authorized_full_refresh_freezes_enforceable_platform_byte_budget(
     tmp_path: Path,
     mode: str,
 ) -> None:
@@ -437,15 +437,10 @@ def test_unenforceable_full_refresh_budget_blocks_executable_artifacts(
         profiles_path=profile_path,
     )
 
-    assert not report.passed
-    assert {issue.code for issue in report.blockers} == {"DPONE_DBT_STRATEGY_UNRESOLVED"}
-    assert all("max_source_bytes cannot be enforced" in issue.message for issue in report.blockers)
-    assert all("strategy_policy.full_refresh.max_source_bytes" in issue.message for issue in report.blockers)
-    assert not report.models
-    output = tmp_path / "must-not-exist"
-    with pytest.raises(ValueError, match="Cannot write artifacts for a blocked dbt publish compile"):
-        _preview_artifact_writer().write(report, output, project_root=DEMO)
-    assert not output.exists()
+    assert report.passed
+    assert not report.blockers
+    assert {model.strategy["mode"] for model in report.models} == {"full_refresh"}
+    assert {model.strategy["max_source_bytes"] for model in report.models} == {1_000_000_000}
 
 
 def test_unused_full_refresh_grant_preserves_supported_selected_strategies(tmp_path: Path) -> None:
