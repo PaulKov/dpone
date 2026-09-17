@@ -38,6 +38,7 @@ class _Catalog:
         self.fail_exchange: str | None = None
         self.fail_rename: str | None = None
         self.fail_drop_table: str | None = None
+        self.fail_quiescence = False
         self.active_query_ids: set[str] = set()
         self.last_query_id: str | None = None
 
@@ -94,6 +95,8 @@ class _Catalog:
         del self.records[table]
 
     def publication_query_active(self, query_id: str) -> bool:
+        if self.fail_quiescence:
+            raise RuntimeError("system.processes unavailable")
         return query_id in self.active_query_ids
 
     def complete_inflight_exchange(self) -> None:
@@ -216,6 +219,20 @@ def test_retry_waits_for_ambiguous_server_query_then_reconciles_without_second_e
     assert service.replay_result(admitted) is not None
     assert catalog.exchange_calls == 1
     assert set(catalog.records) == {"target"}
+
+
+def test_retry_fails_closed_when_server_quiescence_cannot_be_observed() -> None:
+    catalog = _Catalog()
+    catalog.fail_exchange = "before"
+    service = ClickHouseFullRefreshPublicationService(catalog)
+    with pytest.raises(ClickHouseFullRefreshOutcomeUnknown):
+        service.publish(_config(), _candidate(_config()), staged_rows=9)
+    catalog.fail_quiescence = True
+
+    with pytest.raises(ClickHouseFullRefreshOutcomeUnknown, match="cannot prove"):
+        service.prepare_admission(_config())
+
+    assert catalog.exchange_calls == 1
 
 
 def test_different_run_cannot_take_over_unresolved_marker() -> None:
