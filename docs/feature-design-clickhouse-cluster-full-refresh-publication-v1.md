@@ -480,13 +480,13 @@ Checked 2026-09-17. This design depends primarily on ClickHouse semantics:
 - [KeeperMap](https://clickhouse.com/docs/engines/table-engines/special/keepermap)
   provides Keeper-backed key/value state and version-bound updates.
 
-| System/version | Relevant capability | Observed design | Adopt/reject |
-|---|---|---|---|
-| dlt current docs | Full replacement | Destination-specific replacement semantics | Adopt explicit capability admission only |
-| Microsoft SSIS | Batch/commit controls | Explicit completion boundaries, no ClickHouse DDL authority | Adopt explicit completion evidence only |
-| Apache Beam current JdbcIO | Retry/write-result boundaries | Batch completion differs from dataset cutover | Adopt explicit retry boundary only |
-| Informatica, Airbyte, Fivetran, Pentaho | Broad data movement | Does not establish this in-database CAS protocol | N/A for the authority layer |
-| gusty, Astronomer Cosmos | Orchestration | Schedules work rather than owning generation identity | N/A for publication authority |
+| System/version | Relevant capability | Observed design | Adopt/reject | Official source/date |
+|---|---|---|---|---|
+| dlt current docs | Full replacement | Destination-specific replacement semantics | Adopt explicit capability admission only | [Full loading](https://dlthub.com/docs/general-usage/full-loading), checked 2026-09-17 |
+| Microsoft SSIS, SQL Server 16.x/17.x docs | Batch/commit controls | Explicit completion boundaries, no ClickHouse DDL authority | Adopt explicit completion evidence only | [Data flow performance](https://learn.microsoft.com/en-us/sql/integration-services/data-flow/data-flow-performance-features?view=sql-server-ver17), checked 2026-09-17 |
+| Apache Beam current JdbcIO | Retry/write-result boundaries | Batch completion differs from dataset cutover | Adopt explicit retry boundary only | [JdbcIO.Write](https://beam.apache.org/releases/javadoc/current/org/apache/beam/sdk/io/jdbc/JdbcIO.Write.html), checked 2026-09-17 |
+| Informatica, Airbyte, Fivetran, Pentaho | Broad data movement | Product comparison does not establish this in-database CAS protocol | N/A for the authority layer | N/A: no claim about product capability |
+| gusty, Astronomer Cosmos | Orchestration | They schedule work rather than own ClickHouse generation identity | N/A for publication authority | N/A: orchestration is outside the storage authority layer |
 
 No throughput or universal product-superiority claim is made.
 
