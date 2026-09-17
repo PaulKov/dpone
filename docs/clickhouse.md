@@ -414,6 +414,48 @@ Common blocker codes:
 | `clickhouse_cluster_target_engine_mismatch` | Hosts disagree on the engine or physical layout. | Reconcile physical DDL before loading; finalization would be inconsistent. |
 | `clickhouse_cluster_not_found` | The configured cluster name is absent from `system.clusters`. | Fix `physical_design.storage.clickhouse.cluster` or ClickHouse cluster config. |
 
+### Bounded cluster full-refresh publication
+
+A bounded `full_refresh` whose physical design selects `ON CLUSTER` has an
+experimental replicated publication implementation. The default runtime
+composition keeps it non-admitted until the complete deterministic Docker fault
+matrix is green; the existing stable unsupported-topology error remains the
+author-facing result. V1 is designed to admit exactly one shard, at least two
+replicas, an Atomic database, direct `Replicated*MergeTree` target/candidate
+tables, complete catalog visibility, and a platform-owned KeeperMap authority
+table. It does not admit a `Distributed` facade or multi-shard publication.
+
+The author will not configure recovery or retry knobs. After admission, before reading the
+source, dpone checks the complete member inventory and resumes only an operation
+with the same scheduler identity. Publication and cleanup each use one
+non-retried distributed DDL statement. The statement is bound to one
+`system.distributed_ddl_queue` entry by an opaque `log_comment`; query comments
+and transient process IDs are not completion evidence.
+
+The following results are intentionally blocking:
+
+- `DPONE_CLICKHOUSE_CLUSTER_CAS_UNKNOWN`: the Keeper mutation may have committed,
+  but this caller did not receive the acknowledged-and-verified dispatch permit;
+- `DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN`: the exact distributed-DDL entry is
+  absent, duplicated, changed, or no longer has complete host evidence;
+- `DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_IN_PROGRESS`: wait for the original
+  queue entry; do not start a replacement run;
+- `DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_PARTIAL_TERMINAL`: replicas finished in
+  a mixed state; retain both generations and repair manually;
+- `DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNKNOWN`: predecessor removal is not proven
+  complete on every replica.
+
+Do not delete the KeeperMap row or candidate after an unknown/partial result.
+Capture the authority payload, exact queue entry, `system.tables`,
+`system.replicas`, and cluster inventory for every member. Restore connectivity
+and retry the same scheduler invocation for read-only reconciliation. A new
+invocation remains fenced until the prior row reaches `COMPLETED`.
+
+Required grants cover `system.clusters`, `system.databases`, `system.tables`,
+`system.columns`, `system.replicas`, `system.distributed_ddl_queue`, the fixed
+KeeperMap facade, and target-database DDL. Queue retention must exceed the
+largest recovery window. See [ADR 0066](adr/0066-clickhouse-cluster-publication-authority.md).
+
 For `ReplicatedMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}')`,
 repairing a partial table must preserve the UUID of the healthy table. A safe
 manual repair shape is:

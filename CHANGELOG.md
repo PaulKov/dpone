@@ -4,6 +4,14 @@
 
 ### Added
 
+- Add an experimental, default-disabled fail-closed bounded full-refresh
+  publication implementation for one-shard replicated
+  ClickHouse targets. KeeperMap compare-and-swap fences workers, exact
+  distributed-DDL queue receipts reconcile lost responses, and UUID-bound
+  cleanup preserves unresolved generations. The stable runtime does not admit
+  this path until its fault matrix is complete. Local publication remains
+  unchanged; multi-shard and terminal-partial repair remain unsupported.
+
 - Add canonical native original bindings preserving complete subject, storage
   authority and provider-version identity without granting execution authority.
   Add closed native storage metadata and reuse canonical S3 policy validation
