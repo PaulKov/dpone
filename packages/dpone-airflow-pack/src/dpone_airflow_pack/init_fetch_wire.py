@@ -10,6 +10,7 @@ from typing import Any
 from dpone_airflow_pack.init_fetch_contract import (
     AIRFLOW_INDEX_SCHEMA_V2,
     AIRFLOW_INDEX_SCHEMA_V3,
+    AIRFLOW_INDEX_SCHEMA_V4,
     ExactArtifact,
     InitFetchDeliveryContext,
     InitFetchProviderError,
@@ -65,6 +66,7 @@ _INDEX_KEYS_V2 = frozenset(
     }
 )
 _INDEX_KEYS_V3 = _INDEX_KEYS_V2 | frozenset({"mssql_asset_outlet_projection"})
+_INDEX_KEYS_V4 = _INDEX_KEYS_V3 | frozenset({"development_authority_required"})
 _OPTIONAL_INDEX_KEYS_V2 = frozenset(
     {
         "runtime_payloads",
@@ -75,8 +77,9 @@ _OPTIONAL_INDEX_KEYS_V2 = frozenset(
     }
 )
 _OPTIONAL_INDEX_KEYS_V3 = _OPTIONAL_INDEX_KEYS_V2
+_OPTIONAL_INDEX_KEYS_V4 = _OPTIONAL_INDEX_KEYS_V3 | frozenset({"mssql_asset_outlet_projection"})
 _CONTEXT_DIGEST_DIR_RE = re.compile(r"^sha256-[0-9a-f]{64}$")
-_SUPPORTED_INDEX_SCHEMAS = frozenset({AIRFLOW_INDEX_SCHEMA_V2, AIRFLOW_INDEX_SCHEMA_V3})
+_SUPPORTED_INDEX_SCHEMAS = frozenset({AIRFLOW_INDEX_SCHEMA_V2, AIRFLOW_INDEX_SCHEMA_V3, AIRFLOW_INDEX_SCHEMA_V4})
 
 
 def init_fetch_context_from_payload(
@@ -90,15 +93,18 @@ def init_fetch_context_from_payload(
     if schema not in _SUPPORTED_INDEX_SCHEMAS:
         raise InitFetchProviderError(
             "DPONE_AIRFLOW_INDEX_SCHEMA_INVALID",
-            f"Expected schema {AIRFLOW_INDEX_SCHEMA_V2} or {AIRFLOW_INDEX_SCHEMA_V3}",
+            "Expected a supported strict Airflow deployment index schema",
             path=_path_text(path),
         )
-    is_v3 = schema == AIRFLOW_INDEX_SCHEMA_V3
+    is_v3 = schema in {AIRFLOW_INDEX_SCHEMA_V3, AIRFLOW_INDEX_SCHEMA_V4}
+    is_v4 = schema == AIRFLOW_INDEX_SCHEMA_V4
     exact_mapping(
         payload,
         "airflow deployment index v3" if is_v3 else "airflow deployment index v2",
-        _INDEX_KEYS_V3 if is_v3 else _INDEX_KEYS_V2,
-        optional=_OPTIONAL_INDEX_KEYS_V3 if is_v3 else _OPTIONAL_INDEX_KEYS_V2,
+        _INDEX_KEYS_V4 if is_v4 else (_INDEX_KEYS_V3 if is_v3 else _INDEX_KEYS_V2),
+        optional=(
+            _OPTIONAL_INDEX_KEYS_V4 if is_v4 else (_OPTIONAL_INDEX_KEYS_V3 if is_v3 else _OPTIONAL_INDEX_KEYS_V2)
+        ),
         path=path,
     )
     delivery = parse_init_fetch_delivery(payload, path=path)
@@ -153,7 +159,7 @@ def init_fetch_context_from_payload(
         expected_environment=environment,
         expected_binding_set_ref=str(payload.get("binding_set_ref") or ""),
         expected_connection_registry_ref=str(payload.get("connection_registry_ref") or ""),
-        require_present=is_v3,
+        require_present=schema == AIRFLOW_INDEX_SCHEMA_V3,
     )
     context = InitFetchDeliveryContext(
         environment=environment,
@@ -178,6 +184,9 @@ def init_fetch_context_from_payload(
         runtime_image_dbt_ref=dbt_ref,
         runtime_image_dbt_digest=dbt_digest,
         mssql_asset_uri_by_ref=mssql_projection,
+        development_authority_required=(
+            _literal_true(payload.get("development_authority_required"), path) if is_v4 else False
+        ),
     )
     for workload in workloads:
         context.encode_plan(
@@ -270,6 +279,12 @@ def _artifact_environment(
 
 def _path_text(path: Path | None) -> str | None:
     return path.as_posix() if path is not None else None
+
+
+def _literal_true(value: object, path: Path | None) -> bool:
+    if value is not True:
+        raise field_invalid("development_authority_required must be true", path)
+    return True
 
 
 __all__ = ["init_fetch_context_from_payload"]

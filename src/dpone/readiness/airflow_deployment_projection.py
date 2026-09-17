@@ -188,6 +188,7 @@ class AirflowDeploymentProjectionService:
             runtime_payloads=inputs.runtime_payloads,
             release_bytes=inputs.release_bytes,
             mssql_outlet_projection=mssql_outlet_projection,
+            development_authority_required=inputs.development_authority_required,
         )
         sidecar_files: dict[str, bytes] = {}
         if semantic_refresh_sidecars is not None:

@@ -95,6 +95,31 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
     assert release["schema"] == DEVELOPMENT_RELEASE_SCHEMA
     assert release["promotion"]["profile"] == DEVELOPMENT_COMPOSITION_PROFILE
     assert release["development_authority"] == authority.release_projection()
+    _write_environment(tmp_path)
+    projection = AirflowDeploymentProjectionService(
+        root=tmp_path,
+        cache_root=tmp_path / "cache",
+    ).materialize(
+        release_id=materialized.release_id,
+        environment="prod",
+        trust_tier="non_production",
+        runtime_image_ref=IMAGE,
+        runtime_image_digest=IMAGE.split("@")[-1],
+        artifact_registry_ref="synthetic-artifacts",
+        registry_config_ref=_config_map_ref("registry", "1"),
+        trust_policy_ref=_config_map_ref("policy", "2"),
+        airflow_bundle_ref="git:" + "d" * 40,
+    )
+    assert projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v4"
+    context = init_fetch_context_from_payload(projection.airflow_index)
+    assert context.development_authority_required is True
+    encoded = context.encode_plan(
+        workload_id=str(projection.airflow_index["workload_packs"][0]["id"]),
+        execution_kind="runtime",
+        execution_scope="workload",
+        hook_execution="externalized",
+    )
+    assert json.loads(encoded.payload)["schema"] == "dpone.airflow-runtime-init-fetch-plan.v4"
 
 
 def verify_delivery(tmp_path, compiled):

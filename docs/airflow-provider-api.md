@@ -220,7 +220,7 @@ For each task, the context produces canonical compact JSON no larger than
 
 | Transport | Value |
 | --- | --- |
-| `DPONE_INIT_FETCH_PLAN_B64` | Base64 of the canonical v3 runtime fetch plan. |
+| `DPONE_INIT_FETCH_PLAN_B64` | Base64 of the canonical v3 plan for ordinary strict tasks or v4 plan with literal `development_authority_required: true` for protected development tasks. |
 | `DPONE_INIT_FETCH_PLAN_SHA256` | SHA-256 of those exact canonical bytes. |
 | `dpone.io/init-fetch-plan-sha256` | Matching pod annotation. |
 

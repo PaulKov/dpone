@@ -829,6 +829,13 @@ Feature slices:
     Airflow artifacts (`pod-contract.json`, `pod-spec.yaml`, and
     `kpo-kwargs.json`) without discovering manifests, computing sparse paths,
     choosing git-sync auth, or rebuilding PodSpecs
+  - protected development runtime admission depends on
+    `dpone.ports.development_runtime_authority`; exactly one private adapter is
+    installed through the fixed `dpone.development_runtime_authority`
+    entry-point group in the digest-pinned runtime image. Init and base
+    containers independently reopen current authority before sensitive
+    operations, while public core contains no deployment-specific policy or
+    credentials
   - `dpone.gitops.airflow_run_spec` builds `gitops.airflow_run_spec` contracts
     from an already-built `gitops.bundle`
   - `dpone.gitops.airflow_runtime_models` owns `run-spec.json` and

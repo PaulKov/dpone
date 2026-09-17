@@ -5,12 +5,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from dpone.ports.development_runtime_authority import DevelopmentRuntimeAuthorization
     from dpone.runtime.runtime_init_fetch_plan import RuntimeInitFetchPlan
 
 
 import hashlib
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
@@ -23,7 +24,11 @@ from dpone.contracts.dbt_runtime import (
 )
 from dpone.runtime.dbt_project_bundle import verify_dbt_project_bundle_tree
 from dpone.runtime.deployment_cache_common import DeploymentCacheError, open_regular_file
-from dpone.runtime.init_fetch_contract import InitFetchError, cache_relative_path
+from dpone.runtime.init_fetch_contract import (
+    InitFetchError,
+    cache_relative_path,
+    development_runtime_authority_error,
+)
 from dpone.runtime.runtime_init_fetch_ready import (
     RUNTIME_FETCH_READY_NAME,
     parse_ready_manifest,
@@ -69,7 +74,11 @@ class VerifiedPackLauncher:
         plan_sha256: str,
         attestation_required: bool | None = None,
         deployment_attestation_required: bool | None = None,
+        development_authorization: DevelopmentRuntimeAuthorization | None = None,
+        development_release_validator: Callable[[bytes, RuntimeInitFetchPlan], None] | None = None,
     ) -> VerifiedPackCommand:
+        if plan.development_authority_required and development_release_validator is None:
+            raise development_runtime_authority_error()
         ready_payload = read_bounded_regular_file(
             self._artifact_root / RUNTIME_FETCH_READY_NAME,
             root=self._artifact_root,
@@ -104,6 +113,11 @@ class VerifiedPackLauncher:
             )
             for descriptor in plan.artifacts
         }
+        if development_release_validator is not None:
+            development_release_validator(
+                payloads[plan.release.artifact_ref],
+                plan,
+            )
         pack, _verified_pack_fingerprint = validate_runtime_receipts(plan, payloads)
         archive = runtime_payload_archive(pack)
         if archive.sha256 != ready.runtime_payload_sha256:
@@ -144,6 +158,7 @@ class VerifiedPackLauncher:
                 payloads=payloads,
                 plan=plan,
                 worktree_root=self._worktree_root,
+                development_authorization=development_authorization,
             )
         return VerifiedPackCommand(
             argv=argv,
@@ -256,6 +271,7 @@ def _validate_dbt_runtime_identity(
     payloads: Mapping[str, bytes],
     plan: RuntimeInitFetchPlan,
     worktree_root: Path,
+    development_authorization: DevelopmentRuntimeAuthorization | None,
 ) -> None:
     by_kind = {item.kind: item for item in plan.runtime_payloads}
     required_kinds = {"dbt_project_bundle", "dbt_manifest", "dbt_selection_lock"}
@@ -282,6 +298,15 @@ def _validate_dbt_runtime_identity(
             workload_id=plan.workload_pack.id,
             payload_refs=tuple((item.id, item.artifact_ref) for item in plan.runtime_payloads),
             artifact_bytes=payloads,
+            development_authority=(
+                development_authorization.authority if development_authorization is not None else None
+            ),
+            authority_checked_at=(
+                development_authorization.checked_at if development_authorization is not None else None
+            ),
+            current_revocation_epoch=(
+                development_authorization.current_revocation_epoch if development_authorization is not None else None
+            ),
         )
     except (ValueError, RecursionError) as exc:
         raise InitFetchError("DPONE_DBT_SELECTION_DRIFT", "verified dbt release wire is invalid") from exc

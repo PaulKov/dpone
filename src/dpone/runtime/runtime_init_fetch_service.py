@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 import os
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 from dpone.ports.artifact_registry import ArtifactRegistryAuthority
@@ -24,7 +25,10 @@ from dpone.runtime.airflow_deployment_attestation_subject import (
     subject_from_runtime_artifacts,
 )
 from dpone.runtime.dbt_project_bundle import extract_dbt_project_bundle
-from dpone.runtime.init_fetch_contract import InitFetchError
+from dpone.runtime.init_fetch_contract import (
+    InitFetchError,
+    development_runtime_authority_error,
+)
 from dpone.runtime.runtime_init_fetch_artifacts import (
     RuntimeArtifactStager,
     publish_runtime_artifacts,
@@ -80,6 +84,7 @@ class RuntimeInitFetchExecutor:
         trusted_attestation_required: bool = False,
         max_artifact_bytes: int = DEFAULT_STRICT_MAX_ARTIFACT_BYTES,
         max_total_bytes: int = DEFAULT_STRICT_MAX_TOTAL_BYTES,
+        development_release_validator: Callable[[bytes, RuntimeInitFetchPlan], None] | None = None,
     ) -> None:
         self._registry = registry
         self._artifact_root = artifact_root.absolute()
@@ -89,10 +94,13 @@ class RuntimeInitFetchExecutor:
         self._trusted_attestation_required = bool(trusted_attestation_required)
         self._max_artifact_bytes = _positive_limit(max_artifact_bytes, "max_artifact_bytes")
         self._max_total_bytes = _positive_limit(max_total_bytes, "max_total_bytes")
+        self._development_release_validator = development_release_validator
 
     def execute(self, plan: RuntimeInitFetchPlan, *, plan_sha256: str) -> RuntimeFetchReady:
         """Execute after the caller has decoded and hash-validated the untrusted plan."""
 
+        if plan.development_authority_required and self._development_release_validator is None:
+            raise development_runtime_authority_error()
         attestation_required = self._preflight(plan)
         self._artifact_root.mkdir(parents=True, exist_ok=True, mode=0o700)
         require_safe_directory(self._artifact_root)
@@ -124,6 +132,11 @@ class RuntimeInitFetchExecutor:
                 )
                 for item in staged
             }
+            if self._development_release_validator is not None:
+                self._development_release_validator(
+                    payloads[plan.release.artifact_ref],
+                    plan,
+                )
             pack, verified_pack_fingerprint = validate_runtime_receipts(plan, payloads)
             attestation = verify_runtime_attestation(
                 plan=plan,

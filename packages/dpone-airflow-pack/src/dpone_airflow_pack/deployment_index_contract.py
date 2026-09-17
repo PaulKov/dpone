@@ -32,6 +32,7 @@ from dpone_airflow_pack.deployment_index_errors import AirflowDeploymentIndexErr
 from dpone_airflow_pack.init_fetch_contract import (
     AIRFLOW_INDEX_SCHEMA_V2,
     AIRFLOW_INDEX_SCHEMA_V3,
+    AIRFLOW_INDEX_SCHEMA_V4,
     InitFetchDeliveryContext,
     init_fetch_context_from_payload,
 )
@@ -47,9 +48,10 @@ from dpone_airflow_pack.semantic_refresh_index_artifacts import (
 INDEX_SCHEMA_V1 = "dpone.airflow-deployment-index.v1"
 INDEX_SCHEMA_V2 = AIRFLOW_INDEX_SCHEMA_V2
 INDEX_SCHEMA_V3 = AIRFLOW_INDEX_SCHEMA_V3
+INDEX_SCHEMA_V4 = AIRFLOW_INDEX_SCHEMA_V4
 INDEX_SCHEMA = INDEX_SCHEMA_V1
-_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V1, INDEX_SCHEMA_V2, INDEX_SCHEMA_V3})
-_STRICT_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V2, INDEX_SCHEMA_V3})
+_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V1, INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4})
+_STRICT_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4})
 DEFAULT_MAX_INDEX_BYTES = 8 * 1024 * 1024
 _legacy_missing_bytes_warning_pid: int | None = None
 
@@ -400,6 +402,8 @@ __all__ = [
     "INDEX_SCHEMA",
     "INDEX_SCHEMA_V1",
     "INDEX_SCHEMA_V2",
+    "INDEX_SCHEMA_V3",
+    "INDEX_SCHEMA_V4",
     "_is_canonical_sha256_digest",
     "infer_cache_root",
     "load_airflow_deployment_index",
