@@ -29,6 +29,7 @@ owned_paths:
   - src/dpone/runtime/deployment_cache_integrity.py
   - src/dpone/runtime/deployment_cache_current_state.py
   - src/dpone/runtime/deployment_cache_materializer.py
+  - src/dpone/runtime/deployment_cache_models.py
   - src/dpone/readiness/airflow_deployment_projection_policy.py
   - tests/test_development_target_admission.py
   - tests/test_development_remote_delivery_authority.py

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,31 @@ class CurrentDeployment:
     source_commit: str | None = None
     attestation_ref: str | None = None
     workspace_authority_connection_ref: str | None = None
+
+    @classmethod
+    def from_pointer(
+        cls,
+        pointer: Mapping[str, object],
+        *,
+        current_path: Path,
+        pointer_path: Path,
+    ) -> CurrentDeployment:
+        """Build the stable result from one validated current-pointer payload."""
+
+        return cls(
+            activation_id=_optional_text(pointer.get("activation_id")),
+            deployment_id=str(pointer.get("deployment_id") or ""),
+            release_id=str(pointer.get("release_id") or ""),
+            environment=str(pointer.get("environment") or ""),
+            current_path=current_path,
+            pointer_path=pointer_path,
+            promoted_by=str(pointer.get("promoted_by") or ""),
+            promoted_at=str(pointer.get("promoted_at") or ""),
+            previous_deployment_id=_optional_text(pointer.get("previous_deployment_id")),
+            source_commit=_optional_text(pointer.get("source_commit")),
+            attestation_ref=_optional_text(pointer.get("attestation_ref")),
+            workspace_authority_connection_ref=_optional_text(pointer.get("workspace_authority_connection_ref")),
+        )
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -62,6 +88,10 @@ class ValidatedDeploymentProjection:
 
     def identity(self) -> dict[str, str]:
         return {"deployment_id": self.deployment_id, "release_id": self.release_id}
+
+
+def _optional_text(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
 
 
 __all__ = ["CurrentDeployment", "ValidatedDeploymentProjection"]
