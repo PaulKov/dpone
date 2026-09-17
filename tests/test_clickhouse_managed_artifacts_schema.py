@@ -5,7 +5,10 @@ import re
 from datetime import timedelta
 from pathlib import Path
 
+import pytest
+
 from dpone.config import LoadConfig, LoadStrategy
+from dpone.contracts.clickhouse_cluster_admission import CLICKHOUSE_CLUSTER_SOURCE_BUDGET_REQUIRED
 from dpone.runtime.artifacts import InMemoryRowsArtifact
 from dpone.runtime.sinks.base import LoadPayload
 from dpone.runtime.sinks.clickhouse import ClickHouseSink
@@ -166,23 +169,16 @@ def test_manifest_schemas_expose_managed_artifact_staging_schema_contract() -> N
         assert staging["database"]["type"] == "string"
 
 
-def test_clickhouse_managed_artifact_cleanup_and_swap_use_on_cluster() -> None:
+def test_unbounded_cluster_full_refresh_cannot_fall_back_to_legacy_swap() -> None:
     connector = _FakeClickHouseConnector()
     config = _load_config(staging_schema="DWH_Tech")
     config.options["physical_design"] = {"storage": {"clickhouse": {"cluster": "dwh"}}}
 
-    ClickHouseSink(connector).load(config, _payload())
+    with pytest.raises(ValueError, match=CLICKHOUSE_CLUSTER_SOURCE_BUDGET_REQUIRED):
+        ClickHouseSink(connector).load(config, _payload())
 
     rendered = _rendered(connector)
-    assert re.search(
-        r"RENAME TABLE `DWH_Tech`.`orders__dpone_staging_[0-9a-f]{8}` "
-        r"TO `Example_Datamarts`.`orders` ON CLUSTER `dwh`",
-        rendered,
-    )
-    assert re.search(
-        r"DROP TABLE IF EXISTS `DWH_Tech`.`orders__dpone_staging_[0-9a-f]{8}` ON CLUSTER `dwh`",
-        rendered,
-    )
+    assert "RENAME TABLE" not in rendered
 
 
 def _load_config(*, staging_schema: str = "staging") -> LoadConfig:
