@@ -23,6 +23,7 @@ with dpone. For a first MSSQL model published to ClickHouse, start with the
 | Review the planned multi-project release contract (not yet implemented) | [Multi-project release design](feature-design-dbt-multi-project-release.md) |
 | Integrate unreleased workspace readers and understand their limits | [Workspace source verification](dbt-workspace-source-verification.md) |
 | Discover, check and compile projects without a central domain registry | [Workspace authoring](dbt-workspace-authoring.md) |
+| Deliver a complete workspace into an isolated development deployment | [Development workspace delivery](development-workspace-delivery.md) |
 | Prepare and verify an unreleased complete workspace audit mirror | [Workspace promotion](dbt-workspace-promotion.md) |
 | Join dbt results to dpone lineage evidence | Continue with the lineage export contract below |
 

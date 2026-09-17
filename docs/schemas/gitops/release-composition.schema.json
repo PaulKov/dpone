@@ -48,7 +48,10 @@
       "additionalProperties": false,
       "properties": {
         "profile": {
-          "const": "compact_v2_runtime_connection_context"
+          "enum": [
+            "compact_v2_runtime_connection_context",
+            "development_workspace_delivery_v1"
+          ]
         },
         "xcom_sidecar_image": {
           "minLength": 1,

@@ -380,7 +380,7 @@ def _exit_code(code: str) -> int:
         return 2
     if code in _DEPENDENCY_CODES:
         return 3
-    if code in _SECURITY_CODES:
+    if code in _SECURITY_CODES or code.startswith("DPONE_DEVELOPMENT_AUTHORITY_"):
         return 4
     if code.startswith("DPONE_INTERNAL_"):
         return 5

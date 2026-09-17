@@ -184,7 +184,15 @@ def strict_transfer_pack(
     execution = dict(raw_execution) if isinstance(raw_execution, Mapping) else {}
     airflow["execution"] = {key: execution[key] for key in ("inlets", "outlets") if key in execution}
     rewritten["airflow"] = airflow
-    rewritten["connection_projection"] = {}
+    from dpone.readiness.airflow_compact_pack_release_helpers import closed_connection_projection
+
+    projection = dict(rewritten.get("connection_projection") or {})
+    if projection not in ({}, {"query_overrides": {}}):
+        projection.setdefault("payload_format", "airflow_connection_uri")
+        projection.setdefault("secret_values", False)
+        rewritten["connection_projection"] = closed_connection_projection(projection)
+    else:
+        rewritten["connection_projection"] = {}
     rewritten["xcom"] = {"sidecar_image": _exact_image(xcom_sidecar_image)}
     rewritten.pop("pack_fingerprint", None)
     rewritten["pack_fingerprint"] = compute_pack_fingerprint(rewritten)

@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import Any
 
 from dpone.contracts.airflow_release_artifacts import RELEASE_ARTIFACT_PATH_PATTERN
+from dpone.contracts.development_delivery_authority import DEVELOPMENT_COMPOSITION_PROFILE
 from dpone.contracts.release_composition import COMPOSITION_PRODUCER, COMPOSITION_SCHEMA
 from dpone.gitops.schema_contract_primitives import documented_contract
 from dpone.gitops.schema_release_deployment_definitions import release_artifacts_v2_schema, release_v2_defs
@@ -32,11 +33,16 @@ def _array(items: dict[str, Any]) -> dict[str, Any]:
     return {"type": "array", "minItems": 1, "maxItems": 50_000, "items": items}
 
 
-def release_composition_contract(native_schema: dict[str, Any]):
-    """Reuse the v2 schema unchanged inside the new typed authority boundary."""
+def release_composition_contract(
+    native_schema: dict[str, Any],
+    development_native_schema: dict[str, Any],
+):
+    """Keep production and development native authorities explicitly typed."""
     definitions = release_v2_defs()
     native = _expand(native_schema, native_schema["$defs"])
     native.pop("$defs", None)
+    development_native = _expand(development_native_schema, development_native_schema["$defs"])
+    development_native.pop("$defs", None)
     artifacts = deepcopy(release_artifacts_v2_schema())
     artifacts["properties"]["composition_sources"] = _array(_descriptor())
     artifacts["required"].append("composition_sources")
@@ -62,7 +68,10 @@ def release_composition_contract(native_schema: dict[str, Any]):
                 }
             ),
             "promotion": _object(
-                {"schema": {"const": COMPACT_PROMOTION_SCHEMA}, "profile": {"const": COMPACT_PROMOTION_PROFILE}}
+                {
+                    "schema": {"const": COMPACT_PROMOTION_SCHEMA},
+                    "profile": {"enum": [COMPACT_PROMOTION_PROFILE, DEVELOPMENT_COMPOSITION_PROFILE]},
+                }
             ),
             "artifacts": artifacts,
             "constituents": {
@@ -71,7 +80,13 @@ def release_composition_contract(native_schema: dict[str, Any]):
                 "maxItems": 2,
                 "items": {
                     "oneOf": [
-                        _object({"id": {"const": "native"}, "kind": {"const": "dbt_workspace"}, "release": native}),
+                        _object(
+                            {
+                                "id": {"const": "native"},
+                                "kind": {"const": "dbt_workspace"},
+                                "release": {"oneOf": [native, development_native]},
+                            }
+                        ),
                         _object(
                             {
                                 "id": {"const": "standalone"},
@@ -97,7 +112,10 @@ def release_composition_manifest_contract():
         "native_workspace": _object({"root": root, "expected_release_id": digest}),
         "standalone": _object({"root": root, "expected_inventory_sha256": digest}),
         "transport": _object(
-            {"profile": {"const": COMPACT_PROMOTION_PROFILE}, "xcom_sidecar_image": {"type": "string", "minLength": 1}}
+            {
+                "profile": {"enum": [COMPACT_PROMOTION_PROFILE, DEVELOPMENT_COMPOSITION_PROFILE]},
+                "xcom_sidecar_image": {"type": "string", "minLength": 1},
+            }
         ),
     }
     return documented_contract(

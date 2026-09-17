@@ -1,14 +1,23 @@
 """Pure composition authority tests use synthetic, offline metadata only."""
 
 from copy import deepcopy
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from dpone.contracts.airflow_deployment import canonical_fingerprint, release_id
-from dpone.contracts.dbt_contract_validation import sha256_bytes
+from dpone.contracts.dbt_contract_validation import artifact_json_bytes, sha256_bytes
 from dpone.contracts.dbt_release import build_dbt_release_metadata
+from dpone.contracts.dbt_runtime import validate_dbt_runtime_source_projection
 from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V2, dbt_runtime_payload_reference
+from dpone.contracts.development_delivery_authority import (
+    DEVELOPMENT_AUTHORITY_SCHEMA,
+    DEVELOPMENT_COMPOSITION_PROFILE,
+    DEVELOPMENT_RELEASE_SCHEMA,
+    DevelopmentAuthorityReceipt,
+    DevelopmentExecutionSubject,
+)
 from dpone.contracts.release_composition import (
     COMPOSITION_PRODUCER,
     COMPOSITION_SCHEMA,
@@ -19,6 +28,7 @@ from dpone.contracts.release_composition_policy import (
     composition_native_release,
     validate_composition_metadata,
 )
+from dpone.gitops.release_set_validation import validate_release_set
 
 DIGEST = sha256_bytes(b"synthetic")
 PROMOTION = {
@@ -31,7 +41,7 @@ def descriptor(item_id, path):
     return {"id": item_id, "path": path, "sha256": DIGEST, "bytes": 9}
 
 
-def composition():
+def composition(*, development: bool = False):
     payloads = [
         dbt_runtime_payload_reference(f"{kind}_sha256_{DIGEST[7:]}", wire_contract=DBT_RUNTIME_WIRE_V2).descriptor(
             b"synthetic"
@@ -51,7 +61,9 @@ def composition():
         canonical_schema_descriptors=[descriptor("model", "schemas/dbt/model.schema.json")],
         source_snapshot_sha256=DIGEST,
         selection_authority="dbt_cli",
-        route_certifications=[
+        route_certifications=[]
+        if development
+        else [
             {
                 "variant_id": "synthetic",
                 "route_id": "synthetic",
@@ -69,8 +81,29 @@ def composition():
         selection_fingerprints=[DIGEST],
         producer_version="0.74.36",
         wire_contract=DBT_RUNTIME_WIRE_V2,
+        release_schema=DEVELOPMENT_RELEASE_SCHEMA if development else "dpone.release-set.v2",
+        development_authority=(
+            {
+                "schema": DEVELOPMENT_AUTHORITY_SCHEMA,
+                "policy_sha256": "sha256:" + "1" * 64,
+                "grant_sha256": "sha256:" + "2" * 64,
+                "signature_subject_sha256": "sha256:" + "3" * 64,
+                "environment": "development",
+                "source_repository_sha256": "sha256:" + "4" * 64,
+                "source_commit": "5" * 40,
+                "revocation_epoch": 1,
+                "max_workloads": 64,
+                "max_source_bytes": 1024 * 1024,
+                "execution_subjects": [],
+            }
+            if development
+            else None
+        ),
     )
-    native["promotion"] = dict(PROMOTION)
+    promotion = dict(PROMOTION)
+    if development:
+        promotion["profile"] = DEVELOPMENT_COMPOSITION_PROFILE
+    native["promotion"] = promotion
     native["release_id"] = release_id(native)
     inventory = {
         "schema": "dpone.workload-inventory.v1",
@@ -95,7 +128,7 @@ def composition():
     release = {
         "schema": COMPOSITION_SCHEMA,
         "producer": {"name": COMPOSITION_PRODUCER, "version": "0.75.0"},
-        "promotion": dict(PROMOTION),
+        "promotion": promotion,
         "artifacts": artifacts,
         "constituents": [
             {"id": "native", "kind": "dbt_workspace", "release": native},
@@ -114,6 +147,7 @@ def composition():
 def test_complete_composition_preserves_selected_native_authority():
     release = composition()
     validate_composition_metadata(release)
+    assert validate_release_set(release).failure is None
     child = composition_native_release(release, workload_id="native_work")
     assert child == release["constituents"][0]["release"]
     child["artifacts"]["workload_packs"].clear()
@@ -122,6 +156,72 @@ def test_complete_composition_preserves_selected_native_authority():
         composition_native_release(release, workload_id="ordinary_work")
     with pytest.raises(ValueError):
         composition_native_release(release, workload_id="absent")
+
+
+def test_development_composition_delivers_dormant_native_workspace() -> None:
+    release = composition(development=True)
+
+    validate_composition_metadata(release)
+    assert validate_release_set(release).failure is None
+    native = composition_native_release(release, workload_id="native_work")
+    assert native["schema"] == DEVELOPMENT_RELEASE_SCHEMA
+    with pytest.raises(ValueError, match="current_external_authority"):
+        validate_dbt_runtime_source_projection(
+            release_payload=artifact_json_bytes(release),
+            release_id=release["release_id"],
+            workload_id="native_work",
+            payload_refs=(),
+            artifact_bytes={},
+        )
+
+
+def test_development_runtime_requires_matching_current_external_authority() -> None:
+    release = composition(development=True)
+    native = release["constituents"][0]["release"]
+    subject = DevelopmentExecutionSubject("native_work", "runtime")
+    authority = DevelopmentAuthorityReceipt(
+        policy_sha256="sha256:" + "1" * 64,
+        grant_sha256="sha256:" + "2" * 64,
+        signature_subject_sha256="sha256:" + "3" * 64,
+        environment="development",
+        source_repository_sha256="sha256:" + "4" * 64,
+        source_commit="5" * 40,
+        not_before="2026-09-17T11:00:00Z",
+        expires_at="2026-09-17T13:00:00Z",
+        revocation_epoch=1,
+        max_workloads=64,
+        max_source_bytes=1024 * 1024,
+        execution_subjects=(subject,),
+    )
+    native["development_authority"] = authority.release_projection()
+    native["release_id"] = release_id(native)
+    release["release_id"] = release_id(release)
+    prefix = f"cache://releases/{release['release_id'].replace(':', '-')}/"
+    descriptors = native["artifacts"]["runtime_payloads"]
+    payload_refs = tuple((item["id"], prefix + item["path"]) for item in descriptors)
+    artifact_bytes = {artifact_ref: b"synthetic" for _, artifact_ref in payload_refs}
+
+    assert (
+        validate_dbt_runtime_source_projection(
+            release_payload=artifact_json_bytes(release),
+            release_id=release["release_id"],
+            workload_id="native_work",
+            payload_refs=payload_refs,
+            artifact_bytes=artifact_bytes,
+            development_authority=authority,
+            authority_checked_at=datetime(2026, 9, 17, 12, 0, tzinfo=UTC),
+            current_revocation_epoch=1,
+        )
+        == DBT_RUNTIME_WIRE_V2
+    )
+    with pytest.raises(ValueError, match="current_external_authority"):
+        validate_dbt_runtime_source_projection(
+            release_payload=artifact_json_bytes(release),
+            release_id=release["release_id"],
+            workload_id="native_work",
+            payload_refs=payload_refs,
+            artifact_bytes=artifact_bytes,
+        )
 
 
 def test_unordered_inventories_keep_identity_but_ordered_trios_do_not():

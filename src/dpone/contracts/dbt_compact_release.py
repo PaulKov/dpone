@@ -12,6 +12,7 @@ from dpone.contracts.dbt_contract_validation import sha256_bytes
 from dpone.contracts.dbt_release import dbt_release_runtime_wire_contract
 from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V2
 from dpone.contracts.dbt_runtime_release_binding import DbtReleaseArtifactIndex
+from dpone.contracts.development_delivery_authority import DEVELOPMENT_RELEASE_SCHEMA
 from dpone.contracts.strict_json import strict_json_object
 
 COMPACT_OUTPUT_INVALID = "DPONE_COMPACT_PACK_RELEASE_OUTPUT_INVALID"
@@ -28,7 +29,7 @@ class CompactWorkspaceReleasePlan:
     def __init__(self, payload: bytes, *, dag_ids: Sequence[str] | None = None) -> None:
         release = strict_json_object(payload)
         if (
-            release.get("schema") != "dpone.release-set.v2"
+            release.get("schema") not in {"dpone.release-set.v2", DEVELOPMENT_RELEASE_SCHEMA}
             or dbt_release_runtime_wire_contract(release) != DBT_RUNTIME_WIRE_V2
         ):
             raise ValueError("native compact input requires a complete workspace wire-v2 release")

@@ -220,6 +220,7 @@ def declared_release_artifacts(release: Mapping[str, Any]) -> tuple[tuple[PurePo
     if release_schema not in {
         "dpone.release-set.v1",
         "dpone.release-set.v2",
+        "dpone.dbt-release-set.development.v1",
         "dpone.release-set.v3",
     }:
         raise AirflowArtifactDeliveryError(

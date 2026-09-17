@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 
 from dpone.contracts.airflow_correlation import AirflowAttemptCorrelation
 from dpone.contracts.airflow_run_identity import (
@@ -167,6 +168,9 @@ def validate_dbt_runtime_source_projection(
     workload_id: str,
     payload_refs: tuple[tuple[str, str], ...],
     artifact_bytes: Mapping[str, bytes],
+    development_authority: object = None,
+    authority_checked_at: datetime | None = None,
+    current_revocation_epoch: int | None = None,
 ) -> str:
     """Return the verified wire after checking the selected v2 source projection.
 
@@ -180,6 +184,16 @@ def validate_dbt_runtime_source_projection(
         from dpone.contracts.release_composition_policy import composition_native_release
 
         release = composition_native_release(release, workload_id=workload_id)
+    if release.get("schema") == "dpone.dbt-release-set.development.v1":
+        from dpone.contracts.development_delivery_authority import require_development_runtime_authority
+
+        require_development_runtime_authority(
+            release.get("development_authority"),
+            authority=development_authority,
+            workload_id=workload_id,
+            now=authority_checked_at,
+            current_revocation_epoch=current_revocation_epoch,
+        )
     wire = dbt_release_runtime_wire_contract(release)
     if wire == DBT_RUNTIME_WIRE_V2:
         descriptors = bind_dbt_runtime_workload(

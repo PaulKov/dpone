@@ -116,6 +116,7 @@ class DeploymentCacheIntegrityVerifier:
         if release_schema not in {
             "dpone.release-set.v1",
             "dpone.release-set.v2",
+            "dpone.dbt-release-set.development.v1",
             "dpone.release-set.v3",
         }:
             raise DeploymentCacheError(
