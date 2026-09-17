@@ -19,20 +19,20 @@ class _QueryResult:
 
 class _HttpClient:
     def __init__(self) -> None:
-        self.queries: list[tuple[str, object]] = []
-        self.commands: list[tuple[str, object]] = []
+        self.queries: list[tuple[str, object, object]] = []
+        self.commands: list[tuple[str, object, object]] = []
         self.closed = False
 
     def query(self, query: str, *, parameters=None, settings=None):
-        self.queries.append((query, parameters))
+        self.queries.append((query, parameters, settings))
         return _QueryResult([(1, "ok")], ["id", "status"], [_ColumnType("UInt8"), _ColumnType("String")])
 
     def command(self, cmd: str, *, parameters=None, settings=None):
-        self.commands.append((cmd, parameters))
+        self.commands.append((cmd, parameters, settings))
         return "OK"
 
     def query_rows_stream(self, query: str, *, parameters=None, settings=None):
-        self.queries.append((query, parameters))
+        self.queries.append((query, parameters, settings))
         return iter([(1,), (2,)])
 
     def close(self) -> None:
@@ -47,7 +47,7 @@ def test_http_adapter_executes_select_with_clickhouse_driver_shape() -> None:
 
     assert rows == [(1, "ok")]
     assert columns == [("id", "UInt8"), ("status", "String")]
-    assert client.queries == [("SELECT id, status FROM events", None)]
+    assert client.queries == [("SELECT id, status FROM events", None, None)]
 
 
 def test_http_adapter_preserves_exists_table_result() -> None:
@@ -59,7 +59,7 @@ def test_http_adapter_preserves_exists_table_result() -> None:
     rows = adapter.execute("EXISTS TABLE marketing.cash_orders_marts")
 
     assert rows == [(1, "ok")]
-    assert client.queries == [("EXISTS TABLE marketing.cash_orders_marts", None)]
+    assert client.queries == [("EXISTS TABLE marketing.cash_orders_marts", None, None)]
     assert client.commands == []
 
 
@@ -71,5 +71,16 @@ def test_http_adapter_executes_commands_and_streams_rows() -> None:
     assert list(adapter.execute_iter("SELECT id FROM events")) == [(1,), (2,)]
     adapter.disconnect()
 
-    assert client.commands == [("CREATE TEMPORARY TABLE t (id UInt8)", None)]
+    assert client.commands == [("CREATE TEMPORARY TABLE t (id UInt8)", None, None)]
     assert client.closed is True
+
+
+def test_http_adapter_forwards_query_id_as_transport_parameter() -> None:
+    client = _HttpClient()
+    adapter = ClickHouseHttpClientAdapter(client, settings={"max_threads": 2})
+
+    adapter.execute("EXCHANGE TABLES a AND b", query_id="stable-publication-id")
+
+    assert client.commands == [
+        ("EXCHANGE TABLES a AND b", None, {"max_threads": 2, "query_id": "stable-publication-id"})
+    ]

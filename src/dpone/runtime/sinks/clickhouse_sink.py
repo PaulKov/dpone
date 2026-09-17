@@ -113,8 +113,13 @@ class ClickHouseSink(
     ) -> LoadConfig:
         """Preflight or reconcile full-refresh publication before source I/O."""
 
-        del run_context, load_record, dag_id
-        return self._full_refresh_publication.prepare_admission(load_config)
+        del load_record
+        identified = self._full_refresh_publication.bind_runtime_identity(
+            load_config,
+            scheduler_run_id=str(getattr(run_context, "run_id", "") or ""),
+            process_id=str(dag_id or ""),
+        )
+        return self._full_refresh_publication.prepare_admission(identified)
 
     def replay_result(self, load_config: LoadConfig) -> LoadResult | None:
         """Return a catalog-reconciled source-free publication result."""

@@ -28,6 +28,7 @@ class PublicationState(StrEnum):
 
     PENDING = "pending"
     COMMITTED = "committed"
+    CLEANUP_PENDING = "cleanup_pending"
     UNKNOWN = "unknown"
 
 
@@ -135,14 +136,34 @@ class FullRefreshPublicationMarker:
         return asdict(self)
 
 
-def publication_operation_id(*, run_id: str, database: str, target: str) -> str:
+def publication_invocation_id(*, scheduler_run_id: str, process_id: str) -> str:
+    """Derive identity shared by every worker attempt of one scheduler run."""
+
+    if not scheduler_run_id:
+        raise ClickHouseFullRefreshPublicationError(
+            "DPONE_CLICKHOUSE_FULL_REFRESH_IDENTITY_REQUIRED", "scheduler run identity is empty"
+        )
+    return _sha256({"version": 1, "scheduler_run_id": scheduler_run_id, "process_id": process_id})
+
+
+def publication_operation_id(*, invocation_id: str, database: str, target: str) -> str:
     """Derive a retry-stable operation ID without worker try or load identity."""
 
-    if not run_id:
+    if not invocation_id:
         raise ClickHouseFullRefreshPublicationError(
-            "DPONE_CLICKHOUSE_FULL_REFRESH_IDENTITY_REQUIRED", "runtime run_id is empty"
+            "DPONE_CLICKHOUSE_FULL_REFRESH_IDENTITY_REQUIRED", "scheduler invocation identity is empty"
         )
-    return _sha256({"version": 1, "run_id": run_id, "database": database, "target": target})
+    return _sha256({"version": 1, "invocation_id": invocation_id, "database": database, "target": target})
+
+
+def publication_query_id(operation_id: str) -> str:
+    """Return the deterministic ClickHouse query ID for the publication DDL."""
+
+    if not operation_id:
+        raise ClickHouseFullRefreshPublicationError(
+            "DPONE_CLICKHOUSE_FULL_REFRESH_IDENTITY_REQUIRED", "publication operation identity is empty"
+        )
+    return f"dpone-full-refresh-{operation_id}-publish"
 
 
 def publication_marker_name(target: str) -> str:
@@ -171,6 +192,8 @@ def classify_publication(
         return PublicationState.PENDING
     if (target_uuid, candidate_uuid) == (marker.desired_uuid, marker.predecessor_uuid):
         return PublicationState.COMMITTED
+    if target_uuid == marker.desired_uuid and candidate_uuid is None:
+        return PublicationState.CLEANUP_PENDING
     return PublicationState.UNKNOWN
 
 
@@ -185,6 +208,8 @@ __all__ = [
     "FullRefreshPublicationMarker",
     "PublicationState",
     "classify_publication",
+    "publication_invocation_id",
     "publication_marker_name",
     "publication_operation_id",
+    "publication_query_id",
 ]

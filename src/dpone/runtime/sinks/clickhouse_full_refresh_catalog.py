@@ -52,15 +52,23 @@ class ClickHouseFullRefreshCatalog:
             f"ENGINE = TinyLog COMMENT {_literal(comment)}"
         )
 
-    def exchange(self, database: str, target: str, candidate: str) -> None:
+    def exchange(self, database: str, target: str, candidate: str, *, query_id: str) -> None:
         self._connector.execute_query(
-            f"EXCHANGE TABLES {_qualified(database, target)} AND {_qualified(database, candidate)}"
+            f"EXCHANGE TABLES {_qualified(database, target)} AND {_qualified(database, candidate)}",
+            query_id=query_id,
         )
 
-    def rename(self, database: str, candidate: str, target: str) -> None:
+    def rename(self, database: str, candidate: str, target: str, *, query_id: str) -> None:
         self._connector.execute_query(
-            f"RENAME TABLE {_qualified(database, candidate)} TO {_qualified(database, target)}"
+            f"RENAME TABLE {_qualified(database, candidate)} TO {_qualified(database, target)}",
+            query_id=query_id,
         )
+
+    def publication_query_active(self, query_id: str) -> bool:
+        rows = self._connector.get_records(
+            f"SELECT query_id FROM system.processes WHERE query_id = {_literal(query_id)} LIMIT 1"
+        )
+        return bool(rows)
 
     def drop(self, database: str, table: str) -> None:
         self._connector.execute_query(f"DROP TABLE {_qualified(database, table)}")
