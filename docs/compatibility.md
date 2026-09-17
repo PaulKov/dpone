@@ -1212,6 +1212,14 @@ not supported by this new compact mode; existing singleton delivery remains.
 See [compact workspace delivery](dbt-compact-delivery.md) for migration and
 troubleshooting. Production workspace activation remains separately gated.
 
+DEV-only `dpone.dbt-release-set.development.v1` artifacts require distinct
+operation-bound target admission for publication, materialization and cache
+activation. Older adapters, the public CLI, and callers that supply only the
+embedded development receipt fail closed. Existing production v2 releases and
+their route-certification rules are unchanged. Moving a DEV-only source to
+production requires a new production-certified build and release identity;
+artifact relabelling is unsupported.
+
 ## Verified release composition
 
 Use [release composition](release-composition.md) to deliver one complete native
