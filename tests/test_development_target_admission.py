@@ -136,6 +136,7 @@ def test_runtime_entrypoints_accept_the_canonical_admission_type() -> None:
         (deployment_cache_materializer, DeploymentCacheMaterializer.__init__),
     ):
         assert module.DevelopmentTargetAdmission is DevelopmentTargetAdmission
-        assert inspect.get_annotations(constructor, eval_str=False)["development_admission"] == (
-            "DevelopmentTargetAdmission | None"
-        )
+        annotations = inspect.get_annotations(constructor, eval_str=False)
+        assert annotations["development_admission"] == "DevelopmentTargetAdmission | None"
+        if constructor is not DeploymentCacheMaterializer.__init__:
+            assert annotations["development_authority"] == "DevelopmentDeliveryAuthority | None"

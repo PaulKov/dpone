@@ -87,12 +87,12 @@ def require_development_activation_admission(
             target_trust_tier=trust_tier,
             now=clock(),
         )
-    except Exception as exc:  # noqa: BLE001 - authority adapter failures must fail closed.
+    except Exception:  # noqa: BLE001 - authority adapter failures must fail closed.
         raise DeploymentCacheError(
             "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED",
             "DEV-only activation requires current authority for the exact non-production target",
             path=release_path.as_posix(),
-        ) from exc
+        ) from None
 
 
 def _development_authority_projection(release: Mapping[str, object]) -> object | None:

@@ -20,6 +20,7 @@ from dpone.runtime.airflow_artifact_delivery_models import (
 from dpone.runtime.airflow_artifact_delivery_support import (
     ArtifactRegistry,
     ArtifactRegistryError,
+    DevelopmentDeliveryAuthority,
     DevelopmentTargetAdmission,
     DevelopmentTargetAdmissionVerifier,
     download,
@@ -49,6 +50,7 @@ class AirflowArtifactPublisher:
         self,
         *,
         registry: ArtifactRegistry,
+        development_authority: DevelopmentDeliveryAuthority | None = None,
         development_admission: DevelopmentTargetAdmission | None = None,
         development_admission_verifier: DevelopmentTargetAdmissionVerifier | None = None,
         clock: Callable[[], datetime] | None = None,

@@ -11,6 +11,7 @@ from dpone.runtime.airflow_artifact_delivery_models import (
     PublishRequest,
 )
 from dpone.runtime.airflow_artifact_delivery_support import (
+    DevelopmentDeliveryAuthority,
     DevelopmentTargetAdmission,
     DevelopmentTargetAdmissionVerifier,
     from_cache_error,
@@ -26,12 +27,13 @@ from dpone.runtime.deployment_cache_projection_validator import DeploymentCacheP
 def prepare_publication(
     request: PublishRequest,
     *,
+    development_authority: DevelopmentDeliveryAuthority | None = None,
     development_admission: DevelopmentTargetAdmission | None = None,
     development_admission_verifier: DevelopmentTargetAdmissionVerifier | None = None,
     checked_at: datetime | None = None,
     clock: Callable[[], datetime] | None = None,
 ) -> ArtifactInventory:
-    """Validate and inventory all local bytes without registry or credential I/O."""
+    """Validate and inventory bytes; legacy authority never grants target admission."""
 
     projection = _validate_local_projection(request)
     require_registry_ref(projection.deployment, projection.airflow_index, request.artifact_registry_ref)

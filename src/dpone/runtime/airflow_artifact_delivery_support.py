@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from dpone.ports.artifact_registry import (
     ArtifactRegistry,
@@ -37,6 +37,14 @@ from dpone.runtime.development_target_admission import (
 
 _DEVELOPMENT_RELEASE_SCHEMA = "dpone.dbt-release-set.development.v1"
 _DEVELOPMENT_COMPOSITION_PROFILE = "development_workspace_delivery_v1"
+
+
+class DevelopmentDeliveryAuthority(Protocol):
+    """Legacy delivery capability retained only for fail-closed API migration."""
+
+    def release_projection(self) -> dict[str, Any]: ...
+
+    def require_release_budget(self, *, workload_ids: tuple[str, ...], source_bytes: int) -> None: ...
 
 
 def require_development_delivery_authority(
@@ -87,11 +95,11 @@ def require_development_delivery_authority(
                 workload_ids=_development_workload_ids(release),
                 source_bytes=_development_budget_bytes(release, delivered_bytes=source_bytes),
             )
-    except Exception as exc:  # noqa: BLE001 - external authority adapters must fail closed.
+    except Exception:  # noqa: BLE001 - external authority adapters must fail closed.
         raise AirflowArtifactDeliveryError(
             "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED",
             "development artifact delivery requires matching externally verified authority",
-        ) from exc
+        ) from None
 
 
 def _current_authority_time(
