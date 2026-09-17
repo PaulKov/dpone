@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from dpone.contracts import clickhouse_cluster_publication as contracts
+from dpone.ports.clickhouse_cluster_publication import contracts
 
 _DDL_SETTINGS = {
     "skip_unavailable_shards": 0,
