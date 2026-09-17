@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -256,6 +257,34 @@ def validate_development_release_projection(value: object) -> tuple[DevelopmentE
     return subjects
 
 
+def development_release_authority_projection(
+    release: Mapping[str, object],
+) -> dict[str, Any] | None:
+    """Return the validated authority projection for a development release.
+
+    Direct development dbt releases carry the projection at the root. A
+    development composition delegates the same authority to its single native
+    constituent. Other release families return no projection.
+    """
+
+    projection: object | None
+    if release.get("schema") == DEVELOPMENT_RELEASE_SCHEMA:
+        projection = release.get("development_authority")
+    else:
+        promotion = release.get("promotion")
+        if not isinstance(promotion, Mapping) or promotion.get("profile") != DEVELOPMENT_COMPOSITION_PROFILE:
+            return None
+        constituents = release.get("constituents")
+        if not isinstance(constituents, list):
+            raise DevelopmentAuthorityError("release_projection")
+        native = tuple(item for item in constituents if isinstance(item, Mapping) and item.get("id") == "native")
+        if len(native) != 1 or not isinstance(native[0].get("release"), Mapping):
+            raise DevelopmentAuthorityError("release_projection")
+        projection = native[0]["release"].get("development_authority")
+    validate_development_release_projection(projection)
+    return deepcopy(projection)
+
+
 def require_development_runtime_authority(
     projection: object,
     *,
@@ -327,6 +356,7 @@ __all__ = [
     "DevelopmentAuthorityReceipt",
     "DevelopmentExecutionSubject",
     "dbt_development_release_authority_violation",
+    "development_release_authority_projection",
     "require_development_runtime_authority",
     "validate_development_release_projection",
 ]

@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from dpone.gitops.schema_contract_primitives import GitOpsSchemaContract
-
-
-from typing import Any
 
 from dpone.gitops.schema_airflow_init_fetch_execution import (
     bounded_execution_token_schema,
@@ -30,6 +27,7 @@ def airflow_runtime_init_fetch_schema_contracts() -> tuple[GitOpsSchemaContract,
         runtime_init_fetch_plan_contract(),
         runtime_init_fetch_plan_v2_contract(),
         runtime_init_fetch_plan_v3_contract(),
+        _runtime_init_fetch_plan_contract(version=4),
         runtime_fetch_ready_contract(),
     )
 
@@ -49,8 +47,6 @@ def runtime_init_fetch_plan_v3_contract() -> GitOpsSchemaContract:
 def _runtime_init_fetch_plan_contract(*, version: int) -> GitOpsSchemaContract:
     suffix = f"-v{version}" if version > 1 else ""
     kind = f"dpone.airflow-runtime-init-fetch-plan.v{version}"
-    has_runtime_payloads = version >= 2
-    runtime_payload_fields = ("runtime_payloads",) if has_runtime_payloads else ()
     result = documented_contract(
         name=f"airflow-runtime-init-fetch-plan{suffix}",
         kind=kind,
@@ -73,7 +69,8 @@ def _runtime_init_fetch_plan_contract(*, version: int) -> GitOpsSchemaContract:
             "workload_pack",
             "execution",
             "verify",
-            *runtime_payload_fields,
+            *(("runtime_payloads",) if version >= 2 else ()),
+            *(("development_authority_required",) if version >= 4 else ()),
         ),
         properties={
             "schema": {"const": kind},
@@ -110,11 +107,12 @@ def _runtime_init_fetch_plan_contract(*, version: int) -> GitOpsSchemaContract:
                         "items": {"$ref": "#/$defs/runtimePayload"},
                     }
                 }
-                if has_runtime_payloads
+                if version >= 2
                 else {}
             ),
+            **({"development_authority_required": {"const": True}} if version >= 4 else {}),
         },
-        defs=runtime_plan_defs(include_runtime_payloads=has_runtime_payloads),
+        defs=runtime_plan_defs(include_runtime_payloads=version >= 2),
         additional_properties=False,
     )
     result.schema["allOf"] = [

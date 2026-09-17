@@ -184,7 +184,9 @@ module:
 | `dpone.airflow-deployment-index.v1` | `local_preview` | Preserve the non-runnable local preview lane. |
 | v1 | `init_fetch` | Fatal `DPONE_RUNTIME_ARTIFACT_DELIVERY_MIGRATION_REQUIRED`; regenerate and promote a v2 deployment. |
 | `dpone.airflow-deployment-index.v2` | `init_fetch` | Build the strict executable KPO path. |
-| v2 | Any other known mode | Fatal `DPONE_RUNTIME_ARTIFACT_DELIVERY_MODE_UNSUPPORTED`. |
+| `dpone.airflow-deployment-index.v3` | `init_fetch` | Build the strict path with deployment-owned MSSQL outlet projection. |
+| `dpone.airflow-deployment-index.v4` | `init_fetch` | Build the strict development path and require protected runtime authority. |
+| v2-v4 | Any other known mode | Fatal `DPONE_RUNTIME_ARTIFACT_DELIVERY_MODE_UNSUPPORTED`. |
 | Either | Unknown or malformed mode | Fatal index field/schema error. |
 
 The executable path is:
@@ -238,7 +240,7 @@ init container: dpone airflow runtime-init-fetch
 base container: dpone airflow runtime-pack-exec
 ```
 
-New strict tasks emit `dpone.airflow-runtime-init-fetch-plan.v3`. The plan
+New ordinary strict tasks emit `dpone.airflow-runtime-init-fetch-plan.v3`. The plan
 binds an explicit `workload|process` execution scope, the exact process
 selector, and whether hooks execute inside the runtime task (`inline`) or in
 separate Airflow tasks (`externalized`). `process_selector: null` means the
@@ -249,6 +251,36 @@ argv has no `--selector`. The provider installs that path only after proving
 that top-level hook tasks cover every process-local separate hook; otherwise
 DAG construction fails with
 `DPONE_INIT_FETCH_HOOK_OWNERSHIP_INCOMPLETE`.
+
+Development index v4 emits runtime plan v4 with the literal
+`development_authority_required: true` marker. Before registry configuration,
+cache reuse, artifact download, ready-manifest access, or connection-context
+exposure, each init/base process independently loads exactly one adapter from
+the fixed `dpone.development_runtime_authority` Python entry-point group. The
+adapter is installed in the digest-pinned runtime image; CLI flags and
+environment variables cannot select it. Core binds the result to the exact
+environment, release, deployment, image, workload, execution kind, current
+clock, revocation epoch, and fetched release projection. Missing, ambiguous,
+expired, revoked, or mismatched authority fails with
+`DPONE_DEVELOPMENT_RUNTIME_AUTHORITY_REQUIRED`. Adapter results are never
+written to XCom or persisted as credentials.
+
+An image-owned adapter package registers one zero-argument factory:
+
+```toml
+[project.entry-points."dpone.development_runtime_authority"]
+policy = "private_runtime_policy:build_authority"
+```
+
+The factory returns an object implementing
+`DevelopmentRuntimeAuthority.authorize(request)`. The method must authenticate
+the external policy for every call and return
+`DevelopmentRuntimeAuthorization` with a validated
+`DevelopmentAuthorityReceipt`, an aware check timestamp, and the current
+revocation epoch. The request contains only validated logical names and exact
+digests. Adapter exceptions are intentionally replaced by the stable public
+error, so private policy details must be recorded only in the adapter's protected
+audit system.
 
 Runtime verifies the selected process against the fetched pack, selects the
 same process-keyed bootstrap command, and removes any inherited

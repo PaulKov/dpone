@@ -12,12 +12,9 @@ Producers emit v3 only when a projection is present; otherwise they keep v2.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from copy import deepcopy
 
-if TYPE_CHECKING:
-    from dpone.gitops.schema_contract_primitives import GitOpsSchemaContract
-
-from dpone.gitops.schema_contract_primitives import documented_contract
+from dpone.gitops.schema_contract_primitives import GitOpsSchemaContract, documented_contract
 from dpone.gitops.schema_release_deployment_definitions import (
     MSSQL_OUTLET_PROJECTION_PROPERTY,
     airflow_deployment_index_v2_defs,
@@ -157,7 +154,27 @@ def airflow_deployment_index_v3_contract() -> GitOpsSchemaContract:
     return result
 
 
+def airflow_deployment_index_v4_contract() -> GitOpsSchemaContract:
+    """Development-authorized executable index with an optional MSSQL projection."""
+
+    source = airflow_deployment_index_v3_contract()
+    schema = deepcopy(source.schema)
+    kind = "dpone.airflow-deployment-index.v4"
+    schema["$id"] = schema["$id"].replace("airflow-deployment-index-v3", "airflow-deployment-index-v4")
+    schema["title"] = "dpone GitOps executable Airflow deployment index v4"
+    schema["properties"]["schema"] = {"const": kind}
+    schema["properties"]["development_authority_required"] = {"const": True}
+    schema["required"] = [field for field in schema["required"] if field != "mssql_asset_outlet_projection"]
+    schema["required"].append("development_authority_required")
+    return GitOpsSchemaContract(
+        name="airflow-deployment-index-v4",
+        kind=kind,
+        schema=schema,
+    )
+
+
 __all__ = [
     "airflow_deployment_index_v3_contract",
+    "airflow_deployment_index_v4_contract",
     "deployment_set_v3_contract",
 ]
