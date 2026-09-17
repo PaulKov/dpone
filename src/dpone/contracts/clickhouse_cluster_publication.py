@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, replace
 from enum import Enum
@@ -13,6 +14,7 @@ from dpone._compat import StrEnum
 
 SCHEMA_VERSION = "dpone.clickhouse.cluster-full-refresh.v1"
 AUTHORITY_TABLE = "__dpone_cluster_publication_authority"
+_SAFE_QUOTED_IDENTIFIER = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)`")
 
 
 class ClusterPublicationError(RuntimeError):
@@ -129,7 +131,8 @@ class ReplicaGeneration:
     host: str
     target: GenerationIdentity | None
     candidate: GenerationIdentity | None
-    healthy: bool = True
+    target_healthy: bool = True
+    candidate_healthy: bool = True
     row_count: int | None = None
 
 
@@ -202,6 +205,7 @@ class AuthorityRecord:
     ddl_query_digest: str | None = None
     cleanup_correlation_token: str | None = None
     cleanup_entry: str | None = None
+    cleanup_query_digest: str | None = None
     schema_version: str = SCHEMA_VERSION
 
     @property
@@ -212,12 +216,13 @@ class AuthorityRecord:
     def payload_sha256(self) -> str:
         return hashlib.sha256(self.payload.encode()).hexdigest()
 
-    def dispatching(self, *, token: str) -> AuthorityRecord:
+    def dispatching(self, *, token: str, query_digest: str) -> AuthorityRecord:
         return replace(
             self,
             phase=AuthorityPhase.DISPATCHING,
             dispatch_epoch=self.dispatch_epoch + 1,
             ddl_correlation_token=token,
+            ddl_query_digest=query_digest,
         )
 
 
@@ -250,16 +255,16 @@ def classify_replica(
     desired: GenerationIdentity,
     predecessor: GenerationIdentity | None,
 ) -> ReplicaPublicationState:
-    if not fact.healthy:
-        return ReplicaPublicationState.UNKNOWN
     if fact.target == desired:
+        if not fact.target_healthy:
+            return ReplicaPublicationState.UNKNOWN
         if predecessor is None and fact.candidate is None:
             return ReplicaPublicationState.COMMITTED
         if predecessor is not None and fact.candidate == predecessor:
             return ReplicaPublicationState.COMMITTED
         if predecessor is not None and fact.candidate is None:
             return ReplicaPublicationState.CLEANUP_PENDING
-    if fact.candidate == desired and fact.target == predecessor:
+    if fact.candidate == desired and fact.target == predecessor and fact.candidate_healthy:
         return ReplicaPublicationState.PENDING
     return ReplicaPublicationState.UNKNOWN
 
@@ -292,6 +297,13 @@ def canonical_json(value: Any) -> str:
 
 def digest_payload(value: Any) -> str:
     return hashlib.sha256(canonical_json(value).encode()).hexdigest()
+
+
+def ddl_query_digest(query: str) -> str:
+    """Hash the stable formatting shared by submitted and queue-rendered DDL."""
+
+    normalized = _SAFE_QUOTED_IDENTIFIER.sub(r"\1", " ".join(query.split()))
+    return hashlib.sha256(normalized.encode()).hexdigest()
 
 
 def _json_value(value: Any) -> Any:

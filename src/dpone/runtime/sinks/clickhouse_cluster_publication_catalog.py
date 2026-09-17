@@ -99,7 +99,8 @@ class ClickHouseClusterPublicationCatalog:
                 host=host,
                 target=values.get(target),
                 candidate=values.get(candidate),
-                healthy=health.get((host, candidate), health.get((host, target), False)),
+                target_healthy=health.get((host, target), values.get(target) is None),
+                candidate_healthy=health.get((host, candidate), values.get(candidate) is None),
                 row_count=counts.get((host, candidate)),
             )
             for host, values in sorted(by_host.items())
@@ -207,7 +208,7 @@ def _queue_entries(rows: Sequence[Any]) -> tuple[contracts.QueueEntry, ...]:
         result.append(
             contracts.QueueEntry(
                 entry=entry,
-                query_digest=hashlib.sha256(" ".join(query.split()).encode()).hexdigest(),
+                query_digest=contracts.ddl_query_digest(query),
                 correlation_token=next(iter(tokens)),
                 hosts=tuple(
                     contracts.QueueHostResult(

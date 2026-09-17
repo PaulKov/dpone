@@ -20,19 +20,19 @@ class ClickHouseClusterPublicationDdl:
         self._connector = connector
         self._catalog = catalog
 
+    def publication_query_digest(self, record: contracts.AuthorityRecord, *, cluster: str) -> str:
+        return contracts.ddl_query_digest(_publication_sql(record, cluster))
+
+    def cleanup_query_digest(self, record: contracts.AuthorityRecord, *, cluster: str) -> str:
+        return contracts.ddl_query_digest(_cleanup_sql(record, cluster))
+
     def dispatch_publication(
         self, record: contracts.AuthorityRecord, permit: contracts.DispatchPermit, *, cluster: str
     ) -> None:
         self._require_permit(record, permit)
         if not record.ddl_correlation_token:
             raise ValueError("cluster publication correlation token is missing")
-        target = _qualified(record.database, record.target)
-        candidate = _qualified(record.database, record.candidate)
-        if record.predecessor is None:
-            sql = f"RENAME TABLE {candidate} TO {target} ON CLUSTER {_quote(cluster)}"
-        else:
-            sql = f"EXCHANGE TABLES {target} AND {candidate} ON CLUSTER {_quote(cluster)}"
-        self._execute_once(sql, record.ddl_correlation_token, permit)
+        self._execute_once(_publication_sql(record, cluster), record.ddl_correlation_token, permit)
 
     def drop_predecessor(
         self, record: contracts.AuthorityRecord, permit: contracts.DispatchPermit, *, cluster: str
@@ -40,8 +40,7 @@ class ClickHouseClusterPublicationDdl:
         self._require_permit(record, permit)
         if not record.cleanup_correlation_token:
             raise ValueError("cluster cleanup correlation token is missing")
-        sql = f"DROP TABLE IF EXISTS {_qualified(record.database, record.candidate)} ON CLUSTER {_quote(cluster)}"
-        self._execute_once(sql, record.cleanup_correlation_token, permit)
+        self._execute_once(_cleanup_sql(record, cluster), record.cleanup_correlation_token, permit)
 
     def find_entries(self, cluster: str, correlation_token: str) -> tuple[contracts.QueueEntry, ...]:
         return self._catalog.find_entries(cluster, correlation_token)
@@ -71,3 +70,15 @@ def _quote(value: str) -> str:
 
 def _qualified(database: str, table: str) -> str:
     return f"{_quote(database)}.{_quote(table)}"
+
+
+def _publication_sql(record: contracts.AuthorityRecord, cluster: str) -> str:
+    target = _qualified(record.database, record.target)
+    candidate = _qualified(record.database, record.candidate)
+    if record.predecessor is None:
+        return f"RENAME TABLE {candidate} TO {target} ON CLUSTER {_quote(cluster)}"
+    return f"EXCHANGE TABLES {target} AND {candidate} ON CLUSTER {_quote(cluster)}"
+
+
+def _cleanup_sql(record: contracts.AuthorityRecord, cluster: str) -> str:
+    return f"DROP TABLE IF EXISTS {_qualified(record.database, record.candidate)} ON CLUSTER {_quote(cluster)}"
