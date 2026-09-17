@@ -14,8 +14,12 @@ from tests.integration.clickhouse_cluster.evidence import reset_receipt
 @pytest.fixture(scope="session", autouse=True)
 def _fresh_cluster_publication_receipt() -> None:
     if os.getenv("DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION") == "1":
-        _wait_for_distributed_ddl()
-        reset_receipt()
+        _prepare_cluster_publication_session()
+
+
+def _prepare_cluster_publication_session() -> None:
+    reset_receipt()
+    _wait_for_distributed_ddl()
 
 
 def _wait_for_distributed_ddl() -> None:

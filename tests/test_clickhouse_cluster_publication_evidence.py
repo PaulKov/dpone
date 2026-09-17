@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
+from tests.integration.clickhouse_cluster import conftest as cluster_conftest
 from tests.integration.clickhouse_cluster import evidence
 
 
@@ -43,5 +46,20 @@ def test_receipt_reset_discards_stale_session_evidence(tmp_path, monkeypatch) ->
     monkeypatch.setattr(evidence, "RECEIPT", receipt)
 
     evidence.reset_receipt()
+
+    assert not receipt.exists()
+
+
+def test_session_discards_stale_evidence_before_readiness_can_fail(tmp_path, monkeypatch) -> None:
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text('{"status":"passed_live"}')
+    monkeypatch.setattr(evidence, "RECEIPT", receipt)
+
+    def fail_readiness() -> None:
+        raise AssertionError("synthetic startup failure")
+
+    monkeypatch.setattr(cluster_conftest, "_wait_for_distributed_ddl", fail_readiness)
+    with pytest.raises(AssertionError, match="synthetic startup failure"):
+        cluster_conftest._prepare_cluster_publication_session()
 
     assert not receipt.exists()
