@@ -136,4 +136,14 @@ def _recovery_required(path: Path) -> DeploymentCacheError:
     )
 
 
-__all__ = ["DeploymentCacheCurrentState"]
+def control_state_recovery_required(path: Path) -> DeploymentCacheError:
+    """Report pointer/projection disagreement that requires explicit recovery."""
+
+    return DeploymentCacheError(
+        "DPONE_DEPLOYMENT_CACHE_RECOVERY_REQUIRED",
+        "current deployment control files are inconsistent; run cache recovery before promotion",
+        path=path.as_posix(),
+    )
+
+
+__all__ = ["DeploymentCacheCurrentState", "control_state_recovery_required"]

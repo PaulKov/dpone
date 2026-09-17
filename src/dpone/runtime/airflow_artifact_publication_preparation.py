@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from dpone.runtime.airflow_artifact_delivery_models import (
     AirflowArtifactDeliveryError,
     ArtifactInventory,
     PublishRequest,
 )
 from dpone.runtime.airflow_artifact_delivery_support import (
-    DevelopmentDeliveryAuthority,
+    DevelopmentTargetAdmission,
+    DevelopmentTargetAdmissionVerifier,
     from_cache_error,
     require_development_delivery_authority,
     require_registry_ref,
@@ -22,7 +25,9 @@ from dpone.runtime.deployment_cache_projection_validator import DeploymentCacheP
 def prepare_publication(
     request: PublishRequest,
     *,
-    development_authority: DevelopmentDeliveryAuthority | None = None,
+    development_admission: DevelopmentTargetAdmission | None = None,
+    development_admission_verifier: DevelopmentTargetAdmissionVerifier | None = None,
+    checked_at: datetime | None = None,
 ) -> ArtifactInventory:
     """Validate and inventory all local bytes without registry or credential I/O."""
 
@@ -36,11 +41,22 @@ def prepare_publication(
             label="release-set",
             root=request.cache_root,
         )
-        require_development_delivery_authority(release, authority=development_authority)
+        require_development_delivery_authority(
+            release,
+            deployment=projection.deployment,
+            admission=development_admission,
+            admission_verifier=development_admission_verifier,
+            operation="publish",
+            checked_at=checked_at,
+        )
         inventory = build_publish_inventory(request, projection)
         require_development_delivery_authority(
             release,
-            authority=development_authority,
+            deployment=projection.deployment,
+            admission=development_admission,
+            admission_verifier=development_admission_verifier,
+            operation="publish",
+            checked_at=checked_at,
             source_bytes=sum(item.size_bytes for item in inventory.release if not item.completion_marker),
         )
         return inventory

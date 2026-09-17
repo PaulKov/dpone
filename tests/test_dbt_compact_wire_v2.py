@@ -373,7 +373,8 @@ def test_actual_launcher_rejects_resealed_v2_metadata_downgrade(tmp_path, mutati
     )
 
 
-def test_real_offline_toolchain_compact_delivery(tmp_path):
+@pytest.mark.parametrize("development", [False, True])
+def test_real_offline_toolchain_compact_delivery(tmp_path, development):
     """Real parse/ls, source verification and launcher; no build or SQL execution."""
     import importlib.metadata
 
@@ -398,13 +399,35 @@ def test_real_offline_toolchain_compact_delivery(tmp_path):
         (project / "models/project_marker.txt").write_text(f"-- synthetic {name}\nselect 1 as marker\n")
         _parse(executable, project, project, tmp_path / f"parse-{name}")
     compiled = tmp_path / "compiled"
+    authority = _development_authority() if development else None
     service = workspace_service(
-        tmp_path / "profiles", selection=DbtCliSelectionResolver(target_resolver=IsolatedDbtParseTargetResolver())
+        tmp_path / "profiles",
+        selection=DbtCliSelectionResolver(target_resolver=IsolatedDbtParseTargetResolver()),
+        development_authority=authority,
     )
     report = service.compile(root, output_dir=compiled)
     assert report.passed, [(row.project.project_name, row.report.blockers) for row in report.check.projects]
-    delivered = verify_delivery(tmp_path, compiled)
-    _verify_runtime_targets(delivered, tmp_path / "real-preflight", executable)
+    if development:
+        from dpone.app.dbt_promotion_composition import RuntimeDbtProjectBundleOperations
+        from dpone.manifest.confined_files import read_confined_file
+        from dpone.services.dbt_release_source_reader import DbtReleaseSourceReader
+
+        release = json.loads((compiled / "release-set.json").read_bytes())
+        sources = DbtReleaseSourceReader(
+            bundle_operations=RuntimeDbtProjectBundleOperations(),
+            read_file=read_confined_file,
+        ).read(compiled, expected_release_id=release["release_id"])
+        assert len(sources.inventory.projects) == len(PROJECTS)
+        delivered = materialize_compact_pack_release(
+            pack_root=compiled,
+            cache_root=tmp_path / "development-cache",
+            xcom_sidecar_image=SIDECAR,
+            development_authority=authority,
+        )
+        assert delivered.passed, delivered.blockers
+    else:
+        delivered_root = verify_delivery(tmp_path, compiled)
+        _verify_runtime_targets(delivered_root, tmp_path / "real-preflight", executable)
 
 
 @pytest.mark.parametrize("image", ["@sha256:" + "a" * 64, "", "registry.example/xcom:latest"])

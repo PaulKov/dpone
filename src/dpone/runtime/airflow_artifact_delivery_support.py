@@ -10,6 +10,7 @@ import stat
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol, cast
 
@@ -38,22 +39,72 @@ class DevelopmentDeliveryAuthority(Protocol):
     def require_release_budget(self, *, workload_ids: tuple[str, ...], source_bytes: int) -> None: ...
 
 
+class DevelopmentTargetAdmission(Protocol):
+    """Operation-specific capability returned by a trusted target verifier."""
+
+    authority: DevelopmentDeliveryAuthority
+
+    def require(
+        self,
+        *,
+        authority_projection: object,
+        operation: str,
+        release_id: str,
+        deployment_id: str,
+        target_environment: str,
+        target_trust_tier: str,
+        now: datetime,
+    ) -> None: ...
+
+
+class DevelopmentTargetAdmissionVerifier(Protocol):
+    """Protected adapter that reopens current target policy and revocation."""
+
+    def require_current(self, admission: DevelopmentTargetAdmission, *, now: datetime) -> None: ...
+
+
 def require_development_delivery_authority(
     release: Mapping[str, object],
     *,
-    authority: DevelopmentDeliveryAuthority | None,
+    deployment: Mapping[str, object],
+    admission: DevelopmentTargetAdmission | None,
+    admission_verifier: DevelopmentTargetAdmissionVerifier | None,
+    operation: str,
+    checked_at: datetime | None = None,
     source_bytes: int | None = None,
 ) -> None:
-    """Require matching injected authority and combined delivery budgets."""
+    """Require artifact scope plus exact current target-operation admission."""
 
     try:
-        projection = _development_authority_projection(release)
+        projection = development_authority_projection(release)
         if projection is None:
             return
-        if authority is None or authority.release_projection() != projection:
+        release_id = release.get("release_id")
+        deployment_id = deployment.get("deployment_id")
+        environment = deployment.get("environment")
+        trust_tier = deployment.get("trust_tier")
+        if (
+            admission is None
+            or admission_verifier is None
+            or not isinstance(release_id, str)
+            or not isinstance(deployment_id, str)
+            or not isinstance(environment, str)
+            or not isinstance(trust_tier, str)
+            or checked_at is None
+        ):
             raise ValueError("current external authority is required")
+        admission_verifier.require_current(admission, now=checked_at)
+        admission.require(
+            authority_projection=projection,
+            operation=operation,
+            release_id=release_id,
+            deployment_id=deployment_id,
+            target_environment=environment,
+            target_trust_tier=trust_tier,
+            now=checked_at,
+        )
         if source_bytes is not None:
-            authority.require_release_budget(
+            admission.authority.require_release_budget(
                 workload_ids=_development_workload_ids(release),
                 source_bytes=_development_budget_bytes(release, delivered_bytes=source_bytes),
             )
@@ -64,7 +115,7 @@ def require_development_delivery_authority(
         ) from exc
 
 
-def _development_authority_projection(release: Mapping[str, object]) -> object | None:
+def development_authority_projection(release: Mapping[str, object]) -> object | None:
     if release.get("schema") == _DEVELOPMENT_RELEASE_SCHEMA:
         return release.get("development_authority")
     promotion = release.get("promotion")
@@ -307,6 +358,9 @@ __all__ = [
     "ArtifactRegistryError",
     "ArtifactRegistryObjectNotFound",
     "ArtifactRegistryReader",
+    "DevelopmentTargetAdmission",
+    "DevelopmentTargetAdmissionVerifier",
+    "development_authority_projection",
     "download",
     "file_sha256",
     "from_cache_error",
@@ -315,6 +369,7 @@ __all__ = [
     "read_json",
     "registry_unavailable",
     "require_registry_ref",
+    "require_development_delivery_authority",
     "validate_materialization_target",
     "verify_download",
 ]
