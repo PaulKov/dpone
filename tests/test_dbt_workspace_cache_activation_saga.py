@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import traceback
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
@@ -604,6 +605,10 @@ def test_development_activation_closes_initial_authority_verifier_failure(tmp_pa
 
     assert denied.value.code == "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED"
     assert denied.value.details == {}
+    assert denied.value.__cause__ is None
+    assert "protected authority store unavailable" not in "".join(
+        traceback.format_exception(denied.type, denied.value, denied.tb)
+    )
     assert verifier.calls == 1
     assert coordinator.events == []
     assert not (cache / "activations").exists()

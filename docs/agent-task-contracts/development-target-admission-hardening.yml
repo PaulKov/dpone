@@ -12,6 +12,7 @@ acceptance_criteria:
   - "Pointer and audit mutation revalidate complete sealed projection bytes after coordinator preparation or readback, and verifier failures retain stable recovery semantics."
   - "Production release validation and route-certification requirements remain unchanged."
   - "Public CLI paths cannot self-authorize DEV-only delivery or activation."
+  - "The legacy development_authority Python keyword remains accepted but never self-authorizes the new target boundary."
 public_contract_impact:
   level: compatible
   surfaces:

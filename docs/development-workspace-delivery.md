@@ -178,6 +178,14 @@ installation. The public `dpone airflow publish` and `cache-materialize`
 commands cannot inject target admission and therefore fail closed for this
 family.
 
+The deprecated Python keyword `development_authority=` remains accepted by
+`prepare_publication`, `AirflowArtifactPublisher`, and
+`AirflowArtifactMaterializer` for source compatibility during migration. It is
+never adapted into target admission: a DEV-only operation that supplies only
+that legacy receipt fails with `DPONE_DEVELOPMENT_AUTHORITY_REQUIRED`. Platform
+adapters must migrate to the operation-specific admission and current-target
+verifier shown above.
+
 ## Runtime status
 
 Deployment activation is not workload execution permission. Cache activation

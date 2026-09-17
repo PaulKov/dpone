@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import traceback
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -28,6 +29,7 @@ from dpone.runtime.airflow_artifact_delivery import (
     AirflowArtifactPublisher,
 )
 from dpone.runtime.airflow_artifact_delivery_models import MaterializeRequest, PublishRequest
+from dpone.runtime.airflow_artifact_publication import prepare_publication
 from tests.dbt_compact_wire_v2_helpers import IMAGE, SIDECAR, prepare_projects, workspace_service
 from tests.test_airflow_remote_artifact_delivery import _registry
 from tests.test_dbt_airflow_release_e2e import _config_map_ref, _write_environment
@@ -318,7 +320,11 @@ def test_publish_closes_external_target_verifier_failure(tmp_path: Path) -> None
         )
 
     assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert denied.value.__cause__ is None
     assert "protected-policy-location-must-not-escape" not in str(denied.value)
+    assert "protected-policy-location-must-not-escape" not in "".join(
+        traceback.format_exception(denied.type, denied.value, denied.tb)
+    )
     assert not (tmp_path / "registry" / "releases").exists()
 
 
@@ -453,7 +459,63 @@ def test_materialize_closes_external_target_verifier_failure(tmp_path: Path) -> 
         )
 
     assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert denied.value.__cause__ is None
     assert "protected-policy-location-must-not-escape" not in str(denied.value)
+    assert "protected-policy-location-must-not-escape" not in "".join(
+        traceback.format_exception(denied.type, denied.value, denied.tb)
+    )
+    assert not (destination / "releases").exists()
+    assert not (destination / "deployments").exists()
+
+
+def test_legacy_delivery_authority_keyword_is_accepted_but_cannot_self_authorize(tmp_path: Path) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=False)
+    registry = _registry(tmp_path)
+    publish_request = PublishRequest(
+        cache_root=cache,
+        release_id=release_id,
+        deployment_id=deployment_id,
+        environment="development",
+        artifact_registry_ref="synthetic-artifacts",
+        publication_mode="exact",
+    )
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied_prepare:
+        prepare_publication(publish_request, development_authority=authority)
+    assert denied_prepare.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied_publish:
+        AirflowArtifactPublisher(
+            registry=registry,
+            development_authority=authority,
+        ).publish(publish_request)
+    assert denied_publish.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert not (tmp_path / "registry" / "releases").exists()
+
+    AirflowArtifactPublisher(
+        registry=registry,
+        development_admission=_admission(authority, "publish", release_id, deployment_id),
+        development_admission_verifier=_admission_verifier(authority),
+        clock=_clock,
+    ).publish(publish_request)
+    destination = tmp_path / "legacy-authority-cache"
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied_materialize:
+        AirflowArtifactMaterializer(
+            registry=registry,
+            development_authority=authority,
+        ).materialize(
+            MaterializeRequest(
+                cache_root=destination,
+                release_id=release_id,
+                deployment_id=deployment_id,
+                environment="development",
+                artifact_registry_ref="synthetic-artifacts",
+            )
+        )
+
+    assert denied_materialize.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
     assert not (destination / "releases").exists()
     assert not (destination / "deployments").exists()
 

@@ -40,7 +40,9 @@
   coordinator preparation, immediately before pointer or audit mutation.
   Combined delivery budgets remain enforced; production targets, verifier
   availability failures and public CLI self-authorization fail closed through
-  stable public errors.
+  stable public errors without chaining private adapter diagnostics. The legacy
+  `development_authority=` Python keyword remains accepted for migration but
+  cannot satisfy target admission.
 - Add a fail-closed bounded full-refresh publication implementation for one-shard replicated
   ClickHouse targets. KeeperMap compare-and-swap fences workers, exact
   distributed-DDL queue receipts reconcile lost responses, and UUID-bound
