@@ -17,6 +17,7 @@ def studio_openapi_response_schemas(
             "type_matrix",
             "type_inference",
             "physical_design",
+            "publication",
             "reconciliation",
             "state",
             "partitioning",

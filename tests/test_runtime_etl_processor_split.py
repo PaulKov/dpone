@@ -487,6 +487,47 @@ def test_receipt_replay_completes_inert_post_hooks_without_source_or_dml() -> No
     assert governance.post_hook_calls == 1
 
 
+def test_sink_publication_admission_can_complete_source_free_replay_before_extract() -> None:
+    events: list[str] = []
+    replay = LoadResult(
+        inserted_rows=3,
+        updated_rows=0,
+        total_rows=3,
+        staging_rows=3,
+        commit_receipt_id="cluster-publication-replay",
+        commit_outcome=AtomicCommitOutcome.COMMITTED_AFTER_RECEIPT_PROBE,
+        reconciliation_metrics={"clickhouse_cluster_full_refresh": {"phase": "COMPLETED"}},
+    )
+
+    class ReplaySource(StubSource):
+        def extract(self, _load_config, _state):
+            events.append("extract")
+            raise AssertionError("publication replay must not read source")
+
+    class ReplaySink(StubSink):
+        def prepare_runtime_admission(self, load_config, **_kwargs):
+            events.append("admission")
+            return load_config
+
+        def replay_result(self, _load_config):
+            events.append("replay")
+            return replay
+
+        def load(self, _load_config, _payload):
+            events.append("load")
+            raise AssertionError("publication replay must not mutate target")
+
+    result = ETLProcessor(
+        ReplaySource(SimpleNamespace()),
+        ReplaySink(),
+        etl_logger=StubLogger(),
+    ).run(make_load_config())
+
+    assert result["status"] == "success"
+    assert result["reconciliation_metrics"] == replay.reconciliation_metrics
+    assert events == ["admission", "replay"]
+
+
 def test_receipt_replay_with_non_inert_quality_fails_closed_without_source_or_dml() -> None:
     replay = LoadResult(
         inserted_rows=2,

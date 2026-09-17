@@ -19,13 +19,14 @@
   projection, declarative SQL dependencies and separate SQL pre-hooks. Remote
   publication and cache materialization require the same injected receipt and
   combined delivery budget; public CLI paths remain unable to self-authorize.
-- Add an experimental, default-disabled fail-closed bounded full-refresh
-  publication implementation for one-shard replicated
+- Add a fail-closed bounded full-refresh publication implementation for one-shard replicated
   ClickHouse targets. KeeperMap compare-and-swap fences workers, exact
   distributed-DDL queue receipts reconcile lost responses, and UUID-bound
-  cleanup preserves unresolved generations. The stable runtime does not admit
-  this path until its fault matrix is complete. Local publication remains
-  unchanged; multi-shard and terminal-partial repair remain unsupported.
+  cleanup preserves unresolved generations. One admission policy now drives
+  manifest validation, dbt compilation, planning, and runtime routing without a
+  local fallback. Local and legacy-unbounded publication remain unchanged;
+  multi-shard and terminal-partial repair remain unsupported, and external
+  deployments remain unverified until separately certified.
 
 - Add canonical native original bindings preserving complete subject, storage
   authority and provider-version identity without granting execution authority.
@@ -55,8 +56,8 @@
   from terminal partial failure. Add pinned two-replica Docker evidence for
   convergence on the original queue entry, terminal fail-closed retention, and
   deterministic fault injection for the exhaustive queue-status/exact-host
-  classifier. Cluster admission remains disabled while broader topology-drift
-  certification is incomplete.
+  classifier. The exact pinned Docker matrix is internal protocol evidence;
+  external topology and permissions remain unverified.
 
 - Close threaded backfill admission atomically with lease acquisition before
   persisting a chunk failure. Already admitted peers may finish; untouched chunks
@@ -81,12 +82,12 @@
   slice, or certified BCP-stream evidence before ClickHouse target publication.
   Invalid, misplaced, exceeded, incomplete, or unmeasurable budgets now fail
   closed and clean attempt staging instead of being silently ignored.
-- Publish bounded ClickHouse full refresh through a target-local, UUID-bound
+- Publish bounded local ClickHouse full refresh through a target-local, UUID-bound
   marker and one non-retried EXCHANGE/RENAME on admitted local Atomic/Shared
   databases. Reconcile lost replies from catalog truth, fence another run, and
-  verify predecessor identity before cleanup. Unsupported clustered,
-  Distributed, Replicated, cross-database, or legacy unbounded paths are not
-  promoted by this change.
+  verify predecessor identity before cleanup. Clustered publication is handled
+  by its separate Keeper-backed protocol; Distributed, cross-database, and
+  legacy unbounded paths are not promoted by this local protocol.
 - Resolve generated dbt MSSQL interval start filters without literal braces and
   align current setup and recovery guidance with the existing toolchain.
 - Hide overlapping dbt secrets and secret fragments at captured-output retention

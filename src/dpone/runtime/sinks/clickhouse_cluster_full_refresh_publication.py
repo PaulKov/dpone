@@ -142,6 +142,9 @@ class ClickHouseClusterFullRefreshPublicationService:
         cluster = _cluster(load_config)
         database, target = str(load_config.target_schema), str(load_config.target_table)
         target_key = digest_payload({"cluster": cluster, "database": database, "target": target})
+        inventory = self._catalog.inventory(cluster)
+        self._catalog.require_atomic_database(cluster, database, inventory.hosts)
+        self._bootstrap.ensure(cluster, database, inventory.hosts)
         authority = self._authority_factory(database)
         current = authority.read_versioned(target_key)
         if current is None:
@@ -150,10 +153,7 @@ class ClickHouseClusterFullRefreshPublicationService:
             raise ClusterPublicationError(
                 "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target"
             )
-        inventory = self._catalog.inventory(cluster)
         _require_inventory(current.record, inventory)
-        self._catalog.require_atomic_database(cluster, database, inventory.hosts)
-        self._bootstrap.ensure(cluster, database, inventory.hosts)
         if current.record.phase is AuthorityPhase.COMPLETED:
             receipt = ClusterFullRefreshReceipt.from_authority(current, cluster)
         elif current.record.phase is AuthorityPhase.DISPATCHING:

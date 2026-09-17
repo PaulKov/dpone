@@ -6,6 +6,15 @@ from collections.abc import Sequence
 from typing import Any, Protocol
 
 from dpone.contracts import clickhouse_cluster_publication as contracts
+from dpone.contracts.clickhouse_cluster_admission import (
+    ClickHouseClusterAdmissionError as ClickHouseClusterAdmissionError,
+)
+from dpone.contracts.clickhouse_cluster_admission import (
+    clickhouse_cluster_admission_input as clickhouse_cluster_admission_input,
+)
+from dpone.contracts.clickhouse_cluster_admission import (
+    evaluate_clickhouse_cluster_admission as evaluate_clickhouse_cluster_admission,
+)
 
 
 class ClusterPublicationCatalogPort(Protocol):

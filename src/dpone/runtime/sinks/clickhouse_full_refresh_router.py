@@ -5,9 +5,16 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION
+from dpone.ports.clickhouse_cluster_publication import (
+    ClickHouseClusterAdmissionError,
+    clickhouse_cluster_admission_input,
+    evaluate_clickhouse_cluster_admission,
+)
 from dpone.runtime.clickhouse_cluster_publication_composition import (
     build_clickhouse_cluster_publication,
 )
+from dpone.runtime.decision_audit import publish_runtime_decision
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import CLUSTER_RECEIPT_VERSION
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import ClickHouseFullRefreshPublicationService
 
@@ -19,12 +26,9 @@ class ClickHouseFullRefreshPublicationRouter:
         self,
         local: ClickHouseFullRefreshPublicationService,
         cluster: Any,
-        *,
-        cluster_admitted: bool = False,
     ) -> None:
         self._local = local
         self._cluster = cluster
-        self._cluster_admitted = cluster_admitted
 
     @classmethod
     def from_connector(cls, connector: Any) -> ClickHouseFullRefreshPublicationRouter:
@@ -41,18 +45,44 @@ class ClickHouseFullRefreshPublicationRouter:
 
     @staticmethod
     def is_enabled(load_config: Any) -> bool:
-        return ClickHouseFullRefreshPublicationService.is_enabled(load_config)
+        if ClickHouseFullRefreshPublicationService.is_enabled(load_config):
+            return True
+        return evaluate_clickhouse_cluster_admission(_admission_input(load_config)).requested
 
     def prepare_admission(self, load_config: Any) -> Any:
-        service = self._cluster if self._use_cluster(load_config) else self._local
+        service = self._service(load_config)
         return service.prepare_admission(load_config)
 
     def publish(self, load_config: Any, candidate_config: Any, *, staged_rows: int) -> Any:
-        service = self._cluster if self._use_cluster(load_config) else self._local
+        service = self._service(load_config)
         return service.publish(load_config, candidate_config, staged_rows=staged_rows)
 
-    def _use_cluster(self, load_config: Any) -> bool:
-        return self._cluster_admitted and self._local.is_enabled(load_config) and self._cluster.is_enabled(load_config)
+    def _service(self, load_config: Any) -> Any:
+        decision = evaluate_clickhouse_cluster_admission(_admission_input(load_config))
+        if not self._local.is_enabled(load_config) and not decision.requested:
+            return self._local
+        publish_runtime_decision(
+            {
+                "requested": "cluster" if decision.requested else "local",
+                "selected": decision.mode,
+                "blockers": decision.blockers,
+                "release_gate": "blocked" if decision.blockers else "green",
+                "runtime_admission_required": decision.runtime_admission_required,
+                "no_fallback": decision.no_fallback,
+            },
+            decision_id="clickhouse.full_refresh_publication",
+            phase="pre_extract",
+            component="clickhouse_sink",
+            category="publication",
+            fallback_allowed=False,
+        )
+        if decision.requested and not decision.selected:
+            raise ClickHouseClusterAdmissionError(decision)
+        if not decision.selected:
+            return self._local
+        if not self._cluster.is_enabled(load_config):
+            raise RuntimeError("clickhouse_cluster_publication.runtime_capability_unavailable")
+        return self._cluster
 
     def cleanup(self, receipt: Any) -> None:
         if isinstance(receipt, Mapping) and receipt.get("schema_version") == CLUSTER_RECEIPT_VERSION:
@@ -66,3 +96,15 @@ class ClickHouseFullRefreshPublicationRouter:
     @staticmethod
     def replay_result(load_config: Any) -> Any:
         return ClickHouseFullRefreshPublicationService.replay_result(load_config)
+
+
+def _admission_input(load_config: Any) -> Any:
+    options = getattr(load_config, "options", {}) or {}
+    return clickhouse_cluster_admission_input(
+        sink_type="clickhouse",
+        strategy_mode=str(getattr(getattr(load_config, "load_strategy", None), "value", "")),
+        max_source_bytes=options.get(SOURCE_BYTE_BUDGET_OPTION),
+        physical_design=options.get("physical_design"),
+        target_database=str(getattr(load_config, "target_schema", "") or ""),
+        staging_database=str(getattr(load_config, "staging_schema", "") or ""),
+    )

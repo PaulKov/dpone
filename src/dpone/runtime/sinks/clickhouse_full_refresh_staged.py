@@ -6,6 +6,7 @@ from collections.abc import Mapping, MutableMapping
 from typing import Any
 
 from dpone.runtime.governance.ports import StagedLoadHandle
+from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import CLUSTER_RECEIPT_VERSION
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 
 
@@ -25,6 +26,11 @@ def finalize_full_refresh(sink: Any, load_config: Any, handle: StagedLoadHandle)
         staging_rows=handle.staged_rows,
         commit_receipt_id=publication.marker.operation_id if publication is not None else None,
         commit_outcome=AtomicCommitOutcome.COMMITTED if publication is not None else None,
+        reconciliation_metrics=(
+            {"clickhouse_cluster_full_refresh": publication.to_dict()}
+            if publication is not None and getattr(publication, "schema_version", None) == CLUSTER_RECEIPT_VERSION
+            else None
+        ),
     )
 
 

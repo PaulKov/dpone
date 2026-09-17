@@ -147,16 +147,24 @@ for diagnostics, but a pending marker is never redispatched because process
 absence is not an atomic fence. Cleanup verifies the predecessor UUID before
 dropping it and can resume marker-only cleanup after that drop already completed.
 
-Cluster-wide, `Distributed`, `Replicated*`, cross-database, and non-Atomic/Shared
-publication fail before mutation with a stable
-`DPONE_CLICKHOUSE_FULL_REFRESH_*` error. Legacy unbounded full refresh keeps its
-compatibility path and is not certified by this bounded protocol. Offline tests
-do not certify a live topology; see [connector certification](../connector-certification.md).
-The independent
-[one-shard replicated publication design](../feature-design-clickhouse-cluster-full-refresh-publication-v1.md)
-defines the KeeperMap and distributed-DDL recovery work required to remove the
-`Replicated*` limitation. Its status is `RESEARCHED`, so it does not change the
-current route contract.
+For a one-shard cluster with two or more replicas, the same bounded contract can
+select the replicated publication protocol. The target must use an Atomic
+database and a direct `Replicated*MergeTree` engine, staging must remain in the
+target database, DDL scope must be `cluster`, and no `access_table` may be
+enabled. `dpone check` reports all static blockers; `dpone plan` reports the
+selected publication mode, whether runtime admission is still required, and
+that no local fallback exists.
+
+At runtime dpone requires complete replica inventory, bootstraps and verifies a
+KeeperMap authority facade, then reconciles one non-retried distributed DDL
+entry on every replica. Missing or ambiguous evidence retains both generations
+and fails closed. Multi-shard, `Distributed` targets, cross-database staging,
+non-Atomic databases, and terminal-partial auto-repair remain unsupported.
+Legacy unbounded full refresh remains on its compatibility path. The pinned
+Docker matrix is internal protocol evidence only; every external deployment and
+permission set remains `UNVERIFIED` until separately certified. See
+[connector certification](../connector-certification.md) and the approved
+[one-shard replicated publication design](../feature-design-clickhouse-cluster-full-refresh-publication-v1.md).
 
 ## Runtime algorithm
 
