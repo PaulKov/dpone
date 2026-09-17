@@ -182,7 +182,9 @@ def test_real_sql_roles_replay_drift_closed_authority_and_attach(enrollment):
                 with pytest.raises(source.driver.Error, match=r"\(229\)"):
                     runtime.execute(f"SELECT * FROM [{LOCAL}].[{table}]")
             assert (
-                runtime.execute("SELECT HAS_PERMS_BY_NAME(NULL,'SERVER','VIEW SERVER PERFORMANCE STATE')").fetchone()[0]
+                runtime.execute(
+                    "SELECT ISNULL(HAS_PERMS_BY_NAME(NULL,'SERVER','VIEW SERVER PERFORMANCE STATE'),0)"
+                ).fetchone()[0]
                 == 0
             )
         assert f.snapshot() == before_denials
