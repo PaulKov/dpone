@@ -96,10 +96,13 @@ def require_development_delivery_authority(
                 source_bytes=_development_budget_bytes(release, delivered_bytes=source_bytes),
             )
     except Exception:  # noqa: BLE001 - external authority adapters must fail closed.
-        raise AirflowArtifactDeliveryError(
-            "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED",
-            "development artifact delivery requires matching externally verified authority",
-        ) from None
+        pass
+    else:
+        return
+    raise AirflowArtifactDeliveryError(
+        "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED",
+        "development artifact delivery requires matching externally verified authority",
+    ) from None
 
 
 def _current_authority_time(
