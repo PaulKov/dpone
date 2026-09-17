@@ -1,0 +1,10 @@
+<clickhouse>
+  <remote_servers><publication_cluster><shard><internal_replication>true</internal_replication>
+    <replica><host>node1</host><port>9000</port></replica>
+    <replica><host>node2</host><port>9000</port></replica>
+  </shard></publication_cluster></remote_servers>
+  <zookeeper><node><host>keeper</host><port>9181</port></node></zookeeper>
+  <keeper_map_path_prefix>/dpone_keeper_map</keeper_map_path_prefix>
+  <distributed_ddl><path>/clickhouse/task_queue/ddl</path></distributed_ddl>
+  <macros><shard>01</shard><replica>node2</replica></macros>
+</clickhouse>
