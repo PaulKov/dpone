@@ -34,6 +34,9 @@ VersionedAuthorityRecord = contracts.VersionedAuthorityRecord
 classify_aggregate = contracts.classify_aggregate
 classify_replica = contracts.classify_replica
 digest_payload = contracts.digest_payload
+_one_identity = contracts.one_generation_identity
+_optional_one_identity = contracts.optional_generation_identity
+_require_inventory = contracts.require_inventory
 
 
 class ClickHouseClusterFullRefreshPublicationService:
@@ -405,28 +408,6 @@ def _require_verified(result: Any, *, permit: bool) -> VersionedAuthorityRecord:
     if permit and result.permit is None:
         raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_CAS_UNKNOWN", "dispatch permit was not issued")
     return result.observed
-
-
-def _require_inventory(record: AuthorityRecord, inventory: Any) -> None:
-    if inventory.digest != record.inventory_digest:
-        raise ClusterPublicationError(
-            "DPONE_CLICKHOUSE_CLUSTER_INVENTORY_DRIFT",
-            "cluster inventory changed after authority acquisition",
-        )
-
-
-def _one_identity(facts: Any, name: str) -> Any:
-    value = _optional_one_identity(facts, name)
-    if value is None:
-        raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_GENERATION_UNKNOWN", f"{name} is absent")
-    return value
-
-
-def _optional_one_identity(facts: Any, name: str) -> Any:
-    values = {getattr(item, name) for item in facts}
-    if len(values) != 1:
-        raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED", f"{name} differs")
-    return next(iter(values))
 
 
 def _operation_id(load_config: Any) -> str:

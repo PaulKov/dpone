@@ -306,6 +306,30 @@ def ddl_query_digest(query: str) -> str:
     return hashlib.sha256(normalized.encode()).hexdigest()
 
 
+def require_inventory(record: AuthorityRecord, inventory: ClusterInventory) -> None:
+    """Fence recovery when the exact replica inventory has changed."""
+
+    if inventory.digest != record.inventory_digest:
+        raise ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_INVENTORY_DRIFT",
+            "cluster inventory changed after authority acquisition",
+        )
+
+
+def one_generation_identity(facts: Sequence[ReplicaGeneration], role: str) -> GenerationIdentity:
+    value = optional_generation_identity(facts, role)
+    if value is None:
+        raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_GENERATION_UNKNOWN", f"{role} is absent")
+    return value
+
+
+def optional_generation_identity(facts: Sequence[ReplicaGeneration], role: str) -> GenerationIdentity | None:
+    values = {getattr(item, role) for item in facts}
+    if len(values) != 1:
+        raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED", f"{role} differs")
+    return next(iter(values))
+
+
 def _json_value(value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
