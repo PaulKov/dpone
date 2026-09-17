@@ -260,6 +260,7 @@ nav:
       - PostgreSQL: postgres.md
       - MSSQL: mssql.md
       - ClickHouse: clickhouse.md
+      - ClickHouse cluster publication design: feature-design-clickhouse-cluster-full-refresh-publication-v1.md
       - BigQuery: bigquery.md
       - Kafka: kafka.md
       - REST API: rest-api.md
