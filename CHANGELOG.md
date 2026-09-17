@@ -4,6 +4,13 @@
 
 ### Added
 
+- Add protected development runtime admission for exact dbt, flow, batch, and
+  pre-hook subjects. A closed Airflow index/plan v4 marker triggers independent
+  init/base checks through exactly one image-installed private adapter before
+  registry or connection-context access. Core rechecks time, revocation,
+  environment, selected subject, and the fetched release projection; ordinary
+  runtime behavior and existing plan bytes remain unchanged.
+
 - Add development workspace delivery with a distinct fail-closed release
   authority over the stable dbt V2 artifact wire. Complete native workspaces can
   be composed with selector-scoped ordinary flow and batch workloads while

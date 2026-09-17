@@ -16,6 +16,7 @@ DEPLOYMENT_SET_SCHEMA_V2 = "dpone.deployment-set.v2"
 DEPLOYMENT_SET_SCHEMA_V3 = "dpone.deployment-set.v3"
 AIRFLOW_INDEX_SCHEMA_V2 = "dpone.airflow-deployment-index.v2"
 AIRFLOW_INDEX_SCHEMA_V3 = "dpone.airflow-deployment-index.v3"
+AIRFLOW_INDEX_SCHEMA_V4 = "dpone.airflow-deployment-index.v4"
 
 
 def build_environment_deployment_documents(
@@ -39,6 +40,7 @@ def build_environment_deployment_documents(
     runtime_payloads: Sequence[Mapping[str, Any]],
     release_bytes: bytes,
     mssql_outlet_projection: Mapping[str, Any] | None,
+    development_authority_required: bool = False,
 ) -> tuple[dict[str, Any], bytes, dict[str, Any]]:
     """Return ``(deployment, deployment_bytes, airflow_index)``.
 
@@ -48,7 +50,9 @@ def build_environment_deployment_documents(
     """
 
     use_v3 = mssql_outlet_projection is not None
-    optional_projection = {"mssql_asset_outlet_projection": dict(mssql_outlet_projection)} if use_v3 else {}
+    optional_projection = (
+        {"mssql_asset_outlet_projection": dict(mssql_outlet_projection)} if mssql_outlet_projection is not None else {}
+    )
     deployment: dict[str, Any] = {
         "schema": DEPLOYMENT_SET_SCHEMA_V3 if use_v3 else DEPLOYMENT_SET_SCHEMA_V2,
         "deployment_id": "",
@@ -74,7 +78,11 @@ def build_environment_deployment_documents(
     deployment["deployment_id"] = computed_deployment_id
     deployment_bytes = json_bytes(deployment)
     airflow_index: dict[str, Any] = {
-        "schema": AIRFLOW_INDEX_SCHEMA_V3 if use_v3 else AIRFLOW_INDEX_SCHEMA_V2,
+        "schema": (
+            AIRFLOW_INDEX_SCHEMA_V4
+            if development_authority_required
+            else (AIRFLOW_INDEX_SCHEMA_V3 if use_v3 else AIRFLOW_INDEX_SCHEMA_V2)
+        ),
         "release_id": release_id,
         "deployment_id": computed_deployment_id,
         "trust_tier": trust_tier,
@@ -100,6 +108,7 @@ def build_environment_deployment_documents(
             payload=deployment_bytes,
         ),
         **optional_projection,
+        **({"development_authority_required": True} if development_authority_required else {}),
     }
     return deployment, deployment_bytes, airflow_index
 
@@ -107,6 +116,7 @@ def build_environment_deployment_documents(
 __all__ = [
     "AIRFLOW_INDEX_SCHEMA_V2",
     "AIRFLOW_INDEX_SCHEMA_V3",
+    "AIRFLOW_INDEX_SCHEMA_V4",
     "DEPLOYMENT_SET_SCHEMA_V2",
     "DEPLOYMENT_SET_SCHEMA_V3",
     "build_environment_deployment_documents",

@@ -9,6 +9,9 @@ from typing import Any
 from dpone.contracts.airflow_deployment import (
     canonical_fingerprint,
 )
+from dpone.contracts.development_delivery_authority import (
+    development_release_authority_projection,
+)
 from dpone.manifest.confined_files import read_confined_file
 from dpone.readiness.airflow_deployment_artifacts_io import (
     bytes_descriptor,
@@ -57,6 +60,7 @@ class DeploymentProjectionInputs:
     workload_packs: list[dict[str, Any]]
     runtime_payloads: list[dict[str, Any]]
     release_schema: str = "dpone.release-set.v1"
+    development_authority_required: bool = False
 
 
 _STRICT_V2_RULES = ReleaseArtifactRules(
@@ -241,6 +245,7 @@ def _load_projection_inputs(
         workload_packs=workload_packs,
         runtime_payloads=runtime_payloads,
         release_schema=str(release["schema"]),
+        development_authority_required=development_release_authority_projection(release) is not None,
     )
 
 

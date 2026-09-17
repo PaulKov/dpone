@@ -211,6 +211,15 @@ def runtime_artifact_locator(relative: PurePosixPath) -> str:
     return f"{_RUNTIME_ARTIFACT_ROOT}/{relative.as_posix()}"
 
 
+def development_runtime_authority_error() -> InitFetchError:
+    """Return the stable redacted failure shared by protected entrypoints."""
+
+    return InitFetchError(
+        "DPONE_DEVELOPMENT_RUNTIME_AUTHORITY_REQUIRED",
+        "development runtime requires current external authority",
+    )
+
+
 def json_bytes(payload: Mapping[str, Any]) -> bytes:
     """Serialize deterministic UTF-8 JSON evidence."""
 
@@ -314,6 +323,7 @@ def _require_digest(name: str, value: str) -> None:
 __all__ = [
     "build_init_fetch_plan",
     "cache_relative_path",
+    "development_runtime_authority_error",
     "InitFetchedArtifact",
     "InitFetchError",
     "InitFetchPlan",

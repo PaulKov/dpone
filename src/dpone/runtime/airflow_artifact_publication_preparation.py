@@ -59,10 +59,12 @@ def require_exact_publication_projection(
     if (projection.deployment.get("schema"), projection.airflow_index.get("schema")) not in {
         ("dpone.deployment-set.v2", "dpone.airflow-deployment-index.v2"),
         ("dpone.deployment-set.v3", "dpone.airflow-deployment-index.v3"),
+        ("dpone.deployment-set.v2", "dpone.airflow-deployment-index.v4"),
+        ("dpone.deployment-set.v3", "dpone.airflow-deployment-index.v4"),
     }:
         raise AirflowArtifactDeliveryError(
             "DPONE_EXACT_PUBLICATION_PROJECTION_REQUIRED",
-            "exact publication requires matching deployment-set/index v2 or v3",
+            "exact publication requires a matching executable deployment/index wire",
         )
 
 

@@ -19,9 +19,11 @@ from dpone_airflow_pack.deployment_index_errors import AirflowDeploymentIndexErr
 
 AIRFLOW_INDEX_SCHEMA_V2 = "dpone.airflow-deployment-index.v2"
 AIRFLOW_INDEX_SCHEMA_V3 = "dpone.airflow-deployment-index.v3"
+AIRFLOW_INDEX_SCHEMA_V4 = "dpone.airflow-deployment-index.v4"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA = "dpone.airflow-runtime-init-fetch-plan.v1"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2 = "dpone.airflow-runtime-init-fetch-plan.v2"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3 = "dpone.airflow-runtime-init-fetch-plan.v3"
+RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4 = "dpone.airflow-runtime-init-fetch-plan.v4"
 MAX_RUNTIME_INIT_FETCH_PLAN_BYTES = 16 * 1024
 MAX_SELECTED_RUNTIME_PAYLOADS = 16
 
@@ -186,6 +188,7 @@ class InitFetchDeliveryContext:
     runtime_image_dbt_ref: str | None = None
     runtime_image_dbt_digest: str | None = None
     mssql_asset_uri_by_ref: Mapping[str, str] | None = None
+    development_authority_required: bool = False
 
     def workload_pack(self, workload_id: str) -> ExactWorkloadPack:
         for workload in self.workload_packs:
@@ -283,7 +286,11 @@ class InitFetchDeliveryContext:
             )
         image_ref, image_digest = self.runtime_image_for_workload(workload_id)
         plan: dict[str, Any] = {
-            "schema": RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3,
+            "schema": (
+                RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4
+                if self.development_authority_required
+                else RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3
+            ),
             "environment": self.environment,
             "trust_tier": self.trust_tier,
             "release_id": self.release_id,
@@ -315,6 +322,8 @@ class InitFetchDeliveryContext:
             "verify": self.verify.to_dict(),
             "runtime_payloads": [payload.to_dict() for payload in runtime_payloads],
         }
+        if self.development_authority_required:
+            plan["development_authority_required"] = True
         payload = json.dumps(
             plan,
             ensure_ascii=False,
@@ -365,6 +374,7 @@ def _require_execution_token(value: object, field: str) -> None:
 __all__ = [
     "AIRFLOW_INDEX_SCHEMA_V2",
     "AIRFLOW_INDEX_SCHEMA_V3",
+    "AIRFLOW_INDEX_SCHEMA_V4",
     "ConfigMapReference",
     "DevEvidenceDelivery",
     "EncodedInitFetchPlan",
@@ -378,6 +388,7 @@ __all__ = [
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA",
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2",
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3",
+    "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4",
     "VerificationPolicy",
     "WorkloadIdentity",
     "init_fetch_context_from_payload",
