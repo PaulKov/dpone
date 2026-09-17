@@ -44,6 +44,7 @@ owned_paths:
   - docs/agent-task-contracts/development-target-admission-hardening.yml
 integrator_owned_paths:
   - CHANGELOG.md
+  - docs/quality-metrics.md
 read_only_paths:
   - src/dpone/contracts/dbt_release.py
   - src/dpone/contracts/dbt_source_inventory_binding.py
