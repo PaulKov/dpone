@@ -11,7 +11,6 @@ SET @session_id=NULL;
 SET @login_time=NULL;
 IF @@TRANCOUNT<>1 OR XACT_STATE()<>1
  OR ISNULL(CONVERT(int,SERVERPROPERTY('ProductMajorVersion')),0)<>16
- OR ISNULL(HAS_PERMS_BY_NAME(NULL,'SERVER','VIEW SERVER PERFORMANCE STATE'),0)<>1
  OR SUSER_SID(ORIGINAL_LOGIN()) IS NULL
  THROW 51620, 'DPONE_SESSION_CONNECTION_UNOBSERVABLE', 1;
 IF (SELECT COUNT_BIG(*) FROM sys.crypt_properties WHERE class=1 AND major_id=@@PROCID)<>1
@@ -20,16 +19,21 @@ IF (SELECT COUNT_BIG(*) FROM sys.crypt_properties WHERE class=1 AND major_id=@@P
  THROW 51620, 'DPONE_SESSION_CONNECTION_UNOBSERVABLE', 1;
 DECLARE @observed TABLE(connection_id uniqueidentifier,connect_time datetime2(7),
  session_id int,login_time datetime2(7),parent_connection_id uniqueidentifier,authenticated bit);
-INSERT @observed(connection_id,connect_time,session_id,login_time,parent_connection_id,authenticated)
- SELECT c.connection_id,CONVERT(datetime2(7),c.connect_time),c.session_id,
- CONVERT(datetime2(7),s.login_time),c.parent_connection_id,
- CONVERT(bit,CASE WHEN s.is_user_process=1
- AND s.original_security_id=SUSER_SID(ORIGINAL_LOGIN())
- AND DATALENGTH(s.original_security_id)=DATALENGTH(SUSER_SID(ORIGINAL_LOGIN()))
- AND c.parent_connection_id IS NULL THEN 1 ELSE 0 END)
- FROM sys.dm_exec_connections c
- LEFT JOIN sys.dm_exec_sessions s ON s.session_id=c.session_id
- WHERE c.session_id=@@SPID;
+BEGIN TRY
+ INSERT @observed(connection_id,connect_time,session_id,login_time,parent_connection_id,authenticated)
+  SELECT c.connection_id,CONVERT(datetime2(7),c.connect_time),c.session_id,
+  CONVERT(datetime2(7),s.login_time),c.parent_connection_id,
+  CONVERT(bit,CASE WHEN s.is_user_process=1
+  AND s.original_security_id=SUSER_SID(ORIGINAL_LOGIN())
+  AND DATALENGTH(s.original_security_id)=DATALENGTH(SUSER_SID(ORIGINAL_LOGIN()))
+  AND c.parent_connection_id IS NULL THEN 1 ELSE 0 END)
+  FROM sys.dm_exec_connections c
+  LEFT JOIN sys.dm_exec_sessions s ON s.session_id=c.session_id
+  WHERE c.session_id=@@SPID;
+END TRY
+BEGIN CATCH
+ THROW 51620, 'DPONE_SESSION_CONNECTION_UNOBSERVABLE', 1;
+END CATCH;
 IF (SELECT COUNT_BIG(*) FROM @observed)<>1 OR EXISTS
  (SELECT 1 FROM @observed WHERE connection_id IS NULL OR connect_time IS NULL
  OR session_id IS NULL OR session_id<=0 OR session_id<>@@SPID OR login_time IS NULL

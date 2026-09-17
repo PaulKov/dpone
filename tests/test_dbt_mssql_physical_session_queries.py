@@ -16,8 +16,9 @@ def test_connection_observer_queries_only_current_non_mars_authenticated_session
     assert "c.parent_connection_id IS NULL" in sql
     assert "s.original_security_id=SUSER_SID(ORIGINAL_LOGIN())" in sql
     assert "COUNT_BIG(*)" in sql
-    assert "VIEW SERVER PERFORMANCE STATE" in sql
     assert "DPONE_SESSION_CONNECTION_UNOBSERVABLE" in sql
+    assert "HAS_PERMS_BY_NAME(NULL,'SERVER','VIEW SERVER PERFORMANCE STATE')" not in sql
+    assert "BEGIN TRY" in sql and "BEGIN CATCH" in sql
     assert "0x" + (b"c" * 20).hex() in sql
     assert "{{" not in sql
     assert "EXECUTE AS" not in sql
