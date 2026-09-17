@@ -405,6 +405,13 @@ and activation receipts are not interchangeable. Activation recovery includes
 pointer-changing recovery and audit-only repair before coordinator readback or
 durable audit mutation.
 
+Pointer-changing activation and recovery repeat full sealed-projection and
+artifact-integrity validation after coordinator preparation and immediately
+before commit. Audit repair repeats it after active-occurrence readback and
+before its durable append. Current-target verifier failures are sanitized into
+the stable activation-authority error; a failure after preparation retains the
+explicit recovery-required semantics.
+
 The public CLI remains unable to inject this authority. Python platform
 adapters authenticate original policy/grant/signature bytes and current target
 configuration before constructing the typed operation receipt. Standard

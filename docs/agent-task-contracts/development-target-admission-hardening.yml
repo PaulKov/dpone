@@ -8,6 +8,7 @@ integrator: "root"
 acceptance_criteria:
   - "A verified operation receipt binds exact release/deployment IDs, target environment, non-production tier, operation, time, and revocation epoch."
   - "Publish, materialize, cache promotion, and recovery fail closed for absent, stale, mismatched, unknown, or production-tier admission."
+  - "Pointer and audit mutation revalidate complete sealed projection bytes after coordinator preparation or readback, and verifier failures retain stable recovery semantics."
   - "Production release validation and route-certification requirements remain unchanged."
   - "Public CLI paths cannot self-authorize DEV-only delivery or activation."
 public_contract_impact:

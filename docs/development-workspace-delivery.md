@@ -164,6 +164,14 @@ digest and revocation epoch on every publish, materialize, promote, pointer
 recovery, and audit-repair attempt. Reusing a previously valid receipt does not
 bypass a later revocation or policy replacement.
 
+Promotion and pointer recovery revalidate the complete sealed activation,
+including every declared artifact size and digest, after coordinator
+preparation and immediately before pointer commit. Audit-only repair repeats
+that full validation after active-occurrence readback and before appending the
+audit record. A protected-verifier availability failure is reported through
+`DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED`; if preparation has already
+started, the error also carries the recovery flags described above.
+
 `AirflowArtifactPublisher` and `AirflowArtifactMaterializer` reapply the
 workload and source-byte limits before the first registry write or local cache
 installation. The public `dpone airflow publish` and `cache-materialize`
