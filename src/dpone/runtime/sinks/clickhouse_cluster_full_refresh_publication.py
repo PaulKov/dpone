@@ -20,7 +20,6 @@ from dpone.ports.clickhouse_cluster_publication import (
 )
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
 from dpone.runtime.sinks.clickhouse_full_refresh_contract import (
-    FullRefreshPublicationMarker,
     publication_invocation_id,
 )
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import REPLAY_OPTION, SCHEDULER_IDENTITY_OPTION
@@ -156,12 +155,12 @@ class ClickHouseClusterFullRefreshPublicationService:
         self._catalog.require_atomic_database(cluster, database, inventory.hosts)
         self._bootstrap.ensure(cluster, database, inventory.hosts)
         if current.record.phase is AuthorityPhase.COMPLETED:
-            receipt = self._receipt(current, cluster)
+            receipt = ClusterFullRefreshReceipt.from_authority(current, cluster)
         elif current.record.phase is AuthorityPhase.DISPATCHING:
             receipt = self._reconcile_existing(authority, current, cluster)
             self.cleanup(receipt)
         elif current.record.phase in {AuthorityPhase.COMMITTED, AuthorityPhase.CLEANUP_DISPATCHING}:
-            receipt = self._receipt(current, cluster)
+            receipt = ClusterFullRefreshReceipt.from_authority(current, cluster)
             self.cleanup(receipt)
         else:
             raise ClusterPublicationError(
@@ -323,18 +322,7 @@ class ClickHouseClusterFullRefreshPublicationService:
         if current.record != committed:
             result = authority.compare_and_swap(current, committed)
             current = _require_verified(result, permit=False)
-        marker = FullRefreshPublicationMarker.create(
-            operation_id=record.operation_id,
-            database=record.database,
-            target=record.target,
-            candidate=record.candidate,
-            predecessor_uuid=record.predecessor.uuid if record.predecessor else None,
-            desired_uuid=record.desired.uuid,
-            staged_rows=record.staged_rows,
-        )
-        return ClusterFullRefreshReceipt(
-            marker=marker, authority=current.record, authority_version=current.version, cluster=cluster
-        )
+        return ClusterFullRefreshReceipt.from_authority(current, cluster)
 
     def _revalidate_pre_dispatch(self, cluster: str, record: AuthorityRecord) -> None:
         inventory = self._catalog.inventory(cluster)
@@ -350,22 +338,6 @@ class ClickHouseClusterFullRefreshPublicationService:
                 "DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED",
                 "generation changed before publication dispatch",
             )
-
-    @staticmethod
-    def _receipt(current: VersionedAuthorityRecord, cluster: str) -> ClusterFullRefreshReceipt:
-        record = current.record
-        marker = FullRefreshPublicationMarker.create(
-            operation_id=record.operation_id,
-            database=record.database,
-            target=record.target,
-            candidate=record.candidate,
-            predecessor_uuid=record.predecessor.uuid if record.predecessor else None,
-            desired_uuid=record.desired.uuid,
-            staged_rows=record.staged_rows,
-        )
-        return ClusterFullRefreshReceipt(
-            marker=marker, authority=record, authority_version=current.version, cluster=cluster
-        )
 
     @staticmethod
     def _require_same_operation(current: AuthorityRecord, proposed: AuthorityRecord) -> None:
