@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import os
 import secrets
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -19,6 +17,7 @@ from dpone.contracts.clickhouse_cluster_publication import (
     QueueState,
     ddl_query_digest,
 )
+from tests.integration.clickhouse_cluster.evidence import record_scenario
 from tests.integration.clickhouse_cluster.test_clickhouse_cluster_publication_live import (
     _CLUSTER,
     _configs,
@@ -33,7 +32,6 @@ from tests.integration.clickhouse_cluster.test_clickhouse_cluster_publication_li
 
 pytestmark = pytest.mark.integration_live
 
-_RECEIPT = Path("test_artifacts/clickhouse-cluster-publication/docker-receipt.json")
 _RUN_LIVE = os.getenv("DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION") == "1"
 
 
@@ -161,7 +159,7 @@ def test_complete_queue_status_and_host_matrix_fails_closed() -> None:
     assert replace(live, hosts=mixed).state_for(("node1", "node2")) is QueueState.TERMINAL_FAILURE
     unknown_dominates = (replace(first, status="Active", exception_code=None, exception_text=None), extra)
     assert replace(live, hosts=unknown_dominates).state_for(("node1", "node2")) is QueueState.UNKNOWN
-    _record_fault_scenario("queue_status_and_host_matrix", "passed_live")
+    _record_fault_scenario("queue_status_and_host_matrix", "passed_fault_injection")
 
 
 class _QueueBackedFaultDdl:
@@ -268,26 +266,8 @@ class _TerminalPartialDdl(_QueueBackedFaultDdl):
 
 
 def _record_fault_scenario(name: str, result: str) -> None:
-    if _RECEIPT.exists():
-        evidence = json.loads(_RECEIPT.read_text())
-    else:
-        _RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-        evidence = {
-            "schema_version": "dpone.clickhouse.cluster-publication-docker.v1",
-            "server_version": _execute("SELECT version()")[0][0],
-            "replicas": 2,
-            "status": "unverified",
-            "scenario_results": {},
-        }
-    evidence["scenario_results"][name] = result
-    matrix = (
-        "partial_in_progress_then_converged",
-        "terminal_partial",
-        "queue_status_and_host_matrix",
+    record_scenario(
+        name,
+        result,
+        server_version=_execute("SELECT version()")[0][0],
     )
-    evidence["fault_matrix_status"] = (
-        "passed_live"
-        if all(evidence["scenario_results"].get(item) == "passed_live" for item in matrix)
-        else "unverified"
-    )
-    _RECEIPT.write_text(json.dumps(evidence, sort_keys=True) + "\n")

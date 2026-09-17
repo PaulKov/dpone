@@ -2,23 +2,22 @@
 
 from __future__ import annotations
 
-import json
 import os
 import secrets
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 import pytest
 
+from tests.integration.clickhouse_cluster.evidence import record_scenario
+
 pytestmark = pytest.mark.integration_live
 
 _CLUSTER = "publication_cluster"
-_RECEIPT = Path("test_artifacts/clickhouse-cluster-publication/docker-receipt.json")
 
 
 @pytest.mark.skipif(
@@ -74,35 +73,12 @@ def test_keeper_cas_and_distributed_ddl_correlation() -> None:
     assert after == ("DISPATCHING", 1, before + 1)
     assert entries == (1, 1)
     assert stored_queries and all(leading_comment not in query for (query,) in stored_queries)
-    _RECEIPT.parent.mkdir(parents=True, exist_ok=True)
-    _RECEIPT.write_text(
-        json.dumps(
-            {
-                "schema_version": "dpone.clickhouse.cluster-publication-docker.v1",
-                "server_version": _execute("SELECT version()")[0][0],
-                "replicas": 2,
-                "keeper_version_before": before,
-                "keeper_version_after": after[2],
-                "correlated_entries": entries[0],
-                "status": "unverified",
-                "scenario_results": {
-                    "keeper_cas_and_log_comment": "passed_live",
-                    "normal_existing_and_absent_target": "unverified",
-                    "lost_publication_response": "unverified",
-                    "partial_in_progress_then_converged": "unverified",
-                    "terminal_partial": "unverified",
-                    "worker_race": "unverified",
-                    "lost_cas_response": "unverified",
-                    "duplicate_correlation_token": "unverified",
-                    "lost_cleanup_response": "unverified",
-                    "identity_and_membership_drift": "unverified",
-                    "partial_authority_bootstrap": "unverified",
-                    "queue_status_and_host_matrix": "unverified",
-                },
-            },
-            sort_keys=True,
-        )
-        + "\n"
+    _record_scenario(
+        "keeper_cas_and_log_comment",
+        "passed_live",
+        keeper_version_before=before,
+        keeper_version_after=after[2],
+        correlated_entries=entries[0],
     )
 
 
@@ -490,7 +466,9 @@ def _configs(database: str, *, scheduler_identity: str) -> tuple[Any, Any]:
 
 
 def _record_scenario(name: str, result: str, **details: Any) -> None:
-    evidence = json.loads(_RECEIPT.read_text())
-    evidence["scenario_results"][name] = result
-    evidence.update(details)
-    _RECEIPT.write_text(json.dumps(evidence, sort_keys=True) + "\n")
+    record_scenario(
+        name,
+        result,
+        server_version=_execute("SELECT version()")[0][0],
+        details=details,
+    )

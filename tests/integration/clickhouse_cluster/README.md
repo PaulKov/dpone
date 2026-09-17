@@ -9,7 +9,7 @@ Run:
 ```bash
 docker compose -f tests/integration/clickhouse_cluster/docker-compose.yml up -d --wait
 DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION=1 uv run pytest \
-  tests/integration/clickhouse_cluster/test_clickhouse_cluster_publication_live.py -q
+  tests/integration/clickhouse_cluster -q
 docker compose -f tests/integration/clickhouse_cluster/docker-compose.yml down -v
 ```
 
@@ -24,8 +24,9 @@ normal happy-path run cannot create:
   active, followed by convergence of that same entry and generation mapping;
 - a terminal distributed-DDL failure with mixed replica generations, proving a
   retry sends no second publication DDL and retains both generations;
-- every pinned queue status/exception normalization plus exact, missing, extra,
-  and duplicate host evidence.
+- live `Active`/`Finished` success/failure queue rows, plus deterministic injected
+  classifier cases for every remaining pinned status/exception normalization
+  and missing, extra, or duplicate host evidence.
 
 These are Docker protocol checks for the pinned server version. They do not
 enable cluster admission or certify an external deployment.

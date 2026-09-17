@@ -420,10 +420,11 @@ A bounded `full_refresh` whose physical design selects `ON CLUSTER` has an
 experimental replicated publication implementation. The default runtime
 composition keeps it non-admitted; the existing stable unsupported-topology
 error remains the author-facing result. The pinned Docker profile now verifies
-active partial convergence, terminal-partial retention, and exhaustive queue
-status/host classification. Broader identity and membership drift evidence is
-still incomplete, so this is protocol evidence rather than admission or
-external certification. V1 is designed to admit exactly one shard, at least two
+active partial convergence and terminal-partial retention with real queue rows,
+plus deterministic fault-injection coverage of the exhaustive queue status/host
+classifier. Broader identity and membership drift evidence is still incomplete,
+so this is protocol evidence rather than admission or external certification.
+V1 is designed to admit exactly one shard, at least two
 replicas, an Atomic database, direct `Replicated*MergeTree` target/candidate
 tables, complete catalog visibility, and a platform-owned KeeperMap authority
 table. It does not admit a `Distributed` facade or multi-shard publication.
