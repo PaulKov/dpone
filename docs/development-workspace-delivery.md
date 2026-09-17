@@ -182,15 +182,18 @@ family.
 
 Deployment activation is not workload execution permission. Cache activation
 can select a DEV-only deployment only after exact target admission and physical
-workspace coordination. The standard dpone workload runtime still deliberately
-rejects development releases in this increment, even when the build authority
-contains execution subjects. This prevents delivery or pointer activation from
-becoming an implicit credential or writer grant.
+workspace coordination, but that delivery receipt never becomes a credential or
+writer grant. A development index v4 enters the separate protected runtime path:
+each init and base process loads exactly one image-installed authority adapter
+and rechecks the exact environment, release, deployment, runtime image, workload,
+execution kind, clock, revocation epoch and fetched release projection before
+registry configuration, artifact reuse/download or connection-context exposure.
 
-A later runtime feature must inject a current externally verified receipt before
-init-fetch, credential resolution or source access and bind it to the exact
-workload and command kind. Until that protected entrypoint exists, the delivered
-workspace is intentionally dormant and cannot be described as runnable.
+Without that image-installed adapter, or when its current result is missing,
+expired, revoked or mismatched, runtime fails closed with
+`DPONE_DEVELOPMENT_RUNTIME_AUTHORITY_REQUIRED` and the delivered workspace stays
+dormant. See the [protected development runtime design](feature-specs/development-runtime-authority.md)
+and the [Airflow provider runtime contract](airflow-pack-provider.md#indexed-delivery-boundary-after-v0731).
 
 ## Ordinary flow constraints
 
@@ -216,7 +219,7 @@ and compares executable semantics and fingerprints before publication.
 | `DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED` | Cache promotion or recovery lacks exact current DEV target admission | Leave `current` unchanged; reverify policy, revocation and the non-production target before retrying the same immutable deployment |
 | `DPONE_DEVELOPMENT_TARGET_FORBIDDEN` | A DEV-only release was projected for a production-tier target | Rebuild from reviewed source through the production compiler with current production route evidence |
 | Development release rejected as production | The authority families were kept separate | Select the development composition profile; do not rewrite the release schema |
-| Runtime rejects the development release | This delivery-only increment has no protected development runtime entrypoint | Keep the immutable release dormant; execution requires a separately approved runtime feature |
+| `DPONE_DEVELOPMENT_RUNTIME_AUTHORITY_REQUIRED` | The image-installed runtime adapter is absent, unavailable, stale, revoked or mismatched with the exact v4 plan and fetched release | Keep the immutable release dormant; repair the protected adapter or external policy and retry the same exact runtime subject |
 | Ordinary source verification fails | Captured bytes and rebuilt pack differ | Regenerate the source capture from the exact commit; do not edit generated artifacts |
 
 An identical retry reuses the immutable release. Any source, projection,

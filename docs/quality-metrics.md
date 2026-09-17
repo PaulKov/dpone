@@ -153,7 +153,7 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 
 - `dpone.commands.output_json`: **102** - approved stable contract: output serialization port
 - `dpone.commands.output_text`: **99** - approved stable contract: output text rendering port
-- `dpone.contracts.airflow_deployment`: **92**
+- `dpone.contracts.airflow_deployment`: **91**
 - `dpone.manifest.confined_files`: **77**
 - `dpone.readiness.migration_control`: **76**
 - `dpone.gitops.models`: **60**
@@ -235,7 +235,7 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 | `dpone.ports` | 104 | 107 | 352 | 52 | 55 | 300 | 1.03 | 3.38 | 0.486 | 3 | 13 |
 | `dpone.readiness` | 384 | 1022 | 866 | 631 | 391 | 235 | 2.66 | 2.26 | 0.617 | 21 | 7 |
 | `dpone.root` | 1 | 1 | 0 | 0 | 1 | 0 | 1.00 | 0.00 | 0.000 | 1 | 0 |
-| `dpone.runtime` | 1061 | 3157 | 2789 | 2585 | 572 | 204 | 2.98 | 2.63 | 0.819 | 17 | 10 |
+| `dpone.runtime` | 1062 | 3159 | 2791 | 2587 | 572 | 204 | 2.97 | 2.63 | 0.819 | 17 | 10 |
 | `dpone.schema` | 1 | 1 | 1 | 0 | 1 | 1 | 1.00 | 1.00 | 0.000 | 1 | 1 |
 | `dpone.security_redaction` | 1 | 0 | 27 | 0 | 0 | 27 | 0.00 | 27.00 | 1.000 | 0 | 9 |
 | `dpone.services` | 329 | 921 | 544 | 358 | 563 | 186 | 2.80 | 1.65 | 0.389 | 20 | 9 |

@@ -34,11 +34,13 @@
   publication, cache materialization and activation require distinct current
   operation receipts bound to the exact release, deployment and independently
   trusted non-production target. An injected verifier reopens protected target
-  policy and revocation state at every operation and recovery boundary. Cache
+  policy and revocation state at every operation and recovery boundary, after
+  which core resamples its trusted clock before accepting the receipt. Cache
   activation also revalidates sealed projection and artifact bytes after
   coordinator preparation, immediately before pointer or audit mutation.
   Combined delivery budgets remain enforced; production targets, verifier
-  availability failures and public CLI self-authorization fail closed.
+  availability failures and public CLI self-authorization fail closed through
+  stable public errors.
 - Add a fail-closed bounded full-refresh publication implementation for one-shard replicated
   ClickHouse targets. KeeperMap compare-and-swap fences workers, exact
   distributed-DDL queue receipts reconcile lost responses, and UUID-bound

@@ -5,32 +5,17 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol
 
 from dpone.runtime.deployment_cache_common import DeploymentCacheError, read_regular_json_object
 from dpone.runtime.deployment_cache_integrity import release_content_id
 from dpone.runtime.deployment_cache_models import ValidatedDeploymentProjection
+from dpone.runtime.development_target_admission import (
+    DevelopmentTargetAdmission,
+    DevelopmentTargetAdmissionVerifier,
+)
 
 _DEVELOPMENT_RELEASE_SCHEMA = "dpone.dbt-release-set.development.v1"
 _DEVELOPMENT_COMPOSITION_PROFILE = "development_workspace_delivery_v1"
-
-
-class DevelopmentTargetAdmission(Protocol):
-    def require(
-        self,
-        *,
-        authority_projection: object,
-        operation: str,
-        release_id: str,
-        deployment_id: str,
-        target_environment: str,
-        target_trust_tier: str,
-        now: datetime,
-    ) -> None: ...
-
-
-class DevelopmentTargetAdmissionVerifier(Protocol):
-    def require_current(self, admission: DevelopmentTargetAdmission, *, now: datetime) -> None: ...
 
 
 class DevelopmentActivationAdmissionGate:
@@ -92,8 +77,7 @@ def require_development_activation_admission(
         trust_tier = projection.deployment.get("trust_tier")
         if admission is None or admission_verifier is None or not isinstance(trust_tier, str):
             raise ValueError("development target admission is absent")
-        checked_at = clock()
-        admission_verifier.require_current(admission, now=checked_at)
+        admission_verifier.require_current(admission, now=clock())
         admission.require(
             authority_projection=authority_projection,
             operation="activate",
@@ -101,7 +85,7 @@ def require_development_activation_admission(
             deployment_id=projection.deployment_id,
             target_environment=environment,
             target_trust_tier=trust_tier,
-            now=checked_at,
+            now=clock(),
         )
     except Exception as exc:  # noqa: BLE001 - authority adapter failures must fail closed.
         raise DeploymentCacheError(

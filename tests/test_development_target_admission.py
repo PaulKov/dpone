@@ -1,5 +1,6 @@
 """Target admission is exact, current, operation-bound, and non-production."""
 
+import inspect
 from dataclasses import replace
 from datetime import UTC, datetime
 
@@ -7,6 +8,14 @@ import pytest
 
 from dpone.contracts.development_delivery_authority import DevelopmentAuthorityError
 from dpone.contracts.development_target_admission import DevelopmentTargetAdmission
+from dpone.runtime import (
+    airflow_artifact_materialization,
+    airflow_artifact_publication,
+    deployment_cache_materializer,
+)
+from dpone.runtime.airflow_artifact_materialization import AirflowArtifactMaterializer
+from dpone.runtime.airflow_artifact_publication import AirflowArtifactPublisher
+from dpone.runtime.deployment_cache_materializer import DeploymentCacheMaterializer
 from tests.test_development_delivery_authority import authority
 
 RELEASE_ID = "sha256:" + "1" * 64
@@ -118,3 +127,15 @@ def test_current_target_state_is_independently_reopened(
 def test_authority_environment_cannot_be_relabelled_by_target() -> None:
     with pytest.raises(DevelopmentAuthorityError, match="target_environment_mismatch"):
         replace(admission(), target_environment="qa")
+
+
+def test_runtime_entrypoints_accept_the_canonical_admission_type() -> None:
+    for module, constructor in (
+        (airflow_artifact_publication, AirflowArtifactPublisher.__init__),
+        (airflow_artifact_materialization, AirflowArtifactMaterializer.__init__),
+        (deployment_cache_materializer, DeploymentCacheMaterializer.__init__),
+    ):
+        assert module.DevelopmentTargetAdmission is DevelopmentTargetAdmission
+        assert inspect.get_annotations(constructor, eval_str=False)["development_admission"] == (
+            "DevelopmentTargetAdmission | None"
+        )

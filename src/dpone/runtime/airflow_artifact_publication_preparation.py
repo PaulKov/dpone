@@ -49,7 +49,8 @@ def prepare_publication(
             admission=development_admission,
             admission_verifier=development_admission_verifier,
             operation="publish",
-            checked_at=_current_time(checked_at=checked_at, clock=clock),
+            checked_at=checked_at,
+            clock=clock,
         )
         inventory = build_publish_inventory(request, projection)
         require_development_delivery_authority(
@@ -58,16 +59,13 @@ def prepare_publication(
             admission=development_admission,
             admission_verifier=development_admission_verifier,
             operation="publish",
-            checked_at=_current_time(checked_at=checked_at, clock=clock),
+            checked_at=checked_at,
+            clock=clock,
             source_bytes=sum(item.size_bytes for item in inventory.release if not item.completion_marker),
         )
         return inventory
     except DeploymentCacheError as exc:
         raise from_cache_error(exc) from exc
-
-
-def _current_time(*, checked_at: datetime | None, clock: Callable[[], datetime] | None) -> datetime | None:
-    return clock() if clock is not None else checked_at
 
 
 def require_exact_publication_projection(
