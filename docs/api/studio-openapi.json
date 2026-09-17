@@ -1675,6 +1675,9 @@
           "physical_design": {
             "$ref": "#/components/schemas/PlanSection"
           },
+          "publication": {
+            "$ref": "#/components/schemas/PlanSection"
+          },
           "postgres_mssql_wire": {
             "$ref": "#/components/schemas/PlanSection"
           },

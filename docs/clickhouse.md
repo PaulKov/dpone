@@ -416,21 +416,28 @@ Common blocker codes:
 
 ### Bounded cluster full-refresh publication
 
-A bounded `full_refresh` whose physical design selects `ON CLUSTER` has an
-experimental replicated publication implementation. The default runtime
-composition keeps it non-admitted; the existing stable unsupported-topology
-error remains the author-facing result. The pinned Docker profile now verifies
-active partial convergence and terminal-partial retention with real queue rows,
-plus deterministic fault-injection coverage of the exhaustive queue status/host
-classifier. Broader identity and membership drift evidence is still incomplete,
-so this is protocol evidence rather than admission or external certification.
-V1 is designed to admit exactly one shard, at least two
+A bounded `full_refresh` whose physical design selects `ON CLUSTER` is routed to
+the replicated publication protocol when its static contract is complete. One
+pure admission policy is used by `dpone check`, dbt compilation, `dpone plan`,
+and runtime selection. A requested cluster mode never falls back to the local
+publisher: invalid engine, separate staging database, enabled `access_table`,
+missing positive `max_source_bytes`, or local DDL scope is a blocker before
+source I/O.
+
+V1 admits exactly one shard, at least two
 replicas, an Atomic database, direct `Replicated*MergeTree` target/candidate
 tables, complete catalog visibility, and a platform-owned KeeperMap authority
 table. It does not admit a `Distributed` facade or multi-shard publication.
+The pinned Docker profile verifies active partial convergence,
+terminal-partial retention, identity drift fencing, and the exhaustive queue
+status/host classifier. This is internal protocol evidence, not certification
+of an external deployment; external topology, permissions, and Keeper
+availability remain `UNVERIFIED` until separately certified.
 
-The author will not configure recovery or retry knobs. After admission, before reading the
-source, dpone checks the complete member inventory and resumes only an operation
+The author does not configure recovery or retry knobs. Before reading the
+source, dpone checks the complete member inventory, ensures the Atomic database,
+bootstraps the Keeper authority facade, and only then reads the target authority.
+It resumes only an operation
 with the same scheduler identity. Publication and cleanup each use one
 non-retried distributed DDL statement. The statement is bound to one
 `system.distributed_ddl_queue` entry by an opaque `log_comment`; query comments
@@ -495,12 +502,11 @@ workflow cannot establish the outcome, leave it unresolved. The generic
 connector does not provide a new reconciliation or rollback service.
 
 Strict recoverable publication for one shard with multiple
-`Replicated*MergeTree` replicas is a separately reviewed capability. Its
-[researched design](feature-design-clickhouse-cluster-full-refresh-publication-v1.md)
-uses KeeperMap compare-and-swap authority, binds the exact distributed-DDL
-entry, and fails closed when a terminal result is mixed across replicas. It is
-not implemented or certified yet; do not treat the existing topology preflight
-or `ON CLUSTER` rendering as publication recovery support.
+`Replicated*MergeTree` replicas follows the separately reviewed
+[approved design](feature-design-clickhouse-cluster-full-refresh-publication-v1.md).
+It uses KeeperMap compare-and-swap authority, binds the exact distributed-DDL
+entry, and fails closed when a terminal result is mixed across replicas. Do not
+treat internal Docker evidence as certification of an external deployment.
 
 ## Physical design drift
 

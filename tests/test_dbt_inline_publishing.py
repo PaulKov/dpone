@@ -426,6 +426,7 @@ def test_authorized_full_refresh_freezes_enforceable_platform_byte_budget(
         "authorized": True,
         "max_source_bytes": 1_000_000_000,
     }
+    profile_payload["profiles"]["mssql_to_clickhouse_mart"]["sink"]["staging_schema"] = "DWH_Stage"
     profile_path = tmp_path / "profiles.yml"
     profile_path.write_text(
         yaml.safe_dump(profile_payload, sort_keys=False),

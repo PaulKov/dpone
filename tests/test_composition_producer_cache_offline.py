@@ -95,6 +95,7 @@ def _native_release(tmp_path, monkeypatch):
         policy = yaml.safe_load(policy_path.read_bytes())
         profile = next(iter(policy["profiles"].values()))
         profile.pop("state")
+        profile["sink"]["staging_schema"] = profile["sink"]["target_schema"]
         profile["strategy_policy"] = {
             "allowed_strategies": ["full_refresh"],
             "full_refresh": {"authorized": True, "max_source_bytes": MAX_SOURCE_BYTES},

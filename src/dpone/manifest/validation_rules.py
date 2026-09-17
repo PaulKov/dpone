@@ -8,6 +8,7 @@ from dpone.contracts.connector_declarations import canonical_endpoint_type
 from dpone.contracts.postgres_mssql_type_policy import declared_postgres_mssql_contract_blockers
 from dpone.contracts.technical_columns import TechnicalColumnsMode, resolve_technical_columns
 from dpone.manifest.models import ProcessSpec
+from dpone.manifest.validation_clickhouse_cluster import validate_clickhouse_cluster_publication
 from dpone.manifest.validation_description import _validate_description_source_path
 from dpone.manifest.validation_incremental import (
     extract_source_type as _extract_source_type,  # noqa: F401 - compatibility re-export
@@ -35,6 +36,7 @@ def _validate_universal_process(
             manifest_path=manifest_path,
         )
     )
+    issues.extend(validate_clickhouse_cluster_publication(spec, manifest_path=manifest_path))
     return issues
 
 

@@ -180,6 +180,38 @@ def test_cluster_publish_dispatches_once_and_binds_terminal_entry() -> None:
     assert receipt.authority.phase.value == "COMMITTED"
 
 
+def test_first_run_bootstraps_authority_before_first_authority_read() -> None:
+    events: list[str] = []
+
+    class Catalog(_Catalog):
+        def inventory(self, cluster):
+            events.append("inventory")
+            return super().inventory(cluster)
+
+        def require_atomic_database(self, cluster, database, hosts):
+            events.append("atomic_database")
+
+    class Bootstrap(_Bootstrap):
+        def ensure(self, cluster, database, hosts):
+            events.append("bootstrap")
+
+    class Authority(_Authority):
+        def read_versioned(self, target_key):
+            events.append("authority_read")
+            return super().read_versioned(target_key)
+
+    catalog, authority = Catalog(), Authority()
+    service = ClickHouseClusterFullRefreshPublicationService(
+        catalog,
+        lambda database: authority,
+        _Ddl(catalog),
+        Bootstrap(),
+    )
+
+    assert service.prepare_admission(_config()) == _config()
+    assert events == ["inventory", "atomic_database", "bootstrap", "authority_read"]
+
+
 def test_duplicate_queue_correlation_fails_closed() -> None:
     catalog, authority = _Catalog(), _Authority()
     ddl = _Ddl(catalog, duplicate=True)

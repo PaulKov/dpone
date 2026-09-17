@@ -19,6 +19,7 @@ from dpone.contracts.dbt_semantic_refresh_project_overlay import (
 )
 from dpone.contracts.mssql_type_contract import mssql_logical_type
 from dpone.governance.quality import QualityGatePolicy
+from dpone.services.dbt_publish_cluster_admission import cluster_admission_issues
 
 
 class DbtPublishPlannerPort(Protocol):
@@ -76,6 +77,13 @@ class DbtModelToWorkloadCompiler:
             supported_strategies=supported_strategies,
         )
         physical_design, design_warnings = self._planner.physical_design(model, intent, profile)
+        admission_issues = cluster_admission_issues(
+            model=model,
+            profile=profile,
+            strategy=strategy,
+            physical_design=physical_design,
+            target_schema=intent.target_schema or profile.target_schema,
+        )
         workload_id = dbt_workload_id(
             intent.workflow,
             model.alias,
@@ -152,6 +160,7 @@ class DbtModelToWorkloadCompiler:
             warnings=(
                 *strategy_issues,
                 *design_warnings,
+                *admission_issues,
                 *state_issues,
                 *type_issues,
             ),
