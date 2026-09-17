@@ -40,7 +40,6 @@ from dpone.readiness.airflow_compact_pack_runtime_payloads import (
 )
 from dpone.readiness.airflow_deployment_projection import compute_release_id
 from dpone.readiness.airflow_local_release import (
-    ImmutableLocalReleaseDurabilityError,
     ImmutableLocalReleaseError,
     materialize_immutable_local_release,
 )
@@ -298,59 +297,32 @@ def _materialize_workspace(
     dag_ids: Sequence[str] | None,
     development_authority: DevelopmentAuthorityReceipt | None,
 ) -> CompactPackReleaseReport:
-    from dpone.app.dbt_promotion_composition import build_dbt_compact_workspace_release_builder
     from dpone.readiness.airflow_composed_release_materializer import (
         materialize_composed_release,
+        materialize_native_workspace_release,
         read_workspace_release_descriptor,
     )
-    from dpone.readiness.airflow_release_schema_validation import validate_release_set_schema
 
     schema = read_workspace_release_descriptor(root).get("schema")
     if schema == "dpone.release-set.v3":
-        return materialize_composed_release(root, cache, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
+        return materialize_composed_release(
+            root,
+            cache,
+            xcom_sidecar_image=xcom_sidecar_image,
+            dag_ids=dag_ids,
+            development_authority=development_authority,
+        )
 
     if cache.is_relative_to(root.resolve()):
         raise CompactPackReleaseError(
             "DPONE_COMPACT_PACK_RELEASE_CACHE_INVALID", "cache root must be outside the immutable source tree"
         )
-    try:
-        if schema == "dpone.dbt-release-set.development.v1":
-            descriptor = read_workspace_release_descriptor(root)
-            if development_authority is None or development_authority.release_projection() != descriptor.get(
-                "development_authority"
-            ):
-                raise ValueError("development materialization requires externally verified authority")
-        files = build_dbt_compact_workspace_release_builder(
-            development=schema == "dpone.dbt-release-set.development.v1"
-        ).build(root, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
-        release = json.loads(files["release-set.json"])
-        validate_release_set_schema(release, path=root / "release-set.json")
-    except (ValueError, OSError, TypeError, KeyError, RecursionError) as exc:
-        raise CompactPackReleaseError(
-            "DPONE_COMPACT_PACK_RELEASE_WORKSPACE_INVALID",
-            "native workspace release is invalid, incomplete or incompatible; regenerate the complete workspace with a compatible producer",
-        ) from exc
-    release_dir = cache / "releases" / _digest_dir(release["release_id"])
-    try:
-        materialize_immutable_local_release(release_dir, files)
-    except ImmutableLocalReleaseDurabilityError as exc:
-        raise CompactPackReleaseError(
-            "DPONE_COMPACT_PACK_RELEASE_DURABILITY_UNCERTAIN",
-            "complete release is visible but durable publication is unproven; retry identical inputs after storage recovery",
-        ) from exc
-    except OSError as exc:
-        raise CompactPackReleaseError(
-            "DPONE_COMPACT_PACK_RELEASE_WRITE_FAILED",
-            "release publication failed; inspect storage and retry identical inputs",
-        ) from exc
-    return CompactPackReleaseReport(
-        release_id=release["release_id"],
-        release_dir=release_dir.as_posix(),
-        dag_ids=tuple(item["id"] for item in release["artifacts"]["dag_specs"]),
-        workload_ids=tuple(item["id"] for item in release["artifacts"]["workload_packs"]),
-        pack_fingerprints={item["id"]: item["pack_fingerprint"] for item in release["artifacts"]["workload_packs"]},
-        connection_projection_mode="runtime_connection_context",
-        xcom_sidecar_image=xcom_sidecar_image.strip(),
+    return materialize_native_workspace_release(
+        root,
+        cache,
+        xcom_sidecar_image=xcom_sidecar_image,
+        dag_ids=dag_ids,
+        development_authority=development_authority,
     )
 
 
