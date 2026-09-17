@@ -18,6 +18,7 @@ from dpone.services.dbt_workspace_release_assembly import assemble_workspace_rel
 
 if TYPE_CHECKING:
     from dpone.contracts.dbt_workspace import DbtWorkspaceCheckReport
+    from dpone.contracts.development_delivery_authority import DevelopmentAuthorityReceipt
     from dpone.ports.dbt_publishing import DbtProfileStore
     from dpone.ports.dbt_release_files import ConfinedReleaseFileReader
     from dpone.readiness.dbt_publish_atomic_publisher import DbtArtifactTreePublisher
@@ -44,6 +45,7 @@ class DbtWorkspaceArtifactWriter:
         profile_store: DbtProfileStore,
         read_file: ConfinedReleaseFileReader,
         dbt_profiles_dir: Path | None = None,
+        development_authority: DevelopmentAuthorityReceipt | None = None,
     ) -> None:
         self._projector = projector
         self._sources = source_reader
@@ -53,6 +55,7 @@ class DbtWorkspaceArtifactWriter:
         self._profile_store = profile_store
         self._read_file = read_file
         self._profiles_dir = dbt_profiles_dir.absolute() if dbt_profiles_dir is not None else None
+        self._development_authority = development_authority
 
     def write(self, check: DbtWorkspaceCheckReport, *, root: Path, output_dir: Path) -> DbtWorkspaceReleaseTree:
         """Reacquire bounded manifest snapshots; never reread unchecked manifest paths."""
@@ -64,7 +67,12 @@ class DbtWorkspaceArtifactWriter:
             projects = self._project_all(check, root=root, profile_dirs=profile_dirs)
         # Profile cleanup must succeed before publication. Otherwise a cleanup
         # error could report validation failure after making output active.
-        tree = assemble_workspace_release(check, projects, producer_version=self._version)
+        tree = assemble_workspace_release(
+            check,
+            projects,
+            producer_version=self._version,
+            development_authority=self._development_authority,
+        )
         files = dict(tree.files)
         with TemporaryDirectory(prefix="dpone-dbt-workspace-release-") as temporary:
             stage = Path(temporary)

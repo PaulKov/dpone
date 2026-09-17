@@ -19,15 +19,63 @@ IMAGE = "example.invalid/runtime@sha256:" + "a" * 64
 SIDECAR = "example.invalid/sidecar@sha256:" + "b" * 64
 
 
-def ordinary_root(tmp_path: Path, *, sql_file: bool = False, extra_manifest: str = "") -> Path:
+def ordinary_root(
+    tmp_path: Path,
+    *,
+    sql_file: bool = False,
+    extra_manifest: str = "",
+    flow: bool = False,
+    connection_projection: dict[str, object] | None = None,
+    hook_phase: str | None = None,
+    hook_execution: str | None = "separate_task",
+    second_process: bool = False,
+) -> Path:
     """Use the public deterministic producers, never hand-assert producer identity."""
     author = tmp_path / "author"
     author.mkdir()
-    (author / "transfer.yaml").write_text(
+    transfer = (
         "name: orders\nsource:\n  type: postgres\n  connection_ref: source\n"
         "  query: SELECT 1 AS id\nsink:\n  type: postgres\n  connection_ref: target\n"
         "  table:\n    schema: public\n    name: orders\n  strategy:\n    mode: full_refresh\n"
     )
+    if flow:
+        transfer = transfer.replace(
+            "  query: SELECT 1 AS id\n",
+            "  table:\n    schema: public\n    name: source_orders\n",
+        )
+        if hook_phase is not None:
+            execution = (
+                f"          execution:\n            airflow: {hook_execution}\n" if hook_execution is not None else ""
+            )
+            hook = (
+                "  options:\n    hooks:\n"
+                f"      {hook_phase}:\n"
+                "        - id: refresh_source\n"
+                "          kind: source_refresh\n"
+                "          type: sql\n"
+                "          sql: SELECT 1\n"
+                "          mutates_source: true\n" + execution + "sink:\n"
+            )
+            transfer = transfer.replace(
+                "sink:\n",
+                hook,
+            )
+        process_sources = [transfer]
+        if second_process:
+            process_sources.append(
+                transfer.replace("name: orders", "name: customers", 1)
+                .replace("name: source_orders", "name: source_customers", 1)
+                .replace("name: orders", "name: customers", 1)
+            )
+        rendered_processes = []
+        for process_source in process_sources:
+            lines = process_source.splitlines()
+            rendered_processes.append("  - " + lines[0] + "\n" + "\n".join("    " + line for line in lines[1:]))
+        transfer = (
+            "kind: dpone.flow.v1\nauthoring:\n  mode: flow\n  source: transfer.yaml\n"
+            "metadata:\n  id: orders\n  domain: sample\nprocesses:\n" + "\n".join(rendered_processes) + "\n"
+        )
+    (author / "transfer.yaml").write_text(transfer)
     if sql_file:
         path = author / "transfer.yaml"
         path.write_text(path.read_text().replace("query: SELECT 1 AS id", "sql_file: query.sql"))
@@ -40,7 +88,15 @@ def ordinary_root(tmp_path: Path, *, sql_file: bool = False, extra_manifest: str
         manifest="transfer.yaml",
         domain="sample",
         catalog_path="domains/sample.yaml",
-        effective_config={"image": IMAGE, "image_digest": "sha256:" + "a" * 64},
+        effective_config={
+            "image": IMAGE,
+            "image_digest": "sha256:" + "a" * 64,
+            **(
+                {"airflow": {"connection_projection": connection_projection}}
+                if connection_projection is not None
+                else {}
+            ),
+        },
         provenance={},
     )
     pack = AirflowCompactPackBuilder().build(
@@ -54,13 +110,22 @@ def ordinary_root(tmp_path: Path, *, sql_file: bool = False, extra_manifest: str
         {"schedule": None, "start_date": "2026-01-01", "workloads": ["orders"]},
     )
     assert declaration is not None and not issues
+    selectors = tuple(pack.to_jsonable().get("process_plans", {})) if flow else (None,)
+    nodes = tuple(
+        DagSpecNode(
+            node_id="orders" if selector in {None, "orders"} else f"orders__{selector}",
+            workload_id="orders",
+            selector=selector,
+        )
+        for selector in selectors
+    )
     dag = GitOpsAirflowDagSpec(
         declaration=declaration,
         domain="sample",
         source_path="domains/sample.yaml",
-        nodes=(DagSpecNode(node_id="orders", workload_id="orders"),),
+        nodes=nodes,
         edges=(),
-        topological_order=("orders",),
+        topological_order=tuple(node.node_id for node in nodes),
     )
     root = tmp_path / "ordinary"
     (root / "_dags").mkdir(parents=True)
@@ -68,6 +133,29 @@ def ordinary_root(tmp_path: Path, *, sql_file: bool = False, extra_manifest: str
     (root / "_dags/ordinary.dag-spec.json").write_text(dag.to_json())
     (root / "orders/airflow-pack.json").write_text(pack.to_json())
     return root
+
+
+def _alias_projection() -> dict[str, object]:
+    def entry(logical: str) -> dict[str, object]:
+        return {
+            "connection_ref": logical,
+            "registry_connection_ref": logical,
+            "connection_id": logical,
+            "secret_key": "AIRFLOW_CONN_" + logical.upper(),
+            "mount_path": f"/run/secrets/dpone/airflow-connections/{logical}",
+            "fields": {"uri": "uri"},
+        }
+
+    return {
+        "mode": "kubernetes_secret_volume",
+        "secret_name": "dpone-airflow-connection-bridge",
+        "mount_path": "/run/secrets/dpone/airflow-connections",
+        "payload_format": "airflow_connection_uri",
+        "secret_values": False,
+        "cleanup_policy": "after_execute",
+        "connections": [entry("source"), entry("target")],
+        "connection_ids": ["source", "target"],
+    }
 
 
 def test_capture_real_producer_detaches_source_and_rewrites_transport(tmp_path: Path) -> None:
@@ -85,6 +173,91 @@ def test_capture_real_producer_detaches_source_and_rewrites_transport(tmp_path: 
     assert result.inventory_sha256 == before
     with pytest.raises(TypeError):
         result.inventory["dag_specs"][0]["id"] = "changed"
+
+
+def test_capture_selector_scoped_flow_preserves_alias_only_projection(tmp_path: Path) -> None:
+    root = ordinary_root(tmp_path, flow=True, connection_projection=_alias_projection())
+
+    result = _capture(root)
+
+    dag = json.loads(result.dag_files["dags/ordinary.dag-spec.json"])
+    pack = json.loads(result.pack_files["packs/orders.airflow-pack.json"])
+    assert dag["nodes"][0]["selector"] == "orders"
+    assert set(pack["process_plans"]) == {"orders"}
+    assert pack["connection_projection"]["secret_values"] is False
+    assert [row["connection_ref"] for row in pack["connection_projection"]["connections"]] == [
+        "source",
+        "target",
+    ]
+    assert "password" not in json.dumps(pack["connection_projection"])
+
+
+def test_capture_selector_scoped_flow_preserves_verified_separate_pre_hook(tmp_path: Path) -> None:
+    root = ordinary_root(
+        tmp_path,
+        flow=True,
+        connection_projection=_alias_projection(),
+        hook_phase="pre_hook",
+    )
+
+    result = _capture(root)
+
+    pack = json.loads(result.pack_files["packs/orders.airflow-pack.json"])
+    steps = pack["process_plans"]["orders"]["steps"]
+    pre_hooks = [step for step in steps if step.get("phase") == "pre_hook"]
+    assert len(pre_hooks) == 1
+    assert "--hook-id refresh_source" in pre_hooks[0]["command"]
+
+
+def test_capture_rejects_separate_post_hook(tmp_path: Path) -> None:
+    root = ordinary_root(
+        tmp_path,
+        flow=True,
+        connection_projection=_alias_projection(),
+        hook_phase="post_hook",
+    )
+
+    with pytest.raises(ValueError, match="inline SQL post-hooks"):
+        _capture(root)
+
+
+def test_capture_preserves_inline_post_hook(tmp_path: Path) -> None:
+    root = ordinary_root(
+        tmp_path,
+        flow=True,
+        connection_projection=_alias_projection(),
+        hook_phase="post_hook",
+        hook_execution=None,
+    )
+
+    assert _capture(root).relation_writes[0].relation == "orders"
+
+
+def test_capture_rejects_resigned_projection_with_secret_material(tmp_path: Path) -> None:
+    root = ordinary_root(tmp_path, flow=True, connection_projection=_alias_projection())
+
+    def add_secret(pack: dict[str, Any]) -> None:
+        pack["connection_projection"]["connections"][0]["password"] = "embedded-secret"
+
+    _mutate_pack(root, add_secret)
+    with pytest.raises(ValueError, match="aliases"):
+        _capture(root)
+
+
+def test_capture_multi_process_flow_binds_each_selector_once(tmp_path: Path) -> None:
+    root = ordinary_root(
+        tmp_path,
+        flow=True,
+        connection_projection=_alias_projection(),
+        second_process=True,
+    )
+
+    result = _capture(root)
+
+    dag = json.loads(result.dag_files["dags/ordinary.dag-spec.json"])
+    assert {node["selector"] for node in dag["nodes"]} == {"orders", "customers"}
+    assert {write.relation for write in result.relation_writes} == {"orders", "customers"}
+    assert len(result.pack_files) == 1
 
 
 def _mutate_pack(root: Path, mutate: Callable[[dict[str, Any]], None], *, resign: bool = True) -> None:

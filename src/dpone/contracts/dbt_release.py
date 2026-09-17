@@ -15,6 +15,11 @@ from dpone.contracts.airflow_deployment import (
 )
 from dpone.contracts.dbt_contract_validation import sha256_bytes
 from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V1, DBT_RUNTIME_WIRE_V2
+from dpone.contracts.development_delivery_authority import (
+    DEVELOPMENT_RELEASE_SCHEMA,
+    dbt_development_release_authority_violation,
+    validate_development_release_projection,
+)
 
 DBT_SELECTION_AUTHORITY = "dbt_cli"
 DBT_RELEASE_WIRE_CONTRACT = DBT_RUNTIME_WIRE_V1
@@ -167,6 +172,8 @@ def build_dbt_release_metadata(
     selection_fingerprints: list[str],
     producer_version: str,
     wire_contract: str = DBT_RELEASE_WIRE_CONTRACT,
+    release_schema: str = "dpone.release-set.v2",
+    development_authority: Mapping[str, object] | None = None,
 ) -> dict[str, Any]:
     """Compute metadata identity; callers must verify actual artifact bytes.
 
@@ -179,7 +186,7 @@ def build_dbt_release_metadata(
     if wire_contract == DBT_RUNTIME_WIRE_V2:
         selection_fingerprints = sorted(set(selection_fingerprints))
     release: dict[str, Any] = {
-        "schema": "dpone.release-set.v2",
+        "schema": release_schema,
         "release_id": "",
         "producer": {
             "dpone_version": producer_version,
@@ -204,6 +211,11 @@ def build_dbt_release_metadata(
             "route_certifications": route_certifications,
         },
     }
+    if release_schema == DEVELOPMENT_RELEASE_SCHEMA:
+        validate_development_release_projection(development_authority)
+        release["development_authority"] = dict(development_authority or {})
+    elif release_schema != "dpone.release-set.v2" or development_authority is not None:
+        raise ValueError("dbt release authority family is invalid")
     release["release_id"] = compute_release_id(release)
     return release
 
@@ -316,7 +328,10 @@ def dbt_release_runtime_wire_contract(release: Mapping[str, object]) -> str:
     wire = producer.get("wire_contract") if isinstance(producer, Mapping) else None
     if not isinstance(wire, str) or dbt_release_producer_violation(release, expected_wire_contract=wire) is not None:
         raise ValueError("dbt runtime release producer identity is invalid")
-    if wire == DBT_RUNTIME_WIRE_V2 and release.get("schema") != "dpone.release-set.v2":
+    if wire == DBT_RUNTIME_WIRE_V2 and release.get("schema") not in {
+        "dpone.release-set.v2",
+        DEVELOPMENT_RELEASE_SCHEMA,
+    }:
         raise ValueError("dbt runtime release schema is incompatible with its wire")
     return wire
 
@@ -359,6 +374,7 @@ __all__ = [
     "DBT_SELECTION_AUTHORITY",
     "DBT_RELEASE_WIRE_CONTRACT",
     "dbt_release_authority_violation",
+    "dbt_development_release_authority_violation",
     "dbt_release_producer_violation",
     "dbt_release_runtime_wire_contract",
     "is_workspace_dbt_wire",
