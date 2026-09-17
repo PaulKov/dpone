@@ -53,6 +53,7 @@ forbidden_paths:
   - pyproject.toml
   - uv.lock
   - CHANGELOG.md
+  - docs/quality-metrics.md
   - mkdocs.yml
   - .github/workflows
 shared_file_owner: "root"
