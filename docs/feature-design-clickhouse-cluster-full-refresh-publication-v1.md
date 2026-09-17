@@ -826,4 +826,4 @@ separate branch and task only after this specification becomes `APPROVED`.
 - [x] Claimed differentiation is measurable.
 - [x] Tests, evidence, docs, rollout, and rollback are defined.
 - [x] Path ownership and integration plan are conflict-safe.
-- [ ] Maintainer changed status to `APPROVED` after architecture review.
+- [x] Maintainer changed status to `APPROVED` after architecture review.
