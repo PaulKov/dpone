@@ -208,7 +208,7 @@ class AirflowArtifactPublisher:
             request,
             development_admission=self._development_admission,
             development_admission_verifier=self._development_admission_verifier,
-            checked_at=self._clock(),
+            clock=self._clock,
         )
 
     def _create_or_compare(self, item: ArtifactFile) -> bool:

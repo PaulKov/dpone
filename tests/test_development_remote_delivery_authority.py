@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import shutil
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -224,6 +225,38 @@ def test_publish_rechecks_revocation_after_preparation_before_first_write(tmp_pa
     assert not (tmp_path / "registry" / "releases").exists()
 
 
+@pytest.mark.parametrize("publication_mode", ["exact", "compatible"])
+def test_publish_rechecks_grant_time_after_preparation_before_first_write(
+    tmp_path: Path,
+    publication_mode: Literal["exact", "compatible"],
+) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=True)
+    registry = _registry(tmp_path)
+    clock = _ExpiringClock(expire_after_calls=3)
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied:
+        AirflowArtifactPublisher(
+            registry=registry,
+            development_admission=_admission(authority, "publish", release_id, deployment_id),
+            development_admission_verifier=_admission_verifier(authority),
+            clock=clock,
+        ).publish(
+            PublishRequest(
+                cache_root=cache,
+                release_id=release_id,
+                deployment_id=deployment_id,
+                environment="development",
+                artifact_registry_ref="synthetic-artifacts",
+                publication_mode=publication_mode,
+            )
+        )
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert clock.calls >= 4
+    assert not (tmp_path / "registry" / "releases").exists()
+
+
 def test_materialize_rechecks_revocation_immediately_before_install(tmp_path: Path) -> None:
     authority = _development_authority()
     cache, release_id, deployment_id = _development_projection(tmp_path, composed=True)
@@ -422,6 +455,18 @@ def _admission(
 
 def _clock() -> datetime:
     return datetime(2026, 9, 17, 12, 0, tzinfo=UTC)
+
+
+class _ExpiringClock:
+    def __init__(self, *, expire_after_calls: int) -> None:
+        self._expire_after_calls = expire_after_calls
+        self.calls = 0
+
+    def __call__(self) -> datetime:
+        self.calls += 1
+        if self.calls > self._expire_after_calls:
+            return _clock() + timedelta(hours=2)
+        return _clock()
 
 
 class _CurrentTargetVerifier:
