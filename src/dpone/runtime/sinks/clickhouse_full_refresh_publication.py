@@ -12,7 +12,6 @@ from dpone.runtime.sinks.clickhouse_full_refresh_catalog import (
     ClickHouseFullRefreshCatalog,
     ClickHousePublicationTable,
 )
-from dpone.runtime.sinks.clickhouse_full_refresh_receipt import FullRefreshPublicationReceipt
 from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 
@@ -117,7 +116,9 @@ class ClickHouseFullRefreshPublicationService:
         options = getattr(load_config, "options", {}) or {}
         return load_config.load_strategy is LoadStrategy.FULL_REFRESH and SOURCE_BYTE_BUDGET_OPTION in options
 
-    def publish(self, load_config: Any, candidate_config: Any, *, staged_rows: int) -> FullRefreshPublicationReceipt:
+    def publish(
+        self, load_config: Any, candidate_config: Any, *, staged_rows: int
+    ) -> publication_contract.FullRefreshPublicationReceipt:
         """Create immutable intent, execute one DDL, then prove the committed UUID mapping."""
 
         self._require_environment(load_config)
@@ -168,13 +169,13 @@ class ClickHouseFullRefreshPublicationService:
             initial_dispatch=marker_created,
         )
 
-    def cleanup(self, receipt: FullRefreshPublicationReceipt | Mapping[str, Any]) -> None:
+    def cleanup(self, receipt: publication_contract.FullRefreshPublicationReceipt | Mapping[str, Any]) -> None:
         """Drop only the exact predecessor and marker proven by a committed receipt."""
 
         resolved = (
             receipt
-            if isinstance(receipt, FullRefreshPublicationReceipt)
-            else FullRefreshPublicationReceipt.from_mapping(receipt)
+            if isinstance(receipt, publication_contract.FullRefreshPublicationReceipt)
+            else publication_contract.FullRefreshPublicationReceipt.from_mapping(receipt)
         )
         marker = resolved.marker
         records = self._catalog.tables(marker.database, (marker.target, marker.candidate, resolved.marker_table))
@@ -205,7 +206,7 @@ class ClickHouseFullRefreshPublicationService:
         *,
         marker_table: str,
         initial_dispatch: bool,
-    ) -> FullRefreshPublicationReceipt:
+    ) -> publication_contract.FullRefreshPublicationReceipt:
         names = (marker.target, marker.candidate, marker_table)
         records = self._catalog.tables(marker.database, names)
         self._require_exact_marker(records.get(marker_table), marker)
@@ -214,7 +215,7 @@ class ClickHouseFullRefreshPublicationService:
             publication_contract.PublicationState.COMMITTED,
             publication_contract.PublicationState.CLEANUP_PENDING,
         }:
-            return FullRefreshPublicationReceipt(marker=marker, marker_table=marker_table)
+            return publication_contract.FullRefreshPublicationReceipt(marker=marker, marker_table=marker_table)
         if state is not publication_contract.PublicationState.PENDING:
             raise ClickHouseFullRefreshOutcomeUnknown(
                 "DPONE_CLICKHOUSE_FULL_REFRESH_OUTCOME_UNKNOWN", "catalog mapping is neither pending nor committed"
@@ -264,13 +265,13 @@ class ClickHouseFullRefreshPublicationService:
             raise ClickHouseFullRefreshOutcomeUnknown(
                 "DPONE_CLICKHOUSE_FULL_REFRESH_OUTCOME_UNKNOWN", "publication DDL completion is not proven"
             )
-        return FullRefreshPublicationReceipt(
+        return publication_contract.FullRefreshPublicationReceipt(
             marker=marker,
             marker_table=marker_table,
             recovered_after_error=raised,
         )
 
-    def _replay_result(self, receipt: FullRefreshPublicationReceipt) -> LoadResult:
+    def _replay_result(self, receipt: publication_contract.FullRefreshPublicationReceipt) -> LoadResult:
         marker = receipt.marker
         total = self._catalog.count(marker.database, marker.target)
         return LoadResult(
@@ -394,3 +395,5 @@ __all__ = [
     "FullRefreshPublicationCatalog",
     "FullRefreshPublicationReceipt",
 ]
+
+FullRefreshPublicationReceipt = publication_contract.FullRefreshPublicationReceipt

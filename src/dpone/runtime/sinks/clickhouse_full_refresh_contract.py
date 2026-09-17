@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -136,6 +137,44 @@ class FullRefreshPublicationMarker:
         return asdict(self)
 
 
+@dataclass(frozen=True, slots=True)
+class FullRefreshPublicationReceipt:
+    """Verified committed mapping retained until exact cleanup succeeds."""
+
+    marker: FullRefreshPublicationMarker
+    marker_table: str
+    recovered_after_error: bool = False
+
+    @classmethod
+    def from_mapping(cls, raw: Mapping[str, Any]) -> FullRefreshPublicationReceipt:
+        expected = {"marker", "marker_table", "recovered_after_error"}
+        if set(raw) != expected or not isinstance(raw.get("marker"), Mapping):
+            raise ClickHouseFullRefreshPublicationError(
+                "DPONE_CLICKHOUSE_FULL_REFRESH_RECEIPT_INVALID", "receipt fields do not match v1"
+            )
+        marker_json = json.dumps(
+            dict(raw["marker"]),
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        marker = FullRefreshPublicationMarker.from_json(marker_json)
+        marker_table = raw.get("marker_table")
+        recovered = raw.get("recovered_after_error")
+        if not isinstance(marker_table, str) or not marker_table or not isinstance(recovered, bool):
+            raise ClickHouseFullRefreshPublicationError(
+                "DPONE_CLICKHOUSE_FULL_REFRESH_RECEIPT_INVALID", "receipt identity is invalid"
+            )
+        return cls(marker=marker, marker_table=marker_table, recovered_after_error=recovered)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "marker": self.marker.to_dict(),
+            "marker_table": self.marker_table,
+            "recovered_after_error": self.recovered_after_error,
+        }
+
+
 def publication_invocation_id(*, scheduler_run_id: str, process_id: str) -> str:
     """Derive identity shared by every worker attempt of one scheduler run."""
 
@@ -206,6 +245,7 @@ __all__ = [
     "SCHEMA_VERSION",
     "ClickHouseFullRefreshPublicationError",
     "FullRefreshPublicationMarker",
+    "FullRefreshPublicationReceipt",
     "PublicationState",
     "classify_publication",
     "publication_invocation_id",
