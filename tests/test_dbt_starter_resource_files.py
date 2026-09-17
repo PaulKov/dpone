@@ -71,11 +71,12 @@ def test_noninventory_paths_reject_without_io(tmp_path, path):
 def test_only_exact_operation_auxiliary_paths_are_admitted():
     operation = str(uuid4())
     validate_path(f".dpone-starter-resource-transactions/{operation}/old/000.bin")
+    validate_path(f".dpone-starter-resource-transactions/{operation}/old/016.bin")
     target = Path(RESOURCE_PATHS[0])
     validate_path(str(target.with_name(f".{target.name}.{operation}.new")))
     validate_path(str(target.with_name(f".{target.name}.{operation}.restore")))
     with pytest.raises(ValueError):
-        validate_path(f".dpone-starter-resource-transactions/{operation}/old/016.bin")
+        validate_path(f".dpone-starter-resource-transactions/{operation}/old/017.bin")
 
 
 def test_mode_update_requires_original_creation_inode(tmp_path):

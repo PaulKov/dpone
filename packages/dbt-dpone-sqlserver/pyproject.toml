@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dbt-dpone-sqlserver"
+version = "0.1.0.dev0"
+description = "Preparatory distinct SQL Server adapter with fail-closed physical protocol"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = "Apache-2.0"
+dependencies = [
+  "dpone>=0.80.0,<0.81",
+  "dbt-adapters==1.24.5",
+  "dbt-sqlserver==1.11.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dbt"]
+core-metadata-version = "2.4"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "README.md", "pyproject.toml"]
+core-metadata-version = "2.4"

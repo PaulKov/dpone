@@ -17,8 +17,8 @@ import pytest
 import yaml
 
 from dpone.adapters.dbt_subprocess import SubprocessDbtCommandRunner
+from dpone.contracts.native_generation_invocation import decode_trusted_dbt_invocation_completion
 from dpone.contracts.native_source_custody import NativeSourceCustodyError
-from dpone.contracts.native_source_custody_codec import decode_trusted_dbt_invocation_completion
 from tests.native_trusted_dbt_fixtures import InvocationFixture
 
 pytestmark = [

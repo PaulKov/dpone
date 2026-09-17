@@ -2,6 +2,82 @@
 
 ## Unreleased
 
+- Add a preparatory, separately installed `dbt-dpone-sqlserver` adapter with the
+  distinct `dpone_sqlserver` identity and a finite, fail-closed physical protocol.
+  Pass its authenticated launch packet through an anonymous inherited descriptor
+  owned by the existing supervised dbt runner. The public method remains disabled
+  until exact toolchain/profile/source identity, recorder delivery and live driver
+  qualification are complete; ordinary `sqlserver` profiles are unchanged.
+
+- Add immutable SQL Server physical-plan enrollment and durable BUILD-session
+  attachment. The signed procedures authenticate retained plan, command,
+  reservation, registration and source identity, preserve exact one- and
+  two-database permission inventories, and independently read enrollment after
+  commit. This slice does not enable transaction binding, receipts, terminal
+  release or the complete managed route.
+
+- Add optional explicit physical collation selection to the native publishing
+  policy and compare every character column with that authenticated expectation.
+  Preserve omitted-policy behavior and existing rendered SQL through one strict
+  token validator. Live availability and helper-output checks remain separate
+  prerequisites; no database-default inference or query rewriting is introduced.
+
+- Expose the existing protected catalog-binding verification for composing
+  platform provisioners without private discovery subclasses. Preserve exact
+  SQL, permissions and caller-owned transaction settlement.
+
+- Validate physical plans against bounded retained dbt manifests and the complete
+  selected model set before enrollment. Preserve column order, resolved targets,
+  layout and nullability checks; incomplete managed-source and character-collation
+  authority fail explicitly instead of accepting a caller-supplied proof.
+
+- Align native build orchestration with service ownership and concrete engine
+  wiring with the application layer. Keep custody and invocation codecs with
+  their schema owners. Remove unreleased grouping modules while preserving the
+  released dbt result-parser API, original result classes and pickle identity
+  through explicit adaptation to one canonical parser.
+
+- Keep catalog policy projection and closed source-row decoding with their
+  existing contract owners. Preserve real original acquisition, authentication,
+  SQL transaction settlement and existing reader error imports in the adapters.
+
+- Add SQL Server managed attach and transaction-check macro transport with fixed
+  endpoints, bounded closed-result validation and no automatic begin, commit or
+  retry. These helpers do not enable managed materialization: protected server
+  procedures, receipts and complete installed-package qualification are still
+  required.
+
+- Add bounded, signed SQL Server pre-generation discovery for explicit filegroups
+  and candidate namespace availability, without reserving a generation or granting
+  execution authority. Add deterministic table/layout SQL for NONE, ROW, PAGE and
+  COLUMNSTORE, using validated literal collation names. Keep graph admission on
+  the exact supported legacy policy identity; full managed execution and installed
+  starter-resource generation remain separate prerequisites.
+
+- Refresh the SQL Server discovery cursor after transaction setup so the driver
+  uses the remaining operation timeout instead of retaining its initial timeout.
+  Expired setup budgets prevent discovery dispatch without changing settlement.
+
+- Add authenticated reusable SQL Server catalog registrations with immutable
+  per-registration bindings and a separately signed v2 observation module.
+  Require explicit optional catalog limits from the selected native policy;
+  existing v4 policies and the default v1 reader remain compatible. Provisioned
+  source authority is still required. Model enrollment, managed materialization
+  and the complete installed publishing journey remain separate work.
+
+- Add bounded signed SQL Server 2022 catalog observation and exact structural
+  comparison for existing tables, with one transaction, an exact row count and
+  finite certificate permissions. Preserve native FILESTREAM NULL and
+  scale-dependent temporal dimensions. This post-generation observer does not
+  authorize model admission or publication; complete installed self-service
+  execution remains separate work.
+
+- Add a finite signed SQL Server source-identity bridge, privileged installer and
+  bounded transaction reader. Actual caller mappings and current native ownership
+  are checked without advancing generation state. Upstream original authentication
+  remains a platform prerequisite; this does not enable physical model admission
+  or certify the complete publishing route.
+
 - Add privileged immutable SQL Server physical registration storage with exact
   schema/projection checks, current database/principal validation and independent
   lost-acknowledgement readback. Storage does not authorize managed model execution;
@@ -34,14 +110,16 @@
   authoring journey remain unverified; incomplete distributions fail closed.
 
 - Add developer tooling for offline starter-resource checks, isolated pinned
-  dependency generation, recoverable sixteen-file updates and read-only recovery
-  reports. Complete managed package inputs remain required; this does not claim
-  an installed analyst workflow or runtime qualification.
+  dependency generation, recoverable seventeen-file updates and read-only recovery
+  reports. Preserve read-only inspection of legacy sixteen-file journals when
+  adding the catalog v2 asset. Complete managed package inputs remain required;
+  this does not claim an installed analyst workflow or runtime qualification.
 
 - Add immutable managed SQL Server catalog transport records and a strict v1
   decoder for nine result kinds, including lossless seven-digit timestamps and
-  explicit empty markers. SQL acquisition and physical-route qualification remain
-  separate; existing dbt execution behavior is unchanged.
+  explicit empty markers. The bounded acquisition API is available separately;
+  physical-route qualification remains unfinished and existing dbt execution
+  behavior is unchanged.
 
 - Expose the reserved native build bridge through the agreed execution facade while preserving recorder identity and avoiding cyclic imports.
 

@@ -19,8 +19,6 @@ from dpone.contracts.native_source_custody import (
     SourceAdmissionClosure,
     SourceCustodySnapshot,
     SourceExecutorBinding,
-)
-from dpone.contracts.native_source_custody_codec import (
     decode_source_admission_closure,
     encode_source_admission_closure,
 )

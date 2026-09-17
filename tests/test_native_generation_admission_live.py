@@ -29,8 +29,7 @@ from dpone.contracts.dbt_workspace_attempt import DbtWorkspaceAttemptRequest
 from dpone.contracts.native_delivery_json import decode_native_delivery_json, encode_native_delivery_json
 from dpone.contracts.native_identity import OriginalRef
 from dpone.contracts.native_originals import NativeGenerationOriginalSubject
-from dpone.contracts.native_source_custody import SourceExecutorBinding
-from dpone.contracts.native_source_custody_codec import encode_source_executor_binding
+from dpone.contracts.native_source_custody import SourceExecutorBinding, encode_source_executor_binding
 from tests.test_native_generation_admission import generation_request
 from tests.test_native_original_bindings import D, binding
 from tests.test_native_original_subjects import authority

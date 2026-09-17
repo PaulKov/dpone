@@ -30,7 +30,7 @@ def apply(root, **overrides):
 
 def test_create_and_identical_retry_are_clean(tmp_path):
     result = apply(tmp_path)
-    assert result.passed and len(result.changed_paths) == 16
+    assert result.passed and len(result.changed_paths) == 17
     assert not recovery_report(tmp_path).pending
     assert {path: (tmp_path / path).read_bytes() for path in RESOURCE_PATHS} == payloads()
     retry = apply(tmp_path)
@@ -514,6 +514,10 @@ def test_final_metadata_cleanup_retains_sidecar_or_unpersisted_paths(tmp_path, m
         assert report.status == "RECOVERY_REQUIRED"
         assert retained[0] in report.paths
         assert not result.unpersisted_recovery_paths
+        import json
+
+        sidecar = next((tmp_path / ".dpone-starter-resource-transactions").glob("*/recovery.json"))
+        assert json.loads(sidecar.read_bytes())["schema"] == "dpone.starter-resource-recovery.v2"
     if sidecar_failure == "lost_parent":
         assert (tmp_path / "retained-moved-operation").is_dir()
         assert list((tmp_path / ".dpone-starter-resource-transactions").iterdir()) == []

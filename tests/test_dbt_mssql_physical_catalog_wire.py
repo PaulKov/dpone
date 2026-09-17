@@ -267,3 +267,9 @@ def test_nonnullable_values_cannot_be_synthesized(kind, index):
     values[index] = None
     with pytest.raises(ValueError):
         decode(kind, tuple(values))
+
+
+def test_table_retains_native_null_filestream_data_space():
+    details = list(DETAILS["TABLE"])
+    details[-1] = None
+    assert decode("TABLE", tuple(details))[0].filestream_data_space_id is None

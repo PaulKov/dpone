@@ -180,7 +180,7 @@ def test_starter_dry_run_creates_no_destination_and_suppresses_content(tmp_path:
     target = tmp_path / "new-project"
     result = service.init(target, profiles=policy, profile="local", workflow="orders", dry_run=True)
     assert result.passed
-    assert len(result.changes) == 23
+    assert len(result.changes) == 24
     assert all(change.action == "create" and change.diff == "" for change in result.changes)
     assert not target.exists()
 

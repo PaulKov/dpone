@@ -38,7 +38,7 @@ _INVALID_SOURCE = "Starter package source is incomplete, unsafe or differs from 
 
 @dataclass(frozen=True, slots=True)
 class PackageSource:
-    """Detached immutable bytes from exactly fourteen verified source files."""
+    """Detached immutable bytes from exactly fifteen verified source files."""
 
     revision: str
     files: tuple[tuple[str, bytes], ...]

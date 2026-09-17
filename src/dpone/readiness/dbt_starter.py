@@ -88,7 +88,7 @@ class DbtStarterService:
         workflow: str,
         dry_run: bool = False,
     ) -> SelfServiceResult:
-        """Return a content-suppressed plan/apply receipt for 23 project files.
+        """Return a content-suppressed plan/apply receipt for 24 project files.
 
         The parent directory must exist. An absent-root dry-run never creates
         the project, but the injected lock may use bounded external lock state.
@@ -222,8 +222,8 @@ def _selection(
 def _render(files: tuple[ScaffoldFile, ...], values: dict[str, str]) -> tuple[ScaffoldFile, ...]:
     paths = {file.path.as_posix() for file in files}
     if (
-        len(files) != 22
-        or len(paths) != 22
+        len(files) != 23
+        or len(paths) != 23
         or not set(_TEMPLATE_MARKERS).issubset(paths)
         or _POLICY_OUTPUT.as_posix() in paths
     ):

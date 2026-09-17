@@ -102,6 +102,34 @@ authenticate selected graph membership or predecessor receipts, compare current
 catalog state, resolve SQL-collation aliases, or verify a registered database.
 A decoded plan is not a physical-layout certificate.
 
+## Select a physical filegroup in platform policy
+
+A v4 platform profile can retain an explicit filegroup name under
+`native_execution.physical_filegroup`:
+
+```yaml
+native_execution:
+  # Other required native execution settings remain present.
+  physical_filegroup:
+    name: warehouse_data
+```
+
+This optional field preserves existing policies: omission adds no default and
+keeps their serialized bytes unchanged. When supplied, the object accepts only
+`name`. It retains exact spelling, including spaces and quoted-identifier
+characters, and requires 1–128 UTF-16 code units without control characters.
+Do not supply a numeric data-space ID or a fallback.
+
+Preparation code can call
+`dpone.contracts.dbt_native_execution_policy.require_physical_filegroup_name`
+after authenticating the complete selected policy. Missing selection raises
+`ValueError`; the accessor never chooses `PRIMARY` or the database default.
+It validates representation only. The planned P-only discovery consumer must
+resolve the name to an actual permitted filegroup in the registered database,
+record its ID and revalidate it before enrollment and mutation. That SQL consumer
+is not implemented by this policy-field change. A valid name does not provision
+a filegroup, prove visibility or permission, or authorize allocation.
+
 ## Admission ordering and recovery boundary
 
 The planned sequence is preallocated IDs → plan original → command original →

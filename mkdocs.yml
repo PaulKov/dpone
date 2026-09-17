@@ -511,9 +511,19 @@ nav:
       - Native generation admission: native-generation-admission.md
       - Trusted native dbt invocation: native-generation-execution.md
       - Managed SQL catalog wire: dbt-mssql-physical-catalog-wire.md
+      - Managed SQL catalog observation: dbt-mssql-physical-catalog-acquisition.md
       - Managed SQL physical plans: dbt-mssql-physical-plans.md
+      - Managed SQL pre-generation discovery: dbt-mssql-physical-discovery.md
+      - Managed SQL physical rendering: dbt-mssql-physical-rendering.md
+      - Managed SQL plan membership: dbt-mssql-physical-plan-membership.md
+      - Managed SQL collation policy: dbt-mssql-physical-collation.md
+      - Managed SQL plan enrollment: dbt-mssql-physical-enrollment.md
+      - Managed SQL enrollment qualification: dbt-mssql-physical-enrollment-qualification.md
+      - Managed SQL admission transport: dbt-mssql-managed-admission.md
+      - SQL Server graph policy registry: dbt-sqlserver-policy-registry.md
       - Physical runtime registration: dbt-mssql-physical-registration.md
       - Physical registration SQL storage: dbt-mssql-physical-registration-provisioning.md
+      - Registered source identity: dbt-mssql-physical-source-bridge.md
       - Starter resource generation: dbt-starter-resource-generation.md
       - Bounded versioned artifacts: versioned-artifact-store.md
       - Feature design standard: feature-design-standard.md
@@ -661,6 +671,7 @@ nav:
       - ADR 0062: adr/0062-isolated-mssql-switch-activation.md
       - ADR 0064: adr/0064-validated-file-clickhouse-staging.md
       - ADR 0065: adr/0065-trusted-isolated-native-generation-execution.md
+      - ADR 0066 (Proposed): adr/0066-distinct-dbt-sqlserver-strict-transport.md
 
 extra:
   generator: false

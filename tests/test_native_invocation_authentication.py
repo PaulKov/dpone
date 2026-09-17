@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 
+from dpone.adapters.native_generation_invocation_auth import InvocationOriginalReader, authenticate_invocation
 from dpone.contracts.native_source_custody import NativeSourceCustodyError
 from dpone.contracts.native_trusted_dbt_environment_codec import (
     decode_trusted_dbt_owned_root,
@@ -13,7 +14,6 @@ from dpone.contracts.native_trusted_dbt_environment_codec import (
     encode_trusted_dbt_owned_root,
     encode_trusted_dbt_qualification,
 )
-from dpone.runtime.native_generation_invocation_auth import InvocationOriginalReader, authenticate_invocation
 from tests.native_trusted_dbt_fixtures import InvocationFixture
 
 LOCATORS = (
@@ -120,21 +120,20 @@ def test_all_roots_are_acquired_before_role_validation(tmp_path, monkeypatch):
         "AuthenticatedInvocationPlan",
     ],
 )
-def test_legacy_symbols_are_identical_to_canonical_owners(symbol):
-    old = import_module("dpone.runtime.native_generation_invocation_auth")
+def test_invocation_symbols_have_resolvable_canonical_owners(symbol):
     layer = (
         "contracts.native_generation_invocation"
         if symbol == "AuthenticatedInvocationPlan"
         else "adapters.native_generation_invocation_auth"
     )
     canonical = import_module("dpone." + layer)
-    assert getattr(old, symbol) is getattr(canonical, symbol)
+    assert getattr(canonical, symbol).__module__ == "dpone." + layer
 
 
 def test_literal_argument_failure_precedes_filesystem_observation(tmp_path, monkeypatch):
     from pathlib import Path
 
-    from dpone.runtime.native_generation_invocation_auth import verify_invocation_paths
+    from dpone.adapters.native_generation_invocation_auth import verify_invocation_paths
 
     fixture = InvocationFixture(tmp_path)
     reader, _, arguments = authentication(fixture, monkeypatch)

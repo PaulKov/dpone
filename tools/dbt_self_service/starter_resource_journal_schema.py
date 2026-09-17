@@ -10,14 +10,12 @@ from pathlib import PurePosixPath
 from typing import Any
 from uuid import UUID
 
-from dpone.adapters.dbt_starter_resources import _PACKAGE_FILES
+from tools.dbt_self_service.starter_resource_inventory import RESOURCE_PATHS as RESOURCE_PATHS
+from tools.dbt_self_service.starter_resource_inventory import evidence_paths
+
 from dpone.contracts.strict_json import strict_json_object
 from dpone.manifest.bounded_yaml import BoundedYamlLimits
 
-RESOURCE_PATHS = tuple("src/dpone/_assets/dbt_dpone/" + name for name in _PACKAGE_FILES) + (
-    "src/dpone/_assets/dbt_starter/v4/packages.yml",
-    "src/dpone/_assets/dbt_starter/v4/package-lock.yml",
-)
 MAX_RESOURCE_BYTES = BoundedYamlLimits().max_bytes
 MAX_EVENTS = len(RESOURCE_PATHS) * 9 + 8
 MAX_EVENT_BYTES = 4096
@@ -41,9 +39,9 @@ _PHASES = {
 
 
 def validate_manifest(value: dict[str, Any], operation: str, device: int, inode: int) -> None:
+    resource_paths = evidence_paths(value.get("schema"), "transaction")
     if (
         set(value) != {"schema", "operation", "revision", "root", "entries"}
-        or value["schema"] != "dpone.starter-resource-transaction.v1"
         or value["operation"] != operation
         or not isinstance(value["revision"], str)
         or re.fullmatch(r"[0-9a-f]{40}", value["revision"]) is None
@@ -51,13 +49,13 @@ def validate_manifest(value: dict[str, Any], operation: str, device: int, inode:
     ):
         raise ValueError(_ERROR)
     entries = value["entries"]
-    if not isinstance(entries, list) or len(entries) != len(RESOURCE_PATHS):
+    if not isinstance(entries, list) or len(entries) != len(resource_paths):
         raise ValueError(_ERROR)
     observed = []
     for entry in entries:
         if not isinstance(entry, dict) or set(entry) != {"path", "old", "desired_sha256"}:
             raise ValueError(_ERROR)
-        if entry["path"] not in RESOURCE_PATHS or not _valid_digest(entry["desired_sha256"]):
+        if entry["path"] not in resource_paths or not _valid_digest(entry["desired_sha256"]):
             raise ValueError(_ERROR)
         observed.append(entry["path"])
         if entry["old"] is not None:
@@ -65,11 +63,15 @@ def validate_manifest(value: dict[str, Any], operation: str, device: int, inode:
             if not isinstance(old, dict) or set(old) != {"identity", "sha256"} or not _valid_digest(old["sha256"]):
                 raise ValueError(_ERROR)
             _validate_identity(old["identity"])
-    if set(observed) != set(RESOURCE_PATHS):
+    if set(observed) != set(resource_paths):
         raise ValueError(_ERROR)
 
 
 def validate_event(event: dict[str, Any], operation: str | None = None) -> None:
+    _validate_event(event, operation, RESOURCE_PATHS)
+
+
+def _validate_event(event: dict[str, Any], operation: str | None, resource_paths: tuple[str, ...]) -> None:
     if (
         not isinstance(event.get("phase"), str)
         or set(event)
@@ -91,8 +93,8 @@ def validate_event(event: dict[str, Any], operation: str | None = None) -> None:
     if "rollback" in event:
         if operation is None or event["phase"] != "RECOVERY_REQUIRED":
             raise ValueError(_ERROR)
-        validate_rollback(event["rollback"], operation)
-    if "path" in event and event["path"] not in RESOURCE_PATHS:
+        _validate_rollback(event["rollback"], operation, resource_paths)
+    if "path" in event and event["path"] not in resource_paths:
         raise ValueError(_ERROR)
     if event["phase"] in {"APPLYING", "APPLIED", "COMPENSATED"} and "path" not in event:
         raise ValueError(_ERROR)
@@ -116,13 +118,13 @@ def validate_event(event: dict[str, Any], operation: str | None = None) -> None:
         if not isinstance(directory, dict) or set(directory) != {"path", "device", "inode"}:
             raise ValueError(_ERROR)
         if directory["path"] not in {
-            str(parent) for path in RESOURCE_PATHS for parent in PurePosixPath(path).parents if str(parent) != "."
+            str(parent) for path in resource_paths for parent in PurePosixPath(path).parents if str(parent) != "."
         }:
             raise ValueError(_ERROR)
         if any(type(directory[key]) is not int or directory[key] < 0 for key in ("device", "inode")):
             raise ValueError(_ERROR)
     paths = event.get("recovery_paths", [])
-    if not isinstance(paths, list) or len(paths) > len(RESOURCE_PATHS):
+    if not isinstance(paths, list) or len(paths) > len(resource_paths):
         raise ValueError(_ERROR)
     if paths and "path" not in event:
         raise ValueError(_ERROR)
@@ -135,7 +137,7 @@ def validate_event(event: dict[str, Any], operation: str | None = None) -> None:
             or re.fullmatch(r"[A-Za-z0-9_./-]+", path) is None
             or parsed.is_absolute()
             or ".." in parsed.parts
-            or str(parsed.parent) not in {str(PurePosixPath(name).parent) for name in RESOURCE_PATHS}
+            or str(parsed.parent) not in {str(PurePosixPath(name).parent) for name in resource_paths}
         ):
             raise ValueError(_ERROR)
         target = PurePosixPath(event["path"])
@@ -165,6 +167,10 @@ def _valid_digest(value: object) -> bool:
 
 def validate_rollback(value: object, operation: str) -> None:
     """Accept only outcomes tied to a captured creation and its directory receipts."""
+    _validate_rollback(value, operation, RESOURCE_PATHS)
+
+
+def _validate_rollback(value: object, operation: str, resource_paths: tuple[str, ...]) -> None:
     if not isinstance(value, dict) or set(value) != {
         "path",
         "device",
@@ -176,7 +182,7 @@ def validate_rollback(value: object, operation: str) -> None:
         "directory_recovery_paths",
     }:
         raise ValueError(_ERROR)
-    path = _created_path(value["path"], operation)
+    path = _created_path(value["path"], operation, resource_paths)
     if any(type(value[key]) is not int or value[key] < 0 for key in ("device", "inode")):
         raise ValueError(_ERROR)
     if any(type(value[key]) is not bool for key in ("removed", "preserved")):
@@ -212,16 +218,16 @@ def validate_rollback(value: object, operation: str) -> None:
             raise ValueError(_ERROR)
 
 
-def _created_path(value: object, operation: str) -> PurePosixPath:
+def _created_path(value: object, operation: str, resource_paths: tuple[str, ...]) -> PurePosixPath:
     if str(UUID(operation)) != operation or not isinstance(value, str):
         raise ValueError(_ERROR)
     directory = PurePosixPath(METADATA_ROOT) / operation
-    allowed = set(RESOURCE_PATHS)
+    allowed = set(resource_paths)
     allowed.update(str(directory / name) for name in ("manifest.json", "events.jsonl", "recovery.json"))
     allowed.update(
-        str(directory / kind / f"{index:03d}.bin") for kind in ("old", "new") for index in range(len(RESOURCE_PATHS))
+        str(directory / kind / f"{index:03d}.bin") for kind in ("old", "new") for index in range(len(resource_paths))
     )
-    for resource in RESOURCE_PATHS:
+    for resource in resource_paths:
         target = PurePosixPath(resource)
         allowed.update(str(target.with_name(f".{target.name}.{operation}.{suffix}")) for suffix in ("new", "restore"))
     if value not in allowed:
@@ -233,7 +239,8 @@ def validate_sidecar(value: dict[str, Any], operation: str, root: tuple[int, int
     """Bind failure evidence to both the source root and the retained operation directory."""
     if set(value) != {"schema", "operation", "root", "directory", "rollback"}:
         raise ValueError(_ERROR)
-    if value["schema"] != "dpone.starter-resource-recovery.v1" or value["operation"] != operation:
+    resource_paths = evidence_paths(value["schema"], "recovery")
+    if value["operation"] != operation:
         raise ValueError(_ERROR)
     for key, expected in (("root", root), ("directory", directory)):
         identity = value[key]
@@ -243,14 +250,28 @@ def validate_sidecar(value: dict[str, Any], operation: str, root: tuple[int, int
             raise ValueError(_ERROR)
         if (identity["device"], identity["inode"]) != expected:
             raise ValueError(_ERROR)
-    validate_rollback(value["rollback"], operation)
+    _validate_rollback(value["rollback"], operation, resource_paths)
 
 
 def read_events(content: bytes, operation: str | None = None) -> list[dict[str, Any]]:
+    return _read_events(content, operation, RESOURCE_PATHS)
+
+
+def read_manifest_events(content: bytes, operation: str, schema: object) -> list[dict[str, Any]]:
+    """Validate every event against its manifest's immutable versioned scope."""
+    return _read_events(content, operation, evidence_paths(schema, "transaction"))
+
+
+def manifest_log_limit(schema: object) -> int:
+    """Retain historical finite read bounds, independently of current writes."""
+    return (len(evidence_paths(schema, "transaction")) * 9 + 8) * MAX_EVENT_BYTES
+
+
+def _read_events(content: bytes, operation: str | None, resource_paths: tuple[str, ...]) -> list[dict[str, Any]]:
     if content and not content.endswith(b"\n"):
         raise ValueError(_ERROR)
     lines = content.splitlines()
-    if len(lines) > MAX_EVENTS:
+    if len(lines) > len(resource_paths) * 9 + 8:
         raise ValueError(_ERROR)
     events = []
     for number, line in enumerate(lines):
@@ -259,6 +280,6 @@ def read_events(content: bytes, operation: str | None = None) -> list[dict[str, 
         record = strict_json_object(line)
         if type(record.get("sequence")) is not int or record.pop("sequence") != number:
             raise ValueError(_ERROR)
-        validate_event(record, operation)
+        _validate_event(record, operation, resource_paths)
         events.append(record)
     return events

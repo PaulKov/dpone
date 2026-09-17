@@ -7,6 +7,7 @@ import pytest
 
 from dpone.contracts.dbt_mssql_physical_validation import PhysicalPlanError
 from dpone.contracts.dbt_mssql_physical_wire import (
+    decode_physical_model_plan,
     decode_physical_plan_set,
     encode_physical_plan_set,
     physical_plan_set_digest,
@@ -23,6 +24,34 @@ def test_complete_roundtrip_and_external_digest(managed, layout):
     assert encode_physical_plan_set(plan) == payload
     assert plan.to_dict() == document
     assert physical_plan_set_digest(plan) == digest(document)
+
+
+@pytest.mark.parametrize("layout", ["rowstore_none", "rowstore_page", "columnstore"])
+def test_standalone_model_plan_uses_the_canonical_plan_grammar(layout):
+    document = plan_set_document(layout=layout)["models"][0]
+    payload = canonical(document)
+    plan = decode_physical_model_plan(payload)
+    assert plan.to_dict() == document
+
+
+@pytest.mark.parametrize(
+    "alter",
+    [
+        lambda value: value + b"\n",
+        lambda value: value.replace(b'":', b'": '),
+    ],
+)
+def test_standalone_model_plan_rejects_noncanonical_bytes(alter):
+    payload = canonical(plan_set_document()["models"][0])
+    with pytest.raises(PhysicalPlanError):
+        decode_physical_model_plan(alter(payload))
+
+
+def test_standalone_model_plan_rejects_derived_name_or_digest_drift():
+    document = copy.deepcopy(plan_set_document()["models"][0])
+    document["candidate_name"] = "substituted"
+    with pytest.raises(PhysicalPlanError):
+        decode_physical_model_plan(canonical(document))
 
 
 @pytest.mark.parametrize(

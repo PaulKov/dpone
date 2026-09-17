@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from dpone.runtime.native_generation_bound_build import BoundNativeGenerationBuild
+from dpone.app.native_generation_bound_build import BoundNativeGenerationBuild
 from tests.test_dbt_runtime_execution import _attempt, _interval, _pack, _run_identity
 
 
@@ -32,8 +32,8 @@ def test_bound_build_forwards_actual_dependencies_to_existing_engine(tmp_path, m
     inputs = _inputs(tmp_path)
     service = Mock()
     preflight = Mock()
-    monkeypatch.setattr("dpone.runtime.native_generation_bound_build.DbtExecutionService", service)
-    monkeypatch.setattr("dpone.runtime.native_generation_bound_build.DbtRuntimePreflight", preflight)
+    monkeypatch.setattr("dpone.app.native_generation_bound_build.DbtExecutionService", service)
+    monkeypatch.setattr("dpone.app.native_generation_bound_build.DbtRuntimePreflight", preflight)
     build = BoundNativeGenerationBuild(**inputs)
     service.assert_not_called()
     preflight.assert_not_called()
@@ -87,7 +87,7 @@ def test_bound_build_snapshots_values_before_caller_mutation(tmp_path, monkeypat
     # caller object alias at this execution boundary.
     object.__setattr__(original_identity, "release_id", "sha256:" + "e" * 64)
     service = Mock()
-    monkeypatch.setattr("dpone.runtime.native_generation_bound_build.DbtExecutionService", service)
+    monkeypatch.setattr("dpone.app.native_generation_bound_build.DbtExecutionService", service)
     build.execute(command_runner=Mock(), profile_renderer=Mock(), evidence_writer=Mock())
     observed = service.return_value.execute.call_args.kwargs["run_identity"]
     assert observed.to_dict() == expected
@@ -164,7 +164,7 @@ def test_bound_build_propagates_engine_exception_without_retry(tmp_path, monkeyp
         CommitUnknownOutcome(failure_boundary="target_invocation", checkpoint_state="not_advanced")
     )
     service.return_value.execute.side_effect = failure
-    monkeypatch.setattr("dpone.runtime.native_generation_bound_build.DbtExecutionService", service)
+    monkeypatch.setattr("dpone.app.native_generation_bound_build.DbtExecutionService", service)
     build = BoundNativeGenerationBuild(**_inputs(tmp_path))
     with pytest.raises(CommitUnknownError) as observed:
         build.execute(command_runner=Mock(), profile_renderer=Mock(), evidence_writer=Mock())

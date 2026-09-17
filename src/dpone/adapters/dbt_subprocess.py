@@ -16,6 +16,10 @@ from typing import Any, BinaryIO
 
 from dpone.adapters.dbt_executable import current_environment_dbt_executable
 from dpone.adapters.dbt_output_redaction import _sanitize
+from dpone.adapters.dbt_physical_transport_subprocess import (
+    physical_transport_spawn_settings,
+    wait_for_physical_transport_process,
+)
 from dpone.adapters.dbt_process_supervisor import (
     DbtProcessSupervisor,
     ManagedProcess,
@@ -24,6 +28,7 @@ from dpone.adapters.dbt_process_supervisor import (
 from dpone.contracts.dbt_invocation import DbtInvocationContext
 from dpone.contracts.dbt_publishing import DbtPublishingError
 from dpone.contracts.dbt_toolchain import certified_adapter_distribution
+from dpone.ports.dbt_physical_transport import PhysicalTransportLaunch, PhysicalTransportLaunchContext
 from dpone.ports.dbt_publishing import DbtCommandResult, DbtInstalledToolchain
 
 DEFAULT_DBT_OUTPUT_LIMIT_BYTES = 1024 * 1024
@@ -56,6 +61,8 @@ class SubprocessDbtCommandRunner:
         process_supervisor: DbtProcessSupervisor | None = None,
         collector_join_timeout_seconds: float = DEFAULT_DBT_COLLECTOR_JOIN_TIMEOUT_SECONDS,
         dbt_executable: str | None = None,
+        physical_transport_launch: PhysicalTransportLaunch | None = None,
+        monotonic_ns_clock: Callable[[], int] = time.monotonic_ns,
     ) -> None:
         if isinstance(max_output_bytes, bool) or not isinstance(max_output_bytes, int):
             raise ValueError("max_output_bytes must be a positive integer")
@@ -73,6 +80,8 @@ class SubprocessDbtCommandRunner:
         self._process_supervisor = process_supervisor or DbtProcessSupervisor()
         self._collector_join_timeout_seconds = float(collector_join_timeout_seconds)
         self._dbt_executable = dbt_executable or current_environment_dbt_executable()
+        self._physical_transport_launch = physical_transport_launch
+        self._monotonic_ns = monotonic_ns_clock
 
     def run(
         self,
@@ -95,17 +104,17 @@ class SubprocessDbtCommandRunner:
         try:
             invocation_home = _invocation_home(args)
             invocation_home.mkdir(parents=True, exist_ok=True, mode=0o700)
-            process = self._popen(
-                (self._dbt_executable, *args[1:]),
-                cwd=cwd,
-                shell=False,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=_environment(invocation_home),
-                close_fds=True,
-                start_new_session=self._process_supervisor.start_new_session,
-            )
+            launch_context: PhysicalTransportLaunchContext | None = None
+            if self._physical_transport_launch is None:
+                process = self._spawn(args, cwd=cwd, invocation_home=invocation_home)
+            else:
+                with self._physical_transport_launch as launch_context:
+                    process = self._spawn(
+                        args,
+                        cwd=cwd,
+                        invocation_home=invocation_home,
+                        launch_context=launch_context,
+                    )
             stdout = _BoundedCollector(process.stdout, retain_bytes)
             collectors = (stdout,)
             stderr = _BoundedCollector(process.stderr, retain_bytes)
@@ -113,7 +122,17 @@ class SubprocessDbtCommandRunner:
             stdout.start()
             stderr.start()
             try:
-                exit_code = process.wait(timeout=timeout_seconds)
+                exit_code = (
+                    process.wait(timeout=timeout_seconds)
+                    if launch_context is None
+                    else wait_for_physical_transport_process(
+                        process,
+                        context=launch_context,
+                        timeout_seconds=timeout_seconds,
+                        executable=self._dbt_executable,
+                        monotonic_ns_clock=self._monotonic_ns,
+                    )
+                )
             except subprocess.TimeoutExpired as exc:
                 cleanup_started = True
                 self._cleanup_process(process, collectors)
@@ -129,13 +148,7 @@ class SubprocessDbtCommandRunner:
             if process is not None and not cleanup_started:
                 self._cleanup_process(process, collectors)
             raise
-        except (
-            FileNotFoundError,
-            PermissionError,
-            OSError,
-            RuntimeError,
-            ValueError,
-        ) as exc:
+        except (FileNotFoundError, PermissionError, OSError, RuntimeError, ValueError) as exc:
             if process is not None and not cleanup_started:
                 self._cleanup_process(process, collectors)
             raise _execution_error("dbt executable is unavailable or unsafe") from exc
@@ -161,6 +174,31 @@ class SubprocessDbtCommandRunner:
             stderr=stderr_text,
             stdout_truncated=stdout_truncated,
             stderr_truncated=stderr_truncated,
+        )
+
+    def _spawn(
+        self,
+        args: tuple[str, ...],
+        *,
+        cwd: Path,
+        invocation_home: Path,
+        launch_context: PhysicalTransportLaunchContext | None = None,
+    ) -> ManagedProcess:
+        environment, inherited = physical_transport_spawn_settings(
+            _environment(invocation_home),
+            launch_context,
+        )
+        return self._popen(
+            (self._dbt_executable, *args[1:]),
+            cwd=cwd,
+            shell=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=environment,
+            close_fds=True,
+            start_new_session=self._process_supervisor.start_new_session,
+            **inherited,
         )
 
     def _cleanup_process(

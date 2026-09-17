@@ -80,7 +80,14 @@ acquisition/comparison, not a single-resultset decoder.
 `object_type char(2)`, `object_create_time char(27)`,
 `object_modify_time char(27)`, `is_memory_optimized bit`, `durability tinyint`,
 `temporal_type tinyint`, `is_filetable bit`, `is_node bit`, `is_edge bit`,
-`ledger_type tinyint`, `lob_data_space_id int`, `filestream_data_space_id int`.
+`ledger_type tinyint`, `lob_data_space_id int`, `filestream_data_space_id int?`.
+
+SQL2022/Linux ordinary tables report native NULL for `filestream_data_space_id`.
+The decoder preserves NULL and retains integer transport values without coercion.
+The initial physical comparison cell accepts only measured native NULL as absent
+FILESTREAM placement; zero is transport-valid but not a qualified absence value.
+Nonzero placement, FILETABLE and FILESTREAM columns remain unsupported. The SQL
+producer does not COALESCE this field to a fabricated zero.
 
 ### COLUMN
 
@@ -183,3 +190,10 @@ from a baseline-valid case. No synthetic test is SQL visibility/transaction proo
 
 [Native execution overview](native-generation-execution.md) ·
 [Architecture decision](adr/0065-trusted-isolated-native-generation-execution.md)
+
+## Executable acquisition and comparison
+
+The [catalog acquisition guide](dbt-mssql-physical-catalog-acquisition.md) describes
+the separate signed SQL producer, bounded incremental reader, exact structural
+comparison and operator recovery. These consumers enforce additional invariants;
+wire decoding alone still grants no visibility, admission or execution authority.

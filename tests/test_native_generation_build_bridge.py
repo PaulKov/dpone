@@ -10,7 +10,7 @@ from dpone.contracts.commit_unknown import CommitUnknownOutcome
 from dpone.contracts.native_delivery import GenerationReservation
 from dpone.contracts.native_source_custody import NativeSourceCustodyError
 from dpone.ports.dbt_publishing import DbtExecutionOutcome
-from dpone.runtime.native_generation_build_bridge import NativeGenerationBuildRejected, ReservedDbtBuildBridge
+from dpone.services.native_generation_build_bridge import NativeGenerationBuildRejected, ReservedDbtBuildBridge
 from tests.test_native_generation_build_evidence import writer_fixture
 
 

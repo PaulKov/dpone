@@ -83,10 +83,12 @@ an old retained row cannot prove that physical admission remains current. An
 explicit caller retry of reservation remains metadata-only and must pass current
 SQL ownership checks again. No provider method retries the mutation automatically.
 
-This initial ledger retains the last confirmed RESERVED or BUILDING phase.
-Uncertainty is surfaced by the adapter exception; the later authenticated outcome
-recording protocol is not implemented here. Do not interpret the returned phase
-as proof that a process completed or is safe to restart.
+The initial admission layout retains the last confirmed RESERVED or BUILDING
+phase. The separately installed
+[positive completion and freeze extension](native-source-positive-completion.md)
+adds authenticated completion recording and FROZEN. Uncertainty is surfaced by
+the adapter exception. None of these phases proves terminal success, permits
+restarting a build, or authorizes capacity reclamation.
 
 `SourceCustodySnapshot` also validates the planned frozen-state representation:
 an active EXPORT grant requires a quality reference and the exact retained export
@@ -106,9 +108,23 @@ custody behavior, not source catalog qualification, original object storage,
 installed-wheel behavior or a complete dbt route. Shared and corporate endpoints
 are not required for these tests.
 
-Trusted command/profile verification in application composition, credential
-resolution, the local spawn/close lock, actual dbt execution, authenticated
-UNKNOWN outcome persistence, writer closure, FROZEN, quality reads, export and
-SEALED remain unfinished. The full source-ledger protocols must not be wired to
-this partial provider. This capability does not change existing CLI behavior,
-legacy manifest versions, P release rules or ordinary release authority.
+Subsequent implementation slices provide
+[trusted invocation execution](native-generation-execution.md),
+[writer admission closure](native-source-admission-closure.md), and
+[positive completion and freeze](native-source-positive-completion.md). Their
+presence does not qualify the assembled analyst workflow.
+
+The concrete SQL ledger still has no protected quality/export read-grant
+lifecycle or irreversible SEALED/SUCCEEDED transition. Those states in
+`SourceCustodySnapshot` describe a contract, not an installed capability. The
+current decoder's empty `active_reads` tuple is not an observed absence of
+readers. Neither that tuple, CLOSED admission, FROZEN, nor a locally successful
+workspace attempt authorizes releasing a retained transaction slot or generation
+capacity. Release requires independently observed terminal settlement and closed
+read admission under the corresponding protected lifecycle; no such positive
+release may be inferred from this partial provider.
+
+Full source-ledger consumers must remain disabled until their concrete lifecycle
+and assembled producer wiring are implemented and qualified. This capability
+does not change existing CLI behavior, legacy manifest versions, P release rules
+or ordinary release authority.

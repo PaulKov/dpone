@@ -15,8 +15,7 @@ from dpone.adapters.native_generation_mssql import MssqlNativeGenerationControl,
 from dpone.adapters.native_generation_mssql_queries import generation_procedure, generation_procedure_name
 from dpone.adapters.native_generation_mssql_upgrade import FREEZE_INSPECTION_OPERATIONS, GENERATION_ADMISSION_CHECK
 from dpone.contracts.native_identity import OriginalRef
-from dpone.contracts.native_source_custody import SourceTrustedBuildCompletion
-from dpone.contracts.native_source_custody_codec import encode_source_trusted_build_completion
+from dpone.contracts.native_source_custody import SourceTrustedBuildCompletion, encode_source_trusted_build_completion
 from tests.test_native_generation_admission_live import generations as generations
 from tests.test_native_original_bindings import D
 from tests.test_native_originals_mssql_live import CommitFault
@@ -83,7 +82,7 @@ def freeze_request(generations, *, completion_locator=None, substitute=False, re
         prepare_source_closure_receipt,
     )
     from dpone.contracts.native_delivery_json import encode_native_delivery_json
-    from dpone.contracts.native_source_custody_codec import encode_source_admission_closure
+    from dpone.contracts.native_source_custody import encode_source_admission_closure
 
     record, reservation, admission, reference = prepared(generations)
     before = record()
@@ -204,9 +203,8 @@ def test_live_freeze_reconciles_only_positive_unknown(generations, outcome):
 
 @pytest.mark.parametrize("fault", [None, "before", "after"])
 def test_live_runtime_freeze_recovery_uses_actual_current_owner_inspection(generations, fault):
-    from dpone.contracts.native_source_custody import NativeSourceCustodyError
-    from dpone.contracts.native_source_custody_codec import decode_source_trusted_build_completion
-    from dpone.runtime.native_generation_freeze import NativeGenerationFreeze
+    from dpone.contracts.native_source_custody import NativeSourceCustodyError, decode_source_trusted_build_completion
+    from dpone.services.native_generation_freeze import NativeGenerationFreeze
 
     record, reservation, admission, reference = prepared(generations)
     before = record()

@@ -54,7 +54,7 @@ It checks the admitted BUILD command membership and rejects retained monotonic
 elapsed time above the plan's termination allowance; the exact boundary is valid.
 They also validate the workload identifier, not just its pack digest.
 
-`runtime.native_generation_completion_auth.NativeGenerationCompletionAuthenticator`
+`services.native_generation_completion_auth.NativeGenerationCompletionAuthenticator`
 is the independent recovery consumer. It rereads the exact completion, admission,
 termination, inventory, pack, execution evidence and both raw artifacts through
 generation-bound readers. It checks declared artifact sizes before and after

@@ -10,8 +10,8 @@ from dpone.adapters.dbt_mssql_physical_registration_schema import (
     TABLE,
     verify_registration_table_sql,
 )
-from dpone.contracts.dbt_mssql_physical_registration import MssqlPhysicalRuntimeRegistration
-from dpone.contracts.dbt_mssql_physical_registration_codec import (
+from dpone.contracts.dbt_mssql_physical_registration import (
+    MssqlPhysicalRuntimeRegistration,
     decode_physical_runtime_registration,
     encode_physical_runtime_registration,
     physical_runtime_registration_digest,

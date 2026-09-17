@@ -1,6 +1,7 @@
 """Durable synthetic resource-operation journals; no package qualification."""
 
 import hashlib
+import json
 import os
 
 import pytest
@@ -23,6 +24,15 @@ def entries():
 def test_empty_recovery_report_is_read_only(tmp_path):
     assert not recovery_report(tmp_path).pending
     assert list(tmp_path.iterdir()) == []
+
+
+def test_new_manifest_uses_closed_v2_inventory(tmp_path):
+    assert len(RESOURCE_PATHS) == 17
+    assert RESOURCE_PATHS[-3].endswith("/physical-v1/catalog-v2.sql")
+    with ResourceJournal.start(tmp_path, "a" * 40, entries()) as journal:
+        manifest = json.loads((journal.log_path.parent / "manifest.json").read_bytes())
+        assert manifest["schema"] == "dpone.starter-resource-transaction.v2"
+        assert tuple(entry["path"] for entry in manifest["entries"]) == RESOURCE_PATHS
 
 
 def test_durable_manifest_and_observations_roundtrip(tmp_path):

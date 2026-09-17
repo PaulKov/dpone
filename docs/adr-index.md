@@ -78,3 +78,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0064: Explicit validated character-file staging in ClickHouse](adr/0064-validated-file-clickhouse-staging.md)
 
 - [ADR 0065: Trusted isolated native generation execution](adr/0065-trusted-isolated-native-generation-execution.md)
+
+- [ADR 0066: Distinct dbt SQL Server adapter owns strict physical transport (Proposed)](adr/0066-distinct-dbt-sqlserver-strict-transport.md)

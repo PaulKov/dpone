@@ -13,11 +13,13 @@ from types import SimpleNamespace
 from dpone.adapters.dbt_artifacts import LocalDbtExecutionEvidenceWriter, LocalDbtRunResultsReader
 from dpone.adapters.dbt_run_results_schema import OfficialDbtRunResultsValidator
 from dpone.adapters.native_dbt_profile_lease import NativeDbtProfileLease
+from dpone.adapters.native_generation_invocation_auth import InvocationOriginalReader
+from dpone.app.native_generation_bound_build import BoundNativeGenerationBuild
 from dpone.contracts.dbt_contract_validation import artifact_json_bytes
 from dpone.contracts.dbt_runtime import dbt_attempt_id
 from dpone.contracts.native_delivery import GenerationReservation
+from dpone.contracts.native_generation_invocation import encode_trusted_dbt_command_plan
 from dpone.contracts.native_identity import OriginalRef
-from dpone.contracts.native_source_custody_codec import encode_trusted_dbt_command_plan
 from dpone.contracts.native_trusted_dbt_environment_codec import (
     decode_trusted_dbt_owned_root,
     decode_trusted_dbt_qualification,
@@ -30,11 +32,10 @@ from dpone.runtime.dbt_execution_policy import (
     prepare_dbt_build_output_paths,
     prepare_dbt_output_paths,
 )
-from dpone.runtime.native_generation_bound_build import BoundNativeGenerationBuild
 from dpone.runtime.native_generation_build_artifacts import CapturedBuildArtifactReader
-from dpone.runtime.native_generation_build_evidence import NativeGenerationBuildEvidenceWriter
-from dpone.runtime.native_generation_execution import ReservedDbtBuildBridge, TrustedDbtInvocationRecorder
-from dpone.runtime.native_generation_invocation_auth import InvocationOriginalReader
+from dpone.services.native_generation_build_bridge import ReservedDbtBuildBridge
+from dpone.services.native_generation_build_evidence import NativeGenerationBuildEvidenceWriter
+from dpone.services.native_generation_invocation_recorder import TrustedDbtInvocationRecorder
 from tests.native_trusted_dbt_fixtures import InvocationFixture
 from tests.test_dbt_runtime_execution import (
     _PROJECT_YAML,

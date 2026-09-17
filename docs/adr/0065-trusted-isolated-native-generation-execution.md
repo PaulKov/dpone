@@ -324,9 +324,10 @@ equality. This refactor does not change runtime qualification or delivery policy
 pure command, qualification, root-identity and argument-template decisions.
 `adapters.native_generation_invocation_auth` owns fresh original acquisition,
 ordered decoding and filesystem observations through the existing injected
-original ports. The runtime recorder retains sequencing, admission locks,
-deadlines, latched failures and completion publication. Its historical
-authentication module re-exports the same four public objects for compatibility.
+original ports. The service-layer recorder retains sequencing, admission locks,
+deadlines, latched failures and completion publication. The earlier unreleased
+runtime authentication grouping module is removed: callers use the adapter for
+acquisition and the contract owner for `AuthenticatedInvocationPlan`.
 
 Each boundary still checks generation and command before reading originals, then
 reads command, toolchain and qualification. Qualification and invocation checks
@@ -371,15 +372,30 @@ credentials, command admission nor runtime qualification; the bridge still
 validates its exact recorder before rendering a profile.
 
 
-## Native execution public facade
+## Native execution application ownership
 
-The approved `runtime.native_generation_execution` import exposes the actual
-reserved build bridge and recorder through identity-preserving re-exports. The
-complete recorder implementation lives in `runtime.native_generation_invocation_recorder`;
-the bridge imports that canonical owner directly, avoiding a facade/bridge cycle.
-No recorder method, timing, locking, dispatch or evidence behavior changes. Public
-import order is checked in fresh processes. This exposes implemented constructors;
-it does not create a final-quality placeholder or qualify the bootstrap.
+This refinement supersedes the earlier unreleased runtime grouping facade.
+`services.native_generation_build_bridge` and
+`services.native_generation_invocation_recorder` own reserved execution and
+qualified command sequencing. Build-evidence publication and independent
+completion authentication also live in services. The concrete engine remains in
+runtime; `app.native_generation_bound_build` wires it to the build port. Pure
+build validation belongs to contracts. No recorder timing, locking, dispatch,
+credential-admission or evidence algorithm changes with these relocations.
+
+Custody records and their canonical wire codecs share
+`contracts.native_source_custody`; command-plan and termination records/codecs
+share `contracts.native_generation_invocation`. The now-empty unreleased custody
+codec and runtime grouping modules are removed. Existing programme consumers must
+use these defining owners; wire schemas and immutable original bytes do not
+change.
+
+`contracts.dbt_run_results` owns the pure result parser used by native validation.
+The released `runtime.dbt_run_results` API keeps its original dataclass definitions,
+signatures and pickle identities, adapting canonical parsed records explicitly.
+It does not duplicate the parsing or warning-policy algorithm. Compatibility
+tests cover returned types, serialization and resolved annotations. These changes
+do not qualify the installed bootstrap or declare global architecture gates passed.
 
 
 ## Managed physical catalog transport
@@ -480,8 +496,8 @@ limits are separate. Do not require a model's `resource_bounds` reference to equ
 that capacity reference: no such semantic equivalence has been established.
 The pure registration codec excludes resource-bound admission; later runtime
 admission must fail closed until an actual physical-bounds original or explicit
-authenticated projection mapping is implemented. Original resolution, package
-authority, signed runtime procedures and runtime qualification remain unfinished.
+authenticated projection mapping is implemented. Complete original resolution,
+package authority, model admission and runtime qualification remain unfinished.
 
 The pure carrier and codec are documented in the
 [physical registration reference](../dbt-mssql-physical-registration.md).
@@ -495,3 +511,123 @@ Externally authenticated platform inputs remain prerequisites; control/capacity
 bootstrap authority need not be invented as a new native-original kind. Storage
 does not install signed source procedures or grant model admission. Isolated
 storage tests are not full permission, source-execution or route qualification.
+
+The separate [source-identity bridge](../dbt-mssql-physical-source-bridge.md)
+adds finite signed/countersigned modules and a bounded transaction reader. It
+verifies actual model/control callers and current P-before-G ownership without
+mutating native state. Privileged installation verifies fixed module, certificate
+and grant inventories before invoking registration storage. Authenticated upstream
+inputs and exclusion of concurrent privileged DDL remain explicit platform
+preconditions. A successful source observation is not physical model admission,
+launch entitlement, a completion receipt or complete route qualification.
+
+### Exact signature observation permissions
+
+The source bridge's certificate-mapped users require a finite metadata capability
+in addition to the control helper's EXECUTE grant. In the model database, the
+certificate user receives VIEW DEFINITION on the entry procedure only. In the
+control database, the certificate user receives EXECUTE and VIEW DEFINITION on
+the helper procedure only. A same-database installation uses the union of those
+object-scoped grants. These certificate users have no CONNECT grant, role
+membership, ownership or other permissions. Runtime users retain only entry
+EXECUTE and their existing native permissions and DENYs; no public, schema,
+database or certificate-wide metadata permission is introduced.
+
+This refines the earlier helper-EXECUTE-only provisioning design. Isolated
+SQL Server 2022 probes showed that local ownership chaining can keep a helper
+read working without its countersignature. A foreign countersignature can also
+preserve the caller's certificate token, so token presence or effective EXECUTE
+alone does not prove the expected signature. Runtime users cannot see the needed
+signature catalog by default. The narrow certificate-user metadata grants allow
+each executing module to require exactly its expected signature type and actual
+certificate thumbprint, without exposing protected data or changing caller identity.
+The installer verifies the complete grant inventory, and tests must prove both
+successful baseline reads before checking damaged configurations.
+
+The installer compares actual CERTENCODED bytes with the authenticated expected
+public certificate before obtaining its observed thumbprint from both databases.
+Certificate principal SIDs and signature thumbprints are different coordinates;
+SQL Server documents them separately in [sys.certificates](https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-certificates-transact-sql).
+The deployment embeds that verified thumbprint in the finite procedure expansion,
+not in the package template hash or registration digest. Exact module definition,
+signature and grant checks remain mandatory; a permission mismatch is not repaired
+by granting broader access.
+
+### Separate signed catalog observation boundary
+
+The post-G existing-object revalidation implementation uses a separate catalog
+certificate and fixed module. Its certificate user has database VIEW DEFINITION,
+SELECT on sys.sql_expression_dependencies, and SELECT on the authenticated
+model-data schema. Runtime METADATA/BUILD receive catalog EXECUTE only. Existing
+source modules, signatures and permissions remain unchanged. Schema deployment
+inputs require external authentication against the retained profile; the control
+schema field and a typed profile reference cannot supply that authentication.
+
+The canonical catalog SQL template is part of the physical-v1 package. One owned
+transaction validates source identity, rejects RLS, takes an exact COUNT_BIG with
+TABLOCK/HOLDLOCK before its first HEADER, acquires all bounded kinds, verifies a
+second HEADER, compares exact physical structure, and settles before returning.
+Acquisition includes extra-resultset rejection and finite driver statement
+budgets. Failure or uncertain settlement yields no accepted observation.
+
+This closes the observation component only: initial P-only discovery, authenticated
+plan membership and resource-bounds admission remain distinct dependencies. The
+first comparison cell rejects all dependencies and forbidden properties. See
+[the catalog acquisition guide](../dbt-mssql-physical-catalog-acquisition.md) for
+permission inventory, APIs, resource accounting and recovery. Live qualification
+must be established by the exact candidate's isolated SQL2022 evidence.
+
+### Authenticated catalog policy projection
+
+The reusable catalog lifecycle consumes the selected full v4 policy through
+`NativeOriginalVerifier` and `NativeProjectDocumentReader`. The selected
+`authoring_template.invocation_target` explicitly supplies the model database
+and model-data schema. Missing target configuration rejects; the control schema
+and ambient dbt profile cannot supply defaults. Live schema ID and dbo ownership
+remain separate deployment observations. The opaque trusted-profile reference
+identifies this selected projection; no separate profile payload is inferred.
+
+The optional closed `native_execution.physical_catalog_limits` object contains
+`max_catalog_rows`, `max_definition_utf16_bytes`, `max_dependency_rows` and
+`max_columns`. All four are explicit positive SQL integers, dependencies cannot
+exceed catalog rows, and this cell fixes columns at 256. The new catalog consumer
+requires the section and compares all six registration limits exactly against
+the selected policy: these four plus metadata and generation ceilings. Earlier
+v4 documents remain valid without the section, but cannot use this consumer.
+There is no new original kind, registration codec change or implicit default.
+
+This mapping proves platform-selected bounds, selected policy membership, retained
+profile subject/reference and schema selection. It does not prove empirically
+qualified capacity, model-plan membership or SQL route qualification. Model
+`resource_bounds` identifies the selected trusted-profile projection; generation
+`capacity_authority` remains separate. Protected registration readback and an
+immutable companion binding are subsequent lifecycle checks, not substitutes for
+authenticating the selected policy. The companion must not add a foreign key to
+existing registration storage, whose exact verifier rejects inbound and outbound
+foreign keys. Its insert/read path must instead lock and validate the referenced
+registration UUID and digest in the same local transaction.
+
+### Physical-plan enrollment and durable session identity
+
+The first managed SQL Server cell records one immutable enrollment per generation
+after authenticating the retained plan, command, reservation, registration,
+catalog binding and current source identity. A fresh bounded connection reads the
+complete enrollment after commit. Lost acknowledgement or failed readback remains
+unresolved; it does not authorize another generation, mutation retry or capacity
+release.
+
+BUILD attachment records a server-generated child identity together with the
+actual connection ID, connect time, SPID, login time, principals, enrollment and
+selected model bytes. The connection facts are observed by a self-only helper
+signed with a certificate separate from enrollment, source, catalog and discovery.
+Its certificate login receives only SQL Server 2022 `VIEW SERVER PERFORMANCE
+STATE`; runtime principals receive neither that server permission nor direct
+helper access. The enrollment certificate has only its closed table/module and
+cross-database control capabilities. Existing certificate inventories and runtime
+DENYs remain unchanged.
+
+This durable child does not yet prove once-only transaction binding, successful
+model completion or safe release. Pool reset, rollback, receipts, protected read
+closure and irreversible terminal settlement remain separate required mechanisms.
+See [physical enrollment](../dbt-mssql-physical-enrollment.md) and its
+[isolated qualification procedure](../dbt-mssql-physical-enrollment-qualification.md).

@@ -14,8 +14,11 @@ from dpone.contracts.dbt_contract_validation import DbtPublishingError
 from dpone.contracts.dbt_graph_contract import dbt_publish_logical_target, expected_dbt_run_result_ids
 from dpone.contracts.dbt_sqlserver_graph_policy import (
     DBT_SQLSERVER_GRAPH_POLICY_ERROR_CODES,
+)
+from dpone.contracts.dbt_sqlserver_policy_registry import (
     dbt_sqlserver_graph_contract_sha256,
     evaluate_dbt_sqlserver_selected_graph,
+    require_graph_registration,
 )
 
 if TYPE_CHECKING:
@@ -57,8 +60,16 @@ def observe_dbt_selected_graph(
         raise DbtPublishingError(
             "DPONE_DBT_TARGET_IDENTITY_MISMATCH", "Runtime dbt relations differ from the release logical target"
         )
+    try:
+        registration = require_graph_registration(
+            graph_policy_id=lock.graph_policy_id, graph_policy_sha256=lock.graph_policy_sha256
+        )
+    except ValueError:
+        raise DbtPublishingError(
+            "DPONE_DBT_SELECTION_DRIFT", "Runtime dbt graph policy differs from the release selection lock"
+        ) from None
     policy = evaluate_dbt_sqlserver_selected_graph(
-        manifest, lock.selected_graph_unique_ids, expected_logical_target=logical_target
+        manifest, lock.selected_graph_unique_ids, expected_logical_target=logical_target, registration=registration
     )
     if policy.policy_id != lock.graph_policy_id or policy.policy_sha256 != lock.graph_policy_sha256:
         raise DbtPublishingError(
@@ -68,6 +79,6 @@ def observe_dbt_selected_graph(
         issue = policy.issues[0]
         raise DbtPublishingError(issue.code, issue.message)
     return DbtSelectedGraphObservation(
-        dbt_sqlserver_graph_contract_sha256(manifest, lock.selected_graph_unique_ids),
+        dbt_sqlserver_graph_contract_sha256(manifest, lock.selected_graph_unique_ids, registration=registration),
         expected_dbt_run_result_ids(manifest, lock.selected_graph_unique_ids),
     )

@@ -19,11 +19,9 @@ from dpone.contracts.native_source_custody import (
     NativeSourceCustodyError,
     SourceCustodySnapshot,
     SourceTrustedBuildCompletion,
-    require_trusted_build_completion,
-)
-from dpone.contracts.native_source_custody_codec import (
     decode_source_trusted_build_completion,
     encode_source_trusted_build_completion,
+    require_trusted_build_completion,
 )
 from tests.test_native_source_admission_closure import closure
 
@@ -107,7 +105,7 @@ class FreezeFixture:
 
     def __init__(self, *, outcome="ACTIVE", commit_fault=None):
         from dpone.contracts.native_delivery import GenerationReservation
-        from dpone.runtime.native_generation_freeze import NativeGenerationFreeze
+        from dpone.services.native_generation_freeze import NativeGenerationFreeze
 
         self.positive = completion()
         payload = encode_source_trusted_build_completion(self.positive)
@@ -205,7 +203,7 @@ def test_runtime_freeze_explicit_metadata_retry_requires_fresh_inspection():
 
 @pytest.mark.parametrize("accepted", [False, True])
 def test_new_runtime_reconciles_metadata_only_after_independent_inspection(accepted):
-    from dpone.runtime.native_generation_freeze import NativeGenerationFreeze
+    from dpone.services.native_generation_freeze import NativeGenerationFreeze
 
     fixture = FreezeFixture()
     frozen = fixture.freeze() if accepted else None
@@ -349,7 +347,7 @@ class PositiveControl:
         self.reference = OriginalRef("synthetic/positive.json", "sha256:" + sha256(payload).hexdigest())
         self.reservation = GenerationReservation(self.current.generation_id, 1, 2, self.current.reservation)
         self.mutations = self.authentications = self.current_reads = 0
-        from dpone.contracts.native_source_custody_codec import encode_source_admission_closure
+        from dpone.contracts.native_source_custody import encode_source_admission_closure
 
         self.expected_parameters = (
             str(self.current.generation_id),
@@ -632,10 +630,7 @@ def test_inspection_upgrade_preserves_existing_nine_procedures(installed):
 
 
 def completed_row():
-    from dpone.contracts.native_source_custody_codec import (
-        encode_source_admission_closure,
-        encode_source_executor_binding,
-    )
+    from dpone.contracts.native_source_custody import encode_source_admission_closure, encode_source_executor_binding
 
     value = completion()
     payload = encode_source_trusted_build_completion(value)

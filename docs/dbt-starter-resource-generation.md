@@ -11,7 +11,7 @@ interface is documented in [Create a dbt starter](dbt-starter-authoring.md).
 
 ## Prepare an immutable source
 
-Use a local dpone checkout with the approved complete fourteen-file canonical
+Use a local dpone checkout with the approved complete fifteen-file canonical
 `packages/dbt-dpone` package committed. Supply its full lowercase forty-character
 Git commit ID. The revision must already exist locally and be an ancestor of the
 checkout HEAD. Canonical working bytes, executable modes and index entries must
@@ -48,11 +48,18 @@ project, using the fixed public dependency and captured immutable revision.
 It verifies the actual returned lock and all resolved package bytes. No lock or
 future commit pin is fabricated.
 
-The tool writes exactly sixteen resources: fourteen mirrored package files plus
+The tool writes exactly seventeen resources: fifteen mirrored package files plus
 `packages.yml` and `package-lock.yml`. It never rewrites the canonical package or
 the six authored templates. After dependency generation it rechecks captured
 source/template identities and, under the existing authoring lock, destination
 identities before writing. Identical output is a no-op.
+
+New writes use the versioned seventeen-resource transaction inventory, which adds
+the catalog v2 SQL asset. Recovery inspection also understands the original
+sixteen-resource v1 inventory. An update does not rewrite retained v1 journals or
+make unresolved operations safe to discard: inspect and resolve those obligations
+before generating again. Unknown versions and files outside the journal's own
+versioned inventory are rejected.
 
 Replacement is atomic per file, not across the whole set. Readers can observe
 mixed resources during generation; package builds must use a successfully
@@ -89,11 +96,11 @@ order before retrying:
 
 1. The selected checkout exists, its identity has not changed, and the requested
    full commit resolves locally and is an ancestor of HEAD.
-2. The canonical package contains all fourteen approved files; raw working bytes,
+2. The canonical package contains all fifteen approved files; raw working bytes,
    executable modes and index entries match the selected commit. Check for staged,
    extra, missing or unsafe files. The initial five-file package is incomplete.
 3. All six authored templates are present. For check mode, both dependency files
-   and the complete fourteen-file mirror must already exist and match the source.
+   and the complete fifteen-file mirror must already exist and match the source.
    Check lock freshness, exact dependency coordinates and UTF-8 content.
 4. For generation, the selected commit must also be available from the fixed
    public Git origin. A local-only commit is insufficient. Confirm the approved

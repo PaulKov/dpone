@@ -171,6 +171,26 @@ def _plan_set(value: object) -> PhysicalPlanSet:
     )
 
 
+def decode_physical_model_plan(payload: bytes) -> PhysicalModelPlan:
+    """Decode one canonical model-plan document without granting admission.
+
+    The attach protocol returns the selected model plan rather than the complete
+    plan set.  Keeping that boundary here prevents transports from depending on
+    the private record parser or maintaining a second implementation of the
+    physical-plan grammar.
+    """
+
+    try:
+        result = _plan(decode_native_delivery_json(payload))
+        if encode_native_delivery_json(result.to_dict()) != payload:
+            raise PhysicalPlanError("physical model plan requires exact canonical bytes")
+        return result
+    except PhysicalPlanError:
+        raise
+    except (ValueError, DbtPublishingError):
+        raise PhysicalPlanError("physical model plan violates its canonical contract") from None
+
+
 def decode_physical_plan_set(payload: bytes) -> PhysicalPlanSet:
     """Reject malformed, alternate or tampered bytes without partial records.
 
