@@ -217,42 +217,49 @@ class DeploymentCacheMaterializer:
         self._promotion_policy.authorize(promoted_by)
         activation_id = self._promotion_policy.activation_id(None)
         deployment_path = Path(deployment_dir).absolute()
-        with promotion_lock(self._cache_root):
-            previous_deployment_id = self._current_state.actual_deployment_id()
-            if previous_deployment_id != expected_current_deployment_id:
-                raise DeploymentCacheError(
-                    "DPONE_CURRENT_POINTER_CAS_MISMATCH",
-                    "active current deployment changed after the recovery plan was reviewed",
-                    path=(self._cache_root / "current").as_posix(),
+        mutation_started = False
+        try:
+            with promotion_lock(self._cache_root):
+                previous_deployment_id = self._current_state.actual_deployment_id()
+                if previous_deployment_id != expected_current_deployment_id:
+                    raise DeploymentCacheError(
+                        "DPONE_CURRENT_POINTER_CAS_MISMATCH",
+                        "active current deployment changed after the recovery plan was reviewed",
+                        path=(self._cache_root / "current").as_posix(),
+                    )
+                self._development_admission_gate.require(
+                    self._projection_validator.validate_details(deployment_path, environment=environment),
+                    environment=environment,
                 )
-            self._development_admission_gate.require(
-                self._projection_validator.validate_details(deployment_path, environment=environment),
-                environment=environment,
-            )
-            activation = self._activation_snapshotter.prepare(deployment_path, environment=environment)
-            deployment = activation.projection.identity()
-            deployment_path = activation.path
-            pointer = self._promotion_policy.pointer(
-                deployment=deployment,
-                environment=environment,
-                promoted_by=promoted_by,
-                previous_deployment_id=previous_deployment_id,
-                source_commit=None,
-                attestation_ref=None,
-                activation_id=activation_id,
-            )
-            workspace_occurrence = self._workspace_activation.prepare_occurrence(
-                projection_root=deployment_path,
-                dbt_wire=activation.projection.dbt_runtime_wire_contract,
-                activation_id=activation_id,
-                environment=environment,
-                release_id=str(deployment["release_id"]),
-                deployment_id=str(deployment["deployment_id"]),
-                previous_deployment_id=previous_deployment_id,
-            )
-            self._development_admission_gate.require(activation.projection, environment=environment)
-            current, pointer_path = self._commit_promotion(deployment_path=deployment_path, pointer=pointer)
-            self._workspace_activation.activate_occurrence(workspace_occurrence, projection_root=deployment_path)
+                activation = self._activation_snapshotter.prepare(deployment_path, environment=environment)
+                mutation_started = True
+                deployment = activation.projection.identity()
+                deployment_path = activation.path
+                pointer = self._promotion_policy.pointer(
+                    deployment=deployment,
+                    environment=environment,
+                    promoted_by=promoted_by,
+                    previous_deployment_id=previous_deployment_id,
+                    source_commit=None,
+                    attestation_ref=None,
+                    activation_id=activation_id,
+                )
+                workspace_occurrence = self._workspace_activation.prepare_occurrence(
+                    projection_root=deployment_path,
+                    dbt_wire=activation.projection.dbt_runtime_wire_contract,
+                    activation_id=activation_id,
+                    environment=environment,
+                    release_id=str(deployment["release_id"]),
+                    deployment_id=str(deployment["deployment_id"]),
+                    previous_deployment_id=previous_deployment_id,
+                )
+                self._development_admission_gate.require(activation.projection, environment=environment)
+                current, pointer_path = self._commit_promotion(deployment_path=deployment_path, pointer=pointer)
+                self._workspace_activation.activate_occurrence(workspace_occurrence, projection_root=deployment_path)
+        except DeploymentCacheError as exc:
+            if mutation_started and exc.details.get("state_may_have_changed") is not True:
+                raise cache_error_after_mutation(exc) from exc
+            raise
         return CurrentDeployment(
             activation_id=str(pointer["activation_id"]),
             deployment_id=str(deployment["deployment_id"]),

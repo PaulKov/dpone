@@ -153,8 +153,12 @@ The embedded projection, deployment `environment`, database names, a CLI
 `--environment` value, and copied or resealed files are not target authority.
 The integrity-checked deployment must agree with the independently verified
 target. A missing, unknown, expired, revoked, mismatched, or production-tier
-target fails before registry writes, local installation, coordinator calls, or
-current-pointer mutation. Operation receipts are not interchangeable.
+target fails before registry writes, local installation, or current-pointer
+mutation. Operation receipts are not interchangeable. If target state changes
+after activation preparation starts, the failure can leave a sealed inactive
+snapshot or `PREPARED` coordinator reservation; the error then reports
+`state_may_have_changed: true` and `recovery_required: true`, while `current`
+remains unchanged.
 The verifier must compare the receipt with the current protected target-policy
 digest and revocation epoch on every publish, materialize, promote, pointer
 recovery, and audit-repair attempt. Reusing a previously valid receipt does not
