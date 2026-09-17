@@ -321,6 +321,7 @@ def test_publish_closes_external_target_verifier_failure(tmp_path: Path) -> None
 
     assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
     assert denied.value.__cause__ is None
+    assert denied.value.__context__ is None
     assert "protected-policy-location-must-not-escape" not in str(denied.value)
     assert "protected-policy-location-must-not-escape" not in "".join(
         traceback.format_exception(denied.type, denied.value, denied.tb)
@@ -460,6 +461,7 @@ def test_materialize_closes_external_target_verifier_failure(tmp_path: Path) -> 
 
     assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
     assert denied.value.__cause__ is None
+    assert denied.value.__context__ is None
     assert "protected-policy-location-must-not-escape" not in str(denied.value)
     assert "protected-policy-location-must-not-escape" not in "".join(
         traceback.format_exception(denied.type, denied.value, denied.tb)

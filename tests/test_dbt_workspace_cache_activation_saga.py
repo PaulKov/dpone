@@ -606,6 +606,7 @@ def test_development_activation_closes_initial_authority_verifier_failure(tmp_pa
     assert denied.value.code == "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED"
     assert denied.value.details == {}
     assert denied.value.__cause__ is None
+    assert denied.value.__context__ is None
     assert "protected authority store unavailable" not in "".join(
         traceback.format_exception(denied.type, denied.value, denied.tb)
     )
