@@ -152,6 +152,11 @@ publication fail before mutation with a stable
 `DPONE_CLICKHOUSE_FULL_REFRESH_*` error. Legacy unbounded full refresh keeps its
 compatibility path and is not certified by this bounded protocol. Offline tests
 do not certify a live topology; see [connector certification](../connector-certification.md).
+The independent
+[one-shard replicated publication design](../feature-design-clickhouse-cluster-full-refresh-publication-v1.md)
+defines the KeeperMap and distributed-DDL recovery work required to remove the
+`Replicated*` limitation. Its status is `RESEARCHED`, so it does not change the
+current route contract.
 
 ## Runtime algorithm
 
