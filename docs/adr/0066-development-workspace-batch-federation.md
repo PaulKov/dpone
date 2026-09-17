@@ -21,7 +21,7 @@ from being delivered without granting every native workload access to credential
 Add a closed development authority and release family defined by the approved
 [development workspace and batch federation specification](../feature-specs/development-workspace-batch-federation.md).
 The approved specification SHA-256 is
-`6a466d62f898f8cbe434e6cb361a4b8caea5f2c3ef71ce35b8d1b18e18b4b2ed`.
+`2507cf8bc3ae751359cdd7f0a0abe623145cf78f4a619590c08a5adf73c34e0b`.
 
 Development delivery authority permits an immutable deployment to contain the
 complete verified workspace. It does not permit any workload to execute. The
