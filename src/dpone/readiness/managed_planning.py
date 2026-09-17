@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 from dpone.manifest.loader import ManifestLoaderRouter
 from dpone.readiness import managed_native_transfer_plan as native_transfer_plan
 from dpone.readiness import managed_planning_snapshot as snapshot_planning
+from dpone.readiness.clickhouse_publication_planning import clickhouse_publication_plan
 from dpone.readiness.managed_native_projection import (
     native_transfer_bulk_wire,
     native_transfer_route_decision,
@@ -135,6 +136,7 @@ class ExecutionPlanService:
             "type_matrix": self._type_matrix(raw, source_type, sink_type),
             "type_inference": self._type_inference(raw),
             "physical_design": physical_design,
+            "publication": clickhouse_publication_plan(lc, sink_type, route.strategy),
             "reconciliation": snapshot_planning.reconciliation_plan(lc),
             "state": snapshot_planning.state_plan(raw, sink_type),
             "partitioning": self._partitioning(lc.options),

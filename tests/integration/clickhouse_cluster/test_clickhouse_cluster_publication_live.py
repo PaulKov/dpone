@@ -131,6 +131,44 @@ def test_service_publishes_and_cleans_exact_replicated_generations() -> None:
     os.getenv("DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION") != "1",
     reason="set DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION=1 for the opt-in Docker fixture",
 )
+def test_clickhouse_sink_routes_admitted_cluster_publication_without_fallback() -> None:
+    from types import SimpleNamespace
+
+    from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import CLUSTER_RECEIPT_VERSION
+    from dpone.runtime.sinks.clickhouse_sink import ClickHouseSink
+
+    database = _database_name("publication_sink_router")
+    _create_database(database)
+    _create_replicated_table(database, "target")
+    _create_replicated_table(database, "candidate")
+    _execute(f"INSERT INTO {database}.target VALUES (1)")
+    _execute(f"INSERT INTO {database}.candidate VALUES (10),(20)")
+    _wait_for_counts(database, "candidate", expected=2)
+    connector, _catalog, _service_instance = _service(database)
+    sink = ClickHouseSink(connector)
+    config, candidate = _configs(database, scheduler_identity="docker-sink-router")
+    admitted = sink.prepare_runtime_admission(
+        config,
+        run_context=SimpleNamespace(run_id="docker-sink-router"),
+        load_record=SimpleNamespace(),
+        dag_id="cluster-publication",
+    )
+
+    receipt = sink._swap_table_into_target(admitted, candidate)
+
+    assert receipt.schema_version == CLUSTER_RECEIPT_VERSION
+    _wait_for_counts(database, "target", expected=2)
+    sink._cleanup_full_refresh_publication(receipt)
+    assert _execute(
+        f"SELECT count() FROM clusterAllReplicas('{_CLUSTER}', system.tables) "
+        f"WHERE database='{database}' AND name='candidate'"
+    ) == [("0",)]
+
+
+@pytest.mark.skipif(
+    os.getenv("DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION") != "1",
+    reason="set DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION=1 for the opt-in Docker fixture",
+)
 def test_lost_publication_and_cleanup_responses_reconcile_without_redispatch() -> None:
     from dpone.runtime.sinks.clickhouse_cluster_publication_ddl import ClickHouseClusterPublicationDdl
 
@@ -446,7 +484,7 @@ def _service(database: str, *, ddl: Any = None) -> tuple[Any, Any, Any]:
 
 def _configs(database: str, *, scheduler_identity: str) -> tuple[Any, Any]:
     from dpone.config.load_config import LoadConfig
-    from dpone.config.load_strategy import LoadStrategy
+    from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
     from dpone.runtime.sinks.clickhouse_full_refresh_publication import SCHEDULER_IDENTITY_OPTION
 
     config = LoadConfig(
@@ -459,7 +497,15 @@ def _configs(database: str, *, scheduler_identity: str) -> tuple[Any, Any]:
         load_strategy=LoadStrategy.FULL_REFRESH,
         options={
             SCHEDULER_IDENTITY_OPTION: scheduler_identity,
-            "physical_design": {"storage": {"clickhouse": {"cluster": _CLUSTER}}},
+            SOURCE_BYTE_BUDGET_OPTION: 1024 * 1024,
+            "physical_design": {
+                "storage": {
+                    "clickhouse": {
+                        "engine": "ReplicatedMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}')",
+                        "cluster": _CLUSTER,
+                    }
+                }
+            },
         },
     )
     return config, LoadConfig(**{**config.__dict__, "target_table": "candidate"})

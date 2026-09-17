@@ -28,5 +28,6 @@ normal happy-path run cannot create:
   classifier cases for every remaining pinned status/exception normalization
   and missing, extra, or duplicate host evidence.
 
-These are Docker protocol checks for the pinned server version. They do not
-enable cluster admission or certify an external deployment.
+These are Docker protocol checks for the pinned server version, including the
+real `ClickHouseSink` routing boundary. They support internal runtime admission
+but do not certify any external deployment.
