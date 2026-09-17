@@ -156,6 +156,7 @@ class PhysicalChunkedFileExportArtifact(BaseExtractionArtifact):
         self._events: list[dict[str, Any]] = []
         self._generation_failure: dict[str, Any] | None = None
         self._owned_chunk_paths: set[Path] = set()
+        self.source_byte_measurement_complete = False
 
     def rebind_generator(
         self,
@@ -217,6 +218,7 @@ class PhysicalChunkedFileExportArtifact(BaseExtractionArtifact):
             self._close_chunks(chunks)
             if lifecycle is not None:
                 lifecycle.complete()
+            self.source_byte_measurement_complete = True
             return total_rows
         finally:
             self._write_evidence()

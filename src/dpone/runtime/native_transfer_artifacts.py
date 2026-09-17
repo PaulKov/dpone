@@ -63,6 +63,7 @@ class PartitionedTransferPlanArtifact(BaseExtractionArtifact):
         self.transfer_store = transfer_store
         self.reusable_objects = dict(reusable_objects or {})
         self.slice_evidence: list[dict[str, Any]] = []
+        self.source_byte_measurement_complete = False
 
     def materialize(
         self,
@@ -96,6 +97,7 @@ class PartitionedTransferPlanArtifact(BaseExtractionArtifact):
             loaded = sum(self._export_load_cleanup(item, loader, budget) for item in self.slices)
         if lifecycle is not None:
             lifecycle.complete()
+        self.source_byte_measurement_complete = True
         return loaded
 
     def cleanup(self) -> None:
@@ -243,6 +245,7 @@ def _slice_evidence(
         "is_null_partition": slice_info["is_null_partition"],
         "rows_loaded": rows_loaded,
         "bytes": file_bytes,
+        "sha256": getattr(getattr(artifact, "integrity_receipt", None), "sha256", None),
         "file_name": Path(artifact.file_path).name,
     }
     if rows_exported is not None:

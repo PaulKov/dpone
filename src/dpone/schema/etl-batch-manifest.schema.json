@@ -2540,6 +2540,13 @@
                     "backfill"
                   ]
                 },
+                "max_source_bytes": {
+                  "type": "integer",
+                  "title": "Maximum source bytes for full refresh",
+                  "description": "Fail-closed publication limit for the aggregate source-emitted bytes of a full_refresh attempt.",
+                  "minimum": 1,
+                  "maximum": 9223372036854775807
+                },
                 "unique_key": {
                   "title": "Unique key for deterministic merge",
                   "description": "Business key used by incremental_merge and other identity-sensitive strategies.",

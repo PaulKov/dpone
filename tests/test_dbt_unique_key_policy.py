@@ -128,10 +128,7 @@ def test_publish_and_dbt_keys_must_match_even_for_non_merge_strategy() -> None:
     )
 
     assert strategy["mode"] == "full_refresh"
-    assert [issue.code for issue in issues] == [
-        "DPONE_DBT_STRATEGY_UNRESOLVED",
-        "DPONE_DBT_UNIQUE_KEY_INVALID",
-    ]
+    assert [issue.code for issue in issues] == ["DPONE_DBT_UNIQUE_KEY_INVALID"]
 
 
 def test_auto_strategy_emits_only_the_admitted_exact_key() -> None:

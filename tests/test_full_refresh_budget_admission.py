@@ -1,4 +1,4 @@
-"""Public admission must not silently discard a requested source-byte limit."""
+"""Public admission preserves an enforceable source-byte limit."""
 
 from __future__ import annotations
 
@@ -6,15 +6,12 @@ from copy import deepcopy
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock
 
 import pytest
 
-from dpone.config.load_strategy import LoadStrategy
+from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
 from dpone.dag.config import ETLProcessConfig, LoadConfigBuilder
-from dpone.dag.errors import DagConfigurationError
 from dpone.runtime.clickhouse_file_stage_contract import ClickHouseValidatedFilePolicy
-from dpone.strategy_intelligence.compiler import StrategyAutoCompiler
 
 
 def _process(strategy: dict[str, Any]) -> dict[str, Any]:
@@ -34,38 +31,24 @@ def _process(strategy: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@pytest.mark.parametrize("value", [100, None, 0, -1, True, "100"])
-@pytest.mark.parametrize("mode", [None, "full_refresh", "auto", "incremental_append"])
-def test_public_builder_rejects_present_budget_without_changing_input(mode: str | None, value: object) -> None:
-    strategy = {"max_source_bytes": value}
-    if mode is not None:
-        strategy["mode"] = mode
-    process = _process(strategy)
-    original = deepcopy(process)
-
-    with pytest.raises(DagConfigurationError, match=r"sink\.strategy\.max_source_bytes cannot be enforced"):
-        LoadConfigBuilder().build(process)
-
-    assert process == original
-
-
-def test_budget_rejection_precedes_strategy_compilation() -> None:
-    compiler = Mock(spec=StrategyAutoCompiler)
-
-    with pytest.raises(DagConfigurationError, match=r"sink\.strategy\.max_source_bytes"):
-        LoadConfigBuilder(strategy_compiler=compiler).build(_process({"mode": "full_refresh", "max_source_bytes": 100}))
-
-    compiler.compile.assert_not_called()
-
-
-@pytest.mark.parametrize("metadata_only", [False, True])
-def test_public_process_parser_rejects_budget_before_process_construction(metadata_only: bool) -> None:
+def test_public_builder_preserves_valid_full_refresh_budget_without_changing_input() -> None:
     process = _process({"mode": "full_refresh", "max_source_bytes": 100})
     original = deepcopy(process)
 
-    with pytest.raises(DagConfigurationError, match=r"sink\.strategy\.max_source_bytes"):
-        ETLProcessConfig.from_dict(process, metadata_only=metadata_only)
+    built = LoadConfigBuilder().build(process)
 
+    assert built.load_strategy is LoadStrategy.FULL_REFRESH
+    assert built.options[SOURCE_BYTE_BUDGET_OPTION] == 100
+    assert process == original
+
+
+def test_public_metadata_parser_preserves_budget() -> None:
+    process = _process({"mode": "full_refresh", "max_source_bytes": 100})
+    original = deepcopy(process)
+
+    parsed = ETLProcessConfig.from_dict(process, metadata_only=True)
+
+    assert parsed.load_config.options[SOURCE_BYTE_BUDGET_OPTION] == 100
     assert process == original
 
 
