@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -17,7 +17,12 @@ from dpone.runtime.deployment_cache_common import (
     read_regular_json_object,
     resolve_relative_current_symlink,
 )
-from dpone.runtime.deployment_cache_current_state import DeploymentCacheCurrentState
+from dpone.runtime.deployment_cache_current_state import DeploymentCacheCurrentState, control_state_recovery_required
+from dpone.runtime.deployment_cache_development_admission import (
+    DevelopmentActivationAdmissionGate,
+    DevelopmentTargetAdmission,
+    DevelopmentTargetAdmissionVerifier,
+)
 from dpone.runtime.deployment_cache_integrity import (
     DEFAULT_MAX_CACHE_ARTIFACT_BYTES,
 )
@@ -44,8 +49,11 @@ class DeploymentCacheMaterializer:
         max_artifact_bytes: int = DEFAULT_MAX_CACHE_ARTIFACT_BYTES,
         workspace_activation: DbtWorkspaceActivationCoordinatorPort | None = None,
         composition_activation_coordinator: CompositionActivationCoordinatorPort | None = None,
+        development_admission: DevelopmentTargetAdmission | None = None,
+        development_admission_verifier: DevelopmentTargetAdmissionVerifier | None = None,
     ) -> None:
         self._cache_root = Path(cache_root).resolve(strict=False)
+        self._clock = clock if clock is not None else lambda: datetime.now(UTC)
         self._promotion_policy = DeploymentCachePromotionPolicy(
             clock=clock,
             activation_id_factory=activation_id_factory,
@@ -63,6 +71,12 @@ class DeploymentCacheMaterializer:
         self._activation_snapshotter = DeploymentCacheActivationSnapshotter(
             self._cache_root,
             validator=self._projection_validator,
+        )
+        self._development_admission_gate = DevelopmentActivationAdmissionGate(
+            self._cache_root,
+            admission=development_admission,
+            admission_verifier=development_admission_verifier,
+            clock=self._clock,
         )
         self._committer = DeploymentCacheCommitter(self._cache_root)
 
@@ -97,6 +111,10 @@ class DeploymentCacheMaterializer:
         mutation_started = False
         try:
             with promotion_lock(self._cache_root):
+                self._development_admission_gate.require(
+                    self._projection_validator.validate_details(deployment_path, environment=environment),
+                    environment=environment,
+                )
                 activation = self._activation_snapshotter.prepare(deployment_path, environment=environment)
                 mutation_started = True
                 deployment = activation.projection.identity()
@@ -128,6 +146,7 @@ class DeploymentCacheMaterializer:
                     deployment_id=str(deployment["deployment_id"]),
                     previous_deployment_id=previous_deployment_id,
                 )
+                self._development_admission_gate.require(activation.projection, environment=environment)
                 current, pointer_path = self._commit_promotion(
                     deployment_path=deployment_path,
                     pointer=pointer,
@@ -206,6 +225,10 @@ class DeploymentCacheMaterializer:
                     "active current deployment changed after the recovery plan was reviewed",
                     path=(self._cache_root / "current").as_posix(),
                 )
+            self._development_admission_gate.require(
+                self._projection_validator.validate_details(deployment_path, environment=environment),
+                environment=environment,
+            )
             activation = self._activation_snapshotter.prepare(deployment_path, environment=environment)
             deployment = activation.projection.identity()
             deployment_path = activation.path
@@ -227,6 +250,7 @@ class DeploymentCacheMaterializer:
                 deployment_id=str(deployment["deployment_id"]),
                 previous_deployment_id=previous_deployment_id,
             )
+            self._development_admission_gate.require(activation.projection, environment=environment)
             current, pointer_path = self._commit_promotion(deployment_path=deployment_path, pointer=pointer)
             self._workspace_activation.activate_occurrence(workspace_occurrence, projection_root=deployment_path)
         return CurrentDeployment(
@@ -274,11 +298,12 @@ class DeploymentCacheMaterializer:
                 current_target,
                 environment=environment,
             )
+            self._development_admission_gate.require(current_projection, environment=environment)
             if (
                 current_projection.deployment_id != active_id
                 or pointer.get("release_id") != current_projection.release_id
             ):
-                raise _recovery_required(self._cache_root / "current")
+                raise control_state_recovery_required(self._cache_root / "current")
             self._workspace_activation.require_existing(
                 projection_root=current_target,
                 dbt_wire=current_projection.dbt_runtime_wire_contract,
@@ -288,6 +313,7 @@ class DeploymentCacheMaterializer:
                 deployment_id=current_projection.deployment_id,
                 previous_deployment_id=_optional_string(pointer.get("previous_deployment_id")),
             )
+            self._development_admission_gate.require(current_projection, environment=environment)
             audit_payload = dict(pointer)
             audit_payload["recovery"] = {
                 "actor": recovery_actor,
@@ -344,14 +370,6 @@ class DeploymentCacheMaterializer:
 
 def _optional_string(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
-
-
-def _recovery_required(path: Path) -> DeploymentCacheError:
-    return DeploymentCacheError(
-        "DPONE_DEPLOYMENT_CACHE_RECOVERY_REQUIRED",
-        "current deployment control files are inconsistent; run cache recovery before promotion",
-        path=path.as_posix(),
-    )
 
 
 __all__ = ["CurrentDeployment", "DeploymentCacheMaterializer"]

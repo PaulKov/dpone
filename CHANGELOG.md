@@ -10,8 +10,12 @@
   delivery remains separate from exact, current workload execution authority.
   Ordinary composition now verifies public resources, alias-only connection
   projection, declarative SQL dependencies and separate SQL pre-hooks. Remote
-  publication and cache materialization require the same injected receipt and
-  combined delivery budget; public CLI paths remain unable to self-authorize.
+  publication, cache materialization and activation require distinct current
+  operation receipts bound to the exact release, deployment and independently
+  trusted non-production target. An injected verifier reopens protected target
+  policy and revocation state at every operation and recovery boundary. Combined
+  delivery budgets remain enforced; production targets and public CLI
+  self-authorization fail closed.
 
 - Add canonical native original bindings preserving complete subject, storage
   authority and provider-version identity without granting execution authority.
