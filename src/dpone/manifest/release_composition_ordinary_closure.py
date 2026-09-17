@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from dpone.contracts.dbt_relation_writes import DbtRelationWrite, transfer_relation_write
 from dpone.contracts.release_composition_ordinary import OrdinaryReleaseInventoryError
@@ -87,21 +87,25 @@ class OrdinaryPackClosureVerifier:
             observed = {path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()}
             if expected != observed:
                 raise OrdinaryReleaseInventoryError("ordinary archive contains missing or undeclared files")
-            rebuilt = self._builder.build(
-                workload=workload,
-                output_path=pack["output_path"],
-                repo_root=root,
-                mode=pack["mode"],
-                runner_policy=pack["runner_policy"],
-                include_live_gates=False,
-                # State-bearing MSSQL sources are authored before deployment
-                # bindings exist. Reproduce their declared logical outlets;
-                # physical authority is checked only after sealed bindings.
-                outlet_binding="logical" if "state" in manifest else "physical",
-            ).to_jsonable()
+            bindings: tuple[Literal["logical", "physical"], ...] = ("logical", "physical")
+            rebuilt = tuple(
+                self._builder.build(
+                    workload=workload,
+                    output_path=pack["output_path"],
+                    repo_root=root,
+                    mode=pack["mode"],
+                    runner_policy=pack["runner_policy"],
+                    include_live_gates=False,
+                    # Both producer modes are public and deterministic. Logical
+                    # outlets support authoring before deployment bindings;
+                    # physical outlets preserve already bound source trees.
+                    outlet_binding=binding,
+                ).to_jsonable()
+                for binding in bindings
+            )
             # All executable views, including every bootstrap command, process
             # plan, pod projection and compatibility shell command, are checked.
-            if _source_semantics(rebuilt) != _source_semantics(pack):
+            if all(_source_semantics(candidate) != _source_semantics(pack) for candidate in rebuilt):
                 raise OrdinaryReleaseInventoryError(
                     "ordinary pack differs from its declarative producer; regenerate state-bearing MSSQL packs with logical outlets and other packs with the default builder"
                 )
@@ -125,7 +129,8 @@ class OrdinaryPackClosureVerifier:
         provenance = row.get("provenance")
         if not isinstance(config, dict) or not isinstance(provenance, dict):
             raise OrdinaryReleaseInventoryError("ordinary workload configuration is invalid")
-        if config.get("authoring") or config.get("runner"):
+        runner = config.get("runner")
+        if config.get("authoring") or runner not in {None, "airflow"}:
             raise OrdinaryReleaseInventoryError(
                 "ordinary composition does not support custom authoring or runner assets"
             )
@@ -204,7 +209,7 @@ def _require_resource_only_gitops(manifest: Mapping[str, Any]) -> None:
 
 
 def _require_supported_transfer(manifest: Mapping[str, Any]) -> None:
-    """Admit declarative SQL transfers and separate SQL pre-hooks only."""
+    """Admit declarative SQL transfers and verified SQL hooks only."""
     source = manifest.get("source")
     sink = manifest.get("sink")
     allowed = {"postgres", "mssql", "mysql", "clickhouse"}
@@ -218,7 +223,9 @@ def _require_supported_transfer(manifest: Mapping[str, Any]) -> None:
             "ordinary composition requires explicitly declared supported SQL transfer endpoints"
         )
     if "state" in manifest:
-        _require_external_mssql_state(manifest["state"], sink)
+        state = manifest["state"]
+        if not (isinstance(state, Mapping) and state.get("type") == "disabled"):
+            _require_supported_mssql_state(state)
     if "gitops" in manifest:
         _require_resource_only_gitops(manifest)
     options = source.get("options")
@@ -232,13 +239,15 @@ def _require_supported_transfer(manifest: Mapping[str, Any]) -> None:
         raise OrdinaryReleaseInventoryError("ordinary pre-hook declaration is invalid")
     for hook in pre_hooks:
         execution = hook.get("execution") if isinstance(hook, Mapping) else None
-        if (
-            not isinstance(hook, Mapping)
-            or hook.get("type") != "sql"
-            or not isinstance(execution, Mapping)
-            or execution.get("airflow") != "separate_task"
+        if not isinstance(hook, Mapping) or hook.get("type") != "sql":
+            raise OrdinaryReleaseInventoryError("ordinary composition permits only SQL pre-hooks")
+        if execution is not None and (
+            not isinstance(execution, Mapping)
+            or set(execution) - {"airflow", "cli"}
+            or execution.get("airflow") not in {"inline", "separate_task"}
+            or execution.get("cli", "inline") != "inline"
         ):
-            raise OrdinaryReleaseInventoryError("ordinary composition requires separately scheduled SQL pre-hooks")
+            raise OrdinaryReleaseInventoryError("ordinary pre-hook execution mode is unsupported")
     post_hooks = hooks.get("post_hook", [])
     if not isinstance(post_hooks, list):
         raise OrdinaryReleaseInventoryError("ordinary post-hook declaration is invalid")
@@ -292,28 +301,53 @@ def _source_semantics(pack: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _require_external_mssql_state(state: object, sink: object) -> None:
-    """Allow an explicit bounded policy, without inventing runtime defaults.
+def _require_supported_mssql_state(state: object) -> None:
+    """Admit only the runtime's canonical MSSQL state shape.
 
-    This is source-shape admission only. Physical state/target co-location and
-    provisioned table authority still require the runtime's existing verifier.
+    This verifies source shape, not physical database authority. Detached pack
+    reconstruction verifies the resulting bootstrap/runtime commands, while
+    deployment admission retains connection and target authority.
     """
     if (
         not isinstance(state, Mapping)
-        or set(state) - {"type", "connection_ref", "atomicity", "provisioning", "table"}
+        or set(state)
+        - {
+            "type",
+            "connection_ref",
+            "atomicity",
+            "provisioning",
+            "table",
+            "run_table",
+            "receipt_table",
+            "repair_authority_table",
+            "repair_consumption_table",
+            "audit_table",
+            "partition_checkpoint_table",
+        }
         or state.get("type") != "mssql"
-        or state.get("atomicity") != "target_atomic"
-        or state.get("provisioning") != "external"
         or not isinstance(state.get("connection_ref"), str)
         or not state["connection_ref"].strip()
-        or not isinstance(sink, Mapping)
-        or sink.get("type") != "mssql"
     ):
-        raise OrdinaryReleaseInventoryError("ordinary state requires explicit external target-atomic MSSQL authority")
-    table = state.get("table", {})
-    if (
-        not isinstance(table, Mapping)
-        or set(table) - {"database", "schema", "name"}
-        or any(not isinstance(value, str) or not value.strip() or "\x00" in value for value in table.values())
+        raise OrdinaryReleaseInventoryError("ordinary state requires canonical MSSQL state authority")
+    from dpone.config.state import StateConfigError, resolve_mssql_state_defaults
+
+    try:
+        resolve_mssql_state_defaults(state)
+    except StateConfigError as exc:
+        raise OrdinaryReleaseInventoryError(f"ordinary MSSQL state policy is invalid: {exc}") from exc
+    for field in (
+        "table",
+        "run_table",
+        "receipt_table",
+        "repair_authority_table",
+        "repair_consumption_table",
+        "audit_table",
+        "partition_checkpoint_table",
     ):
-        raise OrdinaryReleaseInventoryError("ordinary state table coordinates are invalid")
+        table = state.get(field, {})
+        if (
+            not isinstance(table, Mapping)
+            or set(table) - {"database", "schema", "name", "run_name"}
+            or any(not isinstance(value, str) or not value.strip() or "\x00" in value for value in table.values())
+        ):
+            raise OrdinaryReleaseInventoryError(f"ordinary state {field} coordinates are invalid")

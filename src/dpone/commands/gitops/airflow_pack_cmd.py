@@ -17,6 +17,7 @@ from dpone.commands.output_text import write_text
 from dpone.gitops.airflow_pack_rendering import render_gitops_airflow_pack_markdown
 
 _RUNNER_POLICY_CHOICES = ("advisory", "pr", "release")
+_OUTLET_BINDING_CHOICES = ("physical", "logical")
 
 
 def register_pack_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
@@ -33,6 +34,12 @@ def register_pack_parser(subparsers: argparse._SubParsersAction) -> argparse.Arg
     p.add_argument("--image-digest", help="Optional immutable image digest for planned runtime commands")
     p.add_argument("--mode", choices=("plan", "verify"), default="plan", help="Plan steps or verify local artifacts")
     p.add_argument("--runner-policy", choices=_RUNNER_POLICY_CHOICES, default="advisory", help="Pack policy profile")
+    p.add_argument(
+        "--outlet-binding",
+        choices=_OUTLET_BINDING_CHOICES,
+        default="physical",
+        help="Bind Airflow outlets to deployment-resolved physical URIs or portable logical URIs",
+    )
     p.add_argument(
         "--include-live-gates",
         action="store_true",
@@ -62,6 +69,12 @@ def register_reconcile_parser(subparsers: argparse._SubParsersAction) -> argpars
     p.add_argument("--changed-files", nargs="+", default=[], help="Repo-relative changed files")
     p.add_argument("--changed-files-file", help="Repo-relative newline-delimited changed-files list")
     p.add_argument("--env", default="dev", help="Environment scope")
+    p.add_argument(
+        "--outlet-binding",
+        choices=_OUTLET_BINDING_CHOICES,
+        default="physical",
+        help="Bind Airflow outlets to deployment-resolved physical URIs or portable logical URIs",
+    )
     p.add_argument("--output-dir", default=".dpone/gitops", help="Repo-relative GitOps output root")
     p.add_argument("--output", help="Optional repo-relative console output mirror path")
     p.add_argument("--format", choices=("json", "markdown"), default="json", help="Output format")

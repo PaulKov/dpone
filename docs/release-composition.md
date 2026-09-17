@@ -108,12 +108,14 @@ dags:
     workloads: [ordinary_orders]
 ```
 
-The ordinary composition capability admits a plain single-transfer manifest per
-workload, with optional referenced SQL files. It does not admit batch or authoring
-manifests, recipe expansion, hooks, transforms, custom runner assets, or dbt
-execution. Leave connection projection unconfigured: the final deployment owns
-runtime connection delivery. A secret-volume or Airflow environment bridge is
-not an interchangeable input to this procedure.
+The ordinary composition capability admits declarative single-transfer, flow,
+and batch processes with optional referenced SQL files and SQL pre-hooks. The
+built-in `runner: airflow` marker is allowed; custom runners, authoring assets,
+recipe expansion, transforms, arbitrary commands, separate post-hooks, and dbt
+execution remain outside this boundary. Leave connection projection
+unconfigured: the final deployment owns runtime connection delivery. A
+secret-volume or Airflow environment bridge is not an interchangeable input to
+this procedure.
 
 Inspect and compile the catalog:
 
@@ -127,9 +129,16 @@ dpone gitops airflow pack \
 
 dpone gitops airflow reconcile \
   --workload-set ordinary/gitops.yaml --all-workloads --env dev \
+  --outlet-binding logical \
   --output-dir .dpone/ordinary-build --format json \
   > reports/ordinary-reconcile.json
 ```
+
+`--outlet-binding logical` keeps environment-owned MSSQL hosts and ports out of
+the immutable ordinary source. MSSQL tables must then declare database, schema,
+and table explicitly; dpone does not guess a missing database from an alias.
+Omit the option to retain the backward-compatible physical outlet default for a
+deployment-bound ordinary release.
 
 The single-pack command is an inspection step. Use the full reconcile output for
 composition. Its pack root is **`.dpone/ordinary-build/airflow`**, containing

@@ -29,6 +29,7 @@ def ordinary_root(
     hook_phase: str | None = None,
     hook_execution: str | None = "separate_task",
     second_process: bool = False,
+    runner: str | None = None,
 ) -> Path:
     """Use the public deterministic producers, never hand-assert producer identity."""
     author = tmp_path / "author"
@@ -91,6 +92,7 @@ def ordinary_root(
         effective_config={
             "image": IMAGE,
             "image_digest": "sha256:" + "a" * 64,
+            **({"runner": runner} if runner is not None else {}),
             **(
                 {"airflow": {"connection_projection": connection_projection}}
                 if connection_projection is not None
@@ -175,6 +177,21 @@ def test_capture_real_producer_detaches_source_and_rewrites_transport(tmp_path: 
         result.inventory["dag_specs"][0]["id"] = "changed"
 
 
+def test_capture_accepts_builtin_airflow_runner_marker(tmp_path: Path) -> None:
+    root = ordinary_root(tmp_path, runner="airflow")
+
+    result = _capture(root)
+
+    assert result.relation_writes[0].relation == "orders"
+
+
+def test_capture_rejects_nonstandard_runner_marker(tmp_path: Path) -> None:
+    root = ordinary_root(tmp_path, runner="custom")
+
+    with pytest.raises(ValueError, match="custom authoring or runner"):
+        _capture(root)
+
+
 def test_capture_selector_scoped_flow_preserves_alias_only_projection(tmp_path: Path) -> None:
     root = ordinary_root(tmp_path, flow=True, connection_projection=_alias_projection())
 
@@ -207,6 +224,63 @@ def test_capture_selector_scoped_flow_preserves_verified_separate_pre_hook(tmp_p
     pre_hooks = [step for step in steps if step.get("phase") == "pre_hook"]
     assert len(pre_hooks) == 1
     assert "--hook-id refresh_source" in pre_hooks[0]["command"]
+
+
+def test_capture_selector_scoped_flow_preserves_verified_inline_pre_hook(
+    tmp_path: Path,
+) -> None:
+    root = ordinary_root(
+        tmp_path,
+        flow=True,
+        connection_projection=_alias_projection(),
+        hook_phase="pre_hook",
+        hook_execution=None,
+    )
+
+    assert _capture(root).relation_writes[0].relation == "orders"
+
+
+def test_capture_selector_scoped_flow_preserves_explicit_inline_pre_hook(
+    tmp_path: Path,
+) -> None:
+    root = ordinary_root(
+        tmp_path,
+        flow=True,
+        connection_projection=_alias_projection(),
+        hook_phase="pre_hook",
+        hook_execution="inline",
+    )
+
+    assert _capture(root).relation_writes[0].relation == "orders"
+
+
+def test_capture_uses_physical_outlet_for_explicit_disabled_state(
+    tmp_path: Path,
+) -> None:
+    root = ordinary_root(
+        tmp_path,
+        extra_manifest="state:\n  type: disabled\n",
+        runner="airflow",
+    )
+
+    assert _capture(root).relation_writes[0].relation == "orders"
+
+
+def test_capture_preserves_canonical_runtime_managed_mssql_state(tmp_path: Path) -> None:
+    root = ordinary_root(
+        tmp_path,
+        extra_manifest=(
+            "state:\n"
+            "  type: mssql\n"
+            "  connection_ref: state\n"
+            "  table: {schema: control, name: source_state}\n"
+            "  run_table: {schema: control, run_name: run_state}\n"
+            "  partition_checkpoint_table: {schema: control, name: partition_checkpoint}\n"
+        ),
+        runner="airflow",
+    )
+
+    assert _capture(root).relation_writes[0].relation == "orders"
 
 
 def test_capture_rejects_separate_post_hook(tmp_path: Path) -> None:
