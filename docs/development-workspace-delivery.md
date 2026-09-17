@@ -151,8 +151,7 @@ and compares executable semantics and fingerprints before publication.
 | --- | --- | --- |
 | `DPONE_DEVELOPMENT_AUTHORITY_INVALID` | Receipt family, digest, scope, limit, time, or revocation check failed | Reverify original policy and grant bytes; issue a new bounded receipt when appropriate |
 | Development release rejected as production | The authority families were kept separate | Select the development composition profile; do not rewrite the release schema |
-| Runtime says current external authority is required | Delivery succeeded, but the protected entrypoint did not receive a current verified receipt | Configure the platform verifier adapter and retry the same immutable release |
-| Runtime says workload execution is not authorized | The exact runtime or pre-hook subject is absent | Add only the required subject through the external grant process and rebuild the release |
+| Runtime rejects the development release | This delivery-only increment has no protected development runtime entrypoint | Keep the immutable release dormant; execution requires a separately approved runtime feature |
 | Ordinary source verification fails | Captured bytes and rebuilt pack differ | Regenerate the source capture from the exact commit; do not edit generated artifacts |
 
 An identical retry reuses the immutable release. Any source, projection,
