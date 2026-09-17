@@ -15,6 +15,7 @@ from dpone.runtime.clickhouse_file_stage_contract import (
     require_transport_profile as require_transport_profile,
 )
 from dpone.runtime.clickhouse_staging_composition import (
+    ClickHouseFullRefreshPublicationMixin,
     build_clickhouse_staging_components,
 )
 from dpone.runtime.clickhouse_staging_composition import (
@@ -42,6 +43,7 @@ if TYPE_CHECKING:
 
 
 class ClickHouseSink(
+    ClickHouseFullRefreshPublicationMixin,
     ClickHouseTargetCatalogMixin,
     ClickHouseClusterPreflightMixin,
     ClickHouseBulkMixin,
@@ -93,6 +95,7 @@ class ClickHouseSink(
         self._validated_file_service = staging.validated_file
         self._staging_decoder = staging.decoder
         self._staging_finalizer = staging.finalizer
+        self._full_refresh_publication = staging.full_refresh_publication
         self._payload_ingestion = ClickHousePayloadIngestionService(self, sink_factory=self._clone_sink)
         self._staged_load = ClickHouseStagedLoadService(
             self,
@@ -233,7 +236,13 @@ class ClickHouseSink(
         )
         return staging_config
 
-    def _swap_table_into_target(self, load_config: LoadConfig, replacement_config: LoadConfig) -> None:
+    def _swap_table_into_target(self, load_config: LoadConfig, replacement_config: LoadConfig) -> Any:
+        if self._full_refresh_publication.is_enabled(load_config):
+            return self._full_refresh_publication.publish(
+                load_config,
+                replacement_config,
+                staged_rows=self._count(replacement_config),
+            )
         target_exists = self._table_exists(load_config)
         backup_config = self._operation_table_config(load_config, "backup")
         cluster_clause = self._cluster_ddl_clause(load_config)
@@ -248,6 +257,7 @@ class ClickHouseSink(
             self.connector.execute_query(
                 f"RENAME TABLE {self._table(replacement_config)} TO {self._table(load_config)}{cluster_clause}"
             )
+        return None
 
     def _insert_from_table(self, source_config: LoadConfig, target_config: LoadConfig) -> int:
         settings_clause = ClickHouseNullInsertPolicy.from_load_config(target_config).insert_select_settings_clause()

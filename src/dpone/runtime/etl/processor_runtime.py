@@ -74,7 +74,7 @@ class ProcessorRuntimeServices:
         load_record: Any,
         dag_id: str | None,
     ) -> Any:
-        return self.mssql_transaction_admission_service.prepare(
+        prepared = self.mssql_transaction_admission_service.prepare(
             load_config,
             source=self.source,
             sink=self.sink,
@@ -82,9 +82,22 @@ class ProcessorRuntimeServices:
             load_record=load_record,
             dag_id=dag_id,
         )
+        sink_prepare = getattr(self.sink, "prepare_runtime_admission", None)
+        if not callable(sink_prepare):
+            return prepared
+        return sink_prepare(
+            prepared,
+            run_context=run_context,
+            load_record=load_record,
+            dag_id=dag_id,
+        )
 
     def replay_result(self, load_config: Any) -> Any | None:
-        return self.mssql_transaction_admission_service.replay_result(load_config)
+        result = self.mssql_transaction_admission_service.replay_result(load_config)
+        if result is not None:
+            return result
+        sink_replay = getattr(self.sink, "replay_result", None)
+        return sink_replay(load_config) if callable(sink_replay) else None
 
     def preflight_before_extract(self, load_config: Any, load_record: Any) -> None:
         self.source_extraction_lifecycle_service.assert_supported(self.source, load_config)

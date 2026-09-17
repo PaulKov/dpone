@@ -14,6 +14,7 @@ from dpone.runtime.governance.ports import (
     staged_load_failure_details,
 )
 from dpone.runtime.process_io import add_exception_note
+from dpone.runtime.sinks.clickhouse_full_refresh_staged import finalize_full_refresh, publication_cleanup_plan
 from dpone.runtime.sinks.clickhouse_production_finalize import ClickHouseProductionFinalizer
 from dpone.runtime.sinks.clickhouse_staged_evidence import enforce_source_byte_budget, staged_handle_metadata
 from dpone.runtime.sinks.load_result import LoadResult
@@ -173,11 +174,12 @@ class ClickHouseStagedLoadService:
         retire = getattr(finalizer, "retire_strategy_staging_validations", None)
         if callable(retire):
             retire(self._finalization_config(handle))
-        self._drop_configs(
-            handle.finalization_config,
-            handle.decoded_config,
-            handle.staging_config,
-        )
+        configs, publication = publication_cleanup_plan(handle)
+        if publication is None:
+            self._drop_configs(*configs)
+            return
+        self._drop_configs(*configs)
+        self._sink._cleanup_full_refresh_publication(publication)
 
     def abort(self, handle: StagedLoadHandle) -> None:
         self.cleanup(handle)
@@ -206,13 +208,7 @@ class ClickHouseStagedLoadService:
         return self._sink._create_staging_table(load_config, staging_schema.columns)
 
     def _full_refresh(self, load_config: Any, handle: StagedLoadHandle) -> LoadResult:
-        self._sink._swap_table_into_target(load_config, self._finalization_config(handle))
-        return LoadResult(
-            inserted_rows=handle.staged_rows,
-            updated_rows=0,
-            total_rows=self._sink._count(load_config),
-            staging_rows=handle.staged_rows,
-        )
+        return finalize_full_refresh(self._sink, load_config, handle)
 
     def _incremental_append(self, load_config: Any, handle: StagedLoadHandle) -> LoadResult:
         if self._sink._table_exists(load_config):

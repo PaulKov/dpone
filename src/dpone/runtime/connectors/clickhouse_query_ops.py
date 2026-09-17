@@ -44,13 +44,22 @@ class ClickHouseQueryOps:
     def logger(self):
         return self.connector.logger
 
-    def execute_query(self, query: Any, params: Iterable[Any] | None = None) -> int:
+    def execute_query(
+        self,
+        query: Any,
+        params: Iterable[Any] | None = None,
+        *,
+        query_id: str | None = None,
+    ) -> int:
         self.connector.print_query(query, params)
         attempts = _ddl_retry_attempts()
         settings = _execute_settings(self.connector, query)
         for attempt in range(1, attempts + 1):
             try:
-                self.connector.connection.execute(query, params, settings=settings)
+                if query_id is None:
+                    self.connector.connection.execute(query, params, settings=settings)
+                else:
+                    self.connector.connection.execute(query, params, settings=settings, query_id=query_id)
                 return 0
             except Exception as e:
                 if not _should_retry_ddl(query, e, attempt=attempt, attempts=attempts):
@@ -252,10 +261,11 @@ class ClickHouseQueryOps:
 
 
 def _should_retry_ddl(query: Any, exc: Exception, *, attempt: int, attempts: int) -> bool:
-    # EXCHANGE can have committed before an error is observed; replay swaps back.
+    # Publication EXCHANGE/RENAME may commit before an error is observed. Their
+    # caller must reconcile catalog identity before deciding whether to retry.
     return (
         attempt < attempts
-        and _statement_kind(query) != "EXCHANGE"
+        and _statement_kind(query) not in {"EXCHANGE", "RENAME"}
         and _is_ddl_like(query)
         and _is_retryable_cluster_metadata_error(exc)
     )

@@ -18,9 +18,11 @@ class _ExchangeClient:
         self.apply_before_error = apply_before_error
         self.identities = ("old-generation", "new-generation")
         self.calls: list[tuple[str, Any, Any]] = []
+        self.query_ids: list[str | None] = []
 
-    def execute(self, query: str, params: Any, *, settings: Any) -> None:
+    def execute(self, query: str, params: Any, *, settings: Any, query_id: str | None = None) -> None:
         self.calls.append((query, params, settings))
+        self.query_ids.append(query_id)
         if self.apply_before_error or len(self.calls) > 1:
             self.identities = self.identities[::-1]
         if len(self.calls) == 1 and self.error is not None:
@@ -70,6 +72,16 @@ def test_exchange_pre_effect_error_is_not_assumed_safe_to_retry() -> None:
     assert client.identities == ("old-generation", "new-generation")
 
 
+def test_publication_rename_uncertain_response_is_dispatched_once() -> None:
+    original = RuntimeError("Code: 517. Metadata on replica is not up to date")
+    client = _ExchangeClient(original)
+
+    with pytest.raises(RuntimeError, match="Code: 517"):
+        _query_service(client).execute_query("RENAME TABLE `synthetic`.`candidate` TO `synthetic`.`target`")
+
+    assert len(client.calls) == 1
+
+
 def test_successful_exchange_keeps_parameters_and_ddl_settings() -> None:
     client = _ExchangeClient(None)
     query = "EXCHANGE TABLES `synthetic`.`items` AND `synthetic`.`generation` ON CLUSTER `synthetic_cluster`"
@@ -85,3 +97,13 @@ def test_successful_exchange_keeps_parameters_and_ddl_settings() -> None:
         )
     ]
     assert client.identities == ("new-generation", "old-generation")
+
+
+def test_publication_query_id_is_forwarded_without_mutating_connector_settings() -> None:
+    client = _ExchangeClient(None)
+    service = _query_service(client)
+
+    assert service.execute_query("EXCHANGE TABLES a AND b", query_id="stable-publication-id") == 0
+
+    assert client.query_ids == ["stable-publication-id"]
+    assert service.connector.settings.get("query_id") is None

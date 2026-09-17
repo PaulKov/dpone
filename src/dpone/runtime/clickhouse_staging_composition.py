@@ -1,4 +1,4 @@
-"""Construct ClickHouse staging collaborators without running their callbacks.
+"""Construct ClickHouse sink collaborators without running their callbacks.
 
 This boundary owns transport and storage wiring. The returned bundle carries the
 existing collaborators directly; execution and lifecycle policy stay with them.
@@ -18,6 +18,7 @@ from dpone.runtime.clickhouse_file_stage_contract import (
 )
 from dpone.runtime.connectors.clickhouse_file_stage_client import build_file_client_runner
 from dpone.runtime.connectors.clickhouse_file_stage_http import build_file_http_runner
+from dpone.runtime.sinks.clickhouse_full_refresh_publication import ClickHouseFullRefreshPublicationService
 from dpone.runtime.sinks.clickhouse_physical_types import ClickHousePhysicalColumnTypeResolver
 from dpone.runtime.sinks.clickhouse_staging_decoder import ClickHouseStagingDecoder
 from dpone.runtime.sinks.clickhouse_staging_finalizer import ClickHouseStagingFinalizer
@@ -28,6 +29,39 @@ from dpone.runtime.storage_policy import StoragePreflightService
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
     from dpone.ports.clickhouse_connector import ClickHouseConnectorPort
+    from dpone.runtime.sinks.load_result import LoadResult
+
+
+class ClickHouseFullRefreshPublicationMixin:
+    """Expose publication lifecycle hooks through the sink's narrow service."""
+
+    _full_refresh_publication: ClickHouseFullRefreshPublicationService
+
+    def prepare_runtime_admission(
+        self,
+        load_config: LoadConfig,
+        *,
+        run_context: Any,
+        load_record: Any,
+        dag_id: str | None,
+    ) -> LoadConfig:
+        """Preflight or reconcile full-refresh publication before source I/O."""
+
+        del load_record
+        identified = self._full_refresh_publication.bind_runtime_identity(
+            load_config,
+            scheduler_run_id=str(getattr(run_context, "run_id", "") or ""),
+            process_id=str(dag_id or ""),
+        )
+        return self._full_refresh_publication.prepare_admission(identified)
+
+    def replay_result(self, load_config: LoadConfig) -> LoadResult | None:
+        """Return a catalog-reconciled source-free publication result."""
+
+        return self._full_refresh_publication.replay_result(load_config)
+
+    def _cleanup_full_refresh_publication(self, receipt: Any) -> None:
+        self._full_refresh_publication.cleanup(receipt)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +71,7 @@ class ClickHouseStagingComponents:
     validated_file: ClickHouseValidatedFileService
     decoder: ClickHouseStagingDecoder
     finalizer: ClickHouseStagingFinalizer
+    full_refresh_publication: ClickHouseFullRefreshPublicationService
 
 
 def build_clickhouse_staging_components(
@@ -84,7 +119,8 @@ def build_clickhouse_staging_components(
         count_rows=count_rows,
         mutations_sync=mutations_sync,
     )
-    return ClickHouseStagingComponents(validated_file, decoder, finalizer)
+    full_refresh_publication = ClickHouseFullRefreshPublicationService.from_connector(connector)
+    return ClickHouseStagingComponents(validated_file, decoder, finalizer, full_refresh_publication)
 
 
 def build_file_runner(
