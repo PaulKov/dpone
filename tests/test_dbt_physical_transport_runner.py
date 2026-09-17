@@ -6,6 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 from threading import Event
+from typing import Any
 
 import pytest
 
@@ -209,15 +210,25 @@ def test_actual_runner_spawn_inherits_one_anonymous_packet_and_closes_parent(tmp
         profile_directory=tmp_path,
         cancellation=Event(),
     )
+    inherited: list[int] = []
+
+    def observed_popen(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+        (fd,) = kwargs["pass_fds"]
+        os.fstat(fd)
+        inherited.append(fd)
+        return subprocess.Popen(*args, **kwargs)
 
     result = SubprocessDbtCommandRunner(
         dbt_executable=os.fspath(executable),
         physical_transport_launch=lease,
+        popen_factory=observed_popen,
     ).run(_args(tmp_path), cwd=tmp_path, timeout_seconds=10, redactions=())
 
     assert result.exit_code == 0
     assert result.stdout.strip() == f"packet-bytes={len(delivery.payload)}"
     assert not tuple(tmp_path.glob(".dpone-transport-*"))
+    with pytest.raises(OSError):
+        os.fstat(inherited[0])
     with pytest.raises(ValueError, match="already consumed"):
         lease.__enter__()
 
@@ -229,7 +240,12 @@ def test_spawn_failure_consumes_and_closes_actual_launch_lease(tmp_path: Path) -
         cancellation=Event(),
     )
 
-    def fail_spawn(*_args: object, **_kwargs: object) -> _Process:
+    inherited: list[int] = []
+
+    def fail_spawn(*_args: Any, **kwargs: Any) -> _Process:
+        (fd,) = kwargs["pass_fds"]
+        os.fstat(fd)
+        inherited.append(fd)
         raise OSError("synthetic spawn failure")
 
     runner = SubprocessDbtCommandRunner(
@@ -240,6 +256,8 @@ def test_spawn_failure_consumes_and_closes_actual_launch_lease(tmp_path: Path) -
         runner.run(_args(tmp_path), cwd=tmp_path, timeout_seconds=10, redactions=())
 
     assert not tuple(tmp_path.glob(".dpone-transport-*"))
+    with pytest.raises(OSError):
+        os.fstat(inherited[0])
     with pytest.raises(ValueError, match="already consumed"):
         lease.__enter__()
 
