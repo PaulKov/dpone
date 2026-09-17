@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from dpone.contracts.dbt_workspace_activation import (
     DbtWorkspacePhysicalResource,
     DbtWorkspacePreparedActivation,
 )
+from dpone.runtime import deployment_cache_development_admission as development_admission_module
 from dpone.runtime.deployment_cache_common import DeploymentCacheError
 from dpone.runtime.deployment_cache_materializer import DeploymentCacheMaterializer
 from tests.test_composition_activation_contract import request as composition_request
@@ -305,6 +307,42 @@ def test_development_activation_rejects_release_changed_after_snapshot(tmp_path:
         )
 
     assert denied.value.code == "DPONE_RELEASE_FINGERPRINT_MISMATCH"
+    assert denied.value.details == {"state_may_have_changed": True, "recovery_required": True}
+    assert not (cache / "current").exists()
+    assert not (cache / "current-pointer.json").exists()
+
+
+def test_development_activation_rechecks_grant_time_after_release_verification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=False)
+    deployment = cache / "deployments" / "development" / deployment_id.replace(":", "-", 1)
+    current_time = [_clock()]
+    fingerprint_calls = 0
+    release_content_id = development_admission_module.release_content_id
+
+    def verify_release_then_expire_grant(release) -> str:
+        nonlocal fingerprint_calls
+        verified_id = release_content_id(release)
+        fingerprint_calls += 1
+        if fingerprint_calls == 2:
+            current_time[0] += timedelta(hours=2)
+        return verified_id
+
+    monkeypatch.setattr(development_admission_module, "release_content_id", verify_release_then_expire_grant)
+
+    with pytest.raises(DeploymentCacheError) as denied:
+        DeploymentCacheMaterializer(
+            cache,
+            workspace_activation=_Coordinator(),
+            development_admission=_admission(authority, "activate", release_id, deployment_id),
+            development_admission_verifier=_admission_verifier(authority),
+            clock=lambda: current_time[0],
+        ).promote(deployment, environment="development")
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED"
     assert denied.value.details == {"state_may_have_changed": True, "recovery_required": True}
     assert not (cache / "current").exists()
     assert not (cache / "current-pointer.json").exists()
