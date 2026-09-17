@@ -113,17 +113,22 @@ class ClickHouseClusterFullRefreshPublicationService:
             self._require_same_operation(current.record, record)
             record = current.record
             if record.phase is not AuthorityPhase.PREPARED:
-                return self._reconcile_existing(authority, current, cluster, inventory.hosts, facts)
+                _require_inventory(record, inventory)
+                return self._reconcile_existing(authority, current, cluster)
+        self._revalidate_pre_dispatch(cluster, record)
         token = _correlation_token(operation_id, "publish", record.dispatch_epoch + 1)
-        dispatching = record.dispatching(token=token)
+        dispatching = record.dispatching(
+            token=token,
+            query_digest=self._ddl.publication_query_digest(record, cluster=cluster),
+        )
         won = authority.compare_and_swap(current, dispatching)
         verified = _require_verified(won, permit=True)
         assert won.permit is not None
         try:
             self._ddl.dispatch_publication(dispatching, won.permit, cluster=cluster)
         except Exception:
-            return self._reconcile_existing(authority, verified, cluster, inventory.hosts)
-        return self._reconcile_existing(authority, verified, cluster, inventory.hosts)
+            return self._reconcile_existing(authority, verified, cluster)
+        return self._reconcile_existing(authority, verified, cluster)
 
     def prepare_admission(self, load_config: Any) -> Any:
         """Resume an owned operation before source I/O; never redispatch publication."""
@@ -140,12 +145,13 @@ class ClickHouseClusterFullRefreshPublicationService:
                 "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target"
             )
         inventory = self._catalog.inventory(cluster)
+        _require_inventory(current.record, inventory)
         self._catalog.require_atomic_database(cluster, database, inventory.hosts)
         self._bootstrap.ensure(cluster, database, inventory.hosts)
         if current.record.phase is AuthorityPhase.COMPLETED:
             receipt = self._receipt(current, cluster)
         elif current.record.phase is AuthorityPhase.DISPATCHING:
-            receipt = self._reconcile_existing(authority, current, cluster, inventory.hosts)
+            receipt = self._reconcile_existing(authority, current, cluster)
             self.cleanup(receipt)
         elif current.record.phase in {AuthorityPhase.COMMITTED, AuthorityPhase.CLEANUP_DISPATCHING}:
             receipt = self._receipt(current, cluster)
@@ -179,10 +185,16 @@ class ClickHouseClusterFullRefreshPublicationService:
             raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "authority changed")
         if current.record.phase is AuthorityPhase.COMPLETED:
             return
+        inventory = self._catalog.inventory(resolved.cluster)
+        _require_inventory(current.record, inventory)
+        self._require_publication_entry(current.record, resolved.cluster)
         if current.record.predecessor is None:
+            if current.record.phase is not AuthorityPhase.COMMITTED:
+                raise ClusterPublicationError(
+                    "DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNSAFE", "authority is not ready for completion"
+                )
             self._complete(authority, current)
             return
-        inventory = self._catalog.inventory(resolved.cluster)
         facts = self._catalog.generations(
             resolved.cluster, record.database, record.target, record.candidate, inventory.hosts
         )
@@ -205,6 +217,10 @@ class ClickHouseClusterFullRefreshPublicationService:
             cleanup_correlation_token=_correlation_token(
                 record.operation_id, "cleanup", current.record.dispatch_epoch + 1
             ),
+        )
+        cleanup = replace(
+            cleanup,
+            cleanup_query_digest=self._ddl.cleanup_query_digest(cleanup, cluster=resolved.cluster),
         )
         mutation = authority.compare_and_swap(current, cleanup)
         verified = _require_verified(mutation, permit=True)
@@ -229,11 +245,8 @@ class ClickHouseClusterFullRefreshPublicationService:
         hosts: tuple[str, ...],
         states: tuple[ReplicaPublicationState, ...],
     ) -> None:
-        token = current.record.cleanup_correlation_token
-        if not token:
-            raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNKNOWN", "cleanup token is missing")
-        entries = self._ddl.find_entries(cluster, token)
-        if len(entries) != 1 or entries[0].state_for(hosts) not in {
+        entry = self._require_cleanup_entry(current.record, cluster)
+        if entry.state_for(hosts) not in {
             QueueState.TERMINAL_SUCCESS,
             QueueState.TERMINAL_FAILURE,
         }:
@@ -245,7 +258,7 @@ class ClickHouseClusterFullRefreshPublicationService:
         completed = replace(
             current.record,
             phase=AuthorityPhase.COMPLETED,
-            cleanup_entry=entries[0].entry,
+            cleanup_entry=entry.entry,
         )
         _require_verified(authority.compare_and_swap(current, completed), permit=False)
 
@@ -254,18 +267,14 @@ class ClickHouseClusterFullRefreshPublicationService:
         authority: ClusterPublicationAuthorityPort,
         current: VersionedAuthorityRecord,
         cluster: str,
-        hosts: tuple[str, ...],
-        facts: Any = None,
     ) -> ClusterFullRefreshReceipt:
         record = current.record
-        if not record.ddl_correlation_token:
-            raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN", "dispatch token is missing")
-        entries = self._ddl.find_entries(cluster, record.ddl_correlation_token)
-        if len(entries) != 1:
-            raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN", "exactly one queue entry required")
-        entry = entries[0]
+        inventory = self._catalog.inventory(cluster)
+        _require_inventory(record, inventory)
+        hosts = inventory.hosts
+        entry = self._require_publication_entry(record, cluster)
         queue_state = entry.state_for(hosts)
-        observed = facts or self._catalog.generations(cluster, record.database, record.target, record.candidate, hosts)
+        observed = self._catalog.generations(cluster, record.database, record.target, record.candidate, hosts)
         states = tuple(
             classify_replica(item, desired=record.desired, predecessor=record.predecessor) for item in observed
         )
@@ -282,7 +291,6 @@ class ClickHouseClusterFullRefreshPublicationService:
             record,
             phase=AuthorityPhase.COMMITTED,
             ddl_entry=entry.entry,
-            ddl_query_digest=entry.query_digest,
         )
         if current.record != committed:
             result = authority.compare_and_swap(current, committed)
@@ -299,6 +307,63 @@ class ClickHouseClusterFullRefreshPublicationService:
         return ClusterFullRefreshReceipt(
             marker=marker, authority=current.record, authority_version=current.version, cluster=cluster
         )
+
+    def _require_publication_entry(self, record: AuthorityRecord, cluster: str) -> Any:
+        return self._require_exact_entry(
+            cluster,
+            entry_id=record.ddl_entry,
+            token=record.ddl_correlation_token,
+            query_digest=record.ddl_query_digest,
+            error_code="DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN",
+        )
+
+    def _require_cleanup_entry(self, record: AuthorityRecord, cluster: str) -> Any:
+        return self._require_exact_entry(
+            cluster,
+            entry_id=record.cleanup_entry,
+            token=record.cleanup_correlation_token,
+            query_digest=record.cleanup_query_digest,
+            error_code="DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNKNOWN",
+        )
+
+    def _require_exact_entry(
+        self,
+        cluster: str,
+        *,
+        entry_id: str | None,
+        token: str | None,
+        query_digest: str | None,
+        error_code: str,
+    ) -> Any:
+        if not token or not query_digest:
+            raise ClusterPublicationError(error_code, "DDL identity is incomplete")
+        entries: tuple[Any, ...]
+        if entry_id:
+            entry = self._ddl.read_entry(cluster, entry_id)
+            entries = () if entry is None else (entry,)
+        else:
+            entries = self._ddl.find_entries(cluster, token)
+        if len(entries) != 1:
+            raise ClusterPublicationError(error_code, "exactly one queue entry required")
+        entry = entries[0]
+        if entry.correlation_token != token or entry.query_digest != query_digest:
+            raise ClusterPublicationError(error_code, "queue entry does not match the fenced DDL identity")
+        return entry
+
+    def _revalidate_pre_dispatch(self, cluster: str, record: AuthorityRecord) -> None:
+        inventory = self._catalog.inventory(cluster)
+        _require_inventory(record, inventory)
+        self._catalog.require_atomic_database(cluster, record.database, inventory.hosts)
+        facts = self._catalog.generations(cluster, record.database, record.target, record.candidate, inventory.hosts)
+        if (
+            _one_identity(facts, "candidate") != record.desired
+            or _optional_one_identity(facts, "target") != record.predecessor
+            or any(not fact.candidate_healthy or fact.row_count != record.staged_rows for fact in facts)
+        ):
+            raise ClusterPublicationError(
+                "DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED",
+                "generation changed before publication dispatch",
+            )
 
     @staticmethod
     def _receipt(current: VersionedAuthorityRecord, cluster: str) -> ClusterFullRefreshReceipt:
@@ -340,6 +405,14 @@ def _require_verified(result: Any, *, permit: bool) -> VersionedAuthorityRecord:
     if permit and result.permit is None:
         raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_CAS_UNKNOWN", "dispatch permit was not issued")
     return result.observed
+
+
+def _require_inventory(record: AuthorityRecord, inventory: Any) -> None:
+    if inventory.digest != record.inventory_digest:
+        raise ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_INVENTORY_DRIFT",
+            "cluster inventory changed after authority acquisition",
+        )
 
 
 def _one_identity(facts: Any, name: str) -> Any:

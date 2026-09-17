@@ -173,6 +173,12 @@ def test_lost_publication_and_cleanup_responses_reconcile_without_redispatch() -
             self.publication_calls = 0
             self.cleanup_calls = 0
 
+        def publication_query_digest(self, record, *, cluster):
+            return delegate.publication_query_digest(record, cluster=cluster)
+
+        def cleanup_query_digest(self, record, *, cluster):
+            return delegate.cleanup_query_digest(record, cluster=cluster)
+
         def dispatch_publication(self, record, permit, *, cluster):
             self.publication_calls += 1
             delegate.dispatch_publication(record, permit, cluster=cluster)
