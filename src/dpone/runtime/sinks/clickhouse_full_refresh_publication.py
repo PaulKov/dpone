@@ -393,7 +393,4 @@ __all__ = [
     "ClickHouseFullRefreshOutcomeUnknown",
     "ClickHouseFullRefreshPublicationService",
     "FullRefreshPublicationCatalog",
-    "FullRefreshPublicationReceipt",
 ]
-
-FullRefreshPublicationReceipt = publication_contract.FullRefreshPublicationReceipt
