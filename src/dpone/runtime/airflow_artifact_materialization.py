@@ -99,7 +99,7 @@ class AirflowArtifactMaterializer:
                     admission=self._development_admission,
                     admission_verifier=self._development_admission_verifier,
                     operation="materialize",
-                    checked_at=self._clock(),
+                    clock=self._clock,
                 )
                 require_registry_ref(deployment, index, request.artifact_registry_ref)
                 self._fetch_remaining(
@@ -115,7 +115,7 @@ class AirflowArtifactMaterializer:
                     admission=self._development_admission,
                     admission_verifier=self._development_admission_verifier,
                     operation="materialize",
-                    checked_at=self._clock(),
+                    clock=self._clock,
                     source_bytes=sum(path.stat().st_size for path in staged_release.rglob("*") if path.is_file()),
                 )
                 validate_deployment_auxiliary_files(
@@ -131,7 +131,7 @@ class AirflowArtifactMaterializer:
                     admission=self._development_admission,
                     admission_verifier=self._development_admission_verifier,
                     operation="materialize",
-                    checked_at=self._clock(),
+                    clock=self._clock,
                     source_bytes=sum(path.stat().st_size for path in staged_release.rglob("*") if path.is_file()),
                 )
                 release_state, deployment_state = _install_staged_projection(

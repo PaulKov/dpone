@@ -31,7 +31,9 @@ from tests.test_development_remote_delivery_authority import (
     _admission,
     _admission_verifier,
     _clock,
+    _ClockAdvancingVerifier,
     _development_projection,
+    _MutableClock,
 )
 
 
@@ -411,6 +413,41 @@ def test_development_activation_rechecks_grant_time_after_release_verification(
 
     assert denied.value.code == "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED"
     assert denied.value.details == {"state_may_have_changed": True, "recovery_required": True}
+    assert not (cache / "current").exists()
+    assert not (cache / "current-pointer.json").exists()
+
+
+@pytest.mark.parametrize("composed", [False, True])
+def test_development_activation_rechecks_grant_time_after_final_target_verification(
+    tmp_path: Path,
+    composed: bool,
+) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=composed)
+    deployment = cache / "deployments" / "development" / deployment_id.replace(":", "-", 1)
+    coordinator = _CompositionCoordinator() if composed else _Coordinator()
+    clock = _MutableClock()
+    verifier = _ClockAdvancingVerifier(
+        _admission_verifier(authority),
+        clock=clock,
+        advance_on_call=2,
+    )
+
+    with pytest.raises(DeploymentCacheError) as denied:
+        DeploymentCacheMaterializer(
+            cache,
+            workspace_activation=None if composed else coordinator,
+            composition_activation_coordinator=coordinator if composed else None,
+            development_admission=_admission(authority, "activate", release_id, deployment_id),
+            development_admission_verifier=verifier,
+            clock=clock,
+        ).promote(deployment, environment="development")
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED"
+    assert denied.value.details == {"state_may_have_changed": True, "recovery_required": True}
+    assert verifier.calls == 2
+    assert len(coordinator.events) == 1
+    assert coordinator.events[0][0] == "prepare"
     assert not (cache / "current").exists()
     assert not (cache / "current-pointer.json").exists()
 

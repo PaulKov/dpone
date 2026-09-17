@@ -257,6 +257,71 @@ def test_publish_rechecks_grant_time_after_preparation_before_first_write(
     assert not (tmp_path / "registry" / "releases").exists()
 
 
+@pytest.mark.parametrize("publication_mode", ["exact", "compatible"])
+def test_publish_rechecks_grant_time_after_final_target_verification(
+    tmp_path: Path,
+    publication_mode: Literal["exact", "compatible"],
+) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=True)
+    registry = _registry(tmp_path)
+    clock = _MutableClock()
+    verifier = _ClockAdvancingVerifier(
+        _admission_verifier(authority),
+        clock=clock,
+        advance_on_call=6,
+    )
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied:
+        AirflowArtifactPublisher(
+            registry=registry,
+            development_admission=_admission(authority, "publish", release_id, deployment_id),
+            development_admission_verifier=verifier,
+            clock=clock,
+        ).publish(
+            PublishRequest(
+                cache_root=cache,
+                release_id=release_id,
+                deployment_id=deployment_id,
+                environment="development",
+                artifact_registry_ref="synthetic-artifacts",
+                publication_mode=publication_mode,
+            )
+        )
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert verifier.calls == 6
+    assert not (tmp_path / "registry" / "releases").exists()
+    assert not (tmp_path / "registry" / "deployments").exists()
+
+
+def test_publish_closes_external_target_verifier_failure(tmp_path: Path) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=False)
+    registry = _registry(tmp_path)
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied:
+        AirflowArtifactPublisher(
+            registry=registry,
+            development_admission=_admission(authority, "publish", release_id, deployment_id),
+            development_admission_verifier=_UnavailableVerifier(),
+            clock=_clock,
+        ).publish(
+            PublishRequest(
+                cache_root=cache,
+                release_id=release_id,
+                deployment_id=deployment_id,
+                environment="development",
+                artifact_registry_ref="synthetic-artifacts",
+                publication_mode="exact",
+            )
+        )
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert "protected-policy-location-must-not-escape" not in str(denied.value)
+    assert not (tmp_path / "registry" / "releases").exists()
+
+
 def test_materialize_rechecks_revocation_immediately_before_install(tmp_path: Path) -> None:
     authority = _development_authority()
     cache, release_id, deployment_id = _development_projection(tmp_path, composed=True)
@@ -297,6 +362,98 @@ def test_materialize_rechecks_revocation_immediately_before_install(tmp_path: Pa
 
     assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
     assert verifier.calls == 2
+    assert not (destination / "releases").exists()
+    assert not (destination / "deployments").exists()
+
+
+def test_materialize_rechecks_grant_time_after_final_target_verification(tmp_path: Path) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=True)
+    registry = _registry(tmp_path)
+    AirflowArtifactPublisher(
+        registry=registry,
+        development_admission=_admission(authority, "publish", release_id, deployment_id),
+        development_admission_verifier=_admission_verifier(authority),
+        clock=_clock,
+    ).publish(
+        PublishRequest(
+            cache_root=cache,
+            release_id=release_id,
+            deployment_id=deployment_id,
+            environment="development",
+            artifact_registry_ref="synthetic-artifacts",
+            publication_mode="exact",
+        )
+    )
+    destination = tmp_path / "expired-cache"
+    clock = _MutableClock()
+    verifier = _ClockAdvancingVerifier(
+        _admission_verifier(authority),
+        clock=clock,
+        advance_on_call=3,
+    )
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied:
+        AirflowArtifactMaterializer(
+            registry=registry,
+            development_admission=_admission(authority, "materialize", release_id, deployment_id),
+            development_admission_verifier=verifier,
+            clock=clock,
+        ).materialize(
+            MaterializeRequest(
+                cache_root=destination,
+                release_id=release_id,
+                deployment_id=deployment_id,
+                environment="development",
+                artifact_registry_ref="synthetic-artifacts",
+            )
+        )
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert verifier.calls == 3
+    assert not (destination / "releases").exists()
+    assert not (destination / "deployments").exists()
+
+
+def test_materialize_closes_external_target_verifier_failure(tmp_path: Path) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=False)
+    registry = _registry(tmp_path)
+    AirflowArtifactPublisher(
+        registry=registry,
+        development_admission=_admission(authority, "publish", release_id, deployment_id),
+        development_admission_verifier=_admission_verifier(authority),
+        clock=_clock,
+    ).publish(
+        PublishRequest(
+            cache_root=cache,
+            release_id=release_id,
+            deployment_id=deployment_id,
+            environment="development",
+            artifact_registry_ref="synthetic-artifacts",
+            publication_mode="exact",
+        )
+    )
+    destination = tmp_path / "unavailable-cache"
+
+    with pytest.raises(AirflowArtifactDeliveryError) as denied:
+        AirflowArtifactMaterializer(
+            registry=registry,
+            development_admission=_admission(authority, "materialize", release_id, deployment_id),
+            development_admission_verifier=_UnavailableVerifier(),
+            clock=_clock,
+        ).materialize(
+            MaterializeRequest(
+                cache_root=destination,
+                release_id=release_id,
+                deployment_id=deployment_id,
+                environment="development",
+                artifact_registry_ref="synthetic-artifacts",
+            )
+        )
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED"
+    assert "protected-policy-location-must-not-escape" not in str(denied.value)
     assert not (destination / "releases").exists()
     assert not (destination / "deployments").exists()
 
@@ -467,6 +624,36 @@ class _ExpiringClock:
         if self.calls > self._expire_after_calls:
             return _clock() + timedelta(hours=2)
         return _clock()
+
+
+class _MutableClock:
+    def __init__(self) -> None:
+        self._now = _clock()
+
+    def __call__(self) -> datetime:
+        return self._now
+
+    def expire(self) -> None:
+        self._now += timedelta(hours=2)
+
+
+class _ClockAdvancingVerifier:
+    def __init__(self, delegate, *, clock: _MutableClock, advance_on_call: int) -> None:
+        self._delegate = delegate
+        self._clock = clock
+        self._advance_on_call = advance_on_call
+        self.calls = 0
+
+    def require_current(self, admission: DevelopmentTargetAdmission, *, now: datetime) -> None:
+        self.calls += 1
+        self._delegate.require_current(admission, now=now)
+        if self.calls == self._advance_on_call:
+            self._clock.expire()
+
+
+class _UnavailableVerifier:
+    def require_current(self, admission: DevelopmentTargetAdmission, *, now: datetime) -> None:
+        raise OSError("protected-policy-location-must-not-escape")
 
 
 class _CurrentTargetVerifier:
