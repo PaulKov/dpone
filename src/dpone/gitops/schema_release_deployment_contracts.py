@@ -11,6 +11,7 @@ from dpone.gitops.schema_contract_primitives import (
     documented_contract,
     string_schema,
 )
+from dpone.gitops.schema_development_release import development_release_set_contract
 from dpone.gitops.schema_release_composition import release_composition_contract, release_composition_manifest_contract
 from dpone.gitops.schema_release_deployment_definitions import (
     identity_schema,
@@ -44,7 +45,11 @@ def release_deployment_schema_contracts() -> tuple[GitOpsSchemaContract, ...]:
     return (
         release_set_contract(),
         release_set_v2_contract(),
-        release_composition_contract(release_set_v2_contract().schema),
+        development_release_set_contract(),
+        release_composition_contract(
+            release_set_v2_contract().schema,
+            development_release_set_contract().schema,
+        ),
         release_composition_manifest_contract(),
         deployment_set_contract(),
         deployment_set_v2_contract(),

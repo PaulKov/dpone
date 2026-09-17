@@ -4,6 +4,7 @@ import base64
 import json
 import shutil
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 
 import pytest
@@ -12,6 +13,11 @@ from dpone_airflow_pack.init_fetch_pod import compose_init_fetch_operator_kwargs
 from dpone_airflow_pack.pack_task_runtime import runtime_operator_kwargs
 
 from dpone.contracts.airflow_deployment import release_id
+from dpone.contracts.development_delivery_authority import (
+    DEVELOPMENT_COMPOSITION_PROFILE,
+    DEVELOPMENT_RELEASE_SCHEMA,
+    DevelopmentAuthorityReceipt,
+)
 from dpone.readiness.airflow_compact_pack_release import materialize_compact_pack_release
 from dpone.readiness.airflow_deployment_projection import AirflowDeploymentProjectionService
 from dpone.runtime.airflow_runtime_connection_inventory import runtime_connection_publication_files
@@ -34,6 +40,52 @@ def test_workspace_compact_projection_fetch_and_verified_launcher(tmp_path):
     assert report.passed, [(row.project.project_name, row.report.blockers) for row in report.check.projects]
     assert len(report.check.projects) == 2
     verify_delivery(tmp_path, compiled)
+
+
+def _development_authority() -> DevelopmentAuthorityReceipt:
+    now = datetime(2026, 9, 17, 12, 0, tzinfo=UTC)
+    return DevelopmentAuthorityReceipt(
+        policy_sha256="sha256:" + "1" * 64,
+        grant_sha256="sha256:" + "2" * 64,
+        signature_subject_sha256="sha256:" + "3" * 64,
+        environment="development",
+        source_repository_sha256="sha256:" + "4" * 64,
+        source_commit="5" * 40,
+        not_before=now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        expires_at=(now + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        revocation_epoch=1,
+        max_workloads=64,
+        max_source_bytes=1024 * 1024 * 1024,
+    )
+
+
+def test_development_workspace_materializes_with_distinct_authority_and_stable_wire(tmp_path):
+    root = tmp_path / "workspace"
+    prepare_projects(root)
+    compiled = tmp_path / "compiled"
+    authority = _development_authority()
+    report = workspace_service(
+        tmp_path / "profiles",
+        development_authority=authority,
+    ).compile(root, output_dir=compiled)
+    assert report.passed
+
+    source = json.loads((compiled / "release-set.json").read_bytes())
+    assert source["schema"] == DEVELOPMENT_RELEASE_SCHEMA
+    assert source["producer"]["wire_contract"] == "dpone.dbt-airflow-self-service.v2"
+    assert source["development_authority"] == authority.release_projection()
+    assert source["provenance"]["route_certifications"] == []
+
+    materialized = materialize_compact_pack_release(
+        pack_root=compiled,
+        cache_root=tmp_path / "cache",
+        xcom_sidecar_image=SIDECAR,
+    )
+    assert materialized.passed, materialized.blockers
+    release = json.loads(Path(materialized.release_dir, "release-set.json").read_bytes())
+    assert release["schema"] == DEVELOPMENT_RELEASE_SCHEMA
+    assert release["promotion"]["profile"] == DEVELOPMENT_COMPOSITION_PROFILE
+    assert release["development_authority"] == authority.release_projection()
 
 
 def verify_delivery(tmp_path, compiled):

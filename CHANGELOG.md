@@ -4,6 +4,13 @@
 
 ### Added
 
+- Add development workspace delivery with a distinct fail-closed release
+  authority over the stable dbt V2 artifact wire. Complete native workspaces can
+  be composed with selector-scoped ordinary flow and batch workloads while
+  delivery remains separate from exact, current workload execution authority.
+  Ordinary composition now verifies public resources, alias-only connection
+  projection, declarative SQL dependencies and separate SQL pre-hooks.
+
 - Add canonical native original bindings preserving complete subject, storage
   authority and provider-version identity without granting execution authority.
   Add closed native storage metadata and reuse canonical S3 policy validation

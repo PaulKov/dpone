@@ -21,6 +21,7 @@ from dpone.services.dbt_release_assets import canonical_schema_descriptors, cano
 
 if TYPE_CHECKING:
     from dpone.contracts.dbt_workspace import DbtWorkspaceCheckReport
+    from dpone.contracts.development_delivery_authority import DevelopmentAuthorityReceipt
 
 
 def assemble_workspace_release(
@@ -28,6 +29,7 @@ def assemble_workspace_release(
     projects: Sequence[DbtWorkspaceProjectArtifacts],
     *,
     producer_version: str,
+    development_authority: DevelopmentAuthorityReceipt | None = None,
 ) -> DbtWorkspaceReleaseTree:
     """Verify actual packs, then assemble and validate one complete release.
 
@@ -52,9 +54,11 @@ def assemble_workspace_release(
         pack_fingerprints=fingerprints,
         schema_files=schemas,
         schema_descriptors=canonical_schema_descriptors(schemas),
+        development_authority=development_authority,
     )
     release = strict_json_object(tree.files["release-set.json"])
-    if GitOpsSchemaValidator().validate(release, expected_kind="dpone.release-set.v2"):
+    expected_kind = str(release.get("schema") or "")
+    if GitOpsSchemaValidator().validate(release, expected_kind=expected_kind):
         raise ValueError("workspace release does not satisfy its canonical schema")
     return tree
 

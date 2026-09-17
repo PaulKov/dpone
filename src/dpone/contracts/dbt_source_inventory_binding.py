@@ -14,7 +14,7 @@ from dpone.contracts.dbt_relation_writes import (
     selected_relation_writes,
     transfer_relation_write,
 )
-from dpone.contracts.dbt_release import dbt_release_authority_violation
+from dpone.contracts.dbt_release import dbt_development_release_authority_violation, dbt_release_authority_violation
 from dpone.contracts.dbt_release_workload_binding import (
     DbtDevEvidenceReleaseError,
     ExpectedWorkflowDag,
@@ -34,6 +34,7 @@ from dpone.contracts.dbt_selected_graph_observation import observe_dbt_selected_
 from dpone.contracts.dbt_selection_lock import DbtSelectionLock
 from dpone.contracts.dbt_source_inventory import DbtProjectSource, DbtSourceInventory, DbtWorkflowSource
 from dpone.contracts.dbt_workflow_graph_policy import evaluate_dbt_workflow_graph_ownership
+from dpone.contracts.development_delivery_authority import DEVELOPMENT_RELEASE_SCHEMA
 
 
 def validate_dbt_source_inventory_binding(
@@ -56,11 +57,16 @@ def _bind_source_inventory(
     release: Mapping[str, object], inventory: DbtSourceInventory, expected_release_id: str
 ) -> DbtReleaseArtifactIndex:
 
-    violation = dbt_release_authority_violation(release, expected_wire_contract=DBT_RUNTIME_WIRE_V2)
+    development = release.get("schema") == DEVELOPMENT_RELEASE_SCHEMA
+    violation = (
+        dbt_development_release_authority_violation(release)
+        if development
+        else dbt_release_authority_violation(release, expected_wire_contract=DBT_RUNTIME_WIRE_V2)
+    )
     if violation is not None:
         raise ValueError(violation)
     if (
-        release.get("schema") != "dpone.release-set.v2"
+        release.get("schema") not in {"dpone.release-set.v2", DEVELOPMENT_RELEASE_SCHEMA}
         or release.get("release_id") != expected_release_id
         or release_id(release) != expected_release_id
     ):

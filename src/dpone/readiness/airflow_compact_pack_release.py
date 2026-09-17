@@ -290,7 +290,8 @@ def _materialize_workspace(
     )
     from dpone.readiness.airflow_release_schema_validation import validate_release_set_schema
 
-    if read_workspace_release_descriptor(root).get("schema") == "dpone.release-set.v3":
+    schema = read_workspace_release_descriptor(root).get("schema")
+    if schema == "dpone.release-set.v3":
         return materialize_composed_release(root, cache, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
 
     if cache.is_relative_to(root.resolve()):
@@ -298,9 +299,9 @@ def _materialize_workspace(
             "DPONE_COMPACT_PACK_RELEASE_CACHE_INVALID", "cache root must be outside the immutable source tree"
         )
     try:
-        files = build_dbt_compact_workspace_release_builder().build(
-            root, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids
-        )
+        files = build_dbt_compact_workspace_release_builder(
+            development=schema == "dpone.dbt-release-set.development.v1"
+        ).build(root, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
         release = json.loads(files["release-set.json"])
         validate_release_set_schema(release, path=root / "release-set.json")
     except (ValueError, OSError, TypeError, KeyError, RecursionError) as exc:
@@ -308,8 +309,7 @@ def _materialize_workspace(
             "DPONE_COMPACT_PACK_RELEASE_WORKSPACE_INVALID",
             "native workspace release is invalid, incomplete or incompatible; regenerate the complete workspace with a compatible producer",
         ) from exc
-    release_id = release["release_id"]
-    release_dir = cache / "releases" / _digest_dir(release_id)
+    release_dir = cache / "releases" / _digest_dir(release["release_id"])
     try:
         materialize_immutable_local_release(release_dir, files)
     except ImmutableLocalReleaseDurabilityError as exc:
@@ -323,7 +323,7 @@ def _materialize_workspace(
             "release publication failed; inspect storage and retry identical inputs",
         ) from exc
     return CompactPackReleaseReport(
-        release_id=release_id,
+        release_id=release["release_id"],
         release_dir=release_dir.as_posix(),
         dag_ids=tuple(item["id"] for item in release["artifacts"]["dag_specs"]),
         workload_ids=tuple(item["id"] for item in release["artifacts"]["workload_packs"]),

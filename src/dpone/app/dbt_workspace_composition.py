@@ -18,23 +18,33 @@ from dpone.services.dbt_workspace import DbtWorkspaceService
 
 if TYPE_CHECKING:
     from dpone.contracts.dbt_workspace import DbtWorkspaceProject
+    from dpone.contracts.development_delivery_authority import DevelopmentAuthorityReceipt
     from dpone.ports.dbt_publishing import DbtPublishCompiler
     from dpone.ports.dbt_workspace import DbtWorkspaceWriter
 
 
 def build_dbt_workspace_service(
-    *, environment: Mapping[str, str] | None = None, dbt_profiles_dir: Path | None = None
+    *,
+    environment: Mapping[str, str] | None = None,
+    dbt_profiles_dir: Path | None = None,
+    development_authority: DevelopmentAuthorityReceipt | None = None,
 ) -> DbtWorkspaceService:
     return DbtWorkspaceService(
         discovery=DbtWorkspaceDiscovery(environment=dict(os.environ if environment is None else environment)),
-        compiler_factory=_project_compiler,
-        writer_factory=partial(_workspace_writer, dbt_profiles_dir=dbt_profiles_dir.absolute())
-        if dbt_profiles_dir is not None
-        else _workspace_writer,
+        compiler_factory=partial(_project_compiler, require_certified_routes=development_authority is None),
+        writer_factory=partial(
+            _workspace_writer,
+            dbt_profiles_dir=dbt_profiles_dir.absolute() if dbt_profiles_dir is not None else None,
+            development_authority=development_authority,
+        ),
     )
 
 
-def _workspace_writer(*, dbt_profiles_dir: Path | None = None) -> DbtWorkspaceWriter:
+def _workspace_writer(
+    *,
+    dbt_profiles_dir: Path | None = None,
+    development_authority: DevelopmentAuthorityReceipt | None = None,
+) -> DbtWorkspaceWriter:
     from tempfile import gettempdir
 
     from dpone.adapters.dbt_parse_target import IsolatedDbtParseTargetResolver
@@ -67,14 +77,20 @@ def _workspace_writer(*, dbt_profiles_dir: Path | None = None) -> DbtWorkspaceWr
         producer_version=installed_version(),
         profile_store=TemporaryDbtProfileStore(Path(gettempdir())),
         dbt_profiles_dir=dbt_profiles_dir,
+        development_authority=development_authority,
     )
 
 
-def _project_compiler(root: Path, project: DbtWorkspaceProject) -> DbtPublishCompiler:
+def _project_compiler(
+    root: Path,
+    project: DbtWorkspaceProject,
+    *,
+    require_certified_routes: bool = True,
+) -> DbtPublishCompiler:
     inputs = ConfinedDbtWorkspaceInputs(root=root, project=project, reader=DbtArtifactReader())
     return build_dbt_dpone_compiler(
         root=root / project.project_path,
-        require_certified_routes=True,
+        require_certified_routes=require_certified_routes,
         reader=inputs,
         profile_loader=inputs,
         graph_policy=DbtSqlserverPreviewGraphPolicyValidator(manifest_reader=inputs.graph_manifest),

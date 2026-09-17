@@ -9,6 +9,10 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from dpone.contracts.composition_sources import CompositionSourceSnapshot
 from dpone.contracts.dbt_relation_writes import require_distinct_logical_writes
+from dpone.contracts.development_delivery_authority import (
+    DEVELOPMENT_COMPOSITION_PROFILE,
+    DEVELOPMENT_RELEASE_SCHEMA,
+)
 from dpone.contracts.release_composition import (
     COMPOSITION_PROFILE,
     NATIVE_SIDECARS,
@@ -147,8 +151,16 @@ class ReleaseCompositionService:
             raise ValueError("composition roots must be disjoint")
         payload = self._read(native_root, "release-set.json", max_bytes=8 * 1024 * 1024)
         native = strict_json_object(payload)
-        promotion = {"schema": "dpone.compact-pack-release-promotion.v1", "profile": COMPOSITION_PROFILE}
-        if request.profile != COMPOSITION_PROFILE or native.get("promotion") != promotion:
+        supported_profiles = {COMPOSITION_PROFILE, DEVELOPMENT_COMPOSITION_PROFILE}
+        promotion = {"schema": "dpone.compact-pack-release-promotion.v1", "profile": request.profile}
+        expected_schema = (
+            DEVELOPMENT_RELEASE_SCHEMA if request.profile == DEVELOPMENT_COMPOSITION_PROFILE else "dpone.release-set.v2"
+        )
+        if (
+            request.profile not in supported_profiles
+            or native.get("schema") != expected_schema
+            or native.get("promotion") != promotion
+        ):
             raise ValueError("native input must already use the supported compact transport")
         if validate_release_set(native).failure is not None:
             raise ValueError("native input violates its public schema")
@@ -158,7 +170,13 @@ class ReleaseCompositionService:
         ordinary = self._ordinary.capture(ordinary_root, xcom_sidecar_image=request.xcom_sidecar_image)
         if ordinary.inventory_sha256 != request.expected_inventory_sha256:
             raise ValueError("ordinary source inventory differs from expected identity")
-        files = assemble_composition_files(native, captured, ordinary, producer_version=self._version)
+        files = assemble_composition_files(
+            native,
+            captured,
+            ordinary,
+            producer_version=self._version,
+            profile=request.profile,
+        )
         release = strict_json_object(files["release-set.json"])
         if validate_release_set(release).failure is not None:
             raise ValueError("composed release violates its public schema")

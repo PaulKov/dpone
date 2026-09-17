@@ -14,12 +14,17 @@ from dpone.adapters.dbt_workflow_selection import ManifestPreviewSelectionResolv
 from dpone.app.dbt_promotion_composition import RuntimeDbtProjectBundleOperations
 from dpone.app.dbt_publish_composition import build_dbt_dpone_compiler
 from dpone.contracts.dbt_execution_pack import DbtInvocationTarget
+from dpone.contracts.dbt_release import dbt_development_release_authority_violation, dbt_release_authority_violation
 from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V2
 from dpone.contracts.dbt_workspace import (
     DbtWorkspaceCheckReport,
     DbtWorkspaceDiscoveryReport,
     DbtWorkspaceProject,
     DbtWorkspaceProjectCheck,
+)
+from dpone.contracts.development_delivery_authority import (
+    DEVELOPMENT_RELEASE_SCHEMA,
+    DevelopmentAuthorityReceipt,
 )
 from dpone.manifest.confined_files import read_confined_file
 from dpone.readiness.dbt_sqlserver_project_policy import DbtSqlserverProjectPolicyValidator
@@ -100,12 +105,33 @@ def _project(
     )
 
 
-def _assemble(projects):
+def _development_authority() -> DevelopmentAuthorityReceipt:
+    return DevelopmentAuthorityReceipt(
+        policy_sha256="sha256:" + "1" * 64,
+        grant_sha256="sha256:" + "2" * 64,
+        signature_subject_sha256="sha256:" + "3" * 64,
+        environment="development",
+        source_repository_sha256="sha256:" + "4" * 64,
+        source_commit="5" * 40,
+        not_before="2026-09-17T00:00:00Z",
+        expires_at="2026-09-18T00:00:00Z",
+        revocation_epoch=1,
+        max_workloads=64,
+        max_source_bytes=512 * 1024 * 1024,
+    )
+
+
+def _assemble(projects, *, development: bool = False):
     check = DbtWorkspaceCheckReport(
         DbtWorkspaceDiscoveryReport(tuple(p.check.project for p in projects)),
         tuple(p.check for p in projects),
     )
-    return assemble_workspace_release(check, projects, producer_version="0.74.28")
+    return assemble_workspace_release(
+        check,
+        projects,
+        producer_version="0.74.28",
+        development_authority=_development_authority() if development else None,
+    )
 
 
 @pytest.mark.parametrize("kind", ["model", "transfer"])
@@ -166,6 +192,28 @@ def test_two_projects_are_one_canonical_release_with_complete_reader_acceptance(
         bundle_operations=RuntimeDbtProjectBundleOperations(), read_file=read_confined_file
     ).read(root, expected_release_id=tree.release_id)
     assert {w.source.workflow_id for w in sources.workflows} == {"alpha", "beta"}
+
+
+def test_development_workspace_is_delivery_only_and_rejected_by_production_authority(tmp_path: Path) -> None:
+    tree = _assemble([_project(tmp_path, "alpha")], development=True)
+    release = json.loads(tree.files["release-set.json"])
+
+    assert release["schema"] == DEVELOPMENT_RELEASE_SCHEMA
+    assert release["producer"]["wire_contract"] == DBT_RUNTIME_WIRE_V2
+    assert release["provenance"]["route_certifications"] == []
+    assert release["development_authority"]["execution_subjects"] == []
+    assert dbt_development_release_authority_violation(release) is None
+    assert dbt_release_authority_violation(release, expected_wire_contract=DBT_RUNTIME_WIRE_V2) is not None
+
+    root = tmp_path / "development-compiled"
+    for path, body in tree.files.items():
+        destination = root / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(body)
+    sources = DbtReleaseSourceReader(
+        bundle_operations=RuntimeDbtProjectBundleOperations(), read_file=read_confined_file
+    ).read(root, expected_release_id=tree.release_id)
+    assert {workflow.source.workflow_id for workflow in sources.workflows} == {"alpha"}
 
 
 def test_empty_or_repeated_project_is_rejected(tmp_path: Path):

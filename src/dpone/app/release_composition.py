@@ -8,7 +8,7 @@ from dpone.contracts.release_composition_ordinary import OrdinaryReleaseInventor
 from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
 from dpone.gitops.workload_dependencies import WorkloadDependencyResolver
 from dpone.manifest.confined_files import read_confined_file
-from dpone.manifest.loader import SingleYamlManifestLoader
+from dpone.manifest.loader import ManifestLoaderRouter
 from dpone.manifest.release_composition_ordinary import OrdinaryReleaseInventoryReader
 from dpone.manifest.release_composition_ordinary_closure import OrdinaryPackClosureVerifier
 from dpone.runtime.immutable_local_tree import (
@@ -52,13 +52,13 @@ def _publish_composition(destination, files):
 
 
 def build_ordinary_release_inventory_reader(*, read_file=read_confined_file) -> OrdinaryReleaseInventoryReader:
-    """Wire the mandatory plain-transfer closure policy explicitly."""
+    """Wire the mandatory declarative transfer closure policy explicitly."""
     return OrdinaryReleaseInventoryReader(
         read_file=read_file,
         closure=OrdinaryPackClosureVerifier(
             dependencies=WorkloadDependencyResolver(),
             builder=AirflowCompactPackBuilder(),
-            manifest_loader=SingleYamlManifestLoader(),
+            manifest_loader=ManifestLoaderRouter(),
             unpack_verified=_unpack_verified,
         ),
     )

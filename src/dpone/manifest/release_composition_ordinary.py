@@ -88,7 +88,9 @@ class OrdinaryReleaseInventoryReader:
         dag_rows: list[dict[str, Any]] = []
         pack_rows: list[dict[str, Any]] = []
         writes = []
-        owners: set[str] = set()
+        owners: dict[str, str] = {}
+        selections: set[tuple[str, str | None]] = set()
+        source_packs: dict[str, Mapping[str, Any]] = {}
         for path in dag_paths:
             body = self._read_file(root, path, max_bytes=_MAX_SOURCE_FILE_BYTES)
             _retain(files, path, body)
@@ -99,23 +101,32 @@ class OrdinaryReleaseInventoryReader:
             ids = []
             for node in spec["nodes"]:
                 workload_id = node.get("workload_id")
-                if not isinstance(workload_id, str) or not _ID.fullmatch(workload_id) or workload_id in owners:
+                if not isinstance(workload_id, str) or not _ID.fullmatch(workload_id):
                     raise OrdinaryReleaseInventoryError("ordinary workload membership is invalid or duplicated")
-                if node.get("selector") is not None or node.get("pack_ref") != f"cached://workloads/{workload_id}":
-                    raise OrdinaryReleaseInventoryError("ordinary DAG must reference an entire plain transfer workload")
-                owners.add(workload_id)
+                selector = node.get("selector")
+                if selector is not None and (not isinstance(selector, str) or not selector.strip()):
+                    raise OrdinaryReleaseInventoryError("ordinary DAG selector is invalid")
+                if node.get("pack_ref") != f"cached://workloads/{workload_id}":
+                    raise OrdinaryReleaseInventoryError("ordinary DAG pack reference is invalid")
+                previous_owner = owners.setdefault(workload_id, dag_id)
+                if previous_owner != dag_id or (workload_id, selector) in selections:
+                    raise OrdinaryReleaseInventoryError("ordinary workload membership is invalid or duplicated")
+                selections.add((workload_id, selector))
                 ids.append(workload_id)
                 pack_path = f"{workload_id}/airflow-pack.json"
                 if pack_path not in source_paths:
                     raise OrdinaryReleaseInventoryError("ordinary DAG references a missing workload pack")
-                raw = self._read_file(root, pack_path, max_bytes=_MAX_SOURCE_FILE_BYTES)
-                _retain(files, pack_path, raw)
-                pack = parse_pack_json(raw)
-                fingerprint = verify_pack_fingerprint(pack)
-                writes.append(self._closure.verify(pack, workload_id=workload_id, dag_id=dag_id))
-                rewritten = strict_transfer_pack(pack, xcom_sidecar_image=xcom_sidecar_image)
-                packs[f"packs/{workload_id}.airflow-pack.json"] = _json_bytes(rewritten)
-                pack_rows.append({**_descriptor(workload_id, pack_path, raw), "pack_fingerprint": fingerprint})
+                pack = source_packs.get(workload_id)
+                if pack is None:
+                    raw = self._read_file(root, pack_path, max_bytes=_MAX_SOURCE_FILE_BYTES)
+                    _retain(files, pack_path, raw)
+                    pack = parse_pack_json(raw)
+                    fingerprint = verify_pack_fingerprint(pack)
+                    source_packs[workload_id] = pack
+                    rewritten = strict_transfer_pack(pack, xcom_sidecar_image=xcom_sidecar_image)
+                    packs[f"packs/{workload_id}.airflow-pack.json"] = _json_bytes(rewritten)
+                    pack_rows.append({**_descriptor(workload_id, pack_path, raw), "pack_fingerprint": fingerprint})
+                writes.append(self._closure.verify(pack, workload_id=workload_id, dag_id=dag_id, selector=selector))
             if not ids:
                 raise OrdinaryReleaseInventoryError("ordinary DAG has no workload membership")
             dags[f"dags/{dag_id}.dag-spec.json"] = _json_bytes(
