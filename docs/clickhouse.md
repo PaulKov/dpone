@@ -448,6 +448,14 @@ through the owning publication workflow's verified recovery procedure; if that
 workflow cannot establish the outcome, leave it unresolved. The generic
 connector does not provide a new reconciliation or rollback service.
 
+Strict recoverable publication for one shard with multiple
+`Replicated*MergeTree` replicas is a separately reviewed capability. Its
+[researched design](feature-design-clickhouse-cluster-full-refresh-publication-v1.md)
+uses KeeperMap compare-and-swap authority, binds the exact distributed-DDL
+entry, and fails closed when a terminal result is mixed across replicas. It is
+not implemented or certified yet; do not treat the existing topology preflight
+or `ON CLUSTER` rendering as publication recovery support.
+
 ## Physical design drift
 
 When `sink.options.physical_design.apply_runtime: true`, existing ClickHouse
