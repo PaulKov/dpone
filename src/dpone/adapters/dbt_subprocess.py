@@ -16,7 +16,10 @@ from typing import Any, BinaryIO
 
 from dpone.adapters.dbt_executable import current_environment_dbt_executable
 from dpone.adapters.dbt_output_redaction import _sanitize
-from dpone.adapters.dbt_physical_transport_subprocess import wait_for_physical_transport_process
+from dpone.adapters.dbt_physical_transport_subprocess import (
+    physical_transport_spawn_settings,
+    wait_for_physical_transport_process,
+)
 from dpone.adapters.dbt_process_supervisor import (
     DbtProcessSupervisor,
     ManagedProcess,
@@ -187,13 +190,10 @@ class SubprocessDbtCommandRunner:
         invocation_home: Path,
         launch_context: PhysicalTransportLaunchContext | None = None,
     ) -> ManagedProcess:
-        environment = _environment(invocation_home)
-        inherited: dict[str, object] = {}
-        if launch_context is not None:
-            if set(environment).intersection(launch_context.environment):
-                raise _execution_error("physical transport environment collides with the isolated dbt context")
-            environment.update(launch_context.environment)
-            inherited["pass_fds"] = launch_context.pass_fds
+        environment, inherited = physical_transport_spawn_settings(
+            _environment(invocation_home),
+            launch_context,
+        )
         return self._popen(
             (self._dbt_executable, *args[1:]),
             cwd=cwd,

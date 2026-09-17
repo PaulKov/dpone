@@ -39,6 +39,19 @@ def open_physical_transport_directory(path: Path) -> int:
         raise
 
 
+def physical_transport_spawn_settings(
+    environment: dict[str, str],
+    context: PhysicalTransportLaunchContext | None,
+) -> tuple[dict[str, str], dict[str, object]]:
+    """Add only the reserved inherited descriptor to an isolated environment."""
+
+    if context is None:
+        return environment, {}
+    if set(environment).intersection(context.environment):
+        raise ValueError("physical transport environment collides with the isolated dbt context")
+    return {**environment, **context.environment}, {"pass_fds": context.pass_fds}
+
+
 def wait_for_physical_transport_process(
     process: ManagedProcess,
     *,
