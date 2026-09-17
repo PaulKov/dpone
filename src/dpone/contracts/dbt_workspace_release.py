@@ -26,6 +26,10 @@ from dpone.contracts.dbt_runtime_payloads import (
 )
 from dpone.contracts.dbt_source_inventory import DbtProjectSource, DbtSourceInventory, DbtWorkflowSource
 from dpone.contracts.dbt_source_inventory_binding import DbtSourcePlan
+from dpone.contracts.development_delivery_authority import (
+    DEVELOPMENT_RELEASE_SCHEMA,
+    DevelopmentAuthorityReceipt,
+)
 from dpone.contracts.strict_json import strict_json_object
 
 if TYPE_CHECKING:
@@ -63,6 +67,7 @@ def assemble_dbt_workspace_release(
     pack_fingerprints: Mapping[str, str],
     schema_files: Mapping[str, bytes],
     schema_descriptors: list[dict[str, Any]],
+    development_authority: DevelopmentAuthorityReceipt | None = None,
 ) -> DbtWorkspaceReleaseTree:
     """Build once from all projects; reject omissions, collisions and preview authority.
 
@@ -127,6 +132,11 @@ def assemble_dbt_workspace_release(
         if key in trios:
             descriptor["runtime_payload_ids"] = list(trios[key])
         pack_descriptors.append(descriptor)
+    if development_authority is not None:
+        development_authority.require_release_budget(
+            workload_ids=tuple(sorted(packs)),
+            source_bytes=sum(len(body) for body in (*packs.values(), *dags.values(), *payloads.files.values())),
+        )
     release = build_dbt_release_metadata(
         dag_specs=[
             dbt_release_artifact_descriptor(key, f"dags/{key}.dag-spec.json", body)
@@ -137,10 +147,16 @@ def assemble_dbt_workspace_release(
         canonical_schema_descriptors=schema_descriptors,
         source_snapshot_sha256=inventory.snapshot_sha256,
         selection_authority="dbt_cli",
-        route_certifications=[certifications[key] for key in sorted(certifications)],
+        route_certifications=(
+            [] if development_authority is not None else [certifications[key] for key in sorted(certifications)]
+        ),
         selection_fingerprints=sorted(fingerprints),
         producer_version=producer_version,
         wire_contract=DBT_RUNTIME_WIRE_V2,
+        release_schema=DEVELOPMENT_RELEASE_SCHEMA if development_authority is not None else "dpone.release-set.v2",
+        development_authority=(
+            development_authority.release_projection() if development_authority is not None else None
+        ),
     )
     files = {
         "release-set.json": artifact_json_bytes(release),

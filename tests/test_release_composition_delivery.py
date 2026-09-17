@@ -7,9 +7,14 @@ from pathlib import Path
 import pytest
 
 from dpone.app.release_composition import build_release_composition_service
+from dpone.contracts.development_delivery_authority import (
+    DEVELOPMENT_COMPOSITION_PROFILE,
+    DEVELOPMENT_RELEASE_SCHEMA,
+)
 from dpone.contracts.release_composition import ReleaseCompositionRequest
 from dpone.readiness.airflow_compact_pack_release import materialize_compact_pack_release
 from tests.dbt_compact_wire_v2_helpers import SIDECAR, prepare_projects, workspace_service
+from tests.test_dbt_compact_wire_v2 import _development_authority
 from tests.test_release_composition_ordinary import ordinary_root
 
 
@@ -54,6 +59,51 @@ def test_public_composition_preserves_sources_and_exact_retry(composition_reques
     before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
     assert service.compose(composition_request).to_dict() == report.to_dict()
     assert {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
+
+
+def test_development_workspace_and_ordinary_flow_compose_without_production_relabeling(tmp_path):
+    prepare_projects(tmp_path / "workspace")
+    compiled = tmp_path / "compiled"
+    authority = _development_authority()
+    assert (
+        workspace_service(
+            tmp_path / "profiles",
+            development_authority=authority,
+        )
+        .compile(tmp_path / "workspace", output_dir=compiled)
+        .passed
+    )
+    native = materialize_compact_pack_release(
+        pack_root=compiled,
+        cache_root=tmp_path / "native-cache",
+        xcom_sidecar_image=SIDECAR,
+        development_authority=authority,
+    )
+    assert native.passed, native.blockers
+    ordinary = ordinary_root(tmp_path)
+    service = build_release_composition_service(development_authority=authority)
+    inventory = service.inventory(ordinary, xcom_sidecar_image=SIDECAR)
+    request = ReleaseCompositionRequest(
+        native_root=Path(native.release_dir),
+        expected_release_id=native.release_id,
+        standalone_root=ordinary,
+        expected_inventory_sha256=inventory["inventory_sha256"],
+        output_dir=tmp_path / "composed",
+        xcom_sidecar_image=SIDECAR,
+        profile=DEVELOPMENT_COMPOSITION_PROFILE,
+    )
+
+    denied = build_release_composition_service().compose(request)
+    assert not denied.passed
+    assert not request.output_dir.exists()
+
+    report = service.compose(request)
+    assert report.passed, report.blockers
+    release = json.loads((request.output_dir / "release-set.json").read_bytes())
+    assert release["promotion"]["profile"] == DEVELOPMENT_COMPOSITION_PROFILE
+    child = next(item["release"] for item in release["constituents"] if item["id"] == "native")
+    assert child["schema"] == DEVELOPMENT_RELEASE_SCHEMA
+    assert child["promotion"]["profile"] == DEVELOPMENT_COMPOSITION_PROFILE
 
 
 @pytest.mark.parametrize("field", ["expected_release_id", "expected_inventory_sha256"])

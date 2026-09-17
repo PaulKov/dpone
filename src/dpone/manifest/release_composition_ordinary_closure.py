@@ -1,8 +1,8 @@
 """Detached reconstruction of supported ordinary declarative transfer packs.
 
-The initial capability admits a single transfer manifest and its SQL files.
-Batch/authoring/recipe manifests, custom runner assets, hooks and dbt execution
-need their own complete write/command policy and therefore fail closed here.
+The closed capability admits legacy transfers and selector-scoped flow or batch
+processes with declarative SQL files and separate SQL pre-hooks. Custom runners,
+arbitrary commands, separate post-hooks and dbt execution fail closed.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from dpone.manifest.runtime_materialization import materialize_runtime_manifest
 if TYPE_CHECKING:
     from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
     from dpone.gitops.workload_dependencies import WorkloadDependencyResolver
-    from dpone.manifest.loader import SingleYamlManifestLoader
+    from dpone.manifest.loader import ManifestLoader
     from dpone.ports.release_composition_ordinary import OrdinaryArchiveUnpacker
 
 
@@ -40,7 +40,7 @@ class OrdinaryPackClosureVerifier:
         *,
         dependencies: WorkloadDependencyResolver,
         builder: AirflowCompactPackBuilder,
-        manifest_loader: SingleYamlManifestLoader,
+        manifest_loader: ManifestLoader,
         unpack_verified: OrdinaryArchiveUnpacker,
     ) -> None:
         self._dependencies = dependencies
@@ -48,19 +48,27 @@ class OrdinaryPackClosureVerifier:
         self._manifest_loader = manifest_loader
         self._unpack_verified = unpack_verified
 
-    def verify(self, pack: Mapping[str, Any], *, workload_id: str, dag_id: str) -> DbtRelationWrite:
+    def verify(
+        self,
+        pack: Mapping[str, Any],
+        *,
+        workload_id: str,
+        dag_id: str,
+        selector: str | None = None,
+    ) -> DbtRelationWrite:
         if "runtime_payload_ids" in pack or pack.get("blockers"):
             raise OrdinaryReleaseInventoryError("ordinary packs cannot contain dbt payload authority or blockers")
-        if pack.get("connection_projection") not in ({}, {"query_overrides": {}}):
-            raise OrdinaryReleaseInventoryError("ordinary connection projection must be empty; regenerate the pack")
+        _require_alias_only_projection(pack.get("connection_projection"))
         workload = self._workload(pack, workload_id)
         with TemporaryDirectory(prefix="dpone-ordinary-closure-") as temporary:
             root = Path(temporary) / "source"
             self._unpack_verified(pack, root)
             manifest = load_bounded_yaml(read_confined_file(root, workload.manifest, max_bytes=8 * 1024 * 1024))
-            self._require_single_transfer(manifest, workload_id)
             assert isinstance(manifest, Mapping)
-            self._manifest_loader.load(root / workload.manifest, metadata_only=True)
+            _require_source_family(manifest, workload_id=workload_id)
+            loaded = self._manifest_loader.load(root / workload.manifest, metadata_only=True)
+            process = self._selected_process(loaded, selector=selector, workload_id=workload_id)
+            _require_supported_transfer(process.raw_config)
             dependencies = self._dependencies.resolve(repo_root=root, manifest=workload.manifest)
             if any(item.kind not in {"manifest", "sql_file"} for item in dependencies):
                 raise OrdinaryReleaseInventoryError(
@@ -101,7 +109,7 @@ class OrdinaryPackClosureVerifier:
                 project_path="standalone",
                 workflow_id=dag_id,
                 workload_id=workload_id,
-                manifest=manifest,
+                manifest=process.raw_config,
             )
 
     @staticmethod
@@ -143,29 +151,39 @@ class OrdinaryPackClosureVerifier:
         )
 
     @staticmethod
-    def _require_single_transfer(manifest: object, workload_id: str) -> None:
-        if not isinstance(manifest, Mapping) or manifest.get("name") != workload_id:
+    def _selected_process(loaded: object, *, selector: str | None, workload_id: str) -> Any:
+        processes = tuple(getattr(loaded, "processes", ()))
+        if not processes:
+            raise OrdinaryReleaseInventoryError("ordinary workload has no compiled process")
+        if selector is None:
+            if len(processes) != 1 or getattr(processes[0], "selector", None) is not None:
+                raise OrdinaryReleaseInventoryError("ordinary flow or batch DAG must select one compiled process")
+            process = processes[0]
+        else:
+            selected = tuple(process for process in processes if getattr(process, "selector", None) == selector)
+            if len(selected) != 1:
+                raise OrdinaryReleaseInventoryError("ordinary DAG selector is absent or ambiguous in its workload pack")
+            process = selected[0]
+        if not isinstance(getattr(process, "raw_config", None), Mapping):
+            raise OrdinaryReleaseInventoryError("ordinary compiled process is invalid")
+        if selector is None and process.raw_config.get("name") != workload_id:
             raise OrdinaryReleaseInventoryError("ordinary transfer manifest identity is invalid")
-        if set(manifest) - {"name", "description", "source", "sink", "state", "gitops"}:
-            raise OrdinaryReleaseInventoryError(
-                "ordinary composition supports one plain transfer manifest per workload; batch, authoring and hooks are unsupported"
-            )
-        if "state" in manifest:
-            _require_external_mssql_state(manifest["state"], manifest.get("sink"))
-        if "gitops" in manifest:
-            _require_resource_only_gitops(manifest)
-        source = manifest.get("source")
-        sink = manifest.get("sink")
-        allowed = {"postgres", "mssql", "mysql", "clickhouse"}
-        if (
-            not isinstance(source, Mapping)
-            or not isinstance(sink, Mapping)
-            or source.get("type") not in allowed
-            or sink.get("type") not in allowed
-        ):
-            raise OrdinaryReleaseInventoryError(
-                "ordinary composition requires explicitly declared supported SQL transfer endpoints"
-            )
+        return process
+
+    @staticmethod
+    def _require_single_transfer(manifest: object, workload_id: str) -> None:
+        """Preserve the legacy plain-transfer admission seam.
+
+        Flow and batch manifests use ``_selected_process`` after loader
+        expansion. Callers that validate a plain transfer directly retain the
+        original closed admission contract.
+        """
+        if not isinstance(manifest, Mapping):
+            raise OrdinaryReleaseInventoryError("ordinary transfer manifest identity is invalid")
+        _require_source_family(manifest, workload_id=workload_id)
+        if manifest.get("kind") in {"dpone.flow.v1", "dpone.batch.v1"}:
+            raise OrdinaryReleaseInventoryError("plain transfer admission does not accept flow or batch manifests")
+        _require_supported_transfer(manifest)
 
 
 def _require_resource_only_gitops(manifest: Mapping[str, Any]) -> None:
@@ -183,6 +201,86 @@ def _require_resource_only_gitops(manifest: Mapping[str, Any]) -> None:
         manifest_airflow_resources(manifest)
     except KubernetesResourceError as exc:
         raise OrdinaryReleaseInventoryError(str(exc)) from exc
+
+
+def _require_supported_transfer(manifest: Mapping[str, Any]) -> None:
+    """Admit declarative SQL transfers and separate SQL pre-hooks only."""
+    source = manifest.get("source")
+    sink = manifest.get("sink")
+    allowed = {"postgres", "mssql", "mysql", "clickhouse"}
+    if (
+        not isinstance(source, Mapping)
+        or not isinstance(sink, Mapping)
+        or source.get("type") not in allowed
+        or sink.get("type") not in allowed
+    ):
+        raise OrdinaryReleaseInventoryError(
+            "ordinary composition requires explicitly declared supported SQL transfer endpoints"
+        )
+    if "state" in manifest:
+        _require_external_mssql_state(manifest["state"], sink)
+    if "gitops" in manifest:
+        _require_resource_only_gitops(manifest)
+    options = source.get("options")
+    hooks = options.get("hooks") if isinstance(options, Mapping) else None
+    if hooks is None:
+        return
+    if not isinstance(hooks, Mapping) or set(hooks) - {"pre_hook", "post_hook"}:
+        raise OrdinaryReleaseInventoryError("ordinary composition permits only SQL hooks")
+    pre_hooks = hooks.get("pre_hook", [])
+    if not isinstance(pre_hooks, list):
+        raise OrdinaryReleaseInventoryError("ordinary pre-hook declaration is invalid")
+    for hook in pre_hooks:
+        execution = hook.get("execution") if isinstance(hook, Mapping) else None
+        if (
+            not isinstance(hook, Mapping)
+            or hook.get("type") != "sql"
+            or not isinstance(execution, Mapping)
+            or execution.get("airflow") != "separate_task"
+        ):
+            raise OrdinaryReleaseInventoryError("ordinary composition requires separately scheduled SQL pre-hooks")
+    post_hooks = hooks.get("post_hook", [])
+    if not isinstance(post_hooks, list):
+        raise OrdinaryReleaseInventoryError("ordinary post-hook declaration is invalid")
+    for hook in post_hooks:
+        execution = hook.get("execution") if isinstance(hook, Mapping) else None
+        if (
+            not isinstance(hook, Mapping)
+            or hook.get("type") != "sql"
+            or (isinstance(execution, Mapping) and execution.get("airflow") == "separate_task")
+        ):
+            raise OrdinaryReleaseInventoryError("ordinary composition permits only inline SQL post-hooks")
+
+
+def _require_source_family(manifest: Mapping[str, Any], *, workload_id: str) -> None:
+    """Keep the legacy exact shape while routing explicit authoring families."""
+    if manifest.get("kind") in {"dpone.flow.v1", "dpone.batch.v1"}:
+        return
+    if manifest.get("name") != workload_id:
+        raise OrdinaryReleaseInventoryError("ordinary transfer manifest identity is invalid")
+    if set(manifest) - {"name", "description", "source", "sink", "state", "gitops"}:
+        raise OrdinaryReleaseInventoryError(
+            "ordinary composition supports a plain transfer or an explicit flow/batch manifest"
+        )
+
+
+def _require_alias_only_projection(value: object) -> None:
+    """Require the provider's closed secret-reference shape, never secret bytes."""
+    from dpone.readiness.airflow_compact_pack_release_helpers import closed_connection_projection
+
+    projection = dict(value) if isinstance(value, Mapping) else {}
+    if projection in ({}, {"query_overrides": {}}):
+        return
+    try:
+        closed = closed_connection_projection(projection)
+    except ValueError as exc:
+        raise OrdinaryReleaseInventoryError("ordinary connection projection is invalid") from exc
+    canonical_input = dict(projection)
+    canonical_input.pop("connection_ids", None)
+    if closed != canonical_input or closed.get("secret_values") is not False:
+        raise OrdinaryReleaseInventoryError(
+            "ordinary connection projection must contain only canonical deployment-owned aliases"
+        )
 
 
 def _source_semantics(pack: Mapping[str, Any]) -> dict[str, Any]:

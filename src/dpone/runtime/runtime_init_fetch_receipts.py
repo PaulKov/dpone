@@ -65,6 +65,7 @@ def validate_runtime_receipts(
         not in {
             "dpone.release-set.v1",
             "dpone.release-set.v2",
+            "dpone.dbt-release-set.development.v1",
             "dpone.release-set.v3",
         }
         or release_id(release) != plan.release_id

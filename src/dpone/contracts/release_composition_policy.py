@@ -16,10 +16,18 @@ from typing import Any
 from dpone.contracts.airflow_deployment import canonical_fingerprint, is_canonical_sha256_digest, release_id
 from dpone.contracts.airflow_release_artifacts import release_artifact_path
 from dpone.contracts.dbt_contract_validation import artifact_json_bytes, sha256_bytes
-from dpone.contracts.dbt_release import dbt_release_authority_violation, dbt_release_runtime_wire_contract
+from dpone.contracts.dbt_release import (
+    dbt_development_release_authority_violation,
+    dbt_release_authority_violation,
+    dbt_release_runtime_wire_contract,
+)
 from dpone.contracts.dbt_runtime_payloads import DBT_RUNTIME_WIRE_V2
 from dpone.contracts.dbt_runtime_release_binding import DbtReleaseArtifactIndex
 from dpone.contracts.dbt_source_inventory import MAX_DBT_SOURCE_INVENTORY_BYTES
+from dpone.contracts.development_delivery_authority import (
+    DEVELOPMENT_COMPOSITION_PROFILE,
+    DEVELOPMENT_RELEASE_SCHEMA,
+)
 from dpone.contracts.release_composition import (
     COMPOSITION_PRODUCER,
     COMPOSITION_PROFILE,
@@ -36,6 +44,10 @@ from dpone.contracts.strict_json import strict_json_object
 _BASE_FIELDS = {"id", "path", "sha256", "bytes"}
 _SECTIONS = {"dag_specs", "workload_packs", "canonical_schemas", "runtime_payloads", "composition_sources"}
 _PROMOTION = {"schema": "dpone.compact-pack-release-promotion.v1", "profile": COMPOSITION_PROFILE}
+_DEVELOPMENT_PROMOTION = {
+    "schema": "dpone.compact-pack-release-promotion.v1",
+    "profile": DEVELOPMENT_COMPOSITION_PROFILE,
+}
 _NATIVE_SOURCES = {
     "_composition/native/release-set.json",
     "_composition/native/dbt-source-snapshot.json",
@@ -58,13 +70,16 @@ def validate_composition_metadata(release: Mapping[str, Any]) -> None:
         or producer["name"] != COMPOSITION_PRODUCER
         or not isinstance(version, str)
         or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.!+_-]{0,63}", version) is None
-        or release["promotion"] != _PROMOTION
+        or release["promotion"] not in (_PROMOTION, _DEVELOPMENT_PROMOTION)
     ):
         raise ValueError("composition producer, schema or compact promotion is invalid")
     constituents = _indexed(release["constituents"], limit=2)
     if set(constituents) != {"native", "standalone"}:
         raise ValueError("composition requires exactly the two typed constituents")
-    native = _native(constituents["native"])
+    native = _native(
+        constituents["native"],
+        development=release["promotion"] == _DEVELOPMENT_PROMOTION,
+    )
     ordinary = _ordinary(constituents["standalone"])
     artifacts = _exact(release["artifacts"], _SECTIONS)
     _require_union(artifacts, native, ordinary)
@@ -87,16 +102,22 @@ def composition_native_release(release: Mapping[str, Any], workload_id: str | No
     return deepcopy(dict(native))
 
 
-def _native(constituent: Mapping[str, Any]) -> Mapping[str, Any]:
+def _native(constituent: Mapping[str, Any], *, development: bool) -> Mapping[str, Any]:
     _exact(constituent, {"id", "kind", "release"})
     native = constituent["release"]
     if constituent["kind"] != "dbt_workspace" or not isinstance(native, Mapping):
         raise ValueError("native composition constituent is invalid")
+    authority_violation = (
+        dbt_development_release_authority_violation(native)
+        if development
+        else dbt_release_authority_violation(native, expected_wire_contract=DBT_RUNTIME_WIRE_V2)
+    )
+    expected_schema = DEVELOPMENT_RELEASE_SCHEMA if development else "dpone.release-set.v2"
     if (
-        native.get("schema") != "dpone.release-set.v2"
-        or native.get("promotion") != _PROMOTION
+        native.get("schema") != expected_schema
+        or native.get("promotion") != (_DEVELOPMENT_PROMOTION if development else _PROMOTION)
         or dbt_release_runtime_wire_contract(native) != DBT_RUNTIME_WIRE_V2
-        or dbt_release_authority_violation(native, expected_wire_contract=DBT_RUNTIME_WIRE_V2) is not None
+        or authority_violation is not None
         or native.get("release_id") != release_id(native)
     ):
         raise ValueError("native composition authority or identity is invalid")
@@ -224,7 +245,12 @@ def _exact(value: object, fields: set[str]) -> Mapping[str, Any]:
 
 
 def assemble_composition_files(
-    native: Mapping[str, Any], captured: Mapping[str, bytes], ordinary: OrdinaryReleaseCapture, *, producer_version: str
+    native: Mapping[str, Any],
+    captured: Mapping[str, bytes],
+    ordinary: OrdinaryReleaseCapture,
+    *,
+    producer_version: str,
+    profile: str = COMPOSITION_PROFILE,
 ) -> dict[str, bytes]:
     """Bind the exact constituent union without rewriting native executable bytes."""
     files = {path: body for path, body in captured.items() if path not in NATIVE_SIDECARS}
@@ -252,7 +278,7 @@ def assemble_composition_files(
         "schema": COMPOSITION_SCHEMA,
         "release_id": "",
         "producer": {"name": COMPOSITION_PRODUCER, "version": producer_version},
-        "promotion": dict(_PROMOTION),
+        "promotion": dict(_DEVELOPMENT_PROMOTION if profile == DEVELOPMENT_COMPOSITION_PROFILE else _PROMOTION),
         "artifacts": artifacts,
         "constituents": [
             {"id": "native", "kind": "dbt_workspace", "release": native},

@@ -23,6 +23,7 @@ from dpone.contracts.capability_discovery import (
 )
 from dpone.contracts.dbt_invocation import DbtInvocationTarget
 from dpone.contracts.dbt_selection import manifest_preview_selected_graph
+from dpone.contracts.development_delivery_authority import DevelopmentAuthorityReceipt
 from dpone.manifest.confined_files import read_confined_file
 from dpone.manifest.dbt_publish_intent_resolver import DbtPublishIntentResolver
 from dpone.manifest.dbt_workspace_discovery import DbtWorkspaceDiscovery
@@ -115,17 +116,17 @@ def route_snapshot():
     return CapabilityDiscoverySnapshot(connectors=(), routes=tuple(routes), recipes=())
 
 
-def compiler_factory(root, project):
+def compiler_factory(root, project, *, require_certified_routes=True):
     inputs = ConfinedDbtWorkspaceInputs(root=root, project=project, reader=DbtArtifactReader())
     return DbtDponeCompiler(
         reader=inputs,
         profile_loader=inputs,
         resolver=DbtPublishIntentResolver(),
         model_compiler=DbtModelToWorkloadCompiler(planner=DbtPublishPlanner()),
-        route_capabilities=DbtRouteCapabilityPolicy(route_snapshot(), require_certified=True),
+        route_capabilities=DbtRouteCapabilityPolicy(route_snapshot(), require_certified=require_certified_routes),
         project_policy=DbtSqlserverProjectPolicyValidator(project_root=root / project.project_path),
         graph_policy=DbtSqlserverPreviewGraphPolicyValidator(manifest_reader=inputs.graph_manifest),
-        require_certified_routes=True,
+        require_certified_routes=require_certified_routes,
     )
 
 
@@ -156,7 +157,7 @@ def fixture_dbt_runner(args, *, manifests, **kwargs):
     return subprocess.CompletedProcess(args, 0, stdout=body, stderr=b"")
 
 
-def workspace_service(state, *, selection=None):
+def workspace_service(state, *, selection=None, development_authority: DevelopmentAuthorityReceipt | None = None):
     bundles = RuntimeDbtProjectBundleOperations(package_environment={})
     versions = {"dbt-core": "1.12.3", "dbt-sqlserver": "1.11.1"}
     writer = DbtWorkspaceArtifactWriter(
@@ -182,9 +183,13 @@ def workspace_service(state, *, selection=None):
         publisher=DbtArtifactTreePublisher(),
         producer_version=installed_version(),
         profile_store=TemporaryDbtProfileStore(state),
+        development_authority=development_authority,
     )
     return DbtWorkspaceService(
         discovery=DbtWorkspaceDiscovery(environment={}),
-        compiler_factory=compiler_factory,
+        compiler_factory=partial(
+            compiler_factory,
+            require_certified_routes=development_authority is None,
+        ),
         writer_factory=lambda: writer,
     )

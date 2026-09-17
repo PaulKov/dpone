@@ -19,6 +19,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from dpone.contracts.development_delivery_authority import DevelopmentAuthorityReceipt
 from dpone.gitops.schema_release_set_promotion import (
     COMPACT_PROMOTION_PROFILE,
     COMPACT_PROMOTION_SCHEMA,
@@ -56,6 +57,7 @@ def materialize_compact_pack_release(
     xcom_sidecar_image: str,
     dag_ids: Sequence[str] | None = None,
     provenance: Mapping[str, Any] | None = None,
+    development_authority: DevelopmentAuthorityReceipt | None = None,
 ) -> CompactPackReleaseReport:
     """Rewrite compact packs and write one immutable release-set."""
 
@@ -66,6 +68,7 @@ def materialize_compact_pack_release(
             xcom_sidecar_image=xcom_sidecar_image,
             dag_ids=dag_ids,
             provenance=provenance,
+            development_authority=development_authority,
         )
     except CompactPackReleaseError as exc:
         return CompactPackReleaseReport(
@@ -98,6 +101,7 @@ def _materialize(
     xcom_sidecar_image: str,
     dag_ids: Sequence[str] | None,
     provenance: Mapping[str, Any] | None,
+    development_authority: DevelopmentAuthorityReceipt | None,
 ) -> CompactPackReleaseReport:
     root = pack_root.absolute()
     try:
@@ -107,7 +111,13 @@ def _materialize(
             "DPONE_COMPACT_PACK_RELEASE_CACHE_INVALID", "cache root cannot be resolved safely"
         ) from exc
     if (root / "release-set.json").exists() or (root / "release-set.json").is_symlink():
-        return _materialize_workspace(root, cache, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
+        return _materialize_workspace(
+            root,
+            cache,
+            xcom_sidecar_image=xcom_sidecar_image,
+            dag_ids=dag_ids,
+            development_authority=development_authority,
+        )
     dag_dir = root / "_dags"
     if not dag_dir.is_dir():
         raise CompactPackReleaseError(
@@ -281,55 +291,41 @@ def _materialize(
 
 
 def _materialize_workspace(
-    root: Path, cache: Path, *, xcom_sidecar_image: str, dag_ids: Sequence[str] | None
+    root: Path,
+    cache: Path,
+    *,
+    xcom_sidecar_image: str,
+    dag_ids: Sequence[str] | None,
+    development_authority: DevelopmentAuthorityReceipt | None,
 ) -> CompactPackReleaseReport:
-    from dpone.app.dbt_promotion_composition import build_dbt_compact_workspace_release_builder
     from dpone.readiness.airflow_composed_release_materializer import (
         materialize_composed_release,
+        materialize_native_workspace_release,
         read_workspace_release_descriptor,
     )
-    from dpone.readiness.airflow_release_schema_validation import validate_release_set_schema
 
-    if read_workspace_release_descriptor(root).get("schema") == "dpone.release-set.v3":
-        return materialize_composed_release(root, cache, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids)
+    schema = read_workspace_release_descriptor(root).get("schema")
+    if schema == "dpone.release-set.v3":
+        return materialize_composed_release(
+            root,
+            cache,
+            xcom_sidecar_image=xcom_sidecar_image,
+            dag_ids=dag_ids,
+            development_authority=development_authority,
+        )
 
     if cache.is_relative_to(root.resolve()):
         raise CompactPackReleaseError(
             "DPONE_COMPACT_PACK_RELEASE_CACHE_INVALID", "cache root must be outside the immutable source tree"
         )
-    try:
-        files = build_dbt_compact_workspace_release_builder().build(
-            root, xcom_sidecar_image=xcom_sidecar_image, dag_ids=dag_ids
-        )
-        release = json.loads(files["release-set.json"])
-        validate_release_set_schema(release, path=root / "release-set.json")
-    except (ValueError, OSError, TypeError, KeyError, RecursionError) as exc:
-        raise CompactPackReleaseError(
-            "DPONE_COMPACT_PACK_RELEASE_WORKSPACE_INVALID",
-            "native workspace release is invalid, incomplete or incompatible; regenerate the complete workspace with a compatible producer",
-        ) from exc
-    release_id = release["release_id"]
-    release_dir = cache / "releases" / _digest_dir(release_id)
-    try:
-        materialize_immutable_local_release(release_dir, files)
-    except ImmutableLocalReleaseDurabilityError as exc:
-        raise CompactPackReleaseError(
-            "DPONE_COMPACT_PACK_RELEASE_DURABILITY_UNCERTAIN",
-            "complete release is visible but durable publication is unproven; retry identical inputs after storage recovery",
-        ) from exc
-    except OSError as exc:
-        raise CompactPackReleaseError(
-            "DPONE_COMPACT_PACK_RELEASE_WRITE_FAILED",
-            "release publication failed; inspect storage and retry identical inputs",
-        ) from exc
-    return CompactPackReleaseReport(
-        release_id=release_id,
-        release_dir=release_dir.as_posix(),
-        dag_ids=tuple(item["id"] for item in release["artifacts"]["dag_specs"]),
-        workload_ids=tuple(item["id"] for item in release["artifacts"]["workload_packs"]),
-        pack_fingerprints={item["id"]: item["pack_fingerprint"] for item in release["artifacts"]["workload_packs"]},
-        connection_projection_mode="runtime_connection_context",
-        xcom_sidecar_image=xcom_sidecar_image.strip(),
+    return materialize_native_workspace_release(
+        root,
+        cache,
+        xcom_sidecar_image=xcom_sidecar_image,
+        dag_ids=dag_ids,
+        development_authority=development_authority,
+        publisher=materialize_immutable_local_release,
+        durability_error=ImmutableLocalReleaseDurabilityError,
     )
 
 
