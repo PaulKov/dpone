@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.81.0 - 2026-09-17
+
 ### Added
 
 - Add protected development runtime admission for exact dbt, flow, batch, and
