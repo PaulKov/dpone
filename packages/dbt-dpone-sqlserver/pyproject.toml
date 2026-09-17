@@ -17,6 +17,8 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dbt"]
+core-metadata-version = "2.4"
 
 [tool.hatch.build.targets.sdist]
 include = ["src", "README.md", "pyproject.toml"]
+core-metadata-version = "2.4"

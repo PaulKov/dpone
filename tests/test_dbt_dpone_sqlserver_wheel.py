@@ -25,6 +25,7 @@ def test_wheel_metadata_and_packaged_project():
             archive.read(next(n for n in archive.namelist() if n.endswith("/METADATA")))
         )
         assert metadata["Name"] == "dbt-dpone-sqlserver"
+        assert metadata["Metadata-Version"] == "2.4"
         assert set(metadata["Requires-Python"].split(",")) == {">=3.11", "<3.13"}
         assert any("dbt-sqlserver==1.11.1" == dep for dep in metadata.get_all("Requires-Dist"))
         assert "dbt/include/dpone_sqlserver/dbt_project.yml" in archive.namelist()
