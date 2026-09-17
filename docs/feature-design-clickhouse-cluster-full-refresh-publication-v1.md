@@ -49,7 +49,8 @@ Journey:
 3. Before source extraction, dpone verifies the complete inventory and Keeper
    authority. Unsupported or incomplete topology fails with a stable error.
 4. Dpone stages an immutable replicated candidate, waits for every replica,
-   acquires a fenced target slot, and dispatches one tagged statement.
+   acquires a fenced target slot, and dispatches one statement with an
+   operation-specific `log_comment` setting.
 5. Output reports committed, waiting, terminal-partial, or unknown with a
    per-replica summary and the bound distributed-DDL entry.
 6. A retry resumes the same authority record. It never re-extracts or replays
@@ -143,6 +144,31 @@ The completed record is retained and CAS-transitioned into the next operation,
 so Keeper storage remains one row per target. Detailed immutable evidence stays
 in the existing runtime evidence channel.
 
+The executable V1 control-table row exposes the CAS predicates as typed columns,
+not only inside JSON:
+
+```text
+target_key String PRIMARY KEY
+operation_id String
+fence_token String
+phase String
+dispatch_epoch UInt64
+payload String
+payload_sha256 FixedString(64)
+```
+
+`payload` holds the remaining canonical record. Publication and cleanup each
+store a separate opaque `ddl_correlation_token`, bound queue `entry`, and queue
+query digest in that payload. The token contains a protocol prefix, operation
+digest, action, dispatch epoch, and at least 128 random bits. It is bounded well
+below `max_query_size` and contains no identifiers, credentials, or source data.
+
+`create_if_absent` is an `INSERT` of the complete row with
+`keeper_map_strict_mode = 1`; an existing key is a conflict. A lost create
+response grants no effect permit. A later worker may read and validate the exact
+`PREPARED` record, but it still needs a new acknowledged-and-verified phase CAS
+before publication dispatch.
+
 ### Compatibility and migration
 
 - Local Atomic/Shared publication remains unchanged.
@@ -170,11 +196,11 @@ in the existing runtime evidence channel.
 5. Verify the KeeperMap facade on every member: identical schema, Keeper root,
    and strict-mode capability. Every member must read the same target record and
    KeeperMap `_version`.
-6. If the facade is absent everywhere, bootstrap it with one tagged, non-retried
-   `CREATE TABLE ... ON CLUSTER`. Reconcile the DDL queue and all catalogs before
-   proceeding. A retry may fill absent facades only when every existing facade
-   has the expected schema and Keeper root. Conflict or unresolved partial
-   bootstrap fails closed.
+6. If the facade is absent everywhere, bootstrap it with one non-retried
+   `CREATE TABLE ... ON CLUSTER` carrying a bootstrap-specific `log_comment`.
+   Reconcile the DDL queue and all catalogs before proceeding. A retry may fill
+   absent facades only when every existing facade has the expected schema and
+   Keeper root. Conflict or unresolved partial bootstrap fails closed.
 
 Bootstrap is capability setup, not publication authority. Publication cannot
 start until the control facade is complete on every expected replica.
@@ -219,11 +245,37 @@ produce different physical parts for the same logical data.
    unresolved operation is fenced. Only `COMPLETED` may CAS into a new operation.
 4. Bind inventory digest, predecessor/desired identities, candidate, and row
    count in phase `PREPARED`.
-5. Immediately before dispatch, re-read catalogs and authority. CAS
-   `PREPARED -> DISPATCHING`, increment `dispatch_epoch`, and create a unique DDL
-   tag containing only opaque operation and epoch digests.
-6. Only the process whose CAS call returned success receives an in-memory
-   dispatch permit. Observing `DISPATCHING` later cannot recreate permission.
+5. Immediately before dispatch, re-read catalogs and authority. Execute this
+   logical CAS with `keeper_map_strict_mode = 1`:
+
+   ```sql
+   ALTER TABLE control
+   UPDATE
+     phase = 'DISPATCHING',
+     dispatch_epoch = expected_epoch + 1,
+     payload = new_payload,
+     payload_sha256 = new_payload_sha256
+   WHERE target_key = expected_target_key
+     AND _version = expected_keeper_version
+     AND operation_id = expected_operation_id
+     AND fence_token = expected_fence_token
+     AND phase = 'PREPARED'
+   SETTINGS keeper_map_strict_mode = 1
+   ```
+
+   The new payload contains the unique publication `ddl_correlation_token`.
+6. KeeperMap UPDATE does not return an affected-row count: a false/stale
+   predicate is a successful no-op. After an acknowledged response, read the
+   exact key again and require the new operation, fence, phase, epoch, payload
+   digest, and `_version = expected_keeper_version + 1`.
+7. Only the caller that received both the acknowledged CAS response and the
+   exact post-read receives an in-memory dispatch permit. A Keeper version
+   conflict, zero-row/no-op, foreign record, unexpected version jump, or failed
+   post-read returns `CAS_CONFLICT` or `CAS_OUTCOME_UNKNOWN` with no permit.
+8. A lost or timed-out CAS response never yields a permit, even when a later
+   read shows the requested value. The write may still be in flight, and a
+   read cannot prove that this caller has the sole right to perform the external
+   DDL effect. The operation remains fenced for explicit reconciliation.
 
 There is no lease expiry or automatic ownership transfer. A crash after CAS but
 before a provable queue entry intentionally leaves an unknown operation rather
@@ -234,24 +286,54 @@ than risking a second exchange.
 For an existing target, issue exactly once:
 
 ```sql
-/* opaque operation and dispatch tag */
 EXCHANGE TABLES database.target AND database.candidate
 ON CLUSTER cluster
 ```
 
-For an absent target, issue one tagged `RENAME TABLE` instead. The adapter uses a
+For an absent target, issue one `RENAME TABLE` instead. The adapter uses a
 separate client `query_id`, disables driver retry, and overrides settings with:
 
 ```text
 skip_unavailable_shards = 0
 distributed_ddl_output_mode = throw
 bounded distributed DDL timeout
+log_comment = <exact ddl_correlation_token from the fenced authority record>
 ```
 
-On success, timeout, or lost response, query `system.distributed_ddl_queue`.
-Match by cluster and the exact opaque SQL tag, then bind one and only one entry
-plus its query digest to the authority record. Client query ID and
-`system.processes` are correlation data, not distributed-DDL identity.
+Leading SQL comments are not a correlation channel. ClickHouse parses the DDL
+and stores `queryToString(AST)` in the queue, so comments are absent from
+`system.distributed_ddl_queue.query`. Pinned ClickHouse 24.8 stores changed
+query settings in the DDL log entry, and the system table exposes them as a
+`Map(String, String)`. Therefore V1 correlates through the operation-specific
+`settings['log_comment']`, not query text comments.
+
+Preflight requires `distributed_ddl_entry_format_version >= 2`, the `settings`
+map column, and a successful synthetic capability assertion for the pinned
+version. On success, timeout, or lost response, query the queue for the exact
+cluster and exact `log_comment`. Group repeated per-host rows by `entry`:
+
+```sql
+SELECT entry, groupUniqArray(query), groupUniqArray(settings['log_comment'])
+FROM system.distributed_ddl_queue
+WHERE cluster = expected_cluster
+  AND mapContains(settings, 'log_comment')
+  AND settings['log_comment'] = expected_token
+GROUP BY entry
+```
+
+Exactly one distinct `entry` must match. Its query must parse to the expected
+statement type, cluster, database, target, and candidate; then its normalized
+query digest and entry name are stored in the authority record. Later reads use
+the bound `entry` and require the same query digest, token, and exact host set.
+Client query ID and `system.processes` remain diagnostic correlation only.
+
+The random component makes an accidental token collision negligible, but the
+classifier never resolves a collision probabilistically. Two distinct entries
+with the same token mean duplicate dispatch or external collision and produce
+`OUTCOME_UNKNOWN`; it never selects the newest entry. Zero matching entries
+after an acknowledged/failed dispatch response and a bounded visibility wait is
+also unknown. Repeated rows for the same entry are expected per-host status, not
+duplicates.
 
 After `DISPATCHING`, zero matches, multiple matches, a changed query digest, or
 an entry removed before terminal proof produces `OUTCOME_UNKNOWN`. Missing queue
@@ -303,8 +385,9 @@ For an existing target:
 
 1. Verify every present candidate still has the predecessor UUID and replication
    identity from the authority record.
-2. Send one tagged `DROP TABLE IF EXISTS candidate ON CLUSTER` without generic
-   retry and bind its distributed-DDL entry.
+2. Fence a separate cleanup dispatch epoch/token, then send one
+   `DROP TABLE IF EXISTS candidate ON CLUSTER` with that token in
+   `log_comment`, without generic retry, and bind its distributed-DDL entry.
 3. Reconcile every member. A lost or terminal-partial drop may be redispatched
    because it is monotonic only when every remaining object still has the exact
    predecessor identity and absent members contain no conflicting object.
@@ -340,7 +423,7 @@ revalidate_inventory_authority_and_generations()
 permit = cas_prepared_to_dispatching_with_new_epoch()
 if permit was not returned by this CAS call:
     reconcile_without_dispatch()
-execute_one_tagged_on_cluster_statement_without_retry(permit)
+execute_one_on_cluster_statement_with_log_comment_without_retry(permit)
 bind_exact_distributed_ddl_entry()
 reconcile_until_terminal_or_bounded_wait()
 
@@ -356,7 +439,9 @@ else:
 ```mermaid
 stateDiagram-v2
     [*] --> Prepared: strict inventory and Keeper CAS
-    Prepared --> Dispatching: CAS winner receives permit
+    Prepared --> Dispatching: acknowledged CAS plus exact post-read
+    Prepared --> CASConflict: stale predicate or foreign state
+    Prepared --> CASUnknown: response or post-read is lost
     Dispatching --> InProgress: exact DDL entry bound
     Dispatching --> Unknown: entry cannot be proved
     InProgress --> Committed: all replicas desired
@@ -374,6 +459,11 @@ stateDiagram-v2
 
 - Empty source publishes a validated replicated empty candidate.
 - Duplicate workers cannot both win `PREPARED -> DISPATCHING` CAS.
+- When two workers read the same version, only the acknowledged writer whose
+  post-read proves the exact next version can receive the dispatch permit. The
+  other worker observes a strict-version failure or successful zero-row no-op.
+- A lost CAS response remains `CAS_OUTCOME_UNKNOWN` with no dispatch permit even
+  if a separate read later observes the desired record.
 - A stale worker cannot advance a changed KeeperMap version or fence token.
 - A crash before authority acquisition removes only owned attempt staging.
 - A crash after dispatch CAS retains candidate and authority even when no queue
@@ -417,7 +507,9 @@ unrelated routes.
 ### Ports, adapters, and composition root
 
 The authority port exposes only `create_if_absent`, `read_versioned`, and
-`compare_and_swap`. The DDL port exposes one-shot execution and queue lookup; it
+`compare_and_swap`. Its CAS result distinguishes acknowledged-and-verified,
+conflict, and outcome-unknown; only the first variant can carry a non-serializable
+dispatch permit. The DDL port exposes one-shot execution and queue lookup; it
 does not expose a generic publication retry. The catalog port returns typed
 facts rather than policy. The service owns the aggregate classifier.
 
@@ -431,7 +523,7 @@ only for an admitted bounded cluster plan.
 flowchart LR
     A[Strict inventory] --> B[Generation validation]
     B --> C[KeeperMap CAS]
-    C --> D[One tagged cluster DDL]
+    C --> D[One log-comment-correlated cluster DDL]
     D --> E[Distributed DDL entry]
     E --> F[Per-replica reconciliation]
     F --> G[Exact cleanup]
@@ -446,6 +538,8 @@ flowchart LR
 | PostgreSQL/shared external journal | Familiar transactional authority | Adds a service absent from many deployments | Reject for this topology |
 | KeeperMap target slot | Uses existing Keeper and versioned strict writes | Needs configured prefix and permissions | Adopt |
 | Blind retry of cluster EXCHANGE | Appears to improve availability | Toggles committed replicas back | Reject |
+| Leading SQL correlation comment | Human-readable | Removed by AST serialization before DDL queue storage | Reject |
+| Operation-specific `log_comment` setting | Preserved in the pinned queue entry settings map | Requires entry format/settings capability preflight | Adopt |
 | `system.processes` query-ID check | Easy local observation | Transient and not distributed completion evidence | Diagnostic only |
 | Exact distributed-DDL entry | Preserves the original command | Queue retention must cover recovery | Adopt |
 | Automatic terminal-mixed repair | Less manual work | Needs direct per-replica fenced DDL | Separate design |
@@ -477,8 +571,31 @@ Checked 2026-09-17. This design depends primarily on ClickHouse semantics:
   exposes replication and Keeper state, while
   [system.tables](https://clickhouse.com/docs/reference/system-tables/tables)
   exposes UUID and engine layout.
-- [KeeperMap](https://clickhouse.com/docs/engines/table-engines/special/keepermap)
+- [KeeperMap](https://clickhouse.com/docs/reference/engines/table-engines/special/keepermap)
   provides Keeper-backed key/value state and version-bound updates.
+
+The implementation evidence is pinned to ClickHouse `v24.8.14.39-lts`
+(`29206094b7a121a870b7ac69a4bcf812272a20ad`). The source constructs the DDL
+entry from `queryToString(AST)` and then captures changed settings
+([dispatch source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Interpreters/executeDDLQueryOnCluster.cpp#L181-L185));
+the entry serializer persists those settings
+([DDL entry source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Interpreters/DDLTask.cpp#L71-L109));
+and `system.distributed_ddl_queue` exposes both normalized query and settings
+([system-table source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/System/StorageSystemDDLWorkerQueue.cpp#L49-L60)).
+
+For KeeperMap, the same pinned source defines the virtual `_version`
+([virtual-column source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/StorageKeeperMap.cpp#L350-L365)),
+captures it with mutated rows, and passes it to Keeper `set` in strict mode
+([versioned-set source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/StorageKeeperMap.cpp#L158-L229));
+UPDATE returns all columns and executes the versioned sink synchronously
+([mutation source](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/StorageKeeperMap.cpp#L1433-L1460)).
+
+A disposable Docker check against server `24.8.14.39` confirmed both behaviors:
+a leading DDL comment was absent from the queue `query`, while an
+operation-specific `log_comment` was present unchanged in `settings`; a strict
+KeeperMap UPDATE with the complete predicate raised `_version` from 0 to 1,
+while repeating the stale predicate returned successfully as a no-op. These
+observations define acceptance tests, not live-route certification.
 
 | System/version | Relevant capability | Observed design | Adopt/reject | Official source/date |
 |---|---|---|---|---|
@@ -507,7 +624,8 @@ limitations: Docker evidence does not certify production topology, permissions, 
 
 - Authority values contain opaque hashes, object identities, counts, phases,
   and timestamps, never credentials or source rows.
-- SQL identifiers use the existing renderer; DDL tags are opaque and bounded.
+- SQL identifiers use the existing renderer; DDL correlation tokens are opaque
+  and bounded `log_comment` values, never leading SQL comments.
 - The principal needs documented catalog reads, KeeperMap access, and target
   database DDL privileges.
 - Logs redact connection details and emit stable codes with bounded summaries.
@@ -524,8 +642,10 @@ limitations: Docker evidence does not certify production topology, permissions, 
 | Unit | Existing/absent-target replica mappings | One stable aggregate classification |
 | Unit | Inventory and generation digests | Order-independent; semantic drift changes digest |
 | Unit | Authority codec and versions | Malformed fields and stale versions block |
-| Contract | Two workers | One CAS winner and at most one dispatch |
+| Contract | Two workers from the same prior version | One acknowledged-and-verified CAS permit and at most one dispatch; the loser has no permit |
+| Contract | CAS succeeds but its response is discarded | `CAS_OUTCOME_UNKNOWN`; post-read cannot create a dispatch permit |
 | Contract | Queue active, terminal, absent, duplicate, changed | Only the exact active entry is waited |
+| Contract | Two queue entries reuse one correlation token | Collision is unknown; newest entry is never selected |
 | Contract | Cleanup partial or reply lost | Only exact predecessor can be dropped |
 | Compatibility | Local bounded and legacy unbounded paths | Existing behavior remains unchanged |
 
@@ -546,10 +666,19 @@ Required scenarios:
 4. Cause a terminal error on one replica; observe `PARTIAL_TERMINAL`, retain both
    generations, and send no second publication DDL.
 5. Race workers and prove one dispatch permit.
-6. Inject a KeeperMap version conflict; the stale worker cannot advance.
-7. Lose cleanup response; reconcile and complete exact idempotent cleanup.
-8. Change UUID, engine, schema, Keeper path, or membership; block before mutation.
-9. Partially create the control facade; reconcile safe absence but block mismatch.
+6. Execute KeeperMap CAS on the pinned server with key, `_version`, operation,
+   fence, and phase predicates; prove one version increment and a stale no-op.
+7. Discard an actually committed CAS response in the client fault wrapper;
+   prove the runtime emits `CAS_OUTCOME_UNKNOWN` and sends no DDL even though an
+   independent read observes the new record.
+8. Submit a DDL with both a leading comment and unique `log_comment`; assert the
+   comment is absent from queue `query`, the setting is present unchanged, and
+   exactly one distinct queue `entry` is bound.
+9. Create two harmless DDL entries with the same test correlation token and
+   assert the classifier returns unknown rather than selecting the newest.
+10. Lose cleanup response; reconcile and complete exact idempotent cleanup.
+11. Change UUID, engine, schema, Keeper path, or membership; block before mutation.
+12. Partially create the control facade; reconcile safe absence but block mismatch.
 
 The compose fixture is opt-in locally and an explicit CI job. Certification must
 pin ClickHouse version, configuration, permissions, topology, exact commit, and
@@ -593,8 +722,9 @@ separate branch and task only after this specification becomes `APPROVED`.
 - [ ] Exact one-shard/N-replica inventory is required; partial observation never passes.
 - [ ] Database, engine, UUID, schema, Keeper path, and replica identities agree.
 - [ ] Every replica observes one KeeperMap record and version for the target.
-- [ ] One CAS winner dispatches; stale workers cannot recreate permission.
-- [ ] Every publication binds exactly one distributed-DDL entry.
+- [ ] One acknowledged-and-post-verified CAS winner dispatches; stale workers and lost CAS responses cannot create permission.
+- [ ] Every publication binds exactly one distributed-DDL entry through the exact stored `log_comment` setting.
+- [ ] Missing or duplicate correlation entries fail closed; leading SQL comments are never identity evidence.
 - [ ] Lost response never causes blind `EXCHANGE` replay.
 - [ ] Active partial waits; terminal mixed fails closed.
 - [ ] Unknown identity, queue, or topology prohibits DDL and cleanup.
