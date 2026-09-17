@@ -301,6 +301,8 @@ SELECT @json=CONVERT(nvarchar(max),N'{"filegroup_name":"')
  (0,N'TARGET',JSON_VALUE(models.document,'$.spec.relation.table')),
  (1,N'CANDIDATE',JSON_VALUE(models.document,'$.candidate_name')),
  (2,N'HELPER',JSON_VALUE(models.document,'$.helper_name'))) names(position,role,name)
+ CROSS APPLY OPENJSON(models.document)
+ WITH (model_unique_id nvarchar(max) '$.spec.model_unique_id') model_identity
  {{NAMESPACE_FILTER}};
 IF @json IS NULL OR DATALENGTH({{NAMESPACE_BYTES}})>@metadata_limit
  THROW 51600, 'DPONE_ENROLLMENT_INPUT_INVALID', 1;

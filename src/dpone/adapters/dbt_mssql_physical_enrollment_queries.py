@@ -188,7 +188,7 @@ def _renderer_parts(
         "DOCUMENT_CHECKS": enrollment_document_sql(enrollment_sql=enrollment_sql),
         "CONTROL_LINKS": _enrollment_links(control=True),
         "MODEL_ID": scalar("@model_document", "$.spec.model_unique_id"),
-        "NAMESPACE_MODEL_ID": scalar("models.document", "$.spec.model_unique_id"),
+        "NAMESPACE_MODEL_ID": "model_identity.model_unique_id",
     }
     for key, source, target in [
         ("REGISTRATION_DECODE", "@registration_payload", "@registration"),

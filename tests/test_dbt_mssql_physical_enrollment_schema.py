@@ -214,6 +214,11 @@ def test_real_five_modules_and_tables_install_or_exact_replay(same, existing):
         assert sum(sql.startswith("ADD COUNTER SIGNATURE") for sql in statements) == 1
         assert sum(sql.startswith("ADD SIGNATURE") for sql in statements) == 4
     assert all("{{" not in definition for definition in definitions)
+    if not existing:
+        joined = "\n".join(definitions)
+        assert "CROSS APPLY OPENJSON(models.document)" in joined
+        assert "model_identity.model_unique_id" in joined
+        assert "STRING_ESCAPE((SELECT value FROM OPENJSON(models.document)" not in joined
 
 
 @pytest.mark.parametrize(
