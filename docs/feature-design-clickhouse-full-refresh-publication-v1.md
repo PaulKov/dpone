@@ -17,8 +17,9 @@ coordination state lives in ClickHouse itself. It does not require PostgreSQL or
 another shared state service.
 
 The measurable outcome is binary: after a lost publication response, a retry
-must classify the exact target and candidate UUID mapping before doing any DDL;
-it must never blindly exchange the pair again.
+must classify the exact target and candidate UUID mapping and prove that the
+deterministic prior query ID is absent from `system.processes` before doing any
+DDL; it must never blindly exchange the pair again.
 
 ## Personas and customer journey
 
@@ -104,8 +105,10 @@ must not automatically repeat an unresolved exchange.
 
 ## Detailed algorithm
 
-1. Derive `operation_id = sha256(version, scheduler run identity, database,
-   target)`; exclude worker try number and random load IDs. The immutable marker
+1. Bind the scheduler-owned `RunContext.run_id` and process identity after
+   attempt-local audit injection, then derive `operation_id = sha256(version,
+   scheduler invocation identity, database, target)`; exclude worker try number
+   and random load IDs. The immutable marker
    digest separately binds the exact candidate, predecessor/desired UUIDs and
    staged row count for that operation.
 2. Keep the attempt-local candidate name and derive a fixed per-target marker
@@ -128,12 +131,16 @@ must not automatically repeat an unresolved exchange.
      candidate is absent for the absent-target branch;
    - unknown: every other mapping, missing observation or inconsistent replica.
 9. Acknowledged pending is a failure. Raised-but-committed is recovered success.
-   Raised-and-pending is reported as unknown for the current attempt. A later
-   orchestration retry may execute the DDL once only after pre-source catalog
-   reconciliation proves the exact original pending UUID mapping.
+   Raised-and-pending is reported as unknown for the current attempt. Publication
+   uses a deterministic ClickHouse `query_id`. A later orchestration retry may
+   execute the DDL once only after pre-source catalog reconciliation proves the
+   exact original pending UUID mapping and `system.processes` proves that query
+   ID is no longer active. An unavailable or failed quiescence observation
+   blocks the retry.
 10. After verified commit, drop only the exact predecessor candidate whose UUID
-    matches the marker, then drop the exact marker. Cleanup failure is
-    `CLEANUP_PENDING`, not failed publication.
+    matches the marker, then drop the exact marker. The state where the desired
+    UUID is already at the target, the predecessor candidate is absent and the
+    exact marker remains is `CLEANUP_PENDING`; retry removes only that marker.
 11. Source state advances only after verified committed classification and
     success evidence. An unknown outcome never triggers source re-extraction or
     target mutation automatically.
@@ -168,6 +175,7 @@ stateDiagram-v2
     Pending --> CommitUnknown: DDL reply lost or catalog inconsistent
     Pending --> Committed: catalog proves desired UUID at target
     CommitUnknown --> Pending: catalog proves no commit
+    CommitUnknown --> CommitUnknown: deterministic query ID is still active
     CommitUnknown --> Committed: catalog proves commit
     Committed --> CleanupPending: exact cleanup fails
     Committed --> Complete: predecessor and marker removed
@@ -181,7 +189,10 @@ stateDiagram-v2
   candidate replacement, duplicate delivery or mixed replica evidence blocks.
 - Schema drift after staging blocks at the existing validation boundary.
 - Cancellation before DDL removes only the exact owned candidate/marker.
-- Cancellation or process crash after DDL is reconciled from catalog identity.
+- Cancellation or process crash after DDL is reconciled from catalog identity;
+  a still-running server query fences redispatch.
+- A crash between predecessor deletion and marker deletion resumes as exact
+  marker-only cleanup.
 - Two different runs cannot own one fixed target marker concurrently.
 
 ## Architecture
@@ -250,7 +261,7 @@ schema drop exists.
 |---|---|---|---|
 | Unit | marker codec and all UUID mappings | In-memory | classifier tests |
 | Contract | existing/absent target, foreign marker, engine/topology rejection | Fake connector | publication service tests |
-| Failure injection | lost reply before/after mutation, repeated retry, cleanup failure | Fake connector | zero double-exchange proof |
+| Failure injection | delayed lost reply, repeated retry with fresh audit identity, cleanup crash | Fake connector | zero concurrent/double exchange and marker-only cleanup proof |
 | Integration | Atomic ClickHouse with concurrent reader and two workers | Docker | integration receipt |
 | Live certification | exact production-like topology and permissions | Approved environment | signed route evidence; initially UNVERIFIED |
 | Compatibility | non-full-refresh names/behavior unchanged | Offline suite | regression results |

@@ -28,9 +28,14 @@ class ClickHouseHttpClientAdapter:
         *,
         with_column_types: bool = False,
         settings: dict[str, Any] | None = None,
+        query_id: str | None = None,
     ) -> Any:
         statement = str(query)
         merged = {**(self._settings or {}), **(settings or {})} or None
+        if query_id is not None:
+            # clickhouse-connect serializes this reserved HTTP parameter
+            # separately from SQL SETTINGS, matching X-ClickHouse-Query-Id.
+            merged = {**(merged or {}), "query_id": query_id}
         if _is_query(statement):
             result = self._client.query(statement, parameters=params, settings=merged)
             rows = list(getattr(result, "result_rows", ()) or ())

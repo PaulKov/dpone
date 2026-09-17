@@ -141,8 +141,11 @@ For the bounded dbt route, publication is recoverable on a local ClickHouse
 staging and blocking validation complete, records the exact target/candidate
 UUIDs, and uses one `EXCHANGE TABLES` for an existing target or one `RENAME
 TABLE` for initial publication. A lost client response is reconciled through
-`system.tables`; neither statement is blindly retried. Cleanup verifies the
-predecessor UUID before dropping it.
+`system.tables`; a deterministic query ID must also be absent from
+`system.processes` before a pending operation can be redispatched. Neither
+statement is blindly retried. Cleanup verifies the predecessor UUID before
+dropping it and can resume marker-only cleanup after that drop already
+completed.
 
 Cluster-wide, `Distributed`, `Replicated*`, cross-database, and non-Atomic/Shared
 publication fail before mutation with a stable

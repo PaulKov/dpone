@@ -151,8 +151,14 @@ class ClickHouseConnector(AbstractConnector):
             )
         return self._client
 
-    def execute_query(self, query: Any, params: Iterable[Any] | None = None) -> int:
-        return self._query_ops.execute_query(query, params)
+    def execute_query(
+        self,
+        query: Any,
+        params: Iterable[Any] | None = None,
+        *,
+        query_id: str | None = None,
+    ) -> int:
+        return self._query_ops.execute_query(query, params, query_id=query_id)
 
     def get_records(
         self,

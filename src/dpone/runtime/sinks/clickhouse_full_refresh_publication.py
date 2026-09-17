@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from typing import Any, Protocol
 
 from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
@@ -13,10 +12,12 @@ from dpone.runtime.sinks.clickhouse_full_refresh_catalog import (
     ClickHouseFullRefreshCatalog,
     ClickHousePublicationTable,
 )
+from dpone.runtime.sinks.clickhouse_full_refresh_receipt import FullRefreshPublicationReceipt
 from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 
 REPLAY_OPTION = "__dpone_clickhouse_full_refresh_replay_v1"
+SCHEDULER_IDENTITY_OPTION = "__dpone_clickhouse_full_refresh_scheduler_identity_v1"
 _ADMITTED_DATABASE_ENGINES = frozenset({"Atomic", "Shared"})
 _ZERO_UUID = "00000000-0000-0000-0000-000000000000"
 
@@ -30,9 +31,11 @@ class FullRefreshPublicationCatalog(Protocol):
 
     def create_marker(self, database: str, marker: str, comment: str) -> None: ...
 
-    def exchange(self, database: str, target: str, candidate: str) -> None: ...
+    def exchange(self, database: str, target: str, candidate: str, *, query_id: str) -> None: ...
 
-    def rename(self, database: str, candidate: str, target: str) -> None: ...
+    def rename(self, database: str, candidate: str, target: str, *, query_id: str) -> None: ...
+
+    def publication_query_active(self, query_id: str) -> bool: ...
 
     def drop(self, database: str, table: str) -> None: ...
 
@@ -44,38 +47,6 @@ class ClickHouseFullRefreshOutcomeUnknown(publication_contract.ClickHouseFullRef
 
     safe_to_retry = False
     operator_verification_required = True
-
-
-@dataclass(frozen=True, slots=True)
-class FullRefreshPublicationReceipt:
-    """Verified committed mapping retained until exact cleanup succeeds."""
-
-    marker: publication_contract.FullRefreshPublicationMarker
-    marker_table: str
-    recovered_after_error: bool = False
-
-    @classmethod
-    def from_mapping(cls, raw: Mapping[str, Any]) -> FullRefreshPublicationReceipt:
-        expected = {"marker", "marker_table", "recovered_after_error"}
-        if set(raw) != expected or not isinstance(raw.get("marker"), Mapping):
-            raise publication_contract.ClickHouseFullRefreshPublicationError(
-                "DPONE_CLICKHOUSE_FULL_REFRESH_RECEIPT_INVALID", "receipt fields do not match v1"
-            )
-        marker = publication_contract.FullRefreshPublicationMarker.from_json(_canonical_mapping_json(raw["marker"]))
-        marker_table = raw.get("marker_table")
-        recovered = raw.get("recovered_after_error")
-        if not isinstance(marker_table, str) or not marker_table or not isinstance(recovered, bool):
-            raise publication_contract.ClickHouseFullRefreshPublicationError(
-                "DPONE_CLICKHOUSE_FULL_REFRESH_RECEIPT_INVALID", "receipt identity is invalid"
-            )
-        return cls(marker=marker, marker_table=marker_table, recovered_after_error=recovered)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "marker": self.marker.to_dict(),
-            "marker_table": self.marker_table,
-            "recovered_after_error": self.recovered_after_error,
-        }
 
 
 class ClickHouseFullRefreshPublicationService:
@@ -90,6 +61,25 @@ class ClickHouseFullRefreshPublicationService:
 
         return cls(ClickHouseFullRefreshCatalog(connector))
 
+    @staticmethod
+    def bind_runtime_identity(
+        load_config: Any,
+        *,
+        scheduler_run_id: str,
+        process_id: str,
+    ) -> Any:
+        """Bind scheduler-stable identity after attempt-local audit injection."""
+
+        if not ClickHouseFullRefreshPublicationService.is_enabled(load_config):
+            return load_config
+        invocation_id = publication_contract.publication_invocation_id(
+            scheduler_run_id=scheduler_run_id,
+            process_id=process_id,
+        )
+        options = dict(getattr(load_config, "options", {}) or {})
+        options[SCHEDULER_IDENTITY_OPTION] = invocation_id
+        return replace(load_config, options=options)
+
     def prepare_admission(self, load_config: Any) -> Any:
         """Preflight or reconcile an existing operation before source I/O."""
 
@@ -102,7 +92,7 @@ class ClickHouseFullRefreshPublicationService:
         if marker_record is None:
             return load_config
         marker = self._owned_marker(load_config, marker_record)
-        receipt = self._reconcile_or_publish(marker, marker_table=marker_table)
+        receipt = self._reconcile_or_publish(marker, marker_table=marker_table, initial_dispatch=False)
         result = self._replay_result(receipt)
         self.cleanup(receipt)
         options = dict(getattr(load_config, "options", {}) or {})
@@ -155,13 +145,15 @@ class ClickHouseFullRefreshPublicationService:
             staged_rows=staged_rows,
         )
         marker_record = observed.get(marker_table)
-        if marker_record is None:
+        marker_created = marker_record is None
+        if marker_created:
             try:
                 self._catalog.create_marker(database, marker_table, marker.to_json())
             except Exception:
                 marker_record = self._catalog.tables(database, (marker_table,)).get(marker_table)
                 if marker_record is None:
                     raise
+                marker_created = False
         marker_record = marker_record or self._required_table(
             self._catalog.tables(database, (marker_table,)), marker_table
         )
@@ -170,7 +162,11 @@ class ClickHouseFullRefreshPublicationService:
             raise publication_contract.ClickHouseFullRefreshPublicationError(
                 "DPONE_CLICKHOUSE_FULL_REFRESH_OWNERSHIP_CONFLICT", "marker belongs to another publication plan"
             )
-        return self._reconcile_or_publish(marker, marker_table=marker_table)
+        return self._reconcile_or_publish(
+            marker,
+            marker_table=marker_table,
+            initial_dispatch=marker_created,
+        )
 
     def cleanup(self, receipt: FullRefreshPublicationReceipt | Mapping[str, Any]) -> None:
         """Drop only the exact predecessor and marker proven by a committed receipt."""
@@ -183,11 +179,15 @@ class ClickHouseFullRefreshPublicationService:
         marker = resolved.marker
         records = self._catalog.tables(marker.database, (marker.target, marker.candidate, resolved.marker_table))
         self._require_exact_marker(records.get(resolved.marker_table), marker)
-        if self._state(marker, records) is not publication_contract.PublicationState.COMMITTED:
+        state = self._state(marker, records)
+        if state not in {
+            publication_contract.PublicationState.COMMITTED,
+            publication_contract.PublicationState.CLEANUP_PENDING,
+        }:
             raise ClickHouseFullRefreshOutcomeUnknown(
                 "DPONE_CLICKHOUSE_FULL_REFRESH_OUTCOME_UNKNOWN", "cleanup requires committed UUID mapping"
             )
-        if marker.predecessor_uuid is not None:
+        if marker.predecessor_uuid is not None and state is publication_contract.PublicationState.COMMITTED:
             predecessor = self._required_table(records, marker.candidate)
             if predecessor.uuid != marker.predecessor_uuid:
                 raise publication_contract.ClickHouseFullRefreshPublicationError(
@@ -204,12 +204,16 @@ class ClickHouseFullRefreshPublicationService:
         marker: publication_contract.FullRefreshPublicationMarker,
         *,
         marker_table: str,
+        initial_dispatch: bool,
     ) -> FullRefreshPublicationReceipt:
         names = (marker.target, marker.candidate, marker_table)
         records = self._catalog.tables(marker.database, names)
         self._require_exact_marker(records.get(marker_table), marker)
         state = self._state(marker, records)
-        if state is publication_contract.PublicationState.COMMITTED:
+        if state in {
+            publication_contract.PublicationState.COMMITTED,
+            publication_contract.PublicationState.CLEANUP_PENDING,
+        }:
             return FullRefreshPublicationReceipt(marker=marker, marker_table=marker_table)
         if state is not publication_contract.PublicationState.PENDING:
             raise ClickHouseFullRefreshOutcomeUnknown(
@@ -218,12 +222,36 @@ class ClickHouseFullRefreshPublicationService:
         self._require_supported_table(self._required_table(records, marker.candidate), role="candidate")
         if marker.predecessor_uuid is not None:
             self._require_supported_table(self._required_table(records, marker.target), role="target")
+        query_id = publication_contract.publication_query_id(marker.operation_id)
+        if not initial_dispatch:
+            try:
+                active = self._catalog.publication_query_active(query_id)
+            except Exception as exc:
+                raise ClickHouseFullRefreshOutcomeUnknown(
+                    "DPONE_CLICKHOUSE_FULL_REFRESH_QUIESCENCE_UNKNOWN",
+                    "cannot prove the previous publication query is quiescent",
+                ) from exc
+            if active:
+                raise ClickHouseFullRefreshOutcomeUnknown(
+                    "DPONE_CLICKHOUSE_FULL_REFRESH_PUBLICATION_IN_FLIGHT",
+                    "the previous publication query is still active",
+                )
         raised = False
         try:
             if marker.predecessor_uuid is None:
-                self._catalog.rename(marker.database, marker.candidate, marker.target)
+                self._catalog.rename(
+                    marker.database,
+                    marker.candidate,
+                    marker.target,
+                    query_id=query_id,
+                )
             else:
-                self._catalog.exchange(marker.database, marker.target, marker.candidate)
+                self._catalog.exchange(
+                    marker.database,
+                    marker.target,
+                    marker.candidate,
+                    query_id=query_id,
+                )
         except Exception:
             raised = True
         observed = self._catalog.tables(marker.database, names)
@@ -348,18 +376,14 @@ class ClickHouseFullRefreshPublicationService:
     def _operation_id(load_config: Any) -> str:
         options = getattr(load_config, "options", {}) or {}
         return publication_contract.publication_operation_id(
-            run_id=str(options.get("run_id") or ""),
+            invocation_id=str(options.get(SCHEDULER_IDENTITY_OPTION) or ""),
             database=str(load_config.target_schema),
             target=str(load_config.target_table),
         )
 
-
-def _canonical_mapping_json(value: Mapping[str, Any]) -> str:
-    return json.dumps(dict(value), ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-
-
 __all__ = [
     "REPLAY_OPTION",
+    "SCHEDULER_IDENTITY_OPTION",
     "ClickHouseFullRefreshOutcomeUnknown",
     "ClickHouseFullRefreshPublicationService",
     "FullRefreshPublicationCatalog",
