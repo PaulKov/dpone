@@ -1,11 +1,11 @@
 # Feature design: recoverable ClickHouse cluster full-refresh publication
 
-- Status: RESEARCHED
+- Status: APPROVED
 - Owner: maintainers
 - Issue: none; independent open-source design
-- Target release: TBD
+- Target release: next minor release
 - Last verified: 2026-09-17
-- Implementation gate: architecture review and maintainer approval are required
+- Implementation gate: approved for implementation after independent architecture review
 
 ## Executive summary
 
