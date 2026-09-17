@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -272,6 +273,44 @@ def test_development_activation_requires_exact_nonproduction_admission(tmp_path:
 
 
 @pytest.mark.parametrize("composed", [False, True])
+def test_development_activation_rejects_release_changed_after_snapshot(tmp_path: Path, composed: bool) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=composed)
+    deployment = cache / "deployments" / "development" / deployment_id.replace(":", "-", 1)
+    release_path = cache / "releases" / release_id.replace(":", "-", 1) / "release-set.json"
+    coordinator = _CompositionCoordinator() if composed else _Coordinator()
+
+    def remove_development_authority() -> None:
+        release_path.chmod(0o644)
+        release = json.loads(release_path.read_text(encoding="utf-8"))
+        if composed:
+            native = next(item for item in release["constituents"] if item["id"] == "native")
+            native["release"].pop("development_authority")
+        else:
+            release.pop("development_authority")
+        release_path.write_text(json.dumps(release, sort_keys=True), encoding="utf-8")
+
+    with pytest.raises(DeploymentCacheError) as denied:
+        DeploymentCacheMaterializer(
+            cache,
+            workspace_activation=None if composed else coordinator,
+            composition_activation_coordinator=coordinator if composed else None,
+            development_admission=_admission(authority, "activate", release_id, deployment_id),
+            development_admission_verifier=_admission_verifier(authority, revoke_after_successes=1),
+            clock=_clock,
+        ).promote(
+            deployment,
+            environment="development",
+            precommit_check=remove_development_authority,
+        )
+
+    assert denied.value.code == "DPONE_RELEASE_FINGERPRINT_MISMATCH"
+    assert denied.value.details == {"state_may_have_changed": True, "recovery_required": True}
+    assert not (cache / "current").exists()
+    assert not (cache / "current-pointer.json").exists()
+
+
+@pytest.mark.parametrize("composed", [False, True])
 def test_development_recovery_rechecks_target_operation_before_pointer_mutation(
     tmp_path: Path,
     composed: bool,
@@ -302,6 +341,34 @@ def test_development_recovery_rechecks_target_operation_before_pointer_mutation(
 
     assert denied.value.code == "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED"
     assert not (cache / "current-pointer.json").exists()
+
+
+def test_development_recovery_reports_prepared_state_when_final_admission_is_revoked(tmp_path: Path) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=False)
+    deployment = cache / "deployments" / "development" / deployment_id.replace(":", "-", 1)
+    coordinator = _Coordinator()
+
+    with pytest.raises(DeploymentCacheError) as denied:
+        DeploymentCacheMaterializer(
+            cache,
+            workspace_activation=coordinator,
+            development_admission=_admission(authority, "activate", release_id, deployment_id),
+            development_admission_verifier=_admission_verifier(authority, revoke_after_successes=1),
+            clock=_clock,
+        ).recover(
+            deployment,
+            environment="development",
+            promoted_by="test://platform",
+            expected_current_deployment_id=None,
+        )
+
+    assert denied.value.code == "DPONE_DEVELOPMENT_ACTIVATION_AUTHORITY_REQUIRED"
+    assert denied.value.details == {"state_may_have_changed": True, "recovery_required": True}
+    assert len(coordinator.events) == 1
+    assert coordinator.events[0][0] == "prepare"
+    assert (cache / "activations" / "development" / deployment_id.replace(":", "-", 1)).is_dir()
+    assert not (cache / "current").exists()
 
 
 @pytest.mark.parametrize("composed", [False, True])

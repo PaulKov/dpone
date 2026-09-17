@@ -26,6 +26,7 @@ owned_paths:
   - src/dpone/runtime/airflow_artifact_publication_preparation.py
   - src/dpone/runtime/airflow_artifact_materialization.py
   - src/dpone/runtime/deployment_cache_development_admission.py
+  - src/dpone/runtime/deployment_cache_integrity.py
   - src/dpone/runtime/deployment_cache_current_state.py
   - src/dpone/runtime/deployment_cache_materializer.py
   - src/dpone/readiness/airflow_deployment_projection_policy.py

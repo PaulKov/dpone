@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Protocol
 
 from dpone.runtime.deployment_cache_common import DeploymentCacheError, read_regular_json_object
+from dpone.runtime.deployment_cache_integrity import release_content_id
 from dpone.runtime.deployment_cache_models import ValidatedDeploymentProjection
 
 _DEVELOPMENT_RELEASE_SCHEMA = "dpone.dbt-release-set.development.v1"
@@ -78,6 +79,12 @@ def require_development_activation_admission(
         label="release-set",
         root=cache_root,
     )
+    if release.get("release_id") != projection.release_id or release_content_id(release) != projection.release_id:
+        raise DeploymentCacheError(
+            "DPONE_RELEASE_FINGERPRINT_MISMATCH",
+            "release-set content does not match its content-addressed identity",
+            path=release_path.as_posix(),
+        )
     try:
         authority_projection = _development_authority_projection(release)
         if authority_projection is None:
@@ -105,7 +112,10 @@ def require_development_activation_admission(
 
 def _development_authority_projection(release: Mapping[str, object]) -> object | None:
     if release.get("schema") == _DEVELOPMENT_RELEASE_SCHEMA:
-        return release.get("development_authority")
+        authority = release.get("development_authority")
+        if authority is None:
+            raise ValueError("development authority is missing")
+        return authority
     promotion = release.get("promotion")
     if not isinstance(promotion, dict) or promotion.get("profile") != _DEVELOPMENT_COMPOSITION_PROFILE:
         return None
@@ -115,7 +125,10 @@ def _development_authority_projection(release: Mapping[str, object]) -> object |
     native = tuple(item for item in constituents if isinstance(item, Mapping) and item.get("id") == "native")
     if len(native) != 1 or not isinstance(native[0].get("release"), Mapping):
         raise ValueError("development native constituent is invalid")
-    return native[0]["release"].get("development_authority")
+    authority = native[0]["release"].get("development_authority")
+    if authority is None:
+        raise ValueError("development native authority is missing")
+    return authority
 
 
 __all__ = [
