@@ -152,19 +152,10 @@ class DeploymentCacheMaterializer:
                     pointer=pointer,
                 )
                 self._workspace_activation.activate_occurrence(workspace_occurrence, projection_root=deployment_path)
-                result = CurrentDeployment(
-                    activation_id=str(pointer["activation_id"]),
-                    deployment_id=str(deployment["deployment_id"]),
-                    release_id=str(deployment["release_id"]),
-                    environment=environment,
+                result = CurrentDeployment.from_pointer(
+                    pointer,
                     current_path=current,
                     pointer_path=pointer_path,
-                    promoted_by=promoted_by,
-                    promoted_at=str(pointer["promoted_at"]),
-                    previous_deployment_id=previous_deployment_id,
-                    source_commit=source_commit,
-                    attestation_ref=attestation_ref,
-                    workspace_authority_connection_ref=workspace_authority_connection_ref,
                 )
                 if postcommit_action is not None:
                     postcommit_action(result)
@@ -260,16 +251,10 @@ class DeploymentCacheMaterializer:
             if mutation_started and exc.details.get("state_may_have_changed") is not True:
                 raise cache_error_after_mutation(exc) from exc
             raise
-        return CurrentDeployment(
-            activation_id=str(pointer["activation_id"]),
-            deployment_id=str(deployment["deployment_id"]),
-            release_id=str(deployment["release_id"]),
-            environment=environment,
+        return CurrentDeployment.from_pointer(
+            pointer,
             current_path=current,
             pointer_path=pointer_path,
-            promoted_by=promoted_by,
-            promoted_at=str(pointer["promoted_at"]),
-            previous_deployment_id=previous_deployment_id,
         )
 
     def repair_audit(
@@ -334,19 +319,10 @@ class DeploymentCacheMaterializer:
                     "promotion audit repair could not be written",
                     path=(self._cache_root / "current-pointer-audit.jsonl").as_posix(),
                 ) from exc
-        return CurrentDeployment(
-            activation_id=_optional_string(pointer.get("activation_id")),
-            deployment_id=active_id,
-            release_id=str(pointer.get("release_id") or ""),
-            environment=environment,
+        return CurrentDeployment.from_pointer(
+            pointer,
             current_path=self._cache_root / "current",
             pointer_path=pointer_path,
-            promoted_by=str(pointer.get("promoted_by") or ""),
-            promoted_at=str(pointer.get("promoted_at") or ""),
-            previous_deployment_id=_optional_string(pointer.get("previous_deployment_id")),
-            source_commit=_optional_string(pointer.get("source_commit")),
-            attestation_ref=_optional_string(pointer.get("attestation_ref")),
-            workspace_authority_connection_ref=_optional_string(pointer.get("workspace_authority_connection_ref")),
         )
 
     def _check_cas(
