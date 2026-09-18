@@ -6,14 +6,12 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
-from dpone.ports.clickhouse_external_replication import (
+from dpone.contracts.clickhouse_cluster_publication import QueueEntry, QueueState
+from dpone.contracts.clickhouse_external_replication import (
     ExternalAuthorityPhase,
     ExternalAuthorityRecord,
-    ExternalDispatchPermit,
     ExternalMemberRecord,
     MemberPublicationState,
-    QueueEntry,
-    QueueState,
     classify_member_publication,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_state import desired_generation as _desired
@@ -135,7 +133,7 @@ def cleanup_states(adapter: Any, record: ExternalAuthorityRecord) -> dict[str, b
     return result
 
 
-def _take_permit(adapter: Any, operation_id: str, action: str) -> ExternalDispatchPermit:
+def _take_permit(adapter: Any, operation_id: str, action: str) -> Any:
     permit = adapter._permits.pop((operation_id, action), None)
     if permit is None:
         _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CAS_UNKNOWN")

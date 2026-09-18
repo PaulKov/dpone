@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from dpone.ports.clickhouse_external_replication import ExternalContractError, canonical_json
+from dpone.contracts.clickhouse_external_replication_identity import ExternalContractError, canonical_json
 
 _CONTENT_DIGEST_VERSION = "dpone.clickhouse.canonical-rows.v1"
 _SCHEMA_DIGEST_VERSION = "dpone.clickhouse.canonical-schema.v1"
