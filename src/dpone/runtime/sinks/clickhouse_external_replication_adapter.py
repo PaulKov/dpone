@@ -24,7 +24,6 @@ from dpone.ports.clickhouse_external_replication import (
     ExternalTopologyCatalogPort,
     MemberGenerationObservation,
     MemberPublicationState,
-    PhysicalGeneration,
     QueueEntry,
     QueueState,
     VersionedExternalAuthorityRecord,
@@ -34,6 +33,10 @@ from dpone.ports.clickhouse_external_replication import (
 from dpone.runtime.sinks.clickhouse_external_replication_state import (
     complete_candidate as _complete,
 )
+from dpone.runtime.sinks.clickhouse_external_replication_state import desired_generation as _desired
+from dpone.runtime.sinks.clickhouse_external_replication_state import equivalent_state as _equivalent
+from dpone.runtime.sinks.clickhouse_external_replication_state import generation_shape as _shape
+from dpone.runtime.sinks.clickhouse_external_replication_state import has_predecessor as _has_predecessor
 from dpone.runtime.sinks.clickhouse_external_replication_state import (
     member as _member,
 )
@@ -386,26 +389,6 @@ class ClickHouseExternalReplicationServiceAdapter:
                 member_ids=list(_ids(record)),
             )
         raise ExternalPublicationError(code, evidence=evidence)
-
-
-def _desired(member: ExternalMemberRecord) -> PhysicalGeneration:
-    if member.candidate is None:
-        raise ExternalPublicationError("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED")
-    return member.candidate
-
-
-def _shape(value: PhysicalGeneration | None) -> tuple[Any, ...] | None:
-    return None if value is None else (value.engine_full, value.schema_digest, value.content_digest, value.row_count)
-
-
-def _has_predecessor(record: ExternalAuthorityRecord) -> bool:
-    return any(member.predecessor is not None for member in record.members)
-
-
-def _equivalent(current: Mapping[str, Any], desired: Mapping[str, Any]) -> bool:
-    return {key: value for key, value in current.items() if key != "version"} == {
-        key: value for key, value in desired.items() if key != "version"
-    }
 
 
 __all__ = ["ClickHouseExternalReplicationServiceAdapter"]
