@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.81.2 - 2026-09-18
+
+### Fixed
+
+- Bind development-only dbt release publication, cache materialization,
+  activation, recovery, and audit repair to the exact current non-production
+  target admission. The boundary rechecks expiry after external verification,
+  fails closed without mutating state, preserves recovery metadata after a
+  partial activation, and keeps legacy Python callers source-compatible while
+  requiring migration to canonical admission.
+
 ## 0.81.1 - 2026-09-18
 
 ### Fixed
