@@ -17,22 +17,8 @@ from dpone.ports.clickhouse_external_replication import (
     derive_target_key,
     digest_payload,
 )
-from dpone.runtime.sinks.clickhouse_external_replication_phases import (
-    candidate_name as _candidate_name,
-)
-from dpone.runtime.sinks.clickhouse_external_replication_phases import (
-    cleanup_phase,
-    publish_phase,
-    require_replayable_artifact,
-)
-from dpone.runtime.sinks.clickhouse_external_replication_phases import (
-    matches_generation as _matches,
-)
-from dpone.runtime.sinks.clickhouse_external_replication_phases import (
-    owned_observation as _owned,
-)
-from dpone.runtime.sinks.clickhouse_external_replication_phases import (
-    without_version as _without_version,
+from dpone.runtime.sinks import (
+    clickhouse_external_replication_phases as phase_ops,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 
@@ -95,14 +81,14 @@ class ClickHouseExternalReplicationRuntime:
             plan_sha256=request.plan_sha256,
         )
         source = self._require_source()
-        require_replayable_artifact(request.artifact, self._fail, ())
+        phase_ops.require_replayable_artifact(request.artifact, self._fail, ())
         source.revalidate(request.artifact.identity)
         if source.binding_id != request.artifact.artifact_id or source.identity != request.artifact.identity:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED")
         members = tuple(sorted(self._service.inventory(request.cluster)))
         if len(members) < 2 or len(set(members)) != len(members):
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_INVALID", member_ids=members)
-        require_replayable_artifact(request.artifact, self._fail, members)
+        phase_ops.require_replayable_artifact(request.artifact, self._fail, members)
         if state["phase"] == "COMPLETED":
             return self._receipt(state)
         state = self._stage(request, state)
@@ -151,7 +137,7 @@ class ClickHouseExternalReplicationRuntime:
             return self._receipt(state)
         if state["phase"] in {"LOCKED", "STAGING"}:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", state=state)
-        state = publish_phase(state, service=self._service, cas=self._cas, fail=self._fail)
+        state = phase_ops.publish_phase(state, service=self._service, cas=self._cas, fail=self._fail)
         return self._receipt(state)
 
     def validate_staged(
@@ -173,7 +159,7 @@ class ClickHouseExternalReplicationRuntime:
             bound = state["member_states"][member_id]
             if (
                 bound.get("state") != "READY"
-                or not _matches(observed, state)
+                or not phase_ops.matches_generation(observed, state)
                 or observed.get("candidate_uuid") != bound.get("candidate_uuid")
             ):
                 self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
@@ -189,7 +175,7 @@ class ClickHouseExternalReplicationRuntime:
             return self._receipt(state)
         if state["phase"] not in {"COMMITTED", "CLEANUP_DISPATCHING"}:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", state=state)
-        return self._receipt(cleanup_phase(state, service=self._service, cas=self._cas, fail=self._fail))
+        return self._receipt(phase_ops.cleanup_phase(state, service=self._service, cas=self._cas, fail=self._fail))
 
     def abort(self, request: ExternalPublicationRequest) -> None:
         """Remove exact owned unpublished candidates and close the operation."""
@@ -205,13 +191,13 @@ class ClickHouseExternalReplicationRuntime:
             observed = dict(self._service.observe_candidate(member_id, state["candidate_name"]))
             if not observed.get("exists"):
                 continue
-            if not _owned(observed, state):
+            if not phase_ops.owned_observation(observed, state):
                 self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
             candidate_uuid = str(observed.get("candidate_uuid") or "")
             self._service.drop_owned_candidate(member_id, candidate_uuid=candidate_uuid)
             if self._service.observe_candidate(member_id, state["candidate_name"]).get("exists"):
                 self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", state=state)
-        self._cas(state, {**_without_version(state), "phase": "ABORTED"})
+        self._cas(state, {**phase_ops.without_version(state), "phase": "ABORTED"})
 
     def _receipt(self, state: dict[str, Any]) -> ExternalReplicationReceipt:
         scope = str(getattr(self._service, "evidence_scope", "local_synthetic"))
@@ -245,7 +231,7 @@ class ClickHouseExternalReplicationRuntime:
             "dispatch_epoch": 0 if current is None else int(current["dispatch_epoch"]) + 1,
             "inventory_digest": self._inventory_digest(members),
             "plan_digest": plan_sha256,
-            "candidate_name": _candidate_name(target, operation_id),
+            "candidate_name": phase_ops.candidate_name(target, operation_id),
             "member_ids": members,
             "member_states": {member: {"state": "PENDING"} for member in members},
         }
@@ -263,7 +249,7 @@ class ClickHouseExternalReplicationRuntime:
             state = self._cas(
                 state,
                 {
-                    **_without_version(state),
+                    **phase_ops.without_version(state),
                     "phase": "STAGING",
                     "artifact_sha256": artifact.sha256,
                     "artifact_binding_id": self._require_source().binding_id,
@@ -287,7 +273,7 @@ class ClickHouseExternalReplicationRuntime:
             state = self._stage_member(request.artifact, state, member_id)
         if not all(value["state"] == "READY" for value in state["member_states"].values()):
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", state=state)
-        return self._cas(state, {**_without_version(state), "phase": "STAGED"})
+        return self._cas(state, {**phase_ops.without_version(state), "phase": "STAGED"})
 
     def _stage_member(self, artifact: ExternalArtifactReceipt, state: dict[str, Any], member_id: str) -> dict[str, Any]:
         source = self._require_source()
@@ -295,13 +281,15 @@ class ClickHouseExternalReplicationRuntime:
         member = dict(state["member_states"][member_id])
         observation = dict(self._service.observe_candidate(member_id, state["candidate_name"]))
         if member["state"] == "READY":
-            if _matches(observation, state) and observation.get("candidate_uuid") == member.get("candidate_uuid"):
+            if phase_ops.matches_generation(observation, state) and observation.get("candidate_uuid") == member.get(
+                "candidate_uuid"
+            ):
                 return state
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
         if observation.get("exists"):
-            if _matches(observation, state):
+            if phase_ops.matches_generation(observation, state):
                 return self._mark_member(state, member_id, "READY", str(observation["candidate_uuid"]))
-            if member["state"] not in {"LOADING", "AMBIGUOUS"} or not _owned(observation, state):
+            if member["state"] not in {"LOADING", "AMBIGUOUS"} or not phase_ops.owned_observation(observation, state):
                 self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
             expected_uuid = str(observation.get("candidate_uuid") or "")
             if member.get("candidate_uuid") not in {None, expected_uuid}:
@@ -322,12 +310,12 @@ class ClickHouseExternalReplicationRuntime:
             )
         except Exception:
             observed = dict(self._service.observe_candidate(member_id, state["candidate_name"]))
-            if _matches(observed, state):
+            if phase_ops.matches_generation(observed, state):
                 return self._mark_member(state, member_id, "READY", str(observed["candidate_uuid"]))
             candidate_uuid = str(observed.get("candidate_uuid") or "") or None
             state = self._mark_member(state, member_id, "AMBIGUOUS", candidate_uuid)
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", state=state)
-        if not _matches(result, state):
+        if not phase_ops.matches_generation(result, state):
             state = self._mark_member(state, member_id, "DIVERGED", str(result.get("candidate_uuid") or ""))
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
         return self._mark_member(state, member_id, "READY", str(result["candidate_uuid"]))
@@ -337,7 +325,7 @@ class ClickHouseExternalReplicationRuntime:
     ) -> dict[str, Any]:
         members = {key: dict(value) for key, value in state["member_states"].items()}
         members[member_id] = {"state": status, "candidate_uuid": candidate_uuid}
-        return self._cas(state, {**_without_version(state), "member_states": members})
+        return self._cas(state, {**phase_ops.without_version(state), "member_states": members})
 
     def _cas(self, current: dict[str, Any] | None, desired: Mapping[str, Any]) -> dict[str, Any]:
         target_key = str(desired["target_key"])
