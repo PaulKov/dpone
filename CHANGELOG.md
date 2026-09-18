@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.81.3 - 2026-09-18
+
 ### Fixed
 
 - Admit the existing PostgreSQL XMin initial-to-incremental handoff as one
