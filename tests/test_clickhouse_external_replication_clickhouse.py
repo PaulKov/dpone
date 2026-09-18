@@ -283,6 +283,34 @@ def test_connection_provider_closes_every_member_and_clears_cache_after_close_fa
     assert connections == 3
 
 
+def test_connection_probe_preserves_inventory_error_when_cleanup_also_fails() -> None:
+    connector = _Connector([("node_1", "192.0.2.1", 9000, 1, 1, 0), ("node_2", "192.0.2.2", 9000, 1, 2, 0)])
+    topology = ClickHouseExternalTopologyCatalog(connector)
+    topology.inventory("analytics_cluster")
+
+    class Direct:
+        def get_records(self, query: str) -> list[tuple[int]]:
+            assert query == "SELECT 1"
+            raise TimeoutError("injected probe failure")
+
+        def close(self) -> None:
+            raise OSError("injected cleanup failure")
+
+    provider = ClickHouseExternalReplicaConnectionProvider(
+        connector,
+        topology=topology,
+        connect=lambda _template, _host, _address, _port: Direct(),
+    )
+
+    with pytest.raises(ValueError, match="INVENTORY_INVALID") as raised:
+        provider.require_connections()
+
+    assert raised.value.__notes__ == [
+        "A direct member connection cleanup failure was suppressed to preserve this primary error.",
+        "cleanup_error_type=RuntimeError",
+    ]
+
+
 def test_authority_create_verifies_exact_post_write_and_returns_no_dispatch_permit() -> None:
     record = replace(_record(), phase=ExternalAuthorityPhase.LOCKED, dispatch_epoch=0)
     connector = _Connector()
