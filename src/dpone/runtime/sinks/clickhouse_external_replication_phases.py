@@ -5,7 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any, NoReturn
 
-from dpone.runtime.sinks.clickhouse_external_replication_state import without_version
+from dpone.runtime.sinks.clickhouse_external_replication_state import (
+    candidate_name,
+    matches_generation,
+    owned_observation,
+    require_replayable_artifact,
+    without_version,
+)
 
 Cas = Callable[[dict[str, Any] | None, Mapping[str, Any]], dict[str, Any]]
 Fail = Callable[..., NoReturn]
@@ -61,4 +67,12 @@ def cleanup_phase(state: dict[str, Any], *, service: Any, cas: Cas, fail: Fail) 
     return state
 
 
-__all__ = ["cleanup_phase", "publish_phase"]
+__all__ = [
+    "candidate_name",
+    "cleanup_phase",
+    "matches_generation",
+    "owned_observation",
+    "publish_phase",
+    "require_replayable_artifact",
+    "without_version",
+]

@@ -37,11 +37,11 @@ Run static inspection without changing the manifest:
 
 ```bash
 dpone check \
-  examples/source-sink/mssql-to-clickhouse-cluster-full-refresh.yaml \
+  examples/batch/clickhouse-external-replication-full-refresh.batch.yaml \
   --format json
 
 dpone plan \
-  examples/source-sink/mssql-to-clickhouse-cluster-full-refresh.yaml \
+  examples/batch/clickhouse-external-replication-full-refresh.batch.yaml \
   --format json
 ```
 

@@ -16,12 +16,12 @@ from dpone.runtime.sinks.clickhouse_external_replication_adapter import (
     ClickHouseExternalReplicationServiceAdapter,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_clickhouse import (
-    ClickHouseExternalClusterDdl,
     ClickHouseExternalKeeperMapAuthority,
     ClickHouseExternalReplicaConnectionProvider,
     ClickHouseExternalReplicaStaging,
     ClickHouseExternalTopologyCatalog,
 )
+from dpone.runtime.sinks.clickhouse_external_replication_ddl import ClickHouseExternalClusterDdl
 from dpone.runtime.sinks.clickhouse_external_replication_facade import (
     ClickHouseExternalReplicationFacade,
 )

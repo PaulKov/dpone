@@ -4,10 +4,10 @@ This directory is reserved for generated, machine-readable evidence from the
 external-replication publication test profile. Tests must produce the receipt;
 maintainers must not hand-edit one to claim a pass.
 
-The offline in-process contract is:
+Generate the offline in-process receipt from a clean checkout with:
 
 ```bash
-uv run pytest tests/test_clickhouse_external_replication_runtime.py -q
+uv run python tools/clickhouse_external_publication_evidence.py
 ```
 
 The red-first API contract is
@@ -25,7 +25,7 @@ all-member staging and publication, duplicate-free lost-ack recovery, partial
 stage replay, divergent-generation failure, completed-operation idempotency,
 cleanup recovery, and redacted evidence.
 
-When a producer is implemented, its generated receipt path is:
+The generated receipt path is:
 
 ```text
 test_artifacts/clickhouse-external-publication/synthetic-receipt.json
