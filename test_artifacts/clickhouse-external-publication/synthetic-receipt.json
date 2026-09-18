@@ -1,0 +1,38 @@
+{
+  "evidence_scope": "local_synthetic",
+  "fixture_digest": "3c820709687eb31cac5b689b4bb016991f6d7dcd866c550bb386d2ce51cf4ab6",
+  "live_external_certification": "UNVERIFIED",
+  "scenarios": [
+    {
+      "scenario": "complete_generation",
+      "status": "PASS"
+    },
+    {
+      "scenario": "lost_stage_ack",
+      "status": "PASS"
+    },
+    {
+      "scenario": "partial_stage_replay",
+      "status": "PASS"
+    },
+    {
+      "scenario": "divergent_generation",
+      "status": "PASS"
+    },
+    {
+      "scenario": "completed_replay",
+      "status": "PASS"
+    },
+    {
+      "scenario": "cleanup_recovery",
+      "status": "PASS"
+    },
+    {
+      "scenario": "redacted_failure",
+      "status": "PASS"
+    }
+  ],
+  "schema_version": "dpone.clickhouse.external-publication.synthetic-evidence.v1",
+  "source_commit": "7228c5f21c2c27cd7ea7df0cf0a1c2c60eb8c30e",
+  "status": "PASS"
+}
