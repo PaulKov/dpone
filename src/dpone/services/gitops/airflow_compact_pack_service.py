@@ -324,6 +324,7 @@ class GitOpsAirflowCompactPackService:
             include_live_gates=bool(getattr(args, "include_live_gates", False)),
             env=resolved.env,
             mssql_registry=registry,
+            outlet_binding=getattr(args, "outlet_binding", "physical"),
         )
 
     def _resolve_catalog(self, args: object) -> GitOpsWorkloadCatalogReport:

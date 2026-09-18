@@ -30,6 +30,72 @@ def test_plain_transfer_can_carry_explicit_external_target_atomic_state():
     OrdinaryPackClosureVerifier._require_single_transfer(transfer(), "synthetic_copy")
 
 
+def test_plain_transfer_uses_canonical_external_default_for_target_atomic_state():
+    manifest = transfer()
+    manifest["state"].pop("provisioning")
+
+    OrdinaryPackClosureVerifier._require_single_transfer(manifest, "synthetic_copy")
+
+
+def test_plain_transfer_accepts_canonical_target_atomic_state_table_family():
+    manifest = transfer()
+    manifest["state"].update(
+        {
+            "run_table": {"name": "run_state"},
+            "receipt_table": {"name": "commit_receipt"},
+            "repair_authority_table": {"name": "repair_authority"},
+            "repair_consumption_table": {"name": "repair_consumption"},
+            "audit_table": {"name": "load_audit"},
+        }
+    )
+
+    OrdinaryPackClosureVerifier._require_single_transfer(manifest, "synthetic_copy")
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("run_table", {"name": ""}),
+        ("receipt_table", {"unexpected": "table"}),
+        ("repair_authority_table", "repair_authority"),
+        ("repair_consumption_table", {"name": "bad\x00name"}),
+        ("audit_table", {"name": 7}),
+    ],
+)
+def test_plain_transfer_rejects_invalid_auxiliary_state_table_coordinates(field, value):
+    manifest = transfer()
+    manifest["state"][field] = value
+
+    with pytest.raises(ValueError, match=field):
+        OrdinaryPackClosureVerifier._require_single_transfer(manifest, "synthetic_copy")
+
+
+def test_plain_transfer_accepts_explicit_disabled_state():
+    manifest = transfer()
+    manifest["state"] = {"type": "disabled"}
+
+    OrdinaryPackClosureVerifier._require_single_transfer(manifest, "synthetic_copy")
+
+
+def test_plain_transfer_accepts_canonical_runtime_managed_mssql_state():
+    manifest = transfer()
+    manifest["sink"] = {
+        "type": "clickhouse",
+        "connection_ref": "warehouse",
+        "table": {"schema": "mart", "name": "copy"},
+        "strategy": {"mode": "full_refresh"},
+    }
+    manifest["state"] = {
+        "type": "mssql",
+        "connection_ref": "state",
+        "table": {"schema": "control", "name": "source_state"},
+        "run_table": {"schema": "control", "run_name": "run_state"},
+        "partition_checkpoint_table": {"schema": "control", "name": "partition_checkpoint"},
+    }
+
+    OrdinaryPackClosureVerifier._require_single_transfer(manifest, "synthetic_copy")
+
+
 @pytest.mark.parametrize(
     "state", [None, {}, {"type": "sqlite"}, {"type": "mssql", "atomicity": "eventual", "provisioning": "external"}]
 )

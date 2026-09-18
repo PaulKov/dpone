@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed
+
+- Admit deterministic ordinary Airflow packs produced by current public
+  catalog defaults during verified release composition. Built-in Airflow runner
+  markers, canonical disabled or MSSQL state, and verified SQL
+  pre-hook modes now retain exact detached reconstruction. Add an opt-in logical
+  outlet mode for environment-neutral ordinary packs while preserving physical
+  outlets as the default; missing MSSQL relation identity and custom execution
+  authority still fail closed.
+
 ## 0.81.0 - 2026-09-17
 
 ### Added

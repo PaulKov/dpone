@@ -228,3 +228,28 @@ first-error characterization, v1 legacy checksum spelling, native v2 authority,
 v3 byte closure, actual registry/cache/provider preparation and unchanged activation
 refusal. Compare the canonical graph from the real final files against unchanged
 budgets; a simulated graph does not establish acceptance or release readiness.
+
+## Approved ordinary-producer compatibility amendment
+
+The maintainer approved this additive hardening after existing public compact
+producers exposed valid pack shapes that the first inventory reader rejected.
+The source-admission boundary remains declarative and fail closed:
+
+- the built-in `runner: airflow` marker is equivalent to an omitted runner;
+  every other runner and all authoring assets remain unsupported;
+- `state.type: disabled` and canonical MSSQL state are admitted; canonical
+  defaults and policy combinations are resolved by the shared state contract,
+  and every explicitly supplied state-table coordinate is shape-validated;
+- inline and separately scheduled SQL pre-hooks are admitted because detached
+  reconstruction verifies their complete generated commands; arbitrary hooks,
+  commands, transforms, and separate post-hooks remain rejected;
+- compact `pack` and `reconcile` gain `--outlet-binding logical`. The existing
+  `physical` default is unchanged. Logical MSSQL outlets require explicit
+  database/schema/table coordinates in authoring and contain no host or port.
+
+Inventory reconstruction tries both public producer modes and admits a pack only
+when one complete deterministic rebuild matches every source-semantic field.
+This does not trust a caller-supplied producer label, infer missing MSSQL database
+identity, accept a physical authority without its deployment registry, or weaken
+cross-constituent collision and logical-write closure checks. Existing physical
+pack output and CLI defaults remain byte-compatible.
