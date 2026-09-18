@@ -24,6 +24,7 @@ class ExternalReplicationRuntimeService(Protocol):
     """Durable effects required by the pure runtime coordinator."""
 
     def inventory(self, cluster: str) -> tuple[str, ...]: ...
+    def inventory_digest(self) -> str: ...
     def read_authority(self, target_key: str) -> Mapping[str, Any] | None: ...
     def compare_and_swap_authority(
         self, target_key: str, expected_version: int | None, desired: Mapping[str, Any]
@@ -54,7 +55,7 @@ class ClickHouseExternalReplicationRuntime:
         self,
         *,
         service: ExternalReplicationRuntimeService,
-        artifact_source: ExternalArtifactSourcePort,
+        artifact_source: ExternalArtifactSourcePort | None = None,
     ) -> None:
         self._service = service
         self._artifact_source = artifact_source
@@ -73,10 +74,6 @@ class ClickHouseExternalReplicationRuntime:
             request.validate()
         except ExternalContractError as error:
             self._fail(f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{error.code}")
-        self._require_artifact(request.artifact, member_ids=())
-        self._artifact_source.revalidate(request.artifact)
-        if self._artifact_source.binding_id != request.artifact.artifact_id:
-            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED")
         state = self.prepare(
             cluster=request.cluster,
             database=request.database,
@@ -84,6 +81,11 @@ class ClickHouseExternalReplicationRuntime:
             scheduler_invocation=request.scheduler_invocation,
             plan_sha256=request.plan_sha256,
         )
+        source = self._require_source()
+        self._require_artifact(request.artifact, member_ids=())
+        source.revalidate(request.artifact.identity)
+        if source.binding_id != request.artifact.artifact_id or source.identity != request.artifact.identity:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED")
         members = tuple(sorted(self._service.inventory(request.cluster)))
         if len(members) < 2 or len(set(members)) != len(members):
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_INVALID", member_ids=members)
@@ -151,6 +153,28 @@ class ClickHouseExternalReplicationRuntime:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", state=state)
         return self._receipt(self._cleanup(state))
 
+    def abort(self, request: ExternalPublicationRequest) -> None:
+        """Remove exact owned unpublished candidates and close the operation."""
+
+        state = self._read(request.target_key)
+        if state is None or state.get("operation_id") != request.operation_id:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT", state=state)
+        if state["phase"] == "ABORTED":
+            return
+        if state["phase"] not in {"LOCKED", "STAGING", "STAGED"}:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", state=state)
+        for member_id in state["member_ids"]:
+            observed = dict(self._service.observe_candidate(member_id, state["candidate_name"]))
+            if not observed.get("exists"):
+                continue
+            if not _owned(observed, state):
+                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
+            candidate_uuid = str(observed.get("candidate_uuid") or "")
+            self._service.drop_owned_candidate(member_id, candidate_uuid=candidate_uuid)
+            if self._service.observe_candidate(member_id, state["candidate_name"]).get("exists"):
+                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", state=state)
+        self._cas(state, {**_without_version(state), "phase": "ABORTED"})
+
     def _receipt(self, state: dict[str, Any]) -> ExternalReplicationReceipt:
         scope = str(getattr(self._service, "evidence_scope", "local_synthetic"))
         return ExternalReplicationReceipt.from_state(state, evidence_scope=scope)
@@ -177,13 +201,19 @@ class ClickHouseExternalReplicationRuntime:
             "fence_token": secrets.token_hex(16),
             "phase": "LOCKED",
             "dispatch_epoch": 0 if current is None else int(current["dispatch_epoch"]) + 1,
-            "inventory_digest": digest_payload({"member_ids": members}),
+            "inventory_digest": self._inventory_digest(members),
             "plan_digest": plan_sha256,
             "candidate_name": _candidate_name(target, operation_id),
             "member_ids": members,
             "member_states": {member: {"state": "PENDING"} for member in members},
         }
         return self._cas(current, desired)
+
+    def _inventory_digest(self, members: tuple[str, ...]) -> str:
+        provider = getattr(self._service, "inventory_digest", None)
+        if callable(provider):
+            return str(provider())
+        return digest_payload({"member_ids": members})
 
     def _stage(self, request: ExternalPublicationRequest, state: dict[str, Any]) -> dict[str, Any]:
         if state["phase"] == "LOCKED":
@@ -194,7 +224,8 @@ class ClickHouseExternalReplicationRuntime:
                     **_without_version(state),
                     "phase": "STAGING",
                     "artifact_sha256": artifact.sha256,
-                    "artifact_binding_id": self._artifact_source.binding_id,
+                    "artifact_binding_id": self._require_source().binding_id,
+                    "artifact_byte_size": artifact.byte_size,
                     "artifact_schema_sha256": artifact.schema_sha256,
                     "artifact_content_sha256": artifact.content_sha256,
                     "artifact_row_count": artifact.row_count,
@@ -217,7 +248,8 @@ class ClickHouseExternalReplicationRuntime:
         return self._cas(state, {**_without_version(state), "phase": "STAGED"})
 
     def _stage_member(self, artifact: ExternalArtifactReceipt, state: dict[str, Any], member_id: str) -> dict[str, Any]:
-        self._artifact_source.revalidate(artifact)
+        source = self._require_source()
+        source.revalidate(artifact.identity)
         member = dict(state["member_states"][member_id])
         observation = dict(self._service.observe_candidate(member_id, state["candidate_name"]))
         if member["state"] == "READY":
@@ -243,7 +275,7 @@ class ClickHouseExternalReplicationRuntime:
                     operation_id=state["operation_id"],
                     candidate_name=state["candidate_name"],
                     artifact=artifact,
-                    source=self._artifact_source,
+                    source=source,
                 )
             )
         except Exception:
@@ -344,8 +376,17 @@ class ClickHouseExternalReplicationRuntime:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", state=state)
         if "artifact_sha256" in state and state["artifact_sha256"] != request.artifact.sha256:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", state=state)
-        if "artifact_binding_id" in state and state["artifact_binding_id"] != self._artifact_source.binding_id:
+        if (
+            self._artifact_source is not None
+            and "artifact_binding_id" in state
+            and state["artifact_binding_id"] != self._artifact_source.binding_id
+        ):
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", state=state)
+
+    def _require_source(self) -> ExternalArtifactSourcePort:
+        if self._artifact_source is None:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNSUPPORTED")
+        return self._artifact_source
 
     def _require_artifact(self, artifact: ExternalArtifactReceipt, *, member_ids: tuple[str, ...]) -> None:
         if not artifact.replayable or artifact.byte_size < 0 or artifact.row_count < 0:

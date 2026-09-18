@@ -32,8 +32,12 @@ _SCHEMA_SHA256 = "c" * 64
 class _SyntheticArtifactSource:
     binding_id = "artifact-v1"
 
-    def revalidate(self, artifact: ExternalArtifactReceipt) -> None:
-        assert artifact.artifact_id == self.binding_id
+    @property
+    def identity(self):
+        return _artifact().identity
+
+    def revalidate(self, artifact) -> None:
+        assert artifact == self.identity
 
     def open_replay(self) -> object:
         return object()
@@ -105,7 +109,7 @@ class _SyntheticExternalService:
         """Apply one direct member-local load; this method never retries itself."""
 
         self.stage_calls[member_id] += 1
-        source.revalidate(artifact)
+        source.revalidate(artifact.identity)
         if self.candidates[member_id] is not None:
             raise AssertionError("runtime attempted to append to an existing candidate")
         rows = _ROWS

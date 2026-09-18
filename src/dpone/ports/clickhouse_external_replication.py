@@ -9,7 +9,6 @@ from dpone._compat import StrEnum
 from dpone.contracts.clickhouse_cluster_publication import QueueEntry
 from dpone.contracts.clickhouse_external_replication import (
     ArtifactIdentity,
-    ExternalArtifactReceipt,
     ExternalAuthorityRecord,
     ExternalTopology,
     MemberGenerationObservation,
@@ -23,7 +22,10 @@ class ExternalArtifactSourcePort(Protocol):
     @property
     def binding_id(self) -> str: ...
 
-    def revalidate(self, receipt: ExternalArtifactReceipt) -> None: ...
+    @property
+    def identity(self) -> ArtifactIdentity: ...
+
+    def revalidate(self, expected: ArtifactIdentity) -> None: ...
 
     def open_replay(self) -> Any: ...
 

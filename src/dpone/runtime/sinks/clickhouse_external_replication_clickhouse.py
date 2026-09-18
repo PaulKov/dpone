@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Sequence
 from typing import Any
 
 from dpone.contracts import clickhouse_cluster_publication as cluster_contract
 from dpone.contracts.clickhouse_external_replication import (
+    EXTERNAL_AUTHORITY_SCHEMA_VERSION,
+    INTERNAL_AUTHORITY_SCHEMA_VERSION,
     ArtifactIdentity,
     ExternalAuthorityPhase,
     ExternalAuthorityRecord,
@@ -80,13 +83,9 @@ class ClickHouseExternalReplicaStaging:
         self,
         *,
         connection_provider: Any,
-        artifact_verifier: Any,
-        artifact_source: Callable[[ArtifactIdentity], Any],
         driver: Any,
     ) -> None:
         self._connection_provider = connection_provider
-        self._artifact_verifier = artifact_verifier
-        self._artifact_source = artifact_source
         self._driver = driver
 
     def observe(self, member_id: str, record: ExternalAuthorityRecord) -> MemberGenerationObservation:
@@ -97,13 +96,21 @@ class ClickHouseExternalReplicaStaging:
         return observation
 
     def create_candidate(self, member_id: str, record: ExternalAuthorityRecord) -> PhysicalGeneration:
-        self._sealed_source(record)
         generation = self._driver.create_candidate(self._connection(member_id), record)
         generation.validate()
         return generation
 
-    def load_candidate(self, member_id: str, record: ExternalAuthorityRecord) -> None:
-        sealed_source = self._sealed_source(record)
+    def load_candidate(
+        self,
+        member_id: str,
+        record: ExternalAuthorityRecord,
+        source: ports.ExternalArtifactSourcePort,
+    ) -> None:
+        artifact = record.artifact
+        if artifact is None or source.binding_id != record.artifact_binding_id:
+            raise ExternalContractError("ARTIFACT_UNSUPPORTED", "sealed artifact identity is unavailable")
+        source.revalidate(artifact)
+        sealed_source = source.open_replay()
         self._driver.load_candidate(self._connection(member_id), record, sealed_source)
 
     def drop_candidate(
@@ -122,22 +129,6 @@ class ClickHouseExternalReplicaStaging:
             raise ExternalContractError("INVENTORY_INVALID", "direct member connection is unavailable")
         return connection
 
-    def _sealed_source(self, record: ExternalAuthorityRecord) -> Any:
-        artifact = record.artifact
-        if artifact is None:
-            raise ExternalContractError("ARTIFACT_UNSUPPORTED", "sealed artifact identity is unavailable")
-        self._artifact_verifier.revalidate(artifact)
-        try:
-            source = self._artifact_source(artifact)
-        except Exception:
-            raise ExternalContractError(
-                "ARTIFACT_UNSUPPORTED",
-                "sealed artifact cannot be reopened for this invocation",
-            ) from None
-        if source is None:
-            raise ExternalContractError("ARTIFACT_UNSUPPORTED", "sealed artifact cannot be reopened")
-        return source
-
 
 class ClickHouseExternalKeeperMapAuthority:
     """Persist external authority with one mutation and an exact post-read."""
@@ -146,6 +137,7 @@ class ClickHouseExternalKeeperMapAuthority:
         self._connector = connector
         self._database = database
         self._table = table
+        self._completed_internal: dict[str, tuple[int, str, str, str]] = {}
 
     def read_versioned(self, target_key: str) -> ports.VersionedExternalAuthorityRecord | None:
         rows = self._connector.get_records(
@@ -156,7 +148,16 @@ class ClickHouseExternalKeeperMapAuthority:
         if len(rows) != 1:
             return None
         row = rows[0]
-        record = ExternalAuthorityRecord.from_payload(_text(row[4]))
+        raw = _text(row[4])
+        schema = _authority_schema(raw)
+        if schema == INTERNAL_AUTHORITY_SCHEMA_VERSION:
+            if str(row[2]) != "COMPLETED":
+                raise ExternalContractError("MODE_MISMATCH", "unresolved internal authority blocks external mode")
+            self._completed_internal[target_key] = (int(row[6]), str(row[0]), str(row[1]), str(row[2]))
+            return None
+        if schema != EXTERNAL_AUTHORITY_SCHEMA_VERSION:
+            raise ExternalContractError("SCHEMA_UNSUPPORTED", "authority schema is unsupported")
+        record = ExternalAuthorityRecord.from_payload(raw)
         if (
             record.target_key != target_key
             or record.operation_id != str(row[0])
@@ -170,6 +171,25 @@ class ClickHouseExternalKeeperMapAuthority:
 
     def create_if_absent(self, record: ExternalAuthorityRecord) -> ports.ExternalAuthorityMutationResult:
         record.validate()
+        migration = self._completed_internal.pop(record.target_key, None)
+        if migration is not None:
+            version, operation_id, fence_token, phase = migration
+            sql = (
+                f"ALTER TABLE {self._qualified} UPDATE operation_id = %(operation_id)s, "
+                "fence_token = %(fence_token)s, phase = %(phase)s, dispatch_epoch = %(dispatch_epoch)s, "
+                "payload = %(payload)s, payload_sha256 = %(payload_sha256)s "
+                "WHERE target_key = %(target_key)s AND _version = %(version)s "
+                "AND operation_id = %(expected_operation)s AND fence_token = %(expected_fence)s "
+                "AND phase = %(expected_phase)s"
+            )
+            params = {
+                **_record_params(record),
+                "version": version,
+                "expected_operation": operation_id,
+                "expected_fence": fence_token,
+                "expected_phase": phase,
+            }
+            return self._mutate_once(sql, params, record, prior_version=version)
         sql = (
             f"INSERT INTO {self._qualified} "
             "(target_key, operation_id, fence_token, phase, dispatch_epoch, payload, payload_sha256) "
@@ -410,3 +430,11 @@ def _cleanup_sql(record: ExternalAuthorityRecord, cluster: str) -> str:
 
 def _text(value: Any) -> str:
     return value.decode() if isinstance(value, bytes) else str(value)
+
+
+def _authority_schema(raw: str) -> str | None:
+    try:
+        value = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    return str(value.get("schema_version")) if isinstance(value, dict) else None

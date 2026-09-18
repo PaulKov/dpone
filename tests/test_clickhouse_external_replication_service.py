@@ -17,8 +17,12 @@ from dpone.runtime.sinks.clickhouse_external_replication_runtime import ClickHou
 class _ArtifactSource:
     binding_id = "artifact-v1"
 
-    def revalidate(self, artifact: ExternalArtifactReceipt) -> None:
-        assert artifact.artifact_id == self.binding_id
+    @property
+    def identity(self):
+        return _request().artifact.identity
+
+    def revalidate(self, artifact) -> None:
+        assert artifact == self.identity
 
     def open_replay(self) -> object:
         return object()
@@ -179,6 +183,19 @@ def test_prepare_acquires_authority_before_artifact_staging() -> None:
 
     assert state["phase"] == "LOCKED"
     assert service.stage_calls == {"member-a": 0, "member-b": 0}
+
+
+def test_abort_drops_only_owned_unpublished_candidates() -> None:
+    service = _Service()
+    runtime = _runtime(service)
+    staged = runtime.stage(_request())
+
+    runtime.abort(_request())
+
+    assert staged.phase == "STAGED"
+    assert service.publish_calls == 0
+    assert service.authority is not None and service.authority["phase"] == "ABORTED"
+    assert set(service.drop_calls.values()) == {1}
 
 
 def test_ambiguous_partial_candidate_is_replaced_before_retry() -> None:
