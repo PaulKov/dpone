@@ -19,6 +19,7 @@ from dpone.ports.clickhouse_external_replication import (
 )
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 from dpone.runtime.sinks.clickhouse_external_replication_state import candidate_name as _candidate_name
+from dpone.runtime.sinks.clickhouse_external_replication_state import matches_generation as _matches
 from dpone.runtime.sinks.clickhouse_external_replication_state import owned_observation as _owned
 from dpone.runtime.sinks.clickhouse_external_replication_state import without_version as _without_version
 
@@ -163,7 +164,7 @@ class ClickHouseExternalReplicationRuntime:
             bound = state["member_states"][member_id]
             if (
                 bound.get("state") != "READY"
-                or not self._matches(observed, state)
+                or not _matches(observed, state)
                 or observed.get("candidate_uuid") != bound.get("candidate_uuid")
             ):
                 self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
@@ -285,11 +286,11 @@ class ClickHouseExternalReplicationRuntime:
         member = dict(state["member_states"][member_id])
         observation = dict(self._service.observe_candidate(member_id, state["candidate_name"]))
         if member["state"] == "READY":
-            if self._matches(observation, state) and observation.get("candidate_uuid") == member.get("candidate_uuid"):
+            if _matches(observation, state) and observation.get("candidate_uuid") == member.get("candidate_uuid"):
                 return state
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
         if observation.get("exists"):
-            if self._matches(observation, state):
+            if _matches(observation, state):
                 return self._mark_member(state, member_id, "READY", str(observation["candidate_uuid"]))
             if member["state"] not in {"LOADING", "AMBIGUOUS"} or not _owned(observation, state):
                 self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
@@ -312,12 +313,12 @@ class ClickHouseExternalReplicationRuntime:
             )
         except Exception:
             observed = dict(self._service.observe_candidate(member_id, state["candidate_name"]))
-            if self._matches(observed, state):
+            if _matches(observed, state):
                 return self._mark_member(state, member_id, "READY", str(observed["candidate_uuid"]))
             candidate_uuid = str(observed.get("candidate_uuid") or "") or None
             state = self._mark_member(state, member_id, "AMBIGUOUS", candidate_uuid)
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", state=state)
-        if not self._matches(result, state):
+        if not _matches(result, state):
             state = self._mark_member(state, member_id, "DIVERGED", str(result.get("candidate_uuid") or ""))
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
         return self._mark_member(state, member_id, "READY", str(result["candidate_uuid"]))
@@ -390,16 +391,6 @@ class ClickHouseExternalReplicationRuntime:
     def _read(self, target_key: str) -> dict[str, Any] | None:
         value = self._service.read_authority(target_key)
         return None if value is None else dict(value)
-
-    @staticmethod
-    def _matches(observation: Mapping[str, Any], state: Mapping[str, Any]) -> bool:
-        return bool(observation.get("exists")) and (
-            observation.get("operation_id") == state["operation_id"]
-            and observation.get("candidate_name") == state["candidate_name"]
-            and observation.get("schema_sha256") == state["artifact_schema_sha256"]
-            and observation.get("content_sha256") == state["artifact_content_sha256"]
-            and observation.get("row_count") == state["artifact_row_count"]
-        )
 
     def _require_same_inputs(
         self, state: Mapping[str, Any], request: ExternalPublicationRequest, members: tuple[str, ...]

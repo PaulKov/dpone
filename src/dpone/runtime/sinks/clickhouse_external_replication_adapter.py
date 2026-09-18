@@ -22,13 +22,15 @@ from dpone.ports.clickhouse_external_replication import (
     ExternalPublicationError,
     ExternalReplicaStagingPort,
     ExternalTopologyCatalogPort,
-    MemberGenerationObservation,
     MemberPublicationState,
     QueueEntry,
     QueueState,
     VersionedExternalAuthorityRecord,
     classify_member_publication,
     derive_target_key,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_state import (
+    candidate_observation as _candidate,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_state import (
     complete_candidate as _complete,
@@ -140,7 +142,7 @@ class ClickHouseExternalReplicationServiceAdapter:
         record = self._member_current(member_id).record
         if record.candidate != candidate_name:
             self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
-        return self._candidate(self._staging.observe(member_id, record), record)
+        return _candidate(self._staging.observe(member_id, record), record)
 
     def stage_member_once(
         self,
@@ -185,10 +187,10 @@ class ClickHouseExternalReplicationServiceAdapter:
                 candidate=observed.candidate,
             )
             self._typed_cas(current, replace(record, members=_replace_member(record, ready)))
-            return self._candidate(observed, record)
+            return _candidate(observed, record)
         if error is not None:
             raise error
-        return self._candidate(observed, record)
+        return _candidate(observed, record)
 
     def drop_owned_candidate(self, member_id: str, *, candidate_uuid: str) -> None:
         record = self._member_current(member_id).record
@@ -335,22 +337,6 @@ class ClickHouseExternalReplicationServiceAdapter:
 
     def _state(self, current: VersionedExternalAuthorityRecord) -> dict[str, Any]:
         return state_from_versioned(current)
-
-    @staticmethod
-    def _candidate(observed: MemberGenerationObservation, record: ExternalAuthorityRecord) -> Mapping[str, Any]:
-        candidate = observed.candidate
-        if candidate is None:
-            return {"exists": False, "member_id": observed.member_id}
-        return {
-            "exists": True,
-            "member_id": observed.member_id,
-            "operation_id": record.operation_id,
-            "candidate_name": record.candidate,
-            "candidate_uuid": candidate.uuid,
-            "schema_sha256": candidate.schema_digest,
-            "content_sha256": candidate.content_digest,
-            "row_count": candidate.row_count,
-        }
 
     def _current(self, operation_id: str) -> VersionedExternalAuthorityRecord:
         current = self._authority.read_versioned(self._target_key())

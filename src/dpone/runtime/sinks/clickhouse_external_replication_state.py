@@ -12,6 +12,7 @@ from dpone.ports.clickhouse_external_replication import (
     ExternalMemberRecord,
     ExternalMemberStageState,
     ExternalPublicationError,
+    MemberGenerationObservation,
     MemberPublicationState,
     PhysicalGeneration,
     VersionedExternalAuthorityRecord,
@@ -163,6 +164,32 @@ def owned_observation(observation: Mapping[str, Any], state: Mapping[str, Any]) 
     )
 
 
+def matches_generation(observation: Mapping[str, Any], state: Mapping[str, Any]) -> bool:
+    return bool(observation.get("exists")) and (
+        observation.get("operation_id") == state["operation_id"]
+        and observation.get("candidate_name") == state["candidate_name"]
+        and observation.get("schema_sha256") == state["artifact_schema_sha256"]
+        and observation.get("content_sha256") == state["artifact_content_sha256"]
+        and observation.get("row_count") == state["artifact_row_count"]
+    )
+
+
+def candidate_observation(observed: MemberGenerationObservation, record: ExternalAuthorityRecord) -> Mapping[str, Any]:
+    candidate = observed.candidate
+    if candidate is None:
+        return {"exists": False, "member_id": observed.member_id}
+    return {
+        "exists": True,
+        "member_id": observed.member_id,
+        "operation_id": record.operation_id,
+        "candidate_name": record.candidate,
+        "candidate_uuid": candidate.uuid,
+        "schema_sha256": candidate.schema_digest,
+        "content_sha256": candidate.content_digest,
+        "row_count": candidate.row_count,
+    }
+
+
 def _state_member(
     state: Mapping[str, Any], member_id: str, base: ExternalAuthorityRecord | None
 ) -> ExternalMemberRecord:
@@ -223,12 +250,14 @@ def _fail(code: str, record: ExternalAuthorityRecord | None) -> None:
 __all__ = [
     "complete_candidate",
     "candidate_name",
+    "candidate_observation",
     "desired_generation",
     "equivalent_state",
     "generation_shape",
     "has_predecessor",
     "member",
     "member_ids",
+    "matches_generation",
     "record_from_state",
     "replace_member",
     "state_from_versioned",
