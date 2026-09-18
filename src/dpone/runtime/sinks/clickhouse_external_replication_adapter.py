@@ -151,6 +151,8 @@ class ClickHouseExternalReplicationServiceAdapter:
             record = self._adopt(record)
         action: str | None = None
         if record.phase is ExternalAuthorityPhase.PUBLICATION_DISPATCHING:
+            if set(self._publication_states(record).values()) != {MemberPublicationState.PENDING}:
+                _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
             action = "publication"
             record = replace(record, publication_correlation_token=self._token())
             record = replace(

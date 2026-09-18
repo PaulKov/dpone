@@ -278,7 +278,7 @@ def test_adapter_never_dispatches_without_verified_cas_permit() -> None:
 
 @pytest.mark.parametrize("replaced_slot", ["target", "candidate"])
 def test_adapter_reproves_bound_generations_before_publication_dispatch(replaced_slot: str) -> None:
-    runtime, _, _, staging, ddl = _runtime()
+    runtime, authority, _, staging, ddl = _runtime()
     request = _request()
     runtime.stage(request)
     member_id = _members()[0]
@@ -288,10 +288,12 @@ def test_adapter_reproves_bound_generations_before_publication_dispatch(replaced
         **{replaced_slot: _generation(f"foreign-{replaced_slot}", _digest("9"))},
     )
 
-    with pytest.raises(ExternalPublicationError, match="DDL_UNKNOWN"):
+    with pytest.raises(ExternalPublicationError, match="AUTHORITY_CONFLICT"):
         runtime.publish(request)
 
     assert ddl.publication_calls == 0
+    assert authority.current is not None
+    assert authority.current.record.phase is ExternalAuthorityPhase.STAGED
 
 
 def test_adapter_absent_target_completes_without_cleanup_dispatch() -> None:
