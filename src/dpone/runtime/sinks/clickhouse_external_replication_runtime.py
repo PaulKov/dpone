@@ -72,8 +72,6 @@ class ClickHouseExternalReplicationRuntime:
         return self.cleanup(request)
 
     def stage(self, request: ExternalPublicationRequest) -> ExternalReplicationReceipt:
-        """Fence and stage every member without mutating the published target."""
-
         try:
             request.validate()
         except ExternalContractError as error:
