@@ -11,7 +11,11 @@ import pytest
 
 from dpone.config.load_config import LoadConfig
 from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
-from dpone.contracts.clickhouse_external_replication import ArtifactIdentity, ExternalPublicationError
+from dpone.contracts.clickhouse_external_replication import (
+    ArtifactIdentity,
+    ExternalContractError,
+    ExternalPublicationError,
+)
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.sinks.clickhouse_external_artifact_source import ClickHouseExternalArtifactSource
 from dpone.runtime.sinks.clickhouse_external_replication_facade import (
@@ -148,6 +152,7 @@ def _config(**option_updates: Any) -> LoadConfig:
     options = {
         SOURCE_BYTE_BUDGET_OPTION: 1024,
         SCHEDULER_IDENTITY_OPTION: "scheduled-run",
+        "external_artifact_store_path": "/tmp/dpone-external-artifacts-test",
         "lineage": False,
         "physical_design": {
             "storage": {
@@ -202,6 +207,18 @@ def test_facade_fences_before_artifact_factory_and_runs_governed_lifecycle() -> 
     assert fixture.service.publish_calls == 1
     assert fixture.service.cleanup_calls == 1
     assert "file_path" not in repr(context)
+
+
+def test_facade_requires_explicit_durable_store_before_keeper_lock(monkeypatch: pytest.MonkeyPatch) -> None:
+    fixture = _fixture()
+    monkeypatch.delenv("DPONE_EXTERNAL_ARTIFACT_STORE", raising=False)
+    options = dict(_config().options)
+    options.pop("external_artifact_store_path")
+
+    with pytest.raises(ExternalContractError, match="ARTIFACT_UNAVAILABLE"):
+        fixture.facade.prepare_admission(replace(_config(), options=options))
+
+    assert fixture.service.authority is None
 
 
 def test_direct_stage_acquires_authority_before_artifact_factory() -> None:

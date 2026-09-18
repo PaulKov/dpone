@@ -55,6 +55,7 @@ def test_external_replication_stages_each_member_and_fresh_service_cleans_exact_
         options={
             SCHEDULER_IDENTITY_OPTION: "docker-external-publication",
             SOURCE_BYTE_BUDGET_OPTION: 1024 * 1024,
+            "external_artifact_store_path": "/tmp/dpone-external-artifacts-docker",
             "lineage": False,
             "physical_design": {
                 "storage": {
@@ -93,7 +94,7 @@ def test_external_replication_stages_each_member_and_fresh_service_cleans_exact_
         ) == [("0",)]
     record_external_scenario(
         "external_replication_fresh_cleanup",
-        "passed_live",
+        "PASS",
         server_version=_execute(18123, "SELECT version()")[0][0],
         details={
             "operation_id": result.commit_receipt_id,
@@ -101,6 +102,168 @@ def test_external_replication_stages_each_member_and_fresh_service_cleans_exact_
             "production_composition": True,
         },
     )
+
+
+@pytest.mark.skipif(
+    os.getenv("DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION") != "1",
+    reason="set DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION=1 for the opt-in Docker fixture",
+)
+def test_external_replication_reconciles_lost_responses_and_staging_restart() -> None:
+    sink, config, payload, database = _publication_case("faults")
+    facade = sink._full_refresh_publication._external
+    original_factory = facade._service_factory
+    injected = {"stage": False, "publication": False, "cleanup": False}
+
+    def faulting_factory(*args: object, **kwargs: object) -> object:
+        adapter = original_factory(*args, **kwargs)
+        original_stage = adapter.stage_member_once
+        original_publication = adapter.dispatch_publication_once
+        original_cleanup = adapter.dispatch_cleanup_once
+
+        def lost_stage(*call_args: object, **call_kwargs: object) -> object:
+            result = original_stage(*call_args, **call_kwargs)
+            if not injected["stage"]:
+                injected["stage"] = True
+                raise RuntimeError("injected lost member-load response")
+            return result
+
+        def lost_publication(*call_args: object, **call_kwargs: object) -> None:
+            original_publication(*call_args, **call_kwargs)
+            if not injected["publication"]:
+                injected["publication"] = True
+                raise RuntimeError("injected lost publication response")
+
+        def lost_cleanup(*call_args: object, **call_kwargs: object) -> None:
+            original_cleanup(*call_args, **call_kwargs)
+            if not injected["cleanup"]:
+                injected["cleanup"] = True
+                raise RuntimeError("injected lost cleanup response")
+
+        adapter.stage_member_once = lost_stage
+        adapter.dispatch_publication_once = lost_publication
+        adapter.dispatch_cleanup_once = lost_cleanup
+        return adapter
+
+    facade._service_factory = faulting_factory
+    admitted = sink._full_refresh_publication.prepare_admission(config)
+    result = sink.load(admitted, payload)
+
+    assert injected == {"stage": True, "publication": True, "cleanup": True}
+    for port in (18123, 28123):
+        assert _execute(port, f"SELECT groupArray(id) FROM {database}.target") == [("[10,20]",)]
+    server_version = _execute(18123, "SELECT version()")[0][0]
+    details = {"operation_id": result.commit_receipt_id, "production_composition": True}
+    for scenario in (
+        "external_replication_lost_load_response",
+        "external_replication_lost_publication_response",
+        "external_replication_lost_cleanup_response",
+    ):
+        record_external_scenario(scenario, "PASS", server_version=server_version, details=details)
+
+    interrupted_sink, interrupted_config, interrupted_payload, interrupted_database = _publication_case("restart")
+    interrupted_facade = interrupted_sink._full_refresh_publication._external
+    normal_factory = interrupted_facade._service_factory
+    interrupted = False
+
+    def interrupted_factory(*args: object, **kwargs: object) -> object:
+        nonlocal interrupted
+        adapter = normal_factory(*args, **kwargs)
+        original_stage = adapter.stage_member_once
+
+        def stop_before_load(*call_args: object, **call_kwargs: object) -> object:
+            nonlocal interrupted
+            if not interrupted:
+                interrupted = True
+                raise RuntimeError("injected worker interruption before member load")
+            return original_stage(*call_args, **call_kwargs)
+
+        adapter.stage_member_once = stop_before_load
+        return adapter
+
+    interrupted_facade._service_factory = interrupted_factory
+    interrupted_admitted = interrupted_sink._full_refresh_publication.prepare_admission(interrupted_config)
+    with pytest.raises(Exception, match="STAGING_INCOMPLETE"):
+        interrupted_facade.stage(interrupted_admitted, interrupted_payload)
+
+    fresh_sink, _, _, _ = _publication_case("restart", database=interrupted_database, initialize=False)
+    recovered = fresh_sink._full_refresh_publication.prepare_admission(interrupted_config)
+    replay = fresh_sink._full_refresh_publication.replay_result(recovered)
+    assert interrupted is True
+    assert replay is not None and replay.total_rows == 2
+    for port in (18123, 28123):
+        assert _execute(port, f"SELECT groupArray(id) FROM {interrupted_database}.target") == [("[10,20]",)]
+    record_external_scenario(
+        "external_replication_staging_restart",
+        "PASS",
+        server_version=server_version,
+        details={"operation_id": replay.commit_receipt_id, "production_composition": True},
+    )
+
+
+def _publication_case(
+    label: str,
+    *,
+    database: str | None = None,
+    initialize: bool = True,
+) -> tuple[object, object, object, str]:
+    from dpone.config.load_config import LoadConfig
+    from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
+    from dpone.runtime.artifacts import InMemoryRowsArtifact
+    from dpone.runtime.connectors.clickhouse import ClickHouseConnector
+    from dpone.runtime.sinks.clickhouse_full_refresh_publication import SCHEDULER_IDENTITY_OPTION
+    from dpone.runtime.sinks.clickhouse_sink import ClickHouseSink
+    from dpone.runtime.sinks.load_payload import LoadPayload
+
+    database = database or f"external_publication_{label}_{secrets.token_hex(4)}"
+    if initialize:
+        _execute(18123, f"CREATE DATABASE {database} ON CLUSTER `{_CLUSTER}` ENGINE=Atomic")
+        for port in (18123, 28123):
+            _execute(port, f"CREATE TABLE {database}.target (id Int64) ENGINE=MergeTree ORDER BY id")
+            _execute(port, f"INSERT INTO {database}.target VALUES (1)")
+    connector = ClickHouseConnector(
+        host="127.0.0.1",
+        port=18123,
+        database=database,
+        user="default",
+        password="",
+        driver="http",
+        external_member_endpoint_resolver=_docker_member_endpoint,
+    )
+    config = LoadConfig(
+        source_conn_id="source",
+        target_conn_id="target",
+        source_schema="source",
+        source_table="source_table",
+        target_schema=database,
+        target_table="target",
+        load_strategy=LoadStrategy.FULL_REFRESH,
+        staging_schema=database,
+        options={
+            SCHEDULER_IDENTITY_OPTION: f"docker-external-{label}",
+            SOURCE_BYTE_BUDGET_OPTION: 1024 * 1024,
+            "external_artifact_store_path": "/tmp/dpone-external-artifacts-docker",
+            "lineage": False,
+            "physical_design": {
+                "storage": {
+                    "clickhouse": {
+                        "engine": "MergeTree",
+                        "order_by": ["id"],
+                        "cluster": {
+                            "name": _CLUSTER,
+                            "ddl_scope": "cluster",
+                            "replication_mode": "external",
+                            "external_content_row_budget": 100,
+                        },
+                    }
+                }
+            },
+        },
+    )
+    payload = LoadPayload(
+        artifact=InMemoryRowsArtifact([{"id": 10}, {"id": 20}]),
+        schema=(("id", "bigint"),),
+    )
+    return ClickHouseSink(connector), config, payload, database
 
 
 def _docker_member_endpoint(host: str, address: str, port: int) -> tuple[str, str, int]:

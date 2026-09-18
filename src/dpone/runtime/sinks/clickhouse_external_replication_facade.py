@@ -104,6 +104,7 @@ class ClickHouseExternalReplicationFacade:
         if not self.is_enabled(load_config):
             return load_config
         _require_safe_transformations(load_config, None)
+        external_artifact_store_root(load_config)
         cluster, database, target = _target_identity(load_config)
         service = self._service_factory(cluster, database, target, load_config=load_config)
         runtime = self._runtime_factory(service=service)

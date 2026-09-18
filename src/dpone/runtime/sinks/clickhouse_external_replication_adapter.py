@@ -23,9 +23,11 @@ from dpone.ports.clickhouse_external_replication import (
     ExternalTopologyCatalogPort,
     MemberPublicationState,
     VersionedExternalAuthorityRecord,
+    classify_member_publication,
     derive_target_key,
 )
 from dpone.runtime.sinks import clickhouse_external_replication_adapter_ddl as ddl_ops
+from dpone.runtime.sinks import clickhouse_external_replication_state as state_ops
 from dpone.runtime.sinks.clickhouse_external_replication_state import (
     candidate_observation as _candidate,
 )
@@ -92,6 +94,8 @@ class ClickHouseExternalReplicationServiceAdapter:
         self.evidence_scope = evidence_scope
         self._inventory_digest: str | None = None
         self._permits: dict[tuple[str, str], ExternalDispatchPermit] = {}
+        self._state_ops = state_ops
+        self._classify_member_publication = classify_member_publication
 
     def inventory(self, cluster: str) -> tuple[str, ...]:
         if cluster != self._cluster:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import replace
 from typing import Any
 
@@ -17,9 +17,16 @@ from dpone.ports.clickhouse_external_replication import (
 )
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.sinks.clickhouse_external_replication_canonical import (
-    canonical_rows_digest,
-    canonical_rows_json,
-    canonical_schema_digest,
+    CanonicalGenerationError,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_canonical import (
+    canonical_rows_digest as _canonical_rows_digest,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_canonical import (
+    canonical_rows_json as _canonical_rows_json,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_canonical import (
+    canonical_schema_digest as _canonical_schema_digest,
 )
 from dpone.runtime.sinks.clickhouse_nullability_policy import ClickHouseNullInsertPolicy
 from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDdlRenderer, ClickHouseTableDesign
@@ -28,6 +35,27 @@ from dpone.runtime.support.type_mapping.mssql_clickhouse import (
     MssqlClickHouseTypeMapper,
     MssqlClickHouseTypePolicy,
 )
+
+
+def canonical_schema_digest(columns: Sequence[Sequence[Any]]) -> str:
+    try:
+        return _canonical_schema_digest(columns)
+    except CanonicalGenerationError as exc:
+        raise ExternalContractError(exc.code, exc.detail) from exc
+
+
+def canonical_rows_digest(rows: Iterable[Sequence[Any]]) -> str:
+    try:
+        return _canonical_rows_digest(rows)
+    except CanonicalGenerationError as exc:
+        raise ExternalContractError(exc.code, exc.detail) from exc
+
+
+def canonical_rows_json(rows: Iterable[Sequence[Any]]) -> str:
+    try:
+        return _canonical_rows_json(rows)
+    except CanonicalGenerationError as exc:
+        raise ExternalContractError(exc.code, exc.detail) from exc
 
 
 def insert_external_rows(

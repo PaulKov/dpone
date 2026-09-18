@@ -33,7 +33,13 @@ SCENARIOS = (
     "partial_authority_bootstrap",
     "queue_status_and_host_matrix",
 )
-EXTERNAL_SCENARIOS = ("external_replication_fresh_cleanup",)
+EXTERNAL_SCENARIOS = (
+    "external_replication_fresh_cleanup",
+    "external_replication_lost_load_response",
+    "external_replication_lost_publication_response",
+    "external_replication_lost_cleanup_response",
+    "external_replication_staging_restart",
+)
 
 
 def reset_receipt() -> None:
@@ -89,7 +95,7 @@ def record_external_scenario(
     if name not in EXTERNAL_SCENARIOS:
         raise ValueError(f"unknown external publication scenario: {name}")
     evidence = json.loads(EXTERNAL_RECEIPT.read_text()) if EXTERNAL_RECEIPT.exists() else {}
-    scenarios = {item: {"status": "unverified", "evidence_scope": "local_synthetic"} for item in EXTERNAL_SCENARIOS}
+    scenarios = {item: {"status": "UNVERIFIED", "evidence_scope": "local_synthetic"} for item in EXTERNAL_SCENARIOS}
     scenarios.update(evidence.get("scenarios", {}))
     scenarios[name] = {
         "status": result,
@@ -105,9 +111,7 @@ def record_external_scenario(
             "replicas": 2,
             "evidence_scope": "local_synthetic",
             "scenarios": scenarios,
-            "status": (
-                "passed_live" if all(value["status"] == "passed_live" for value in scenarios.values()) else "unverified"
-            ),
+            "status": "PASS" if all(value["status"] == "PASS" for value in scenarios.values()) else "UNVERIFIED",
             "production_certification": "UNVERIFIED",
         }
     )

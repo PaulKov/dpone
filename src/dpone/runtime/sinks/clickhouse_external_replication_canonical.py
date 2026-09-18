@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime, time
@@ -10,10 +11,19 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from dpone.contracts.clickhouse_external_replication_identity import ExternalContractError, canonical_json
-
 _CONTENT_DIGEST_VERSION = "dpone.clickhouse.canonical-rows.v1"
 _SCHEMA_DIGEST_VERSION = "dpone.clickhouse.canonical-schema.v1"
+
+
+class CanonicalGenerationError(ValueError):
+    def __init__(self, code: str, detail: str) -> None:
+        self.code = code
+        self.detail = detail
+        super().__init__(f"{code}:{detail}")
+
+
+def _canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 def canonical_schema_digest(columns: Sequence[Sequence[Any]]) -> str:
@@ -22,7 +32,7 @@ def canonical_schema_digest(columns: Sequence[Sequence[Any]]) -> str:
     normalized = []
     for column in columns:
         if len(column) < 5:
-            raise ExternalContractError("GENERATION_UNKNOWN", "schema catalog row is incomplete")
+            raise CanonicalGenerationError("GENERATION_UNKNOWN", "schema catalog row is incomplete")
         normalized.append(
             {
                 "name": str(column[0]),
@@ -33,7 +43,7 @@ def canonical_schema_digest(columns: Sequence[Sequence[Any]]) -> str:
             }
         )
     payload = {"version": _SCHEMA_DIGEST_VERSION, "columns": normalized}
-    return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+    return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
 
 
 def canonical_rows_digest(rows: Iterable[Sequence[Any]]) -> str:
@@ -41,7 +51,7 @@ def canonical_rows_digest(rows: Iterable[Sequence[Any]]) -> str:
 
     digest = hashlib.sha256()
     digest.update((_CONTENT_DIGEST_VERSION + "\n").encode("utf-8"))
-    encoded_rows = sorted(canonical_json([_canonical_value(value) for value in row]) for row in rows)
+    encoded_rows = sorted(_canonical_json([_canonical_value(value) for value in row]) for row in rows)
     for encoded in encoded_rows:
         digest.update(str(len(encoded)).encode("ascii"))
         digest.update(b":")
@@ -53,7 +63,7 @@ def canonical_rows_digest(rows: Iterable[Sequence[Any]]) -> str:
 def canonical_rows_json(rows: Iterable[Sequence[Any]]) -> str:
     """Serialize typed rows canonically while preserving artifact row order."""
 
-    return canonical_json([[_canonical_value(value) for value in row] for row in rows])
+    return _canonical_json([[_canonical_value(value) for value in row] for row in rows])
 
 
 def _canonical_value(value: Any) -> Any:
@@ -67,7 +77,7 @@ def _canonical_value(value: Any) -> Any:
         return ["decimal", format(value, "f")]
     if isinstance(value, float):
         if not math.isfinite(value):
-            raise ExternalContractError("GENERATION_UNKNOWN", "non-finite values are unsupported")
+            raise CanonicalGenerationError("GENERATION_UNKNOWN", "non-finite values are unsupported")
         return ["float", value.hex()]
     if isinstance(value, str):
         return ["string", value]
@@ -85,9 +95,14 @@ def _canonical_value(value: Any) -> Any:
         return ["sequence", [_canonical_value(item) for item in value]]
     if isinstance(value, Mapping):
         items = [(_canonical_value(key), _canonical_value(item)) for key, item in value.items()]
-        items.sort(key=lambda pair: canonical_json(pair[0]))
+        items.sort(key=lambda pair: _canonical_json(pair[0]))
         return ["mapping", [[key, item] for key, item in items]]
-    raise ExternalContractError("GENERATION_UNKNOWN", "canonical value type is unsupported")
+    raise CanonicalGenerationError("GENERATION_UNKNOWN", "canonical value type is unsupported")
 
 
-__all__ = ["canonical_rows_digest", "canonical_rows_json", "canonical_schema_digest"]
+__all__ = [
+    "CanonicalGenerationError",
+    "canonical_rows_digest",
+    "canonical_rows_json",
+    "canonical_schema_digest",
+]

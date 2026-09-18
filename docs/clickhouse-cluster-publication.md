@@ -128,7 +128,11 @@ only inside a deployment-provided, verified
 [credentials quickstart](getting-started/credentials-quickstart.md) and
 [runtime startup diagnostics](airflow-runtime-startup-diagnostics.md). Retain
 the artifact spool on durable worker storage by setting
-`DPONE_EXTERNAL_ARTIFACT_STORE` (or `options.external_artifact_store_path`).
+`DPONE_EXTERNAL_ARTIFACT_STORE` (or the schema-declared
+`options.external_artifact_store_path`). External admission fails before the
+Keeper lock when neither is configured; there is no local `/tmp` fallback.
+For multi-worker deployments the path must resolve to the same durable storage
+on every eligible worker.
 
 ```bash
 dpone run \

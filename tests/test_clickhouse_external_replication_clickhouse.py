@@ -194,6 +194,7 @@ def test_connection_provider_probes_resolved_admitted_snapshot_without_refresh()
     )
     topology.inventory("analytics_cluster")
     calls: list[tuple[str, str, int]] = []
+    closed: list[bool] = []
 
     class Direct:
         def get_records(self, query: str) -> list[tuple[int]]:
@@ -201,7 +202,7 @@ def test_connection_provider_probes_resolved_admitted_snapshot_without_refresh()
             return [(1,)]
 
         def close(self) -> None:
-            raise AssertionError("successful admitted connections must remain open")
+            closed.append(True)
 
     provider = ClickHouseExternalReplicaConnectionProvider(
         connector,
@@ -213,6 +214,7 @@ def test_connection_provider_probes_resolved_admitted_snapshot_without_refresh()
     provider.require_connections()
 
     assert calls == [("127.0.0.1", "127.0.0.1", 29000), ("127.0.0.1", "127.0.0.1", 19000)]
+    assert len(closed) == 2
     assert len(connector.queries) == 1
 
 

@@ -38,8 +38,10 @@ receipt to:
 test_artifacts/clickhouse-external-publication/docker-receipt.json
 ```
 
-Its scope is `local_synthetic`; scenario details remain nested per scenario and
-production certification remains `UNVERIFIED`.
+Its scope is `local_synthetic`; scenario details remain nested per scenario,
+each completed Docker scenario uses `PASS`, and production certification
+remains `UNVERIFIED`. The matrix exercises fresh cleanup, lost member-load,
+publication and cleanup responses, plus a fresh-process `STAGING` restart.
 
 The receipt must bind the exact commit and fixture-configuration digests, label
 its scope `mocked_in_process`, list each scenario independently, and use only
@@ -47,8 +49,8 @@ its scope `mocked_in_process`, list each scenario independently, and use only
 digests only—never endpoints, credentials, source values, SQL text, or local
 filesystem paths.
 
-This profile is a mocked in-process integration contract, not the pinned
-two-member Docker synthetic profile and not a live integration or production
-certification. Both local synthetic and live certification remain `UNVERIFIED`
-until their separately approved profiles run. The receipt is generated after
-the reviewed commit and is not checked in with a stale parent identity.
+The offline profile is a mocked in-process integration contract. The pinned
+two-member Docker profile is local synthetic evidence, not production
+certification. Production certification remains `UNVERIFIED` until an
+explicitly approved external environment runs. Receipts are generated after
+the reviewed commit and are not checked in with a stale parent identity.
