@@ -314,21 +314,23 @@ def dbt_relation_write_subject(write: DbtRelationWrite) -> str:
 
     if not isinstance(write, DbtRelationWrite):
         raise DbtWorkspaceActivationError("write")
-    return canonical_fingerprint(
-        {
-            "schema": "dpone.dbt-workspace-relation-write.v1",
-            "project_path": write.project_path,
-            "workflow_id": write.workflow_id,
-            "resource_id": write.resource_id,
-            "kind": write.kind,
-            "connector": write.connector,
-            "connection_ref": write.connection_ref,
-            "database": write.database,
-            "relation_schema": write.schema,
-            "relation": write.relation,
-            "role": write.role,
-        }
-    )
+    payload = {
+        "schema": "dpone.dbt-workspace-relation-write.v1",
+        "project_path": write.project_path,
+        "workflow_id": write.workflow_id,
+        "resource_id": write.resource_id,
+        "kind": write.kind,
+        "connector": write.connector,
+        "connection_ref": write.connection_ref,
+        "database": write.database,
+        "relation_schema": write.schema,
+        "relation": write.relation,
+        "role": write.role,
+    }
+    if write.write_coordination_key is not None:
+        payload["write_coordination_key"] = write.write_coordination_key
+        payload["write_phase"] = write.write_phase
+    return canonical_fingerprint(payload)
 
 
 def _request_dict(

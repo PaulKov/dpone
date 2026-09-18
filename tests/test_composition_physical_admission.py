@@ -66,6 +66,36 @@ def test_native_helper_collision_with_ordinary_target_is_not_ignored():
         observe_composition_writes((native, ordinary), context=None, backend=Backend())
 
 
+def test_source_proven_initial_incremental_handoff_shares_one_physical_target():
+    initial, incremental = writes()
+    coordination = digest("durable handoff")
+    initial = replace(initial, kind="transfer", write_coordination_key=coordination, write_phase="initial")
+    incremental = replace(incremental, write_coordination_key=coordination, write_phase="incremental")
+
+    result = observe_composition_writes((initial, incremental), context=None, backend=Backend())
+
+    assert len(result) == 1
+
+
+def test_unmatched_handoff_metadata_does_not_hide_physical_collision():
+    initial, incremental = writes()
+    initial = replace(initial, kind="transfer", write_coordination_key=digest("handoff a"), write_phase="initial")
+    incremental = replace(incremental, write_coordination_key=digest("handoff b"), write_phase="incremental")
+
+    with pytest.raises(CompositionAdmissionError, match="physical_target_collision"):
+        observe_composition_writes((initial, incremental), context=None, backend=Backend())
+
+
+def test_handoff_phases_must_resolve_to_one_physical_target():
+    initial, incremental = writes()
+    coordination = digest("durable handoff")
+    initial = replace(initial, kind="transfer", write_coordination_key=coordination, write_phase="initial")
+    incremental = replace(incremental, write_coordination_key=coordination, write_phase="incremental")
+
+    with pytest.raises(CompositionAdmissionError, match="physical_target_collision"):
+        observe_composition_writes((initial, incremental), context=None, backend=Backend(collision=False))
+
+
 def test_missing_catalog_slot_rejects_complete_parent():
     class Partial(Backend):
         def observe_domain(self, domain, rows, context):

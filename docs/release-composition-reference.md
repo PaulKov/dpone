@@ -237,7 +237,16 @@ The independent reader reconstructs the native child view and calls its unchange
 source and integrity verifiers. It reconstructs ordinary source bytes, recaptures
 the inventory, and compares the deterministic final transport bytes. It also
 checks combined logical writes. Different connection aliases are not proof of
-physical target disjointness; composition activation remains unavailable.
+physical target disjointness.
+
+The one intentional shared-writer lifecycle is a PostgreSQL XMin `initial` and
+`incremental` pair carrying the same non-empty `handoff_id`, source relation,
+external target-atomic state contract, and unique key. Composition derives a
+coordination fingerprint from those source bytes and admits exactly one writer
+of each phase. Physical admission independently requires both writes to resolve
+to the same observed target before treating them as one lifecycle. Two writers
+of the same phase, a third writer, mismatched handoff metadata, or any unrelated
+logical/physical collision remains a hard failure.
 
 The source ordinary reader admits at most 10,000 files, 8 MiB per source file,
 and 512 MiB total source bytes. Runtime extraction applies its normal per-archive

@@ -19,6 +19,7 @@ from dpone.manifest.confined_files import read_confined_file
 
 IMAGE = "example.invalid/runtime@sha256:" + "a" * 64
 SIDECAR = "example.invalid/sidecar@sha256:" + "b" * 64
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def ordinary_root(
@@ -157,6 +158,63 @@ def ordinary_root(
     return root
 
 
+def xmin_handoff_root(tmp_path: Path) -> Path:
+    """Build both public handoff phases through the real compact-pack producer."""
+
+    author = tmp_path / "author"
+    author.mkdir()
+    root = tmp_path / "ordinary"
+    (root / "_dags").mkdir(parents=True)
+    nodes = []
+    workload_ids = []
+    for phase in ("initial", "incremental"):
+        workload_id = f"orders_{phase}"
+        workload_ids.append(workload_id)
+        manifest_name = f"{workload_id}.yaml"
+        example = REPO_ROOT / f"examples/batch/postgres-xmin-{phase}-to-mssql.batch.yaml"
+        body = example.read_text().replace("connection_id:", "connection_ref:")
+        body = body.replace(
+            "table: {schema: landing, name: orders}",
+            "table: {database: warehouse, schema: landing, name: orders}",
+        )
+        (author / manifest_name).write_text(body)
+        workload = GitOpsWorkloadDefinition(
+            workload_id=workload_id,
+            manifest=manifest_name,
+            domain="sample",
+            catalog_path="domains/sample.yaml",
+            effective_config={"image": IMAGE, "image_digest": "sha256:" + "a" * 64},
+            provenance={},
+        )
+        pack = AirflowCompactPackBuilder().build(
+            workload=workload,
+            output_path=f"{workload_id}/airflow-pack.json",
+            repo_root=author,
+            outlet_binding="logical",
+        )
+        assert not pack.blockers
+        selectors = tuple(pack.to_jsonable()["process_plans"])
+        assert len(selectors) == 1
+        nodes.append(DagSpecNode(node_id=workload_id, workload_id=workload_id, selector=selectors[0]))
+        (root / workload_id).mkdir()
+        (root / workload_id / "airflow-pack.json").write_text(pack.to_json())
+    declaration, issues = parse_dag_declaration(
+        "xmin_handoff",
+        {"schedule": None, "start_date": "2026-01-01", "workloads": workload_ids},
+    )
+    assert declaration is not None and not issues
+    dag = GitOpsAirflowDagSpec(
+        declaration=declaration,
+        domain="sample",
+        source_path="domains/sample.yaml",
+        nodes=tuple(nodes),
+        edges=(),
+        topological_order=tuple(node.node_id for node in nodes),
+    )
+    (root / "_dags/xmin_handoff.dag-spec.json").write_text(dag.to_json())
+    return root
+
+
 def _alias_projection() -> dict[str, object]:
     def entry(logical: str) -> dict[str, object]:
         return {
@@ -195,6 +253,14 @@ def test_capture_real_producer_detaches_source_and_rewrites_transport(tmp_path: 
     assert result.inventory_sha256 == before
     with pytest.raises(TypeError):
         result.inventory["dag_specs"][0]["id"] = "changed"
+
+
+def test_capture_accepts_producer_backed_xmin_handoff_pair(tmp_path: Path) -> None:
+    result = _capture(xmin_handoff_root(tmp_path))
+
+    assert len(result.relation_writes) == 2
+    assert {write.write_phase for write in result.relation_writes} == {"initial", "incremental"}
+    assert len({write.write_coordination_key for write in result.relation_writes}) == 1
 
 
 def test_capture_accepts_builtin_airflow_runner_marker(tmp_path: Path) -> None:
