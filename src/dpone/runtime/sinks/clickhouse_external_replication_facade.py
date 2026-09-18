@@ -4,20 +4,20 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import replace
-from typing import Any, Protocol
+from typing import Any, NoReturn, Protocol
 
-from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
+from dpone.config.load_strategy import LoadStrategy
 from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactReceipt,
     ExternalArtifactSourcePort,
     ExternalPublicationError,
     ExternalPublicationRequest,
-    digest_payload,
 )
 from dpone.runtime.lineage.options import LineageOptions
 from dpone.runtime.sinks.clickhouse_external_replication_context import (
     ExternalStagedContext,
     ExternalStagedValidation,
+    derive_semantic_plan_digest,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_runtime import (
     ClickHouseExternalReplicationRuntime,
@@ -90,16 +90,40 @@ class ClickHouseExternalReplicationFacade:
 
         if not self.is_enabled(load_config):
             return load_config
+        _require_safe_transformations(load_config, None)
         cluster, database, target = _target_identity(load_config)
         service = self._service_factory(cluster, database, target, load_config=load_config)
         runtime = self._runtime_factory(service=service)
+        scheduler_invocation = _scheduler_identity(load_config)
+        plan_sha256 = _plan_digest(load_config, cluster=cluster, database=database, target=target)
         state = runtime.prepare(
             cluster=cluster,
             database=database,
             target=target,
-            scheduler_invocation=_scheduler_identity(load_config),
-            plan_sha256=_plan_digest(load_config, cluster=cluster, database=database, target=target),
+            scheduler_invocation=scheduler_invocation,
+            plan_sha256=plan_sha256,
         )
+        phase = str(state.get("phase") or "")
+        if phase in {"STAGED", "PUBLICATION_DISPATCHING", "COMMITTED", "CLEANUP_DISPATCHING"}:
+            request = _request_from_state(
+                state,
+                cluster=cluster,
+                database=database,
+                target=target,
+                scheduler_invocation=scheduler_invocation,
+                plan_sha256=plan_sha256,
+            )
+            expected = ExternalReplicationReceipt.from_state(
+                dict(state), evidence_scope=str(getattr(service, "evidence_scope", "local_synthetic"))
+            )
+            if phase == "STAGED":
+                runtime.validate_staged(request, expected)
+            if phase in {"STAGED", "PUBLICATION_DISPATCHING"}:
+                runtime.publish(request)
+            state = _read_authority(service, request.target_key)
+            if state.get("phase") in {"COMMITTED", "CLEANUP_DISPATCHING"}:
+                runtime.cleanup(request)
+            state = _read_authority(service, request.target_key)
         if state.get("phase") != "COMPLETED":
             return load_config
         scope = str(getattr(service, "evidence_scope", "local_synthetic"))
@@ -296,24 +320,47 @@ def _scheduler_identity(load_config: Any) -> str:
 
 
 def _plan_digest(load_config: Any, *, cluster: str, database: str, target: str) -> str:
-    options = _options(load_config)
-    clickhouse = _clickhouse_options(load_config)
-    cluster_options = _cluster_options(load_config)
-    strategy = getattr(load_config, "load_strategy", None)
-    return digest_payload(
-        {
-            "version": 1,
-            "strategy": str(getattr(strategy, "value", strategy) or ""),
-            "cluster": cluster,
-            "database": database,
-            "target": target,
-            "staging_database": str(getattr(load_config, "staging_schema", "") or ""),
-            "engine": str(clickhouse.get("engine") or "MergeTree"),
-            "ddl_scope": str(cluster_options.get("ddl_scope") or "local"),
-            "replication_mode": str(cluster_options.get("replication_mode") or "internal"),
-            "max_source_bytes": options.get(SOURCE_BYTE_BUDGET_OPTION),
-        }
+    return derive_semantic_plan_digest(
+        load_config,
+        cluster=cluster,
+        database=database,
+        target=target,
+        runtime_option_keys=frozenset({SCHEDULER_IDENTITY_OPTION, EXTERNAL_REPLAY_OPTION}),
     )
+
+
+def _request_from_state(
+    state: Mapping[str, Any],
+    *,
+    cluster: str,
+    database: str,
+    target: str,
+    scheduler_invocation: str,
+    plan_sha256: str,
+) -> ExternalPublicationRequest:
+    return ExternalPublicationRequest(
+        cluster=cluster,
+        database=database,
+        target=target,
+        scheduler_invocation=scheduler_invocation,
+        plan_sha256=plan_sha256,
+        artifact=ExternalArtifactReceipt(
+            artifact_id=str(state["artifact_binding_id"]),
+            sha256=str(state["artifact_sha256"]),
+            byte_size=int(state["artifact_byte_size"]),
+            row_count=int(state["artifact_row_count"]),
+            schema_sha256=str(state["artifact_schema_sha256"]),
+            content_sha256=str(state["artifact_content_sha256"]),
+            replayable=True,
+        ),
+    )
+
+
+def _read_authority(service: ExternalReplicationRuntimeService, target_key: str) -> dict[str, Any]:
+    state = service.read_authority(target_key)
+    if state is None:
+        _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT")
+    return dict(state)
 
 
 def _require_safe_transformations(load_config: Any, payload: Any) -> None:
@@ -346,7 +393,7 @@ def _cluster_options(load_config: Any) -> Mapping[str, Any]:
     return cluster if isinstance(cluster, Mapping) else {}
 
 
-def _fail(code: str) -> None:
+def _fail(code: str) -> NoReturn:
     raise ExternalPublicationError(code)
 
 

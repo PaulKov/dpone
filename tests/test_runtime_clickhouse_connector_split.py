@@ -75,6 +75,35 @@ class StubConnector(ClickHouseConnector):
         self._client = FakeClient()
 
 
+def test_clickhouse_connector_preserves_legacy_positional_credentials_and_logger() -> None:
+    logger = DummyLogger()
+    connector = ClickHouseConnector(
+        "localhost",
+        9000,
+        "db",
+        "user",
+        "password",
+        "application",
+        True,
+        False,
+        3,
+        4,
+        {},
+        "native",
+        "ca.pem",
+        "gcs-key",
+        "gcs-secret",
+        "vault/path",
+        logger,
+    )
+
+    assert connector.gcs_hmac_key == "gcs-key"
+    assert connector.gcs_hmac_secret == "gcs-secret"
+    assert connector.gcs_hmac_vault_path == "vault/path"
+    assert connector.logger is logger
+    assert connector.external_member_endpoint_resolver is None
+
+
 def test_clickhouse_connector_facade_builds_basic_queries():
     connector = StubConnector()
     assert connector.build_select_query("db", "tbl", ["a", "b"], limit=10, offset=5) == (

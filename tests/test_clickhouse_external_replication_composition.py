@@ -8,14 +8,35 @@ import pytest
 from dpone.runtime import clickhouse_external_replication_composition as composition
 
 
+def test_direct_member_connection_uses_advertised_native_transport() -> None:
+    calls: list[tuple[str, int, str, str]] = []
+
+    class Connector:
+        def clone_for_endpoint(
+            self,
+            host: str,
+            port: int,
+            *,
+            application_suffix: str,
+            driver: str | None = None,
+        ) -> object:
+            calls.append((host, port, application_suffix, str(driver)))
+            return object()
+
+    result = composition._direct_member_connection(Connector(), "node-1", "192.0.2.1", 9000)
+
+    assert result is not None
+    assert calls == [("node-1", 9000, "external-member", "native")]
+
+
 def test_atomic_database_is_required_before_authority_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
     events: list[str] = []
 
     class Topology:
         bootstrap_hosts = ("member-a", "member-b")
 
-        def __init__(self, connector: Any) -> None:
-            del connector
+        def __init__(self, connector: Any, **kwargs: Any) -> None:
+            del connector, kwargs
 
         def inventory(self, cluster: str) -> None:
             del cluster

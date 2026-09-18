@@ -167,14 +167,84 @@ def test_connection_provider_resolves_an_opaque_member_through_injected_factory(
         calls.append((template, host, address, port))
         return object()
 
-    result = ClickHouseExternalReplicaConnectionProvider(
-        connector,
-        cluster="analytics_cluster",
-        connect=connect,
-    ).connection_for(member_id)
+    topology = ClickHouseExternalTopologyCatalog(connector)
+    inventory = topology.inventory("analytics_cluster")
+    provider = ClickHouseExternalReplicaConnectionProvider(connector, topology=topology, connect=connect)
+    connector.rows = []
+
+    result = provider.connection_for(member_id)
 
     assert result is not None
     assert calls == [(connector, "node_1", "192.0.2.1", 9000)]
+    assert len(connector.queries) == 1
+    assert topology.member_ids() == tuple(member.member_id for member in inventory.ordered_members)
+
+
+def test_connection_provider_probes_resolved_admitted_snapshot_without_refresh() -> None:
+    connector = _Connector(
+        [
+            ("node_1", "192.0.2.1", 9000, 1, 1, 0),
+            ("node_2", "192.0.2.2", 9000, 1, 2, 0),
+        ]
+    )
+    resolved = {"node_1": 19000, "node_2": 29000}
+    topology = ClickHouseExternalTopologyCatalog(
+        connector,
+        resolve_endpoint=lambda host, _address, _port: ("127.0.0.1", "127.0.0.1", resolved[host]),
+    )
+    topology.inventory("analytics_cluster")
+    calls: list[tuple[str, str, int]] = []
+
+    class Direct:
+        def get_records(self, query: str) -> list[tuple[int]]:
+            assert query == "SELECT 1"
+            return [(1,)]
+
+        def close(self) -> None:
+            raise AssertionError("successful admitted connections must remain open")
+
+    provider = ClickHouseExternalReplicaConnectionProvider(
+        connector,
+        topology=topology,
+        connect=lambda _template, host, address, port: calls.append((host, address, port)) or Direct(),
+    )
+    connector.rows = []
+
+    provider.require_connections()
+
+    assert calls == [("127.0.0.1", "127.0.0.1", 29000), ("127.0.0.1", "127.0.0.1", 19000)]
+    assert len(connector.queries) == 1
+
+
+def test_connection_probe_closes_admitted_members_when_a_later_member_is_unreachable() -> None:
+    connector = _Connector([("node_1", "192.0.2.1", 9000, 1, 1, 0), ("node_2", "192.0.2.2", 9000, 1, 2, 0)])
+    topology = ClickHouseExternalTopologyCatalog(connector)
+    topology.inventory("analytics_cluster")
+    closed: list[str] = []
+
+    class Direct:
+        def __init__(self, host: str) -> None:
+            self.host = host
+
+        def get_records(self, query: str) -> list[tuple[int]]:
+            assert query == "SELECT 1"
+            if self.host == "node_1":
+                raise TimeoutError("unreachable")
+            return [(1,)]
+
+        def close(self) -> None:
+            closed.append(self.host)
+
+    provider = ClickHouseExternalReplicaConnectionProvider(
+        connector,
+        topology=topology,
+        connect=lambda _template, host, _address, _port: Direct(host),
+    )
+
+    with pytest.raises(ValueError, match="INVENTORY_INVALID"):
+        provider.require_connections()
+
+    assert closed
 
 
 def test_authority_create_verifies_exact_post_write_and_returns_no_dispatch_permit() -> None:

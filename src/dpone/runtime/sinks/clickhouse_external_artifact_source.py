@@ -12,13 +12,13 @@ from dpone.config.load_strategy import MAX_SOURCE_BYTE_BUDGET, SOURCE_BYTE_BUDGE
 from dpone.ports.clickhouse_external_replication import (
     ArtifactIdentity,
     ExternalContractError,
-    canonical_json,
     digest_payload,
 )
 from dpone.runtime.file_artifacts import FileExportArtifact
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.sinks.clickhouse_external_replication_member_driver import (
     canonical_rows_digest,
+    canonical_rows_json,
     canonical_schema_digest,
 )
 from dpone.runtime.sinks.clickhouse_row_values import ClickHouseRowValueCoercer
@@ -71,7 +71,7 @@ class ClickHouseExternalArtifactSource:
             raise ExternalContractError("CONTENT_BUDGET_EXCEEDED", "artifact row budget exceeded")
         schema_rows = tuple((name, dtype, "", "", index) for index, (name, dtype) in enumerate(mapped_schema, 1))
         wire_digest = canonical_rows_digest(rows)
-        canonical = canonical_json(rows).encode("utf-8")
+        canonical = canonical_rows_json(rows).encode("utf-8")
         if len(canonical) > self._maximum_bytes:
             raise ExternalContractError("CONTENT_BUDGET_EXCEEDED", "artifact byte budget exceeded")
         identity = ArtifactIdentity(

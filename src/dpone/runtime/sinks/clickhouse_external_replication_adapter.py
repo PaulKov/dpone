@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 from collections.abc import Callable, Mapping
 from dataclasses import replace
-from typing import Any, NoReturn
+from typing import Any
 
 from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactReceipt,
@@ -19,7 +19,6 @@ from dpone.ports.clickhouse_external_replication import (
     ExternalDispatchPermit,
     ExternalMemberRecord,
     ExternalMemberStageState,
-    ExternalPublicationError,
     ExternalReplicaStagingPort,
     ExternalTopologyCatalogPort,
     MemberPublicationState,
@@ -37,6 +36,7 @@ from dpone.runtime.sinks.clickhouse_external_replication_state import (
 )
 from dpone.runtime.sinks.clickhouse_external_replication_state import desired_generation as _desired
 from dpone.runtime.sinks.clickhouse_external_replication_state import equivalent_state as _equivalent
+from dpone.runtime.sinks.clickhouse_external_replication_state import fail_external as _error
 from dpone.runtime.sinks.clickhouse_external_replication_state import generation_shape as _shape
 from dpone.runtime.sinks.clickhouse_external_replication_state import has_predecessor as _has_predecessor
 from dpone.runtime.sinks.clickhouse_external_replication_state import (
@@ -48,6 +48,8 @@ from dpone.runtime.sinks.clickhouse_external_replication_state import (
 from dpone.runtime.sinks.clickhouse_external_replication_state import (
     record_from_state,
     require_queue_entry,
+    require_stage_request,
+    reusable_candidate_observation,
     state_from_versioned,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_state import (
@@ -76,18 +78,6 @@ def _take_permit(
     if permit is None:
         _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CAS_UNKNOWN")
     return permit
-
-
-def _error(code: str, record: ExternalAuthorityRecord | None = None) -> NoReturn:
-    evidence: dict[str, object] = {"evidence_scope": "runtime", "member_ids": []}
-    if record is not None:
-        evidence.update(
-            target_key=record.target_key,
-            operation_id=record.operation_id,
-            phase=record.phase.value,
-            member_ids=list(_ids(record)),
-        )
-    raise ExternalPublicationError(code, evidence=evidence)
 
 
 class ClickHouseExternalReplicationServiceAdapter:
@@ -195,25 +185,33 @@ class ClickHouseExternalReplicationServiceAdapter:
     ) -> Mapping[str, Any]:
         current = self._member_current(member_id)
         record = current.record
-        if (
-            record.operation_id != operation_id
-            or record.candidate != candidate_name
-            or record.artifact != artifact.identity
-            or source.identity != artifact.identity
-            or record.artifact_binding_id != source.binding_id
-        ):
-            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", record)
+        require_stage_request(
+            record,
+            operation_id=operation_id,
+            candidate_name=candidate_name,
+            artifact=artifact,
+            source=source,
+            fail=_error,
+        )
         source.revalidate(artifact.identity)
-        source.open_replay()
         observed = self._staging.observe(member_id, record)
         member = _member(record, member_id)
+        reusable = reusable_candidate_observation(observed, member, record, fail=_error)
+        if reusable is not None:
+            return reusable
+        if record.phase is not ExternalAuthorityPhase.STAGING:
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", record)
+        created_here = False
         if observed.candidate is None:
             created = self._staging.create_candidate(member_id, record)
             member = replace(member, stage_state=ExternalMemberStageState.CANDIDATE_BOUND, candidate=created)
             current = self._typed_cas(current, replace(record, members=_replace_member(record, member)))
             record = current.record
+            created_here = True
         elif member.candidate != observed.candidate:
             _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
+        if not created_here:
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", record)
         error: Exception | None = None
         try:
             self._staging.load_candidate(member_id, record, source)

@@ -21,6 +21,7 @@ class _HttpClient:
     def __init__(self) -> None:
         self.queries: list[tuple[str, object, object]] = []
         self.commands: list[tuple[str, object, object]] = []
+        self.inserts: list[tuple[str, object, object, object]] = []
         self.closed = False
 
     def query(self, query: str, *, parameters=None, settings=None):
@@ -34,6 +35,9 @@ class _HttpClient:
     def query_rows_stream(self, query: str, *, parameters=None, settings=None):
         self.queries.append((query, parameters, settings))
         return iter([(1,), (2,)])
+
+    def insert(self, table: str, data, *, column_names=None, settings=None):
+        self.inserts.append((table, data, column_names, settings))
 
     def close(self) -> None:
         self.closed = True
@@ -84,3 +88,26 @@ def test_http_adapter_forwards_query_id_as_transport_parameter() -> None:
     assert client.commands == [
         ("EXCHANGE TABLES a AND b", None, {"max_threads": 2, "query_id": "stable-publication-id"})
     ]
+
+
+def test_http_adapter_inserts_typed_rows_without_treating_them_as_query_parameters() -> None:
+    client = _HttpClient()
+    adapter = ClickHouseHttpClientAdapter(client, settings={"max_threads": 2})
+
+    adapter.insert_rows(
+        "analytics.candidate",
+        [(10,), (20,)],
+        column_names=["id"],
+        settings={"async_insert": 0},
+        query_id="external-member-load",
+    )
+
+    assert client.inserts == [
+        (
+            "analytics.candidate",
+            [(10,), (20,)],
+            ["id"],
+            {"max_threads": 2, "async_insert": 0, "query_id": "external-member-load"},
+        )
+    ]
+    assert client.commands == []

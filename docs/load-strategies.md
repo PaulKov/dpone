@@ -74,6 +74,12 @@ neither should multiply spool files or BCP processes.
 ## `full_refresh`
 
 Use `full_refresh` when the selected source boundary can be reloaded completely.
+For a one-shard ClickHouse cluster, publication mode follows the physical
+replication owner: `internal` stages one replicated generation, while explicit
+`external` stages the same sealed artifact directly on every independent member.
+See [ClickHouse cluster publication](clickhouse-cluster-publication.md); external
+mode is bounded, requires `lineage: false`, and fails closed without live member
+admission.
 
 ```yaml
 sink:

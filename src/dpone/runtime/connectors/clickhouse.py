@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 import os
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 from dpone.runtime.connector_logging import etl_logger
@@ -72,6 +72,7 @@ class ClickHouseConnector(AbstractConnector):
         gcs_hmac_secret: str | None = None,
         gcs_hmac_vault_path: str | None = None,
         logger: ETLLogger | None = None,
+        external_member_endpoint_resolver: Callable[[str, str, int], tuple[str, str, int]] | None = None,
     ):
         self.host = host
         self.driver = _normalize_driver(driver)
@@ -85,6 +86,7 @@ class ClickHouseConnector(AbstractConnector):
         self.connect_timeout = connect_timeout
         self.send_receive_timeout = send_receive_timeout
         self.ca_cert = ca_cert
+        self.external_member_endpoint_resolver = external_member_endpoint_resolver
         self.gcs_hmac_key = gcs_hmac_key
         self.gcs_hmac_secret = gcs_hmac_secret
         self.gcs_hmac_vault_path = gcs_hmac_vault_path
@@ -267,6 +269,7 @@ class ClickHouseConnector(AbstractConnector):
         port: int,
         *,
         application_suffix: str,
+        driver: str | None = None,
     ) -> ClickHouseConnector:
         """Reuse resolved credentials for one explicitly admitted direct member."""
 
@@ -285,8 +288,9 @@ class ClickHouseConnector(AbstractConnector):
             gcs_hmac_key=self.gcs_hmac_key,
             gcs_hmac_secret=self.gcs_hmac_secret,
             gcs_hmac_vault_path=self.gcs_hmac_vault_path,
-            driver=self.driver,
+            driver=driver or self.driver,
             ca_cert=self.ca_cert,
+            external_member_endpoint_resolver=self.external_member_endpoint_resolver,
             logger=self.logger,
         )
 

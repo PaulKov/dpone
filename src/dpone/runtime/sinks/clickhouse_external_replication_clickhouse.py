@@ -31,9 +31,11 @@ _INVENTORY_SQL = (
 
 
 class ClickHouseExternalTopologyCatalog:
-    def __init__(self, connector: Any) -> None:
+    def __init__(self, connector: Any, *, resolve_endpoint: Callable[..., tuple[str, str, int]] | None = None) -> None:
         self._connector = connector
+        self._resolve_endpoint = resolve_endpoint or _identity_endpoint
         self._member_ids_by_host: dict[str, str] = {}
+        self._member_endpoints: dict[str, tuple[str, str, int]] = {}
         self._bootstrap_hosts: tuple[str, ...] = ()
         self._inventory_digest: str | None = None
 
@@ -51,24 +53,27 @@ class ClickHouseExternalTopologyCatalog:
             for row, member in zip(rows, members, strict=True)
             for host in (str(row[0]), str(row[1]))
         }
+        self._member_endpoints = {
+            member.member_id: self._resolve_endpoint(str(row[0]), str(row[1]), int(row[2]))
+            for row, member in zip(rows, members, strict=True)
+        }
         self._bootstrap_hosts = tuple(str(row[0]) for row in rows)
         self._inventory_digest = digest_payload(
             [
                 {
                     "member_id": member.member_id,
                     "endpoint_digest": digest_payload(
-                        {"host": str(row[0]), "address": str(row[1]), "port": int(row[2])}
+                        {"host": endpoint[0], "address": endpoint[1], "port": endpoint[2]}
                     ),
                 }
-                for row, member in zip(rows, members, strict=True)
+                for member in members
+                for endpoint in (self._member_endpoints[member.member_id],)
             ]
         )
         return topology
 
     @property
     def bootstrap_hosts(self) -> tuple[str, ...]:
-        """Return raw host keys only for the internal authority bootstrap boundary."""
-
         return self._bootstrap_hosts
 
     @property
@@ -78,18 +83,31 @@ class ClickHouseExternalTopologyCatalog:
         return self._inventory_digest
 
     def member_identity(self, host: str) -> str:
-        """Resolve a queue host into its opaque admitted member identity."""
-
         member_id = self._member_ids_by_host.get(str(host))
         if member_id is None:
             raise ExternalContractError("INVENTORY_INVALID", "queue host is not in admitted inventory")
         return member_id
 
+    def member_endpoint(self, member_id: str) -> tuple[str, str, int]:
+        try:
+            return self._member_endpoints[member_id]
+        except KeyError:
+            raise ExternalContractError("INVENTORY_INVALID", "member is not in admitted inventory") from None
+
+    def member_ids(self) -> tuple[str, ...]:
+        return tuple(sorted(self._member_endpoints))
+
 
 class ClickHouseExternalReplicaConnectionProvider:
-    def __init__(self, connector: Any, *, cluster: str, connect: Callable[..., Any]) -> None:
+    def __init__(
+        self,
+        connector: Any,
+        *,
+        topology: ClickHouseExternalTopologyCatalog,
+        connect: Callable[..., Any],
+    ) -> None:
         self._connector = connector
-        self._cluster = cluster
+        self._topology = topology
         self._connect = connect
         self._connections: dict[str, Any] = {}
         self._member_ids_by_connection: dict[int, str] = {}
@@ -98,28 +116,27 @@ class ClickHouseExternalReplicaConnectionProvider:
         cached = self._connections.get(member_id)
         if cached is not None:
             return cached
-        rows = _inventory_rows(self._connector, self._cluster)
-        topology = ExternalTopology(
-            cluster=self._cluster,
-            replication_mode=ReplicationMode.EXTERNAL,
-            members=tuple(_member(row) for row in rows),
-        )
-        topology.validate()
-        matches = [row for row in rows if _member(row).member_id == member_id]
-        if len(matches) != 1:
-            raise ExternalContractError("INVENTORY_INVALID", "opaque member identity is not uniquely resolvable")
-        row = matches[0]
+        host, address, port = self._topology.member_endpoint(member_id)
         try:
-            connection = self._connect(self._connector, str(row[0]), str(row[1]), int(row[2]))
+            connection = self._connect(self._connector, host, address, port)
             self._connections[member_id] = connection
             self._member_ids_by_connection[id(connection)] = member_id
             return connection
         except Exception:
             raise ExternalContractError("INVENTORY_INVALID", "direct member connection is unavailable") from None
 
-    def member_identity(self, connection: Any) -> str:
-        """Return the opaque identity bound to a provider-owned connection."""
+    def require_connections(self) -> None:
+        try:
+            for member_id in self._topology.member_ids():
+                if self.connection_for(member_id).get_records("SELECT 1") != [(1,)]:
+                    raise RuntimeError("direct member probe returned an unexpected result")
+        except Exception:
+            for direct in self._connections.values():
+                if callable(close := getattr(direct, "close", None)):
+                    close()
+            raise ExternalContractError("INVENTORY_INVALID", "direct member connection is unavailable") from None
 
+    def member_identity(self, connection: Any) -> str:
         return self._member_ids_by_connection.get(id(connection), "")
 
 
@@ -185,8 +202,6 @@ class ClickHouseExternalReplicaStaging:
 
 
 class ClickHouseExternalKeeperMapAuthority:
-    """Persist external authority with one mutation and an exact post-read."""
-
     def __init__(self, connector: Any, database: str, *, table: str = cluster_contract.AUTHORITY_TABLE) -> None:
         self._connector = connector
         self._database = database
@@ -316,6 +331,10 @@ class ClickHouseExternalKeeperMapAuthority:
 
 def _inventory_rows(connector: Any, cluster: str) -> list[Any]:
     return connector.get_records(_INVENTORY_SQL, {"cluster": cluster})
+
+
+def _identity_endpoint(host: str, address: str, port: int) -> tuple[str, str, int]:
+    return host, address, port
 
 
 def _member(row: Sequence[Any]) -> ExternalMember:

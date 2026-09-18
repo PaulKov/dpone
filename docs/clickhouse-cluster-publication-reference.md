@@ -76,6 +76,13 @@ Runtime requires the exact current inventory:
 - direct member connection capability; and
 - canonical typed-content digest support within configured budgets.
 
+The coordinator connection may use HTTP. External member staging is deliberately
+native and uses the admitted `system.clusters` port unless an injected endpoint
+resolver translates it for the runtime network. The resolver output, not a later
+catalog refresh, is part of the fenced inventory snapshot. Admission opens all
+resolved member connections before extraction. Default lineage projection is
+not supported on this route; set `options.lineage: false`.
+
 External mode currently admits replayable in-memory rows and uncompressed CSV
 or TSV file artifacts without a bulk text codec. Unsupported, streaming,
 compressed, native-wire, or decoder-dependent artifacts fail before candidate

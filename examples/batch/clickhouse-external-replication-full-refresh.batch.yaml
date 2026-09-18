@@ -21,6 +21,7 @@ defaults:
       mode: full_refresh
       max_source_bytes: 104857600
     options:
+      lineage: false
       physical_design:
         storage:
           clickhouse:

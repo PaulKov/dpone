@@ -8,6 +8,7 @@ from typing import Any, NoReturn
 from dpone.ports.clickhouse_external_replication import (
     ArtifactIdentity,
     ExternalArtifactReceipt,
+    ExternalArtifactSourcePort,
     ExternalAuthorityPhase,
     ExternalAuthorityRecord,
     ExternalClusterDdlPort,
@@ -59,7 +60,7 @@ def record_from_state(
     inventory_digest: str,
 ) -> ExternalAuthorityRecord:
     if str(state["inventory_digest"]) != inventory_digest:
-        _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", base)
+        fail_external("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", base)
     artifact = _artifact(state)
     same_operation = base is not None and base.operation_id == str(state["operation_id"])
     operation_base = base if same_operation else None
@@ -109,7 +110,7 @@ def state_from_versioned(current: VersionedExternalAuthorityRecord) -> dict[str,
             status = "DIVERGED" if diverged else "AMBIGUOUS"
         states[item.member_id] = {
             "state": status,
-            "candidate_uuid": None if item.candidate is None else item.candidate.uuid,
+            **_generation_state(item.candidate),
         }
     state: dict[str, Any] = {
         "target_key": record.target_key,
@@ -212,6 +213,43 @@ def matches_generation(observation: Mapping[str, Any], state: Mapping[str, Any])
     )
 
 
+def require_stage_request(
+    record: ExternalAuthorityRecord,
+    *,
+    operation_id: str,
+    candidate_name: str,
+    artifact: ExternalArtifactReceipt,
+    source: ExternalArtifactSourcePort,
+    fail: Any,
+) -> None:
+    if (
+        record.operation_id != operation_id
+        or record.candidate != candidate_name
+        or record.artifact != artifact.identity
+        or source.identity != artifact.identity
+        or record.artifact_binding_id != source.binding_id
+    ):
+        fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", record)
+
+
+def reusable_candidate_observation(
+    observed: MemberGenerationObservation,
+    member_record: ExternalMemberRecord,
+    record: ExternalAuthorityRecord,
+    *,
+    fail: Any,
+) -> Mapping[str, Any] | None:
+    if not complete_candidate(observed.candidate, record.artifact):
+        return None
+    if (
+        member_record.candidate is None
+        or observed.candidate is None
+        or member_record.candidate.uuid != observed.candidate.uuid
+    ):
+        fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
+    return candidate_observation(observed, record)
+
+
 def candidate_observation(observed: MemberGenerationObservation, record: ExternalAuthorityRecord) -> Mapping[str, Any]:
     candidate = observed.candidate
     if candidate is None:
@@ -222,6 +260,7 @@ def candidate_observation(observed: MemberGenerationObservation, record: Externa
         "operation_id": record.operation_id,
         "candidate_name": record.candidate,
         "candidate_uuid": candidate.uuid,
+        "engine_full": candidate.engine_full,
         "schema_sha256": candidate.schema_digest,
         "content_sha256": candidate.content_digest,
         "row_count": candidate.row_count,
@@ -243,8 +282,14 @@ def _state_member(
     uuid = raw.get("candidate_uuid")
     if uuid is None and status in {"PENDING", "LOADING"}:
         candidate = None
-    elif uuid is not None and (candidate is None or candidate.uuid != uuid):
-        _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", base)
+    elif uuid is not None:
+        encoded = _generation_from_state(raw)
+        if encoded is not None:
+            if candidate is not None and candidate.uuid != encoded.uuid:
+                fail_external("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", base)
+            candidate = encoded
+        elif candidate is None or candidate.uuid != uuid:
+            fail_external("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", base)
     return ExternalMemberRecord(
         member_id=member_id,
         stage_state=stage,
@@ -253,6 +298,38 @@ def _state_member(
         predecessor=None if prior is None else prior.predecessor,
         candidate=candidate,
     )
+
+
+def _generation_state(candidate: PhysicalGeneration | None) -> dict[str, Any]:
+    if candidate is None:
+        return {"candidate_uuid": None}
+    return {
+        "candidate_uuid": candidate.uuid,
+        "candidate_engine_full": candidate.engine_full,
+        "candidate_schema_sha256": candidate.schema_digest,
+        "candidate_content_sha256": candidate.content_digest,
+        "candidate_row_count": candidate.row_count,
+    }
+
+
+def _generation_from_state(raw: Mapping[str, Any]) -> PhysicalGeneration | None:
+    fields = (
+        "candidate_engine_full",
+        "candidate_schema_sha256",
+        "candidate_content_sha256",
+        "candidate_row_count",
+    )
+    if not all(raw.get(field) is not None for field in fields):
+        return None
+    candidate = PhysicalGeneration(
+        uuid=str(raw["candidate_uuid"]),
+        engine_full=str(raw["candidate_engine_full"]),
+        schema_digest=str(raw["candidate_schema_sha256"]),
+        content_digest=str(raw["candidate_content_sha256"]),
+        row_count=int(raw["candidate_row_count"]),
+    )
+    candidate.validate()
+    return candidate
 
 
 def _artifact(state: Mapping[str, Any]) -> ArtifactIdentity | None:
@@ -273,7 +350,7 @@ def _field(record: ExternalAuthorityRecord | None, name: str) -> str | None:
     return None if record is None else getattr(record, name)
 
 
-def _fail(code: str, record: ExternalAuthorityRecord | None) -> None:
+def fail_external(code: str, record: ExternalAuthorityRecord | None = None) -> NoReturn:
     evidence: dict[str, object] = {"evidence_scope": "runtime", "member_ids": []}
     if record is not None:
         evidence.update(
@@ -292,12 +369,15 @@ __all__ = [
     "candidate_observation",
     "desired_generation",
     "equivalent_state",
+    "fail_external",
     "generation_shape",
     "has_predecessor",
     "member",
     "member_ids",
     "matches_generation",
     "record_from_state",
+    "require_stage_request",
+    "reusable_candidate_observation",
     "replace_member",
     "state_from_versioned",
     "owned_observation",

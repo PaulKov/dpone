@@ -17,6 +17,44 @@ Cas = Callable[[dict[str, Any] | None, Mapping[str, Any]], dict[str, Any]]
 Fail = Callable[..., NoReturn]
 
 
+def validate_request(request: Any, fail: Fail) -> None:
+    try:
+        request.validate()
+    except ValueError as error:
+        code = str(getattr(error, "code", "REQUEST_INVALID"))
+        fail(f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{code}")
+
+
+def candidate_state(candidate: Mapping[str, Any] | None) -> dict[str, Any]:
+    if candidate is None:
+        return {"candidate_uuid": None}
+    return {
+        "candidate_uuid": candidate.get("candidate_uuid"),
+        "candidate_engine_full": candidate.get("engine_full"),
+        "candidate_schema_sha256": candidate.get("schema_sha256"),
+        "candidate_content_sha256": candidate.get("content_sha256"),
+        "candidate_row_count": candidate.get("row_count"),
+    }
+
+
+def require_same_inputs(
+    state: Mapping[str, Any],
+    request: Any,
+    members: tuple[str, ...],
+    inventory_digest: str,
+    artifact_binding_id: str | None,
+    fail: Fail,
+) -> None:
+    if tuple(state["member_ids"]) != members or state["plan_digest"] != request.plan_sha256:
+        fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", state=state)
+    if state["inventory_digest"] != inventory_digest:
+        fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", state=state)
+    if "artifact_sha256" in state and state["artifact_sha256"] != request.artifact.sha256:
+        fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", state=state)
+    if artifact_binding_id is not None and state.get("artifact_binding_id") != artifact_binding_id:
+        fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", state=state)
+
+
 def publish_phase(state: dict[str, Any], *, service: Any, cas: Cas, fail: Fail) -> dict[str, Any]:
     if state["phase"] == "STAGED":
         state = cas(
@@ -74,10 +112,13 @@ def cleanup_phase(state: dict[str, Any], *, service: Any, cas: Cas, fail: Fail) 
 
 __all__ = [
     "candidate_name",
+    "candidate_state",
     "cleanup_phase",
     "matches_generation",
     "owned_observation",
     "publish_phase",
     "require_replayable_artifact",
+    "require_same_inputs",
+    "validate_request",
     "without_version",
 ]
