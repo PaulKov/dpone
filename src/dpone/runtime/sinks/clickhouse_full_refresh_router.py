@@ -65,6 +65,7 @@ class ClickHouseFullRefreshPublicationRouter:
             {
                 "requested": "cluster" if decision.requested else "local",
                 "selected": decision.mode,
+                "replication_mode": decision.replication_mode,
                 "blockers": decision.blockers,
                 "release_gate": "blocked" if decision.blockers else "green",
                 "runtime_admission_required": decision.runtime_admission_required,

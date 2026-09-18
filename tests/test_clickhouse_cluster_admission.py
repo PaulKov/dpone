@@ -16,6 +16,8 @@ from dpone.contracts.clickhouse_cluster_admission import (
     CLICKHOUSE_CLUSTER_ACCESS_TABLE_UNSUPPORTED,
     CLICKHOUSE_CLUSTER_DDL_SCOPE_REQUIRED,
     CLICKHOUSE_CLUSTER_ENGINE_REQUIRED,
+    CLICKHOUSE_CLUSTER_EXTERNAL_ENGINE_REQUIRED,
+    CLICKHOUSE_CLUSTER_REPLICATION_MODE_INVALID,
     CLICKHOUSE_CLUSTER_SOURCE_BUDGET_REQUIRED,
     CLICKHOUSE_CLUSTER_STAGING_DATABASE_UNSUPPORTED,
     ClickHouseClusterAdmissionInput,
@@ -43,6 +45,7 @@ def _request(**overrides: object) -> ClickHouseClusterAdmissionInput:
         "engine": "ReplicatedMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}')",
         "cluster_name": "analytics_cluster",
         "ddl_scope": "cluster",
+        "replication_mode": "internal",
         "access_table_enabled": False,
         "target_database": "analytics",
         "staging_database": "analytics",
@@ -60,6 +63,31 @@ def test_cluster_admission_selects_only_complete_bounded_contract() -> None:
     assert decision.mode == "cluster"
     assert decision.runtime_admission_required is True
     assert decision.no_fallback is True
+    assert decision.replication_mode == "internal"
+
+
+def test_external_cluster_admission_requires_explicit_mode_and_non_replicated_engine() -> None:
+    decision = evaluate_clickhouse_cluster_admission(_request(replication_mode="external", engine="MergeTree"))
+
+    assert decision.selected is True
+    assert decision.mode == "cluster_external"
+    assert decision.replication_mode == "external"
+    assert decision.no_fallback is True
+
+
+def test_external_cluster_admission_rejects_replicated_engine_without_fallback() -> None:
+    decision = evaluate_clickhouse_cluster_admission(_request(replication_mode="external"))
+
+    assert decision.selected is False
+    assert decision.blockers == (CLICKHOUSE_CLUSTER_EXTERNAL_ENGINE_REQUIRED,)
+    assert decision.no_fallback is True
+
+
+def test_cluster_admission_rejects_unknown_replication_mode() -> None:
+    decision = evaluate_clickhouse_cluster_admission(_request(replication_mode="automatic"))
+
+    assert decision.selected is False
+    assert decision.blockers == (CLICKHOUSE_CLUSTER_REPLICATION_MODE_INVALID,)
 
 
 def test_local_full_refresh_remains_local_and_legacy_unbounded_compatible() -> None:
@@ -425,6 +453,7 @@ sink:
         "runtime_admission_required": True,
         "blockers": [],
         "no_fallback": True,
+        "replication_mode": "internal",
     }
 
 

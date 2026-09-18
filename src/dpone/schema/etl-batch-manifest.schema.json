@@ -4902,6 +4902,15 @@
                                       ],
                                       "default": "cluster"
                                     },
+                                    "replication_mode": {
+                                      "type": "string",
+                                      "enum": [
+                                        "internal",
+                                        "external"
+                                      ],
+                                      "default": "internal",
+                                      "description": "Data replication owner. External mode requires independent non-replicated MergeTree members and strict runtime admission."
+                                    },
                                     "on_cluster": {
                                       "type": "boolean",
                                       "description": "Deprecated compatibility alias. Prefer ddl_scope: cluster.",

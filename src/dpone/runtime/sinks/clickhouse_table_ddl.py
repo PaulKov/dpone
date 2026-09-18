@@ -18,6 +18,7 @@ from dpone.runtime.physical_design.table_settings import (
 )
 
 ClickHouseDdlScope = Literal["local", "cluster"]
+ClickHouseReplicationMode = Literal["internal", "external"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,18 +27,22 @@ class ClickHouseClusterDesign:
 
     name: str | None = None
     ddl_scope: ClickHouseDdlScope = "local"
+    replication_mode: ClickHouseReplicationMode = "internal"
 
     @classmethod
     def from_config(cls, raw: Any) -> ClickHouseClusterDesign:
         if isinstance(raw, str):
             name = raw.strip() or None
-            return cls(name=name, ddl_scope="cluster" if name else "local")
+            return cls(name=name, ddl_scope="cluster" if name else "local", replication_mode="internal")
         values = raw if isinstance(raw, Mapping) else {}
         name = str(values.get("name") or "").strip() or None
         ddl_scope = _ddl_scope(values)
+        replication_mode = str(values.get("replication_mode") or "internal").strip().lower()
+        if replication_mode not in {"internal", "external"}:
+            raise ValueError("physical_design.storage.clickhouse.cluster.replication_mode must be internal or external")
         if ddl_scope == "cluster" and not name:
             raise ValueError("physical_design.storage.clickhouse.cluster.name is required for cluster DDL")
-        return cls(name=name, ddl_scope=ddl_scope)
+        return cls(name=name, ddl_scope=ddl_scope, replication_mode=cast(ClickHouseReplicationMode, replication_mode))
 
     @property
     def on_cluster(self) -> bool:
