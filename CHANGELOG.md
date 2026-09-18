@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.81.1 - 2026-09-18
+
 ### Fixed
 
 - Admit deterministic ordinary Airflow packs produced by current public
