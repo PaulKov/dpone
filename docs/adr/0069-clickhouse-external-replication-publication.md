@@ -1,4 +1,4 @@
-# ADR 0068: External ClickHouse replication uses fenced per-member generations
+# ADR 0069: External ClickHouse replication uses fenced per-member generations
 
 Status: Accepted
 
