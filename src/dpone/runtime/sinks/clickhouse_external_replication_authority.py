@@ -6,14 +6,12 @@ import secrets
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from dpone.runtime.sinks import clickhouse_external_replication_phases as phase_ops
-
 
 def acquire_lock(
     *,
     target_key: str,
     operation_id: str,
-    target: str,
+    candidate_name: str,
     plan_sha256: str,
     members: tuple[str, ...],
     inventory_digest: str,
@@ -40,7 +38,7 @@ def acquire_lock(
         "dispatch_epoch": 0 if current is None else int(current["dispatch_epoch"]) + 1,
         "inventory_digest": inventory_digest,
         "plan_digest": plan_sha256,
-        "candidate_name": phase_ops.candidate_name(target, operation_id),
+        "candidate_name": candidate_name,
         "member_ids": members,
         "member_states": {member: {"state": "PENDING"} for member in members},
     }
@@ -54,6 +52,7 @@ def abort_prepared(
     read: Callable[[str], dict[str, Any] | None],
     cas: Callable[[dict[str, Any] | None, Mapping[str, Any]], dict[str, Any]],
     fail: Callable[..., Any],
+    without_version: Callable[[Mapping[str, Any]], dict[str, Any]],
 ) -> None:
     state = read(target_key)
     if state is None or state.get("operation_id") != operation_id or state.get("phase") in {"ABORTED"}:
@@ -64,7 +63,7 @@ def abort_prepared(
         member.get("candidate_uuid") is not None for member in state.get("member_states", {}).values()
     ):
         fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", state=state)
-    cas(state, {**phase_ops.without_version(state), "phase": "ABORTED"})
+    cas(state, {**without_version(state), "phase": "ABORTED"})
 
 
 __all__ = ["abort_prepared", "acquire_lock"]

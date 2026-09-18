@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-
-from dpone.ports.clickhouse_external_replication import ArtifactIdentity
+from typing import Any
 
 
 class ClickHouseExternalArtifactVerifier:
     """Delegate exact artifact revalidation without exposing storage details."""
 
-    def __init__(self, *, revalidate: Callable[[ArtifactIdentity], None]) -> None:
+    def __init__(self, *, revalidate: Callable[[Any], None]) -> None:
         self._revalidate = revalidate
 
-    def revalidate(self, artifact: ArtifactIdentity) -> None:
+    def revalidate(self, artifact: Any) -> None:
         artifact.validate()
         self._revalidate(artifact)
 

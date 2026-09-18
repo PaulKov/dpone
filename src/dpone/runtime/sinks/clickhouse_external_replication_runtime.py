@@ -142,6 +142,7 @@ class ClickHouseExternalReplicationRuntime:
             read=self._read,
             cas=self._cas,
             fail=self._fail,
+            without_version=phase_ops.without_version,
         )
 
     def publish(self, request: ExternalPublicationRequest) -> ExternalReplicationReceipt:
@@ -240,17 +241,14 @@ class ClickHouseExternalReplicationRuntime:
         return authority_ops.acquire_lock(
             target_key=target_key,
             operation_id=operation_id,
-            target=target,
+            candidate_name=phase_ops.candidate_name(target, operation_id),
             plan_sha256=plan_sha256,
             members=members,
-            inventory_digest=self._inventory_digest(members),
+            inventory_digest=runtime_support.inventory_digest(self._service, members),
             read=self._read,
             cas=self._cas,
             fail=self._fail,
         )
-
-    def _inventory_digest(self, members: tuple[str, ...]) -> str:
-        return runtime_support.inventory_digest(self._service, members)
 
     def _stage(self, request: ExternalPublicationRequest, state: dict[str, Any]) -> dict[str, Any]:
         if state["phase"] == "LOCKED":
