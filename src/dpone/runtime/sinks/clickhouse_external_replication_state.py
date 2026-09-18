@@ -2,22 +2,52 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
+from collections.abc import Callable, Mapping
+from typing import Any, NoReturn
 
 from dpone.ports.clickhouse_external_replication import (
     ArtifactIdentity,
     ExternalArtifactReceipt,
     ExternalAuthorityPhase,
     ExternalAuthorityRecord,
+    ExternalClusterDdlPort,
     ExternalMemberRecord,
     ExternalMemberStageState,
     ExternalPublicationError,
     MemberGenerationObservation,
     MemberPublicationState,
     PhysicalGeneration,
+    QueueEntry,
     VersionedExternalAuthorityRecord,
 )
+
+Fail = Callable[[str, ExternalAuthorityRecord | None], NoReturn]
+
+
+def require_queue_entry(
+    ddl: ExternalClusterDdlPort,
+    cluster: str,
+    record: ExternalAuthorityRecord,
+    *,
+    cleanup: bool,
+    fail: Fail,
+) -> QueueEntry:
+    """Resolve the queue entry bound to the authority token and digest."""
+
+    entry_id = record.cleanup_entry if cleanup else record.publication_entry
+    token = record.cleanup_correlation_token if cleanup else record.publication_correlation_token
+    digest = record.cleanup_query_digest if cleanup else record.publication_query_digest
+    code = f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{'CLEANUP_' if cleanup else 'DDL_'}UNKNOWN"
+    if not token or not digest:
+        fail(code, record)
+    entries = (
+        (() if (entry := ddl.read_entry(cluster, entry_id)) is None else (entry,))
+        if entry_id
+        else ddl.find_entries(cluster, token)
+    )
+    if len(entries) != 1 or entries[0].correlation_token != token or entries[0].query_digest != digest:
+        fail(code, record)
+    return entries[0]
 
 
 def record_from_state(

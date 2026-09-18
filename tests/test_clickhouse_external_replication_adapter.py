@@ -111,7 +111,7 @@ class _Staging:
         return self.values[member_id]
 
     def create_candidate(self, member_id, record):
-        candidate = _generation(f"new-{member_id}", _digest("0"), rows=0)
+        candidate = _generation(f"new-{record.operation_id[:8]}-{member_id}", _digest("0"), rows=0)
         self.values[member_id] = replace(self.values[member_id], candidate=candidate)
         return candidate
 
@@ -274,6 +274,24 @@ def test_adapter_never_dispatches_without_verified_cas_permit() -> None:
 
     assert ddl.publication_calls == 0
     assert ddl.cleanup_calls == 0
+
+
+@pytest.mark.parametrize("replaced_slot", ["target", "candidate"])
+def test_adapter_reproves_bound_generations_before_publication_dispatch(replaced_slot: str) -> None:
+    runtime, _, _, staging, ddl = _runtime()
+    request = _request()
+    runtime.stage(request)
+    member_id = _members()[0]
+    observed = staging.values[member_id]
+    staging.values[member_id] = replace(
+        observed,
+        **{replaced_slot: _generation(f"foreign-{replaced_slot}", _digest("9"))},
+    )
+
+    with pytest.raises(ExternalPublicationError, match="DDL_UNKNOWN"):
+        runtime.publish(request)
+
+    assert ddl.publication_calls == 0
 
 
 def test_adapter_absent_target_completes_without_cleanup_dispatch() -> None:

@@ -200,7 +200,7 @@ class ClickHouseExternalReplicationRuntime:
         self._cas(state, {**phase_ops.without_version(state), "phase": "ABORTED"})
 
     def _receipt(self, state: dict[str, Any]) -> ExternalReplicationReceipt:
-        scope = str(getattr(self._service, "evidence_scope", "local_synthetic"))
+        scope = str(getattr(self._service, "evidence_scope", "runtime"))
         return ExternalReplicationReceipt.from_state(state, evidence_scope=scope)
 
     def _lock_values(
@@ -360,15 +360,15 @@ class ClickHouseExternalReplicationRuntime:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNSUPPORTED")
         return self._artifact_source
 
-    @staticmethod
     def _fail(
+        self,
         code: str,
         *,
         state: Mapping[str, Any] | None = None,
         member_ids: tuple[str, ...] = (),
     ) -> NoReturn:
         evidence: dict[str, object] = {
-            "evidence_scope": "local_synthetic",
+            "evidence_scope": str(getattr(self._service, "evidence_scope", "runtime")),
             "member_ids": list(member_ids or tuple(state.get("member_ids", ())) if state else member_ids),
         }
         if state is not None:

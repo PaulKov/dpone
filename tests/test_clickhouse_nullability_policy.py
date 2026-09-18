@@ -10,6 +10,7 @@ from dpone.config.load_strategy import LoadStrategy
 from dpone.runtime.file_artifacts import FileExportArtifact
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.schema_evolution import SchemaEvolutionService
+from dpone.runtime.sinks.clickhouse_external_replication_member_driver import insert_external_rows
 from dpone.runtime.sinks.clickhouse_nullability_policy import ClickHouseNullInsertPolicy
 from dpone.runtime.sinks.clickhouse_payload_ingestion import ClickHousePayloadIngestionService
 from dpone.runtime.sinks.clickhouse_sink import ClickHouseSink
@@ -150,11 +151,14 @@ def test_external_member_insert_forces_stable_identity_and_synchronous_settings(
         schema=(("amount", "Int64"),),
     )
 
-    inserted = service.insert_external_rows(
+    inserted = insert_external_rows(
+        sink,
         _load_config({}),
         payload,
         query_id="stable-query-id",
         deduplication_token="stable-dedup-token",
+        map_schema=service._clickhouse_schema,
+        coerce_row=service._row_value_coercer.coerce_row,
     )
 
     assert inserted == 1
