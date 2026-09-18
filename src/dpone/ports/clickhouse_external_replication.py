@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from dpone._compat import StrEnum
-from dpone.contracts.clickhouse_cluster_publication import QueueEntry
+from dpone.contracts import clickhouse_cluster_publication as cluster_contract
+from dpone.contracts.clickhouse_cluster_publication import QueueEntry, QueueState
 from dpone.contracts.clickhouse_external_replication import (
     EXTERNAL_AUTHORITY_SCHEMA_VERSION,
     EXTERNAL_RECEIPT_SCHEMA_VERSION,
@@ -25,11 +26,9 @@ from dpone.contracts.clickhouse_external_replication import (
     MemberGenerationObservation,
     MemberPublicationState,
     PhysicalGeneration,
-    QueueState,
     ReplicationMode,
     canonical_json,
     classify_member_publication,
-    cluster_contract,
     derive_generation_id,
     derive_operation_id,
     derive_target_key,

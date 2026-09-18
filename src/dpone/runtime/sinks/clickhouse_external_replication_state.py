@@ -128,6 +128,41 @@ def complete_candidate(candidate: PhysicalGeneration | None, artifact: ArtifactI
     )
 
 
+def desired_generation(member_record: ExternalMemberRecord) -> PhysicalGeneration:
+    if member_record.candidate is None:
+        raise ExternalPublicationError("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED")
+    return member_record.candidate
+
+
+def generation_shape(value: PhysicalGeneration | None) -> tuple[Any, ...] | None:
+    return None if value is None else (value.engine_full, value.schema_digest, value.content_digest, value.row_count)
+
+
+def has_predecessor(record: ExternalAuthorityRecord) -> bool:
+    return any(member_record.predecessor is not None for member_record in record.members)
+
+
+def equivalent_state(current: Mapping[str, Any], desired: Mapping[str, Any]) -> bool:
+    return {key: value for key, value in current.items() if key != "version"} == {
+        key: value for key, value in desired.items() if key != "version"
+    }
+
+
+def candidate_name(target: str, operation_id: str) -> str:
+    return f"{target[:96]}__dpone_ext_{operation_id[:20]}"
+
+
+def without_version(state: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in state.items() if key != "version"}
+
+
+def owned_observation(observation: Mapping[str, Any], state: Mapping[str, Any]) -> bool:
+    return (
+        observation.get("operation_id") == state["operation_id"]
+        and observation.get("candidate_name") == state["candidate_name"]
+    )
+
+
 def _state_member(
     state: Mapping[str, Any], member_id: str, base: ExternalAuthorityRecord | None
 ) -> ExternalMemberRecord:
@@ -187,9 +222,16 @@ def _fail(code: str, record: ExternalAuthorityRecord | None) -> None:
 
 __all__ = [
     "complete_candidate",
+    "candidate_name",
+    "desired_generation",
+    "equivalent_state",
+    "generation_shape",
+    "has_predecessor",
     "member",
     "member_ids",
     "record_from_state",
     "replace_member",
     "state_from_versioned",
+    "owned_observation",
+    "without_version",
 ]

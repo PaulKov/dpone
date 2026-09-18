@@ -18,6 +18,9 @@ from dpone.ports.clickhouse_external_replication import (
     digest_payload,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
+from dpone.runtime.sinks.clickhouse_external_replication_state import candidate_name as _candidate_name
+from dpone.runtime.sinks.clickhouse_external_replication_state import owned_observation as _owned
+from dpone.runtime.sinks.clickhouse_external_replication_state import without_version as _without_version
 
 
 class ExternalReplicationRuntimeService(Protocol):
@@ -441,21 +444,6 @@ class ClickHouseExternalReplicationRuntime:
                 phase=state.get("phase"),
             )
         raise ExternalPublicationError(code, evidence=evidence)
-
-
-def _candidate_name(target: str, operation_id: str) -> str:
-    return f"{target[:96]}__dpone_ext_{operation_id[:20]}"
-
-
-def _without_version(state: Mapping[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in state.items() if key != "version"}
-
-
-def _owned(observation: Mapping[str, Any], state: Mapping[str, Any]) -> bool:
-    return (
-        observation.get("operation_id") == state["operation_id"]
-        and observation.get("candidate_name") == state["candidate_name"]
-    )
 
 
 __all__ = ["ClickHouseExternalReplicationRuntime", "ExternalReplicationRuntimeService"]
