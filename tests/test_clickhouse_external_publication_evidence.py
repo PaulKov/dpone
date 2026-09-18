@@ -30,7 +30,8 @@ def test_evidence_producer_binds_commit_fixture_and_independent_scenarios(
 
     assert receipt["source_commit"] == "a" * 40
     assert receipt["status"] == "PASS"
-    assert receipt["evidence_scope"] == "local_synthetic"
+    assert receipt["evidence_scope"] == "mocked_in_process"
+    assert receipt["local_synthetic_certification"] == "UNVERIFIED"
     assert receipt["live_external_certification"] == "UNVERIFIED"
     assert [item["scenario"] for item in receipt["scenarios"]] == [name for name, _ in SCENARIOS]
     assert invoked == [node for _, node in SCENARIOS]

@@ -19,6 +19,7 @@ from dpone.ports.clickhouse_external_replication import (
     MemberGenerationObservation,
     PhysicalGeneration,
     canonical_json,
+    digest_payload,
 )
 from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
 from dpone.runtime.sinks.load_payload import LoadPayload
@@ -87,7 +88,20 @@ class ClickHouseExternalReplicationMemberDriver:
         observed = self._observe_table(connector, record.database, record.candidate)
         if expected is None or observed is None or observed.uuid != expected.uuid:
             raise ExternalContractError("GENERATION_DIVERGED", "candidate physical identity is not bound")
-        self._sink(connector)._insert_payload(self._candidate_config(record), sealed_payload)
+        query_id = f"dpone-external-stage-{record.operation_id[:16]}-{member_id[:16]}"
+        deduplication_token = digest_payload(
+            {
+                "operation_id": record.operation_id,
+                "generation_id": record.generation_id,
+                "member_id": member_id,
+            }
+        )
+        self._sink(connector)._payload_ingestion.insert_external_rows(
+            self._candidate_config(record),
+            sealed_payload,
+            query_id=query_id,
+            deduplication_token=deduplication_token,
+        )
 
     def drop_candidate(
         self,

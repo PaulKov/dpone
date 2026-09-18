@@ -14,6 +14,7 @@ from dpone.contracts.clickhouse_external_replication import (
     ExternalMemberRecord,
     PhysicalGeneration,
     derive_generation_id,
+    digest_payload,
 )
 from dpone.runtime.artifacts import InMemoryRowsArtifact
 from dpone.runtime.sinks.clickhouse_external_replication_member_driver import (
@@ -108,8 +109,9 @@ class _Connector:
 class _Sink:
     def __init__(self, connector: _Connector) -> None:
         self.connector = connector
+        self._payload_ingestion = self
         self.created: list[tuple[Any, Any, bool]] = []
-        self.loaded: list[tuple[Any, LoadPayload]] = []
+        self.loaded: list[tuple[Any, LoadPayload, str, str]] = []
 
     def _create_table(self, config: Any, schema: Any, *, if_not_exists: bool) -> None:
         self.created.append((config, schema, if_not_exists))
@@ -120,8 +122,15 @@ class _Sink:
             "rows": [],
         }
 
-    def _insert_payload(self, config: Any, payload: LoadPayload) -> int:
-        self.loaded.append((config, payload))
+    def insert_external_rows(
+        self,
+        config: Any,
+        payload: LoadPayload,
+        *,
+        query_id: str,
+        deduplication_token: str,
+    ) -> int:
+        self.loaded.append((config, payload, query_id, deduplication_token))
         rows = [(1, "alpha"), (2, "beta")]
         self.connector.tables[config.target_table]["rows"] = rows
         return len(rows)
@@ -214,7 +223,20 @@ def test_load_accepts_only_sealed_load_payload_and_calls_sink_once(load_config: 
 
     driver.load_candidate(connector, record, payload)
 
-    assert sink.loaded == [(sink.created[0][0], payload)]
+    assert sink.loaded == [
+        (
+            sink.created[0][0],
+            payload,
+            "dpone-external-stage-2222222222222222-" + record.members[0].member_id[:16],
+            digest_payload(
+                {
+                    "operation_id": record.operation_id,
+                    "generation_id": record.generation_id,
+                    "member_id": record.members[0].member_id,
+                }
+            ),
+        )
+    ]
     assert driver.observe(connector, record).candidate is not None
 
     with pytest.raises(ValueError, match="ARTIFACT_UNSUPPORTED"):

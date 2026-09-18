@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION
 from dpone.contracts.clickhouse_external_replication import ExternalContractError
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.sinks.clickhouse_external_artifact_source import ClickHouseExternalArtifactSource
@@ -43,4 +44,31 @@ def test_revalidation_detects_mutation_and_budget_is_fail_closed() -> None:
     with pytest.raises(ExternalContractError, match="CONTENT_BUDGET_EXCEEDED"):
         ClickHouseExternalArtifactSource(
             sink=_Sink(), load_config=object(), payload=_payload([{"id": 1}, {"id": 2}]), maximum_rows=1
+        )
+
+
+def test_sealed_source_enforces_exact_source_byte_budget_before_staging() -> None:
+    payload = _payload([{"id": 1}])
+    baseline = ClickHouseExternalArtifactSource(
+        sink=_Sink(),
+        load_config=SimpleNamespace(options={SOURCE_BYTE_BUDGET_OPTION: 10_000}),
+        payload=payload,
+        maximum_rows=1,
+    )
+    size = baseline.identity.byte_size
+
+    exact = ClickHouseExternalArtifactSource(
+        sink=_Sink(),
+        load_config=SimpleNamespace(options={SOURCE_BYTE_BUDGET_OPTION: size}),
+        payload=_payload([{"id": 1}]),
+        maximum_rows=1,
+    )
+    assert exact.identity.byte_size == size
+
+    with pytest.raises(ExternalContractError, match="CONTENT_BUDGET_EXCEEDED"):
+        ClickHouseExternalArtifactSource(
+            sink=_Sink(),
+            load_config=SimpleNamespace(options={SOURCE_BYTE_BUDGET_OPTION: size - 1}),
+            payload=_payload([{"id": 1}]),
+            maximum_rows=1,
         )

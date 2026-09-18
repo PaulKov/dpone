@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from dpone.config.load_strategy import MAX_SOURCE_BYTE_BUDGET, SOURCE_BYTE_BUDGET_OPTION
 from dpone.ports.clickhouse_external_replication import (
     ArtifactIdentity,
     ExternalContractError,
@@ -35,6 +36,8 @@ class ClickHouseExternalArtifactSource:
         self._load_config = load_config
         self._payload = payload
         self._maximum_rows = maximum_rows
+        options = getattr(load_config, "options", {}) or {}
+        self._maximum_bytes = int(options.get(SOURCE_BYTE_BUDGET_OPTION, MAX_SOURCE_BYTE_BUDGET))
         self._sealed_payload, self._identity = self._seal()
         sealed = self._sealed_payload.artifact
         if not isinstance(sealed, InMemoryRowsArtifact):
@@ -69,6 +72,8 @@ class ClickHouseExternalArtifactSource:
         schema_rows = tuple((name, dtype, "", "", index) for index, (name, dtype) in enumerate(mapped_schema, 1))
         wire_digest = canonical_rows_digest(rows)
         canonical = canonical_json(rows).encode("utf-8")
+        if len(canonical) > self._maximum_bytes:
+            raise ExternalContractError("CONTENT_BUDGET_EXCEEDED", "artifact byte budget exceeded")
         identity = ArtifactIdentity(
             sha256=hashlib.sha256(canonical).hexdigest(),
             byte_size=len(canonical),

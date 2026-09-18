@@ -31,7 +31,9 @@ def record_from_state(
     if str(state["inventory_digest"]) != inventory_digest:
         _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", base)
     artifact = _artifact(state)
-    members = tuple(_state_member(state, member_id, base) for member_id in state["member_ids"])
+    same_operation = base is not None and base.operation_id == str(state["operation_id"])
+    operation_base = base if same_operation else None
+    members = tuple(_state_member(state, member_id, operation_base) for member_id in state["member_ids"])
     error = next(
         (
             f"external_generation_diverged:{item.member_id}"
@@ -55,12 +57,12 @@ def record_from_state(
         artifact=artifact,
         artifact_binding_id=None if artifact is None else str(state["artifact_binding_id"]),
         generation_id=None if artifact is None else str(state["generation_id"]),
-        publication_correlation_token=_field(base, "publication_correlation_token"),
-        publication_entry=_field(base, "publication_entry"),
-        publication_query_digest=_field(base, "publication_query_digest"),
-        cleanup_correlation_token=_field(base, "cleanup_correlation_token"),
-        cleanup_entry=_field(base, "cleanup_entry"),
-        cleanup_query_digest=_field(base, "cleanup_query_digest"),
+        publication_correlation_token=_field(operation_base, "publication_correlation_token"),
+        publication_entry=_field(operation_base, "publication_entry"),
+        publication_query_digest=_field(operation_base, "publication_query_digest"),
+        cleanup_correlation_token=_field(operation_base, "cleanup_correlation_token"),
+        cleanup_entry=_field(operation_base, "cleanup_entry"),
+        cleanup_query_digest=_field(operation_base, "cleanup_query_digest"),
         error_code=error,
     )
     record.validate()

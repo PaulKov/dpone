@@ -1,10 +1,10 @@
-# ClickHouse external-publication synthetic evidence
+# ClickHouse external-publication mocked evidence
 
 This directory is reserved for generated, machine-readable evidence from the
 external-replication publication test profile. Tests must produce the receipt;
 maintainers must not hand-edit one to claim a pass.
 
-Generate the offline in-process receipt from a clean checkout with:
+Generate the offline in-process mocked receipt from a clean checkout with:
 
 ```bash
 uv run python tools/clickhouse_external_publication_evidence.py
@@ -25,18 +25,20 @@ all-member staging and publication, duplicate-free lost-ack recovery, partial
 stage replay, divergent-generation failure, completed-operation idempotency,
 cleanup recovery, and redacted evidence.
 
-The generated receipt path is:
+The generated local receipt path is:
 
 ```text
-test_artifacts/clickhouse-external-publication/synthetic-receipt.json
+test_artifacts/clickhouse-external-publication/mocked-receipt.json
 ```
 
 The receipt must bind the exact commit and fixture-configuration digests, label
-its scope `local_synthetic`, list each scenario independently, and use only
+its scope `mocked_in_process`, list each scenario independently, and use only
 `PASS`, `FAIL`, `SKIP`, or `UNVERIFIED`. It must contain opaque member IDs and
 digests only—never endpoints, credentials, source values, SQL text, or local
 filesystem paths.
 
-This profile is a mocked integration contract. It is not a live integration or
-production certification. Until an explicitly approved external environment is
-run, live certification remains `UNVERIFIED`.
+This profile is a mocked in-process integration contract, not the pinned
+two-member Docker synthetic profile and not a live integration or production
+certification. Both local synthetic and live certification remain `UNVERIFIED`
+until their separately approved profiles run. The receipt is generated after
+the reviewed commit and is not checked in with a stale parent identity.

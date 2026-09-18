@@ -7,6 +7,7 @@ import pytest
 from dpone.contracts.clickhouse_cluster_publication import QueueEntry, QueueHostResult
 from dpone.contracts.clickhouse_external_replication import (
     ExternalArtifactReceipt,
+    ExternalAuthorityPhase,
     ExternalMember,
     ExternalPublicationError,
     ExternalPublicationRequest,
@@ -51,6 +52,7 @@ class _Authority:
     def __init__(self) -> None:
         self.current: VersionedExternalAuthorityRecord | None = None
         self.unknown_dispatch = False
+        self.phases: list[str] = []
 
     def read_versioned(self, target_key: str) -> VersionedExternalAuthorityRecord | None:
         if self.current is not None:
@@ -68,6 +70,7 @@ class _Authority:
         if self.unknown_dispatch and desired.phase.value == "PUBLICATION_DISPATCHING":
             return ExternalAuthorityMutationResult(ExternalAuthorityMutationStatus.OUTCOME_UNKNOWN)
         self.current = VersionedExternalAuthorityRecord(desired, current.version + 1)
+        self.phases.append(desired.phase.value)
         permit = None
         if desired.phase.value in {"PUBLICATION_DISPATCHING", "CLEANUP_DISPATCHING"}:
             permit = ExternalDispatchPermit(
@@ -191,7 +194,7 @@ def _generation(label: str, content: str, *, rows: int = 2) -> PhysicalGeneratio
 def _entry(name: str, token: str | None, query_digest: str | None) -> QueueEntry:
     assert token is not None and query_digest is not None
     return QueueEntry(
-        entry=name,
+        entry=f"{name}-{token}",
         query_digest=query_digest,
         correlation_token=token,
         hosts=tuple(QueueHostResult(member, "Finished", 0, "") for member in _members()),
@@ -202,12 +205,12 @@ def _members() -> tuple[str, ...]:
     return tuple(member.member_id for member in _Topology().value.ordered_members)
 
 
-def _request() -> ExternalPublicationRequest:
+def _request(scheduler_invocation: str = "scheduled-run") -> ExternalPublicationRequest:
     return ExternalPublicationRequest(
         cluster="analytics_cluster",
         database="analytics",
         target="target_table",
-        scheduler_invocation="scheduled-run",
+        scheduler_invocation=scheduler_invocation,
         plan_sha256=_digest("f"),
         artifact=ExternalArtifactReceipt(
             artifact_id="artifact-v1",
@@ -221,9 +224,11 @@ def _request() -> ExternalPublicationRequest:
     )
 
 
-def _runtime(*, lose_reply: bool = False, unknown_dispatch: bool = False):
+def _runtime(*, lose_reply: bool = False, unknown_dispatch: bool = False, absent_target: bool = False):
     topology, authority, artifact = _Topology(), _Authority(), _Artifact()
     staging = _Staging(_members())
+    if absent_target:
+        staging.values = {member: MemberGenerationObservation(member, None, None) for member in _members()}
     ddl = _Ddl(staging)
     ddl.lose_publication_reply = lose_reply
     authority.unknown_dispatch = unknown_dispatch
@@ -269,3 +274,56 @@ def test_adapter_never_dispatches_without_verified_cas_permit() -> None:
 
     assert ddl.publication_calls == 0
     assert ddl.cleanup_calls == 0
+
+
+def test_adapter_absent_target_completes_without_cleanup_dispatch() -> None:
+    runtime, authority, _, _, ddl = _runtime(absent_target=True)
+
+    receipt = runtime.run(_request())
+
+    assert receipt.phase == "COMPLETED"
+    assert authority.current is not None and authority.current.record.phase is ExternalAuthorityPhase.COMPLETED
+    assert ddl.publication_calls == 1
+    assert ddl.cleanup_calls == 0
+    assert "CLEANUP_DISPATCHING" not in authority.phases
+
+
+def test_adapter_rejects_foreign_predecessor_before_cleanup_dispatch() -> None:
+    runtime, _, _, staging, ddl = _runtime()
+    request = _request()
+    runtime.stage(request)
+    runtime.publish(request)
+    member_id = _members()[0]
+    observed = staging.values[member_id]
+    staging.values[member_id] = replace(observed, candidate=_generation("foreign", _digest("9")))
+
+    with pytest.raises(ExternalPublicationError, match="CLEANUP_UNKNOWN"):
+        runtime.cleanup(request)
+
+    assert ddl.cleanup_calls == 0
+
+
+def test_adapter_freshly_adopts_target_for_each_completed_operation() -> None:
+    runtime, authority, _, staging, ddl = _runtime()
+
+    first = runtime.run(_request("scheduled-run-1"))
+    second = runtime.run(_request("scheduled-run-2"))
+
+    assert first.phase == second.phase == "COMPLETED"
+    assert first.operation_id != second.operation_id
+    assert authority.current is not None and authority.current.record.operation_id == second.operation_id
+    assert set(staging.loads.values()) == {2}
+    assert ddl.publication_calls == 2
+    assert ddl.cleanup_calls == 2
+
+
+def test_adapter_freshly_adopts_target_after_initially_absent_operation() -> None:
+    runtime, _, _, staging, ddl = _runtime(absent_target=True)
+
+    first = runtime.run(_request("scheduled-run-1"))
+    second = runtime.run(_request("scheduled-run-2"))
+
+    assert first.phase == second.phase == "COMPLETED"
+    assert set(staging.loads.values()) == {2}
+    assert ddl.publication_calls == 2
+    assert ddl.cleanup_calls == 1

@@ -1,4 +1,4 @@
-"""Produce commit-bound synthetic ClickHouse external-publication evidence."""
+"""Produce commit-bound mocked ClickHouse external-publication evidence."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "dpone.clickhouse.external-publication.synthetic-evidence.v1"
-DEFAULT_OUTPUT = Path("test_artifacts/clickhouse-external-publication/synthetic-receipt.json")
+SCHEMA_VERSION = "dpone.clickhouse.external-publication.mocked-evidence.v1"
+DEFAULT_OUTPUT = Path("test_artifacts/clickhouse-external-publication/mocked-receipt.json")
 TEST_MODULE = "tests/test_clickhouse_external_replication_runtime.py"
 SCENARIOS = (
     (
@@ -66,8 +66,9 @@ def produce_receipt(root: Path, *, runner: Runner) -> dict[str, Any]:
         "schema_version": SCHEMA_VERSION,
         "source_commit": source_commit,
         "fixture_digest": _digest(fixture),
-        "evidence_scope": "local_synthetic",
+        "evidence_scope": "mocked_in_process",
         "status": "PASS" if all(item["status"] == "PASS" for item in results) else "FAIL",
+        "local_synthetic_certification": "UNVERIFIED",
         "live_external_certification": "UNVERIFIED",
         "scenarios": results,
     }
@@ -80,7 +81,7 @@ def _run_scenario(command: Sequence[str], root: Path) -> int:
 
 def _require_clean_checkout(root: Path) -> None:
     if _git(root, "status", "--porcelain"):
-        raise RuntimeError("synthetic evidence requires a clean checkout")
+        raise RuntimeError("mocked evidence requires a clean checkout")
 
 
 def _git(root: Path, *args: str) -> str:
