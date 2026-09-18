@@ -16,6 +16,7 @@ from dpone.contracts.clickhouse_external_replication import (
     derive_operation_id,
     derive_target_key,
 )
+from dpone.ports.clickhouse_external_replication import ExternalArtifactSourcePort
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 
 
@@ -35,6 +36,7 @@ class ExternalReplicationRuntimeService(Protocol):
         operation_id: str,
         candidate_name: str,
         artifact: ExternalArtifactReceipt,
+        source: ExternalArtifactSourcePort,
     ) -> Mapping[str, Any]: ...
     def drop_owned_candidate(self, member_id: str, *, candidate_uuid: str) -> None: ...
     def dispatch_publication_once(
@@ -48,44 +50,124 @@ class ExternalReplicationRuntimeService(Protocol):
 class ClickHouseExternalReplicationRuntime:
     """Order durable effects so retries never append or redispatch blindly."""
 
-    def __init__(self, *, service: ExternalReplicationRuntimeService) -> None:
+    def __init__(
+        self,
+        *,
+        service: ExternalReplicationRuntimeService,
+        artifact_source: ExternalArtifactSourcePort,
+    ) -> None:
         self._service = service
+        self._artifact_source = artifact_source
 
     def run(self, request: ExternalPublicationRequest) -> ExternalReplicationReceipt:
         """Resume one deterministic operation through staging, publish, and cleanup."""
+
+        self.stage(request)
+        self.publish(request)
+        return self.cleanup(request)
+
+    def stage(self, request: ExternalPublicationRequest) -> ExternalReplicationReceipt:
+        """Fence and stage every member without mutating the published target."""
 
         try:
             request.validate()
         except ExternalContractError as error:
             self._fail(f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{error.code}")
+        self._require_artifact(request.artifact, member_ids=())
+        self._artifact_source.revalidate(request.artifact)
+        if self._artifact_source.binding_id != request.artifact.artifact_id:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED")
+        state = self.prepare(
+            cluster=request.cluster,
+            database=request.database,
+            target=request.target,
+            scheduler_invocation=request.scheduler_invocation,
+            plan_sha256=request.plan_sha256,
+        )
         members = tuple(sorted(self._service.inventory(request.cluster)))
         if len(members) < 2 or len(set(members)) != len(members):
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_INVALID", member_ids=members)
         self._require_artifact(request.artifact, member_ids=members)
-        target_key = derive_target_key(request.cluster, request.database, request.target)
-        operation_id = derive_operation_id(
-            scheduler_invocation=request.scheduler_invocation,
-            target_key=target_key,
-            normalized_plan_digest=request.plan_sha256,
-        )
-        state = self._lock(request, target_key, operation_id, members)
         if state["phase"] == "COMPLETED":
-            return ExternalReplicationReceipt.from_state(state)
+            return self._receipt(state)
         state = self._stage(request, state)
-        state = self._publish(state)
-        state = self._cleanup(state)
-        return ExternalReplicationReceipt.from_state(state)
+        return self._receipt(state)
 
-    def _lock(
+    def prepare(
         self,
-        request: ExternalPublicationRequest,
+        *,
+        cluster: str,
+        database: str,
+        target: str,
+        scheduler_invocation: str,
+        plan_sha256: str,
+    ) -> dict[str, Any]:
+        """Acquire or resume target authority before source extraction."""
+
+        if not all((cluster, database, target, scheduler_invocation)):
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_REQUEST_INVALID")
+        target_key = derive_target_key(cluster, database, target)
+        operation_id = derive_operation_id(
+            scheduler_invocation=scheduler_invocation,
+            target_key=target_key,
+            normalized_plan_digest=plan_sha256,
+        )
+        members = tuple(sorted(self._service.inventory(cluster)))
+        if len(members) < 2 or len(set(members)) != len(members):
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_INVALID", member_ids=members)
+        return self._lock_values(
+            target_key=target_key,
+            operation_id=operation_id,
+            target=target,
+            plan_sha256=plan_sha256,
+            members=members,
+        )
+
+    def publish(self, request: ExternalPublicationRequest) -> ExternalReplicationReceipt:
+        """Publish a previously staged operation and finish exact cleanup."""
+
+        request.validate()
+        state = self._read(request.target_key)
+        if state is None or state.get("operation_id") != request.operation_id:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT", state=state)
+        members = tuple(sorted(self._service.inventory(request.cluster)))
+        self._require_same_inputs(state, request, members)
+        if state["phase"] == "COMPLETED":
+            return self._receipt(state)
+        if state["phase"] in {"LOCKED", "STAGING"}:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", state=state)
+        state = self._publish(state)
+        return self._receipt(state)
+
+    def cleanup(self, request: ExternalPublicationRequest) -> ExternalReplicationReceipt:
+        """Finish separately fenced cleanup after publication is committed."""
+
+        state = self._read(request.target_key)
+        if state is None or state.get("operation_id") != request.operation_id:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT", state=state)
+        if state["phase"] == "COMPLETED":
+            return self._receipt(state)
+        if state["phase"] not in {"COMMITTED", "CLEANUP_DISPATCHING"}:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", state=state)
+        return self._receipt(self._cleanup(state))
+
+    def _receipt(self, state: dict[str, Any]) -> ExternalReplicationReceipt:
+        scope = str(getattr(self._service, "evidence_scope", "local_synthetic"))
+        return ExternalReplicationReceipt.from_state(state, evidence_scope=scope)
+
+    def _lock_values(
+        self,
+        *,
         target_key: str,
         operation_id: str,
+        target: str,
+        plan_sha256: str,
         members: tuple[str, ...],
     ) -> dict[str, Any]:
         current = self._read(target_key)
         if current is not None and current.get("operation_id") == operation_id:
-            self._require_same_inputs(current, request, members)
+            if tuple(current["member_ids"]) != members or current["plan_digest"] != plan_sha256:
+                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", state=current)
             return current
         if current is not None and current.get("phase") not in {"COMPLETED", "ABORTED"}:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT", state=current)
@@ -96,8 +178,8 @@ class ClickHouseExternalReplicationRuntime:
             "phase": "LOCKED",
             "dispatch_epoch": 0 if current is None else int(current["dispatch_epoch"]) + 1,
             "inventory_digest": digest_payload({"member_ids": members}),
-            "plan_digest": request.plan_sha256,
-            "candidate_name": _candidate_name(request.target, operation_id),
+            "plan_digest": plan_sha256,
+            "candidate_name": _candidate_name(target, operation_id),
             "member_ids": members,
             "member_states": {member: {"state": "PENDING"} for member in members},
         }
@@ -112,6 +194,7 @@ class ClickHouseExternalReplicationRuntime:
                     **_without_version(state),
                     "phase": "STAGING",
                     "artifact_sha256": artifact.sha256,
+                    "artifact_binding_id": self._artifact_source.binding_id,
                     "artifact_schema_sha256": artifact.schema_sha256,
                     "artifact_content_sha256": artifact.content_sha256,
                     "artifact_row_count": artifact.row_count,
@@ -134,6 +217,7 @@ class ClickHouseExternalReplicationRuntime:
         return self._cas(state, {**_without_version(state), "phase": "STAGED"})
 
     def _stage_member(self, artifact: ExternalArtifactReceipt, state: dict[str, Any], member_id: str) -> dict[str, Any]:
+        self._artifact_source.revalidate(artifact)
         member = dict(state["member_states"][member_id])
         observation = dict(self._service.observe_candidate(member_id, state["candidate_name"]))
         if member["state"] == "READY":
@@ -159,6 +243,7 @@ class ClickHouseExternalReplicationRuntime:
                     operation_id=state["operation_id"],
                     candidate_name=state["candidate_name"],
                     artifact=artifact,
+                    source=self._artifact_source,
                 )
             )
         except Exception:
@@ -258,6 +343,8 @@ class ClickHouseExternalReplicationRuntime:
         if tuple(state["member_ids"]) != members or state["plan_digest"] != request.plan_sha256:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", state=state)
         if "artifact_sha256" in state and state["artifact_sha256"] != request.artifact.sha256:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", state=state)
+        if "artifact_binding_id" in state and state["artifact_binding_id"] != self._artifact_source.binding_id:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", state=state)
 
     def _require_artifact(self, artifact: ExternalArtifactReceipt, *, member_ids: tuple[str, ...]) -> None:

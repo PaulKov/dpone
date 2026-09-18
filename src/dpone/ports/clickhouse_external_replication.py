@@ -9,11 +9,23 @@ from dpone._compat import StrEnum
 from dpone.contracts.clickhouse_cluster_publication import QueueEntry
 from dpone.contracts.clickhouse_external_replication import (
     ArtifactIdentity,
+    ExternalArtifactReceipt,
     ExternalAuthorityRecord,
     ExternalTopology,
     MemberGenerationObservation,
     PhysicalGeneration,
 )
+
+
+class ExternalArtifactSourcePort(Protocol):
+    """Invocation-scoped access to one sealed replayable artifact."""
+
+    @property
+    def binding_id(self) -> str: ...
+
+    def revalidate(self, receipt: ExternalArtifactReceipt) -> None: ...
+
+    def open_replay(self) -> Any: ...
 
 
 class ExternalAuthorityMutationStatus(StrEnum):
@@ -78,7 +90,12 @@ class ExternalReplicaStagingPort(Protocol):
 
     def observe(self, member_id: str, record: ExternalAuthorityRecord) -> MemberGenerationObservation: ...
     def create_candidate(self, member_id: str, record: ExternalAuthorityRecord) -> PhysicalGeneration: ...
-    def load_candidate(self, member_id: str, record: ExternalAuthorityRecord) -> None: ...
+    def load_candidate(
+        self,
+        member_id: str,
+        record: ExternalAuthorityRecord,
+        source: ExternalArtifactSourcePort,
+    ) -> None: ...
     def drop_candidate(
         self,
         member_id: str,
@@ -112,6 +129,7 @@ class ExternalClusterDdlPort(Protocol):
 
 __all__ = [
     "ExternalArtifactPort",
+    "ExternalArtifactSourcePort",
     "ExternalAuthorityMutationResult",
     "ExternalAuthorityMutationStatus",
     "ExternalAuthorityPort",

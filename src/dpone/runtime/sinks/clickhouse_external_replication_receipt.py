@@ -48,7 +48,9 @@ class ExternalReplicationReceipt:
         )
 
     @classmethod
-    def from_state(cls, state: dict[str, Any]) -> ExternalReplicationReceipt:
+    def from_state(
+        cls, state: dict[str, Any], *, evidence_scope: str = "local_synthetic"
+    ) -> ExternalReplicationReceipt:
         """Create a receipt from the high-level durable runtime state."""
 
         return cls(
@@ -61,6 +63,7 @@ class ExternalReplicationReceipt:
             member_ids=tuple(sorted(str(value) for value in state["member_ids"])),
             authority_version=int(state["version"]),
             phase=str(state["phase"]),
+            evidence_scope=evidence_scope,
         )
 
     def to_dict(self) -> dict[str, Any]:
