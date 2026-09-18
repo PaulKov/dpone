@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from typing import Any
 
 import pytest
+
 from dpone.contracts.clickhouse_external_replication import (
     ExternalArtifactReceipt,
     ExternalPublicationError,
@@ -26,6 +27,16 @@ _ROWS = ((1, "alpha"), (2, "beta"), (3, "gamma"))
 _ARTIFACT_SHA256 = "a" * 64
 _CONTENT_SHA256 = "b" * 64
 _SCHEMA_SHA256 = "c" * 64
+
+
+class _SyntheticArtifactSource:
+    binding_id = "artifact-v1"
+
+    def revalidate(self, artifact: ExternalArtifactReceipt) -> None:
+        assert artifact.artifact_id == self.binding_id
+
+    def open_replay(self) -> object:
+        return object()
 
 
 class _SyntheticExternalService:
@@ -89,10 +100,12 @@ class _SyntheticExternalService:
         operation_id: str,
         candidate_name: str,
         artifact: ExternalArtifactReceipt,
+        source: _SyntheticArtifactSource,
     ) -> Mapping[str, Any]:
         """Apply one direct member-local load; this method never retries itself."""
 
         self.stage_calls[member_id] += 1
+        source.revalidate(artifact)
         if self.candidates[member_id] is not None:
             raise AssertionError("runtime attempted to append to an existing candidate")
         rows = _ROWS
@@ -241,7 +254,7 @@ def _request() -> ExternalPublicationRequest:
 
 
 def _runtime(service: _SyntheticExternalService) -> ClickHouseExternalReplicationRuntime:
-    return ClickHouseExternalReplicationRuntime(service=service)
+    return ClickHouseExternalReplicationRuntime(service=service, artifact_source=_SyntheticArtifactSource())
 
 
 def _assert_completed(receipt: Any, service: _SyntheticExternalService) -> None:

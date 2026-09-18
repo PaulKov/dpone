@@ -14,6 +14,20 @@ from dpone.contracts.clickhouse_external_replication import (
 from dpone.runtime.sinks.clickhouse_external_replication_runtime import ClickHouseExternalReplicationRuntime
 
 
+class _ArtifactSource:
+    binding_id = "artifact-v1"
+
+    def revalidate(self, artifact: ExternalArtifactReceipt) -> None:
+        assert artifact.artifact_id == self.binding_id
+
+    def open_replay(self) -> object:
+        return object()
+
+
+def _runtime(service: _Service) -> ClickHouseExternalReplicationRuntime:
+    return ClickHouseExternalReplicationRuntime(service=service, artifact_source=_ArtifactSource())
+
+
 class _Service:
     def __init__(self) -> None:
         self.members = ("member-a", "member-b")
@@ -121,7 +135,7 @@ def _request() -> ExternalPublicationRequest:
 
 def test_completed_operation_replays_without_mutation() -> None:
     service = _Service()
-    runtime = ClickHouseExternalReplicationRuntime(service=service)
+    runtime = _runtime(service)
 
     first = runtime.run(_request())
     effects = (dict(service.stage_calls), service.publish_calls, service.cleanup_calls)
@@ -132,10 +146,45 @@ def test_completed_operation_replays_without_mutation() -> None:
     assert effects == (service.stage_calls, service.publish_calls, service.cleanup_calls)
 
 
+def test_stage_and_publish_are_separate_governance_boundaries() -> None:
+    service = _Service()
+    runtime = _runtime(service)
+
+    staged = runtime.stage(_request())
+
+    assert staged.phase == "STAGED"
+    assert service.publish_calls == 0
+    assert set(service.targets.values()) == {"predecessor"}
+
+    committed = runtime.publish(_request())
+
+    assert committed.phase == "COMMITTED"
+    assert service.publish_calls == 1
+
+    completed = runtime.cleanup(_request())
+    assert completed.phase == "COMPLETED"
+
+
+def test_prepare_acquires_authority_before_artifact_staging() -> None:
+    service = _Service()
+    runtime = _runtime(service)
+
+    state = runtime.prepare(
+        cluster="analytics_cluster",
+        database="analytics",
+        target="target_table",
+        scheduler_invocation="scheduled-run",
+        plan_sha256="f" * 64,
+    )
+
+    assert state["phase"] == "LOCKED"
+    assert service.stage_calls == {"member-a": 0, "member-b": 0}
+
+
 def test_ambiguous_partial_candidate_is_replaced_before_retry() -> None:
     service = _Service()
     service.partial_member = "member-b"
-    runtime = ClickHouseExternalReplicationRuntime(service=service)
+    runtime = _runtime(service)
 
     with pytest.raises(ExternalPublicationError, match="STAGING_INCOMPLETE"):
         runtime.run(_request())
@@ -150,7 +199,7 @@ def test_ambiguous_partial_candidate_is_replaced_before_retry() -> None:
 def test_cleanup_resume_observes_original_dispatch_without_repeating_it() -> None:
     service = _Service()
     service.cleanup_interrupted = True
-    runtime = ClickHouseExternalReplicationRuntime(service=service)
+    runtime = _runtime(service)
 
     with pytest.raises(ExternalPublicationError, match="CLEANUP_IN_PROGRESS"):
         runtime.run(_request())
