@@ -10,10 +10,10 @@ from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactSourcePort,
     ExternalPublicationError,
     ExternalPublicationRequest,
+    ExternalReplicationReceipt,
 )
 from dpone.runtime.lineage.options import LineageOptions
 from dpone.runtime.sinks.clickhouse_external_replication_context import derive_semantic_plan_digest
-from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 from dpone.runtime.sinks.clickhouse_external_replication_runtime import (
     ClickHouseExternalReplicationRuntime,
     ExternalReplicationRuntimeService,

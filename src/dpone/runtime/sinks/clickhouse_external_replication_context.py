@@ -8,8 +8,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from dpone.ports.clickhouse_external_replication import ExternalPublicationRequest, canonical_json, digest_payload
-from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
+from dpone.ports.clickhouse_external_replication import (
+    ExternalPublicationRequest,
+    ExternalReplicationReceipt,
+    canonical_json,
+    digest_payload,
+)
 
 
 @dataclass(frozen=True, slots=True)

@@ -116,6 +116,24 @@ def test_manifest_schema_exposes_clickhouse_cluster_and_access_table_contract() 
         assert clickhouse_storage["access_table"]["properties"]["sharding_key"]["type"] == "string"
 
 
+def test_manifest_schemas_expose_identical_external_artifact_store_contract() -> None:
+    config_schema = json.loads(Path("src/dpone/schema/etl-config.schema.json").read_text(encoding="utf-8"))
+    batch_schema = json.loads(Path("src/dpone/schema/etl-batch-manifest.schema.json").read_text(encoding="utf-8"))
+
+    contracts = []
+    for schema in (config_schema, batch_schema):
+        sink_options = (
+            schema["properties"]["sink"]["properties"]["options"]["properties"]
+            if "sink" in schema.get("properties", {})
+            else schema["definitions"]["process_fragment"]["properties"]["sink"]["properties"]["options"]["properties"]
+        )
+        contracts.append(sink_options["external_artifact_store_path"])
+
+    assert contracts[0] == contracts[1]
+    assert contracts[0]["type"] == "string"
+    assert contracts[0]["minLength"] == 1
+
+
 @pytest.mark.parametrize(
     "cluster_payload",
     [

@@ -193,7 +193,7 @@ def test_external_replication_reconciles_lost_responses_and_staging_restart() ->
     for port in (18123, 28123):
         assert _execute(port, f"SELECT groupArray(id) FROM {interrupted_database}.target") == [("[10,20]",)]
     record_external_scenario(
-        "external_replication_staging_restart",
+        "external_replication_staging_fresh_service_recovery",
         "PASS",
         server_version=server_version,
         details={"operation_id": replay.commit_receipt_id, "production_composition": True},

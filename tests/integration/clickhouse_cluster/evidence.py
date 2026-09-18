@@ -38,7 +38,7 @@ EXTERNAL_SCENARIOS = (
     "external_replication_lost_load_response",
     "external_replication_lost_publication_response",
     "external_replication_lost_cleanup_response",
-    "external_replication_staging_restart",
+    "external_replication_staging_fresh_service_recovery",
 )
 
 

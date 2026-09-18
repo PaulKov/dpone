@@ -249,6 +249,40 @@ def test_connection_probe_closes_admitted_members_when_a_later_member_is_unreach
     assert closed
 
 
+def test_connection_provider_closes_every_member_and_clears_cache_after_close_failure() -> None:
+    connector = _Connector([("node_1", "192.0.2.1", 9000, 1, 1, 0), ("node_2", "192.0.2.2", 9000, 1, 2, 0)])
+    topology = ClickHouseExternalTopologyCatalog(connector)
+    inventory = topology.inventory("analytics_cluster")
+    closed: list[str] = []
+    connections = 0
+
+    class Direct:
+        def __init__(self, host: str) -> None:
+            self.host = host
+
+        def close(self) -> None:
+            closed.append(self.host)
+            if self.host == "node_1":
+                raise TimeoutError("injected close failure")
+
+    def connect(_template: Any, host: str, _address: str, _port: int) -> Direct:
+        nonlocal connections
+        connections += 1
+        return Direct(host)
+
+    provider = ClickHouseExternalReplicaConnectionProvider(connector, topology=topology, connect=connect)
+    for member in inventory.ordered_members:
+        provider.connection_for(member.member_id)
+
+    with pytest.raises(RuntimeError, match="connection cleanup failed") as raised:
+        provider.close()
+
+    assert sorted(closed) == ["node_1", "node_2"]
+    assert raised.value.__notes__ == ["failed_connections=1"]
+    provider.connection_for(inventory.ordered_members[0].member_id)
+    assert connections == 3
+
+
 def test_authority_create_verifies_exact_post_write_and_returns_no_dispatch_permit() -> None:
     record = replace(_record(), phase=ExternalAuthorityPhase.LOCKED, dispatch_epoch=0)
     connector = _Connector()
@@ -481,6 +515,33 @@ def test_replica_staging_fails_before_load_when_artifact_binding_differs() -> No
         staging.load_candidate(member_id, record, Source())
 
     assert mutations == []
+
+
+def test_replica_staging_preserves_primary_error_when_connection_cleanup_fails() -> None:
+    record = _record()
+    member_id = record.members[0].member_id
+
+    class Provider:
+        def connection_for(self, requested: str) -> object:
+            assert requested == member_id
+            return object()
+
+        def close(self) -> None:
+            raise RuntimeError("injected cleanup failure")
+
+    class Driver:
+        def observe(self, direct: Any, observed_record: ExternalAuthorityRecord) -> MemberGenerationObservation:
+            raise LookupError("primary observation failure")
+
+    staging = ClickHouseExternalReplicaStaging(connection_provider=Provider(), driver=Driver())
+
+    with pytest.raises(LookupError, match="primary observation failure") as raised:
+        staging.observe(member_id, record)
+
+    assert raised.value.__notes__ == [
+        "A direct member connection cleanup failure was suppressed to preserve this primary error.",
+        "cleanup_error_type=RuntimeError",
+    ]
 
 
 def test_cluster_ddl_requires_exact_permit_and_submits_one_correlated_statement() -> None:
