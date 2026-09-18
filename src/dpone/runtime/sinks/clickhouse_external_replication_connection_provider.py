@@ -39,14 +39,21 @@ class ExternalReplicaConnectionProvider:
             raise self._unavailable() from None
 
     def require_connections(self) -> None:
+        primary_error: Exception | None = None
         try:
             for member_id in self._topology.member_ids():
                 if self.connection_for(member_id).get_records("SELECT 1") != [(1,)]:
                     raise RuntimeError("direct member probe returned an unexpected result")
         except Exception:
-            raise self._unavailable() from None
-        finally:
+            primary_error = self._unavailable()
+        try:
             self.close()
+        except Exception as close_error:
+            if primary_error is None:
+                raise
+            _note_suppressed_cleanup(primary_error, close_error)
+        if primary_error is not None:
+            raise primary_error from None
 
     def member_identity(self, connection: Any) -> str:
         return self._member_ids_by_connection.get(id(connection), "")
@@ -93,10 +100,12 @@ def managed_member_connection(
             except Exception as close_error:
                 if primary_error is None:
                     raise
-                primary_error.add_note(
-                    "A direct member connection cleanup failure was suppressed to preserve this primary error."
-                )
-                primary_error.add_note(f"cleanup_error_type={type(close_error).__name__}")
+                _note_suppressed_cleanup(primary_error, close_error)
+
+
+def _note_suppressed_cleanup(primary_error: BaseException, close_error: Exception) -> None:
+    primary_error.add_note("A direct member connection cleanup failure was suppressed to preserve this primary error.")
+    primary_error.add_note(f"cleanup_error_type={type(close_error).__name__}")
 
 
 __all__ = ["ExternalReplicaConnectionProvider", "managed_member_connection"]
