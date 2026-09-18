@@ -12,6 +12,8 @@ import pytest
 from dpone.app.release_composition import build_ordinary_release_inventory_reader
 from dpone.gitops.airflow_compact_pack import AirflowCompactPackBuilder
 from dpone.gitops.airflow_dag_spec import DagSpecNode, GitOpsAirflowDagSpec, parse_dag_declaration
+from dpone.gitops.airflow_mssql_asset_authority import MssqlAssetAuthority
+from dpone.gitops.airflow_mssql_registry_snapshot import ResolvedMssqlAssetRegistry
 from dpone.gitops.workload_catalog_models import GitOpsWorkloadDefinition
 from dpone.manifest.confined_files import read_confined_file
 
@@ -30,6 +32,8 @@ def ordinary_root(
     hook_execution: str | None = "separate_task",
     second_process: bool = False,
     runner: str | None = None,
+    outlet_binding: str = "physical",
+    registry_bound_mssql: bool = False,
 ) -> Path:
     """Use the public deterministic producers, never hand-assert producer identity."""
     author = tmp_path / "author"
@@ -39,6 +43,11 @@ def ordinary_root(
         "  query: SELECT 1 AS id\nsink:\n  type: postgres\n  connection_ref: target\n"
         "  table:\n    schema: public\n    name: orders\n  strategy:\n    mode: full_refresh\n"
     )
+    if registry_bound_mssql:
+        transfer = transfer.replace(
+            "sink:\n  type: postgres\n  connection_ref: target\n  table:\n    schema: public\n    name: orders\n",
+            "sink:\n  type: mssql\n  connection_ref: target\n  table:\n    schema: mart\n    name: orders\n",
+        )
     if flow:
         transfer = transfer.replace(
             "  query: SELECT 1 AS id\n",
@@ -105,6 +114,17 @@ def ordinary_root(
         workload=workload,
         output_path="orders/airflow-pack.json",
         repo_root=author,
+        outlet_binding=outlet_binding,
+        mssql_registry=(
+            ResolvedMssqlAssetRegistry(
+                env="dev",
+                path=None,
+                authorities={"target": MssqlAssetAuthority(host="sql.example.invalid")},
+                databases={"target": "warehouse"},
+            )
+            if registry_bound_mssql
+            else None
+        ),
     )
     assert not pack.blockers
     declaration, issues = parse_dag_declaration(
@@ -183,6 +203,15 @@ def test_capture_accepts_builtin_airflow_runner_marker(tmp_path: Path) -> None:
     result = _capture(root)
 
     assert result.relation_writes[0].relation == "orders"
+
+
+def test_capture_rejects_physical_mssql_pack_when_identity_depends_on_detached_registry(
+    tmp_path: Path,
+) -> None:
+    root = ordinary_root(tmp_path, registry_bound_mssql=True)
+
+    with pytest.raises(ValueError, match="regenerate.*logical outlets"):
+        _capture(root)
 
 
 def test_capture_rejects_nonstandard_runner_marker(tmp_path: Path) -> None:
@@ -273,7 +302,7 @@ def test_capture_preserves_canonical_runtime_managed_mssql_state(tmp_path: Path)
             "state:\n"
             "  type: mssql\n"
             "  connection_ref: state\n"
-            "  table: {schema: control, name: source_state}\n"
+            "  table: {database: state_db, schema: control, name: source_state}\n"
             "  run_table: {schema: control, run_name: run_state}\n"
             "  partition_checkpoint_table: {schema: control, name: partition_checkpoint}\n"
         ),
@@ -281,6 +310,28 @@ def test_capture_preserves_canonical_runtime_managed_mssql_state(tmp_path: Path)
     )
 
     assert _capture(root).relation_writes[0].relation == "orders"
+
+
+@pytest.mark.parametrize("coordinate", ["database", "schema"])
+def test_capture_rejects_mssql_state_tables_outside_primary_location(
+    tmp_path: Path,
+    coordinate: str,
+) -> None:
+    value = "other_db" if coordinate == "database" else "other_schema"
+    root = ordinary_root(
+        tmp_path,
+        extra_manifest=(
+            "state:\n"
+            "  type: mssql\n"
+            "  connection_ref: state\n"
+            "  table: {database: state_db, schema: control, name: source_state}\n"
+            f"  receipt_table: {{{coordinate}: {value}, name: receipts}}\n"
+        ),
+        runner="airflow",
+    )
+
+    with pytest.raises(ValueError, match=f"receipt_table.{coordinate} must match"):
+        _capture(root)
 
 
 def test_capture_rejects_separate_post_hook(tmp_path: Path) -> None:

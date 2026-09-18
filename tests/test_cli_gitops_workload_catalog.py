@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 from argparse import Namespace
@@ -14,7 +15,12 @@ from dpone.adapters.fs_local import LocalFileSystem
 from dpone.adapters.yaml_pyyaml import PyYamlCodec
 from dpone.app.context import AppContext
 from dpone.app.settings import Settings
-from dpone.commands.gitops.airflow_pack_cmd import cmd_gitops_airflow_pack, cmd_gitops_airflow_reconcile
+from dpone.commands.gitops.airflow_pack_cmd import (
+    cmd_gitops_airflow_pack,
+    cmd_gitops_airflow_reconcile,
+    register_pack_parser,
+    register_reconcile_parser,
+)
 from dpone.commands.gitops.gitlab_cmd import cmd_gitops_gitlab_render_child_pipeline
 from dpone.commands.gitops.workloads_cmd import cmd_gitops_workloads_explain, cmd_gitops_workloads_list
 from dpone.gitops.changed_files import resolve_changed_files
@@ -88,6 +94,24 @@ def _catalog(tmp_path: Path) -> Path:
     )
     _write(root / "manifests" / "mssql" / "account_sales.yaml", "source: {}\nsink: {}")
     return root / "gitops.yaml"
+
+
+def _write_explicit_mssql_manifest(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "dpone_workloads/manifests/mssql/account_sales.yaml",
+        """
+        name: work-item_account_sales
+        source:
+          type: postgres
+          connection_ref: source
+          query: SELECT 1 AS id
+        sink:
+          type: mssql
+          connection_ref: target
+          table: {database: warehouse, schema: mart, name: account_sales}
+          strategy: {mode: full_refresh}
+        """,
+    )
 
 
 def test_workloads_list_and_explain_cli_are_json_and_secret_free(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -199,6 +223,63 @@ def test_airflow_pack_cli_builds_single_compact_workload_pack(tmp_path: Path, mo
     assert payload["runtime_selection"] == {}
 
 
+@pytest.mark.parametrize("command", ["pack", "reconcile"])
+def test_airflow_outlet_binding_parser_defaults_and_rejects_unknown_value(command: str) -> None:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    register = register_pack_parser if command == "pack" else register_reconcile_parser
+    register(subparsers)
+    required = ["--workload-set", "workloads.yaml"] if command == "reconcile" else []
+
+    assert parser.parse_args([command, *required]).outlet_binding == "physical"
+    assert parser.parse_args([command, *required, "--outlet-binding", "logical"]).outlet_binding == "logical"
+    with pytest.raises(SystemExit, match="2"):
+        parser.parse_args([command, *required, "--outlet-binding", "unknown"])
+
+
+def test_airflow_pack_cli_forwards_logical_outlet_binding(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.chdir(tmp_path)
+    workload_set = _catalog(tmp_path)
+    _write_explicit_mssql_manifest(tmp_path)
+    output = ".dpone/gitops/airflow/work-item_account_sales/airflow-pack.json"
+
+    code = cmd_gitops_airflow_pack(
+        Namespace(
+            workload="work-item_account_sales",
+            workload_set=str(workload_set),
+            env="dev",
+            output_path=output,
+            artifact_dir=None,
+            bundle_path=None,
+            image=None,
+            image_digest=None,
+            mode="plan",
+            runner_policy="advisory",
+            outlet_binding="logical",
+            include_live_gates=False,
+            output=None,
+            format="json",
+        ),
+        ctx=_ctx(tmp_path),
+        logger=logging.getLogger("test"),
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert code == 0
+    assert payload["airflow"]["execution"]["outlets"] == [
+        {
+            "asset_ref": {
+                "connection_ref": "target",
+                "database": "warehouse",
+                "engine": "mssql",
+                "schema": "mart",
+                "table": "account_sales",
+            },
+            "provenance": "inferred:asset_graph.v1",
+        }
+    ]
+
+
 def test_airflow_pack_cli_renders_compact_pack_markdown(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.chdir(tmp_path)
     workload_set = _catalog(tmp_path)
@@ -254,6 +335,50 @@ def test_airflow_reconcile_writes_packs_for_affected_workloads(tmp_path: Path, m
     assert payload["affected_workloads"] == ["work-item_account_sales"]
     assert payload["packs"][0].endswith("work-item_account_sales/airflow-pack.json")
     assert (tmp_path / payload["packs"][0]).is_file()
+
+
+def test_airflow_reconcile_cli_forwards_logical_outlet_binding(tmp_path: Path, monkeypatch, capsys) -> None:
+    from tests.mssql_asset_registry_fixtures import write_mssql_connection_registry
+
+    monkeypatch.chdir(tmp_path)
+    workload_set = _catalog(tmp_path)
+    _write_explicit_mssql_manifest(tmp_path)
+    write_mssql_connection_registry(
+        tmp_path,
+        connections={
+            "target": {
+                "type": "mssql",
+                "connection": {
+                    "asset_authority": {"host": "sql.example.invalid", "port": 1433},
+                    "database": "warehouse",
+                },
+            }
+        },
+    )
+    changed = _write(tmp_path / "changed.txt", "dpone_workloads/gitops/domains/sales.yaml\n")
+
+    code = cmd_gitops_airflow_reconcile(
+        Namespace(
+            workload_set=str(workload_set),
+            changed_files=[],
+            changed_files_file=changed.relative_to(tmp_path).as_posix(),
+            all_workloads=False,
+            env="dev",
+            outlet_binding="logical",
+            output_dir=".dpone/gitops",
+            output=None,
+            format="json",
+        ),
+        ctx=_ctx(tmp_path),
+        logger=logging.getLogger("test"),
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["packs"], json.dumps(payload, indent=2)
+    pack = json.loads((tmp_path / payload["packs"][0]).read_text(encoding="utf-8"))
+
+    assert code == 0
+    assert pack["airflow"]["execution"]["outlets"][0]["asset_ref"]["database"] == "warehouse"
+    assert "uri" not in pack["airflow"]["execution"]["outlets"][0]
 
 
 def test_airflow_reconcile_writes_full_catalog_to_requested_output_root(tmp_path: Path, monkeypatch, capsys) -> None:

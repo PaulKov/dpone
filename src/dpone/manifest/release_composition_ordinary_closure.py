@@ -329,12 +329,6 @@ def _require_supported_mssql_state(state: object) -> None:
         or not state["connection_ref"].strip()
     ):
         raise OrdinaryReleaseInventoryError("ordinary state requires canonical MSSQL state authority")
-    from dpone.config.state import StateConfigError, resolve_mssql_state_defaults
-
-    try:
-        resolve_mssql_state_defaults(state)
-    except StateConfigError as exc:
-        raise OrdinaryReleaseInventoryError(f"ordinary MSSQL state policy is invalid: {exc}") from exc
     for field in (
         "table",
         "run_table",
@@ -345,9 +339,27 @@ def _require_supported_mssql_state(state: object) -> None:
         "partition_checkpoint_table",
     ):
         table = state.get(field, {})
+        allowed_coordinates = {"database", "schema", "name"}
+        if field == "run_table":
+            allowed_coordinates.add("run_name")
         if (
             not isinstance(table, Mapping)
-            or set(table) - {"database", "schema", "name", "run_name"}
+            or set(table) - allowed_coordinates
             or any(not isinstance(value, str) or not value.strip() or "\x00" in value for value in table.values())
         ):
             raise OrdinaryReleaseInventoryError(f"ordinary state {field} coordinates are invalid")
+    from dpone.config.state import StateConfigError, resolve_mssql_state_location_defaults
+
+    primary = state.get("table")
+    primary_table = primary if isinstance(primary, Mapping) else {}
+    try:
+        # Sentinel deployment defaults let the canonical runtime validator check
+        # every authored cross-table constraint without inventing real registry
+        # authority for a detached source archive.
+        resolve_mssql_state_location_defaults(
+            state,
+            default_database=str(primary_table.get("database") or "dpone_detached"),
+            default_schema=str(primary_table.get("schema") or "etl_state"),
+        )
+    except StateConfigError as exc:
+        raise OrdinaryReleaseInventoryError(f"ordinary MSSQL state policy is invalid: {exc}") from exc

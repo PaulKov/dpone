@@ -163,14 +163,18 @@ manifests, hooks, transforms, extra runtime sections, custom runner assets, live
 gate commands, or dbt payload IDs/execution. Unsupported input fails closed and
 must use its existing separate delivery path.
 
-An optional `state` requires `type: mssql`, explicit `connection_ref`,
-`atomicity: target_atomic`, and `provisioning: external`, with an MSSQL sink.
-Only optional `table: {database, schema, name}` coordinates are admitted in this
-initial subset. Build these state-bearing MSSQL packs with the existing
+An optional `state` may be explicitly disabled or use the runtime's canonical
+MSSQL state policy with an explicit `connection_ref`. State table coordinates
+must use the same database and schema as `state.table`; only `run_table` may use
+the deprecated `run_name` spelling. Build state-bearing MSSQL packs with the
+existing
 `AirflowCompactPackBuilder.build(..., outlet_binding="logical")` option. The
 closure verifier reproduces that same logical outlet projection before deployment
 bindings exist; physical outlet/target authority is not inferred from the alias.
-Sources without `state` retain their existing physical-outlet reconstruction.
+Registry-derived physical MSSQL identity is intentionally not reconstructed from
+the detached archive because that would require embedding deployment authority.
+Use logical outlets with an explicit database for composable MSSQL packs.
+Non-MSSQL sources without `state` retain their existing physical-outlet reconstruction.
 Unknown fields/backends and implicit policies fail source
 admission. The runtime still verifies actual target/state co-location and
 externally provisioned control objects. See the narrower

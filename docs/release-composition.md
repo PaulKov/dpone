@@ -138,7 +138,11 @@ dpone gitops airflow reconcile \
 the immutable ordinary source. MSSQL tables must then declare database, schema,
 and table explicitly; dpone does not guess a missing database from an alias.
 Omit the option to retain the backward-compatible physical outlet default for a
-deployment-bound ordinary release.
+deployment-bound ordinary release. A physical MSSQL pack whose database or
+authority came only from an external registry is deliberately not portable:
+detached inventory rejects it because the source archive contains no registry
+authority. Reconcile with logical outlets and an explicit database before
+composition; dpone never embeds the registry snapshot or guesses its values.
 
 The single-pack command is an inspection step. Use the full reconcile output for
 composition. Its pack root is **`.dpone/ordinary-build/airflow`**, containing
