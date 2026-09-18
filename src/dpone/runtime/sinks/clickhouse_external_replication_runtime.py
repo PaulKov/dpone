@@ -17,6 +17,7 @@ from dpone.ports.clickhouse_external_replication import (
     derive_target_key,
     digest_payload,
 )
+from dpone.runtime.sinks.clickhouse_external_replication_phases import cleanup_phase, publish_phase
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 from dpone.runtime.sinks.clickhouse_external_replication_state import candidate_name as _candidate_name
 from dpone.runtime.sinks.clickhouse_external_replication_state import matches_generation as _matches
@@ -142,7 +143,7 @@ class ClickHouseExternalReplicationRuntime:
             return self._receipt(state)
         if state["phase"] in {"LOCKED", "STAGING"}:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", state=state)
-        state = self._publish(state)
+        state = publish_phase(state, service=self._service, cas=self._cas, fail=self._fail)
         return self._receipt(state)
 
     def validate_staged(
@@ -180,7 +181,7 @@ class ClickHouseExternalReplicationRuntime:
             return self._receipt(state)
         if state["phase"] not in {"COMMITTED", "CLEANUP_DISPATCHING"}:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", state=state)
-        return self._receipt(self._cleanup(state))
+        return self._receipt(cleanup_phase(state, service=self._service, cas=self._cas, fail=self._fail))
 
     def abort(self, request: ExternalPublicationRequest) -> None:
         """Remove exact owned unpublished candidates and close the operation."""
@@ -322,56 +323,6 @@ class ClickHouseExternalReplicationRuntime:
             state = self._mark_member(state, member_id, "DIVERGED", str(result.get("candidate_uuid") or ""))
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
         return self._mark_member(state, member_id, "READY", str(result["candidate_uuid"]))
-
-    def _publish(self, state: dict[str, Any]) -> dict[str, Any]:
-        if state["phase"] == "STAGED":
-            state = self._cas(
-                state,
-                {
-                    **_without_version(state),
-                    "phase": "PUBLICATION_DISPATCHING",
-                    "dispatch_epoch": int(state["dispatch_epoch"]) + 1,
-                },
-            )
-            try:
-                self._service.dispatch_publication_once(
-                    operation_id=state["operation_id"],
-                    candidate_name=state["candidate_name"],
-                    member_ids=tuple(state["member_ids"]),
-                )
-            except Exception:
-                pass
-        if state["phase"] == "PUBLICATION_DISPATCHING":
-            observed = self._service.observe_publication(state["operation_id"])
-            if set(observed) != set(state["member_ids"]) or set(observed.values()) != {"desired"}:
-                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_IN_PROGRESS", state=state)
-            state = self._cas(state, {**_without_version(state), "phase": "COMMITTED"})
-        return state
-
-    def _cleanup(self, state: dict[str, Any]) -> dict[str, Any]:
-        if state["phase"] == "COMMITTED":
-            state = self._cas(
-                state,
-                {
-                    **_without_version(state),
-                    "phase": "CLEANUP_DISPATCHING",
-                    "dispatch_epoch": int(state["dispatch_epoch"]) + 1,
-                },
-            )
-            try:
-                self._service.dispatch_cleanup_once(
-                    operation_id=state["operation_id"], member_ids=tuple(state["member_ids"])
-                )
-            except Exception:
-                pass
-        if state["phase"] == "CLEANUP_DISPATCHING":
-            observed = self._service.observe_cleanup(state["operation_id"])
-            if set(observed) != set(state["member_ids"]) or any(observed.values()):
-                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", state=state)
-            state = self._cas(state, {**_without_version(state), "phase": "COMPLETED"})
-        if state["phase"] != "COMPLETED":
-            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STATE_INVALID", state=state)
-        return state
 
     def _mark_member(
         self, state: dict[str, Any], member_id: str, status: str, candidate_uuid: str | None
