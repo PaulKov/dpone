@@ -1,0 +1,302 @@
+"""Recoverable coordinator for externally replicated ClickHouse publication."""
+
+from __future__ import annotations
+
+import secrets
+from collections.abc import Mapping
+from typing import Any, NoReturn, Protocol
+
+from dpone.contracts.clickhouse_cluster_publication import digest_payload
+from dpone.contracts.clickhouse_external_replication import (
+    ExternalArtifactReceipt,
+    ExternalContractError,
+    ExternalPublicationError,
+    ExternalPublicationRequest,
+    derive_generation_id,
+    derive_operation_id,
+    derive_target_key,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
+
+
+class ExternalReplicationRuntimeService(Protocol):
+    """Durable effects required by the pure runtime coordinator."""
+
+    def inventory(self, cluster: str) -> tuple[str, ...]: ...
+    def read_authority(self, target_key: str) -> Mapping[str, Any] | None: ...
+    def compare_and_swap_authority(
+        self, target_key: str, expected_version: int | None, desired: Mapping[str, Any]
+    ) -> Mapping[str, Any]: ...
+    def observe_candidate(self, member_id: str, candidate_name: str) -> Mapping[str, Any]: ...
+    def stage_member_once(
+        self,
+        member_id: str,
+        *,
+        operation_id: str,
+        candidate_name: str,
+        artifact: ExternalArtifactReceipt,
+    ) -> Mapping[str, Any]: ...
+    def drop_owned_candidate(self, member_id: str, *, candidate_uuid: str) -> None: ...
+    def dispatch_publication_once(
+        self, *, operation_id: str, candidate_name: str, member_ids: tuple[str, ...]
+    ) -> None: ...
+    def observe_publication(self, operation_id: str) -> Mapping[str, str]: ...
+    def dispatch_cleanup_once(self, *, operation_id: str, member_ids: tuple[str, ...]) -> None: ...
+    def observe_cleanup(self, operation_id: str) -> Mapping[str, bool]: ...
+
+
+class ClickHouseExternalReplicationRuntime:
+    """Order durable effects so retries never append or redispatch blindly."""
+
+    def __init__(self, *, service: ExternalReplicationRuntimeService) -> None:
+        self._service = service
+
+    def run(self, request: ExternalPublicationRequest) -> ExternalReplicationReceipt:
+        """Resume one deterministic operation through staging, publish, and cleanup."""
+
+        try:
+            request.validate()
+        except ExternalContractError as error:
+            self._fail(f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{error.code}")
+        members = tuple(sorted(self._service.inventory(request.cluster)))
+        if len(members) < 2 or len(set(members)) != len(members):
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_INVALID", member_ids=members)
+        self._require_artifact(request.artifact, member_ids=members)
+        target_key = derive_target_key(request.cluster, request.database, request.target)
+        operation_id = derive_operation_id(
+            scheduler_invocation=request.scheduler_invocation,
+            target_key=target_key,
+            normalized_plan_digest=request.plan_sha256,
+        )
+        state = self._lock(request, target_key, operation_id, members)
+        if state["phase"] == "COMPLETED":
+            return ExternalReplicationReceipt.from_state(state)
+        state = self._stage(request, state)
+        state = self._publish(state)
+        state = self._cleanup(state)
+        return ExternalReplicationReceipt.from_state(state)
+
+    def _lock(
+        self,
+        request: ExternalPublicationRequest,
+        target_key: str,
+        operation_id: str,
+        members: tuple[str, ...],
+    ) -> dict[str, Any]:
+        current = self._read(target_key)
+        if current is not None and current.get("operation_id") == operation_id:
+            self._require_same_inputs(current, request, members)
+            return current
+        if current is not None and current.get("phase") not in {"COMPLETED", "ABORTED"}:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT", state=current)
+        desired = {
+            "target_key": target_key,
+            "operation_id": operation_id,
+            "fence_token": secrets.token_hex(16),
+            "phase": "LOCKED",
+            "dispatch_epoch": 0 if current is None else int(current["dispatch_epoch"]) + 1,
+            "inventory_digest": digest_payload({"member_ids": members}),
+            "plan_digest": request.plan_sha256,
+            "candidate_name": _candidate_name(request.target, operation_id),
+            "member_ids": members,
+            "member_states": {member: {"state": "PENDING"} for member in members},
+        }
+        return self._cas(current, desired)
+
+    def _stage(self, request: ExternalPublicationRequest, state: dict[str, Any]) -> dict[str, Any]:
+        if state["phase"] == "LOCKED":
+            artifact = request.artifact
+            state = self._cas(
+                state,
+                {
+                    **_without_version(state),
+                    "phase": "STAGING",
+                    "artifact_sha256": artifact.sha256,
+                    "artifact_schema_sha256": artifact.schema_sha256,
+                    "artifact_content_sha256": artifact.content_sha256,
+                    "artifact_row_count": artifact.row_count,
+                    "generation_id": derive_generation_id(
+                        operation_id=state["operation_id"],
+                        artifact_sha256=artifact.sha256,
+                        schema_digest=artifact.schema_sha256,
+                        row_count=artifact.row_count,
+                    ),
+                },
+            )
+        if state["phase"] not in {"STAGING", "STAGED", "PUBLICATION_DISPATCHING", "COMMITTED", "CLEANUP_DISPATCHING"}:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STATE_INVALID", state=state)
+        if state["phase"] != "STAGING":
+            return state
+        for member_id in state["member_ids"]:
+            state = self._stage_member(request.artifact, state, member_id)
+        if not all(value["state"] == "READY" for value in state["member_states"].values()):
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", state=state)
+        return self._cas(state, {**_without_version(state), "phase": "STAGED"})
+
+    def _stage_member(self, artifact: ExternalArtifactReceipt, state: dict[str, Any], member_id: str) -> dict[str, Any]:
+        member = dict(state["member_states"][member_id])
+        observation = dict(self._service.observe_candidate(member_id, state["candidate_name"]))
+        if member["state"] == "READY":
+            if self._matches(observation, state) and observation.get("candidate_uuid") == member.get("candidate_uuid"):
+                return state
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
+        if observation.get("exists"):
+            if self._matches(observation, state):
+                return self._mark_member(state, member_id, "READY", str(observation["candidate_uuid"]))
+            if member["state"] not in {"LOADING", "AMBIGUOUS"} or not _owned(observation, state):
+                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
+            expected_uuid = str(observation.get("candidate_uuid") or "")
+            if member.get("candidate_uuid") not in {None, expected_uuid}:
+                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
+            self._service.drop_owned_candidate(member_id, candidate_uuid=expected_uuid)
+            if self._service.observe_candidate(member_id, state["candidate_name"]).get("exists"):
+                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", state=state)
+        state = self._mark_member(state, member_id, "LOADING", None)
+        try:
+            result = dict(
+                self._service.stage_member_once(
+                    member_id,
+                    operation_id=state["operation_id"],
+                    candidate_name=state["candidate_name"],
+                    artifact=artifact,
+                )
+            )
+        except Exception:
+            observed = dict(self._service.observe_candidate(member_id, state["candidate_name"]))
+            if self._matches(observed, state):
+                return self._mark_member(state, member_id, "READY", str(observed["candidate_uuid"]))
+            candidate_uuid = str(observed.get("candidate_uuid") or "") or None
+            state = self._mark_member(state, member_id, "AMBIGUOUS", candidate_uuid)
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", state=state)
+        if not self._matches(result, state):
+            state = self._mark_member(state, member_id, "DIVERGED", str(result.get("candidate_uuid") or ""))
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
+        return self._mark_member(state, member_id, "READY", str(result["candidate_uuid"]))
+
+    def _publish(self, state: dict[str, Any]) -> dict[str, Any]:
+        if state["phase"] == "STAGED":
+            state = self._cas(
+                state,
+                {
+                    **_without_version(state),
+                    "phase": "PUBLICATION_DISPATCHING",
+                    "dispatch_epoch": int(state["dispatch_epoch"]) + 1,
+                },
+            )
+            try:
+                self._service.dispatch_publication_once(
+                    operation_id=state["operation_id"],
+                    candidate_name=state["candidate_name"],
+                    member_ids=tuple(state["member_ids"]),
+                )
+            except Exception:
+                pass
+        if state["phase"] == "PUBLICATION_DISPATCHING":
+            observed = self._service.observe_publication(state["operation_id"])
+            if set(observed) != set(state["member_ids"]) or set(observed.values()) != {"desired"}:
+                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_IN_PROGRESS", state=state)
+            state = self._cas(state, {**_without_version(state), "phase": "COMMITTED"})
+        return state
+
+    def _cleanup(self, state: dict[str, Any]) -> dict[str, Any]:
+        if state["phase"] == "COMMITTED":
+            state = self._cas(
+                state,
+                {
+                    **_without_version(state),
+                    "phase": "CLEANUP_DISPATCHING",
+                    "dispatch_epoch": int(state["dispatch_epoch"]) + 1,
+                },
+            )
+            try:
+                self._service.dispatch_cleanup_once(
+                    operation_id=state["operation_id"], member_ids=tuple(state["member_ids"])
+                )
+            except Exception:
+                pass
+        if state["phase"] == "CLEANUP_DISPATCHING":
+            observed = self._service.observe_cleanup(state["operation_id"])
+            if set(observed) != set(state["member_ids"]) or any(observed.values()):
+                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", state=state)
+            state = self._cas(state, {**_without_version(state), "phase": "COMPLETED"})
+        if state["phase"] != "COMPLETED":
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STATE_INVALID", state=state)
+        return state
+
+    def _mark_member(
+        self, state: dict[str, Any], member_id: str, status: str, candidate_uuid: str | None
+    ) -> dict[str, Any]:
+        members = {key: dict(value) for key, value in state["member_states"].items()}
+        members[member_id] = {"state": status, "candidate_uuid": candidate_uuid}
+        return self._cas(state, {**_without_version(state), "member_states": members})
+
+    def _cas(self, current: dict[str, Any] | None, desired: Mapping[str, Any]) -> dict[str, Any]:
+        target_key = str(desired["target_key"])
+        version = None if current is None else int(current["version"])
+        try:
+            return dict(self._service.compare_and_swap_authority(target_key, version, desired))
+        except Exception:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT", state=current)
+
+    def _read(self, target_key: str) -> dict[str, Any] | None:
+        value = self._service.read_authority(target_key)
+        return None if value is None else dict(value)
+
+    @staticmethod
+    def _matches(observation: Mapping[str, Any], state: Mapping[str, Any]) -> bool:
+        return bool(observation.get("exists")) and (
+            observation.get("operation_id") == state["operation_id"]
+            and observation.get("candidate_name") == state["candidate_name"]
+            and observation.get("schema_sha256") == state["artifact_schema_sha256"]
+            and observation.get("content_sha256") == state["artifact_content_sha256"]
+            and observation.get("row_count") == state["artifact_row_count"]
+        )
+
+    def _require_same_inputs(
+        self, state: Mapping[str, Any], request: ExternalPublicationRequest, members: tuple[str, ...]
+    ) -> None:
+        if tuple(state["member_ids"]) != members or state["plan_digest"] != request.plan_sha256:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", state=state)
+        if "artifact_sha256" in state and state["artifact_sha256"] != request.artifact.sha256:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", state=state)
+
+    def _require_artifact(self, artifact: ExternalArtifactReceipt, *, member_ids: tuple[str, ...]) -> None:
+        if not artifact.replayable or artifact.byte_size < 0 or artifact.row_count < 0:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNSUPPORTED", member_ids=member_ids)
+
+    @staticmethod
+    def _fail(
+        code: str,
+        *,
+        state: Mapping[str, Any] | None = None,
+        member_ids: tuple[str, ...] = (),
+    ) -> NoReturn:
+        evidence: dict[str, object] = {
+            "evidence_scope": "local_synthetic",
+            "member_ids": list(member_ids or tuple(state.get("member_ids", ())) if state else member_ids),
+        }
+        if state is not None:
+            evidence.update(
+                target_key=state.get("target_key"),
+                operation_id=state.get("operation_id"),
+                phase=state.get("phase"),
+            )
+        raise ExternalPublicationError(code, evidence=evidence)
+
+
+def _candidate_name(target: str, operation_id: str) -> str:
+    return f"{target[:96]}__dpone_ext_{operation_id[:20]}"
+
+
+def _without_version(state: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in state.items() if key != "version"}
+
+
+def _owned(observation: Mapping[str, Any], state: Mapping[str, Any]) -> bool:
+    return (
+        observation.get("operation_id") == state["operation_id"]
+        and observation.get("candidate_name") == state["candidate_name"]
+    )
+
+
+__all__ = ["ClickHouseExternalReplicationRuntime", "ExternalReplicationRuntimeService"]
