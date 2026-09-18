@@ -5,21 +5,37 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from dpone._compat import StrEnum
 from dpone.contracts.clickhouse_cluster_publication import canonical_json, digest_payload
+from dpone.contracts.clickhouse_external_replication_codec import (
+    decode_dataclass as _decode_dataclass,
+)
+from dpone.contracts.clickhouse_external_replication_codec import (
+    decode_member as _decode_member,
+)
+from dpone.contracts.clickhouse_external_replication_codec import (
+    member_evidence as _member_evidence,
+)
+from dpone.contracts.clickhouse_external_replication_codec import (
+    require_exact_fields as _require_exact_fields,
+)
+from dpone.contracts.clickhouse_external_replication_identity import (
+    ExternalContractError,
+    derive_generation_id,
+    derive_member_id,
+    derive_operation_id,
+    derive_target_key,
+)
+from dpone.contracts.clickhouse_external_replication_identity import (
+    require_digest as _require_digest,
+)
 
 EXTERNAL_AUTHORITY_SCHEMA_VERSION = "dpone.clickhouse.cluster-external-full-refresh.v1"
 EXTERNAL_RECEIPT_SCHEMA_VERSION = "dpone.clickhouse.cluster-external-full-refresh-receipt.v1"
 INTERNAL_AUTHORITY_SCHEMA_VERSION = "dpone.clickhouse.cluster-full-refresh.v1"
-
-
-class ExternalContractError(ValueError):
-    def __init__(self, code: str, detail: str) -> None:
-        self.code = code
-        super().__init__(f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{code}:{detail}")
 
 
 class ReplicationMode(StrEnum):
@@ -384,90 +400,3 @@ def classify_member_publication(
     if observation.target == predecessor and observation.candidate == desired:
         return MemberPublicationState.PENDING
     return MemberPublicationState.UNKNOWN
-
-
-def derive_target_key(cluster: str, database: str, target: str) -> str:
-    return digest_payload({"cluster": cluster, "database": database, "target": target})
-
-
-def derive_operation_id(*, scheduler_invocation: str, target_key: str, normalized_plan_digest: str) -> str:
-    if not scheduler_invocation:
-        raise ExternalContractError("IDENTITY_INVALID", "scheduler invocation is required")
-    _require_digest(target_key, "target key")
-    _require_digest(normalized_plan_digest, "plan")
-    return digest_payload(
-        {
-            "protocol_version": 1,
-            "scheduler_invocation": scheduler_invocation,
-            "target_key": target_key,
-            "normalized_plan_digest": normalized_plan_digest,
-        }
-    )
-
-
-def derive_member_id(shard_num: int, replica_num: int) -> str:
-    if shard_num <= 0 or replica_num <= 0:
-        raise ExternalContractError("IDENTITY_INVALID", "member coordinates must be positive")
-    return digest_payload({"shard_num": shard_num, "replica_num": replica_num})
-
-
-def derive_generation_id(*, operation_id: str, artifact_sha256: str, schema_digest: str, row_count: int) -> str:
-    _require_digest(operation_id, "operation")
-    _require_digest(artifact_sha256, "artifact")
-    _require_digest(schema_digest, "schema")
-    if isinstance(row_count, bool) or row_count < 0:
-        raise ExternalContractError("IDENTITY_INVALID", "generation row count must be non-negative")
-    return digest_payload(
-        {
-            "operation_id": operation_id,
-            "artifact_sha256": artifact_sha256,
-            "schema_digest": schema_digest,
-            "row_count": row_count,
-        }
-    )
-
-
-def _decode_member(value: Any) -> ExternalMemberRecord:
-    _require_exact_fields(value, ExternalMemberRecord)
-    value = dict(value)
-    value["stage_state"] = ExternalMemberStageState(value["stage_state"])
-    value["publication_state"] = MemberPublicationState(value["publication_state"])
-    for name in ("predecessor", "candidate"):
-        value[name] = None if value[name] is None else _decode_dataclass(PhysicalGeneration, value[name])
-    return ExternalMemberRecord(**value)
-
-
-def _decode_dataclass(kind: type[Any], value: Any) -> Any:
-    _require_exact_fields(value, kind)
-    return kind(**value)
-
-
-def _require_exact_fields(value: Any, kind: type[Any]) -> None:
-    if not isinstance(value, dict) or set(value) != {item.name for item in fields(kind)}:
-        raise ExternalContractError("AUTHORITY_INVALID", f"{kind.__name__} fields differ")
-
-
-def _member_evidence(member: ExternalMemberRecord) -> dict[str, Any]:
-    def generation(value: PhysicalGeneration | None) -> dict[str, Any] | None:
-        if value is None:
-            return None
-        return {
-            "uuid": value.uuid,
-            "schema_digest": value.schema_digest,
-            "content_digest": value.content_digest,
-            "row_count": value.row_count,
-        }
-
-    return {
-        "member_id": member.member_id,
-        "stage_state": member.stage_state.value,
-        "publication_state": member.publication_state.value,
-        "cleanup_complete": member.cleanup_complete,
-        "predecessor": generation(member.predecessor),
-        "candidate": generation(member.candidate),
-    }
-
-
-def _require_digest(value: str, label: str) -> None:
-    if not isinstance(value, str) or len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
-        raise ExternalContractError("IDENTITY_INVALID", f"{label} digest must be lowercase SHA-256")
