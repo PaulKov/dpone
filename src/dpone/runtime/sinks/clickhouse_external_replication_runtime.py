@@ -2,23 +2,22 @@
 
 from __future__ import annotations
 
-import secrets
 from collections.abc import Mapping
 from typing import Any, NoReturn, Protocol
 
 from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactReceipt,
     ExternalArtifactSourcePort,
-    ExternalPublicationError,
     ExternalPublicationRequest,
     derive_generation_id,
     derive_operation_id,
     derive_target_key,
-    digest_payload,
 )
+from dpone.runtime.sinks import clickhouse_external_replication_authority as authority_ops
 from dpone.runtime.sinks import (
     clickhouse_external_replication_phases as phase_ops,
 )
+from dpone.runtime.sinks import clickhouse_external_replication_runtime_support as runtime_support
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 
 
@@ -137,18 +136,13 @@ class ClickHouseExternalReplicationRuntime:
             target_key=target_key,
             normalized_plan_digest=plan_sha256,
         )
-        state = self._read(target_key)
-        if state is None or state.get("operation_id") != operation_id:
-            return
-        if state.get("phase") == "ABORTED":
-            return
-        if state.get("phase") != "LOCKED":
-            return
-        if "artifact_sha256" in state or any(
-            member.get("candidate_uuid") is not None for member in state.get("member_states", {}).values()
-        ):
-            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", state=state)
-        self._cas(state, {**phase_ops.without_version(state), "phase": "ABORTED"})
+        authority_ops.abort_prepared(
+            target_key=target_key,
+            operation_id=operation_id,
+            read=self._read,
+            cas=self._cas,
+            fail=self._fail,
+        )
 
     def publish(self, request: ExternalPublicationRequest) -> ExternalReplicationReceipt:
         """Publish a previously staged operation and finish exact cleanup."""
@@ -232,8 +226,7 @@ class ClickHouseExternalReplicationRuntime:
         self._cas(state, {**phase_ops.without_version(state), "phase": "ABORTED"})
 
     def _receipt(self, state: dict[str, Any]) -> ExternalReplicationReceipt:
-        scope = str(getattr(self._service, "evidence_scope", "runtime"))
-        return ExternalReplicationReceipt.from_state(state, evidence_scope=scope)
+        return runtime_support.receipt(self._service, state)
 
     def _lock_values(
         self,
@@ -244,34 +237,20 @@ class ClickHouseExternalReplicationRuntime:
         plan_sha256: str,
         members: tuple[str, ...],
     ) -> dict[str, Any]:
-        current = self._read(target_key)
-        if current is not None and current.get("operation_id") == operation_id:
-            if (
-                tuple(current["member_ids"]) != members
-                or current["plan_digest"] != plan_sha256
-                or current["inventory_digest"] != self._inventory_digest(members)
-            ):
-                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", state=current)
-            return current
-        if current is not None and current.get("phase") not in {"COMPLETED", "ABORTED"}:
-            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT", state=current)
-        desired = {
-            "target_key": target_key,
-            "operation_id": operation_id,
-            "fence_token": secrets.token_hex(16),
-            "phase": "LOCKED",
-            "dispatch_epoch": 0 if current is None else int(current["dispatch_epoch"]) + 1,
-            "inventory_digest": self._inventory_digest(members),
-            "plan_digest": plan_sha256,
-            "candidate_name": phase_ops.candidate_name(target, operation_id),
-            "member_ids": members,
-            "member_states": {member: {"state": "PENDING"} for member in members},
-        }
-        return self._cas(current, desired)
+        return authority_ops.acquire_lock(
+            target_key=target_key,
+            operation_id=operation_id,
+            target=target,
+            plan_sha256=plan_sha256,
+            members=members,
+            inventory_digest=self._inventory_digest(members),
+            read=self._read,
+            cas=self._cas,
+            fail=self._fail,
+        )
 
     def _inventory_digest(self, members: tuple[str, ...]) -> str:
-        provider = getattr(self._service, "inventory_digest", None)
-        return str(provider()) if callable(provider) else digest_payload({"member_ids": members})
+        return runtime_support.inventory_digest(self._service, members)
 
     def _stage(self, request: ExternalPublicationRequest, state: dict[str, Any]) -> dict[str, Any]:
         if state["phase"] == "LOCKED":
@@ -371,12 +350,7 @@ class ClickHouseExternalReplicationRuntime:
         return self._cas(state, {**phase_ops.without_version(state), "member_states": members})
 
     def _cas(self, current: dict[str, Any] | None, desired: Mapping[str, Any]) -> dict[str, Any]:
-        target_key = str(desired["target_key"])
-        version = None if current is None else int(current["version"])
-        try:
-            return dict(self._service.compare_and_swap_authority(target_key, version, desired))
-        except Exception:
-            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT", state=current)
+        return runtime_support.compare_and_swap(self._service, current, desired, self._fail)
 
     def _read(self, target_key: str) -> dict[str, Any] | None:
         value = self._service.read_authority(target_key)
@@ -385,12 +359,14 @@ class ClickHouseExternalReplicationRuntime:
     def _require_same_inputs(
         self, state: Mapping[str, Any], request: ExternalPublicationRequest, members: tuple[str, ...]
     ) -> None:
-        binding = (
-            None
-            if self._artifact_source is None or "artifact_binding_id" not in state
-            else self._artifact_source.binding_id
+        runtime_support.require_same_inputs(
+            service=self._service,
+            artifact_source=self._artifact_source,
+            state=state,
+            request=request,
+            members=members,
+            fail=self._fail,
         )
-        phase_ops.require_same_inputs(state, request, members, self._inventory_digest(members), binding, self._fail)
 
     def _require_source(self) -> ExternalArtifactSourcePort:
         if self._artifact_source is None:
@@ -404,17 +380,7 @@ class ClickHouseExternalReplicationRuntime:
         state: Mapping[str, Any] | None = None,
         member_ids: tuple[str, ...] = (),
     ) -> NoReturn:
-        evidence: dict[str, object] = {
-            "evidence_scope": str(getattr(self._service, "evidence_scope", "runtime")),
-            "member_ids": list(member_ids or tuple(state.get("member_ids", ())) if state else member_ids),
-        }
-        if state is not None:
-            evidence.update(
-                target_key=state.get("target_key"),
-                operation_id=state.get("operation_id"),
-                phase=state.get("phase"),
-            )
-        raise ExternalPublicationError(code, evidence=evidence)
+        runtime_support.fail(self._service, code, state=state, member_ids=member_ids)
 
 
 __all__ = ["ClickHouseExternalReplicationRuntime", "ExternalReplicationRuntimeService"]
