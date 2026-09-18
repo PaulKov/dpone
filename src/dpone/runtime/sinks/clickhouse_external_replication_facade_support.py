@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, NoReturn
+from typing import Any, NoReturn, Protocol
 
 from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactReceipt,
@@ -14,13 +14,42 @@ from dpone.ports.clickhouse_external_replication import (
 from dpone.runtime.lineage.options import LineageOptions
 from dpone.runtime.sinks.clickhouse_external_replication_context import derive_semantic_plan_digest
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
-from dpone.runtime.sinks.clickhouse_external_replication_runtime import ExternalReplicationRuntimeService
+from dpone.runtime.sinks.clickhouse_external_replication_runtime import (
+    ClickHouseExternalReplicationRuntime,
+    ExternalReplicationRuntimeService,
+)
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import SCHEDULER_IDENTITY_OPTION
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 from dpone.runtime.support.clickhouse_tsv_codec import ClickHouseTabSeparatedCodec
 
 EXTERNAL_REPLAY_OPTION = "__dpone_clickhouse_external_replication_replay_v1"
 EXTERNAL_ADMISSION_OPTION = "__dpone_clickhouse_external_replication_admission_v1"
+
+
+class ExternalRuntimeFactory(Protocol):
+    """Construct one coordinator around an invocation-scoped service."""
+
+    def __call__(
+        self,
+        *,
+        service: ExternalReplicationRuntimeService,
+        artifact_source: ExternalArtifactSourcePort | None = None,
+    ) -> ClickHouseExternalReplicationRuntime: ...
+
+
+class ExternalServiceFactory(Protocol):
+    """Build target services, optionally with payload capabilities for staging."""
+
+    def __call__(
+        self,
+        cluster: str,
+        database: str,
+        target: str,
+        *,
+        load_config: Any | None = None,
+        payload: Any | None = None,
+        maximum_rows: int | None = None,
+    ) -> ExternalReplicationRuntimeService: ...
 
 
 def artifact_receipt(source: ExternalArtifactSourcePort) -> ExternalArtifactReceipt:
@@ -126,6 +155,39 @@ def require_safe_transformations(load_config: Any, payload: Any) -> None:
             fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_TRANSFORMATION_UNSUPPORTED")
 
 
+def require_preflight(load_config: Any) -> None:
+    """Require the exact admission receipt for this external operation."""
+
+    cluster, database, target = target_identity(load_config)
+    plan_sha256 = plan_digest(load_config, cluster=cluster, database=database, target=target)
+    admission = options(load_config).get(EXTERNAL_ADMISSION_OPTION)
+    if not isinstance(admission, Mapping):
+        fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ADMISSION_REQUIRED")
+    expected = ExternalPublicationRequest(
+        cluster=cluster,
+        database=database,
+        target=target,
+        scheduler_invocation=scheduler_identity(load_config),
+        plan_sha256=plan_sha256,
+        artifact=ExternalArtifactReceipt(
+            artifact_id="preflight",
+            sha256="0" * 64,
+            byte_size=0,
+            row_count=0,
+            schema_sha256="0" * 64,
+            content_sha256="0" * 64,
+            replayable=True,
+        ),
+    )
+    if (
+        admission.get("operation_id") != expected.operation_id
+        or admission.get("target_key") != expected.target_key
+        or admission.get("plan_sha256") != plan_sha256
+        or admission.get("phase") not in {"LOCKED", "STAGING", "STAGED", "COMPLETED"}
+    ):
+        fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ADMISSION_REQUIRED")
+
+
 def options(load_config: Any) -> Mapping[str, Any]:
     raw = getattr(load_config, "options", None)
     return raw if isinstance(raw, Mapping) else {}
@@ -157,6 +219,7 @@ __all__ = [
     "plan_digest",
     "read_authority",
     "request_from_state",
+    "require_preflight",
     "require_safe_transformations",
     "scheduler_identity",
     "target_identity",

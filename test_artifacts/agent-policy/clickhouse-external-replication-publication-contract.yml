@@ -54,6 +54,9 @@ integrator_owned_paths:
   - src/dpone/schema/**
   - src/dpone/contracts/clickhouse_cluster_admission.py
   - src/dpone/contracts/clickhouse_cluster_publication.py
+  - src/dpone/contracts/clickhouse_external_replication_identity.py
+  - src/dpone/contracts/clickhouse_external_replication_classification.py
+  - src/dpone/runtime/sinks/clickhouse_external_artifact_verifier.py
   - src/dpone/manifest/validation_clickhouse_cluster.py
   - src/dpone/ports/clickhouse_cluster_publication.py
   - src/dpone/runtime/clickhouse_cluster_publication_composition.py

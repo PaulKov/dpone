@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from dpone.contracts.clickhouse_cluster_publication import canonical_json, digest_payload
 
 
@@ -9,6 +11,13 @@ class ExternalContractError(ValueError):
     def __init__(self, code: str, detail: str) -> None:
         self.code = code
         super().__init__(f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{code}:{detail}")
+
+
+class ExternalPublicationError(RuntimeError):
+    def __init__(self, code: str, *, evidence: Mapping[str, object] | None = None) -> None:
+        self.code = code
+        self.evidence = dict(evidence or {})
+        super().__init__(code)
 
 
 def require_digest(value: str, label: str) -> None:
@@ -59,6 +68,7 @@ def derive_generation_id(*, operation_id: str, artifact_sha256: str, schema_dige
 
 __all__ = [
     "ExternalContractError",
+    "ExternalPublicationError",
     "canonical_json",
     "derive_generation_id",
     "derive_member_id",

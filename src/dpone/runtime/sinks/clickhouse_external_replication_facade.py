@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import replace
-from typing import Any, Protocol
+from typing import Any
 
 from dpone.config.load_strategy import LoadStrategy
 from dpone.ports.clickhouse_external_replication import (
-    ExternalArtifactReceipt,
     ExternalArtifactSourcePort,
     ExternalPublicationRequest,
 )
@@ -24,6 +23,8 @@ from dpone.runtime.sinks.clickhouse_external_replication_context import (
 from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
     EXTERNAL_ADMISSION_OPTION,
     EXTERNAL_REPLAY_OPTION,
+    ExternalRuntimeFactory,
+    ExternalServiceFactory,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
     artifact_receipt as _artifact_receipt,
@@ -50,6 +51,9 @@ from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
     request_from_state as _request_from_state,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    require_preflight as _require_preflight,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
     require_safe_transformations as _require_safe_transformations,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
@@ -61,36 +65,8 @@ from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
 from dpone.runtime.sinks.clickhouse_external_replication_runtime import (
     ClickHouseExternalReplicationRuntime,
     ExternalReplicationReceipt,
-    ExternalReplicationRuntimeService,
 )
 from dpone.runtime.sinks.load_result import LoadResult
-
-
-class ExternalRuntimeFactory(Protocol):
-    """Construct one coordinator around an invocation-scoped service."""
-
-    def __call__(
-        self,
-        *,
-        service: ExternalReplicationRuntimeService,
-        artifact_source: ExternalArtifactSourcePort | None = None,
-    ) -> ClickHouseExternalReplicationRuntime: ...
-
-
-class ExternalServiceFactory(Protocol):
-    """Build target services, optionally with payload capabilities for staging."""
-
-    def __call__(
-        self,
-        cluster: str,
-        database: str,
-        target: str,
-        *,
-        load_config: Any | None = None,
-        payload: Any | None = None,
-        maximum_rows: int | None = None,
-    ) -> ExternalReplicationRuntimeService: ...
-
 
 ExternalArtifactSourceFactory = Callable[[Any, Any], ExternalArtifactSourcePort]
 
@@ -204,34 +180,7 @@ class ClickHouseExternalReplicationFacade:
     def require_preflight(self, load_config: Any) -> None:
         """Fail closed unless this exact external plan completed admission."""
 
-        cluster, database, target = _target_identity(load_config)
-        plan_sha256 = _plan_digest(load_config, cluster=cluster, database=database, target=target)
-        admission = _options(load_config).get(EXTERNAL_ADMISSION_OPTION)
-        if not isinstance(admission, Mapping):
-            _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ADMISSION_REQUIRED")
-        expected_target = ExternalPublicationRequest(
-            cluster=cluster,
-            database=database,
-            target=target,
-            scheduler_invocation=_scheduler_identity(load_config),
-            plan_sha256=plan_sha256,
-            artifact=ExternalArtifactReceipt(
-                artifact_id="preflight",
-                sha256="0" * 64,
-                byte_size=0,
-                row_count=0,
-                schema_sha256="0" * 64,
-                content_sha256="0" * 64,
-                replayable=True,
-            ),
-        )
-        if (
-            admission.get("operation_id") != expected_target.operation_id
-            or admission.get("target_key") != expected_target.target_key
-            or admission.get("plan_sha256") != plan_sha256
-            or admission.get("phase") not in {"LOCKED", "STAGING", "STAGED", "COMPLETED"}
-        ):
-            _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ADMISSION_REQUIRED")
+        _require_preflight(load_config)
 
     def stage(self, load_config: Any, payload: Any) -> ExternalStagedContext:
         """Seal and directly stage one immutable generation on every member."""

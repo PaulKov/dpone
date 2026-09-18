@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -29,6 +28,9 @@ from dpone.contracts.clickhouse_external_replication_identity import (
     derive_operation_id,
     derive_target_key,
     digest_payload,
+)
+from dpone.contracts.clickhouse_external_replication_identity import (
+    ExternalPublicationError as ExternalPublicationError,
 )
 from dpone.contracts.clickhouse_external_replication_identity import (
     require_digest as _require_digest,
@@ -205,13 +207,6 @@ class ExternalPublicationRequest:
             schema_digest=self.artifact.schema_sha256,
             row_count=self.artifact.row_count,
         )
-
-
-class ExternalPublicationError(RuntimeError):
-    def __init__(self, code: str, *, evidence: Mapping[str, object] | None = None) -> None:
-        self.code = code
-        self.evidence = dict(evidence or {})
-        super().__init__(code)
 
 
 @dataclass(frozen=True, slots=True)
@@ -391,19 +386,6 @@ class ExternalAuthorityRecord:
         }
 
 
-def classify_member_publication(
-    observation: MemberGenerationObservation,
-    *,
-    desired: PhysicalGeneration,
-    predecessor: PhysicalGeneration | None,
-) -> MemberPublicationState:
-    if observation.target == desired:
-        if predecessor is None and observation.candidate is None:
-            return MemberPublicationState.COMMITTED
-        if predecessor is not None and observation.candidate == predecessor:
-            return MemberPublicationState.COMMITTED
-        if predecessor is not None and observation.candidate is None:
-            return MemberPublicationState.CLEANUP_PENDING
-    if observation.target == predecessor and observation.candidate == desired:
-        return MemberPublicationState.PENDING
-    return MemberPublicationState.UNKNOWN
+from dpone.contracts.clickhouse_external_replication_classification import (  # noqa: E402
+    classify_member_publication as classify_member_publication,
+)

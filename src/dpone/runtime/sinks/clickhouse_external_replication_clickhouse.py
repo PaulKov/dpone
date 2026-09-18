@@ -10,7 +10,6 @@ from dpone.ports import clickhouse_external_replication as ports
 from dpone.ports.clickhouse_external_replication import (
     EXTERNAL_AUTHORITY_SCHEMA_VERSION,
     INTERNAL_AUTHORITY_SCHEMA_VERSION,
-    ArtifactIdentity,
     ExternalAuthorityPhase,
     ExternalAuthorityRecord,
     ExternalContractError,
@@ -22,6 +21,7 @@ from dpone.ports.clickhouse_external_replication import (
     cluster_contract,
     digest_payload,
 )
+from dpone.runtime.sinks.clickhouse_external_artifact_verifier import ClickHouseExternalArtifactVerifier
 
 _MUTATION_SETTINGS = {"keeper_map_strict_mode": 1, "insert_keeper_max_retries": 0}
 _INVENTORY_SQL = (
@@ -138,15 +138,6 @@ class ClickHouseExternalReplicaConnectionProvider:
 
     def member_identity(self, connection: Any) -> str:
         return self._member_ids_by_connection.get(id(connection), "")
-
-
-class ClickHouseExternalArtifactVerifier:
-    def __init__(self, *, revalidate: Callable[[ArtifactIdentity], None]) -> None:
-        self._revalidate = revalidate
-
-    def revalidate(self, artifact: ArtifactIdentity) -> None:
-        artifact.validate()
-        self._revalidate(artifact)
 
 
 class ClickHouseExternalReplicaStaging:
