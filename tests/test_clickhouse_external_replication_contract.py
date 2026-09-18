@@ -94,6 +94,7 @@ def _authority() -> ExternalAuthorityRecord:
         target="target_table",
         candidate="target_table__dpone_ext_1234",
         artifact=artifact,
+        artifact_binding_id="artifact-v1",
         generation_id=derive_generation_id(
             operation_id=operation_id,
             artifact_sha256=artifact.sha256,

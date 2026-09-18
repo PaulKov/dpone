@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from typing import Any
 
@@ -113,6 +114,7 @@ def _record() -> ExternalAuthorityRecord:
         candidate="candidate_table",
         members=members,
         artifact=artifact,
+        artifact_binding_id="artifact-v1",
         generation_id=derive_generation_id(
             operation_id=operation_id,
             artifact_sha256=artifact.sha256,
@@ -200,6 +202,48 @@ def test_authority_create_verifies_exact_post_write_and_returns_no_dispatch_perm
     assert kwargs["settings"]["insert_keeper_max_retries"] == 0
 
 
+def test_authority_migrates_only_completed_internal_slot_through_versioned_cas() -> None:
+    desired = replace(_record(), phase=ExternalAuthorityPhase.LOCKED, dispatch_epoch=0)
+
+    class Connector:
+        def __init__(self) -> None:
+            self.row = (
+                "prior-operation",
+                "prior-fence",
+                "COMPLETED",
+                4,
+                json.dumps({"schema_version": "dpone.clickhouse.cluster-full-refresh.v1"}),
+                _digest("9"),
+                7,
+            )
+            self.connection = self
+
+        def get_records(self, query: str, params: Any = None) -> list[tuple[Any, ...]]:
+            del query, params
+            return [self.row]
+
+        def execute(self, sql: str, params: dict[str, Any], **kwargs: Any) -> None:
+            del sql, kwargs
+            self.row = (
+                params["operation_id"],
+                params["fence_token"],
+                params["phase"],
+                params["dispatch_epoch"],
+                params["payload"],
+                params["payload_sha256"],
+                8,
+            )
+
+    connector = Connector()
+    authority = ClickHouseExternalKeeperMapAuthority(connector, "analytics")
+
+    assert authority.read_versioned(desired.target_key) is None
+    migrated = authority.create_if_absent(desired)
+
+    assert migrated.status is ExternalAuthorityMutationStatus.VERIFIED
+    assert migrated.observed is not None and migrated.observed.version == 8
+
+
 def test_authority_dispatch_cas_returns_bound_permit_only_after_exact_version() -> None:
     desired = _record()
     current_record = replace(desired, phase=ExternalAuthorityPhase.STAGED, dispatch_epoch=0)
@@ -265,6 +309,16 @@ def test_replica_staging_passes_only_a_direct_member_connection_to_driver() -> N
     calls: list[tuple[str, Any]] = []
     artifact_checks: list[ArtifactIdentity] = []
 
+    class Source:
+        binding_id = "artifact-v1"
+        identity = record.artifact
+
+        def revalidate(self, artifact: ArtifactIdentity) -> None:
+            artifact_checks.append(artifact)
+
+        def open_replay(self) -> object:
+            return sealed_source
+
     class Driver:
         def observe(self, direct: Any, observed_record: ExternalAuthorityRecord) -> MemberGenerationObservation:
             calls.append(("observe", direct))
@@ -295,22 +349,20 @@ def test_replica_staging_passes_only_a_direct_member_connection_to_driver() -> N
 
     staging = ClickHouseExternalReplicaStaging(
         connection_provider=lambda requested: connection if requested == member_id else None,
-        artifact_verifier=ClickHouseExternalArtifactVerifier(revalidate=artifact_checks.append),
-        artifact_source=lambda artifact: sealed_source,
         driver=Driver(),
     )
 
     assert staging.observe(member_id, record).member_id == member_id
     staging.create_candidate(member_id, record)
-    staging.load_candidate(member_id, record)
+    staging.load_candidate(member_id, record, Source())
     expected = record.members[0].candidate
     assert expected is not None
     staging.drop_candidate(member_id, record, expected)
     assert calls == [(name, connection) for name in ("observe", "create", "load", "drop")]
-    assert artifact_checks == [record.artifact, record.artifact]
+    assert artifact_checks == [record.artifact]
 
 
-def test_replica_staging_fails_before_candidate_mutation_when_artifact_cannot_reopen() -> None:
+def test_replica_staging_fails_before_load_when_artifact_binding_differs() -> None:
     record = _record()
     member_id = record.members[0].member_id
     mutations: list[str] = []
@@ -320,8 +372,7 @@ def test_replica_staging_fails_before_candidate_mutation_when_artifact_cannot_re
             raise AssertionError("not used")
 
         def create_candidate(self, direct: Any, observed_record: ExternalAuthorityRecord) -> PhysicalGeneration:
-            mutations.append("create")
-            return _generation("unexpected")
+            raise AssertionError("not used")
 
         def load_candidate(self, direct: Any, observed_record: ExternalAuthorityRecord, source: Any) -> None:
             raise AssertionError("not used")
@@ -336,13 +387,21 @@ def test_replica_staging_fails_before_candidate_mutation_when_artifact_cannot_re
 
     staging = ClickHouseExternalReplicaStaging(
         connection_provider=lambda requested: object(),
-        artifact_verifier=ClickHouseExternalArtifactVerifier(revalidate=lambda artifact: None),
-        artifact_source=lambda artifact: None,
         driver=Driver(),
     )
 
+    class Source:
+        binding_id = "different-artifact"
+        identity = record.artifact
+
+        def revalidate(self, artifact: ArtifactIdentity) -> None:
+            mutations.append("revalidate")
+
+        def open_replay(self) -> None:
+            mutations.append("open")
+
     with pytest.raises(ValueError, match="ARTIFACT_UNSUPPORTED"):
-        staging.create_candidate(member_id, record)
+        staging.load_candidate(member_id, record, Source())
 
     assert mutations == []
 

@@ -5,11 +5,10 @@ from __future__ import annotations
 import secrets
 from collections.abc import Callable, Mapping
 from dataclasses import replace
-from typing import Any, NoReturn, Protocol
+from typing import Any, NoReturn
 
 from dpone.contracts.clickhouse_cluster_publication import QueueEntry, QueueState
 from dpone.contracts.clickhouse_external_replication import (
-    ArtifactIdentity,
     ExternalArtifactReceipt,
     ExternalAuthorityPhase,
     ExternalAuthorityRecord,
@@ -23,6 +22,7 @@ from dpone.contracts.clickhouse_external_replication import (
     derive_target_key,
 )
 from dpone.ports.clickhouse_external_replication import (
+    ExternalArtifactSourcePort,
     ExternalAuthorityMutationResult,
     ExternalAuthorityMutationStatus,
     ExternalAuthorityPort,
@@ -32,22 +32,22 @@ from dpone.ports.clickhouse_external_replication import (
     ExternalTopologyCatalogPort,
     VersionedExternalAuthorityRecord,
 )
-
-
-class ExternalArtifactSourcePort(Protocol):
-    """Invocation-scoped immutable artifact and its explicit load capability."""
-
-    @property
-    def identity(self) -> ArtifactIdentity: ...
-
-    def revalidate(self, expected: ArtifactIdentity) -> None: ...
-
-    def load_candidate(
-        self,
-        staging: ExternalReplicaStagingPort,
-        member_id: str,
-        record: ExternalAuthorityRecord,
-    ) -> None: ...
+from dpone.runtime.sinks.clickhouse_external_replication_state import (
+    complete_candidate as _complete,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_state import (
+    member as _member,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_state import (
+    member_ids as _ids,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_state import (
+    record_from_state,
+    state_from_versioned,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_state import (
+    replace_member as _replace_member,
+)
 
 
 class ClickHouseExternalReplicationServiceAdapter:
@@ -58,7 +58,6 @@ class ClickHouseExternalReplicationServiceAdapter:
         *,
         topology: ExternalTopologyCatalogPort,
         authority: ExternalAuthorityPort,
-        source: ExternalArtifactSourcePort,
         staging: ExternalReplicaStagingPort,
         ddl: ExternalClusterDdlPort,
         cluster: str,
@@ -68,7 +67,6 @@ class ClickHouseExternalReplicationServiceAdapter:
     ) -> None:
         self._topology_port = topology
         self._authority = authority
-        self._source = source
         self._staging = staging
         self._ddl = ddl
         self._cluster = cluster
@@ -85,6 +83,9 @@ class ClickHouseExternalReplicationServiceAdapter:
         topology.validate()
         self._inventory_digest = topology.digest
         return tuple(member.member_id for member in topology.ordered_members)
+
+    def inventory_digest(self) -> str:
+        return self._inventory()
 
     def read_authority(self, target_key: str) -> Mapping[str, Any] | None:
         current = self._authority.read_versioned(target_key)
@@ -143,6 +144,7 @@ class ClickHouseExternalReplicationServiceAdapter:
         operation_id: str,
         candidate_name: str,
         artifact: ExternalArtifactReceipt,
+        source: ExternalArtifactSourcePort,
     ) -> Mapping[str, Any]:
         current = self._member_current(member_id)
         record = current.record
@@ -150,10 +152,12 @@ class ClickHouseExternalReplicationServiceAdapter:
             record.operation_id != operation_id
             or record.candidate != candidate_name
             or record.artifact != artifact.identity
-            or self._source.identity != artifact.identity
+            or source.identity != artifact.identity
+            or record.artifact_binding_id != source.binding_id
         ):
             self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", record)
-        self._source.revalidate(artifact.identity)
+        source.revalidate(artifact.identity)
+        source.open_replay()
         observed = self._staging.observe(member_id, record)
         member = _member(record, member_id)
         if observed.candidate is None:
@@ -165,7 +169,7 @@ class ClickHouseExternalReplicationServiceAdapter:
             self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
         error: Exception | None = None
         try:
-            self._source.load_candidate(self._staging, member_id, record)
+            self._staging.load_candidate(member_id, record, source)
         except Exception as caught:  # reconcile a possibly-lost load reply
             error = caught
         observed = self._staging.observe(member_id, record)
@@ -224,81 +228,13 @@ class ClickHouseExternalReplicationServiceAdapter:
         return self._cleanup_states(record)
 
     def _record(self, state: Mapping[str, Any], base: ExternalAuthorityRecord | None) -> ExternalAuthorityRecord:
-        artifact = self._artifact(state)
-        members = tuple(self._state_member(state, member_id, base) for member_id in state["member_ids"])
-        error = next(
-            (
-                f"external_generation_diverged:{member.member_id}"
-                for member in members
-                if state["member_states"][member.member_id]["state"] == "DIVERGED"
-            ),
-            None,
-        )
-        record = ExternalAuthorityRecord(
-            target_key=str(state["target_key"]),
-            operation_id=str(state["operation_id"]),
-            fence_token=str(state["fence_token"]),
-            phase=ExternalAuthorityPhase(str(state["phase"])),
-            dispatch_epoch=int(state["dispatch_epoch"]),
-            inventory_digest=self._inventory(),
-            plan_digest=str(state["plan_digest"]),
+        return record_from_state(
+            state,
+            base,
             database=self._database,
             target=self._target,
-            candidate=str(state["candidate_name"]),
-            members=members,
-            artifact=artifact,
-            generation_id=None if artifact is None else str(state["generation_id"]),
-            publication_correlation_token=_field(base, "publication_correlation_token"),
-            publication_entry=_field(base, "publication_entry"),
-            publication_query_digest=_field(base, "publication_query_digest"),
-            cleanup_correlation_token=_field(base, "cleanup_correlation_token"),
-            cleanup_entry=_field(base, "cleanup_entry"),
-            cleanup_query_digest=_field(base, "cleanup_query_digest"),
-            error_code=error,
+            inventory_digest=self._inventory(),
         )
-        record.validate()
-        return record
-
-    def _state_member(
-        self, state: Mapping[str, Any], member_id: str, base: ExternalAuthorityRecord | None
-    ) -> ExternalMemberRecord:
-        prior = None if base is None else _member(base, member_id)
-        raw = state["member_states"][member_id]
-        status = raw["state"]
-        stage = ExternalMemberStageState.CANDIDATE_BOUND
-        if status == "READY":
-            stage = ExternalMemberStageState.READY
-        elif status == "PENDING":
-            stage = ExternalMemberStageState.PENDING
-        candidate = None if prior is None else prior.candidate
-        uuid = raw.get("candidate_uuid")
-        if uuid is None and status in {"PENDING", "LOADING"}:
-            candidate = None
-        elif uuid is not None and (candidate is None or candidate.uuid != uuid):
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", base)
-        return ExternalMemberRecord(
-            member_id=member_id,
-            stage_state=stage,
-            publication_state=MemberPublicationState.UNKNOWN if prior is None else prior.publication_state,
-            cleanup_complete=False if prior is None else prior.cleanup_complete,
-            predecessor=None if prior is None else prior.predecessor,
-            candidate=candidate,
-        )
-
-    def _artifact(self, state: Mapping[str, Any]) -> ArtifactIdentity | None:
-        if "artifact_sha256" not in state:
-            return None
-        expected = self._source.identity
-        projected = (
-            str(state["artifact_sha256"]),
-            int(state["artifact_row_count"]),
-            str(state["artifact_schema_sha256"]),
-            str(state["artifact_content_sha256"]),
-        )
-        actual = (expected.sha256, expected.row_count, expected.schema_digest, expected.wire_digest)
-        if projected != actual:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED")
-        return expected
 
     def _adopt(self, record: ExternalAuthorityRecord) -> ExternalAuthorityRecord:
         observed = tuple(self._staging.observe(member.member_id, record) for member in record.members)
@@ -393,39 +329,7 @@ class ClickHouseExternalReplicationServiceAdapter:
         return result.observed
 
     def _state(self, current: VersionedExternalAuthorityRecord) -> dict[str, Any]:
-        record = current.record
-        states = {}
-        for member in record.members:
-            status = member.stage_state.value.upper()
-            if member.stage_state is ExternalMemberStageState.CANDIDATE_BOUND:
-                diverged = record.error_code == f"external_generation_diverged:{member.member_id}"
-                status = "DIVERGED" if diverged else "AMBIGUOUS"
-            states[member.member_id] = {
-                "state": status,
-                "candidate_uuid": None if member.candidate is None else member.candidate.uuid,
-            }
-        state: dict[str, Any] = {
-            "target_key": record.target_key,
-            "operation_id": record.operation_id,
-            "fence_token": record.fence_token,
-            "phase": record.phase.value,
-            "dispatch_epoch": record.dispatch_epoch,
-            "inventory_digest": record.inventory_digest,
-            "plan_digest": record.plan_digest,
-            "candidate_name": record.candidate,
-            "member_ids": _ids(record),
-            "member_states": states,
-            "version": current.version,
-        }
-        if record.artifact is not None:
-            state.update(
-                artifact_sha256=record.artifact.sha256,
-                artifact_schema_sha256=record.artifact.schema_digest,
-                artifact_content_sha256=record.artifact.wire_digest,
-                artifact_row_count=record.artifact.row_count,
-                generation_id=record.generation_id,
-            )
-        return state
+        return state_from_versioned(current)
 
     @staticmethod
     def _candidate(observed: MemberGenerationObservation, record: ExternalAuthorityRecord) -> Mapping[str, Any]:
@@ -482,39 +386,10 @@ class ClickHouseExternalReplicationServiceAdapter:
         raise ExternalPublicationError(code, evidence=evidence)
 
 
-def _field(record: ExternalAuthorityRecord | None, name: str) -> str | None:
-    return None if record is None else getattr(record, name)
-
-
-def _member(record: ExternalAuthorityRecord, member_id: str) -> ExternalMemberRecord:
-    return next(member for member in record.members if member.member_id == member_id)
-
-
-def _replace_member(record: ExternalAuthorityRecord, desired: ExternalMemberRecord) -> tuple[ExternalMemberRecord, ...]:
-    return tuple(desired if member.member_id == desired.member_id else member for member in record.members)
-
-
-def _ids(record: ExternalAuthorityRecord) -> tuple[str, ...]:
-    return tuple(member.member_id for member in record.members)
-
-
 def _desired(member: ExternalMemberRecord) -> PhysicalGeneration:
     if member.candidate is None:
         raise ExternalPublicationError("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED")
     return member.candidate
-
-
-def _complete(candidate: PhysicalGeneration | None, artifact: ArtifactIdentity | None) -> bool:
-    return (
-        candidate is not None
-        and artifact is not None
-        and (
-            candidate.schema_digest,
-            candidate.content_digest,
-            candidate.row_count,
-        )
-        == (artifact.schema_digest, artifact.wire_digest, artifact.row_count)
-    )
 
 
 def _shape(value: PhysicalGeneration | None) -> tuple[Any, ...] | None:
@@ -531,4 +406,4 @@ def _equivalent(current: Mapping[str, Any], desired: Mapping[str, Any]) -> bool:
     }
 
 
-__all__ = ["ClickHouseExternalReplicationServiceAdapter", "ExternalArtifactSourcePort"]
+__all__ = ["ClickHouseExternalReplicationServiceAdapter"]

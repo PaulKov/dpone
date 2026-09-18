@@ -17,8 +17,6 @@ INTERNAL_AUTHORITY_SCHEMA_VERSION = "dpone.clickhouse.cluster-full-refresh.v1"
 
 
 class ExternalContractError(ValueError):
-    """An external-replication value cannot be trusted safely."""
-
     def __init__(self, code: str, detail: str) -> None:
         self.code = code
         super().__init__(f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{code}:{detail}")
@@ -131,8 +129,6 @@ class ArtifactIdentity:
 
 @dataclass(frozen=True, slots=True)
 class ExternalArtifactReceipt:
-    """Replayable artifact proof accepted by external orchestration."""
-
     artifact_id: str
     sha256: str
     byte_size: int
@@ -196,8 +192,6 @@ class ExternalPublicationRequest:
 
 
 class ExternalPublicationError(RuntimeError):
-    """Stable public failure with caller-supplied redacted evidence."""
-
     def __init__(self, code: str, *, evidence: Mapping[str, object] | None = None) -> None:
         self.code = code
         self.evidence = dict(evidence or {})
@@ -264,6 +258,7 @@ class ExternalAuthorityRecord:
     candidate: str
     members: tuple[ExternalMemberRecord, ...]
     artifact: ArtifactIdentity | None = None
+    artifact_binding_id: str | None = None
     generation_id: str | None = None
     publication_correlation_token: str | None = None
     publication_entry: str | None = None
@@ -294,10 +289,12 @@ class ExternalAuthorityRecord:
         for member in ordered:
             member.validate()
         if self.artifact is None:
-            if self.generation_id is not None:
+            if self.generation_id is not None or self.artifact_binding_id is not None:
                 raise ExternalContractError("AUTHORITY_INVALID", "generation requires artifact identity")
         else:
             self.artifact.validate()
+            if not self.artifact_binding_id:
+                raise ExternalContractError("AUTHORITY_INVALID", "artifact binding identity is missing")
             expected = derive_generation_id(
                 operation_id=self.operation_id,
                 artifact_sha256=self.artifact.sha256,
