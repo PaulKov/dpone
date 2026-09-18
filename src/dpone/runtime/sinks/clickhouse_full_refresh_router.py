@@ -16,6 +16,7 @@ from dpone.runtime.clickhouse_cluster_publication_composition import (
 )
 from dpone.runtime.decision_audit import publish_runtime_decision
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import CLUSTER_RECEIPT_VERSION
+from dpone.contracts.clickhouse_external_replication import EXTERNAL_RECEIPT_SCHEMA_VERSION
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import ClickHouseFullRefreshPublicationService
 
 
@@ -26,9 +27,11 @@ class ClickHouseFullRefreshPublicationRouter:
         self,
         local: ClickHouseFullRefreshPublicationService,
         cluster: Any,
+        external: Any | None = None,
     ) -> None:
         self._local = local
         self._cluster = cluster
+        self._external = external
 
     @classmethod
     def from_connector(cls, connector: Any) -> ClickHouseFullRefreshPublicationRouter:
@@ -57,6 +60,33 @@ class ClickHouseFullRefreshPublicationRouter:
         service = self._service(load_config)
         return service.publish(load_config, candidate_config, staged_rows=staged_rows)
 
+    def is_external(self, load_config: Any) -> bool:
+        return evaluate_clickhouse_cluster_admission(_admission_input(load_config)).mode == "cluster_external"
+
+    def stage_external(self, load_config: Any, payload: Any) -> Any:
+        service = self._service(load_config)
+        return service.stage(load_config, payload)
+
+    def validate_external(self, context: Any) -> Any:
+        if self._external is None:
+            raise RuntimeError("clickhouse_cluster_external_publication.runtime_capability_unavailable")
+        return self._external.validate(context)
+
+    def publish_external(self, context: Any, validation: Any) -> Any:
+        if self._external is None:
+            raise RuntimeError("clickhouse_cluster_external_publication.runtime_capability_unavailable")
+        return self._external.publish(context, validation)
+
+    def cleanup_external(self, context: Any) -> Any:
+        if self._external is None:
+            raise RuntimeError("clickhouse_cluster_external_publication.runtime_capability_unavailable")
+        return self._external.cleanup(context)
+
+    def abort_external(self, context: Any) -> None:
+        if self._external is None:
+            raise RuntimeError("clickhouse_cluster_external_publication.runtime_capability_unavailable")
+        self._external.abort(context)
+
     def _service(self, load_config: Any) -> Any:
         decision = evaluate_clickhouse_cluster_admission(_admission_input(load_config))
         if not self._local.is_enabled(load_config) and not decision.requested:
@@ -81,11 +111,25 @@ class ClickHouseFullRefreshPublicationRouter:
             raise ClickHouseClusterAdmissionError(decision)
         if not decision.selected:
             return self._local
+        if decision.mode == "cluster_external":
+            if self._external is None or not self._external.is_enabled(load_config):
+                raise RuntimeError("clickhouse_cluster_external_publication.runtime_capability_unavailable")
+            return self._external
         if not self._cluster.is_enabled(load_config):
             raise RuntimeError("clickhouse_cluster_publication.runtime_capability_unavailable")
         return self._cluster
 
     def cleanup(self, receipt: Any) -> None:
+        if isinstance(receipt, Mapping) and receipt.get("schema_version") == EXTERNAL_RECEIPT_SCHEMA_VERSION:
+            if self._external is None:
+                raise RuntimeError("clickhouse_cluster_external_publication.runtime_capability_unavailable")
+            self._external.cleanup_receipt(receipt)
+            return
+        if getattr(receipt, "schema_version", None) == EXTERNAL_RECEIPT_SCHEMA_VERSION:
+            if self._external is None:
+                raise RuntimeError("clickhouse_cluster_external_publication.runtime_capability_unavailable")
+            self._external.cleanup_receipt(receipt)
+            return
         if isinstance(receipt, Mapping) and receipt.get("schema_version") == CLUSTER_RECEIPT_VERSION:
             self._cluster.cleanup(receipt)
             return
@@ -94,8 +138,10 @@ class ClickHouseFullRefreshPublicationRouter:
             return
         self._local.cleanup(receipt)
 
-    @staticmethod
-    def replay_result(load_config: Any) -> Any:
+    def replay_result(self, load_config: Any) -> Any:
+        decision = evaluate_clickhouse_cluster_admission(_admission_input(load_config))
+        if decision.mode == "cluster_external" and self._external is not None:
+            return self._external.replay_result(load_config)
         return ClickHouseFullRefreshPublicationService.replay_result(load_config)
 
 

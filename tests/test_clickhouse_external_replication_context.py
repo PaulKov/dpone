@@ -38,7 +38,11 @@ def test_external_context_survives_validation_without_entering_evidence() -> Non
         authority_version=4,
         phase="STAGED",
     )
-    context = ExternalStagedContext(request=request, staged_receipt=receipt)
+    context = ExternalStagedContext(
+        request=request,
+        staged_receipt=receipt,
+        candidate_name="target_table__dpone_ext_candidate",
+    )
     handle = StagedLoadHandle(
         staging_config=None,
         payload_schema=(),

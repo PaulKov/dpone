@@ -255,13 +255,28 @@ class ClickHouseConnector(AbstractConnector):
 
     def clone_for_partition(self, partition_index: int) -> ClickHouseConnector:
         """Return an isolated connector for one parallel partition worker."""
+        return self.clone_for_endpoint(
+            self.host,
+            self.port,
+            application_suffix=f"partition-{partition_index}",
+        )
+
+    def clone_for_endpoint(
+        self,
+        host: str,
+        port: int,
+        *,
+        application_suffix: str,
+    ) -> ClickHouseConnector:
+        """Reuse resolved credentials for one explicitly admitted direct member."""
+
         return ClickHouseConnector(
-            host=self.host,
-            port=self.port,
+            host=host,
+            port=port,
             database=self.database,
             user=self.user,
             password=self.password,
-            application_name=f"{self.application_name}-partition-{partition_index}",
+            application_name=f"{self.application_name}-{application_suffix}",
             secure=self.secure,
             compression=self.compression,
             connect_timeout=self.connect_timeout,
