@@ -18,12 +18,15 @@ from dpone_airflow_pack.cache_reconcile_status import read_reconcile_status
 from dpone_airflow_pack.deployment_index_contract import (
     INDEX_SCHEMA_V1,
     INDEX_SCHEMA_V2,
+    INDEX_SCHEMA_V3,
+    INDEX_SCHEMA_V4,
     AirflowDeploymentIndexError,
     infer_cache_root,
     resolve_cache_artifact,
 )
 
-_SUPPORTED_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V1, INDEX_SCHEMA_V2})
+_STRICT_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4})
+_SUPPORTED_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V1, *_STRICT_INDEX_SCHEMAS})
 _DEFAULT_MAX_CACHE_JSON_BYTES = 8 * 1024 * 1024
 
 
@@ -84,7 +87,7 @@ def read_exact_cache_status(
             _blocker(
                 "airflow_pack_index_schema_mismatch",
                 str(index_path),
-                f"Expected schema {INDEX_SCHEMA_V1} or {INDEX_SCHEMA_V2}",
+                "Expected a supported Airflow deployment index schema",
             )
         )
         workloads = {workload_id: _missing_workload_status(workload_id) for workload_id in workload_ids}
@@ -103,7 +106,7 @@ def read_exact_cache_status(
                     "current-pointer identity differs from airflow-index identity",
                 )
             )
-        if index.get("schema") == INDEX_SCHEMA_V2 and activation_id is None:
+        if index.get("schema") in _STRICT_INDEX_SCHEMAS and activation_id is None:
             blockers.append(
                 _blocker(
                     "airflow_pack_activation_id_missing",
@@ -132,7 +135,7 @@ def read_exact_cache_status(
         release_id=release_id,
         deployment_id=deployment_id,
         activation_id=activation_id,
-        required=index.get("schema") == INDEX_SCHEMA_V2,
+        required=index.get("schema") in _STRICT_INDEX_SCHEMAS,
         airflow_index_sha256=("sha256:" + index_sha if index_sha is not None else None),
         max_age_seconds=max_reconcile_age_seconds,
     )
