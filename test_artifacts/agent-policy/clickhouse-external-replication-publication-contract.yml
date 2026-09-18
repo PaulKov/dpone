@@ -62,7 +62,17 @@ integrator_owned_paths:
   - src/dpone/runtime/sinks/clickhouse_full_refresh_router.py
   - src/dpone/runtime/sinks/clickhouse_staged_load.py
   - src/dpone/runtime/sinks/clickhouse_sink.py
+  - src/dpone/runtime/sinks/clickhouse_cluster_preflight.py
+  - src/dpone/runtime/sinks/clickhouse_table_ddl.py
+  - src/dpone/runtime/etl/processor_runtime.py
+  - src/dpone/runtime/connectors/clickhouse_tsv_codec.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_queryout_artifacts.py
+  - src/dpone/commands/run_failure_output.py
   - tests/test_clickhouse_cluster_admission.py
+  - tests/test_clickhouse_cluster_topology_preflight.py
+  - tests/test_runtime_clickhouse_tsv_codec.py
+  - tests/test_clickhouse_bulk_path_resolution.py
+  - tests/test_run_failure_output.py
   - tests/conftest.py
 
 read_only_paths:

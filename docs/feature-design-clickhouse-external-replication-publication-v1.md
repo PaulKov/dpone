@@ -107,8 +107,10 @@ Journey:
 - Dpone can create one direct member connection from the already-resolved sink
   credential without logging or persisting secrets.
 - KeeperMap is configured and available to every member.
-- The replayable artifact stays immutable and retained until external staging
-  reaches `STAGED` or the operation is safely aborted.
+- The replayable artifact is atomically retained in a content-addressed durable
+  store, is reopenable by a fresh process from its authority-bound identity,
+  and stays immutable until external staging reaches `STAGED` or the operation
+  is safely aborted. Authority/evidence contains no local path.
 - Logical-content verification uses a deterministic SHA-256 stream over typed
   rows in a canonical all-column order. Unsupported types or an unbounded sort
   fail admission; equal row counts alone never prove equality.
@@ -273,8 +275,10 @@ For each member in stable member-ID order:
    and canonical content digest.
 4. If it exactly matches the desired generation, CAS that member to `READY`
    without inserting.
-5. If it is absent, create the deterministic local candidate and bind its UUID
-   by CAS before load.
+5. If it is absent, generate and CAS a candidate UUID intent before physical
+   mutation, execute `CREATE TABLE ... UUID` with that exact value, observe it,
+   and CAS the complete candidate identity before load. A retry after process
+   death reuses the same intent and never adopts a foreign UUID.
 6. If it is incomplete after an ambiguous prior load, require that no member has
    entered publication and the candidate UUID is the exact owned UUID. Drop that
    candidate locally, prove absence, recreate it, bind the new UUID, and replay
@@ -348,7 +352,9 @@ for member in inventory.members:
     if current is ambiguous_owned_partial:
         require_no_publication_started()
         drop_exact_owned_candidate(member)
-    create_and_bind_candidate(member)
+    persist_candidate_uuid_intent(member)
+    create_candidate_with_exact_uuid(member)
+    bind_observed_candidate(member)
     load_artifact_once(member, artifact)
     require_exact_content(member, desired)
     mark_ready(member)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import ClassVar
 
 from dpone.runtime.support.temporal_fidelity import (
@@ -183,6 +184,31 @@ class ClickHouseTabSeparatedCodec:
             f"{self._clickhouse_literal(self.marker_prefix)})"
         )
 
+    def decode_wire_value(self, value: str, *, source_type: str | None = None) -> object:
+        """Decode one MSSQL-produced TabSeparated field without data loss."""
+
+        if value == r"\N":
+            return None
+        decoded = _unescape_tabseparated(value)
+        if decoded == self.empty_string_marker:
+            return ""
+        decoded = decoded.replace(self.escaped_prefix_marker, self.marker_prefix)
+        if self._uses_epoch_naive_timestamp(source_type):
+            scale = naive_timestamp_scale(str(source_type or ""))
+            ticks = int(decoded)
+            seconds, fraction = divmod(ticks, 10**scale)
+            microseconds = fraction * (10 ** max(0, 6 - scale)) if scale <= 6 else fraction // (10 ** (scale - 6))
+            return datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=seconds, microseconds=microseconds)
+        return decoded
+
+    def preserves_text_value(self, source_type: str | None) -> bool:
+        """Return whether decoded text must bypass generic empty/null coercion."""
+
+        normalized = str(source_type or "").strip().lower()
+        return self._is_binary(normalized) or any(
+            token in normalized for token in ("char", "text", "xml", "uniqueidentifier")
+        )
+
     def _uses_epoch_naive_timestamp(self, source_type: str | None) -> bool:
         normalized_type = str(source_type or "").strip().lower()
         if not is_naive_timestamp_type(normalized_type):
@@ -238,3 +264,19 @@ class ClickHouseTabSeparatedCodec:
     @staticmethod
     def _is_datetimeoffset(normalized_type: str) -> bool:
         return normalized_type.startswith("datetimeoffset")
+
+
+def _unescape_tabseparated(value: str) -> str:
+    escapes = {"t": "\t", "n": "\n", "r": "\r", "\\": "\\"}
+    result: list[str] = []
+    index = 0
+    while index < len(value):
+        current = value[index]
+        if current != "\\" or index + 1 >= len(value):
+            result.append(current)
+            index += 1
+            continue
+        following = value[index + 1]
+        result.append(escapes.get(following, following))
+        index += 2
+    return "".join(result)

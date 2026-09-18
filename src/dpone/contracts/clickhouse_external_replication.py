@@ -57,6 +57,7 @@ class ExternalAuthorityPhase(StrEnum):
 
 class ExternalMemberStageState(StrEnum):
     PENDING = "pending"
+    CREATE_INTENT = "create_intent"
     CANDIDATE_BOUND = "candidate_bound"
     READY = "ready"
 
@@ -247,6 +248,7 @@ class ExternalMemberRecord:
     publication_state: MemberPublicationState = MemberPublicationState.UNKNOWN
     cleanup_complete: bool = False
     predecessor: PhysicalGeneration | None = None
+    candidate_uuid_intent: str | None = None
     candidate: PhysicalGeneration | None = None
 
     def validate(self) -> None:
@@ -257,6 +259,10 @@ class ExternalMemberRecord:
                 generation.validate()
         if self.stage_state is ExternalMemberStageState.READY and self.candidate is None:
             raise ExternalContractError("MEMBER_INVALID", "ready member has no bound candidate")
+        if self.stage_state is ExternalMemberStageState.CREATE_INTENT and not self.candidate_uuid_intent:
+            raise ExternalContractError("MEMBER_INVALID", "create intent has no candidate UUID")
+        if self.candidate is not None and self.candidate_uuid_intent not in {None, self.candidate.uuid}:
+            raise ExternalContractError("MEMBER_INVALID", "candidate differs from its UUID intent")
 
 
 @dataclass(frozen=True, slots=True)

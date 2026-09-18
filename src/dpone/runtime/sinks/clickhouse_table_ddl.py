@@ -166,11 +166,13 @@ class ClickHouseTableDdlRenderer:
         columns_sql: Sequence[str],
         design: ClickHouseTableDesign | None = None,
         if_not_exists: bool = False,
+        table_uuid: str | None = None,
     ) -> str:
         resolved = design or ClickHouseTableDesign()
         clause = "IF NOT EXISTS " if if_not_exists else ""
+        uuid_clause = f" UUID '{table_uuid}'" if table_uuid else ""
         lines = [
-            f"CREATE TABLE {clause}{table}{resolved.cluster.ddl_clause} "
+            f"CREATE TABLE {clause}{table}{uuid_clause}{resolved.cluster.ddl_clause} "
             f"({', '.join(columns_sql)}) ENGINE = {resolved.engine}"
         ]
         if resolved.partition_by:

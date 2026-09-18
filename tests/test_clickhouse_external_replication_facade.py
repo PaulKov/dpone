@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -11,6 +12,8 @@ import pytest
 from dpone.config.load_config import LoadConfig
 from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
 from dpone.contracts.clickhouse_external_replication import ArtifactIdentity, ExternalPublicationError
+from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
+from dpone.runtime.sinks.clickhouse_external_artifact_source import ClickHouseExternalArtifactSource
 from dpone.runtime.sinks.clickhouse_external_replication_facade import (
     ClickHouseExternalReplicationFacade,
 )
@@ -18,6 +21,7 @@ from dpone.runtime.sinks.clickhouse_external_replication_runtime import (
     ClickHouseExternalReplicationRuntime,
 )
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import SCHEDULER_IDENTITY_OPTION
+from dpone.runtime.sinks.load_payload import LoadPayload
 
 
 class _ArtifactSource:
@@ -348,6 +352,120 @@ def test_external_mode_is_explicit_and_unsafe_transformations_fail_closed() -> N
 
     assert fixture.source_calls == 0
     assert fixture.service.stage_calls == 0
+
+
+def test_unsupported_artifact_after_admission_aborts_lock_and_allows_next_operation() -> None:
+    fixture = _fixture()
+    admitted = fixture.facade.prepare_admission(_config())
+
+    with pytest.raises(ExternalPublicationError, match="TRANSFORMATION_UNSUPPORTED"):
+        fixture.facade.stage(
+            admitted,
+            _payload(codec=SimpleNamespace(clickhouse_decode_expression=lambda value: value)),
+        )
+
+    assert fixture.service.authority is not None
+    assert fixture.service.authority["phase"] == "ABORTED"
+    assert fixture.service.candidates == dict.fromkeys(fixture.service.members)
+    assert fixture.service.stage_calls == 0
+
+    next_config = replace(
+        _config(),
+        options={**_config().options, SCHEDULER_IDENTITY_OPTION: "scheduled-run-next"},
+    )
+    fixture.facade.prepare_admission(next_config)
+    assert fixture.service.authority["phase"] == "LOCKED"
+
+
+def test_declared_row_budget_is_preserved_after_staging() -> None:
+    service = _Service()
+    observed_budgets: list[int] = []
+
+    def service_factory(cluster: str, database: str, target: str, **kwargs: Any) -> _Service:
+        del cluster, database, target
+        maximum_rows = kwargs.get("maximum_rows")
+        if maximum_rows is not None:
+            observed_budgets.append(maximum_rows)
+        return service
+
+    facade = ClickHouseExternalReplicationFacade(
+        service_factory=service_factory,
+        artifact_source_factory=lambda *_: _ArtifactSource(),
+    )
+    cluster = {
+        **_config().options["physical_design"]["storage"]["clickhouse"]["cluster"],
+        "external_content_row_budget": 100_001,
+    }
+    config = replace(
+        _config(),
+        options={
+            **_config().options,
+            "physical_design": {"storage": {"clickhouse": {"engine": "MergeTree", "cluster": cluster}}},
+        },
+    )
+    context = facade.stage(config, _payload())
+    validation = facade.validate(context)
+    facade.publish(context, validation)
+    facade.cleanup(context)
+
+    assert context.content_row_budget == 100_001
+    assert observed_budgets == [100_001, 100_001, 100_001, 100_001]
+
+
+def test_prepare_resumes_staging_from_retained_artifact_without_source_io(tmp_path: Path) -> None:
+    service = _Service()
+
+    class ArtifactSink:
+        _payload_ingestion = SimpleNamespace(
+            _clickhouse_schema=lambda config, schema: tuple((name, "Int64") for name, _ in schema)
+        )
+
+    def source_factory(load_config: Any, payload: Any) -> ClickHouseExternalArtifactSource:
+        return ClickHouseExternalArtifactSource(
+            sink=ArtifactSink(),
+            load_config=load_config,
+            payload=payload,
+            maximum_rows=10,
+        )
+
+    facade = ClickHouseExternalReplicationFacade(
+        service_factory=lambda cluster, database, target, **_: service,
+        artifact_source_factory=source_factory,
+    )
+    config = replace(
+        _config(),
+        options={**_config().options, "external_artifact_store_path": str(tmp_path)},
+    )
+    payload = LoadPayload(
+        artifact=InMemoryRowsArtifact([{"id": 1}, {"id": 2}]),
+        schema=(("id", "bigint"),),
+    )
+    original_stage = service.stage_member_once
+    failed = False
+
+    def fail_second_member_once(member_id: str, **values: Any) -> Mapping[str, Any]:
+        nonlocal failed
+        if member_id == "member-b" and not failed:
+            failed = True
+            raise RuntimeError("simulated process boundary")
+        return original_stage(member_id, **values)
+
+    service.stage_member_once = fail_second_member_once  # type: ignore[method-assign]
+    with pytest.raises(ExternalPublicationError, match="STAGING_INCOMPLETE"):
+        facade.stage(config, payload)
+    assert service.authority is not None and service.authority["phase"] == "STAGING"
+
+    service.stage_member_once = original_stage  # type: ignore[method-assign]
+    resumed = ClickHouseExternalReplicationFacade(
+        service_factory=lambda cluster, database, target, **_: service,
+        artifact_source_factory=lambda *_: (_ for _ in ()).throw(AssertionError("source must not be read")),
+    )
+    replay_config = resumed.prepare_admission(config)
+
+    assert resumed.replay_result(replay_config) is not None
+    assert service.authority["phase"] == "COMPLETED"
+    assert service.stage_calls == 2
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_abort_removes_only_unpublished_owned_candidates() -> None:

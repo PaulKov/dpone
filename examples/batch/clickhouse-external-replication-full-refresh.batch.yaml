@@ -5,13 +5,13 @@ defaults:
   name: external_cluster_full_refresh
   source:
     type: mssql
-    connection_id: source_connection
+    connection_ref: source_connection
     options:
       batch_size: 50000
       export_format: csv
   sink:
     type: clickhouse
-    connection_id: target_connection
+    connection_ref: target_connection
     table:
       schema: analytics
       name: target_table

@@ -6,6 +6,7 @@ import secrets
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from typing import Any
+from uuid import uuid4
 
 from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactReceipt,
@@ -203,8 +204,31 @@ class ClickHouseExternalReplicationServiceAdapter:
             _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", record)
         created_here = False
         if observed.candidate is None:
-            created = self._staging.create_candidate(member_id, record)
-            member = replace(member, stage_state=ExternalMemberStageState.CANDIDATE_BOUND, candidate=created)
+            intent = member.candidate_uuid_intent or str(uuid4())
+            if member.candidate_uuid_intent is None:
+                member = replace(
+                    member,
+                    stage_state=ExternalMemberStageState.CREATE_INTENT,
+                    candidate_uuid_intent=intent,
+                )
+                current = self._typed_cas(current, replace(record, members=_replace_member(record, member)))
+                record = current.record
+            created = self._staging.create_candidate(member_id, record, expected_uuid=intent)
+            member = replace(
+                member,
+                stage_state=ExternalMemberStageState.CANDIDATE_BOUND,
+                candidate_uuid_intent=intent,
+                candidate=created,
+            )
+            current = self._typed_cas(current, replace(record, members=_replace_member(record, member)))
+            record = current.record
+            created_here = True
+        elif member.candidate is None and member.candidate_uuid_intent == observed.candidate.uuid:
+            member = replace(
+                member,
+                stage_state=ExternalMemberStageState.CANDIDATE_BOUND,
+                candidate=observed.candidate,
+            )
             current = self._typed_cas(current, replace(record, members=_replace_member(record, member)))
             record = current.record
             created_here = True
@@ -233,6 +257,10 @@ class ClickHouseExternalReplicationServiceAdapter:
     def drop_owned_candidate(self, member_id: str, *, candidate_uuid: str) -> None:
         record = self._member_current(member_id).record
         expected = _member(record, member_id).candidate
+        intent = _member(record, member_id).candidate_uuid_intent
+        if expected is None and intent == candidate_uuid:
+            observed = self._staging.observe(member_id, record).candidate
+            expected = observed if observed is not None and observed.uuid == intent else None
         if expected is None or expected.uuid != candidate_uuid:
             _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
         self._staging.drop_candidate(member_id, record, expected)

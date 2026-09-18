@@ -31,6 +31,16 @@ The generated local receipt path is:
 test_artifacts/clickhouse-external-publication/mocked-receipt.json
 ```
 
+The opt-in two-member Docker Desktop profile writes a separate producer-owned
+receipt to:
+
+```text
+test_artifacts/clickhouse-external-publication/docker-receipt.json
+```
+
+Its scope is `local_synthetic`; scenario details remain nested per scenario and
+production certification remains `UNVERIFIED`.
+
 The receipt must bind the exact commit and fixture-configuration digests, label
 its scope `mocked_in_process`, list each scenario independently, and use only
 `PASS`, `FAIL`, `SKIP`, or `UNVERIFIED`. It must contain opaque member IDs and

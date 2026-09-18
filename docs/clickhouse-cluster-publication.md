@@ -102,8 +102,9 @@ The static plan includes this additive publication decision:
 
 ```json
 {
-  "requested": "cluster",
-  "selected": "cluster_external",
+  "requested": true,
+  "selected": true,
+  "mode": "cluster_external",
   "replication_mode": "external",
   "runtime_admission_required": true,
   "no_fallback": true
@@ -120,11 +121,19 @@ sealed source artifact unchanged. Lineage projection and decoder-dependent
 transformations fail during pre-source admission; dpone does not extract first
 and silently alter the artifact later.
 
-Run through the normal runtime entrypoint after the plan is reviewed:
+Run through the normal runtime entrypoint after the plan is reviewed. The
+manifest contains logical `connection_ref` aliases, never credentials. Run it
+only inside a deployment-provided, verified
+`DPONE_RUNTIME_CONNECTION_CONTEXT`; see the
+[credentials quickstart](getting-started/credentials-quickstart.md) and
+[runtime startup diagnostics](airflow-runtime-startup-diagnostics.md). Retain
+the artifact spool on durable worker storage by setting
+`DPONE_EXTERNAL_ARTIFACT_STORE` (or `options.external_artifact_store_path`).
 
 ```bash
 dpone run \
   examples/batch/clickhouse-external-replication-full-refresh.batch.yaml \
+  --run-id external-cluster-full-refresh-001 \
   --format json
 ```
 
@@ -167,13 +176,15 @@ A successful external run has all of these properties:
 - cleanup either completed everywhere or remains explicitly recoverable.
 
 Structured output uses opaque member IDs and digests. It excludes endpoints,
-credentials, raw SQL values, source rows, and local artifact paths. Runtime
-failures are written to stderr and exit non-zero. Normal stdout and file-output
-atomicity follow the existing `dpone run` contract.
+credentials, raw SQL values, source rows, and local artifact paths. Structured
+runtime success and failure documents are written to stdout; a failure also
+exits non-zero. Stderr is reserved for argument parsing and launcher
+diagnostics.
 
 ## Retry and recovery boundary
 
-Retry only the same scheduler operation. Dpone observes the Keeper authority,
+Retry only the same scheduler operation, including the identical explicit
+`--run-id external-cluster-full-refresh-001`. Dpone observes the Keeper authority,
 owned candidates, queue entry, and target generations, then resumes the exact
 incomplete phase. A different operation remains fenced while the earlier record
 is unresolved.

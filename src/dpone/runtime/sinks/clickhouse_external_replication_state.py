@@ -110,7 +110,7 @@ def state_from_versioned(current: VersionedExternalAuthorityRecord) -> dict[str,
             status = "DIVERGED" if diverged else "AMBIGUOUS"
         states[item.member_id] = {
             "state": status,
-            **_generation_state(item.candidate),
+            **_generation_state(item.candidate, candidate_uuid_intent=item.candidate_uuid_intent),
         }
     state: dict[str, Any] = {
         "target_key": record.target_key,
@@ -278,6 +278,8 @@ def _state_member(
         stage = ExternalMemberStageState.READY
     elif status == "PENDING":
         stage = ExternalMemberStageState.PENDING
+    elif status in {"CREATE_INTENT", "LOADING"} and raw.get("candidate_uuid") is not None:
+        stage = ExternalMemberStageState.CREATE_INTENT
     candidate = None if prior is None else prior.candidate
     uuid = raw.get("candidate_uuid")
     if uuid is None and status in {"PENDING", "LOADING"}:
@@ -296,13 +298,26 @@ def _state_member(
         publication_state=MemberPublicationState.UNKNOWN if prior is None else prior.publication_state,
         cleanup_complete=False if prior is None else prior.cleanup_complete,
         predecessor=None if prior is None else prior.predecessor,
+        candidate_uuid_intent=(
+            candidate.uuid
+            if candidate is not None
+            else str(raw["candidate_uuid"])
+            if stage is ExternalMemberStageState.CREATE_INTENT
+            else None
+            if prior is None
+            else prior.candidate_uuid_intent
+        ),
         candidate=candidate,
     )
 
 
-def _generation_state(candidate: PhysicalGeneration | None) -> dict[str, Any]:
+def _generation_state(
+    candidate: PhysicalGeneration | None,
+    *,
+    candidate_uuid_intent: str | None = None,
+) -> dict[str, Any]:
     if candidate is None:
-        return {"candidate_uuid": None}
+        return {"candidate_uuid": candidate_uuid_intent}
     return {
         "candidate_uuid": candidate.uuid,
         "candidate_engine_full": candidate.engine_full,

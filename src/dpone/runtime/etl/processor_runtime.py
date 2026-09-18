@@ -179,11 +179,14 @@ class ProcessorRuntimeServices:
         )
 
     def abort_prepared_source_boundary(self, load_config: Any) -> None:
-        """Release a post-admission source lease that never reached terminal ownership."""
+        """Release post-admission source and sink leases not reaching ownership."""
 
         abort = getattr(self.source, "abort_mssql_source_boundary", None)
         if callable(abort):
             abort(load_config)
+        sink_abort = getattr(self.sink, "abort_runtime_admission", None)
+        if callable(sink_abort):
+            sink_abort(load_config)
 
 
 def complete_replay_governance(

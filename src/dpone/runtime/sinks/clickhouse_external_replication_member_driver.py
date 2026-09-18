@@ -23,8 +23,12 @@ from dpone.ports.clickhouse_external_replication import (
 )
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.sinks.clickhouse_nullability_policy import ClickHouseNullInsertPolicy
-from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
+from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDdlRenderer, ClickHouseTableDesign
 from dpone.runtime.sinks.load_payload import LoadPayload
+from dpone.runtime.support.type_mapping.mssql_clickhouse import (
+    MssqlClickHouseTypeMapper,
+    MssqlClickHouseTypePolicy,
+)
 
 _CONTENT_DIGEST_VERSION = "dpone.clickhouse.canonical-rows.v1"
 _SCHEMA_DIGEST_VERSION = "dpone.clickhouse.canonical-schema.v1"
@@ -136,7 +140,9 @@ class ClickHouseExternalReplicationMemberDriver:
             candidate=self._observe_table(connector, record.database, record.candidate),
         )
 
-    def create_candidate(self, connector: Any, record: ExternalAuthorityRecord) -> PhysicalGeneration:
+    def create_candidate(
+        self, connector: Any, record: ExternalAuthorityRecord, *, expected_uuid: str
+    ) -> PhysicalGeneration:
         record.validate()
         self._require_payload_schema()
         self._require_member(connector, record)
@@ -144,10 +150,12 @@ class ClickHouseExternalReplicationMemberDriver:
             raise ExternalContractError("GENERATION_DIVERGED", "owned candidate already exists")
         config = self._candidate_config(record)
         sink = self._sink(connector)
-        sink._create_table(config, self._payload_schema, if_not_exists=False)
+        _create_candidate_with_uuid(sink, config, self._payload_schema, expected_uuid)
         created = self._observe_table(connector, record.database, record.candidate)
         if created is None:
             raise ExternalContractError("GENERATION_UNKNOWN", "created candidate is not observable")
+        if created.uuid != expected_uuid:
+            raise ExternalContractError("GENERATION_DIVERGED", "created candidate UUID differs from intent")
         return created
 
     def load_candidate(self, connector: Any, record: ExternalAuthorityRecord, sealed_payload: Any) -> None:
@@ -309,6 +317,25 @@ def canonical_rows_json(rows: Iterable[Sequence[Any]]) -> str:
     """Serialize typed rows canonically while preserving artifact row order."""
 
     return canonical_json([[_canonical_value(value) for value in row] for row in rows])
+
+
+def _create_candidate_with_uuid(
+    sink: Any,
+    load_config: Any,
+    schema: Sequence[tuple[str, str]],
+    table_uuid: str,
+) -> None:
+    options = getattr(load_config, "options", {}) or {}
+    mapper = MssqlClickHouseTypeMapper(MssqlClickHouseTypePolicy.from_config(options.get("type_fidelity")))
+    columns = [f"`{column}` {sink._column_type(load_config, mapper, column, dtype)}" for column, dtype in schema]
+    design = sink._ensure_database(load_config)
+    statement = ClickHouseTableDdlRenderer().render_create_table(
+        table=sink._table(load_config),
+        columns_sql=columns,
+        design=design,
+        table_uuid=table_uuid,
+    )
+    sink.connector.execute_query(statement)
 
 
 def _canonical_value(value: Any) -> Any:

@@ -109,14 +109,18 @@ class _Staging:
         }
         self.loads = dict.fromkeys(members, 0)
         self.drops = dict.fromkeys(members, 0)
+        self.crash_after_create_once = False
 
     def observe(self, member_id, record):
         del record
         return self.values[member_id]
 
-    def create_candidate(self, member_id, record):
-        candidate = _generation(f"new-{record.operation_id[:8]}-{member_id}", _digest("0"), rows=0)
+    def create_candidate(self, member_id, record, *, expected_uuid):
+        candidate = replace(_generation("intent", _digest("0"), rows=0), uuid=expected_uuid)
         self.values[member_id] = replace(self.values[member_id], candidate=candidate)
+        if self.crash_after_create_once:
+            self.crash_after_create_once = False
+            raise _ProcessDeath
         return candidate
 
     def load_candidate(self, member_id, record, source):
@@ -183,6 +187,10 @@ class _Ddl:
         for member, observation in tuple(self.staging.values.items()):
             self.staging.values[member] = replace(observation, candidate=None)
         self.entries.append(_entry("cleanup", record.cleanup_correlation_token, record.cleanup_query_digest))
+
+
+class _ProcessDeath(BaseException):
+    pass
 
 
 def _generation(label: str, content: str, *, rows: int = 2) -> PhysicalGeneration:
@@ -268,6 +276,38 @@ def test_adapter_runs_exact_typed_authority_and_queue_protocol() -> None:
     assert ddl.publication_calls == 1
     assert ddl.cleanup_calls == 1
     assert "analytics" not in str(receipt.to_dict())
+
+
+def test_process_death_after_create_recovers_from_prebound_uuid() -> None:
+    runtime, authority, _, staging, ddl = _runtime()
+    staging.crash_after_create_once = True
+
+    with pytest.raises(_ProcessDeath):
+        runtime.stage(_request())
+
+    assert authority.current is not None
+    creating = next(
+        member for member in authority.current.record.members if member.stage_state.value == "create_intent"
+    )
+    observed = staging.values[creating.member_id].candidate
+    assert observed is not None
+    assert creating.candidate_uuid_intent == observed.uuid
+
+    service = ClickHouseExternalReplicationServiceAdapter(
+        topology=_Topology(),
+        authority=authority,
+        staging=staging,
+        ddl=ddl,
+        cluster="analytics_cluster",
+        database="analytics",
+        target="target_table",
+    )
+    fresh = ClickHouseExternalReplicationRuntime(service=service, artifact_source=_Artifact())
+    receipt = fresh.run(_request())
+
+    assert receipt.phase == "COMPLETED"
+    assert staging.drops[creating.member_id] == 0
+    assert staging.loads[creating.member_id] == 1
 
 
 def test_adapter_never_dispatches_without_verified_cas_permit() -> None:

@@ -50,8 +50,9 @@ external decision is additive to the existing result:
 
 ```json
 {
-  "requested": "cluster",
-  "selected": "cluster_external",
+  "requested": true,
+  "selected": true,
+  "mode": "cluster_external",
   "replication_mode": "external",
   "runtime_admission_required": true,
   "no_fallback": true
@@ -60,8 +61,9 @@ external decision is additive to the existing result:
 
 A static blocker produces a non-zero validation result. JSON validation errors
 use stable codes on stdout according to the existing check/plan contract.
-Runtime failures occur after live admission begins, are emitted on stderr, and
-also exit non-zero. No error path changes the request to local publication.
+Runtime failures occur after live admission begins, emit a structured document
+on stdout, and exit non-zero. Stderr is reserved for parser or launcher
+diagnostics. No error path changes the request to local publication.
 
 ## Runtime admission
 
@@ -83,10 +85,15 @@ catalog refresh, is part of the fenced inventory snapshot. Admission opens all
 resolved member connections before extraction. Default lineage projection is
 not supported on this route; set `options.lineage: false`.
 
-External mode currently admits replayable in-memory rows and uncompressed CSV
-or TSV file artifacts without a bulk text codec. Unsupported, streaming,
-compressed, native-wire, or decoder-dependent artifacts fail before candidate
-mutation; dpone does not silently switch transport or publication mode.
+External mode admits replayable in-memory rows, uncompressed CSV/TSV artifacts,
+and the versioned `dpone.clickhouse.tab-separated` MSSQL codec. The codec is
+sealed into canonical typed rows before member mutation and preserves NULL,
+empty strings, control characters, and reserved markers. Unknown codecs, raw
+MSSQL-delimited files, streaming, compressed, or native-wire artifacts fail
+before candidate mutation; dpone does not silently switch transport or
+publication mode. The retained content-addressed artifact is reopened during a
+same-operation `STAGING` restart and released only after `STAGED` or verified
+abort.
 
 `skip_unavailable_shards=1` and partial catalog results are never admission
 evidence.

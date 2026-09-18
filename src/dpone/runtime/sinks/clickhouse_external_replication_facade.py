@@ -4,30 +4,66 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import replace
-from typing import Any, NoReturn, Protocol
+from typing import Any, Protocol
 
 from dpone.config.load_strategy import LoadStrategy
 from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactReceipt,
     ExternalArtifactSourcePort,
-    ExternalPublicationError,
     ExternalPublicationRequest,
 )
-from dpone.runtime.lineage.options import LineageOptions
+from dpone.runtime.sinks.clickhouse_external_artifact_source import (
+    ClickHouseExternalArtifactSource,
+    external_artifact_store_root,
+    external_content_row_budget,
+)
 from dpone.runtime.sinks.clickhouse_external_replication_context import (
     ExternalStagedContext,
     ExternalStagedValidation,
-    derive_semantic_plan_digest,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    EXTERNAL_ADMISSION_OPTION,
+    EXTERNAL_REPLAY_OPTION,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    artifact_receipt as _artifact_receipt,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    cluster_options as _cluster_options,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    fail as _fail,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    load_result as _load_result,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    options as _options,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    plan_digest as _plan_digest,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    read_authority as _read_authority,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    request_from_state as _request_from_state,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    require_safe_transformations as _require_safe_transformations,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    scheduler_identity as _scheduler_identity,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_facade_support import (
+    target_identity as _target_identity,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_runtime import (
     ClickHouseExternalReplicationRuntime,
     ExternalReplicationReceipt,
     ExternalReplicationRuntimeService,
 )
-from dpone.runtime.sinks.clickhouse_full_refresh_publication import SCHEDULER_IDENTITY_OPTION
-from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
-
-EXTERNAL_REPLAY_OPTION = "__dpone_clickhouse_external_replication_replay_v1"
+from dpone.runtime.sinks.load_result import LoadResult
 
 
 class ExternalRuntimeFactory(Protocol):
@@ -52,6 +88,7 @@ class ExternalServiceFactory(Protocol):
         *,
         load_config: Any | None = None,
         payload: Any | None = None,
+        maximum_rows: int | None = None,
     ) -> ExternalReplicationRuntimeService: ...
 
 
@@ -103,8 +140,17 @@ class ClickHouseExternalReplicationFacade:
             scheduler_invocation=scheduler_invocation,
             plan_sha256=plan_sha256,
         )
+        options = dict(_options(load_config))
+        options[EXTERNAL_ADMISSION_OPTION] = {
+            "operation_id": str(state["operation_id"]),
+            "target_key": str(state["target_key"]),
+            "inventory_digest": str(state["inventory_digest"]),
+            "phase": str(state["phase"]),
+            "plan_sha256": plan_sha256,
+        }
+        load_config = replace(load_config, options=options)
         phase = str(state.get("phase") or "")
-        if phase in {"STAGED", "PUBLICATION_DISPATCHING", "COMMITTED", "CLEANUP_DISPATCHING"}:
+        if phase in {"STAGING", "STAGED", "PUBLICATION_DISPATCHING", "COMMITTED", "CLEANUP_DISPATCHING"}:
             request = _request_from_state(
                 state,
                 cluster=cluster,
@@ -116,6 +162,27 @@ class ClickHouseExternalReplicationFacade:
             expected = ExternalReplicationReceipt.from_state(
                 dict(state), evidence_scope=str(getattr(service, "evidence_scope", "local_synthetic"))
             )
+            if phase == "STAGING":
+                source = ClickHouseExternalArtifactSource.reopen(
+                    root=external_artifact_store_root(load_config),
+                    binding_id=request.artifact.artifact_id,
+                    expected=request.artifact.identity,
+                )
+                runtime = self._runtime(
+                    cluster,
+                    database,
+                    target,
+                    source=source,
+                    load_config=load_config,
+                    payload=source.open_replay(),
+                )
+                runtime.stage(request)
+                source.release(external_artifact_store_root(load_config))
+                state = _read_authority(service, request.target_key)
+                phase = str(state.get("phase") or "")
+                expected = ExternalReplicationReceipt.from_state(
+                    dict(state), evidence_scope=str(getattr(service, "evidence_scope", "local_synthetic"))
+                )
             if phase == "STAGED":
                 runtime.validate_staged(request, expected)
             if phase in {"STAGED", "PUBLICATION_DISPATCHING"}:
@@ -134,28 +201,73 @@ class ClickHouseExternalReplicationFacade:
         )
         return replace(load_config, options=options)
 
+    def require_preflight(self, load_config: Any) -> None:
+        """Fail closed unless this exact external plan completed admission."""
+
+        cluster, database, target = _target_identity(load_config)
+        plan_sha256 = _plan_digest(load_config, cluster=cluster, database=database, target=target)
+        admission = _options(load_config).get(EXTERNAL_ADMISSION_OPTION)
+        if not isinstance(admission, Mapping):
+            _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ADMISSION_REQUIRED")
+        expected_target = ExternalPublicationRequest(
+            cluster=cluster,
+            database=database,
+            target=target,
+            scheduler_invocation=_scheduler_identity(load_config),
+            plan_sha256=plan_sha256,
+            artifact=ExternalArtifactReceipt(
+                artifact_id="preflight",
+                sha256="0" * 64,
+                byte_size=0,
+                row_count=0,
+                schema_sha256="0" * 64,
+                content_sha256="0" * 64,
+                replayable=True,
+            ),
+        )
+        if (
+            admission.get("operation_id") != expected_target.operation_id
+            or admission.get("target_key") != expected_target.target_key
+            or admission.get("plan_sha256") != plan_sha256
+            or admission.get("phase") not in {"LOCKED", "STAGING", "STAGED", "COMPLETED"}
+        ):
+            _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ADMISSION_REQUIRED")
+
     def stage(self, load_config: Any, payload: Any) -> ExternalStagedContext:
         """Seal and directly stage one immutable generation on every member."""
 
         if not self.is_enabled(load_config):
             _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_MODE_REQUIRED")
-        _require_safe_transformations(load_config, payload)
         cluster, database, target = _target_identity(load_config)
         plan_sha256 = _plan_digest(load_config, cluster=cluster, database=database, target=target)
-        self._runtime(
+        prepared_runtime = self._runtime(
             cluster,
             database,
             target,
             load_config=load_config,
             payload=payload,
-        ).prepare(
+        )
+        prepared_runtime.prepare(
             cluster=cluster,
             database=database,
             target=target,
             scheduler_invocation=_scheduler_identity(load_config),
             plan_sha256=plan_sha256,
         )
-        source = self._artifact_source_factory(load_config, payload)
+        try:
+            _require_safe_transformations(load_config, payload)
+            source = self._artifact_source_factory(load_config, payload)
+            if isinstance(source, ClickHouseExternalArtifactSource):
+                source.persist(external_artifact_store_root(load_config))
+        except Exception:
+            prepared_runtime.abort_prepared(
+                cluster=cluster,
+                database=database,
+                target=target,
+                scheduler_invocation=_scheduler_identity(load_config),
+                plan_sha256=plan_sha256,
+            )
+            raise
         request = ExternalPublicationRequest(
             cluster=cluster,
             database=database,
@@ -175,6 +287,8 @@ class ClickHouseExternalReplicationFacade:
         receipt = runtime.stage(request)
         if receipt.phase != "STAGED":
             _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE")
+        if isinstance(source, ClickHouseExternalArtifactSource):
+            source.release(external_artifact_store_root(load_config))
         state = self._service_factory(cluster, database, target, load_config=load_config).read_authority(
             request.target_key
         )
@@ -185,6 +299,7 @@ class ClickHouseExternalReplicationFacade:
             request=request,
             staged_receipt=receipt,
             candidate_name=str(state["candidate_name"]),
+            content_row_budget=external_content_row_budget(load_config),
         )
 
     def validate(self, context: ExternalStagedContext) -> ExternalStagedValidation:
@@ -192,7 +307,12 @@ class ClickHouseExternalReplicationFacade:
 
         receipt = context.staged_receipt
         request = context.request
-        validated = self._runtime(request.cluster, request.database, request.target).validate_staged(request, receipt)
+        validated = self._runtime(
+            request.cluster,
+            request.database,
+            request.target,
+            maximum_rows=context.content_row_budget,
+        ).validate_staged(request, receipt)
         if validated != receipt:
             _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_VALIDATION_INVALID")
         return ExternalStagedValidation(
@@ -212,7 +332,12 @@ class ClickHouseExternalReplicationFacade:
         if validation != expected:
             _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_VALIDATION_INVALID")
         request = context.request
-        receipt = self._runtime(request.cluster, request.database, request.target).publish(request)
+        receipt = self._runtime(
+            request.cluster,
+            request.database,
+            request.target,
+            maximum_rows=context.content_row_budget,
+        ).publish(request)
         if receipt.phase != "COMMITTED":
             _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_IN_PROGRESS")
         return receipt
@@ -221,7 +346,12 @@ class ClickHouseExternalReplicationFacade:
         """Finish separately fenced predecessor cleanup."""
 
         request = context.request
-        receipt = self._runtime(request.cluster, request.database, request.target).cleanup(request)
+        receipt = self._runtime(
+            request.cluster,
+            request.database,
+            request.target,
+            maximum_rows=context.content_row_budget,
+        ).cleanup(request)
         if receipt.phase != "COMPLETED":
             _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS")
         return receipt
@@ -239,6 +369,20 @@ class ClickHouseExternalReplicationFacade:
 
         request = context.request
         self._runtime(request.cluster, request.database, request.target).abort(request)
+
+    def abort_prepared_admission(self, load_config: Any) -> None:
+        """Release this invocation's lock when extraction never reached staging."""
+
+        if not self.is_enabled(load_config):
+            return
+        cluster, database, target = _target_identity(load_config)
+        self._runtime(cluster, database, target, load_config=load_config).abort_prepared(
+            cluster=cluster,
+            database=database,
+            target=target,
+            scheduler_invocation=_scheduler_identity(load_config),
+            plan_sha256=_plan_digest(load_config, cluster=cluster, database=database, target=target),
+        )
 
     @staticmethod
     def replay_result(load_config: Any) -> LoadResult | None:
@@ -260,145 +404,18 @@ class ClickHouseExternalReplicationFacade:
         source: ExternalArtifactSourcePort | None = None,
         load_config: Any | None = None,
         payload: Any | None = None,
+        maximum_rows: int | None = None,
     ) -> ClickHouseExternalReplicationRuntime:
-        service = self._service_factory(
-            cluster,
-            database,
-            target,
-            load_config=load_config,
-            payload=payload,
-        )
+        kwargs = {"load_config": load_config, "payload": payload}
+        if maximum_rows is not None:
+            kwargs["maximum_rows"] = maximum_rows
+        service = self._service_factory(cluster, database, target, **kwargs)
         return self._runtime_factory(service=service, artifact_source=source)
-
-
-def _artifact_receipt(source: ExternalArtifactSourcePort) -> ExternalArtifactReceipt:
-    identity = source.identity
-    receipt = ExternalArtifactReceipt(
-        artifact_id=source.binding_id,
-        sha256=identity.sha256,
-        byte_size=identity.byte_size,
-        row_count=identity.row_count,
-        schema_sha256=identity.schema_digest,
-        content_sha256=identity.wire_digest,
-        replayable=True,
-    )
-    receipt.validate()
-    return receipt
-
-
-def _load_result(
-    receipt: ExternalReplicationReceipt,
-    *,
-    staged_rows: int,
-    replay: bool = False,
-) -> LoadResult:
-    return LoadResult(
-        inserted_rows=staged_rows,
-        updated_rows=0,
-        total_rows=staged_rows,
-        staging_rows=staged_rows,
-        commit_receipt_id=receipt.operation_id,
-        commit_outcome=(AtomicCommitOutcome.COMMITTED_AFTER_RECEIPT_PROBE if replay else AtomicCommitOutcome.COMMITTED),
-        reconciliation_metrics={"clickhouse_cluster_external_full_refresh": receipt.to_dict()},
-    )
-
-
-def _target_identity(load_config: Any) -> tuple[str, str, str]:
-    cluster = str(_cluster_options(load_config).get("name") or "").strip()
-    database = str(getattr(load_config, "target_schema", "") or "").strip()
-    target = str(getattr(load_config, "target_table", "") or "").strip()
-    if not all((cluster, database, target)):
-        _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_REQUEST_INVALID")
-    return cluster, database, target
-
-
-def _scheduler_identity(load_config: Any) -> str:
-    identity = str(_options(load_config).get(SCHEDULER_IDENTITY_OPTION) or "").strip()
-    if not identity:
-        _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_IDENTITY_REQUIRED")
-    return identity
-
-
-def _plan_digest(load_config: Any, *, cluster: str, database: str, target: str) -> str:
-    return derive_semantic_plan_digest(
-        load_config,
-        cluster=cluster,
-        database=database,
-        target=target,
-        runtime_option_keys=frozenset({SCHEDULER_IDENTITY_OPTION, EXTERNAL_REPLAY_OPTION}),
-    )
-
-
-def _request_from_state(
-    state: Mapping[str, Any],
-    *,
-    cluster: str,
-    database: str,
-    target: str,
-    scheduler_invocation: str,
-    plan_sha256: str,
-) -> ExternalPublicationRequest:
-    return ExternalPublicationRequest(
-        cluster=cluster,
-        database=database,
-        target=target,
-        scheduler_invocation=scheduler_invocation,
-        plan_sha256=plan_sha256,
-        artifact=ExternalArtifactReceipt(
-            artifact_id=str(state["artifact_binding_id"]),
-            sha256=str(state["artifact_sha256"]),
-            byte_size=int(state["artifact_byte_size"]),
-            row_count=int(state["artifact_row_count"]),
-            schema_sha256=str(state["artifact_schema_sha256"]),
-            content_sha256=str(state["artifact_content_sha256"]),
-            replayable=True,
-        ),
-    )
-
-
-def _read_authority(service: ExternalReplicationRuntimeService, target_key: str) -> dict[str, Any]:
-    state = service.read_authority(target_key)
-    if state is None:
-        _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT")
-    return dict(state)
-
-
-def _require_safe_transformations(load_config: Any, payload: Any) -> None:
-    if LineageOptions.from_config(_options(load_config).get("lineage")).enabled:
-        _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_TRANSFORMATION_UNSUPPORTED")
-    artifacts = (getattr(payload, "artifact", None),)
-    partitions = tuple(getattr(artifacts[0], "partitions", ()) or ())
-    for artifact in (*artifacts, *partitions):
-        codec = getattr(artifact, "bulk_text_codec", None)
-        if codec is not None and hasattr(codec, "clickhouse_decode_expression"):
-            _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_TRANSFORMATION_UNSUPPORTED")
-
-
-def _options(load_config: Any) -> Mapping[str, Any]:
-    raw = getattr(load_config, "options", None)
-    return raw if isinstance(raw, Mapping) else {}
-
-
-def _clickhouse_options(load_config: Any) -> Mapping[str, Any]:
-    physical = _options(load_config).get("physical_design")
-    physical = physical if isinstance(physical, Mapping) else {}
-    storage = physical.get("storage")
-    storage = storage if isinstance(storage, Mapping) else {}
-    clickhouse = storage.get("clickhouse")
-    return clickhouse if isinstance(clickhouse, Mapping) else {}
-
-
-def _cluster_options(load_config: Any) -> Mapping[str, Any]:
-    cluster = _clickhouse_options(load_config).get("cluster")
-    return cluster if isinstance(cluster, Mapping) else {}
-
-
-def _fail(code: str) -> NoReturn:
-    raise ExternalPublicationError(code)
 
 
 __all__ = [
     "EXTERNAL_REPLAY_OPTION",
+    "EXTERNAL_ADMISSION_OPTION",
     "ClickHouseExternalReplicationFacade",
     "ExternalArtifactSourceFactory",
     "ExternalRuntimeFactory",

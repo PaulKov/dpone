@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from datetime import date, datetime, time
 from decimal import Decimal
@@ -106,6 +107,15 @@ class _Connector:
 
     def execute_query(self, query: str, params: Any = None) -> int:
         self.mutations.append(query)
+        if query.startswith("CREATE TABLE"):
+            matched = re.search(r"UUID '([^']+)'", query)
+            assert matched is not None
+            self.tables["candidate_table"] = {
+                "uuid": matched.group(1),
+                "engine": "MergeTree ORDER BY tuple()",
+                "columns": [("id", "Int64", "", "", 1), ("label", "String", "", "", 2)],
+                "rows": [],
+            }
         if query.startswith("DROP TABLE"):
             self.tables.pop("candidate_table", None)
         return 0
@@ -117,14 +127,19 @@ class _Sink:
         self.created: list[tuple[Any, Any, bool]] = []
         self.loaded: list[tuple[Any, LoadPayload, str, str]] = []
 
-    def _create_table(self, config: Any, schema: Any, *, if_not_exists: bool) -> None:
-        self.created.append((config, schema, if_not_exists))
-        self.connector.tables[config.target_table] = {
-            "uuid": "candidate-uuid",
-            "engine": "MergeTree ORDER BY tuple()",
-            "columns": [("id", "Int64", "", "", 1), ("label", "String", "", "", 2)],
-            "rows": [],
-        }
+    def _column_type(self, config: Any, mapper: Any, column: str, dtype: str) -> str:
+        del config, mapper, column
+        return "Int64" if "int" in dtype else "String"
+
+    def _ensure_database(self, config: Any) -> Any:
+        from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
+
+        self.created.append((config, (("id", "bigint"), ("label", "varchar")), False))
+        return ClickHouseTableDesign(engine="MergeTree", order_by=("id",))
+
+    @staticmethod
+    def _table(config: Any) -> str:
+        return f"`{config.target_schema}`.`{config.target_table}`"
 
     def insert_external_rows(
         self,
@@ -220,7 +235,7 @@ def test_create_uses_deterministic_candidate_and_forces_local_ddl(load_config: L
     connector = _Connector()
     driver, sink = _driver(load_config, connector)
 
-    created = driver.create_candidate(connector, _record())
+    created = driver.create_candidate(connector, _record(), expected_uuid="candidate-uuid")
 
     config, schema, if_not_exists = sink.created[0]
     clickhouse = config.options["physical_design"]["storage"]["clickhouse"]
@@ -236,7 +251,7 @@ def test_load_accepts_only_sealed_load_payload_and_calls_sink_once(load_config: 
     connector = _Connector()
     driver, sink = _driver(load_config, connector)
     record = _record()
-    created = driver.create_candidate(connector, record)
+    created = driver.create_candidate(connector, record, expected_uuid="candidate-uuid")
     record = replace(record, members=(replace(record.members[0], candidate=created), record.members[1]))
     payload = LoadPayload(
         artifact=InMemoryRowsArtifact([{"id": 1, "label": "alpha"}, {"id": 2, "label": "beta"}]),
@@ -275,11 +290,11 @@ def test_drop_mutates_only_the_exact_expected_candidate_uuid(load_config: LoadCo
     connector = _Connector()
     driver, _ = _driver(load_config, connector)
     record = _record()
-    expected = driver.create_candidate(connector, record)
+    expected = driver.create_candidate(connector, record, expected_uuid="candidate-uuid")
 
     driver.drop_candidate(connector, record, expected)
 
-    assert connector.mutations == ["DROP TABLE `analytics`.`candidate_table`"]
+    assert connector.mutations[-1] == "DROP TABLE `analytics`.`candidate_table`"
     assert driver.observe(connector, record).candidate is None
 
 
@@ -316,12 +331,13 @@ def test_drop_rejects_foreign_uuid_without_mutation(load_config: LoadConfig) -> 
     connector = _Connector()
     driver, _ = _driver(load_config, connector)
     record = _record()
-    expected = driver.create_candidate(connector, record)
+    expected = driver.create_candidate(connector, record, expected_uuid="candidate-uuid")
+    mutations_before_drop = list(connector.mutations)
 
     with pytest.raises(ValueError, match="GENERATION_DIVERGED"):
         driver.drop_candidate(connector, record, replace(expected, uuid="foreign-uuid"))
 
-    assert connector.mutations == []
+    assert connector.mutations == mutations_before_drop
     assert "candidate_table" in connector.tables
 
 

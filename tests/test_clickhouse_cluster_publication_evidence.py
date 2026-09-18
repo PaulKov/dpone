@@ -52,6 +52,30 @@ def test_receipt_reset_discards_stale_session_evidence(tmp_path, monkeypatch) ->
     assert not receipt.exists()
 
 
+def test_external_receipt_is_separate_scoped_and_per_scenario(tmp_path, monkeypatch) -> None:
+    receipt = tmp_path / "external-receipt.json"
+    monkeypatch.setattr(evidence, "EXTERNAL_RECEIPT", receipt)
+
+    evidence.record_external_scenario(
+        "external_replication_fresh_cleanup",
+        "passed_live",
+        server_version="24.8",
+        details={"production_composition": True},
+    )
+
+    observed = json.loads(receipt.read_text())
+    assert observed["evidence_scope"] == "local_synthetic"
+    assert observed["production_certification"] == "UNVERIFIED"
+    assert set(observed["scenarios"]) == set(evidence.EXTERNAL_SCENARIOS)
+    scenario = observed["scenarios"]["external_replication_fresh_cleanup"]
+    assert scenario == {
+        "status": "passed_live",
+        "evidence_scope": "local_synthetic",
+        "details": {"production_composition": True},
+    }
+    assert "external_replication_fresh_cleanup" not in evidence.SCENARIOS
+
+
 def test_session_discards_stale_evidence_before_readiness_can_fail(tmp_path, monkeypatch) -> None:
     receipt = tmp_path / "receipt.json"
     receipt.write_text('{"status":"passed_live"}')

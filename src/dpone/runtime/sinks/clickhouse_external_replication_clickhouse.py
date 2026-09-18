@@ -166,8 +166,10 @@ class ClickHouseExternalReplicaStaging:
         _validate_observation(observation)
         return observation
 
-    def create_candidate(self, member_id: str, record: ExternalAuthorityRecord) -> PhysicalGeneration:
-        generation = self._driver.create_candidate(self._connection(member_id), record)
+    def create_candidate(
+        self, member_id: str, record: ExternalAuthorityRecord, *, expected_uuid: str
+    ) -> PhysicalGeneration:
+        generation = self._driver.create_candidate(self._connection(member_id), record, expected_uuid=expected_uuid)
         generation.validate()
         return generation
 
