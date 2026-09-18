@@ -458,7 +458,7 @@ flowchart LR
 
 ### ADR requirement
 
-Required. ADR 0068 records that external mode uses Keeper authority plus direct
+Required. ADR 0069 records that external mode uses Keeper authority plus direct
 per-member staging while ADR 0067 remains authoritative for internal mode.
 
 ### Quality-budget impact

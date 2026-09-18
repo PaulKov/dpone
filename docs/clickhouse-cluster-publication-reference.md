@@ -175,6 +175,6 @@ manual action.
 - Live external certification is `UNVERIFIED` until an approved environment
   supplies current topology, grants, retention, and failure-injection evidence.
 
-See [ADR 0068](adr/0068-clickhouse-external-replication-publication.md) for the
+See [ADR 0069](adr/0069-clickhouse-external-replication-publication.md) for the
 architecture decision and [ADR 0067](adr/0067-clickhouse-cluster-publication-authority.md)
 for internal-mode authority.

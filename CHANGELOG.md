@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Add an explicit, fail-closed ClickHouse `external` replication mode for
+  bounded full refreshes to one-shard clusters of independent MergeTree
+  members. The protocol fences the target before mutation, replays one sealed
+  artifact directly to every required member, verifies a complete logical
+  generation, and publishes through one correlated cluster DDL. Existing local
+  and internal-replication routes remain unchanged; live production
+  certification is still unverified.
+
 ## 0.81.3 - 2026-09-18
 
 ### Fixed
