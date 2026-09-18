@@ -7,6 +7,7 @@ import pytest
 from dpone.config import LoadConfig
 from dpone.runtime.decision_audit import RuntimeDecisionContext
 from dpone.runtime.etl.processor import ETLProcessor
+from dpone.runtime.sinks.clickhouse_cluster_preflight import ClickHouseClusterPreflightMixin
 from dpone.runtime.sinks.clickhouse_cluster_topology import ClickHouseClusterTopologyProbe
 from dpone.runtime.sinks.clickhouse_sink import ClickHouseSink
 
@@ -169,6 +170,33 @@ def test_clickhouse_sink_publishes_topology_blocker_before_extract() -> None:
     assert decision.release_gate == "blocked"
     assert decision.blockers == ("clickhouse_cluster_target_missing_replicas",)
     assert decision.details["missing_hosts"] == ["dc1", "dc2"]
+
+
+def test_external_preflight_does_not_apply_internal_shared_uuid_invariant() -> None:
+    class Publication:
+        required = False
+
+        @staticmethod
+        def is_external(load_config: Any) -> bool:
+            return True
+
+        def require_external_preflight(self, load_config: Any) -> None:
+            del load_config
+            self.required = True
+
+    class Sink(ClickHouseClusterPreflightMixin):
+        connector = _ClusterConnector(
+            actual_hosts=("dc1", "dc2", "dc3"),
+            uuids=("uuid-a", "uuid-b", "uuid-c"),
+            engines=("MergeTree ORDER BY tuple()",),
+        )
+        _full_refresh_publication = Publication()
+
+    sink = Sink()
+    sink.preflight_before_extract(load_config=_clustered_config())
+
+    assert sink._full_refresh_publication.required is True
+    assert not any("clusterAllReplicas" in query for query in sink.connector.queries)
 
 
 def test_etl_processor_runs_preflight_before_source_extract() -> None:

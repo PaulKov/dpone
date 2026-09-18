@@ -51,7 +51,8 @@ different plan or inventory digest is drift, not a new recovery authority.
 
 ## 2. Collect read-only evidence
 
-Through the owning runtime diagnostics, capture redacted evidence for:
+Capture redacted evidence from the structured `dpone run --format json` result
+and the owning platform's read-only ClickHouse/Keeper diagnostics for:
 
 - authority schema version, Keeper version, operation digest, phase, fence,
   dispatch epoch, inventory digest, and generation digest;
@@ -91,6 +92,13 @@ typed-content digest and exact owned UUID.
 Submit the same scheduler operation through the normal runtime. Preserve its
 original run identity; do not manufacture a new identity by renaming the
 candidate, changing the manifest, or incrementing a user-controlled token.
+
+```bash
+dpone run \
+  examples/batch/clickhouse-external-replication-full-refresh.batch.yaml \
+  --run-id external-cluster-full-refresh-001 \
+  --format json
+```
 
 The runtime resumes according to durable authority:
 

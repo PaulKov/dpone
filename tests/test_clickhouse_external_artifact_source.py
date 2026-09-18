@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -72,3 +73,25 @@ def test_sealed_source_enforces_exact_source_byte_budget_before_staging() -> Non
             payload=_payload([{"id": 1}]),
             maximum_rows=1,
         )
+
+
+def test_retained_artifact_reopens_after_source_instance_is_gone(tmp_path: Path) -> None:
+    source = ClickHouseExternalArtifactSource(
+        sink=_Sink(),
+        load_config=object(),
+        payload=_payload([{"id": 1}, {"id": 2}]),
+        maximum_rows=2,
+    )
+    source.persist(tmp_path)
+
+    reopened = ClickHouseExternalArtifactSource.reopen(
+        root=tmp_path,
+        binding_id=source.binding_id,
+        expected=source.identity,
+    )
+
+    assert reopened.identity == source.identity
+    assert reopened.open_replay().artifact._rows == [{"id": 1}, {"id": 2}]  # type: ignore[attr-defined]
+    assert str(tmp_path) not in repr(reopened)
+    reopened.release(tmp_path)
+    assert list(tmp_path.iterdir()) == []

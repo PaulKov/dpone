@@ -33,6 +33,9 @@ def write_run_failure(args: argparse.Namespace, exc: Exception) -> None:
             result["quality_gates"] = redact_value(to_jsonable())
         if isinstance(stable_code, str):
             result["error_code"] = stable_code
+        evidence = getattr(exc, "evidence", None)
+        if isinstance(evidence, dict):
+            result["evidence"] = redact_value(evidence)
         outcome = getattr(exc, "outcome", None)
         if isinstance(outcome, QualityGateFailureOutcome):
             result.update(outcome.result_fields())

@@ -50,6 +50,7 @@ def build_clickhouse_external_replication(sink: Any) -> ClickHouseExternalReplic
         *,
         load_config: Any | None = None,
         payload: Any | None = None,
+        maximum_rows: int | None = None,
     ) -> ClickHouseExternalReplicationServiceAdapter:
         catalog = ClickHouseClusterPublicationCatalog(connector)
         topology = ClickHouseExternalTopologyCatalog(
@@ -70,7 +71,9 @@ def build_clickhouse_external_replication(sink: Any) -> ClickHouseExternalReplic
         )
         provider.require_connections()
         schema = tuple(getattr(payload, "schema", ()) or ())
-        budget = external_content_row_budget(load_config) if load_config is not None else 100_000
+        budget = external_content_row_budget(load_config) if load_config is not None else maximum_rows
+        if budget is None:
+            raise ValueError("clickhouse_external_replication.content_row_budget_required")
         driver = ClickHouseExternalReplicationMemberDriver(
             load_config=load_config,
             payload_schema=schema,

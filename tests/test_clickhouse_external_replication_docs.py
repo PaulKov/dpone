@@ -20,6 +20,10 @@ def test_external_cluster_full_refresh_example_parses_with_exact_mode() -> None:
     assert payload["kind"] == "dpone.batch.v1"
     defaults = payload["defaults"]
     assert defaults["source"]["type"] == "mssql"
+    assert defaults["source"]["connection_ref"] == "source_connection"
+    assert defaults["sink"]["connection_ref"] == "target_connection"
+    assert "connection_id" not in defaults["source"]
+    assert "connection_id" not in defaults["sink"]
     assert payload["schemas"] == {"source_schema": {"tables": ["source_table"]}}
 
     sink = defaults["sink"]
@@ -43,7 +47,8 @@ def test_external_publication_docs_cover_the_complete_user_journey() -> None:
     required = (
         "## Prerequisites",
         "## First success with external replication",
-        '"selected": "cluster_external"',
+        '"selected": true',
+        '"mode": "cluster_external"',
         '"replication_mode": "external"',
         '"no_fallback": true',
         "dpone.clickhouse.cluster-external-full-refresh-receipt.v1",
@@ -56,6 +61,9 @@ def test_external_publication_docs_cover_the_complete_user_journey() -> None:
         "## 4. Retry safely",
         "## 5. Verify recovery",
         "Live certification remains **UNVERIFIED**",
+        "--run-id external-cluster-full-refresh-001",
+        "DPONE_RUNTIME_CONNECTION_CONTEXT",
+        "DPONE_EXTERNAL_ARTIFACT_STORE",
     )
     for marker in required:
         assert marker in text
@@ -71,6 +79,8 @@ def test_external_error_pages_are_actionable_and_cross_linked() -> None:
         "CLICKHOUSE_CLUSTER_EXTERNAL_ENGINE_UNSUPPORTED",
         "CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_INCOMPLETE",
         "CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNSUPPORTED",
+        "CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNAVAILABLE",
+        "CLICKHOUSE_CLUSTER_EXTERNAL_TRANSFORMATION_UNSUPPORTED",
         "CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_DIVERGED",
         "CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_PARTIAL",
         "CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN",

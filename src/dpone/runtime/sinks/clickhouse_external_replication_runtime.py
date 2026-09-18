@@ -120,6 +120,36 @@ class ClickHouseExternalReplicationRuntime:
             members=members,
         )
 
+    def abort_prepared(
+        self,
+        *,
+        cluster: str,
+        database: str,
+        target: str,
+        scheduler_invocation: str,
+        plan_sha256: str,
+    ) -> None:
+        """Close an exact pre-artifact lock without touching ClickHouse data."""
+
+        target_key = derive_target_key(cluster, database, target)
+        operation_id = derive_operation_id(
+            scheduler_invocation=scheduler_invocation,
+            target_key=target_key,
+            normalized_plan_digest=plan_sha256,
+        )
+        state = self._read(target_key)
+        if state is None or state.get("operation_id") != operation_id:
+            return
+        if state.get("phase") == "ABORTED":
+            return
+        if state.get("phase") != "LOCKED":
+            return
+        if "artifact_sha256" in state or any(
+            member.get("candidate_uuid") is not None for member in state.get("member_states", {}).values()
+        ):
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", state=state)
+        self._cas(state, {**phase_ops.without_version(state), "phase": "ABORTED"})
+
     def publish(self, request: ExternalPublicationRequest) -> ExternalReplicationReceipt:
         """Publish a previously staged operation and finish exact cleanup."""
 
@@ -289,15 +319,21 @@ class ClickHouseExternalReplicationRuntime:
         if observation.get("exists"):
             if phase_ops.matches_generation(observation, state):
                 return self._mark_member(state, member_id, "READY", observation)
-            if member["state"] not in {"LOADING", "AMBIGUOUS"} or not phase_ops.owned_observation(observation, state):
+            if member["state"] not in {"CREATE_INTENT", "LOADING", "AMBIGUOUS"} or not phase_ops.owned_observation(
+                observation, state
+            ):
                 self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
             expected_uuid = str(observation.get("candidate_uuid") or "")
             if member.get("candidate_uuid") not in {None, expected_uuid}:
                 self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
-            self._service.drop_owned_candidate(member_id, candidate_uuid=expected_uuid)
-            if self._service.observe_candidate(member_id, state["candidate_name"]).get("exists"):
-                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", state=state)
-        state = self._mark_member(state, member_id, "LOADING", None)
+            if member["state"] == "CREATE_INTENT" and member.get("candidate_uuid") == expected_uuid:
+                state = self._mark_member(state, member_id, "LOADING", observation)
+            else:
+                self._service.drop_owned_candidate(member_id, candidate_uuid=expected_uuid)
+                if self._service.observe_candidate(member_id, state["candidate_name"]).get("exists"):
+                    self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", state=state)
+        if state["member_states"][member_id]["state"] != "LOADING":
+            state = self._mark_member(state, member_id, "LOADING", None)
         try:
             result = dict(
                 self._service.stage_member_once(

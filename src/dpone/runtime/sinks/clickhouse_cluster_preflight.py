@@ -19,6 +19,14 @@ class ClickHouseClusterPreflightMixin:
 
     def preflight_before_extract(self, *, load_config: LoadConfig, load_record: Any | None = None) -> None:
         del load_record
+        publication = getattr(self, "_full_refresh_publication", None)
+        if publication is not None and publication.is_external(load_config):
+            # External replication deliberately owns one local MergeTree
+            # generation per member, so UUID equality is not an invariant.
+            # Its admission service has already enumerated and probed every
+            # direct member before this hook is reached.
+            publication.require_external_preflight(load_config)
+            return
         evidence = ClickHouseClusterTopologyProbe(self.connector).inspect(load_config)
         publish_runtime_decision(
             {

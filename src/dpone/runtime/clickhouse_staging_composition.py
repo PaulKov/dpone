@@ -60,6 +60,11 @@ class ClickHouseFullRefreshPublicationMixin:
 
         return self._full_refresh_publication.replay_result(load_config)
 
+    def abort_runtime_admission(self, load_config: LoadConfig) -> None:
+        """Close an unused external publication lock after pre-stage failure."""
+
+        self._full_refresh_publication.abort_prepared_admission(load_config)
+
     def _cleanup_full_refresh_publication(self, receipt: Any) -> None:
         self._full_refresh_publication.cleanup(receipt)
 

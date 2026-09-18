@@ -19,6 +19,7 @@ class ExternalStagedContext:
     request: ExternalPublicationRequest
     staged_receipt: ExternalReplicationReceipt
     candidate_name: str
+    content_row_budget: int = 100_000
 
     def __post_init__(self) -> None:
         if self.staged_receipt.phase != "STAGED":
@@ -29,6 +30,8 @@ class ExternalStagedContext:
             raise ValueError("external staged context generation differs")
         if not self.candidate_name:
             raise ValueError("external staged context candidate is missing")
+        if isinstance(self.content_row_budget, bool) or self.content_row_budget <= 0:
+            raise ValueError("external staged context row budget must be positive")
 
 
 @dataclass(frozen=True, slots=True)

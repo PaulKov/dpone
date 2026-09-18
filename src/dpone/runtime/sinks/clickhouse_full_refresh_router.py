@@ -75,6 +75,13 @@ class ClickHouseFullRefreshPublicationRouter:
     def is_external(self, load_config: Any) -> bool:
         return evaluate_clickhouse_cluster_admission(_admission_input(load_config)).mode == "cluster_external"
 
+    def require_external_preflight(self, load_config: Any) -> None:
+        """Require the already-completed direct-member external admission."""
+
+        if self._external is None:
+            raise RuntimeError("clickhouse_cluster_external_publication.runtime_capability_unavailable")
+        self._external.require_preflight(load_config)
+
     def stage_external(self, load_config: Any, payload: Any) -> Any:
         service = self._service(load_config)
         return service.stage(load_config, payload)
@@ -103,6 +110,10 @@ class ClickHouseFullRefreshPublicationRouter:
         if self._external is None:
             raise RuntimeError("clickhouse_cluster_external_publication.runtime_capability_unavailable")
         self._external.abort(context)
+
+    def abort_prepared_admission(self, load_config: Any) -> None:
+        if self.is_external(load_config) and self._external is not None:
+            self._external.abort_prepared_admission(load_config)
 
     def _service(self, load_config: Any) -> Any:
         decision = evaluate_clickhouse_cluster_admission(_admission_input(load_config))

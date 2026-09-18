@@ -38,6 +38,14 @@ replicated engines in external mode, incomplete inventory, unsupported
 artifacts, or divergent generations fail closed. The local publisher is never a
 fallback.
 
+The authority persists a candidate UUID intent before local `CREATE TABLE` and
+the DDL uses that exact UUID. A process death between CREATE and its response is
+therefore recoverable without adopting or deleting a foreign table. The sealed
+typed artifact is retained in a content-addressed durable store through
+`STAGED`; a fresh process reopens and verifies it during `STAGING` without
+re-reading the source. The admitted content row budget is carried through
+stage, validation, publication, and cleanup rather than reverting to a default.
+
 External authority and receipts are versioned separately, while V1 internal
 records remain readable and recoverable in the same target-key namespace.
 

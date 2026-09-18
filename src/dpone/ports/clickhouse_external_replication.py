@@ -105,7 +105,9 @@ class ExternalReplicaStagingPort(Protocol):
     """Perform direct local candidate operations for exactly one opaque member."""
 
     def observe(self, member_id: str, record: ExternalAuthorityRecord) -> MemberGenerationObservation: ...
-    def create_candidate(self, member_id: str, record: ExternalAuthorityRecord) -> PhysicalGeneration: ...
+    def create_candidate(
+        self, member_id: str, record: ExternalAuthorityRecord, *, expected_uuid: str
+    ) -> PhysicalGeneration: ...
     def load_candidate(
         self,
         member_id: str,

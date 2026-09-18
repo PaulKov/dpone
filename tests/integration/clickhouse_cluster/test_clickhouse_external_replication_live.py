@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from tests.integration.clickhouse_cluster.evidence import record_scenario
+from tests.integration.clickhouse_cluster.evidence import record_external_scenario
 
 pytestmark = pytest.mark.integration_live
 
@@ -78,6 +78,7 @@ def test_external_replication_stages_each_member_and_fresh_service_cleans_exact_
     )
     sink = ClickHouseSink(connector)
     admitted = sink._full_refresh_publication.prepare_admission(config)
+    sink.preflight_before_extract(load_config=admitted)
     result = sink.load(admitted, payload)
     receipt = (result.reconciliation_metrics or {})["clickhouse_cluster_external_full_refresh"]
 
@@ -90,14 +91,13 @@ def test_external_replication_stages_each_member_and_fresh_service_cleans_exact_
             port,
             f"SELECT count() FROM system.tables WHERE database='{database}' AND name LIKE 'target__dpone_ext_%'",
         ) == [("0",)]
-    record_scenario(
+    record_external_scenario(
         "external_replication_fresh_cleanup",
         "passed_live",
         server_version=_execute(18123, "SELECT version()")[0][0],
         details={
             "operation_id": result.commit_receipt_id,
             "member_count": len(receipt["member_ids"]),
-            "evidence_scope": "local_docker_live",
             "production_composition": True,
         },
     )

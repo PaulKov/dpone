@@ -394,10 +394,13 @@ def test_replica_staging_passes_only_a_direct_member_connection_to_driver() -> N
             calls.append(("observe", direct))
             return MemberGenerationObservation(member_id, None, observed_record.members[0].candidate)
 
-        def create_candidate(self, direct: Any, observed_record: ExternalAuthorityRecord) -> PhysicalGeneration:
+        def create_candidate(
+            self, direct: Any, observed_record: ExternalAuthorityRecord, *, expected_uuid: str
+        ) -> PhysicalGeneration:
             calls.append(("create", direct))
             candidate = observed_record.members[0].candidate
             assert candidate is not None
+            assert expected_uuid == candidate.uuid
             return candidate
 
         def load_candidate(
@@ -423,7 +426,7 @@ def test_replica_staging_passes_only_a_direct_member_connection_to_driver() -> N
     )
 
     assert staging.observe(member_id, record).member_id == member_id
-    staging.create_candidate(member_id, record)
+    staging.create_candidate(member_id, record, expected_uuid=record.members[0].candidate.uuid)
     staging.load_candidate(member_id, record, Source())
     expected = record.members[0].candidate
     assert expected is not None
@@ -441,7 +444,9 @@ def test_replica_staging_fails_before_load_when_artifact_binding_differs() -> No
         def observe(self, direct: Any, observed_record: ExternalAuthorityRecord) -> MemberGenerationObservation:
             raise AssertionError("not used")
 
-        def create_candidate(self, direct: Any, observed_record: ExternalAuthorityRecord) -> PhysicalGeneration:
+        def create_candidate(
+            self, direct: Any, observed_record: ExternalAuthorityRecord, *, expected_uuid: str
+        ) -> PhysicalGeneration:
             raise AssertionError("not used")
 
         def load_candidate(self, direct: Any, observed_record: ExternalAuthorityRecord, source: Any) -> None:
