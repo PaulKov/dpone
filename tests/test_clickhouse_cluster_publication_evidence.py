@@ -58,7 +58,7 @@ def test_external_receipt_is_separate_scoped_and_per_scenario(tmp_path, monkeypa
 
     evidence.record_external_scenario(
         "external_replication_fresh_cleanup",
-        "passed_live",
+        "PASS",
         server_version="24.8",
         details={"production_composition": True},
     )
@@ -69,7 +69,7 @@ def test_external_receipt_is_separate_scoped_and_per_scenario(tmp_path, monkeypa
     assert set(observed["scenarios"]) == set(evidence.EXTERNAL_SCENARIOS)
     scenario = observed["scenarios"]["external_replication_fresh_cleanup"]
     assert scenario == {
-        "status": "passed_live",
+        "status": "PASS",
         "evidence_scope": "local_synthetic",
         "details": {"production_composition": True},
     }

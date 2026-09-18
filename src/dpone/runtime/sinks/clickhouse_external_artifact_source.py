@@ -6,7 +6,6 @@ import csv
 import hashlib
 import json
 import os
-import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -235,12 +234,21 @@ class ClickHouseExternalArtifactSource:
 
 
 def external_artifact_store_root(load_config: Any) -> Path:
-    """Resolve the process-independent local retention root."""
+    """Resolve the explicitly configured durable retention root."""
 
     options = getattr(load_config, "options", {}) or {}
     configured = options.get("external_artifact_store_path") if isinstance(options, Mapping) else None
     environment = os.environ.get("DPONE_EXTERNAL_ARTIFACT_STORE")
-    return Path(str(configured or environment or (Path(tempfile.gettempdir()) / "dpone-external-artifacts")))
+    value = str(configured or environment or "").strip()
+    if not value:
+        raise ExternalContractError(
+            "ARTIFACT_UNAVAILABLE",
+            "external replication requires an explicit durable artifact store",
+        )
+    root = Path(value).expanduser()
+    if not root.is_absolute():
+        raise ExternalContractError("ARTIFACT_UNAVAILABLE", "artifact store path must be absolute")
+    return root
 
 
 def _decode_canonical_value(value: Any) -> Any:

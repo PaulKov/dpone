@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from typing import Any
 
 from dpone.ports import clickhouse_external_replication as ports
@@ -22,6 +23,9 @@ from dpone.ports.clickhouse_external_replication import (
     digest_payload,
 )
 from dpone.runtime.sinks.clickhouse_external_artifact_verifier import ClickHouseExternalArtifactVerifier
+from dpone.runtime.sinks.clickhouse_external_replication_connection_provider import (
+    ExternalReplicaConnectionProvider,
+)
 
 _MUTATION_SETTINGS = {"keeper_map_strict_mode": 1, "insert_keeper_max_retries": 0}
 _INVENTORY_SQL = (
@@ -98,7 +102,7 @@ class ClickHouseExternalTopologyCatalog:
         return tuple(sorted(self._member_endpoints))
 
 
-class ClickHouseExternalReplicaConnectionProvider:
+class ClickHouseExternalReplicaConnectionProvider(ExternalReplicaConnectionProvider):
     def __init__(
         self,
         connector: Any,
@@ -106,38 +110,15 @@ class ClickHouseExternalReplicaConnectionProvider:
         topology: ClickHouseExternalTopologyCatalog,
         connect: Callable[..., Any],
     ) -> None:
-        self._connector = connector
-        self._topology = topology
-        self._connect = connect
-        self._connections: dict[str, Any] = {}
-        self._member_ids_by_connection: dict[int, str] = {}
-
-    def connection_for(self, member_id: str) -> Any:
-        cached = self._connections.get(member_id)
-        if cached is not None:
-            return cached
-        host, address, port = self._topology.member_endpoint(member_id)
-        try:
-            connection = self._connect(self._connector, host, address, port)
-            self._connections[member_id] = connection
-            self._member_ids_by_connection[id(connection)] = member_id
-            return connection
-        except Exception:
-            raise ExternalContractError("INVENTORY_INVALID", "direct member connection is unavailable") from None
-
-    def require_connections(self) -> None:
-        try:
-            for member_id in self._topology.member_ids():
-                if self.connection_for(member_id).get_records("SELECT 1") != [(1,)]:
-                    raise RuntimeError("direct member probe returned an unexpected result")
-        except Exception:
-            for direct in self._connections.values():
-                if callable(close := getattr(direct, "close", None)):
-                    close()
-            raise ExternalContractError("INVENTORY_INVALID", "direct member connection is unavailable") from None
-
-    def member_identity(self, connection: Any) -> str:
-        return self._member_ids_by_connection.get(id(connection), "")
+        super().__init__(
+            connector,
+            topology=topology,
+            connect=connect,
+            unavailable=lambda: ExternalContractError(
+                "INVENTORY_INVALID",
+                "direct member connection is unavailable",
+            ),
+        )
 
 
 class ClickHouseExternalReplicaStaging:
@@ -151,7 +132,8 @@ class ClickHouseExternalReplicaStaging:
         self._driver = driver
 
     def observe(self, member_id: str, record: ExternalAuthorityRecord) -> MemberGenerationObservation:
-        observation = self._driver.observe(self._connection(member_id), record)
+        with self._connection(member_id) as connection:
+            observation = self._driver.observe(connection, record)
         if observation.member_id != member_id:
             raise ExternalContractError("INVENTORY_INVALID", "staging observation belongs to another member")
         _validate_observation(observation)
@@ -160,7 +142,8 @@ class ClickHouseExternalReplicaStaging:
     def create_candidate(
         self, member_id: str, record: ExternalAuthorityRecord, *, expected_uuid: str
     ) -> PhysicalGeneration:
-        generation = self._driver.create_candidate(self._connection(member_id), record, expected_uuid=expected_uuid)
+        with self._connection(member_id) as connection:
+            generation = self._driver.create_candidate(connection, record, expected_uuid=expected_uuid)
         generation.validate()
         return generation
 
@@ -175,7 +158,8 @@ class ClickHouseExternalReplicaStaging:
             raise ExternalContractError("ARTIFACT_UNSUPPORTED", "sealed artifact identity is unavailable")
         source.revalidate(artifact)
         sealed_source = source.open_replay()
-        self._driver.load_candidate(self._connection(member_id), record, sealed_source)
+        with self._connection(member_id) as connection:
+            self._driver.load_candidate(connection, record, sealed_source)
 
     def drop_candidate(
         self,
@@ -184,14 +168,20 @@ class ClickHouseExternalReplicaStaging:
         expected: PhysicalGeneration,
     ) -> None:
         expected.validate()
-        self._driver.drop_candidate(self._connection(member_id), record, expected)
+        with self._connection(member_id) as connection:
+            self._driver.drop_candidate(connection, record, expected)
 
-    def _connection(self, member_id: str) -> Any:
+    @contextmanager
+    def _connection(self, member_id: str) -> Iterator[Any]:
         provider = self._connection_provider
         connection = provider(member_id) if callable(provider) else provider.connection_for(member_id)
         if connection is None:
             raise ExternalContractError("INVENTORY_INVALID", "direct member connection is unavailable")
-        return connection
+        try:
+            yield connection
+        finally:
+            if callable(close := getattr(provider, "close", None)):
+                close()
 
 
 class ClickHouseExternalKeeperMapAuthority:
