@@ -150,6 +150,76 @@ def test_transfer_uses_generated_sink_coordinates_and_canonical_connector_family
         require_distinct_logical_writes((_write(), row))
 
 
+def _xmin_handoff_transfer(*, mode: str, handoff_id: str = "orders_v1") -> DbtRelationWrite:
+    return transfer_relation_write(
+        project_path="standalone",
+        workflow_id=f"orders_{mode}",
+        workload_id=f"orders_{mode}",
+        manifest={
+            "source": {
+                "type": "postgres",
+                "connection_ref": "source",
+                "table": {"schema": "public", "name": "orders"},
+                "options": {
+                    "incremental_strategy": "xmin",
+                    "xmin_execution": {"mode": mode, "handoff_id": handoff_id},
+                },
+            },
+            "sink": {
+                "type": "mssql",
+                "connection_ref": "warehouse",
+                "table": {"database": "warehouse", "schema": "mart", "name": "orders"},
+                "strategy": {"mode": "backfill" if mode == "initial" else "incremental_merge", "unique_key": ["id"]},
+            },
+            "state": {
+                "type": "mssql",
+                "connection_ref": "state",
+                "atomicity": "target_atomic",
+                "provisioning": "external",
+                "table": {"name": "source_state"},
+            },
+        },
+    )
+
+
+def test_xmin_initial_and_incremental_handoff_share_one_logical_target() -> None:
+    initial = _xmin_handoff_transfer(mode="initial")
+    incremental = _xmin_handoff_transfer(mode="incremental")
+
+    assert initial.write_coordination_key == incremental.write_coordination_key
+    assert {initial.write_phase, incremental.write_phase} == {"initial", "incremental"}
+    require_distinct_logical_writes((initial, incremental))
+
+
+@pytest.mark.parametrize(
+    "writes",
+    [
+        (_xmin_handoff_transfer(mode="initial"), _xmin_handoff_transfer(mode="initial")),
+        (
+            _xmin_handoff_transfer(mode="initial", handoff_id="orders_v1"),
+            _xmin_handoff_transfer(mode="incremental", handoff_id="orders_v2"),
+        ),
+        (
+            _xmin_handoff_transfer(mode="initial"),
+            _xmin_handoff_transfer(mode="incremental"),
+            _xmin_handoff_transfer(mode="incremental"),
+        ),
+    ],
+)
+def test_xmin_handoff_does_not_hide_ambiguous_writers(writes) -> None:
+    with pytest.raises(DbtPublishingError, match="collision"):
+        require_distinct_logical_writes(writes)
+
+
+def test_xmin_handoff_rejects_third_writer_for_another_declared_target() -> None:
+    initial = _xmin_handoff_transfer(mode="initial")
+    incremental = _xmin_handoff_transfer(mode="incremental")
+    third = replace(incremental, workflow_id="orders_copy", relation="orders_copy")
+
+    with pytest.raises(DbtPublishingError, match="collision"):
+        require_distinct_logical_writes((initial, incremental, third))
+
+
 @pytest.mark.parametrize("field", ["schema", "relation", "connection_ref"])
 def test_missing_coordinates_fail_closed(field):
     with pytest.raises(DbtPublishingError) as raised:

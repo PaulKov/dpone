@@ -10,8 +10,13 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Literal
 
+from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
 from dpone.contracts.connector_declarations import canonical_endpoint_type
-from dpone.contracts.dbt_contract_validation import DbtPublishingError
+from dpone.contracts.dbt_contract_validation import DbtPublishingError, canonical_fingerprint
+from dpone.contracts.postgres_xmin_execution import (
+    PostgresXminExecutionMode,
+    postgres_xmin_execution_policy,
+)
 
 if TYPE_CHECKING:
     from dpone.contracts.dbt_execution_pack import DbtExecutionPack
@@ -31,6 +36,8 @@ class DbtRelationWrite:
     schema: str
     relation: str
     role: Literal["target", "intermediate", "backup", "helper"] = "target"
+    write_coordination_key: str | None = None
+    write_phase: Literal["initial", "incremental"] | None = None
 
     def __post_init__(self) -> None:
         for name in ("project_path", "workflow_id", "resource_id", "connector", "connection_ref", "schema", "relation"):
@@ -41,6 +48,15 @@ class DbtRelationWrite:
             raise _invalid(self.project_path)
         if self.role not in {"target", "intermediate", "backup", "helper"} or (
             self.kind == "transfer" and self.role != "target"
+        ):
+            raise _invalid(self.project_path)
+        if (self.write_coordination_key is None) != (self.write_phase is None):
+            raise _invalid(self.project_path)
+        if self.write_coordination_key is not None and (
+            self.kind != "transfer"
+            or self.role != "target"
+            or not is_canonical_sha256_digest(self.write_coordination_key)
+            or self.write_phase not in {"initial", "incremental"}
         ):
             raise _invalid(self.project_path)
         object.__setattr__(self, "connector", canonical_endpoint_type(self.connector))
@@ -69,7 +85,7 @@ def selected_relation_writes(
     """
 
     nodes = _mapping(manifest.get("nodes"), project_path)
-    writes = []
+    writes: list[DbtRelationWrite] = []
     for unique_id in execution.selection_lock.selected_graph_unique_ids:
         if unique_id.startswith("unit_test."):
             unit = _mapping(_mapping(manifest.get("unit_tests"), project_path).get(unique_id), project_path)
@@ -167,6 +183,7 @@ def transfer_relation_write(
     sink = _mapping(manifest.get("sink"), project_path)
     table = _mapping(sink.get("table"), project_path)
     database = table.get("database")
+    coordination_key, phase = _xmin_handoff_coordination(manifest, project=project_path)
     return DbtRelationWrite(
         project_path=project_path,
         workflow_id=workflow_id,
@@ -177,25 +194,113 @@ def transfer_relation_write(
         database=None if database is None else _text(database, project=project_path),
         schema=_text(table.get("schema"), project=project_path),
         relation=_text(table.get("name"), project=project_path),
+        write_coordination_key=coordination_key,
+        write_phase=phase,
     )
 
 
 def require_distinct_logical_writes(writes: Sequence[DbtRelationWrite]) -> None:
     """Reject duplicate writers without claiming different keys are physically disjoint."""
 
-    owners: dict[tuple[str, str, str | None, str, str], DbtRelationWrite] = {}
+    owners: dict[tuple[str, str, str | None, str, str], list[DbtRelationWrite]] = {}
+    handoffs: dict[str, list[DbtRelationWrite]] = {}
     for row in sorted(
         writes, key=lambda item: (item.project_path, item.workflow_id, item.kind, item.resource_id, item.role)
     ):
-        previous = owners.get(row.logical_key)
-        if previous is not None:
-            raise DbtPublishingError(
-                "DPONE_DBT_WORKSPACE_TARGET_COLLISION",
-                f"Logical relation collision between {previous.owner} and {row.owner}",
-                path=row.project_path,
-                remediation="Give each materialized relation one writer; review model aliases and transfer targets. Do not rename deployed DAG IDs or bypass physical preflight.",
-            )
-        owners[row.logical_key] = row
+        owners.setdefault(row.logical_key, []).append(row)
+        if row.write_coordination_key is not None:
+            handoffs.setdefault(row.write_coordination_key, []).append(row)
+    for rows in handoffs.values():
+        if len(rows) > 1 and not is_coordinated_write_handoff(rows):
+            _raise_collision(rows)
+    for rows in owners.values():
+        if len(rows) == 1 or is_coordinated_write_handoff(rows):
+            continue
+        _raise_collision(rows)
+
+
+def is_coordinated_write_handoff(rows: Sequence[DbtRelationWrite]) -> bool:
+    """Recognize exactly one source-proven initial/incremental lifecycle pair."""
+
+    return (
+        len(rows) == 2
+        and all(row.kind == "transfer" and row.write_coordination_key is not None for row in rows)
+        and len({row.write_coordination_key for row in rows}) == 1
+        and {row.write_phase for row in rows} == {"initial", "incremental"}
+    )
+
+
+def _raise_collision(rows: Sequence[DbtRelationWrite]) -> None:
+    first, second = rows[:2]
+    raise DbtPublishingError(
+        "DPONE_DBT_WORKSPACE_TARGET_COLLISION",
+        f"Logical relation collision between {first.owner} and {second.owner}",
+        path=second.project_path,
+        remediation="Give each materialized relation one writer; review model aliases and transfer targets. Do not rename deployed DAG IDs or bypass physical preflight.",
+    )
+
+
+def _xmin_handoff_coordination(
+    manifest: Mapping[str, object], *, project: str
+) -> tuple[str | None, Literal["initial", "incremental"] | None]:
+    """Bind a pair only to the existing fail-closed PostgreSQL XMin handoff."""
+
+    source = manifest.get("source")
+    sink = manifest.get("sink")
+    if not isinstance(source, Mapping) or not isinstance(sink, Mapping):
+        return None, None
+    options = source.get("options")
+    if not isinstance(options, Mapping):
+        return None, None
+    try:
+        policy = postgres_xmin_execution_policy(options)
+    except ValueError:
+        return None, None
+    if (
+        source.get("type") != "postgres"
+        or sink.get("type") not in {"mssql", "sqlserver"}
+        or options.get("incremental_strategy") != "xmin"
+        or policy.mode is PostgresXminExecutionMode.AUTO
+    ):
+        return None, None
+    state = manifest.get("state")
+    strategy = sink.get("strategy")
+    if (
+        not isinstance(state, Mapping)
+        or not isinstance(strategy, Mapping)
+        or state.get("type") != "mssql"
+        or state.get("atomicity") != "target_atomic"
+        or state.get("provisioning") != "external"
+    ):
+        return None, None
+    assert policy.handoff_id is not None
+    source_table = _mapping(source.get("table"), project)
+    unique_key = strategy.get("unique_key")
+    if (
+        not isinstance(unique_key, list)
+        or not unique_key
+        or any(not isinstance(item, str) or not item.strip() for item in unique_key)
+    ):
+        return None, None
+    identity = {
+        "schema": "dpone.postgres-xmin-write-coordination.v1",
+        "handoff_id": policy.handoff_id,
+        "source": {
+            "type": "postgres",
+            "connection_ref": _text(source.get("connection_ref"), project=project),
+            "table": {
+                "database": source_table.get("database"),
+                "schema": _text(source_table.get("schema"), project=project),
+                "name": _text(source_table.get("name"), project=project),
+            },
+        },
+        "state": state,
+        "unique_key": unique_key,
+    }
+    phase: Literal["initial", "incremental"] = (
+        "initial" if policy.mode is PostgresXminExecutionMode.INITIAL else "incremental"
+    )
+    return canonical_fingerprint(identity), phase
 
 
 def _mapping(value: object, project: str) -> Mapping[str, object]:

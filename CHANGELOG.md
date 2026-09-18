@@ -6,6 +6,12 @@
 
 ### Fixed
 
+- Admit the existing PostgreSQL XMin initial-to-incremental handoff as one
+  coordinated writer lifecycle during release composition and physical
+  admission. The exception is derived from the complete public handoff
+  contract and remains fail-closed for duplicate phases, mismatched identities,
+  third writers, and unrelated logical or physical target collisions.
+
 - Bind development-only dbt release publication, cache materialization,
   activation, recovery, and audit repair to the exact current non-production
   target admission. The boundary rechecks expiry after external verification,

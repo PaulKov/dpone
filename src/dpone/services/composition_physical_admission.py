@@ -14,6 +14,7 @@ from dpone.contracts.composition_control import (
     DbtRelationWrite,
     dbt_relation_write_subject,
 )
+from dpone.contracts.dbt_relation_writes import is_coordinated_write_handoff
 
 if TYPE_CHECKING:
     from dpone.ports.composition_physical import CompositionPhysicalBackend
@@ -66,14 +67,23 @@ def observe_composition_writes(
     """Use one complete comparison per physical domain, never per connection alias."""
     groups = _resolve_domains(writes, context=context, backend=backend)
     resources = []
+    observed_handoffs: dict[str, list[tuple[DbtRelationWrite, str, int]]] = {}
     for guard, (domain, group) in sorted(groups.items()):
         observation = backend.observe_domain(domain, tuple(group), context)
         observation.__post_init__()
         expected = tuple(sorted(dbt_relation_write_subject(write) for write in group))
         if observation.domain != domain or tuple(sorted(subject for subject, _ in observation.slots)) != expected:
             raise CompositionAdmissionError("physical_observation_closure")
-        equivalences = [equivalence for _, equivalence in observation.slots]
-        if len(set(equivalences)) != len(equivalences):
+        writes_by_subject = {dbt_relation_write_subject(write): write for write in group}
+        writes_by_equivalence: dict[int, list[DbtRelationWrite]] = {}
+        for subject, equivalence in observation.slots:
+            write = writes_by_subject[subject]
+            writes_by_equivalence.setdefault(equivalence, []).append(write)
+            if write.write_coordination_key is not None:
+                observed_handoffs.setdefault(write.write_coordination_key, []).append((write, guard, equivalence))
+        if any(
+            len(matches) > 1 and not is_coordinated_write_handoff(matches) for matches in writes_by_equivalence.values()
+        ):
             raise CompositionAdmissionError("physical_target_collision")
         resources.append(
             CompositionPhysicalResource(
@@ -85,6 +95,15 @@ def observe_composition_writes(
                 write_subjects=expected,
             )
         )
+    if any(
+        len(matches) > 1
+        and (
+            not is_coordinated_write_handoff([write for write, _, _ in matches])
+            or len({(guard, equivalence) for _, guard, equivalence in matches}) != 1
+        )
+        for matches in observed_handoffs.values()
+    ):
+        raise CompositionAdmissionError("physical_target_collision")
     return tuple(resources)
 
 
