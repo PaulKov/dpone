@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-batch-manifest.schema.json
+kind: dpone.batch.v1
+
+defaults:
+  name: external_cluster_full_refresh
+  source:
+    type: mssql
+    connection_id: source_connection
+    options:
+      batch_size: 50000
+      export_format: csv
+  sink:
+    type: clickhouse
+    connection_id: target_connection
+    table:
+      schema: analytics
+      name: target_table
+    staging:
+      schema: analytics
+    strategy:
+      mode: full_refresh
+      max_source_bytes: 104857600
+    options:
+      physical_design:
+        storage:
+          clickhouse:
+            engine: MergeTree
+            order_by:
+              - record_id
+            cluster:
+              name: analytics_cluster
+              ddl_scope: cluster
+              replication_mode: external
+
+quality:
+  gates:
+    - id: source_target_rows
+      type: row_count_reconciliation
+      severity: error
+      tolerance:
+        mode: absolute
+        value: 0
+
+schemas:
+  source_schema:
+    tables:
+      - source_table
