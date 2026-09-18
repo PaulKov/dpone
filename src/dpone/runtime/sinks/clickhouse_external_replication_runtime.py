@@ -9,6 +9,7 @@ from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactReceipt,
     ExternalArtifactSourcePort,
     ExternalPublicationRequest,
+    ExternalReplicationReceipt,
     derive_generation_id,
     derive_operation_id,
     derive_target_key,
@@ -18,7 +19,6 @@ from dpone.runtime.sinks import (
     clickhouse_external_replication_phases as phase_ops,
 )
 from dpone.runtime.sinks import clickhouse_external_replication_runtime_support as runtime_support
-from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 
 
 class ExternalReplicationRuntimeService(Protocol):

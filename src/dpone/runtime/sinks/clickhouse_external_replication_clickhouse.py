@@ -25,6 +25,7 @@ from dpone.ports.clickhouse_external_replication import (
 from dpone.runtime.sinks.clickhouse_external_artifact_verifier import ClickHouseExternalArtifactVerifier
 from dpone.runtime.sinks.clickhouse_external_replication_connection_provider import (
     ExternalReplicaConnectionProvider,
+    managed_member_connection,
 )
 
 _MUTATION_SETTINGS = {"keeper_map_strict_mode": 1, "insert_keeper_max_retries": 0}
@@ -173,15 +174,12 @@ class ClickHouseExternalReplicaStaging:
 
     @contextmanager
     def _connection(self, member_id: str) -> Iterator[Any]:
-        provider = self._connection_provider
-        connection = provider(member_id) if callable(provider) else provider.connection_for(member_id)
-        if connection is None:
-            raise ExternalContractError("INVENTORY_INVALID", "direct member connection is unavailable")
-        try:
+        with managed_member_connection(
+            self._connection_provider,
+            member_id,
+            unavailable=lambda: ExternalContractError("INVENTORY_INVALID", "direct member connection is unavailable"),
+        ) as connection:
             yield connection
-        finally:
-            if callable(close := getattr(provider, "close", None)):
-                close()
 
 
 class ClickHouseExternalKeeperMapAuthority:

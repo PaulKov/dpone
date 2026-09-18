@@ -9,10 +9,10 @@ from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactSourcePort,
     ExternalPublicationError,
     ExternalPublicationRequest,
+    ExternalReplicationReceipt,
     digest_payload,
 )
 from dpone.runtime.sinks import clickhouse_external_replication_phases as phase_ops
-from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 
 
 def inventory_digest(service: Any, members: tuple[str, ...]) -> str:
