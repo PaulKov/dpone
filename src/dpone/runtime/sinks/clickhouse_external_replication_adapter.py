@@ -54,6 +54,41 @@ from dpone.runtime.sinks.clickhouse_external_replication_state import (
 )
 
 
+def _state(current: VersionedExternalAuthorityRecord) -> dict[str, Any]:
+    return state_from_versioned(current)
+
+
+def _target_key(adapter: ClickHouseExternalReplicationServiceAdapter) -> str:
+    return derive_target_key(adapter._cluster, adapter._database, adapter._target)
+
+
+def _inventory(adapter: ClickHouseExternalReplicationServiceAdapter) -> str:
+    if adapter._inventory_digest is None:
+        _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_INVALID")
+    return adapter._inventory_digest
+
+
+def _take_permit(
+    adapter: ClickHouseExternalReplicationServiceAdapter, operation_id: str, action: str
+) -> ExternalDispatchPermit:
+    permit = adapter._permits.pop((operation_id, action), None)
+    if permit is None:
+        _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CAS_UNKNOWN")
+    return permit
+
+
+def _error(code: str, record: ExternalAuthorityRecord | None = None) -> NoReturn:
+    evidence: dict[str, object] = {"evidence_scope": "runtime", "member_ids": []}
+    if record is not None:
+        evidence.update(
+            target_key=record.target_key,
+            operation_id=record.operation_id,
+            phase=record.phase.value,
+            member_ids=list(_ids(record)),
+        )
+    raise ExternalPublicationError(code, evidence=evidence)
+
+
 class ClickHouseExternalReplicationServiceAdapter:
     """Translate the runtime coordinator into fenced typed port operations."""
 
@@ -84,7 +119,7 @@ class ClickHouseExternalReplicationServiceAdapter:
 
     def inventory(self, cluster: str) -> tuple[str, ...]:
         if cluster != self._cluster:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT")
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT")
         topology = self._topology_port.inventory(cluster)
         topology.validate()
         digest = getattr(self._topology_port, "inventory_digest", topology.digest)
@@ -92,11 +127,11 @@ class ClickHouseExternalReplicationServiceAdapter:
         return tuple(member.member_id for member in topology.ordered_members)
 
     def inventory_digest(self) -> str:
-        return self._inventory()
+        return _inventory(self)
 
     def read_authority(self, target_key: str) -> Mapping[str, Any] | None:
         current = self._authority.read_versioned(target_key)
-        return None if current is None else self._state(current)
+        return None if current is None else _state(current)
 
     def compare_and_swap_authority(
         self, target_key: str, expected_version: int | None, desired: Mapping[str, Any]
@@ -104,12 +139,12 @@ class ClickHouseExternalReplicationServiceAdapter:
         current = self._authority.read_versioned(target_key)
         if current is None:
             if expected_version is not None:
-                self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CAS_CONFLICT")
+                _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CAS_CONFLICT")
             return self._verified(self._authority.create_if_absent(self._adopt(self._record(desired, None))), None)
         if current.version != expected_version:
-            if _equivalent(self._state(current), desired):
-                return self._state(current)
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CAS_CONFLICT", current.record)
+            if _equivalent(_state(current), desired):
+                return _state(current)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CAS_CONFLICT", current.record)
         record = self._record(desired, current.record)
         action: str | None = None
         if record.phase is ExternalAuthorityPhase.PUBLICATION_DISPATCHING:
@@ -141,7 +176,7 @@ class ClickHouseExternalReplicationServiceAdapter:
     def observe_candidate(self, member_id: str, candidate_name: str) -> Mapping[str, Any]:
         record = self._member_current(member_id).record
         if record.candidate != candidate_name:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
         return _candidate(self._staging.observe(member_id, record), record)
 
     def stage_member_once(
@@ -162,7 +197,7 @@ class ClickHouseExternalReplicationServiceAdapter:
             or source.identity != artifact.identity
             or record.artifact_binding_id != source.binding_id
         ):
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", record)
         source.revalidate(artifact.identity)
         source.open_replay()
         observed = self._staging.observe(member_id, record)
@@ -173,7 +208,7 @@ class ClickHouseExternalReplicationServiceAdapter:
             current = self._typed_cas(current, replace(record, members=_replace_member(record, member)))
             record = current.record
         elif member.candidate != observed.candidate:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
         error: Exception | None = None
         try:
             self._staging.load_candidate(member_id, record, source)
@@ -196,16 +231,16 @@ class ClickHouseExternalReplicationServiceAdapter:
         record = self._member_current(member_id).record
         expected = _member(record, member_id).candidate
         if expected is None or expected.uuid != candidate_uuid:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
         self._staging.drop_candidate(member_id, record, expected)
         if self._staging.observe(member_id, record).candidate is not None:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE", record)
 
     def dispatch_publication_once(self, *, operation_id: str, candidate_name: str, member_ids: tuple[str, ...]) -> None:
         record = self._current(operation_id).record
         if record.candidate != candidate_name or _ids(record) != member_ids:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
-        self._ddl.dispatch_publication(record, self._take_permit(operation_id, "publication"), cluster=self._cluster)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
+        self._ddl.dispatch_publication(record, _take_permit(self, operation_id, "publication"), cluster=self._cluster)
 
     def observe_publication(self, operation_id: str) -> Mapping[str, str]:
         record = self._current(operation_id).record
@@ -213,9 +248,9 @@ class ClickHouseExternalReplicationServiceAdapter:
         states = self._publication_states(record)
         queue = entry.state_for(_ids(record))
         if MemberPublicationState.UNKNOWN in states.values() or queue is QueueState.UNKNOWN:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_DDL_UNKNOWN", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_DDL_UNKNOWN", record)
         if queue in {QueueState.TERMINAL_SUCCESS, QueueState.TERMINAL_FAILURE} and len(set(states.values())) > 1:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_PARTIAL_TERMINAL", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_PARTIAL_TERMINAL", record)
         return {
             member_id: "desired" if state is MemberPublicationState.COMMITTED else "predecessor"
             for member_id, state in states.items()
@@ -224,14 +259,14 @@ class ClickHouseExternalReplicationServiceAdapter:
     def dispatch_cleanup_once(self, *, operation_id: str, member_ids: tuple[str, ...]) -> None:
         record = self._current(operation_id).record
         if _ids(record) != member_ids:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", record)
         if _has_predecessor(record):
-            self._ddl.drop_predecessor(record, self._take_permit(operation_id, "cleanup"), cluster=self._cluster)
+            self._ddl.drop_predecessor(record, _take_permit(self, operation_id, "cleanup"), cluster=self._cluster)
 
     def observe_cleanup(self, operation_id: str) -> Mapping[str, bool]:
         record = self._current(operation_id).record
         if _has_predecessor(record) and self._entry(record, cleanup=True).state_for(_ids(record)) is QueueState.UNKNOWN:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", record)
         return self._cleanup_states(record)
 
     def _record(self, state: Mapping[str, Any], base: ExternalAuthorityRecord | None) -> ExternalAuthorityRecord:
@@ -240,17 +275,17 @@ class ClickHouseExternalReplicationServiceAdapter:
             base,
             database=self._database,
             target=self._target,
-            inventory_digest=self._inventory(),
+            inventory_digest=_inventory(self),
         )
 
     def _adopt(self, record: ExternalAuthorityRecord) -> ExternalAuthorityRecord:
         observed = tuple(self._staging.observe(member.member_id, record) for member in record.members)
         if any(value.candidate is not None for value in observed):
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
         targets = tuple(value.target for value in observed)
         mixed_presence = any(value is None for value in targets) and any(value is not None for value in targets)
         if mixed_presence or len({_shape(value) for value in targets if value is not None}) > 1:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_BASELINE_DIVERGED", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_BASELINE_DIVERGED", record)
         return replace(
             record,
             members=tuple(replace(member, predecessor=value) for member, value in zip(record.members, targets)),
@@ -261,10 +296,10 @@ class ClickHouseExternalReplicationServiceAdapter:
     ) -> tuple[QueueEntry, tuple[ExternalMemberRecord, ...]]:
         entry = self._entry(record, cleanup=False)
         if entry.state_for(_ids(record)) not in {QueueState.TERMINAL_SUCCESS, QueueState.TERMINAL_FAILURE}:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_IN_PROGRESS", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_IN_PROGRESS", record)
         states = self._publication_states(record)
         if set(states.values()) != {MemberPublicationState.COMMITTED}:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_PARTIAL_TERMINAL", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_PARTIAL_TERMINAL", record)
         members = tuple(replace(member, publication_state=states[member.member_id]) for member in record.members)
         return entry, members
 
@@ -276,9 +311,9 @@ class ClickHouseExternalReplicationServiceAdapter:
             QueueState.TERMINAL_SUCCESS,
             QueueState.TERMINAL_FAILURE,
         }:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", record)
         if any(self._cleanup_states(record).values()):
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", record)
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", record)
         return entry, tuple(replace(member, cleanup_complete=True) for member in record.members)
 
     def _publication_states(self, record: ExternalAuthorityRecord) -> dict[str, MemberPublicationState]:
@@ -295,7 +330,7 @@ class ClickHouseExternalReplicationServiceAdapter:
         result: dict[str, bool] = {}
         for member_id, state in self._publication_states(record).items():
             if state not in {MemberPublicationState.COMMITTED, MemberPublicationState.CLEANUP_PENDING}:
-                self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", record)
+                _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", record)
             result[member_id] = state is MemberPublicationState.COMMITTED
         return result
 
@@ -305,14 +340,14 @@ class ClickHouseExternalReplicationServiceAdapter:
         digest = record.cleanup_query_digest if cleanup else record.publication_query_digest
         code = f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{'CLEANUP_' if cleanup else 'DDL_'}UNKNOWN"
         if not token or not digest:
-            self._error(code, record)
+            _error(code, record)
         entries = (
             (() if (entry := self._ddl.read_entry(self._cluster, entry_id)) is None else (entry,))
             if entry_id
             else self._ddl.find_entries(self._cluster, token)
         )
         if len(entries) != 1 or entries[0].correlation_token != token or entries[0].query_digest != digest:
-            self._error(code, record)
+            _error(code, record)
         return entries[0]
 
     def _typed_cas(
@@ -321,60 +356,31 @@ class ClickHouseExternalReplicationServiceAdapter:
         return self._require_verified(self._authority.compare_and_swap(current, desired), None)
 
     def _verified(self, result: ExternalAuthorityMutationResult, action: str | None) -> Mapping[str, Any]:
-        return self._state(self._require_verified(result, action))
+        return _state(self._require_verified(result, action))
 
     def _require_verified(
         self, result: ExternalAuthorityMutationResult, action: str | None
     ) -> VersionedExternalAuthorityRecord:
         if result.status is not ExternalAuthorityMutationStatus.VERIFIED or result.observed is None:
             suffix = "CAS_CONFLICT" if result.status is ExternalAuthorityMutationStatus.CONFLICT else "CAS_UNKNOWN"
-            self._error(f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{suffix}")
+            _error(f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{suffix}")
         if action is not None:
             if result.permit is None:
-                self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CAS_UNKNOWN", result.observed.record)
+                _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CAS_UNKNOWN", result.observed.record)
             self._permits[(result.observed.record.operation_id, action)] = result.permit
         return result.observed
 
-    def _state(self, current: VersionedExternalAuthorityRecord) -> dict[str, Any]:
-        return state_from_versioned(current)
-
     def _current(self, operation_id: str) -> VersionedExternalAuthorityRecord:
-        current = self._authority.read_versioned(self._target_key())
+        current = self._authority.read_versioned(_target_key(self))
         if current is None or current.record.operation_id != operation_id:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT")
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT")
         return current
 
     def _member_current(self, member_id: str) -> VersionedExternalAuthorityRecord:
-        current = self._authority.read_versioned(self._target_key())
+        current = self._authority.read_versioned(_target_key(self))
         if current is None or member_id not in _ids(current.record):
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT")
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT")
         return current
-
-    def _take_permit(self, operation_id: str, action: str) -> ExternalDispatchPermit:
-        permit = self._permits.pop((operation_id, action), None)
-        if permit is None:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CAS_UNKNOWN")
-        return permit
-
-    def _target_key(self) -> str:
-        return derive_target_key(self._cluster, self._database, self._target)
-
-    def _inventory(self) -> str:
-        if self._inventory_digest is None:
-            self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_INVALID")
-        return self._inventory_digest
-
-    @staticmethod
-    def _error(code: str, record: ExternalAuthorityRecord | None = None) -> NoReturn:
-        evidence: dict[str, object] = {"evidence_scope": "runtime", "member_ids": []}
-        if record is not None:
-            evidence.update(
-                target_key=record.target_key,
-                operation_id=record.operation_id,
-                phase=record.phase.value,
-                member_ids=list(_ids(record)),
-            )
-        raise ExternalPublicationError(code, evidence=evidence)
 
 
 __all__ = ["ClickHouseExternalReplicationServiceAdapter"]

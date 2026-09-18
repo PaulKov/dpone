@@ -37,7 +37,7 @@ owned_paths:
   - tests/integration/clickhouse_cluster/**
   - docs/clickhouse-cluster-publication*.md
   - docs/errors/CLICKHOUSE_CLUSTER_EXTERNAL_*.md
-  - examples/source-sink/mssql-to-clickhouse-cluster-full-refresh.yaml
+  - examples/batch/clickhouse-external-replication-full-refresh.batch.yaml
   - test_artifacts/clickhouse-external-publication/**
 
 integrator_owned_paths:

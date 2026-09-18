@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dpone.contracts.clickhouse_cluster_publication import digest_payload
+from dpone.contracts.clickhouse_cluster_publication import canonical_json, digest_payload
 
 
 class ExternalContractError(ValueError):
@@ -59,9 +59,11 @@ def derive_generation_id(*, operation_id: str, artifact_sha256: str, schema_dige
 
 __all__ = [
     "ExternalContractError",
+    "canonical_json",
     "derive_generation_id",
     "derive_member_id",
     "derive_operation_id",
     "derive_target_key",
+    "digest_payload",
     "require_digest",
 ]

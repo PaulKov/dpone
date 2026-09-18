@@ -17,13 +17,24 @@ from dpone.ports.clickhouse_external_replication import (
     derive_target_key,
     digest_payload,
 )
-from dpone.runtime.sinks.clickhouse_external_replication_phases import cleanup_phase, publish_phase
+from dpone.runtime.sinks.clickhouse_external_replication_phases import (
+    candidate_name as _candidate_name,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_phases import (
+    cleanup_phase,
+    publish_phase,
+    require_replayable_artifact,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_phases import (
+    matches_generation as _matches,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_phases import (
+    owned_observation as _owned,
+)
+from dpone.runtime.sinks.clickhouse_external_replication_phases import (
+    without_version as _without_version,
+)
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
-from dpone.runtime.sinks.clickhouse_external_replication_state import candidate_name as _candidate_name
-from dpone.runtime.sinks.clickhouse_external_replication_state import matches_generation as _matches
-from dpone.runtime.sinks.clickhouse_external_replication_state import owned_observation as _owned
-from dpone.runtime.sinks.clickhouse_external_replication_state import require_replayable_artifact
-from dpone.runtime.sinks.clickhouse_external_replication_state import without_version as _without_version
 
 
 class ExternalReplicationRuntimeService(Protocol):

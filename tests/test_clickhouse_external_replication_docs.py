@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-EXAMPLE = ROOT / "examples/source-sink/mssql-to-clickhouse-cluster-full-refresh.yaml"
+EXAMPLE = ROOT / "examples/batch/clickhouse-external-replication-full-refresh.batch.yaml"
 DOCS = (
     ROOT / "docs/clickhouse-cluster-publication.md",
     ROOT / "docs/clickhouse-cluster-publication-reference.md",

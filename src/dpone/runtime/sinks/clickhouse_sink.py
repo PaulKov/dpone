@@ -17,6 +17,7 @@ from dpone.runtime.clickhouse_file_stage_contract import (
 from dpone.runtime.clickhouse_staging_composition import (
     ClickHouseFullRefreshPublicationMixin,
     build_clickhouse_staging_components,
+    build_full_refresh_publication_router,
 )
 from dpone.runtime.clickhouse_staging_composition import (
     build_file_runner as build_file_runner,
@@ -24,7 +25,6 @@ from dpone.runtime.clickhouse_staging_composition import (
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.sinks.clickhouse_bulk_mixin import ClickHouseBulkMixin
 from dpone.runtime.sinks.clickhouse_cluster_preflight import ClickHouseClusterPreflightMixin
-from dpone.runtime.sinks.clickhouse_full_refresh_router import ClickHouseFullRefreshPublicationRouter
 from dpone.runtime.sinks.clickhouse_lineage_projection import ClickHouseSinkSideLineageProjector
 from dpone.runtime.sinks.clickhouse_nullability_policy import ClickHouseNullInsertPolicy
 from dpone.runtime.sinks.clickhouse_payload_ingestion import ClickHousePayloadIngestionService
@@ -98,7 +98,7 @@ class ClickHouseSink(
         self._staging_finalizer = staging.finalizer
         self._full_refresh_publication = staging.full_refresh_publication
         self._payload_ingestion = ClickHousePayloadIngestionService(self, sink_factory=self._clone_sink)
-        self._full_refresh_publication = ClickHouseFullRefreshPublicationRouter.from_sink(self)
+        self._full_refresh_publication = build_full_refresh_publication_router(self)
         self._staged_load = ClickHouseStagedLoadService(
             self,
             plan_staging_table=lambda config: self._operation_table_config(config, "staging"),

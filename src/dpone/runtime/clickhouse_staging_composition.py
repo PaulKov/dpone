@@ -123,6 +123,12 @@ def build_clickhouse_staging_components(
     return ClickHouseStagingComponents(validated_file, decoder, finalizer, full_refresh_publication)
 
 
+def build_full_refresh_publication_router(sink: Any) -> ClickHouseFullRefreshPublicationRouter:
+    """Complete publication wiring after the sink composition root exists."""
+
+    return ClickHouseFullRefreshPublicationRouter.from_sink(sink)
+
+
 def build_file_runner(
     config: LoadConfig, policy: ClickHouseValidatedFilePolicy, *, connector: Any, clock: Callable[[], float]
 ) -> ClickHouseFileStageRunner:

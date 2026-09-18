@@ -9,7 +9,6 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from dpone._compat import StrEnum
-from dpone.contracts.clickhouse_cluster_publication import canonical_json, digest_payload
 from dpone.contracts.clickhouse_external_replication_codec import (
     decode_dataclass as _decode_dataclass,
 )
@@ -24,10 +23,12 @@ from dpone.contracts.clickhouse_external_replication_codec import (
 )
 from dpone.contracts.clickhouse_external_replication_identity import (
     ExternalContractError,
+    canonical_json,
     derive_generation_id,
     derive_member_id,
     derive_operation_id,
     derive_target_key,
+    digest_payload,
 )
 from dpone.contracts.clickhouse_external_replication_identity import (
     require_digest as _require_digest,

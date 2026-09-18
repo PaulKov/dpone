@@ -19,9 +19,9 @@ from dpone.runtime.sinks.clickhouse_external_replication_context import (
     ExternalStagedContext,
     ExternalStagedValidation,
 )
-from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 from dpone.runtime.sinks.clickhouse_external_replication_runtime import (
     ClickHouseExternalReplicationRuntime,
+    ExternalReplicationReceipt,
     ExternalReplicationRuntimeService,
 )
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import SCHEDULER_IDENTITY_OPTION

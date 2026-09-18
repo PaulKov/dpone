@@ -25,12 +25,12 @@ from dpone.ports.clickhouse_external_replication import (
 )
 from dpone.runtime.sinks.clickhouse_external_replication_clickhouse import (
     ClickHouseExternalArtifactVerifier,
-    ClickHouseExternalClusterDdl,
     ClickHouseExternalKeeperMapAuthority,
     ClickHouseExternalReplicaConnectionProvider,
     ClickHouseExternalReplicaStaging,
     ClickHouseExternalTopologyCatalog,
 )
+from dpone.runtime.sinks.clickhouse_external_replication_ddl import ClickHouseExternalClusterDdl
 
 
 class _Connection:

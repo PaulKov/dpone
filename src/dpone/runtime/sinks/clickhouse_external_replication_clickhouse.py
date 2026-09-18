@@ -22,7 +22,6 @@ from dpone.ports.clickhouse_external_replication import (
     cluster_contract,
     digest_payload,
 )
-from dpone.runtime.sinks.clickhouse_external_replication_ddl import ClickHouseExternalClusterDdl
 
 _MUTATION_SETTINGS = {"keeper_map_strict_mode": 1, "insert_keeper_max_retries": 0}
 _INVENTORY_SQL = (
@@ -381,7 +380,6 @@ def _authority_schema(raw: str) -> str | None:
 
 __all__ = [
     "ClickHouseExternalArtifactVerifier",
-    "ClickHouseExternalClusterDdl",
     "ClickHouseExternalKeeperMapAuthority",
     "ClickHouseExternalReplicaConnectionProvider",
     "ClickHouseExternalReplicaStaging",

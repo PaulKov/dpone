@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import fields
 from typing import Any
-
-from dpone.contracts.clickhouse_external_replication_identity import ExternalContractError
 
 
 def decode_member(value: Any) -> Any:
     from dpone.contracts.clickhouse_external_replication import (
+        ExternalContractError,
         ExternalMemberRecord,
         ExternalMemberStageState,
         MemberPublicationState,
         PhysicalGeneration,
     )
 
-    require_exact_fields(value, ExternalMemberRecord)
+    require_exact_fields(value, ExternalMemberRecord, error_type=ExternalContractError)
     value = dict(value)
     value["stage_state"] = ExternalMemberStageState(value["stage_state"])
     value["publication_state"] = MemberPublicationState(value["publication_state"])
@@ -26,13 +26,24 @@ def decode_member(value: Any) -> Any:
 
 
 def decode_dataclass(kind: type[Any], value: Any) -> Any:
-    require_exact_fields(value, kind)
+    from dpone.contracts.clickhouse_external_replication import ExternalContractError
+
+    require_exact_fields(value, kind, error_type=ExternalContractError)
     return kind(**value)
 
 
-def require_exact_fields(value: Any, kind: type[Any]) -> None:
+def require_exact_fields(
+    value: Any,
+    kind: type[Any],
+    *,
+    error_type: Callable[[str, str], Exception] | None = None,
+) -> None:
     if not isinstance(value, dict) or set(value) != {item.name for item in fields(kind)}:
-        raise ExternalContractError("AUTHORITY_INVALID", f"{kind.__name__} fields differ")
+        if error_type is None:
+            from dpone.contracts.clickhouse_external_replication import ExternalContractError
+
+            error_type = ExternalContractError
+        raise error_type("AUTHORITY_INVALID", f"{kind.__name__} fields differ")
 
 
 def member_evidence(member: Any) -> dict[str, Any]:
