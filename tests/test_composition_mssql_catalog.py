@@ -41,9 +41,45 @@ def test_exact_complete_shape_and_row_bounds(schema, verified_reference):
     rows = expected_rows(schema)
     cursor = Cursor(rows)
     catalog.require_composition_mssql_schema(cursor, schema)
-    assert len(cursor.calls) == len(rows) == 75
+    assert len(cursor.calls) == len(rows) == 76
     assert all(limit == len(rows[key]) + 1 for _, _, limit, key in cursor.calls)
     assert all("COMMIT" not in sql and "ROLLBACK" not in sql for sql, _, _, _ in cursor.calls)
+
+
+def test_sql_server_2019_projects_impossible_ledger_metadata_as_zero(verified_reference):
+    cursor = Cursor(expected_rows())
+
+    catalog.require_composition_mssql_schema(cursor, "control")
+
+    table_queries = [sql for sql, _, _, key in cursor.calls if key[1] == "table"]
+    assert table_queries
+    assert all("CONVERT(int,0)" in sql and "CAST(NULL AS int)" in sql for sql in table_queries)
+    assert all("t.ledger_type" not in sql and "t.ledger_view_id" not in sql for sql in table_queries)
+
+
+@pytest.mark.parametrize("capabilities", [((16, 3),), ((12, 5),), ((12, 8),)])
+def test_ledger_capable_engines_audit_real_ledger_metadata(capabilities, verified_reference):
+    rows = expected_rows()
+    rows["database", "server_capabilities"] = capabilities
+    cursor = Cursor(rows)
+
+    catalog.require_composition_mssql_schema(cursor, "control")
+
+    table_queries = [sql for sql, _, _, key in cursor.calls if key[1] == "table"]
+    assert table_queries
+    assert all(
+        "t.ledger_type" in sql and "t.is_dropped_ledger_table" in sql and "t.ledger_view_id" in sql
+        for sql in table_queries
+    )
+
+
+@pytest.mark.parametrize("capabilities", [(), ((15,),), ((None, 3),), ((15, None),), ((True, 3),), ((15, False),)])
+def test_unknown_server_capabilities_fail_closed(capabilities, verified_reference):
+    rows = expected_rows()
+    rows["database", "server_capabilities"] = capabilities
+
+    with pytest.raises(CompositionAdmissionError, match="control_schema_unavailable"):
+        catalog.require_composition_mssql_schema(Cursor(rows), "control")
 
 
 @pytest.mark.parametrize("schema", ["", "a.b", "private;SELECT", "x" * 129, None])
