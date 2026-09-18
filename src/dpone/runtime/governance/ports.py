@@ -27,6 +27,7 @@ class StagedLoadHandle:
     finalization_config: Any | None = None
     decoded_config: Any | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    sink_state: Any | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
