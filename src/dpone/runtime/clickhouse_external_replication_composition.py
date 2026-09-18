@@ -54,6 +54,7 @@ def build_clickhouse_external_replication(sink: Any) -> ClickHouseExternalReplic
         catalog = ClickHouseClusterPublicationCatalog(connector)
         topology = ClickHouseExternalTopologyCatalog(connector)
         topology.inventory(cluster)
+        catalog.require_atomic_database(cluster, database, topology.bootstrap_hosts)
         ClickHouseClusterAuthorityBootstrap(connector, catalog).ensure(
             cluster,
             database,

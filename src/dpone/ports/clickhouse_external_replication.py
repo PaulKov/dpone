@@ -101,12 +101,6 @@ class ReplicaConnectionProvider(Protocol):
     def connection_for(self, member_id: str) -> Any: ...
 
 
-class ExternalArtifactPort(Protocol):
-    """Reopen and verify the immutable artifact immediately before use."""
-
-    def revalidate(self, artifact: ArtifactIdentity) -> None: ...
-
-
 class ExternalReplicaStagingPort(Protocol):
     """Perform direct local candidate operations for exactly one opaque member."""
 
@@ -154,7 +148,6 @@ __all__ = [
     "EXTERNAL_RECEIPT_SCHEMA_VERSION",
     "INTERNAL_AUTHORITY_SCHEMA_VERSION",
     "ArtifactIdentity",
-    "ExternalArtifactPort",
     "ExternalArtifactReceipt",
     "ExternalArtifactSourcePort",
     "ExternalAuthorityPhase",

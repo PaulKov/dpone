@@ -8,6 +8,7 @@ import pytest
 from dpone.config import LoadConfig
 from dpone.config.load_strategy import LoadStrategy
 from dpone.runtime.file_artifacts import FileExportArtifact
+from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.schema_evolution import SchemaEvolutionService
 from dpone.runtime.sinks.clickhouse_nullability_policy import ClickHouseNullInsertPolicy
 from dpone.runtime.sinks.clickhouse_payload_ingestion import ClickHousePayloadIngestionService
@@ -125,6 +126,48 @@ def test_clickhouse_row_insert_passes_driver_defaulting_setting() -> None:
 
     assert inserted == 1
     assert sink.connector.connection.calls[0][2]["settings"] == {"input_format_null_as_default": True}
+
+
+def test_external_member_insert_forces_stable_identity_and_synchronous_settings() -> None:
+    class Connection:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, list[tuple[object, ...]], dict]] = []
+
+        def execute(self, query: str, rows: list[tuple[object, ...]], **kwargs) -> None:
+            self.calls.append((query, rows, kwargs))
+
+    class Sink:
+        def __init__(self) -> None:
+            self.connector = SimpleNamespace(connection=Connection())
+
+        def _table(self, load_config: LoadConfig) -> str:
+            return f"`{load_config.target_schema}`.`{load_config.target_table}`"
+
+    sink = Sink()
+    service = ClickHousePayloadIngestionService(sink, sink_factory=lambda connector: Sink())
+    payload = LoadPayload(
+        artifact=InMemoryRowsArtifact([{"amount": 7}]),
+        schema=(("amount", "Int64"),),
+    )
+
+    inserted = service.insert_external_rows(
+        _load_config({}),
+        payload,
+        query_id="stable-query-id",
+        deduplication_token="stable-dedup-token",
+    )
+
+    assert inserted == 1
+    _, rows, kwargs = sink.connector.connection.calls[0]
+    assert rows == [(7,)]
+    assert kwargs == {
+        "query_id": "stable-query-id",
+        "settings": {
+            "async_insert": 0,
+            "wait_for_async_insert": 1,
+            "insert_deduplication_token": "stable-dedup-token",
+        },
+    }
 
 
 def test_clickhouse_insert_select_adds_insert_null_as_default_setting() -> None:

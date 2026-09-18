@@ -103,7 +103,7 @@ class ClickHouseExternalReplicationServiceAdapter:
         database: str,
         target: str,
         token_factory: Callable[[], str] | None = None,
-        evidence_scope: str = "local_synthetic",
+        evidence_scope: str = "mocked_in_process",
     ) -> None:
         self._topology_port = topology
         self._authority = authority
@@ -146,6 +146,8 @@ class ClickHouseExternalReplicationServiceAdapter:
                 return _state(current)
             _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CAS_CONFLICT", current.record)
         record = self._record(desired, current.record)
+        if record.phase is ExternalAuthorityPhase.LOCKED and record.operation_id != current.record.operation_id:
+            record = self._adopt(record)
         action: str | None = None
         if record.phase is ExternalAuthorityPhase.PUBLICATION_DISPATCHING:
             action = "publication"
@@ -261,11 +263,17 @@ class ClickHouseExternalReplicationServiceAdapter:
         if _ids(record) != member_ids:
             _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", record)
         if _has_predecessor(record):
+            if set(self._cleanup_states(record).values()) != {True}:
+                _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", record)
             self._ddl.drop_predecessor(record, _take_permit(self, operation_id, "cleanup"), cluster=self._cluster)
 
     def observe_cleanup(self, operation_id: str) -> Mapping[str, bool]:
         record = self._current(operation_id).record
-        if _has_predecessor(record) and self._entry(record, cleanup=True).state_for(_ids(record)) is QueueState.UNKNOWN:
+        if (
+            record.phase is ExternalAuthorityPhase.CLEANUP_DISPATCHING
+            and _has_predecessor(record)
+            and self._entry(record, cleanup=True).state_for(_ids(record)) is QueueState.UNKNOWN
+        ):
             _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", record)
         return self._cleanup_states(record)
 
@@ -331,7 +339,9 @@ class ClickHouseExternalReplicationServiceAdapter:
         for member_id, state in self._publication_states(record).items():
             if state not in {MemberPublicationState.COMMITTED, MemberPublicationState.CLEANUP_PENDING}:
                 _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", record)
-            result[member_id] = state is MemberPublicationState.COMMITTED
+            result[member_id] = (
+                _member(record, member_id).predecessor is not None and state is MemberPublicationState.COMMITTED
+            )
         return result
 
     def _entry(self, record: ExternalAuthorityRecord, *, cleanup: bool) -> QueueEntry:

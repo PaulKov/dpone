@@ -45,6 +45,11 @@ def publish_phase(state: dict[str, Any], *, service: Any, cas: Cas, fail: Fail) 
 
 def cleanup_phase(state: dict[str, Any], *, service: Any, cas: Cas, fail: Fail) -> dict[str, Any]:
     if state["phase"] == "COMMITTED":
+        pending = service.observe_cleanup(state["operation_id"])
+        if set(pending) != set(state["member_ids"]):
+            fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", state=state)
+        if not any(pending.values()):
+            return cas(state, {**without_version(state), "phase": "COMPLETED"})
         state = cas(
             state,
             {
