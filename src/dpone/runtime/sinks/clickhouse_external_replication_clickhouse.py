@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from dpone.contracts import clickhouse_cluster_publication as cluster_contract
+from dpone.contracts.clickhouse_cluster_publication import digest_payload
 from dpone.contracts.clickhouse_external_replication import (
     EXTERNAL_AUTHORITY_SCHEMA_VERSION,
     INTERNAL_AUTHORITY_SCHEMA_VERSION,
@@ -33,16 +34,57 @@ _INVENTORY_SQL = (
 class ClickHouseExternalTopologyCatalog:
     def __init__(self, connector: Any) -> None:
         self._connector = connector
+        self._member_ids_by_host: dict[str, str] = {}
+        self._bootstrap_hosts: tuple[str, ...] = ()
+        self._inventory_digest: str | None = None
 
     def inventory(self, cluster: str) -> ExternalTopology:
         rows = _inventory_rows(self._connector, cluster)
+        members = tuple(_member(row) for row in rows)
         topology = ExternalTopology(
             cluster=cluster,
             replication_mode=ReplicationMode.EXTERNAL,
-            members=tuple(_member(row) for row in rows),
+            members=members,
         )
         topology.validate()
+        self._member_ids_by_host = {
+            host: member.member_id
+            for row, member in zip(rows, members, strict=True)
+            for host in (str(row[0]), str(row[1]))
+        }
+        self._bootstrap_hosts = tuple(str(row[0]) for row in rows)
+        self._inventory_digest = digest_payload(
+            [
+                {
+                    "member_id": member.member_id,
+                    "endpoint_digest": digest_payload(
+                        {"host": str(row[0]), "address": str(row[1]), "port": int(row[2])}
+                    ),
+                }
+                for row, member in zip(rows, members, strict=True)
+            ]
+        )
         return topology
+
+    @property
+    def bootstrap_hosts(self) -> tuple[str, ...]:
+        """Return raw host keys only for the internal authority bootstrap boundary."""
+
+        return self._bootstrap_hosts
+
+    @property
+    def inventory_digest(self) -> str:
+        if self._inventory_digest is None:
+            raise ExternalContractError("INVENTORY_INVALID", "inventory must be observed first")
+        return self._inventory_digest
+
+    def member_identity(self, host: str) -> str:
+        """Resolve a queue host into its opaque admitted member identity."""
+
+        member_id = self._member_ids_by_host.get(str(host))
+        if member_id is None:
+            raise ExternalContractError("INVENTORY_INVALID", "queue host is not in admitted inventory")
+        return member_id
 
 
 class ClickHouseExternalReplicaConnectionProvider:
@@ -50,8 +92,13 @@ class ClickHouseExternalReplicaConnectionProvider:
         self._connector = connector
         self._cluster = cluster
         self._connect = connect
+        self._connections: dict[str, Any] = {}
+        self._member_ids_by_connection: dict[int, str] = {}
 
     def connection_for(self, member_id: str) -> Any:
+        cached = self._connections.get(member_id)
+        if cached is not None:
+            return cached
         rows = _inventory_rows(self._connector, self._cluster)
         topology = ExternalTopology(
             cluster=self._cluster,
@@ -64,9 +111,17 @@ class ClickHouseExternalReplicaConnectionProvider:
             raise ExternalContractError("INVENTORY_INVALID", "opaque member identity is not uniquely resolvable")
         row = matches[0]
         try:
-            return self._connect(self._connector, str(row[0]), str(row[1]), int(row[2]))
+            connection = self._connect(self._connector, str(row[0]), str(row[1]), int(row[2]))
+            self._connections[member_id] = connection
+            self._member_ids_by_connection[id(connection)] = member_id
+            return connection
         except Exception:
             raise ExternalContractError("INVENTORY_INVALID", "direct member connection is unavailable") from None
+
+    def member_identity(self, connection: Any) -> str:
+        """Return the opaque identity bound to a provider-owned connection."""
+
+        return self._member_ids_by_connection.get(id(connection), "")
 
 
 class ClickHouseExternalArtifactVerifier:

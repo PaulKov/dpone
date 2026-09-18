@@ -89,6 +89,7 @@ sink:
             name: analytics_cluster
             ddl_scope: cluster
             replication_mode: external
+            external_content_row_budget: 100000
 ```
 
 The static plan includes this additive publication decision:

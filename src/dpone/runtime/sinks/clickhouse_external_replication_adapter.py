@@ -64,6 +64,7 @@ class ClickHouseExternalReplicationServiceAdapter:
         database: str,
         target: str,
         token_factory: Callable[[], str] | None = None,
+        evidence_scope: str = "local_synthetic",
     ) -> None:
         self._topology_port = topology
         self._authority = authority
@@ -73,6 +74,7 @@ class ClickHouseExternalReplicationServiceAdapter:
         self._database = database
         self._target = target
         self._token = token_factory or (lambda: secrets.token_hex(16))
+        self.evidence_scope = evidence_scope
         self._inventory_digest: str | None = None
         self._permits: dict[tuple[str, str], ExternalDispatchPermit] = {}
 
@@ -81,7 +83,8 @@ class ClickHouseExternalReplicationServiceAdapter:
             self._error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT")
         topology = self._topology_port.inventory(cluster)
         topology.validate()
-        self._inventory_digest = topology.digest
+        digest = getattr(self._topology_port, "inventory_digest", topology.digest)
+        self._inventory_digest = str(digest)
         return tuple(member.member_id for member in topology.ordered_members)
 
     def inventory_digest(self) -> str:

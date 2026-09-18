@@ -33,6 +33,7 @@ def test_external_cluster_full_refresh_example_parses_with_exact_mode() -> None:
         "name": "analytics_cluster",
         "ddl_scope": "cluster",
         "replication_mode": "external",
+        "external_content_row_budget": 100000,
     }
 
 

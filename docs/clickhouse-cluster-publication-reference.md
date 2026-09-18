@@ -15,6 +15,7 @@ The cluster configuration is nested under
 | `name` | non-empty string | none | ClickHouse cluster inspected and used for cluster-scoped DDL |
 | `ddl_scope` | `local` or `cluster` | existing configuration default | Cluster publication requires `cluster` |
 | `replication_mode` | `internal` or `external` | `internal` | Explicitly selects the physical staging and generation protocol |
+| `external_content_row_budget` | positive integer | `100000` | Bounds the rows sealed and re-observed for exact typed-content proof in external mode |
 
 All cluster full-refresh modes also require:
 
@@ -74,6 +75,11 @@ Runtime requires the exact current inventory:
 - consistent KeeperMap facade and target authority view;
 - direct member connection capability; and
 - canonical typed-content digest support within configured budgets.
+
+External mode currently admits replayable in-memory rows and uncompressed CSV
+or TSV file artifacts without a bulk text codec. Unsupported, streaming,
+compressed, native-wire, or decoder-dependent artifacts fail before candidate
+mutation; dpone does not silently switch transport or publication mode.
 
 `skip_unavailable_shards=1` and partial catalog results are never admission
 evidence.

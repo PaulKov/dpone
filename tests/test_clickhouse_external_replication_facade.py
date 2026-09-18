@@ -128,11 +128,12 @@ def _fixture() -> _Fixture:
     def source_factory(load_config: Any, payload: Any) -> _ArtifactSource:
         assert load_config.target_table == "target_table"
         assert payload.artifact.file_path == "/synthetic/only-used-by-factory"
+        assert service.authority is not None and service.authority["phase"] == "LOCKED"
         holder.source_calls += 1
         return _ArtifactSource()
 
     holder.facade = ClickHouseExternalReplicationFacade(
-        service_factory=lambda cluster, database, target: service,
+        service_factory=lambda cluster, database, target, **_: service,
         artifact_source_factory=source_factory,
         runtime_factory=ClickHouseExternalReplicationRuntime,
     )
@@ -199,6 +200,16 @@ def test_facade_fences_before_artifact_factory_and_runs_governed_lifecycle() -> 
     assert "file_path" not in repr(context)
 
 
+def test_direct_stage_acquires_authority_before_artifact_factory() -> None:
+    fixture = _fixture()
+
+    context = fixture.facade.stage(_config(), _payload())
+
+    assert fixture.service.authority is not None
+    assert context.staged_receipt.phase == "STAGED"
+    assert fixture.source_calls == 1
+
+
 def test_prepare_completed_operation_exposes_idempotent_replay_without_source() -> None:
     fixture = _fixture()
     config = fixture.facade.prepare_admission(_config())
@@ -208,7 +219,10 @@ def test_prepare_completed_operation_exposes_idempotent_replay_without_source() 
 
     replay_config = fixture.facade.prepare_admission(_config())
 
-    assert fixture.facade.replay_result(replay_config) == completed
+    replay = fixture.facade.replay_result(replay_config)
+    assert replay is not None
+    assert replay.commit_receipt_id == completed.operation_id
+    assert replay.inserted_rows == 2
     assert fixture.source_calls == 1
 
 
@@ -232,7 +246,7 @@ def test_validation_rejects_authority_or_inventory_drift() -> None:
     assert fixture.service.authority is not None
     fixture.service.authority["version"] += 1
 
-    with pytest.raises(ExternalPublicationError, match="VALIDATION_INVALID"):
+    with pytest.raises(ExternalPublicationError, match="GENERATION_DIVERGED"):
         fixture.facade.validate(context)
 
     assert fixture.service.publish_calls == 0
