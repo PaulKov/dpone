@@ -160,9 +160,9 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 - `dpone.contracts.dbt_contract_validation`: **57**
 - `dpone.gitops.schema_contract_primitives`: **55**
 - `dpone.commands.func_command`: **54**
-- `dpone.runtime.sinks.load_result`: **50** - approved stable contract: sink load result DTO
+- `dpone.runtime.sinks.load_result`: **51** - approved stable contract: sink load result DTO
+- `dpone.config.load_strategy`: **50** - approved stable contract: load strategy enum contract
 - `dpone.runtime.sources.extract_result`: **50** - approved stable contract: source extraction DTO
-- `dpone.config.load_strategy`: **48** - approved stable contract: load strategy enum contract
 - `dpone.runtime.deployment_cache_common`: **47**
 - `dpone.ops.routes.models`: **46**
 - `dpone.runtime.artifact_models`: **46**
@@ -198,7 +198,7 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 | `dpone.cli` | 4 | 9 | 4 | 3 | 6 | 1 | 2.25 | 1.00 | 0.333 | 4 | 1 |
 | `dpone.cli_render` | 24 | 46 | 43 | 19 | 27 | 24 | 1.92 | 1.79 | 0.413 | 8 | 3 |
 | `dpone.commands` | 238 | 922 | 583 | 581 | 341 | 2 | 3.87 | 2.45 | 0.630 | 22 | 1 |
-| `dpone.config` | 16 | 33 | 122 | 18 | 15 | 104 | 2.06 | 7.62 | 0.545 | 3 | 10 |
+| `dpone.config` | 16 | 33 | 124 | 18 | 15 | 106 | 2.06 | 7.75 | 0.545 | 3 | 10 |
 | `dpone.connector_sdk` | 12 | 9 | 13 | 9 | 0 | 4 | 0.75 | 1.08 | 1.000 | 0 | 1 |
 | `dpone.contracts` | 292 | 691 | 1505 | 678 | 13 | 827 | 2.37 | 5.15 | 0.981 | 6 | 18 |
 | `dpone.core` | 7 | 8 | 1 | 1 | 7 | 0 | 1.14 | 0.14 | 0.125 | 4 | 0 |
@@ -235,7 +235,7 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 | `dpone.ports` | 104 | 107 | 354 | 52 | 55 | 302 | 1.03 | 3.40 | 0.486 | 3 | 13 |
 | `dpone.readiness` | 384 | 1022 | 866 | 631 | 391 | 235 | 2.66 | 2.26 | 0.617 | 21 | 7 |
 | `dpone.root` | 1 | 1 | 0 | 0 | 1 | 0 | 1.00 | 0.00 | 0.000 | 1 | 0 |
-| `dpone.runtime` | 1062 | 3159 | 2791 | 2587 | 572 | 204 | 2.97 | 2.63 | 0.819 | 17 | 10 |
+| `dpone.runtime` | 1076 | 3206 | 2825 | 2621 | 585 | 204 | 2.98 | 2.63 | 0.818 | 17 | 10 |
 | `dpone.schema` | 1 | 1 | 1 | 0 | 1 | 1 | 1.00 | 1.00 | 0.000 | 1 | 1 |
 | `dpone.security_redaction` | 1 | 0 | 27 | 0 | 0 | 27 | 0.00 | 27.00 | 1.000 | 0 | 9 |
 | `dpone.services` | 329 | 922 | 544 | 358 | 564 | 186 | 2.80 | 1.65 | 0.388 | 20 | 9 |
@@ -262,10 +262,10 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 | `dpone.readiness` | `dpone.contracts` | 85 |
 | `dpone.readiness` | `dpone.runtime` | 84 |
 | `dpone.commands` | `dpone.readiness` | 81 |
-| `dpone.runtime` | `dpone.config` | 69 |
+| `dpone.runtime` | `dpone.config` | 71 |
+| `dpone.runtime` | `dpone.ports` | 67 |
 | `dpone.services` | `dpone.readiness` | 67 |
 | `dpone.ops` | `dpone.runtime` | 59 |
-| `dpone.runtime` | `dpone.backfill` | 57 |
 
 **Top 15 cross-slice dependency flows**
 
@@ -278,12 +278,12 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 | `dpone.readiness` | `dpone.manifest` | 96 |
 | `dpone.readiness` | `dpone.contracts` | 85 |
 | `dpone.readiness` | `dpone.runtime` | 84 |
-| `dpone.runtime` | `dpone.config` | 69 |
+| `dpone.runtime` | `dpone.config` | 71 |
+| `dpone.runtime` | `dpone.ports` | 67 |
 | `dpone.ops` | `dpone.runtime` | 59 |
 | `dpone.runtime` | `dpone.backfill` | 57 |
-| `dpone.runtime` | `dpone.ports` | 56 |
+| `dpone.ports` | `dpone.contracts` | 55 |
 | `dpone.runtime` | `dpone.readiness` | 55 |
-| `dpone.ports` | `dpone.contracts` | 53 |
 | `dpone.app` | `dpone.adapters` | 52 |
 | `dpone.manifest` | `dpone.contracts` | 48 |
 

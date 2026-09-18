@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import date, datetime, time
+from decimal import Decimal
+from types import SimpleNamespace
 from typing import Any
+from uuid import UUID
 
 import pytest
 
@@ -17,6 +21,7 @@ from dpone.contracts.clickhouse_external_replication import (
     digest_payload,
 )
 from dpone.runtime.artifacts import InMemoryRowsArtifact
+from dpone.runtime.sinks.clickhouse_external_artifact_source import ClickHouseExternalArtifactSource
 from dpone.runtime.sinks.clickhouse_external_replication_member_driver import (
     ClickHouseExternalReplicationMemberDriver,
     canonical_rows_digest,
@@ -276,6 +281,35 @@ def test_drop_mutates_only_the_exact_expected_candidate_uuid(load_config: LoadCo
 
     assert connector.mutations == ["DROP TABLE `analytics`.`candidate_table`"]
     assert driver.observe(connector, record).candidate is None
+
+
+def test_artifact_source_seals_typed_clickhouse_values_canonically(load_config: LoadConfig) -> None:
+    typed_schema = (
+        ("event_date", "Date"),
+        ("event_time", "DateTime64(6)"),
+        ("amount", "Decimal(18,2)"),
+        ("event_id", "UUID"),
+        ("payload", "String"),
+        ("clock", "String"),
+    )
+    row = {
+        "event_date": date(2026, 9, 18),
+        "event_time": datetime(2026, 9, 18, 12, 30, 45, 123456),
+        "amount": Decimal("12.30"),
+        "event_id": UUID("12345678-1234-5678-1234-567812345678"),
+        "payload": b"\x00\xff",
+        "clock": time(12, 30, 45, 123456),
+    }
+    payload = LoadPayload(artifact=InMemoryRowsArtifact([row]), schema=typed_schema)
+    sink = SimpleNamespace(_payload_ingestion=SimpleNamespace(_clickhouse_schema=lambda _config, _schema: typed_schema))
+
+    first = ClickHouseExternalArtifactSource(sink=sink, load_config=load_config, payload=payload, maximum_rows=10)
+    second = ClickHouseExternalArtifactSource(sink=sink, load_config=load_config, payload=payload, maximum_rows=10)
+
+    assert first.identity == second.identity
+    assert first.identity.row_count == 1
+    assert first.identity.byte_size > 0
+    assert first.open_replay().artifact._rows == second.open_replay().artifact._rows
 
 
 def test_drop_rejects_foreign_uuid_without_mutation(load_config: LoadConfig) -> None:

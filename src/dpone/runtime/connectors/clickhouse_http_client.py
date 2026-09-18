@@ -57,6 +57,27 @@ class ClickHouseHttpClientAdapter:
             return
         yield from stream
 
+    def insert_rows(
+        self,
+        table: str,
+        rows: Iterable[Iterable[Any]],
+        *,
+        column_names: Iterable[str],
+        settings: dict[str, Any] | None = None,
+        query_id: str | None = None,
+    ) -> None:
+        """Insert typed rows through clickhouse-connect's native insert API."""
+
+        merged = {**(self._settings or {}), **(settings or {})}
+        if query_id is not None:
+            merged["query_id"] = query_id
+        self._client.insert(
+            table,
+            list(rows),
+            column_names=list(column_names),
+            settings=merged or None,
+        )
+
     def disconnect(self) -> None:
         close = getattr(self._client, "close", None)
         if callable(close):

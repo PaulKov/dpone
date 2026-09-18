@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, fields, is_dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any
 
-from dpone.ports.clickhouse_external_replication import ExternalPublicationRequest
+from dpone.ports.clickhouse_external_replication import ExternalPublicationRequest, canonical_json, digest_payload
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 
 
@@ -36,4 +40,59 @@ class ExternalStagedValidation:
     authority_version: int
 
 
-__all__ = ["ExternalStagedContext", "ExternalStagedValidation"]
+def derive_semantic_plan_digest(
+    load_config: Any,
+    *,
+    cluster: str,
+    database: str,
+    target: str,
+    runtime_option_keys: frozenset[str] = frozenset(),
+) -> str:
+    """Bind operation identity to normalized source, target, and transformation semantics."""
+
+    if not is_dataclass(load_config):
+        raise TypeError("clickhouse external replication requires a dataclass load configuration")
+    projected = {
+        field.name: _stable_plan_value(getattr(load_config, field.name))
+        for field in fields(load_config)
+        if field.name != "options"
+    }
+    options = {
+        str(key): _stable_plan_value(value)
+        for key, value in _mapping(getattr(load_config, "options", None)).items()
+        if key not in runtime_option_keys
+    }
+    return digest_payload(
+        {
+            "version": 2,
+            "resolved_target": {"cluster": cluster, "database": database, "table": target},
+            "load_config": projected,
+            "options": options,
+        }
+    )
+
+
+def _stable_plan_value(value: Any) -> Any:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, Enum):
+        return _stable_plan_value(value.value)
+    if isinstance(value, Path):
+        return str(value)
+    if is_dataclass(value):
+        return {field.name: _stable_plan_value(getattr(value, field.name)) for field in fields(value)}
+    if isinstance(value, Mapping):
+        return {str(key): _stable_plan_value(item) for key, item in value.items()}
+    if isinstance(value, tuple | list):
+        return [_stable_plan_value(item) for item in value]
+    if isinstance(value, set | frozenset):
+        normalized = [_stable_plan_value(item) for item in value]
+        return sorted(normalized, key=canonical_json)
+    raise TypeError(f"unsupported clickhouse external plan value: {type(value).__name__}")
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+__all__ = ["ExternalStagedContext", "ExternalStagedValidation", "derive_semantic_plan_digest"]

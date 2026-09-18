@@ -39,6 +39,11 @@ Before the first run, confirm all of the following:
   create, insert, exchange or rename, and drop managed tables;
 - the runtime can connect directly to every admitted member without exposing
   endpoints or credentials in output;
+- direct member connections use the native transport and the per-member ports
+  advertised by `system.clusters`; an injected endpoint resolver is required
+  when Docker, a proxy, NAT, or another network boundary changes those addresses;
+- every resolved direct connection is opened during admission and the resolved
+  endpoint set is bound into the inventory digest before extraction;
 - distributed-DDL queue retention exceeds the maximum recovery window; and
 - extraction produces one immutable replayable artifact with a SHA-256 digest,
   schema identity, byte size, and row count.
@@ -81,6 +86,7 @@ sink:
     mode: full_refresh
     max_source_bytes: 104857600
   options:
+    lineage: false
     physical_design:
       storage:
         clickhouse:
@@ -108,6 +114,11 @@ The static plan includes this additive publication decision:
 current member inventory, grants, Keeper state, or direct-member connectivity.
 Fix every blocker before proceeding. Do not reinterpret a static pass as live
 certification.
+
+`lineage: false` is required for this bounded V2 route because it publishes the
+sealed source artifact unchanged. Lineage projection and decoder-dependent
+transformations fail during pre-source admission; dpone does not extract first
+and silently alter the artifact later.
 
 Run through the normal runtime entrypoint after the plan is reviewed:
 

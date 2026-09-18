@@ -45,5 +45,6 @@ class ClickHouseConnectorPort(Protocol):
         port: int,
         *,
         application_suffix: str,
+        driver: str | None = None,
     ) -> ClickHouseConnectorPort:
         """Return an equivalent connector for one admitted direct member."""

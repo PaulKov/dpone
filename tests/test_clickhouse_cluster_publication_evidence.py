@@ -25,6 +25,8 @@ def test_receipt_merges_out_of_order_scenarios_without_false_complete_status(tmp
     assert observed["scenario_results"]["keeper_cas_and_log_comment"] == "passed_live"
     assert observed["scenario_results"]["normal_existing_and_absent_target"] == "unverified"
     assert observed["keeper_version_after"] == 1
+    assert len(observed["source_commit"]) == 40
+    assert len(observed["fixture_digest"]) == 64
     assert observed["status"] == "unverified"
 
 

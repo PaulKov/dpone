@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import SimpleNamespace
 from typing import Any
 
@@ -226,6 +226,86 @@ def test_prepare_completed_operation_exposes_idempotent_replay_without_source() 
     assert fixture.source_calls == 1
 
 
+@pytest.mark.parametrize("resume_phase", ["STAGED", "COMMITTED"])
+def test_prepare_resumes_post_staging_operation_without_source(resume_phase: str) -> None:
+    fixture = _fixture()
+    config = fixture.facade.prepare_admission(_config())
+    context = fixture.facade.stage(config, _payload())
+    if resume_phase == "COMMITTED":
+        fixture.facade.publish(context, fixture.facade.validate(context))
+
+    replay_config = fixture.facade.prepare_admission(_config())
+
+    replay = fixture.facade.replay_result(replay_config)
+    assert replay is not None
+    assert replay.commit_outcome.value == "committed_after_receipt_probe"
+    assert fixture.service.authority is not None
+    assert fixture.service.authority["phase"] == "COMPLETED"
+    assert fixture.source_calls == 1
+    assert fixture.service.cleanup_calls == 1
+
+
+@pytest.mark.parametrize("resume_phase", ["PUBLICATION_DISPATCHING", "CLEANUP_DISPATCHING"])
+def test_prepare_reconciles_interrupted_dispatch_without_source(resume_phase: str) -> None:
+    fixture = _fixture()
+    config = fixture.facade.prepare_admission(_config())
+    context = fixture.facade.stage(config, _payload())
+    assert fixture.service.authority is not None
+    if resume_phase == "PUBLICATION_DISPATCHING":
+        fixture.service.authority["phase"] = resume_phase
+        fixture.service.targets = dict.fromkeys(fixture.service.members, context.request.operation_id)
+    else:
+        fixture.facade.publish(context, fixture.facade.validate(context))
+        fixture.service.authority["phase"] = resume_phase
+        fixture.service.predecessors = dict.fromkeys(fixture.service.members, False)
+
+    replay_config = fixture.facade.prepare_admission(_config())
+
+    assert fixture.facade.replay_result(replay_config) is not None
+    assert fixture.service.authority["phase"] == "COMPLETED"
+    assert fixture.source_calls == 1
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        lambda config: replace(config, source_conn_id="other-source"),
+        lambda config: replace(config, source_database="warehouse"),
+        lambda config: replace(config, source_schema="other_schema"),
+        lambda config: replace(config, source_table="other_table"),
+        lambda config: replace(
+            config,
+            options={
+                **config.options,
+                "physical_design": {
+                    "storage": {
+                        "clickhouse": {
+                            **config.options["physical_design"]["storage"]["clickhouse"],
+                            "order_by": ["event_id"],
+                        }
+                    }
+                },
+            },
+        ),
+    ],
+    ids=["connection", "database", "schema", "table", "physical-design"],
+)
+def test_semantic_plan_changes_never_replay_prior_operation(changed: Any) -> None:
+    fixture = _fixture()
+    config = _config()
+    admitted = fixture.facade.prepare_admission(config)
+    context = fixture.facade.stage(admitted, _payload())
+    fixture.facade.publish(context, fixture.facade.validate(context))
+    fixture.facade.cleanup(context)
+    prior_operation = context.request.operation_id
+
+    changed_config = fixture.facade.prepare_admission(changed(config))
+
+    assert fixture.facade.replay_result(changed_config) is None
+    assert fixture.service.authority is not None
+    assert fixture.service.authority["operation_id"] != prior_operation
+
+
 def test_validation_is_bound_to_exact_staged_authority() -> None:
     fixture = _fixture()
     config = fixture.facade.prepare_admission(_config())
@@ -257,6 +337,8 @@ def test_external_mode_is_explicit_and_unsafe_transformations_fail_closed() -> N
     assert fixture.facade.is_enabled(_config()) is True
     assert fixture.facade.is_enabled(_config(physical_design={})) is False
 
+    with pytest.raises(ExternalPublicationError, match="TRANSFORMATION_UNSUPPORTED"):
+        fixture.facade.prepare_admission(_config(lineage=True))
     with pytest.raises(ExternalPublicationError, match="TRANSFORMATION_UNSUPPORTED"):
         fixture.facade.stage(_config(lineage=True), _payload())
     with pytest.raises(ExternalPublicationError, match="TRANSFORMATION_UNSUPPORTED"):

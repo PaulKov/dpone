@@ -52,7 +52,10 @@ def build_clickhouse_external_replication(sink: Any) -> ClickHouseExternalReplic
         payload: Any | None = None,
     ) -> ClickHouseExternalReplicationServiceAdapter:
         catalog = ClickHouseClusterPublicationCatalog(connector)
-        topology = ClickHouseExternalTopologyCatalog(connector)
+        topology = ClickHouseExternalTopologyCatalog(
+            connector,
+            resolve_endpoint=getattr(connector, "external_member_endpoint_resolver", None),
+        )
         topology.inventory(cluster)
         catalog.require_atomic_database(cluster, database, topology.bootstrap_hosts)
         ClickHouseClusterAuthorityBootstrap(connector, catalog).ensure(
@@ -62,9 +65,10 @@ def build_clickhouse_external_replication(sink: Any) -> ClickHouseExternalReplic
         )
         provider = ClickHouseExternalReplicaConnectionProvider(
             connector,
-            cluster=cluster,
+            topology=topology,
             connect=_direct_member_connection,
         )
+        provider.require_connections()
         schema = tuple(getattr(payload, "schema", ()) or ())
         budget = external_content_row_budget(load_config) if load_config is not None else 100_000
         driver = ClickHouseExternalReplicationMemberDriver(
@@ -97,8 +101,8 @@ def build_clickhouse_external_replication(sink: Any) -> ClickHouseExternalReplic
 
 
 def _direct_member_connection(base: Any, host_name: str, host_address: str, port: int) -> Any:
-    endpoint = host_address or host_name
-    direct = base.clone_for_endpoint(endpoint, port, application_suffix="external-member")
+    endpoint = host_name or host_address
+    direct = base.clone_for_endpoint(endpoint, port, application_suffix="external-member", driver="native")
     return direct
 
 

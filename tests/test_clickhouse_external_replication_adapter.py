@@ -52,6 +52,7 @@ class _Authority:
     def __init__(self) -> None:
         self.current: VersionedExternalAuthorityRecord | None = None
         self.unknown_dispatch = False
+        self.lose_ready_cas_once = False
         self.phases: list[str] = []
 
     def read_versioned(self, target_key: str) -> VersionedExternalAuthorityRecord | None:
@@ -68,6 +69,9 @@ class _Authority:
     def compare_and_swap(self, current, desired):
         assert self.current == current
         if self.unknown_dispatch and desired.phase.value == "PUBLICATION_DISPATCHING":
+            return ExternalAuthorityMutationResult(ExternalAuthorityMutationStatus.OUTCOME_UNKNOWN)
+        if self.lose_ready_cas_once and any(member.stage_state.value == "ready" for member in desired.members):
+            self.lose_ready_cas_once = False
             return ExternalAuthorityMutationResult(ExternalAuthorityMutationStatus.OUTCOME_UNKNOWN)
         self.current = VersionedExternalAuthorityRecord(desired, current.version + 1)
         self.phases.append(desired.phase.value)
@@ -347,3 +351,109 @@ def test_adapter_freshly_adopts_target_after_initially_absent_operation() -> Non
     assert set(staging.loads.values()) == {2}
     assert ddl.publication_calls == 2
     assert ddl.cleanup_calls == 1
+
+
+def test_fresh_adapter_initializes_inventory_before_cleanup() -> None:
+    runtime, authority, _, staging, ddl = _runtime()
+    request = _request()
+    runtime.stage(request)
+    runtime.publish(request)
+    topology = _Topology()
+    fresh_service = ClickHouseExternalReplicationServiceAdapter(
+        topology=topology,
+        authority=authority,
+        staging=staging,
+        ddl=ddl,
+        cluster=request.cluster,
+        database=request.database,
+        target=request.target,
+    )
+
+    completed = ClickHouseExternalReplicationRuntime(service=fresh_service).cleanup(request)
+
+    assert completed.phase == "COMPLETED"
+    assert ddl.cleanup_calls == 1
+
+
+def test_cleanup_rejects_topology_drift_before_dispatch() -> None:
+    runtime, authority, _, staging, ddl = _runtime()
+    request = _request()
+    runtime.stage(request)
+    runtime.publish(request)
+    topology = _Topology()
+    topology.value = replace(
+        topology.value,
+        members=(
+            *topology.value.members,
+            ExternalMember.create(shard_num=1, replica_num=3, internal_replication=False),
+        ),
+    )
+    fresh_service = ClickHouseExternalReplicationServiceAdapter(
+        topology=topology,
+        authority=authority,
+        staging=staging,
+        ddl=ddl,
+        cluster=request.cluster,
+        database=request.database,
+        target=request.target,
+    )
+
+    with pytest.raises(ExternalPublicationError, match="INVENTORY_DRIFT"):
+        ClickHouseExternalReplicationRuntime(service=fresh_service).cleanup(request)
+
+    assert ddl.cleanup_calls == 0
+
+
+def test_fresh_adapter_initializes_inventory_before_abort() -> None:
+    runtime, authority, _, staging, ddl = _runtime()
+    request = _request()
+    runtime.stage(request)
+    fresh_service = ClickHouseExternalReplicationServiceAdapter(
+        topology=_Topology(),
+        authority=authority,
+        staging=staging,
+        ddl=ddl,
+        cluster=request.cluster,
+        database=request.database,
+        target=request.target,
+    )
+
+    ClickHouseExternalReplicationRuntime(service=fresh_service).abort(request)
+
+    assert authority.current is not None
+    assert authority.current.record.phase is ExternalAuthorityPhase.ABORTED
+    assert set(staging.drops.values()) == {1}
+
+
+def test_late_same_operation_worker_never_reloads_ready_candidate() -> None:
+    runtime, authority, artifact, staging, _ = _runtime()
+    request = _request()
+    runtime.stage(request)
+    service = runtime._service
+    assert authority.current is not None
+
+    observed = service.stage_member_once(
+        _members()[0],
+        operation_id=request.operation_id,
+        candidate_name=authority.current.record.candidate,
+        artifact=request.artifact,
+        source=artifact,
+    )
+
+    assert observed["row_count"] == request.artifact.row_count
+    assert set(staging.loads.values()) == {1}
+
+
+def test_lost_ready_cas_recovers_complete_physical_generation() -> None:
+    runtime, authority, _, _, _ = _runtime()
+    authority.lose_ready_cas_once = True
+
+    staged = runtime.stage(_request())
+
+    assert staged.phase == "STAGED"
+    assert authority.current is not None
+    for member in authority.current.record.members:
+        assert member.stage_state is not None
+        assert member.candidate is not None
+        assert member.candidate.content_digest == _request().artifact.content_sha256
+        assert member.candidate.row_count == _request().artifact.row_count

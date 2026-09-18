@@ -60,12 +60,23 @@ def insert_external_rows(
         "insert_deduplication_token": deduplication_token,
     }
     column_sql = ", ".join(f"`{column}`" for column in columns)
-    sink.connector.connection.execute(
-        f"INSERT INTO {sink._table(load_config)} ({column_sql}) VALUES",
-        rows,
-        settings=settings,
-        query_id=query_id,
-    )
+    connection = sink.connector.connection
+    insert_rows = getattr(connection, "insert_rows", None)
+    if callable(insert_rows):
+        insert_rows(
+            sink._table(load_config),
+            rows,
+            column_names=columns,
+            settings=settings,
+            query_id=query_id,
+        )
+    else:
+        connection.execute(
+            f"INSERT INTO {sink._table(load_config)} ({column_sql}) VALUES",
+            rows,
+            settings=settings,
+            query_id=query_id,
+        )
     return len(rows)
 
 
@@ -294,6 +305,12 @@ def canonical_rows_digest(rows: Iterable[Sequence[Any]]) -> str:
     return digest.hexdigest()
 
 
+def canonical_rows_json(rows: Iterable[Sequence[Any]]) -> str:
+    """Serialize typed rows canonically while preserving artifact row order."""
+
+    return canonical_json([[_canonical_value(value) for value in row] for row in rows])
+
+
 def _canonical_value(value: Any) -> Any:
     if value is None:
         return ["null", None]
@@ -364,6 +381,7 @@ def _qualified(database: str, table: str) -> str:
 __all__ = [
     "ClickHouseExternalReplicationMemberDriver",
     "canonical_rows_digest",
+    "canonical_rows_json",
     "canonical_schema_digest",
     "insert_external_rows",
 ]

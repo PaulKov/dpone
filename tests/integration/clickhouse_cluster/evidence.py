@@ -2,13 +2,23 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
 RECEIPT = Path("test_artifacts/clickhouse-cluster-publication/docker-receipt.json")
+_FIXTURE_FILES = (
+    Path("tests/integration/clickhouse_cluster/docker-compose.yml"),
+    Path("tests/integration/clickhouse_cluster/evidence.py"),
+    Path("tests/integration/clickhouse_cluster/test_clickhouse_external_replication_live.py"),
+    Path("tests/integration/clickhouse_cluster/config/node1/cluster.xml"),
+    Path("tests/integration/clickhouse_cluster/config/node2/cluster.xml"),
+)
 
 SCENARIOS = (
+    "external_replication_fresh_cleanup",
     "keeper_cas_and_log_comment",
     "normal_existing_and_absent_target",
     "lost_publication_response",
@@ -49,6 +59,8 @@ def record_scenario(
     evidence.update(
         {
             "schema_version": "dpone.clickhouse.cluster-publication-docker.v1",
+            "source_commit": _source_commit(),
+            "fixture_digest": _fixture_digest(),
             "server_version": server_version,
             "replicas": 2,
             "scenario_results": results,
@@ -59,3 +71,22 @@ def record_scenario(
         evidence.update(details)
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     RECEIPT.write_text(json.dumps(evidence, sort_keys=True) + "\n")
+
+
+def _source_commit() -> str:
+    return subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _fixture_digest() -> str:
+    digest = hashlib.sha256()
+    for path in _FIXTURE_FILES:
+        digest.update(path.as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
