@@ -14,6 +14,7 @@ class ExternalStagedContext:
 
     request: ExternalPublicationRequest
     staged_receipt: ExternalReplicationReceipt
+    candidate_name: str
 
     def __post_init__(self) -> None:
         if self.staged_receipt.phase != "STAGED":
@@ -22,6 +23,8 @@ class ExternalStagedContext:
             raise ValueError("external staged context operation differs")
         if self.request.generation_id != self.staged_receipt.generation_id:
             raise ValueError("external staged context generation differs")
+        if not self.candidate_name:
+            raise ValueError("external staged context candidate is missing")
 
 
 @dataclass(frozen=True, slots=True)

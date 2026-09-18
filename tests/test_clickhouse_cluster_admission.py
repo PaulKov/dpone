@@ -180,6 +180,29 @@ def test_router_selects_cluster_without_hidden_enable_flag() -> None:
     assert local.prepared == local.published == 0
 
 
+def test_router_selects_external_without_internal_or_local_fallback() -> None:
+    local, internal, external = _Publisher(), _Publisher(), _Publisher()
+    router = ClickHouseFullRefreshPublicationRouter(local, internal, external)
+    config = _runtime_config()
+    physical = dict(config.options["physical_design"])
+    storage = dict(physical["storage"])
+    clickhouse = dict(storage["clickhouse"])
+    clickhouse["engine"] = "MergeTree"
+    clickhouse["cluster"] = {
+        "name": "analytics_cluster",
+        "ddl_scope": "cluster",
+        "replication_mode": "external",
+    }
+    storage["clickhouse"] = clickhouse
+    physical["storage"] = storage
+    config = replace(config, options={**config.options, "physical_design": physical})
+
+    router.prepare_admission(config)
+
+    assert external.prepared == 1
+    assert internal.prepared == local.prepared == 0
+
+
 def test_router_publishes_cluster_selection_to_decision_audit() -> None:
     decisions: list[object] = []
     publisher = SimpleNamespace(publish=decisions.append)

@@ -141,6 +141,31 @@ class ClickHouseExternalReplicationRuntime:
         state = self._publish(state)
         return self._receipt(state)
 
+    def validate_staged(
+        self,
+        request: ExternalPublicationRequest,
+        expected: ExternalReplicationReceipt,
+    ) -> ExternalReplicationReceipt:
+        """Re-prove the exact all-member barrier immediately before publication."""
+
+        members = tuple(sorted(self._service.inventory(request.cluster)))
+        state = self._read(request.target_key)
+        if state is None or state.get("operation_id") != request.operation_id:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT", state=state)
+        self._require_same_inputs(state, request, members)
+        if state.get("phase") != "STAGED" or int(state["version"]) != expected.authority_version:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
+        for member_id in members:
+            observed = self._service.observe_candidate(member_id, state["candidate_name"])
+            bound = state["member_states"][member_id]
+            if (
+                bound.get("state") != "READY"
+                or not self._matches(observed, state)
+                or observed.get("candidate_uuid") != bound.get("candidate_uuid")
+            ):
+                self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", state=state)
+        return self._receipt(state)
+
     def cleanup(self, request: ExternalPublicationRequest) -> ExternalReplicationReceipt:
         """Finish separately fenced cleanup after publication is committed."""
 
@@ -373,6 +398,8 @@ class ClickHouseExternalReplicationRuntime:
         self, state: Mapping[str, Any], request: ExternalPublicationRequest, members: tuple[str, ...]
     ) -> None:
         if tuple(state["member_ids"]) != members or state["plan_digest"] != request.plan_sha256:
+            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", state=state)
+        if state["inventory_digest"] != self._inventory_digest(members):
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", state=state)
         if "artifact_sha256" in state and state["artifact_sha256"] != request.artifact.sha256:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED", state=state)

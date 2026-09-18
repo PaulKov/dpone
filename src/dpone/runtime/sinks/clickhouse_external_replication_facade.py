@@ -25,6 +25,7 @@ from dpone.runtime.sinks.clickhouse_external_replication_runtime import (
     ExternalReplicationRuntimeService,
 )
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import SCHEDULER_IDENTITY_OPTION
+from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 
 EXTERNAL_REPLAY_OPTION = "__dpone_clickhouse_external_replication_replay_v1"
 
@@ -91,7 +92,7 @@ class ClickHouseExternalReplicationFacade:
         scope = str(getattr(service, "evidence_scope", "local_synthetic"))
         receipt = ExternalReplicationReceipt.from_state(dict(state), evidence_scope=scope)
         options = dict(_options(load_config))
-        options[EXTERNAL_REPLAY_OPTION] = receipt
+        options[EXTERNAL_REPLAY_OPTION] = _load_result(receipt, staged_rows=int(state["artifact_row_count"]), replay=True)
         return replace(load_config, options=options)
 
     def stage(self, load_config: Any, payload: Any) -> ExternalStagedContext:
@@ -110,30 +111,26 @@ class ClickHouseExternalReplicationFacade:
             plan_sha256=_plan_digest(load_config, cluster=cluster, database=database, target=target),
             artifact=_artifact_receipt(source),
         )
-        receipt = self._runtime(cluster, database, target, source=source).stage(request)
+        runtime = self._runtime(cluster, database, target, source=source)
+        receipt = runtime.stage(request)
         if receipt.phase != "STAGED":
             _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE")
-        return ExternalStagedContext(request=request, staged_receipt=receipt)
+        state = self._service_factory(cluster, database, target).read_authority(request.target_key)
+        if state is None or state.get("operation_id") != request.operation_id:
+            _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT")
+        return ExternalStagedContext(
+            request=request,
+            staged_receipt=receipt,
+            candidate_name=str(state["candidate_name"]),
+        )
 
     def validate(self, context: ExternalStagedContext) -> ExternalStagedValidation:
         """Bind validation to the exact staged generation and authority version."""
 
         receipt = context.staged_receipt
         request = context.request
-        service = self._service_factory(request.cluster, request.database, request.target)
-        members = tuple(sorted(service.inventory(request.cluster)))
-        state = service.read_authority(request.target_key)
-        valid = (
-            state is not None
-            and state.get("phase") == "STAGED"
-            and state.get("operation_id") == receipt.operation_id
-            and state.get("generation_id") == receipt.generation_id
-            and state.get("inventory_digest") == receipt.inventory_digest
-            and int(state.get("version", -1)) == receipt.authority_version
-            and tuple(sorted(str(value) for value in state.get("member_ids", ()))) == receipt.member_ids
-            and members == receipt.member_ids
-        )
-        if not valid:
+        validated = self._runtime(request.cluster, request.database, request.target).validate_staged(request, receipt)
+        if validated != receipt:
             _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_VALIDATION_INVALID")
         return ExternalStagedValidation(
             operation_id=receipt.operation_id,
@@ -166,6 +163,14 @@ class ClickHouseExternalReplicationFacade:
             _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS")
         return receipt
 
+    @staticmethod
+    def publication_result(receipt: ExternalReplicationReceipt, *, staged_rows: int) -> LoadResult:
+        """Project a committed external receipt into the connector-neutral result."""
+
+        if receipt.phase != "COMMITTED":
+            _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_IN_PROGRESS")
+        return _load_result(receipt, staged_rows=staged_rows)
+
     def abort(self, context: ExternalStagedContext) -> None:
         """Abort only an unpublished operation through exact-owned cleanup."""
 
@@ -173,13 +178,13 @@ class ClickHouseExternalReplicationFacade:
         self._runtime(request.cluster, request.database, request.target).abort(request)
 
     @staticmethod
-    def replay_result(load_config: Any) -> ExternalReplicationReceipt | None:
+    def replay_result(load_config: Any) -> LoadResult | None:
         """Return a previously completed same-operation receipt, if present."""
 
         result = _options(load_config).get(EXTERNAL_REPLAY_OPTION)
         if result is None:
             return None
-        if not isinstance(result, ExternalReplicationReceipt) or result.phase != "COMPLETED":
+        if not isinstance(result, LoadResult):
             _fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_RECEIPT_INVALID")
         return result
 
@@ -208,6 +213,25 @@ def _artifact_receipt(source: ExternalArtifactSourcePort) -> ExternalArtifactRec
     )
     receipt.validate()
     return receipt
+
+
+def _load_result(
+    receipt: ExternalReplicationReceipt,
+    *,
+    staged_rows: int,
+    replay: bool = False,
+) -> LoadResult:
+    return LoadResult(
+        inserted_rows=staged_rows,
+        updated_rows=0,
+        total_rows=staged_rows,
+        staging_rows=staged_rows,
+        commit_receipt_id=receipt.operation_id,
+        commit_outcome=(
+            AtomicCommitOutcome.COMMITTED_AFTER_RECEIPT_PROBE if replay else AtomicCommitOutcome.COMMITTED
+        ),
+        reconciliation_metrics={"clickhouse_cluster_external_full_refresh": receipt.to_dict()},
+    )
 
 
 def _target_identity(load_config: Any) -> tuple[str, str, str]:
