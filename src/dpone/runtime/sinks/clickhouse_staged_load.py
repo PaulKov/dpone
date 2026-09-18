@@ -14,6 +14,7 @@ from dpone.runtime.governance.ports import (
     staged_load_failure_details,
 )
 from dpone.runtime.process_io import add_exception_note
+from dpone.runtime.sinks.clickhouse_external_replication_context import ExternalStagedContext
 from dpone.runtime.sinks.clickhouse_full_refresh_staged import finalize_full_refresh, publication_cleanup_plan
 from dpone.runtime.sinks.clickhouse_production_finalize import ClickHouseProductionFinalizer
 from dpone.runtime.sinks.clickhouse_staged_evidence import enforce_source_byte_budget, staged_handle_metadata
@@ -46,6 +47,8 @@ class ClickHouseStagedLoadService:
 
     def stage(self, load_config: Any, payload: Any) -> StagedLoadHandle:
         load_config = self._effective_config(load_config)
+        if self._is_external(load_config):
+            return self._stage_external(load_config, payload)
         staging_config = self._create_staging(load_config, payload)
         finalization_config = decoded_config = None
         try:
@@ -130,6 +133,13 @@ class ClickHouseStagedLoadService:
         """Finalize a handle whose exact effective table already passed validation."""
 
         load_config = self._effective_config(load_config)
+        external = self._external_context(handle)
+        if external is not None:
+            receipt = self._sink._full_refresh_publication.publish_external(external, validation_token)
+            return self._sink._full_refresh_publication.external_result(
+                receipt,
+                staged_rows=handle.staged_rows,
+            )
         self._sink._staging_finalizer.require_strategy_staging_validation(
             validation_token,
             load_config,
@@ -159,6 +169,9 @@ class ClickHouseStagedLoadService:
         """Validate the exact post-projection table before target finalization."""
 
         load_config = self._effective_config(load_config)
+        external = self._external_context(handle)
+        if external is not None:
+            return self._sink._full_refresh_publication.validate_external(external)
         return self._sink._staging_finalizer.validate_strategy_staging_key_integrity(
             load_config,
             self._finalization_config(handle),
@@ -170,6 +183,10 @@ class ClickHouseStagedLoadService:
         return replace(load_config, load_strategy=backfill_inner_strategy(load_config))
 
     def cleanup(self, handle: StagedLoadHandle) -> None:
+        external = self._external_context(handle)
+        if external is not None:
+            self._sink._full_refresh_publication.cleanup_external(external)
+            return
         finalizer = getattr(self._sink, "_staging_finalizer", None)
         retire = getattr(finalizer, "retire_strategy_staging_validations", None)
         if callable(retire):
@@ -182,7 +199,32 @@ class ClickHouseStagedLoadService:
         self._sink._cleanup_full_refresh_publication(publication)
 
     def abort(self, handle: StagedLoadHandle) -> None:
+        external = self._external_context(handle)
+        if external is not None:
+            self._sink._full_refresh_publication.abort_external(external)
+            return
         self.cleanup(handle)
+
+    def _stage_external(self, load_config: Any, payload: Any) -> StagedLoadHandle:
+        context = self._sink._full_refresh_publication.stage_external(load_config, payload)
+        staging_config = replace(load_config, target_table=context.candidate_name)
+        return StagedLoadHandle(
+            staging_config=staging_config,
+            payload_schema=tuple(getattr(payload, "schema", ())),
+            staged_rows=context.request.artifact.row_count,
+            metadata={"external_publication": context.staged_receipt.to_dict()},
+            sink_state=context,
+        )
+
+    @staticmethod
+    def _external_context(handle: StagedLoadHandle) -> ExternalStagedContext | None:
+        state = getattr(handle, "sink_state", None)
+        return state if isinstance(state, ExternalStagedContext) else None
+
+    def _is_external(self, load_config: Any) -> bool:
+        publication = getattr(self._sink, "_full_refresh_publication", None)
+        predicate = getattr(publication, "is_external", None)
+        return bool(callable(predicate) and predicate(load_config))
 
     def _create_staging(self, load_config: Any, payload: Any) -> Any:
         if self._plan_staging_table is not None:

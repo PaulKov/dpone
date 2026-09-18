@@ -4911,6 +4911,12 @@
                                       "default": "internal",
                                       "description": "Data replication owner. External mode requires independent non-replicated MergeTree members and strict runtime admission."
                                     },
+                                    "external_content_row_budget": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "default": 100000,
+                                      "description": "Maximum rows that external mode may seal and re-observe for exact typed-content proof."
+                                    },
                                     "on_cluster": {
                                       "type": "boolean",
                                       "description": "Deprecated compatibility alias. Prefer ddl_scope: cluster.",

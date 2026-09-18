@@ -48,8 +48,6 @@ class ClickHouseExternalReplicationMemberDriver:
             raise ValueError("clickhouse_external_member_driver.max_content_rows_must_be_positive")
         self._load_config = load_config
         self._payload_schema = tuple((str(name), str(dtype)) for name, dtype in payload_schema)
-        if not self._payload_schema:
-            raise ValueError("clickhouse_external_member_driver.payload_schema_required")
         self._sink_factory = sink_factory
         self._member_identity = member_identity
         self._max_content_rows = max_content_rows
@@ -65,6 +63,7 @@ class ClickHouseExternalReplicationMemberDriver:
 
     def create_candidate(self, connector: Any, record: ExternalAuthorityRecord) -> PhysicalGeneration:
         record.validate()
+        self._require_payload_schema()
         self._require_member(connector, record)
         if self._observe_table(connector, record.database, record.candidate) is not None:
             raise ExternalContractError("GENERATION_DIVERGED", "owned candidate already exists")
@@ -78,6 +77,7 @@ class ClickHouseExternalReplicationMemberDriver:
 
     def load_candidate(self, connector: Any, record: ExternalAuthorityRecord, sealed_payload: Any) -> None:
         record.validate()
+        self._require_payload_schema()
         member_id = self._require_member(connector, record)
         if not isinstance(sealed_payload, LoadPayload):
             raise ExternalContractError("ARTIFACT_UNSUPPORTED", "sealed replay must be a LoadPayload")
@@ -176,6 +176,10 @@ class ClickHouseExternalReplicationMemberDriver:
             raise ExternalContractError("INVENTORY_INVALID", "direct member identity is not admitted")
         return member_id
 
+    def _require_payload_schema(self) -> None:
+        if not self._payload_schema:
+            raise ExternalContractError("ARTIFACT_UNSUPPORTED", "payload schema is required for staging")
+
 
 def canonical_schema_digest(columns: Sequence[Sequence[Any]]) -> str:
     """Digest ordered ClickHouse catalog columns without exposing their values."""
@@ -198,12 +202,12 @@ def canonical_schema_digest(columns: Sequence[Sequence[Any]]) -> str:
 
 
 def canonical_rows_digest(rows: Iterable[Sequence[Any]]) -> str:
-    """Digest an already canonically ordered typed row stream."""
+    """Digest a typed row multiset in deterministic canonical order."""
 
     digest = hashlib.sha256()
     digest.update((_CONTENT_DIGEST_VERSION + "\n").encode("utf-8"))
-    for row in rows:
-        encoded = canonical_json([_canonical_value(value) for value in row])
+    encoded_rows = sorted(canonical_json([_canonical_value(value) for value in row]) for row in rows)
+    for encoded in encoded_rows:
         digest.update(str(len(encoded)).encode("ascii"))
         digest.update(b":")
         digest.update(encoded.encode("utf-8"))

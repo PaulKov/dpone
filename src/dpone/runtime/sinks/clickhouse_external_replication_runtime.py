@@ -215,7 +215,11 @@ class ClickHouseExternalReplicationRuntime:
     ) -> dict[str, Any]:
         current = self._read(target_key)
         if current is not None and current.get("operation_id") == operation_id:
-            if tuple(current["member_ids"]) != members or current["plan_digest"] != plan_sha256:
+            if (
+                tuple(current["member_ids"]) != members
+                or current["plan_digest"] != plan_sha256
+                or current["inventory_digest"] != self._inventory_digest(members)
+            ):
                 self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_DRIFT", state=current)
             return current
         if current is not None and current.get("phase") not in {"COMPLETED", "ABORTED"}:
