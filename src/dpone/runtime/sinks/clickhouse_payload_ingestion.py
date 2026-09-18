@@ -306,48 +306,6 @@ class ClickHousePayloadIngestionService:
             return 0
         return self.execute_insert(load_config, columns, batch)
 
-    def insert_external_rows(
-        self,
-        load_config: LoadConfig,
-        payload: LoadPayload,
-        *,
-        query_id: str,
-        deduplication_token: str,
-    ) -> int:
-        """Insert one fenced external-replication member generation synchronously."""
-
-        artifact = payload.artifact
-        if not isinstance(artifact, InMemoryRowsArtifact):
-            raise ValueError("clickhouse_external_artifact.requires_in_memory_rows")
-        mapped_schema = self._clickhouse_schema(load_config, payload.schema)
-        columns = [column for column, _ in mapped_schema]
-        column_types = [column_type for _, column_type in mapped_schema]
-        rows = [
-            self._row_value_coercer.coerce_row(
-                tuple(row.get(column) for column in columns),
-                column_types,
-            )
-            for row in artifact._rows
-        ]
-        if not rows:
-            return 0
-        policy = ClickHouseNullInsertPolicy.from_load_config(load_config)
-        policy.validate_rows(columns, rows)
-        settings = {
-            **policy.driver_settings(),
-            "async_insert": 0,
-            "wait_for_async_insert": 1,
-            "insert_deduplication_token": deduplication_token,
-        }
-        column_sql = ", ".join(f"`{column}`" for column in columns)
-        self._sink.connector.connection.execute(
-            f"INSERT INTO {self._sink._table(load_config)} ({column_sql}) VALUES",
-            rows,
-            settings=settings,
-            query_id=query_id,
-        )
-        return len(rows)
-
     def _insert_with_staging_delta(self, load_config: LoadConfig, insert: Callable[[], int]) -> int:
         before = int(self._sink._count(load_config))
         reported = int(insert() or 0)

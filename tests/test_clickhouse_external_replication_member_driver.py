@@ -109,7 +109,6 @@ class _Connector:
 class _Sink:
     def __init__(self, connector: _Connector) -> None:
         self.connector = connector
-        self._payload_ingestion = self
         self.created: list[tuple[Any, Any, bool]] = []
         self.loaded: list[tuple[Any, LoadPayload, str, str]] = []
 
@@ -165,12 +164,30 @@ def load_config() -> LoadConfig:
 
 def _driver(load_config: LoadConfig, connector: _Connector) -> tuple[ClickHouseExternalReplicationMemberDriver, _Sink]:
     sink = _Sink(connector)
+
+    def insert_rows(
+        direct_sink: _Sink,
+        config: Any,
+        payload: LoadPayload,
+        *,
+        query_id: str,
+        deduplication_token: str,
+        **_: Any,
+    ) -> int:
+        return direct_sink.insert_external_rows(
+            config,
+            payload,
+            query_id=query_id,
+            deduplication_token=deduplication_token,
+        )
+
     driver = ClickHouseExternalReplicationMemberDriver(
         load_config=load_config,
         payload_schema=(("id", "bigint"), ("label", "varchar")),
         sink_factory=lambda direct: sink if direct is connector else None,
         member_identity=lambda direct: _record().members[0].member_id if direct is connector else "",
         max_content_rows=3,
+        insert_rows=insert_rows,
     )
     return driver, sink
 

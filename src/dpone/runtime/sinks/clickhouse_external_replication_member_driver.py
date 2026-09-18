@@ -21,11 +21,72 @@ from dpone.ports.clickhouse_external_replication import (
     canonical_json,
     digest_payload,
 )
+from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
+from dpone.runtime.sinks.clickhouse_nullability_policy import ClickHouseNullInsertPolicy
 from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
 from dpone.runtime.sinks.load_payload import LoadPayload
 
 _CONTENT_DIGEST_VERSION = "dpone.clickhouse.canonical-rows.v1"
 _SCHEMA_DIGEST_VERSION = "dpone.clickhouse.canonical-schema.v1"
+
+
+def insert_external_rows(
+    sink: Any,
+    load_config: Any,
+    payload: LoadPayload,
+    *,
+    query_id: str,
+    deduplication_token: str,
+    map_schema: Callable[[Any, Sequence[tuple[str, str]]], Sequence[tuple[str, str]]],
+    coerce_row: Callable[[tuple[Any, ...], Sequence[str]], tuple[Any, ...]],
+) -> int:
+    """Insert one member generation with synchronous, replay-safe settings."""
+
+    artifact = payload.artifact
+    if not isinstance(artifact, InMemoryRowsArtifact):
+        raise ValueError("clickhouse_external_artifact.requires_in_memory_rows")
+    mapped_schema = map_schema(load_config, payload.schema)
+    columns = [column for column, _ in mapped_schema]
+    column_types = [column_type for _, column_type in mapped_schema]
+    rows = [coerce_row(tuple(row.get(column) for column in columns), column_types) for row in artifact._rows]
+    if not rows:
+        return 0
+    policy = ClickHouseNullInsertPolicy.from_load_config(load_config)
+    policy.validate_rows(columns, rows)
+    settings = {
+        **policy.driver_settings(),
+        "async_insert": 0,
+        "wait_for_async_insert": 1,
+        "insert_deduplication_token": deduplication_token,
+    }
+    column_sql = ", ".join(f"`{column}`" for column in columns)
+    sink.connector.connection.execute(
+        f"INSERT INTO {sink._table(load_config)} ({column_sql}) VALUES",
+        rows,
+        settings=settings,
+        query_id=query_id,
+    )
+    return len(rows)
+
+
+def _insert_with_sink_ingestion(
+    sink: Any,
+    load_config: Any,
+    payload: LoadPayload,
+    *,
+    query_id: str,
+    deduplication_token: str,
+) -> int:
+    ingestion = sink._payload_ingestion
+    return insert_external_rows(
+        sink,
+        load_config,
+        payload,
+        query_id=query_id,
+        deduplication_token=deduplication_token,
+        map_schema=ingestion._clickhouse_schema,
+        coerce_row=ingestion._row_value_coercer.coerce_row,
+    )
 
 
 class ClickHouseExternalReplicationMemberDriver:
@@ -44,6 +105,7 @@ class ClickHouseExternalReplicationMemberDriver:
         sink_factory: Callable[[Any], Any],
         member_identity: Callable[[Any], str],
         max_content_rows: int,
+        insert_rows: Callable[..., int] = _insert_with_sink_ingestion,
     ) -> None:
         if isinstance(max_content_rows, bool) or max_content_rows <= 0:
             raise ValueError("clickhouse_external_member_driver.max_content_rows_must_be_positive")
@@ -52,6 +114,7 @@ class ClickHouseExternalReplicationMemberDriver:
         self._sink_factory = sink_factory
         self._member_identity = member_identity
         self._max_content_rows = max_content_rows
+        self._insert_rows = insert_rows
 
     def observe(self, connector: Any, record: ExternalAuthorityRecord) -> MemberGenerationObservation:
         record.validate()
@@ -96,7 +159,9 @@ class ClickHouseExternalReplicationMemberDriver:
                 "member_id": member_id,
             }
         )
-        self._sink(connector)._payload_ingestion.insert_external_rows(
+        sink = self._sink(connector)
+        self._insert_rows(
+            sink,
             self._candidate_config(record),
             sealed_payload,
             query_id=query_id,
@@ -300,4 +365,5 @@ __all__ = [
     "ClickHouseExternalReplicationMemberDriver",
     "canonical_rows_digest",
     "canonical_schema_digest",
+    "insert_external_rows",
 ]

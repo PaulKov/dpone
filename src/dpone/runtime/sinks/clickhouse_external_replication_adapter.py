@@ -47,6 +47,7 @@ from dpone.runtime.sinks.clickhouse_external_replication_state import (
 )
 from dpone.runtime.sinks.clickhouse_external_replication_state import (
     record_from_state,
+    require_queue_entry,
     state_from_versioned,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_state import (
@@ -242,11 +243,13 @@ class ClickHouseExternalReplicationServiceAdapter:
         record = self._current(operation_id).record
         if record.candidate != candidate_name or _ids(record) != member_ids:
             _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
+        if set(self._publication_states(record).values()) != {MemberPublicationState.PENDING}:
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_GENERATION_DIVERGED", record)
         self._ddl.dispatch_publication(record, _take_permit(self, operation_id, "publication"), cluster=self._cluster)
 
     def observe_publication(self, operation_id: str) -> Mapping[str, str]:
         record = self._current(operation_id).record
-        entry = self._entry(record, cleanup=False)
+        entry = require_queue_entry(self._ddl, self._cluster, record, cleanup=False, fail=_error)
         states = self._publication_states(record)
         queue = entry.state_for(_ids(record))
         if MemberPublicationState.UNKNOWN in states.values() or queue is QueueState.UNKNOWN:
@@ -272,7 +275,8 @@ class ClickHouseExternalReplicationServiceAdapter:
         if (
             record.phase is ExternalAuthorityPhase.CLEANUP_DISPATCHING
             and _has_predecessor(record)
-            and self._entry(record, cleanup=True).state_for(_ids(record)) is QueueState.UNKNOWN
+            and require_queue_entry(self._ddl, self._cluster, record, cleanup=True, fail=_error).state_for(_ids(record))
+            is QueueState.UNKNOWN
         ):
             _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", record)
         return self._cleanup_states(record)
@@ -302,7 +306,7 @@ class ClickHouseExternalReplicationServiceAdapter:
     def _require_publication(
         self, record: ExternalAuthorityRecord
     ) -> tuple[QueueEntry, tuple[ExternalMemberRecord, ...]]:
-        entry = self._entry(record, cleanup=False)
+        entry = require_queue_entry(self._ddl, self._cluster, record, cleanup=False, fail=_error)
         if entry.state_for(_ids(record)) not in {QueueState.TERMINAL_SUCCESS, QueueState.TERMINAL_FAILURE}:
             _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_IN_PROGRESS", record)
         states = self._publication_states(record)
@@ -314,7 +318,11 @@ class ClickHouseExternalReplicationServiceAdapter:
     def _require_cleanup(
         self, record: ExternalAuthorityRecord
     ) -> tuple[QueueEntry | None, tuple[ExternalMemberRecord, ...]]:
-        entry = self._entry(record, cleanup=True) if _has_predecessor(record) else None
+        entry = (
+            require_queue_entry(self._ddl, self._cluster, record, cleanup=True, fail=_error)
+            if _has_predecessor(record)
+            else None
+        )
         if entry is not None and entry.state_for(_ids(record)) not in {
             QueueState.TERMINAL_SUCCESS,
             QueueState.TERMINAL_FAILURE,
@@ -343,22 +351,6 @@ class ClickHouseExternalReplicationServiceAdapter:
                 _member(record, member_id).predecessor is not None and state is MemberPublicationState.COMMITTED
             )
         return result
-
-    def _entry(self, record: ExternalAuthorityRecord, *, cleanup: bool) -> QueueEntry:
-        entry_id = record.cleanup_entry if cleanup else record.publication_entry
-        token = record.cleanup_correlation_token if cleanup else record.publication_correlation_token
-        digest = record.cleanup_query_digest if cleanup else record.publication_query_digest
-        code = f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{'CLEANUP_' if cleanup else 'DDL_'}UNKNOWN"
-        if not token or not digest:
-            _error(code, record)
-        entries = (
-            (() if (entry := self._ddl.read_entry(self._cluster, entry_id)) is None else (entry,))
-            if entry_id
-            else self._ddl.find_entries(self._cluster, token)
-        )
-        if len(entries) != 1 or entries[0].correlation_token != token or entries[0].query_digest != digest:
-            _error(code, record)
-        return entries[0]
 
     def _typed_cas(
         self, current: VersionedExternalAuthorityRecord, desired: ExternalAuthorityRecord

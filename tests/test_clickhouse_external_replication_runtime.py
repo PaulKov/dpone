@@ -46,6 +46,8 @@ class _SyntheticArtifactSource:
 class _SyntheticExternalService:
     """Narrow stateful fake for the external service port expected by runtime."""
 
+    evidence_scope = "local_synthetic"
+
     def __init__(self) -> None:
         self.members = ("member-a", "member-b")
         self.authority: dict[str, dict[str, Any]] = {}
@@ -384,3 +386,14 @@ def test_failure_evidence_is_redacted_and_contains_only_opaque_member_ids() -> N
     ):
         assert forbidden not in rendered
         assert forbidden not in str(raised.value)
+
+
+def test_failure_evidence_uses_injected_production_scope() -> None:
+    service = _SyntheticExternalService()
+    service.evidence_scope = "production_live"
+    service.diverge_next_stage("member-b")
+
+    with pytest.raises(ExternalPublicationError) as raised:
+        _runtime(service).run(_request())
+
+    assert raised.value.evidence["evidence_scope"] == "production_live"
