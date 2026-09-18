@@ -4,6 +4,15 @@ This how-to is for release engineers and platform operators moving a validated
 dbt workflow from the dev environment to prod. It preserves build-once
 identity: prod receives the exact release digest proven in dev.
 
+> **Applicability:** this same-digest procedure applies only to an
+> environment-neutral release that already carries current production route
+> certification. It does not apply to
+> `dpone.dbt-release-set.development.v1`. A DEV-only release is never copied,
+> relabelled or promoted into production. Keep the reviewed source commit,
+> obtain current production route evidence, and compile through the ordinary
+> production path without development scope. That produces a new
+> `dpone.release-set.v2` identity for normal production admission.
+
 > **Production activation is fail-closed.** It proceeds only when the same
 > release bytes passed dev evidence, source-mirror, checksum, provider-parse,
 > and offline runtime-attestation verification. This implementation supplies a

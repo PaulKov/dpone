@@ -16,6 +16,7 @@ from dpone.contracts.airflow_deployment import (
 from dpone.contracts.airflow_deployment_projection import (
     is_versioned_airflow_bundle_ref,
 )
+from dpone.contracts.development_delivery_authority import DEVELOPMENT_RELEASE_SCHEMA
 from dpone.contracts.runtime_artifact_delivery import (
     is_pinned_artifact_registry_ref,
     is_safe_artifact_registry_logical_ref,
@@ -75,6 +76,12 @@ def dev_evidence_delivery(
 
 def require_runtime_payload_authority(release_schema: str, has_runtime_payloads: bool, trust_tier: str) -> None:
     """Keep v1 payload inventory outside production dbt authority."""
+
+    if release_schema == DEVELOPMENT_RELEASE_SCHEMA and trust_tier != "non_production":
+        raise AirflowDeploymentProjectionError(
+            "DPONE_DEVELOPMENT_TARGET_FORBIDDEN",
+            "DEV-only releases require an independently admitted non-production target",
+        )
 
     if requires_release_set_v2_for_runtime_payloads(
         release_schema=release_schema,

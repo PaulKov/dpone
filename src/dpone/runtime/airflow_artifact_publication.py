@@ -5,8 +5,9 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dpone.runtime.airflow_artifact_delivery_models import (
@@ -20,6 +21,8 @@ from dpone.runtime.airflow_artifact_delivery_support import (
     ArtifactRegistry,
     ArtifactRegistryError,
     DevelopmentDeliveryAuthority,
+    DevelopmentTargetAdmission,
+    DevelopmentTargetAdmissionVerifier,
     download,
     from_cache_error,
     registry_unavailable,
@@ -48,25 +51,30 @@ class AirflowArtifactPublisher:
         *,
         registry: ArtifactRegistry,
         development_authority: DevelopmentDeliveryAuthority | None = None,
+        development_admission: DevelopmentTargetAdmission | None = None,
+        development_admission_verifier: DevelopmentTargetAdmissionVerifier | None = None,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._registry = registry
-        self._development_authority = development_authority
+        self._development_admission = development_admission
+        self._development_admission_verifier = development_admission_verifier
+        self._clock = clock if clock is not None else lambda: datetime.now(UTC)
 
     def publish(self, request: PublishRequest) -> PublishReport:
-        inventory = prepare_publication(request, development_authority=self._development_authority)
+        self._prepare(request)
         if request.publication_mode == "compatible":
-            return self._publish_compatible(request, inventory)
-        return self._publish_exact(request, inventory)
+            return self._publish_compatible(request)
+        return self._publish_exact(request)
 
     def _publish_exact(
         self,
         request: PublishRequest,
-        inventory: ArtifactInventory,
     ) -> PublishReport:
         registry_scope_id = require_registry_scope(
             self._registry,
             request.registry_scope_id,
         )
+        inventory = self._prepare(request)
         created = 0
         existing = 0
         verified = 0
@@ -74,6 +82,7 @@ class AirflowArtifactPublisher:
         published_deployment = False
         try:
             with _verified_snapshot(inventory, request=request) as snapshot:
+                self._prepare(request)
                 with tempfile.TemporaryDirectory(prefix=".dpone-artifact-readback-") as readback_dir:
                     readback_root = Path(readback_dir).resolve()
                     verified_release: list[ArtifactFile] = []
@@ -146,14 +155,15 @@ class AirflowArtifactPublisher:
     def _publish_compatible(
         self,
         request: PublishRequest,
-        inventory: ArtifactInventory,
     ) -> PublishReport:
+        inventory = self._prepare(request)
         created = 0
         existing = 0
         published_release = False
         published_deployment = False
         try:
             with _verified_snapshot(inventory, request=request) as snapshot:
+                self._prepare(request)
                 for item in snapshot.objects:
                     was_created = self._create_or_compare_compatible(item, request=request)
                     created += int(was_created)
@@ -193,6 +203,14 @@ class AirflowArtifactPublisher:
             existing_equal_objects=existing,
             published_release=published_release,
             published_deployment=published_deployment,
+        )
+
+    def _prepare(self, request: PublishRequest) -> ArtifactInventory:
+        return prepare_publication(
+            request,
+            development_admission=self._development_admission,
+            development_admission_verifier=self._development_admission_verifier,
+            clock=self._clock,
         )
 
     def _create_or_compare(self, item: ArtifactFile) -> bool:

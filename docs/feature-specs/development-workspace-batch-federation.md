@@ -383,6 +383,43 @@ registry/cache delivery in this increment. Roll back by selecting the prior
 immutable deployment. Any authority ambiguity, attempted credential issuance to
 a dormant workload or source-closure mismatch blocks rollout.
 
+## Approved target-admission hardening
+
+Maintainer approval on 2026-09-17 extends the delivery-only increment with a
+fail-closed target boundary. The embedded development projection remains an
+immutable artifact claim; it is not target authority. Publication,
+materialization, cache activation and activation recovery additionally require
+an externally verified, operation-specific receipt bound to the exact release
+ID, deployment ID, target environment, `non_production` trust tier, target
+policy digest, verification time and current revocation epoch.
+Each protected entrypoint calls a separately injected current-target verifier,
+which reopens the protected policy digest and revocation epoch immediately
+before the operation. Receipt reuse after either value changes fails closed.
+
+The target environment and tier come from protected target configuration and
+the integrity-checked deployment projection. Bundle labels, database names,
+CLI flags and copied files never satisfy this boundary. Missing, unknown,
+expired, revoked, mismatched or production-tier admission rejects before the
+first external write or current-pointer mutation. Publication, materialization
+and activation receipts are not interchangeable. Activation recovery includes
+pointer-changing recovery and audit-only repair before coordinator readback or
+durable audit mutation.
+
+Pointer-changing activation and recovery repeat full sealed-projection and
+artifact-integrity validation after coordinator preparation and immediately
+before commit. Audit repair repeats it after active-occurrence readback and
+before its durable append. Current-target verifier failures are sanitized into
+the stable activation-authority error; a failure after preparation retains the
+explicit recovery-required semantics.
+
+The public CLI remains unable to inject this authority. Python platform
+adapters authenticate original policy/grant/signature bytes and current target
+configuration before constructing the typed operation receipt. Standard
+production releases retain their current schema and route-certification gate.
+A DEV-only release is never relabelled for production: operators retain the
+reviewed source, obtain current production route evidence and rebuild through
+the production compiler, producing a new production release identity.
+
 ## Agent execution plan
 
 | Agent/role | Owned paths | Read-only paths | Forbidden paths | Dependency |

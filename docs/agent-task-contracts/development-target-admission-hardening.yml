@@ -1,0 +1,94 @@
+schema_version: 1
+task_id: "DPONE-DEV-TARGET-ADMISSION"
+title: "Bind DEV-only releases to trusted target admission"
+goal: "Prevent a development-only dbt release from being published, installed, or activated outside its exact non-production target authority."
+specification: "docs/feature-specs/development-workspace-batch-federation.md#approved-target-admission-hardening"
+base_commit: "32c6b0ba4938c76f843c50080dffb0f5ec10c047"
+integrator: "root"
+acceptance_criteria:
+  - "A verified operation receipt binds exact release/deployment IDs, target environment, non-production tier, operation, time, and revocation epoch."
+  - "Publish, materialize, cache promotion, and recovery fail closed for absent, stale, mismatched, unknown, or production-tier admission."
+  - "Each mutation boundary resamples the trusted clock after the external target verifier returns; adapter failures map to stable public authority errors."
+  - "Pointer and audit mutation revalidate complete sealed projection bytes after coordinator preparation or readback, and verifier failures retain stable recovery semantics."
+  - "Production release validation and route-certification requirements remain unchanged."
+  - "Public CLI paths cannot self-authorize DEV-only delivery or activation."
+  - "The legacy development_authority Python keyword remains accepted but never self-authorizes the new target boundary."
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - Python development delivery API
+    - immutable release admission
+    - Airflow artifact publication and materialization
+    - deployment-cache activation and recovery
+    - documentation and errors
+  migration_required: true
+owned_paths:
+  - src/dpone/contracts/development_target_admission.py
+  - src/dpone/runtime/airflow_artifact_delivery_support.py
+  - src/dpone/runtime/airflow_artifact_publication.py
+  - src/dpone/runtime/airflow_artifact_publication_preparation.py
+  - src/dpone/runtime/airflow_artifact_materialization.py
+  - src/dpone/runtime/deployment_cache_development_admission.py
+  - src/dpone/runtime/development_target_admission.py
+  - src/dpone/runtime/deployment_cache_integrity.py
+  - src/dpone/runtime/deployment_cache_current_state.py
+  - src/dpone/runtime/deployment_cache_materializer.py
+  - src/dpone/runtime/deployment_cache_models.py
+  - src/dpone/readiness/airflow_deployment_projection_policy.py
+  - tests/test_development_target_admission.py
+  - tests/test_development_remote_delivery_authority.py
+  - tests/test_dbt_compact_wire_v2.py
+  - tests/test_dbt_workspace_cache_activation_saga.py
+  - docs/development-workspace-delivery.md
+  - docs/dbt-self-service-promotion.md
+  - docs/dbt-self-service-errors.md
+  - docs/compatibility.md
+  - docs/feature-specs/development-workspace-batch-federation.md
+  - docs/adr/0066-development-workspace-batch-federation.md
+  - docs/agent-task-contracts/development-target-admission-hardening.yml
+integrator_owned_paths:
+  - CHANGELOG.md
+  - docs/quality-metrics.md
+read_only_paths:
+  - src/dpone/contracts/dbt_release.py
+  - src/dpone/contracts/dbt_source_inventory_binding.py
+  - src/dpone/services/dbt_release_source_reader.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - docs/quality-metrics.md
+  - mkdocs.yml
+  - .github/workflows
+shared_file_owner: "root"
+dependencies:
+  - "docs/adr/0066-development-workspace-batch-federation.md"
+required_checks:
+  focused:
+    - "uv run pytest -q tests/test_development_target_admission.py tests/test_development_remote_delivery_authority.py tests/test_dbt_workspace_cache_activation_saga.py tests/test_dbt_workspace_release_assembly.py tests/test_release_composition_policy.py"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run dpone docs check-architecture-fitness"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live: []
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

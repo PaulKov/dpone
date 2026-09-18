@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import shutil
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
@@ -20,6 +21,8 @@ from dpone.runtime.airflow_artifact_delivery_support import (
     ArtifactRegistryObjectNotFound,
     ArtifactRegistryReader,
     DevelopmentDeliveryAuthority,
+    DevelopmentTargetAdmission,
+    DevelopmentTargetAdmissionVerifier,
     PinnedCacheRoot,
     download,
     from_cache_error,
@@ -63,6 +66,9 @@ class AirflowArtifactMaterializer:
         attestation_verifier: ArtifactAttestationVerifier | None = None,
         deployment_attestation_verifier: AirflowDeploymentAttestationVerifier | None = None,
         development_authority: DevelopmentDeliveryAuthority | None = None,
+        development_admission: DevelopmentTargetAdmission | None = None,
+        development_admission_verifier: DevelopmentTargetAdmissionVerifier | None = None,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._registry = registry
         self._attestation_gate = MaterializationAttestationGate(
@@ -70,7 +76,9 @@ class AirflowArtifactMaterializer:
             release_verifier=attestation_verifier,
             deployment_verifier=deployment_attestation_verifier,
         )
-        self._development_authority = development_authority
+        self._development_admission = development_admission
+        self._development_admission_verifier = development_admission_verifier
+        self._clock = clock if clock is not None else lambda: datetime.now(UTC)
 
     def materialize(self, request: MaterializeRequest) -> MaterializeReport:
         self._attestation_gate.preflight()
@@ -87,7 +95,14 @@ class AirflowArtifactMaterializer:
                 self._require_completion_markers(request)
                 release, deployment, index = self._fetch_manifests(state)
                 validate_remote_artifact_headers(request, release=release, deployment=deployment, index=index)
-                require_development_delivery_authority(release, authority=self._development_authority)
+                require_development_delivery_authority(
+                    release,
+                    deployment=deployment,
+                    admission=self._development_admission,
+                    admission_verifier=self._development_admission_verifier,
+                    operation="materialize",
+                    clock=self._clock,
+                )
                 require_registry_ref(deployment, index, request.artifact_registry_ref)
                 self._fetch_remaining(
                     state,
@@ -98,7 +113,11 @@ class AirflowArtifactMaterializer:
                 staged_release = staging / "releases" / request.release_dir_name
                 require_development_delivery_authority(
                     release,
-                    authority=self._development_authority,
+                    deployment=deployment,
+                    admission=self._development_admission,
+                    admission_verifier=self._development_admission_verifier,
+                    operation="materialize",
+                    clock=self._clock,
                     source_bytes=sum(path.stat().st_size for path in staged_release.rglob("*") if path.is_file()),
                 )
                 validate_deployment_auxiliary_files(
@@ -108,6 +127,15 @@ class AirflowArtifactMaterializer:
                 staged_projection = _validate_projection(request, cache_root=staging)
                 self._attestation_gate.verify(staged_projection, cache_root=staging)
                 cache_root_guard()
+                require_development_delivery_authority(
+                    release,
+                    deployment=deployment,
+                    admission=self._development_admission,
+                    admission_verifier=self._development_admission_verifier,
+                    operation="materialize",
+                    clock=self._clock,
+                    source_bytes=sum(path.stat().st_size for path in staged_release.rglob("*") if path.is_file()),
+                )
                 release_state, deployment_state = _install_staged_projection(
                     request,
                     staging,

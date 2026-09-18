@@ -7,13 +7,13 @@ import inspect
 import json
 import os
 import stat
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol, cast
 
-from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
 from dpone.ports.artifact_registry import (
     ArtifactRegistry,
     ArtifactRegistryAuthority,
@@ -23,15 +23,24 @@ from dpone.ports.artifact_registry import (
     ArtifactRegistryReader,
     ArtifactRegistryReadLimitExceeded,
 )
-from dpone.runtime.airflow_artifact_delivery_models import AirflowArtifactDeliveryError, MaterializeRequest
+from dpone.runtime.airflow_artifact_delivery_models import (
+    AirflowArtifactDeliveryError,
+    MaterializeRequest,
+    canonical_digest_or_none,
+)
 from dpone.runtime.deployment_cache_common import DeploymentCacheError
+from dpone.runtime.development_target_admission import (
+    DevelopmentTargetAdmission,
+    DevelopmentTargetAdmissionVerifier,
+    DevelopmentTargetOperation,
+)
 
 _DEVELOPMENT_RELEASE_SCHEMA = "dpone.dbt-release-set.development.v1"
 _DEVELOPMENT_COMPOSITION_PROFILE = "development_workspace_delivery_v1"
 
 
 class DevelopmentDeliveryAuthority(Protocol):
-    """Capability injected only after external development-policy verification."""
+    """Legacy delivery capability retained only for fail-closed API migration."""
 
     def release_projection(self) -> dict[str, Any]: ...
 
@@ -41,30 +50,73 @@ class DevelopmentDeliveryAuthority(Protocol):
 def require_development_delivery_authority(
     release: Mapping[str, object],
     *,
-    authority: DevelopmentDeliveryAuthority | None,
+    deployment: Mapping[str, object],
+    admission: DevelopmentTargetAdmission | None,
+    admission_verifier: DevelopmentTargetAdmissionVerifier | None,
+    operation: DevelopmentTargetOperation,
+    checked_at: datetime | None = None,
+    clock: Callable[[], datetime] | None = None,
     source_bytes: int | None = None,
 ) -> None:
-    """Require matching injected authority and combined delivery budgets."""
+    """Require artifact scope plus exact current target-operation admission."""
 
     try:
-        projection = _development_authority_projection(release)
+        projection = development_authority_projection(release)
         if projection is None:
             return
-        if authority is None or authority.release_projection() != projection:
+        release_id = release.get("release_id")
+        deployment_id = deployment.get("deployment_id")
+        environment = deployment.get("environment")
+        trust_tier = deployment.get("trust_tier")
+        if (
+            admission is None
+            or admission_verifier is None
+            or not isinstance(release_id, str)
+            or not isinstance(deployment_id, str)
+            or not isinstance(environment, str)
+            or not isinstance(trust_tier, str)
+        ):
             raise ValueError("current external authority is required")
+        admission_verifier.require_current(
+            admission,
+            now=_current_authority_time(checked_at=checked_at, clock=clock),
+        )
+        admission.require(
+            authority_projection=projection,
+            operation=operation,
+            release_id=release_id,
+            deployment_id=deployment_id,
+            target_environment=environment,
+            target_trust_tier=trust_tier,
+            now=_current_authority_time(checked_at=checked_at, clock=clock),
+        )
         if source_bytes is not None:
-            authority.require_release_budget(
+            admission.authority.require_release_budget(
                 workload_ids=_development_workload_ids(release),
                 source_bytes=_development_budget_bytes(release, delivered_bytes=source_bytes),
             )
-    except (AttributeError, TypeError, ValueError) as exc:
-        raise AirflowArtifactDeliveryError(
-            "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED",
-            "development artifact delivery requires matching externally verified authority",
-        ) from exc
+    except Exception:  # noqa: BLE001 - external authority adapters must fail closed.
+        pass
+    else:
+        return
+    raise AirflowArtifactDeliveryError(
+        "DPONE_DEVELOPMENT_AUTHORITY_REQUIRED",
+        "development artifact delivery requires matching externally verified authority",
+    ) from None
 
 
-def _development_authority_projection(release: Mapping[str, object]) -> object | None:
+def _current_authority_time(
+    *,
+    checked_at: datetime | None,
+    clock: Callable[[], datetime] | None,
+) -> datetime:
+    current = clock() if clock is not None else checked_at
+    if not isinstance(current, datetime):
+        raise ValueError("current external authority time is required")
+    return current
+
+
+def development_authority_projection(release: Mapping[str, object]) -> object | None:
     if release.get("schema") == _DEVELOPMENT_RELEASE_SCHEMA:
         return release.get("development_authority")
     promotion = release.get("promotion")
@@ -232,7 +284,7 @@ def require_registry_scope(
             "DPONE_ARTIFACT_REGISTRY_SCOPE_INVALID",
             "artifact registry returned an invalid non-secret scope identity",
         ) from exc
-    if not is_canonical_sha256_digest(scope_id):
+    if not isinstance(scope_id, str) or canonical_digest_or_none(scope_id) is None:
         raise AirflowArtifactDeliveryError(
             "DPONE_ARTIFACT_REGISTRY_SCOPE_INVALID",
             "artifact registry returned an invalid non-secret scope identity",
@@ -307,6 +359,9 @@ __all__ = [
     "ArtifactRegistryError",
     "ArtifactRegistryObjectNotFound",
     "ArtifactRegistryReader",
+    "DevelopmentTargetAdmission",
+    "DevelopmentTargetAdmissionVerifier",
+    "development_authority_projection",
     "download",
     "file_sha256",
     "from_cache_error",
@@ -315,6 +370,7 @@ __all__ = [
     "read_json",
     "registry_unavailable",
     "require_registry_ref",
+    "require_development_delivery_authority",
     "validate_materialization_target",
     "verify_download",
 ]

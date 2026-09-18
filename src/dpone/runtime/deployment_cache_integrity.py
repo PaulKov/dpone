@@ -50,6 +50,12 @@ from dpone.runtime.deployment_cache_integrity_artifacts import (
 _BASE_ARTIFACT_SECTIONS = ("dag_specs", "workload_packs")
 
 
+def release_content_id(release: Mapping[str, Any]) -> str:
+    """Return the canonical identity used by deployment-cache integrity checks."""
+
+    return airflow_deployment.release_id(release)
+
+
 def require_release_activation_support(dbt_wire: str | None) -> None:
     """Translate release activation policy before pointer or audit mutation."""
 
@@ -137,7 +143,7 @@ class DeploymentCacheIntegrityVerifier:
                 "release-set identity does not match the deployment release",
                 path=release_path.as_posix(),
             )
-        if airflow_deployment.release_id(release) != release_id:
+        if release_content_id(release) != release_id:
             raise DeploymentCacheError(
                 "DPONE_RELEASE_FINGERPRINT_MISMATCH",
                 "release-set content does not match its content-addressed identity",
@@ -304,4 +310,4 @@ class DeploymentCacheIntegrityVerifier:
             )
 
 
-__all__ = ["DEFAULT_MAX_CACHE_ARTIFACT_BYTES", "DeploymentCacheIntegrityVerifier"]
+__all__ = ["DEFAULT_MAX_CACHE_ARTIFACT_BYTES", "DeploymentCacheIntegrityVerifier", "release_content_id"]

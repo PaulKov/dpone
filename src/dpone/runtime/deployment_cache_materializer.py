@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -17,7 +17,12 @@ from dpone.runtime.deployment_cache_common import (
     read_regular_json_object,
     resolve_relative_current_symlink,
 )
-from dpone.runtime.deployment_cache_current_state import DeploymentCacheCurrentState
+from dpone.runtime.deployment_cache_current_state import DeploymentCacheCurrentState, control_state_recovery_required
+from dpone.runtime.deployment_cache_development_admission import (
+    DevelopmentActivationAdmissionGate,
+    DevelopmentTargetAdmission,
+    DevelopmentTargetAdmissionVerifier,
+)
 from dpone.runtime.deployment_cache_integrity import (
     DEFAULT_MAX_CACHE_ARTIFACT_BYTES,
 )
@@ -44,8 +49,11 @@ class DeploymentCacheMaterializer:
         max_artifact_bytes: int = DEFAULT_MAX_CACHE_ARTIFACT_BYTES,
         workspace_activation: DbtWorkspaceActivationCoordinatorPort | None = None,
         composition_activation_coordinator: CompositionActivationCoordinatorPort | None = None,
+        development_admission: DevelopmentTargetAdmission | None = None,
+        development_admission_verifier: DevelopmentTargetAdmissionVerifier | None = None,
     ) -> None:
         self._cache_root = Path(cache_root).resolve(strict=False)
+        self._clock = clock if clock is not None else lambda: datetime.now(UTC)
         self._promotion_policy = DeploymentCachePromotionPolicy(
             clock=clock,
             activation_id_factory=activation_id_factory,
@@ -63,6 +71,12 @@ class DeploymentCacheMaterializer:
         self._activation_snapshotter = DeploymentCacheActivationSnapshotter(
             self._cache_root,
             validator=self._projection_validator,
+        )
+        self._development_admission_gate = DevelopmentActivationAdmissionGate(
+            self._cache_root,
+            admission=development_admission,
+            admission_verifier=development_admission_verifier,
+            clock=self._clock,
         )
         self._committer = DeploymentCacheCommitter(self._cache_root)
 
@@ -97,6 +111,10 @@ class DeploymentCacheMaterializer:
         mutation_started = False
         try:
             with promotion_lock(self._cache_root):
+                self._development_admission_gate.require(
+                    self._projection_validator.validate_details(deployment_path, environment=environment),
+                    environment=environment,
+                )
                 activation = self._activation_snapshotter.prepare(deployment_path, environment=environment)
                 mutation_started = True
                 deployment = activation.projection.identity()
@@ -128,24 +146,16 @@ class DeploymentCacheMaterializer:
                     deployment_id=str(deployment["deployment_id"]),
                     previous_deployment_id=previous_deployment_id,
                 )
+                self._require_verified_activation(deployment_path, environment=environment)
                 current, pointer_path = self._commit_promotion(
                     deployment_path=deployment_path,
                     pointer=pointer,
                 )
                 self._workspace_activation.activate_occurrence(workspace_occurrence, projection_root=deployment_path)
-                result = CurrentDeployment(
-                    activation_id=str(pointer["activation_id"]),
-                    deployment_id=str(deployment["deployment_id"]),
-                    release_id=str(deployment["release_id"]),
-                    environment=environment,
+                result = CurrentDeployment.from_pointer(
+                    pointer,
                     current_path=current,
                     pointer_path=pointer_path,
-                    promoted_by=promoted_by,
-                    promoted_at=str(pointer["promoted_at"]),
-                    previous_deployment_id=previous_deployment_id,
-                    source_commit=source_commit,
-                    attestation_ref=attestation_ref,
-                    workspace_authority_connection_ref=workspace_authority_connection_ref,
                 )
                 if postcommit_action is not None:
                     postcommit_action(result)
@@ -198,47 +208,53 @@ class DeploymentCacheMaterializer:
         self._promotion_policy.authorize(promoted_by)
         activation_id = self._promotion_policy.activation_id(None)
         deployment_path = Path(deployment_dir).absolute()
-        with promotion_lock(self._cache_root):
-            previous_deployment_id = self._current_state.actual_deployment_id()
-            if previous_deployment_id != expected_current_deployment_id:
-                raise DeploymentCacheError(
-                    "DPONE_CURRENT_POINTER_CAS_MISMATCH",
-                    "active current deployment changed after the recovery plan was reviewed",
-                    path=(self._cache_root / "current").as_posix(),
+        mutation_started = False
+        try:
+            with promotion_lock(self._cache_root):
+                previous_deployment_id = self._current_state.actual_deployment_id()
+                if previous_deployment_id != expected_current_deployment_id:
+                    raise DeploymentCacheError(
+                        "DPONE_CURRENT_POINTER_CAS_MISMATCH",
+                        "active current deployment changed after the recovery plan was reviewed",
+                        path=(self._cache_root / "current").as_posix(),
+                    )
+                self._development_admission_gate.require(
+                    self._projection_validator.validate_details(deployment_path, environment=environment),
+                    environment=environment,
                 )
-            activation = self._activation_snapshotter.prepare(deployment_path, environment=environment)
-            deployment = activation.projection.identity()
-            deployment_path = activation.path
-            pointer = self._promotion_policy.pointer(
-                deployment=deployment,
-                environment=environment,
-                promoted_by=promoted_by,
-                previous_deployment_id=previous_deployment_id,
-                source_commit=None,
-                attestation_ref=None,
-                activation_id=activation_id,
-            )
-            workspace_occurrence = self._workspace_activation.prepare_occurrence(
-                projection_root=deployment_path,
-                dbt_wire=activation.projection.dbt_runtime_wire_contract,
-                activation_id=activation_id,
-                environment=environment,
-                release_id=str(deployment["release_id"]),
-                deployment_id=str(deployment["deployment_id"]),
-                previous_deployment_id=previous_deployment_id,
-            )
-            current, pointer_path = self._commit_promotion(deployment_path=deployment_path, pointer=pointer)
-            self._workspace_activation.activate_occurrence(workspace_occurrence, projection_root=deployment_path)
-        return CurrentDeployment(
-            activation_id=str(pointer["activation_id"]),
-            deployment_id=str(deployment["deployment_id"]),
-            release_id=str(deployment["release_id"]),
-            environment=environment,
+                activation = self._activation_snapshotter.prepare(deployment_path, environment=environment)
+                mutation_started = True
+                deployment = activation.projection.identity()
+                deployment_path = activation.path
+                pointer = self._promotion_policy.pointer(
+                    deployment=deployment,
+                    environment=environment,
+                    promoted_by=promoted_by,
+                    previous_deployment_id=previous_deployment_id,
+                    source_commit=None,
+                    attestation_ref=None,
+                    activation_id=activation_id,
+                )
+                workspace_occurrence = self._workspace_activation.prepare_occurrence(
+                    projection_root=deployment_path,
+                    dbt_wire=activation.projection.dbt_runtime_wire_contract,
+                    activation_id=activation_id,
+                    environment=environment,
+                    release_id=str(deployment["release_id"]),
+                    deployment_id=str(deployment["deployment_id"]),
+                    previous_deployment_id=previous_deployment_id,
+                )
+                self._require_verified_activation(deployment_path, environment=environment)
+                current, pointer_path = self._commit_promotion(deployment_path=deployment_path, pointer=pointer)
+                self._workspace_activation.activate_occurrence(workspace_occurrence, projection_root=deployment_path)
+        except DeploymentCacheError as exc:
+            if mutation_started and exc.details.get("state_may_have_changed") is not True:
+                raise cache_error_after_mutation(exc) from exc
+            raise
+        return CurrentDeployment.from_pointer(
+            pointer,
             current_path=current,
             pointer_path=pointer_path,
-            promoted_by=promoted_by,
-            promoted_at=str(pointer["promoted_at"]),
-            previous_deployment_id=previous_deployment_id,
         )
 
     def repair_audit(
@@ -274,11 +290,12 @@ class DeploymentCacheMaterializer:
                 current_target,
                 environment=environment,
             )
+            self._development_admission_gate.require(current_projection, environment=environment)
             if (
                 current_projection.deployment_id != active_id
                 or pointer.get("release_id") != current_projection.release_id
             ):
-                raise _recovery_required(self._cache_root / "current")
+                raise control_state_recovery_required(self._cache_root / "current")
             self._workspace_activation.require_existing(
                 projection_root=current_target,
                 dbt_wire=current_projection.dbt_runtime_wire_contract,
@@ -288,6 +305,16 @@ class DeploymentCacheMaterializer:
                 deployment_id=current_projection.deployment_id,
                 previous_deployment_id=_optional_string(pointer.get("previous_deployment_id")),
             )
+            current_projection = self.validate_current_details(
+                current_target,
+                environment=environment,
+            )
+            self._development_admission_gate.require(current_projection, environment=environment)
+            if (
+                current_projection.deployment_id != active_id
+                or pointer.get("release_id") != current_projection.release_id
+            ):
+                raise control_state_recovery_required(self._cache_root / "current")
             audit_payload = dict(pointer)
             audit_payload["recovery"] = {
                 "actor": recovery_actor,
@@ -301,19 +328,10 @@ class DeploymentCacheMaterializer:
                     "promotion audit repair could not be written",
                     path=(self._cache_root / "current-pointer-audit.jsonl").as_posix(),
                 ) from exc
-        return CurrentDeployment(
-            activation_id=_optional_string(pointer.get("activation_id")),
-            deployment_id=active_id,
-            release_id=str(pointer.get("release_id") or ""),
-            environment=environment,
+        return CurrentDeployment.from_pointer(
+            pointer,
             current_path=self._cache_root / "current",
             pointer_path=pointer_path,
-            promoted_by=str(pointer.get("promoted_by") or ""),
-            promoted_at=str(pointer.get("promoted_at") or ""),
-            previous_deployment_id=_optional_string(pointer.get("previous_deployment_id")),
-            source_commit=_optional_string(pointer.get("source_commit")),
-            attestation_ref=_optional_string(pointer.get("attestation_ref")),
-            workspace_authority_connection_ref=_optional_string(pointer.get("workspace_authority_connection_ref")),
         )
 
     def _check_cas(
@@ -336,6 +354,15 @@ class DeploymentCacheMaterializer:
                 path=(self._cache_root / "current-pointer.json").as_posix(),
             )
 
+    def _require_verified_activation(self, deployment_path: Path, *, environment: str) -> None:
+        """Revalidate sealed projection bytes and authority immediately before commit."""
+
+        projection = self._projection_validator.validate_activation_details(
+            deployment_path,
+            environment=environment,
+        )
+        self._development_admission_gate.require(projection, environment=environment)
+
     def _commit_promotion(self, *, deployment_path: Path, pointer: dict[str, Any]) -> tuple[Path, Path]:
         """Delegate the commit protocol through the stable test seam."""
 
@@ -344,14 +371,6 @@ class DeploymentCacheMaterializer:
 
 def _optional_string(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
-
-
-def _recovery_required(path: Path) -> DeploymentCacheError:
-    return DeploymentCacheError(
-        "DPONE_DEPLOYMENT_CACHE_RECOVERY_REQUIRED",
-        "current deployment control files are inconsistent; run cache recovery before promotion",
-        path=path.as_posix(),
-    )
 
 
 __all__ = ["CurrentDeployment", "DeploymentCacheMaterializer"]
