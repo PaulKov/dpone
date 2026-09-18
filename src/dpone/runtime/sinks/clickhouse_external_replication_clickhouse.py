@@ -6,9 +6,8 @@ import json
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from dpone.contracts import clickhouse_cluster_publication as cluster_contract
-from dpone.contracts.clickhouse_cluster_publication import digest_payload
-from dpone.contracts.clickhouse_external_replication import (
+from dpone.ports import clickhouse_external_replication as ports
+from dpone.ports.clickhouse_external_replication import (
     EXTERNAL_AUTHORITY_SCHEMA_VERSION,
     INTERNAL_AUTHORITY_SCHEMA_VERSION,
     ArtifactIdentity,
@@ -20,8 +19,9 @@ from dpone.contracts.clickhouse_external_replication import (
     MemberGenerationObservation,
     PhysicalGeneration,
     ReplicationMode,
+    cluster_contract,
+    digest_payload,
 )
-from dpone.ports import clickhouse_external_replication as ports
 
 _MUTATION_SETTINGS = {"keeper_map_strict_mode": 1, "insert_keeper_max_retries": 0}
 _DDL_SETTINGS = dict(skip_unavailable_shards=0, distributed_ddl_output_mode="throw", distributed_ddl_task_timeout=60)

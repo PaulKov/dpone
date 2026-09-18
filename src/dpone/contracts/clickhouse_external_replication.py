@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass, fields
 from typing import Any
 
 from dpone._compat import StrEnum
+from dpone.contracts import clickhouse_cluster_publication as cluster_contract  # noqa: F401
+from dpone.contracts.clickhouse_cluster_publication import QueueState as QueueState  # noqa: F401
 from dpone.contracts.clickhouse_cluster_publication import canonical_json, digest_payload
 
 EXTERNAL_AUTHORITY_SCHEMA_VERSION = "dpone.clickhouse.cluster-external-full-refresh.v1"

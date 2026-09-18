@@ -7,13 +7,13 @@ from dataclasses import replace
 from typing import Any, Protocol
 
 from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
-from dpone.contracts.clickhouse_cluster_publication import digest_payload
-from dpone.contracts.clickhouse_external_replication import (
+from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactReceipt,
+    ExternalArtifactSourcePort,
     ExternalPublicationError,
     ExternalPublicationRequest,
+    digest_payload,
 )
-from dpone.ports.clickhouse_external_replication import ExternalArtifactSourcePort
 from dpone.runtime.lineage.options import LineageOptions
 from dpone.runtime.sinks.clickhouse_external_replication_context import (
     ExternalStagedContext,

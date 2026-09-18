@@ -7,30 +7,29 @@ from collections.abc import Callable, Mapping
 from dataclasses import replace
 from typing import Any, NoReturn
 
-from dpone.contracts.clickhouse_cluster_publication import QueueEntry, QueueState
-from dpone.contracts.clickhouse_external_replication import (
-    ExternalArtifactReceipt,
-    ExternalAuthorityPhase,
-    ExternalAuthorityRecord,
-    ExternalMemberRecord,
-    ExternalMemberStageState,
-    ExternalPublicationError,
-    MemberGenerationObservation,
-    MemberPublicationState,
-    PhysicalGeneration,
-    classify_member_publication,
-    derive_target_key,
-)
 from dpone.ports.clickhouse_external_replication import (
+    ExternalArtifactReceipt,
     ExternalArtifactSourcePort,
     ExternalAuthorityMutationResult,
     ExternalAuthorityMutationStatus,
+    ExternalAuthorityPhase,
     ExternalAuthorityPort,
+    ExternalAuthorityRecord,
     ExternalClusterDdlPort,
     ExternalDispatchPermit,
+    ExternalMemberRecord,
+    ExternalMemberStageState,
+    ExternalPublicationError,
     ExternalReplicaStagingPort,
     ExternalTopologyCatalogPort,
+    MemberGenerationObservation,
+    MemberPublicationState,
+    PhysicalGeneration,
+    QueueEntry,
+    QueueState,
     VersionedExternalAuthorityRecord,
+    classify_member_publication,
+    derive_target_key,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_state import (
     complete_candidate as _complete,
