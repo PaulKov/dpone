@@ -342,6 +342,11 @@ def _require_supported_mssql_state(state: object) -> None:
         allowed_coordinates = {"database", "schema", "name"}
         if field == "run_table":
             allowed_coordinates.add("run_name")
+        if field == "partition_checkpoint_table":
+            # The runtime checkpoint store accepts only schema/name and uses
+            # the state connection's database. Reject an ignored authority
+            # coordinate instead of certifying a misleading declaration.
+            allowed_coordinates.remove("database")
         if (
             not isinstance(table, Mapping)
             or set(table) - allowed_coordinates
@@ -352,6 +357,14 @@ def _require_supported_mssql_state(state: object) -> None:
 
     primary = state.get("table")
     primary_table = primary if isinstance(primary, Mapping) else {}
+    checkpoint = state.get("partition_checkpoint_table")
+    checkpoint_table = checkpoint if isinstance(checkpoint, Mapping) else {}
+    primary_schema = str(primary_table.get("schema") or "etl_state")
+    checkpoint_schema = str(checkpoint_table.get("schema") or primary_schema)
+    if checkpoint_schema != primary_schema:
+        raise OrdinaryReleaseInventoryError(
+            "ordinary state partition_checkpoint_table.schema must match state.table.schema"
+        )
     try:
         # Sentinel deployment defaults let the canonical runtime validator check
         # every authored cross-table constraint without inventing real registry
@@ -359,7 +372,7 @@ def _require_supported_mssql_state(state: object) -> None:
         resolve_mssql_state_location_defaults(
             state,
             default_database=str(primary_table.get("database") or "dpone_detached"),
-            default_schema=str(primary_table.get("schema") or "etl_state"),
+            default_schema=primary_schema,
         )
     except StateConfigError as exc:
         raise OrdinaryReleaseInventoryError(f"ordinary MSSQL state policy is invalid: {exc}") from exc

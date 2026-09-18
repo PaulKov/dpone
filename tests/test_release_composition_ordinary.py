@@ -334,6 +334,35 @@ def test_capture_rejects_mssql_state_tables_outside_primary_location(
         _capture(root)
 
 
+@pytest.mark.parametrize(
+    ("coordinate", "value", "message"),
+    [
+        ("database", "other_db", "partition_checkpoint_table coordinates are invalid"),
+        ("schema", "other_schema", "partition_checkpoint_table.schema must match"),
+    ],
+)
+def test_capture_rejects_noncanonical_partition_checkpoint_location(
+    tmp_path: Path,
+    coordinate: str,
+    value: str,
+    message: str,
+) -> None:
+    root = ordinary_root(
+        tmp_path,
+        extra_manifest=(
+            "state:\n"
+            "  type: mssql\n"
+            "  connection_ref: state\n"
+            "  table: {database: state_db, schema: control, name: source_state}\n"
+            f"  partition_checkpoint_table: {{{coordinate}: {value}, name: checkpoints}}\n"
+        ),
+        runner="airflow",
+    )
+
+    with pytest.raises(ValueError, match=message):
+        _capture(root)
+
+
 def test_capture_rejects_separate_post_hook(tmp_path: Path) -> None:
     root = ordinary_root(
         tmp_path,
