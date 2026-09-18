@@ -6,12 +6,12 @@ from collections.abc import Mapping
 from typing import Any
 
 from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION
-from dpone.contracts.clickhouse_external_replication import EXTERNAL_RECEIPT_SCHEMA_VERSION
 from dpone.ports.clickhouse_cluster_publication import (
     ClickHouseClusterAdmissionError,
     clickhouse_cluster_admission_input,
     evaluate_clickhouse_cluster_admission,
 )
+from dpone.ports.clickhouse_external_replication import EXTERNAL_RECEIPT_SCHEMA_VERSION
 from dpone.runtime.clickhouse_cluster_publication_composition import (
     build_clickhouse_cluster_publication,
 )

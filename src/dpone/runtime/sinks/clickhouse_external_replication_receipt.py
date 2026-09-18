@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from dpone.contracts.clickhouse_external_replication import (
+from dpone.ports.clickhouse_external_replication import (
     EXTERNAL_RECEIPT_SCHEMA_VERSION,
     ExternalAuthorityRecord,
 )

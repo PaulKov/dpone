@@ -13,12 +13,12 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from dpone.contracts.clickhouse_cluster_publication import canonical_json
-from dpone.contracts.clickhouse_external_replication import (
+from dpone.ports.clickhouse_external_replication import (
     ExternalAuthorityRecord,
     ExternalContractError,
     MemberGenerationObservation,
     PhysicalGeneration,
+    canonical_json,
 )
 from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
 from dpone.runtime.sinks.load_payload import LoadPayload

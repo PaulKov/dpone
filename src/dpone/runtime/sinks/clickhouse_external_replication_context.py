@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dpone.contracts.clickhouse_external_replication import ExternalPublicationRequest
+from dpone.ports.clickhouse_external_replication import ExternalPublicationRequest
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 
 

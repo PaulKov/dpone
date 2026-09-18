@@ -6,17 +6,17 @@ import secrets
 from collections.abc import Mapping
 from typing import Any, NoReturn, Protocol
 
-from dpone.contracts.clickhouse_cluster_publication import digest_payload
-from dpone.contracts.clickhouse_external_replication import (
+from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactReceipt,
+    ExternalArtifactSourcePort,
     ExternalContractError,
     ExternalPublicationError,
     ExternalPublicationRequest,
     derive_generation_id,
     derive_operation_id,
     derive_target_key,
+    digest_payload,
 )
-from dpone.ports.clickhouse_external_replication import ExternalArtifactSourcePort
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
 
 

@@ -8,8 +8,12 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from dpone.contracts.clickhouse_cluster_publication import canonical_json, digest_payload
-from dpone.contracts.clickhouse_external_replication import ArtifactIdentity, ExternalContractError
+from dpone.ports.clickhouse_external_replication import (
+    ArtifactIdentity,
+    ExternalContractError,
+    canonical_json,
+    digest_payload,
+)
 from dpone.runtime.file_artifacts import FileExportArtifact
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.sinks.clickhouse_external_replication_member_driver import (

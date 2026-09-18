@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from dpone.contracts.clickhouse_external_replication import (
+from dpone.ports.clickhouse_external_replication import (
     ArtifactIdentity,
     ExternalAuthorityPhase,
     ExternalAuthorityRecord,
@@ -14,8 +14,8 @@ from dpone.contracts.clickhouse_external_replication import (
     ExternalPublicationError,
     MemberPublicationState,
     PhysicalGeneration,
+    VersionedExternalAuthorityRecord,
 )
-from dpone.ports.clickhouse_external_replication import VersionedExternalAuthorityRecord
 
 
 def record_from_state(
