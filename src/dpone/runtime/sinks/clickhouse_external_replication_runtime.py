@@ -22,6 +22,7 @@ from dpone.runtime.sinks.clickhouse_external_replication_receipt import External
 from dpone.runtime.sinks.clickhouse_external_replication_state import candidate_name as _candidate_name
 from dpone.runtime.sinks.clickhouse_external_replication_state import matches_generation as _matches
 from dpone.runtime.sinks.clickhouse_external_replication_state import owned_observation as _owned
+from dpone.runtime.sinks.clickhouse_external_replication_state import require_replayable_artifact
 from dpone.runtime.sinks.clickhouse_external_replication_state import without_version as _without_version
 
 
@@ -66,8 +67,6 @@ class ClickHouseExternalReplicationRuntime:
         self._artifact_source = artifact_source
 
     def run(self, request: ExternalPublicationRequest) -> ExternalReplicationReceipt:
-        """Resume one deterministic operation through staging, publish, and cleanup."""
-
         self.stage(request)
         self.publish(request)
         return self.cleanup(request)
@@ -87,14 +86,14 @@ class ClickHouseExternalReplicationRuntime:
             plan_sha256=request.plan_sha256,
         )
         source = self._require_source()
-        self._require_artifact(request.artifact, member_ids=())
+        require_replayable_artifact(request.artifact, self._fail, ())
         source.revalidate(request.artifact.identity)
         if source.binding_id != request.artifact.artifact_id or source.identity != request.artifact.identity:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_CHANGED")
         members = tuple(sorted(self._service.inventory(request.cluster)))
         if len(members) < 2 or len(set(members)) != len(members):
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_INVENTORY_INVALID", member_ids=members)
-        self._require_artifact(request.artifact, member_ids=members)
+        require_replayable_artifact(request.artifact, self._fail, members)
         if state["phase"] == "COMPLETED":
             return self._receipt(state)
         state = self._stage(request, state)
@@ -363,10 +362,6 @@ class ClickHouseExternalReplicationRuntime:
         if self._artifact_source is None:
             self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNSUPPORTED")
         return self._artifact_source
-
-    def _require_artifact(self, artifact: ExternalArtifactReceipt, *, member_ids: tuple[str, ...]) -> None:
-        if not artifact.replayable or artifact.byte_size < 0 or artifact.row_count < 0:
-            self._fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNSUPPORTED", member_ids=member_ids)
 
     @staticmethod
     def _fail(

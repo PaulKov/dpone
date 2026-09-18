@@ -7,6 +7,7 @@ from typing import Any
 
 from dpone.ports.clickhouse_external_replication import (
     ArtifactIdentity,
+    ExternalArtifactReceipt,
     ExternalAuthorityPhase,
     ExternalAuthorityRecord,
     ExternalMemberRecord,
@@ -127,6 +128,11 @@ def complete_candidate(candidate: PhysicalGeneration | None, artifact: ArtifactI
         )
         == (artifact.schema_digest, artifact.wire_digest, artifact.row_count)
     )
+
+
+def require_replayable_artifact(artifact: ExternalArtifactReceipt, fail: Any, member_ids: tuple[str, ...]) -> None:
+    if not artifact.replayable or artifact.byte_size < 0 or artifact.row_count < 0:
+        fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNSUPPORTED", member_ids=member_ids)
 
 
 def desired_generation(member_record: ExternalMemberRecord) -> PhysicalGeneration:
@@ -250,6 +256,7 @@ def _fail(code: str, record: ExternalAuthorityRecord | None) -> None:
 __all__ = [
     "complete_candidate",
     "candidate_name",
+    "require_replayable_artifact",
     "candidate_observation",
     "desired_generation",
     "equivalent_state",
