@@ -44,6 +44,22 @@ remains `UNVERIFIED`. The matrix exercises fresh cleanup, lost member-load,
 publication and cleanup responses, plus recovery from `STAGING` through a
 freshly composed service in the same process.
 
+The exact-commit performance producer writes:
+
+```text
+test_artifacts/clickhouse-external-publication/benchmark-receipt.json
+```
+
+Schema `dpone.clickhouse.external-publication-benchmark.v1` records the tracked
+budget digest, source commit/tree, fixture digest, environment, measured trial
+durations, exact member counts, content-digest equality, publication phase,
+and cleanup proof. Its verdict is `PASS` only when both the canonical-digest
+and two-member fan-out sections pass their tracked budgets and correctness
+checks. The receipt deliberately omits endpoints, database names, SQL,
+credentials, and row values. It is generated after the reviewed commit and
+stored byte-identically with its SHA-256 in release evidence; it is not added
+back to the commit whose identity it records.
+
 The receipt must bind the exact commit and fixture-configuration digests, label
 its scope `mocked_in_process`, list each scenario independently, and use only
 `PASS`, `FAIL`, `SKIP`, or `UNVERIFIED`. It must contain opaque member IDs and

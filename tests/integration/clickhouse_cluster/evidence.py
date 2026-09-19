@@ -4,17 +4,24 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import platform
 import subprocess
 from pathlib import Path
 from typing import Any
 
 RECEIPT = Path("test_artifacts/clickhouse-cluster-publication/docker-receipt.json")
 EXTERNAL_RECEIPT = Path("test_artifacts/clickhouse-external-publication/docker-receipt.json")
+EXTERNAL_PERFORMANCE_RECEIPT = Path("test_artifacts/clickhouse-external-publication/benchmark-receipt.json")
+EXTERNAL_PERFORMANCE_BUDGET = Path("tests/integration/clickhouse_cluster/external_replication_performance_budget.json")
 _FIXTURE_FILES = (
     Path("tests/integration/clickhouse_cluster/docker-compose.yml"),
     Path("tests/integration/clickhouse_cluster/conftest.py"),
     Path("tests/integration/clickhouse_cluster/evidence.py"),
+    Path("tests/integration/clickhouse_cluster/external_replication_live_support.py"),
+    EXTERNAL_PERFORMANCE_BUDGET,
     Path("tests/integration/clickhouse_cluster/test_clickhouse_external_replication_live.py"),
+    Path("tests/integration/clickhouse_cluster/test_clickhouse_external_replication_performance_live.py"),
     Path("tests/integration/clickhouse_cluster/config/keeper/keeper.xml"),
     Path("tests/integration/clickhouse_cluster/config/node1/cluster.xml"),
     Path("tests/integration/clickhouse_cluster/config/node2/cluster.xml"),
@@ -57,6 +64,13 @@ def reset_external_receipt() -> None:
 
     if EXTERNAL_RECEIPT.exists():
         EXTERNAL_RECEIPT.unlink()
+
+
+def reset_external_performance_receipt() -> None:
+    """Discard only stale external-publication benchmark evidence."""
+
+    if EXTERNAL_PERFORMANCE_RECEIPT.exists():
+        EXTERNAL_PERFORMANCE_RECEIPT.unlink()
 
 
 def record_scenario(
@@ -106,7 +120,9 @@ def record_external_scenario(
     if name not in EXTERNAL_SCENARIOS:
         raise ValueError(f"unknown external publication scenario: {name}")
     evidence = json.loads(EXTERNAL_RECEIPT.read_text()) if EXTERNAL_RECEIPT.exists() else {}
-    scenarios = {item: {"status": "UNVERIFIED", "evidence_scope": "local_synthetic"} for item in EXTERNAL_SCENARIOS}
+    scenarios: dict[str, dict[str, Any]] = {
+        item: {"status": "UNVERIFIED", "evidence_scope": "local_synthetic"} for item in EXTERNAL_SCENARIOS
+    }
     scenarios.update(evidence.get("scenarios", {}))
     scenarios[name] = {
         "status": result,
@@ -131,6 +147,42 @@ def record_external_scenario(
     )
     EXTERNAL_RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     EXTERNAL_RECEIPT.write_text(json.dumps(evidence, sort_keys=True) + "\n")
+
+
+def write_external_performance_receipt(
+    *,
+    canonical_digest: dict[str, Any],
+    member_fanout: dict[str, Any],
+    server_version: str,
+) -> None:
+    """Atomically write exact-commit local performance evidence without secrets."""
+
+    source_commit, source_tree = _source_binding()
+    benchmark_config = EXTERNAL_PERFORMANCE_BUDGET.read_bytes()
+    passed = canonical_digest.get("status") == "PASS" and member_fanout.get("status") == "PASS"
+    evidence = {
+        "schema_version": "dpone.clickhouse.external-publication-benchmark.v1",
+        "status": "PASS" if passed else "FAIL",
+        "evidence_scope": "local_synthetic",
+        "production_certification": "UNVERIFIED",
+        "source_commit": source_commit,
+        "source_tree": source_tree,
+        "tracked_tree_status": "clean",
+        "fixture_digest": _fixture_digest(source_commit),
+        "benchmark_config_sha256": hashlib.sha256(benchmark_config).hexdigest(),
+        "environment": {
+            "clickhouse_version": server_version,
+            "python_version": platform.python_version(),
+            "platform": platform.platform(),
+            "cpu_count": os.cpu_count() or 0,
+        },
+        "canonical_digest": canonical_digest,
+        "member_fanout": member_fanout,
+    }
+    EXTERNAL_PERFORMANCE_RECEIPT.parent.mkdir(parents=True, exist_ok=True)
+    temporary = EXTERNAL_PERFORMANCE_RECEIPT.with_suffix(".tmp")
+    temporary.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(EXTERNAL_PERFORMANCE_RECEIPT)
 
 
 def _git(*args: str, text: bool = True) -> str | bytes:
