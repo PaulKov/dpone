@@ -18,6 +18,7 @@ from tests.integration.clickhouse_cluster.external_replication_performance_evide
     validate_external_performance_receipt,
     write_external_performance_receipt,
 )
+from tests.integration.clickhouse_cluster.external_replication_performance_validation import SCHEMA_V1, SCHEMA_V2
 from tests.integration.clickhouse_cluster.test_clickhouse_external_replication_performance_live import (
     _benchmark_canonical_digest,
 )
@@ -107,6 +108,7 @@ def test_performance_receipt_is_exact_bound_and_never_overwritten(
     original = receipt_path.read_bytes()
 
     assert written["status"] == "PASS"
+    assert written["schema_version"] == SCHEMA_V2
     assert written["source_commit"] == "a" * 40
     assert written["source_tree"] == "b" * 40
     assert written["fixture_digest"] == "c" * 64
@@ -150,7 +152,20 @@ def test_performance_receipt_fails_closed_and_rejects_tampering(
     valid["canonical_digest"] = passing_canonical
     valid["member_fanout"] = passing_fanout
     _validate(valid, budget_path)
-    for mutation in ("commit", "budget", "section_secret", "top_level_secret", "digest", "environment"):
+    for mutation in (
+        "commit",
+        "budget",
+        "section_secret",
+        "top_level_secret",
+        "digest",
+        "environment",
+        "environment_endpoint",
+        "missing_median",
+        "forged_median",
+        "forged_maximum",
+        "not_finite",
+        "boolean_number",
+    ):
         tampered = deepcopy(valid)
         if mutation == "commit":
             tampered["source_commit"] = "d" * 40
@@ -162,8 +177,46 @@ def test_performance_receipt_fails_closed_and_rejects_tampering(
             tampered["credential"] = "plaintext-secret"
         elif mutation == "digest":
             tampered["canonical_digest"]["digest"] = "not-a-sha256"
-        else:
+        elif mutation == "environment":
             tampered["environment"]["clickhouse_version"] = "forged"
+        elif mutation == "environment_endpoint":
+            tampered["environment"]["endpoint"] = "https://user:secret@example.invalid"
+        elif mutation == "missing_median":
+            del tampered["canonical_digest"]["median_seconds"]
+        elif mutation == "forged_median":
+            tampered["canonical_digest"]["median_seconds"] = 0.2
+        elif mutation == "forged_maximum":
+            tampered["member_fanout"]["max_seconds"] = 0.5
+        elif mutation == "not_finite":
+            tampered["member_fanout"]["trial_seconds"][0] = float("nan")
+        else:
+            tampered["canonical_digest"]["rows"] = True
+        with pytest.raises(ValueError, match="failed validation"):
+            _validate(tampered, budget_path)
+
+
+def test_performance_receipt_reads_bounded_historical_v1_contract(tmp_path: Path) -> None:
+    budget_path = tmp_path / "budget.json"
+    budget_path.write_text(EXTERNAL_PERFORMANCE_BUDGET.read_text(encoding="utf-8"), encoding="utf-8")
+    canonical, fanout = _passing_sections()
+    fanout.pop("max_source_bytes")
+    payload = _valid_payload(canonical=canonical, fanout=fanout)
+    payload["schema_version"] = SCHEMA_V1
+    payload.pop("observation")
+
+    _validate(payload, budget_path)
+
+
+def test_performance_receipt_v2_requires_observation_and_source_budget(tmp_path: Path) -> None:
+    budget_path = tmp_path / "budget.json"
+    budget_path.write_text(EXTERNAL_PERFORMANCE_BUDGET.read_text(encoding="utf-8"), encoding="utf-8")
+    canonical, fanout = _passing_sections()
+    payload = _valid_payload(canonical=canonical, fanout=fanout)
+
+    for field, section in (("observation", payload), ("max_source_bytes", payload["member_fanout"])):
+        tampered = deepcopy(payload)
+        target = tampered if section is payload else tampered["member_fanout"]
+        del target[field]
         with pytest.raises(ValueError, match="failed validation"):
             _validate(tampered, budget_path)
 
@@ -215,6 +268,30 @@ def _passing_sections() -> tuple[dict[str, Any], dict[str, Any]]:
         "status": "PASS",
     }
     return canonical, fanout
+
+
+def _valid_payload(*, canonical: dict[str, Any], fanout: dict[str, Any]) -> dict[str, Any]:
+    budget_bytes = EXTERNAL_PERFORMANCE_BUDGET.read_bytes()
+    return {
+        "schema_version": SCHEMA_V2,
+        "status": "PASS",
+        "evidence_scope": "local_synthetic",
+        "production_certification": "UNVERIFIED",
+        "source_commit": "a" * 40,
+        "source_tree": "b" * 40,
+        "tracked_tree_status": "clean",
+        "fixture_digest": "c" * 64,
+        "benchmark_config_sha256": hashlib.sha256(budget_bytes).hexdigest(),
+        "environment": {
+            "clickhouse_version": "24.8.14.39",
+            "python_version": "3.13.7",
+            "platform": "test-platform",
+            "cpu_count": 8,
+        },
+        "observation": _observation(),
+        "canonical_digest": canonical,
+        "member_fanout": fanout,
+    }
 
 
 def _observation() -> dict[str, str]:

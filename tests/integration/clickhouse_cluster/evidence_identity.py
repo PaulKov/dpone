@@ -14,6 +14,7 @@ FIXTURE_FILES = (
     Path("tests/integration/clickhouse_cluster/external_replication_live_support.py"),
     Path("tests/integration/clickhouse_cluster/external_replication_performance_budget.json"),
     Path("tests/integration/clickhouse_cluster/external_replication_performance_evidence.py"),
+    Path("tests/integration/clickhouse_cluster/external_replication_performance_validation.py"),
     Path("tests/integration/clickhouse_cluster/test_clickhouse_external_replication_live.py"),
     Path("tests/integration/clickhouse_cluster/test_clickhouse_external_replication_performance_live.py"),
     Path("tests/integration/clickhouse_cluster/config/keeper/keeper.xml"),
