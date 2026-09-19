@@ -22,8 +22,17 @@ from dpone.runtime.sinks.load_result import AtomicCommitOutcome
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTED_MANIFEST = ROOT / "examples/batch/clickhouse-external-replication-full-refresh.batch.yaml"
 RECEIPT = {
+    "schema_version": "dpone.clickhouse.external-publication-receipt.v1",
     "phase": "COMMITTED",
+    "target_key": "1" * 64,
     "operation_id": "external-operation",
+    "generation_id": "2" * 64,
+    "inventory_digest": "3" * 64,
+    "plan_digest": "4" * 64,
+    "artifact_sha256": "5" * 64,
+    "member_ids": ["6" * 64, "7" * 64],
+    "authority_version": 3,
+    "replication_mode": "external",
     "evidence_scope": "runtime",
     "evidence_status": "UNVERIFIED",
 }
@@ -190,17 +199,55 @@ def test_documented_external_route_has_default_runner_cli_python_parity(
 
     for field in ("status", "inserted_rows", "updated_rows", "final_rows", "extracted_rows", "errors"):
         assert cli_payload["result"][field] == python_payload["result"][field]
-    assert python_payload["result"]["status"] == "success"
+    assert {
+        field: python_payload["result"][field]
+        for field in ("status", "inserted_rows", "updated_rows", "final_rows", "extracted_rows", "errors")
+    } == {
+        "status": "success",
+        "inserted_rows": 2,
+        "updated_rows": 0,
+        "final_rows": 2,
+        "extracted_rows": 2,
+        "errors": [],
+    }
+    for payload in (cli_payload, python_payload):
+        assert payload["run_id"] == "external-cluster-full-refresh-parity"
+        assert payload["process"] == "external_cluster_full_refresh"
+        assert payload["selector"] == "source_schema.source_table"
     assert hydrator.events_by_run == [
         ["runtime_admission", "publication_receipt_durable", "target_commit_callback"],
         ["runtime_admission", "publication_receipt_durable", "target_commit_callback"],
     ]
     assert hydrator.normalized_routes == [hydrator.normalized_routes[0], hydrator.normalized_routes[0]]
-    assert hydrator.normalized_routes[0]["cluster"]["replication_mode"] == "external"
+    assert hydrator.normalized_routes[0] == {
+        "source": "mssql",
+        "sink": "clickhouse",
+        "strategy": "full_refresh",
+        "target": "analytics.target_table",
+        "cluster": {
+            "name": "analytics_cluster",
+            "ddl_scope": "cluster",
+            "replication_mode": "external",
+            "external_content_row_budget": 100_000,
+        },
+    }
     assert route_factory.routes == [("mssql", "clickhouse", "full_refresh")] * 2
     for payload in (cli_payload, python_payload):
-        receipt = payload["result"]["details"]["reconciliation_metrics"]["clickhouse_cluster_external_full_refresh"]
+        metrics = payload["result"]["details"]["reconciliation_metrics"]
+        receipt = metrics["clickhouse_cluster_external_full_refresh"]
         assert all(receipt[field] == value for field, value in RECEIPT.items())
+        quality = metrics["quality_gates"]
+        assert quality["passed"] is True
+        assert quality["gate_contract"] == [
+            {"gate_id": "source_target_rows", "type": "row_count_reconciliation", "severity": "error"}
+        ]
+        assert quality["results"][0]["status"] == "passed"
+        assert quality["results"][0]["metrics"] == {
+            "source_row_count": 2,
+            "target_row_count": 2,
+            "difference": 0,
+            "allowed_difference": 0.0,
+        }
 
 
 def test_external_route_default_runner_failure_never_commits_or_checkpoints(

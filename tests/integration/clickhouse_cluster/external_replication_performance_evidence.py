@@ -15,6 +15,7 @@ from tests.integration.clickhouse_cluster.evidence_identity import (
     fixture_digest,
     performance_fixture_digest,
     source_binding,
+    tracked_file_bytes,
 )
 from tests.integration.clickhouse_cluster.external_replication_performance_validation import (
     EXTERNAL_PERFORMANCE_COMMAND,
@@ -79,13 +80,19 @@ def verify_external_performance_receipt() -> dict[str, Any]:
 
     source_commit, source_tree = source_binding()
     evidence = json.loads(EXTERNAL_PERFORMANCE_RECEIPT.read_text(encoding="utf-8"))
+    schema_version = str(evidence.get("schema_version") or "")
+    benchmark_config = (
+        tracked_file_bytes(source_commit, EXTERNAL_PERFORMANCE_BUDGET)
+        if schema_version == "dpone.clickhouse.external-publication-benchmark.v1"
+        else EXTERNAL_PERFORMANCE_BUDGET.read_bytes()
+    )
     validate_external_performance_receipt(
         evidence,
         source_commit=source_commit,
         source_tree=source_tree,
-        fixture_digest=performance_fixture_digest(source_commit, str(evidence.get("schema_version") or "")),
-        benchmark_config_sha256=hashlib.sha256(EXTERNAL_PERFORMANCE_BUDGET.read_bytes()).hexdigest(),
-        budget=json.loads(EXTERNAL_PERFORMANCE_BUDGET.read_text(encoding="utf-8")),
+        fixture_digest=performance_fixture_digest(source_commit, schema_version),
+        benchmark_config_sha256=hashlib.sha256(benchmark_config).hexdigest(),
+        budget=json.loads(benchmark_config),
     )
     return evidence
 

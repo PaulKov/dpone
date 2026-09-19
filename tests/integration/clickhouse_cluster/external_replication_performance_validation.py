@@ -57,7 +57,7 @@ def validate_external_performance_receipt(
         if not isinstance(observation, Mapping) or not _valid_observation(observation):
             errors.append("observation")
     environment = evidence.get("environment")
-    if not isinstance(environment, Mapping) or not _valid_environment(environment):
+    if not isinstance(environment, Mapping) or not _valid_environment(environment, schema=schema):
         errors.append("environment")
     if errors:
         raise ValueError("external performance receipt failed validation: " + ",".join(sorted(set(errors))))
@@ -113,12 +113,12 @@ def _validate_sections(
         errors.append("canonical_measurement")
     if fanout.get("status") == "PASS" and not fanout_measurement:
         errors.append("fanout_measurement")
-    _validate_canonical_digest(canonical, budget, errors)
+    _validate_canonical_digest(canonical, budget, schema=schema, errors=errors)
     canonical_passed = (
         canonical.get("stable_across_trials") is True
         and canonical_measurement
         and _within_budget(canonical)
-        and canonical.get("digest") == _expected_canonical_digest(budget)
+        and canonical.get("digest") == _expected_canonical_digest(budget, schema=schema)
         and canonical.get("status") == "PASS"
     )
     counts = fanout.get("per_member_row_counts")
@@ -185,12 +185,14 @@ def _within_budget(section: Mapping[str, Any]) -> bool:
 def _validate_canonical_digest(
     canonical: Mapping[str, Any],
     budget: Mapping[str, Any],
+    *,
+    schema: Any,
     errors: list[str],
 ) -> None:
     digest = canonical.get("digest")
     if digest is None and canonical.get("status") == "FAIL":
         return
-    expected = _expected_canonical_digest(budget)
+    expected = _expected_canonical_digest(budget, schema=schema)
     if not isinstance(digest, str) or len(digest) != 64 or digest != expected:
         errors.append("canonical_digest")
 
@@ -248,11 +250,12 @@ def _valid_observation(observation: Mapping[str, Any]) -> bool:
     return started.tzinfo is not None and finished.tzinfo is not None and started <= finished
 
 
-def _valid_environment(environment: Mapping[str, Any]) -> bool:
+def _valid_environment(environment: Mapping[str, Any], *, schema: Any) -> bool:
     if set(environment) != _ENVIRONMENT_FIELDS:
         return False
     return (
-        environment.get("clickhouse_version") == _pinned_clickhouse_version()
+        environment.get("clickhouse_version")
+        == (_V1_CLICKHOUSE_VERSION if schema == SCHEMA_V1 else _pinned_clickhouse_version())
         and isinstance(environment.get("python_version"), str)
         and bool(environment["python_version"])
         and isinstance(environment.get("platform"), str)
@@ -278,7 +281,7 @@ def _pinned_clickhouse_version() -> str:
     return versions.pop()
 
 
-def _expected_canonical_digest(budget: Mapping[str, Any]) -> str:
+def _expected_canonical_digest(budget: Mapping[str, Any], *, schema: Any) -> str:
     canonical_budget = budget.get("canonical_digest")
     if not isinstance(canonical_budget, Mapping):
         return ""
@@ -286,6 +289,8 @@ def _expected_canonical_digest(budget: Mapping[str, Any]) -> str:
     columns = canonical_budget.get("columns")
     if not _positive_int(rows) or columns != 3:
         return ""
+    if schema == SCHEMA_V1:
+        return _V1_CANONICAL_DIGEST if rows == 100_000 else ""
     return canonical_rows_digest(
         (index, f"value-{index % 1000:04d}", None if index % 7 == 0 else index % 97) for index in range(rows)
     )
@@ -357,6 +362,8 @@ _BASE_TOP_LEVEL_FIELDS = frozenset(
 )
 _TOP_LEVEL_FIELDS = {SCHEMA_V1: _BASE_TOP_LEVEL_FIELDS, SCHEMA_V2: _BASE_TOP_LEVEL_FIELDS | {"observation"}}
 _ENVIRONMENT_FIELDS = {"clickhouse_version", "cpu_count", "platform", "python_version"}
+_V1_CLICKHOUSE_VERSION = "24.8.14.39"
+_V1_CANONICAL_DIGEST = "c4370bf4ec0e4f1ca8df2645c7785a79d7ee4a8970b5fb20977c3dcbf8aa4655"
 
 
 __all__ = [
