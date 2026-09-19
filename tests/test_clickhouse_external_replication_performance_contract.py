@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -326,6 +327,42 @@ def test_historical_receipt_rejects_nonexistent_full_source_sha() -> None:
             expected_source_commit="f" * 40,
             receipt_path=Path("must-not-be-read.json"),
         )
+
+
+def test_historical_source_reads_ignore_git_replace_refs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ("git", *args),
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    git("init", "--quiet")
+    git("config", "user.name", "dpone test")
+    git("config", "user.email", "dpone-test@example.invalid")
+    fixture = tmp_path / "fixture.txt"
+    fixture.write_text("original\n", encoding="utf-8")
+    git("add", "fixture.txt")
+    git("commit", "--quiet", "-m", "original")
+    original_commit = git("rev-parse", "HEAD")
+    original_tree = git("rev-parse", "HEAD^{tree}")
+
+    fixture.write_text("replacement\n", encoding="utf-8")
+    git("commit", "--quiet", "-am", "replacement")
+    replacement_commit = git("rev-parse", "HEAD")
+    replacement_tree = git("rev-parse", "HEAD^{tree}")
+    git("replace", original_commit, replacement_commit)
+
+    assert replacement_tree != original_tree
+    assert git("rev-parse", f"{original_commit}^{{tree}}") == replacement_tree
+    monkeypatch.chdir(tmp_path)
+    assert evidence_identity.tracked_source_tree(original_commit) == original_tree
+    assert evidence_identity.tracked_file_bytes(original_commit, Path("fixture.txt")) == b"original\n"
 
 
 def test_performance_receipt_v2_requires_observation_and_source_budget(tmp_path: Path) -> None:

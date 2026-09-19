@@ -105,7 +105,7 @@ def tracked_source_tree(source_commit: str) -> str:
 
 def _git(*args: str, text: bool = True) -> str | bytes:
     return subprocess.run(
-        ("git", *args),
+        ("git", "--no-replace-objects", *args),
         check=True,
         capture_output=True,
         text=text,
