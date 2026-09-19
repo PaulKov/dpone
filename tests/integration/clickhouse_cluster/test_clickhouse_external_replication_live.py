@@ -4,16 +4,20 @@ from __future__ import annotations
 
 import os
 import secrets
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
 import pytest
 
 from tests.integration.clickhouse_cluster.evidence import record_external_scenario
+from tests.integration.clickhouse_cluster.external_replication_live_support import (
+    CLUSTER as _CLUSTER,
+)
+from tests.integration.clickhouse_cluster.external_replication_live_support import (
+    docker_member_endpoint as _docker_member_endpoint,
+)
+from tests.integration.clickhouse_cluster.external_replication_live_support import execute as _execute
+from tests.integration.clickhouse_cluster.external_replication_live_support import publication_case as _publication_case
 
 pytestmark = pytest.mark.integration_live
-
-_CLUSTER = "external_publication_cluster"
 
 
 @pytest.mark.skipif(
@@ -318,90 +322,3 @@ def test_external_replication_terminal_partial_is_retained_without_redispatch() 
         server_version=_execute(18123, "SELECT version()")[0][0],
         details={"dispatch_count": dispatches, "retained_mixed_generation": True},
     )
-
-
-def _publication_case(
-    label: str,
-    *,
-    database: str | None = None,
-    initialize: bool = True,
-    rows: list[dict[str, int]] | None = None,
-) -> tuple[object, object, object, str]:
-    from dpone.config.load_config import LoadConfig
-    from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
-    from dpone.runtime.artifacts import InMemoryRowsArtifact
-    from dpone.runtime.connectors.clickhouse import ClickHouseConnector
-    from dpone.runtime.sinks.clickhouse_full_refresh_publication import SCHEDULER_IDENTITY_OPTION
-    from dpone.runtime.sinks.clickhouse_sink import ClickHouseSink
-    from dpone.runtime.sinks.load_payload import LoadPayload
-
-    database = database or f"external_publication_{label}_{secrets.token_hex(4)}"
-    if initialize:
-        _execute(18123, f"CREATE DATABASE {database} ON CLUSTER `{_CLUSTER}` ENGINE=Atomic")
-        for port in (18123, 28123):
-            _execute(port, f"CREATE TABLE {database}.target (id Int64) ENGINE=MergeTree ORDER BY id")
-            _execute(port, f"INSERT INTO {database}.target VALUES (1)")
-    connector = ClickHouseConnector(
-        host="127.0.0.1",
-        port=18123,
-        database=database,
-        user="default",
-        password="",
-        driver="http",
-        external_member_endpoint_resolver=_docker_member_endpoint,
-    )
-    config = LoadConfig(
-        source_conn_id="source",
-        target_conn_id="target",
-        source_schema="source",
-        source_table="source_table",
-        target_schema=database,
-        target_table="target",
-        load_strategy=LoadStrategy.FULL_REFRESH,
-        staging_schema=database,
-        options={
-            SCHEDULER_IDENTITY_OPTION: f"docker-external-{label}",
-            SOURCE_BYTE_BUDGET_OPTION: 1024 * 1024,
-            "external_artifact_store_path": "/tmp/dpone-external-artifacts-docker",
-            "lineage": False,
-            "physical_design": {
-                "storage": {
-                    "clickhouse": {
-                        "engine": "MergeTree",
-                        "order_by": ["id"],
-                        "cluster": {
-                            "name": _CLUSTER,
-                            "ddl_scope": "cluster",
-                            "replication_mode": "external",
-                            "external_content_row_budget": 100,
-                        },
-                    }
-                }
-            },
-        },
-    )
-    payload = LoadPayload(
-        artifact=InMemoryRowsArtifact([{"id": 10}, {"id": 20}] if rows is None else rows),
-        schema=(("id", "bigint"),),
-    )
-    return ClickHouseSink(connector), config, payload, database
-
-
-def _docker_member_endpoint(host: str, address: str, port: int) -> tuple[str, str, int]:
-    del address, port
-    published_port = {"node1": 19000, "node2": 29000}.get(host)
-    if published_port is None:
-        raise ValueError("unexpected Docker member")
-    return "127.0.0.1", "127.0.0.1", published_port
-
-
-def _execute(port: int, sql: str) -> list[tuple[str, ...]]:
-    statement = sql + " FORMAT TabSeparated" if sql.lstrip().upper().startswith("SELECT") else sql
-    request = Request(
-        f"http://127.0.0.1:{port}/?" + urlencode({"distributed_ddl_output_mode": "throw"}),
-        data=statement.encode(),
-        method="POST",
-    )
-    with urlopen(request, timeout=60) as response:  # noqa: S310 - fixed local Docker endpoint
-        body = response.read().decode().strip()
-    return [tuple(line.split("\t")) for line in body.splitlines()] if body else []
