@@ -94,6 +94,7 @@ def validate_runtime_receipts(
         not in {
             "dpone.deployment-set.v2",
             "dpone.deployment-set.v3",
+            "dpone.deployment-set.v4",
         }
         or deployment_id(deployment) != plan.deployment_id
     ):

@@ -108,6 +108,10 @@ def init_fetch_context_from_payload(
         path=path,
     )
     delivery = parse_init_fetch_delivery(payload, path=path)
+    if is_v4 and delivery.runtime_authority is None:
+        raise field_invalid("development authority requires runtime_artifact_delivery.runtime_authority", path)
+    if not is_v4 and delivery.runtime_authority is not None:
+        raise field_invalid("runtime authority is allowed only for development-authorized plans", path)
     release_id = digest(payload.get("release_id"), "release_id", path)
     deployment_id = digest(payload.get("deployment_id"), "deployment_id", path)
     for field in ("binding_set_ref", "connection_registry_ref", "credential_runtime_ref"):
@@ -187,6 +191,7 @@ def init_fetch_context_from_payload(
         development_authority_required=(
             _literal_true(payload.get("development_authority_required"), path) if is_v4 else False
         ),
+        runtime_authority=delivery.runtime_authority,
     )
     for workload in workloads:
         context.encode_plan(

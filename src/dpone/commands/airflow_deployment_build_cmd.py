@@ -68,6 +68,14 @@ def register_build_parser(subparsers: argparse._SubParsersAction) -> argparse.Ar
         "--dev-evidence-worker-queue",
         help="Dedicated Airflow worker queue that mounts the dev evidence PVC",
     )
+    parser.add_argument(
+        "--runtime-authority-secret-name",
+        help="Kubernetes Secret containing external runtime-authority configuration for a protected development release",
+    )
+    parser.add_argument(
+        "--runtime-authority-secret-key",
+        help="Secret key to project read-only; defaults to authority.json when the Secret is selected",
+    )
     parser.add_argument("--format", choices=["text", "json"], default="text")
     return parser
 
@@ -101,6 +109,10 @@ def cmd_airflow_build(args: argparse.Namespace, *, ctx: object, logger: logging.
         airflow_bundle_ref=args.airflow_bundle_ref,
         dev_evidence_pvc_claim=args.dev_evidence_pvc_claim,
         dev_evidence_worker_queue=args.dev_evidence_worker_queue,
+        runtime_authority_ref=_optional_secret_ref(
+            name=getattr(args, "runtime_authority_secret_name", None),
+            key=getattr(args, "runtime_authority_secret_key", None),
+        ),
     )
     emit_self_service_result(result, args.format, command="airflow_build")
     if result.exit_code is not None:
@@ -122,6 +134,16 @@ def _optional_config_map_ref(
         "name": name,
         "key": key if key is not None else default_key,
         "sha256": sha256,
+    }
+
+
+def _optional_secret_ref(*, name: object, key: object) -> dict[str, object] | None:
+    if name is None and key is None:
+        return None
+    return {
+        "kind": "kubernetes_secret",
+        "name": name,
+        "key": key if key is not None else "authority.json",
     }
 
 

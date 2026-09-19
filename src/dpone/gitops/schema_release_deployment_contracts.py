@@ -31,6 +31,7 @@ from dpone.gitops.schema_release_deployment_v3_contracts import (
     airflow_deployment_index_v3_contract,
     airflow_deployment_index_v4_contract,
     deployment_set_v3_contract,
+    deployment_set_v4_contract,
 )
 from dpone.gitops.schema_release_set_promotion import (
     COMPACT_PROMOTION_PROFILE,
@@ -55,6 +56,7 @@ def release_deployment_schema_contracts() -> tuple[GitOpsSchemaContract, ...]:
         deployment_set_contract(),
         deployment_set_v2_contract(),
         deployment_set_v3_contract(),
+        deployment_set_v4_contract(),
         airflow_deployment_index_v2_contract(),
         airflow_deployment_index_v3_contract(),
         airflow_deployment_index_v4_contract(),

@@ -216,6 +216,7 @@ _DEPLOYMENT_SCHEMAS = frozenset(
         "dpone.deployment-set.v1",
         "dpone.deployment-set.v2",
         "dpone.deployment-set.v3",
+        "dpone.deployment-set.v4",
     }
 )
 _INDEX_SCHEMAS = frozenset(
@@ -231,8 +232,7 @@ _SCHEMA_WIRE_PAIRS = frozenset(
         ("dpone.deployment-set.v1", "dpone.airflow-deployment-index.v1"),
         ("dpone.deployment-set.v2", "dpone.airflow-deployment-index.v2"),
         ("dpone.deployment-set.v3", "dpone.airflow-deployment-index.v3"),
-        ("dpone.deployment-set.v2", "dpone.airflow-deployment-index.v4"),
-        ("dpone.deployment-set.v3", "dpone.airflow-deployment-index.v4"),
+        ("dpone.deployment-set.v4", "dpone.airflow-deployment-index.v4"),
     }
 )
 

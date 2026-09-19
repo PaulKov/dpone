@@ -120,7 +120,8 @@ generated loaders must use the combined load-and-acknowledge API above so cache
 retention cannot delete a parsed but unacknowledged activation.
 
 When `index_path` is provided, the provider reads either the v1 compatibility
-wire or `dpone.airflow-deployment-index.v2`. When `repo_root` is provided
+wire or a supported strict `dpone.airflow-deployment-index.v2` through `.v4`.
+When `repo_root` is provided
 without `index_path`, the legacy
 `.dpone/gitops/airflow/_dags/*.dag-spec.json` loader is used for compatibility.
 For deployment-index loading, node `pack_ref` values that use `cached://`
@@ -141,6 +142,9 @@ Mode policy is wire-specific:
 | v1 `local_preview` | Supported static, non-runnable preview; no KPO/runtime pack wiring. |
 | v1 `init_fetch` | `DPONE_RUNTIME_ARTIFACT_DELIVERY_MIGRATION_REQUIRED`. |
 | v2 `init_fetch` | Continue through the strict executable KPO preflight. |
+| v4 protected development `init_fetch` with a closed runtime-authority Secret source | Continue and mount the referenced key read-only in init/base containers. |
+| v4 missing or malformed runtime-authority source | `DPONE_AIRFLOW_INDEX_FIELD_INVALID`. |
+| v2/v3 with a runtime-authority source | `DPONE_AIRFLOW_INDEX_FIELD_INVALID`; ordinary/production paths cannot opt in. |
 | v2 known non-`init_fetch` mode | `DPONE_RUNTIME_ARTIFACT_DELIVERY_MODE_UNSUPPORTED`. |
 | Unknown mode | `DPONE_AIRFLOW_INDEX_FIELD_INVALID`. |
 

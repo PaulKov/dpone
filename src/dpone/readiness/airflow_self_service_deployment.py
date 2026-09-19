@@ -33,6 +33,7 @@ def build_deployment_result(
     airflow_bundle_ref: str | None = None,
     dev_evidence_pvc_claim: str | None = None,
     dev_evidence_worker_queue: str | None = None,
+    runtime_authority_ref: Mapping[str, Any] | None = None,
 ) -> SelfServiceResult:
     """Materialize an environment deployment projection without promoting current."""
 
@@ -64,6 +65,7 @@ def build_deployment_result(
             airflow_bundle_ref=airflow_bundle_ref,
             dev_evidence_pvc_claim=dev_evidence_pvc_claim,
             dev_evidence_worker_queue=dev_evidence_worker_queue,
+            runtime_authority_ref=runtime_authority_ref,
         )
     except AirflowDeploymentProjectionError as exc:
         return SelfServiceResult(

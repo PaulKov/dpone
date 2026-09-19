@@ -29,6 +29,7 @@ from dpone.gitops.schema_release_deployment_v2_contracts import (
 )
 from dpone.gitops.schema_runtime_artifact_delivery import (
     runtime_artifact_delivery_schema,
+    runtime_authority_source_schema,
     runtime_image_ref_schema,
 )
 from dpone.gitops.schema_runtime_connection_context import (
@@ -164,6 +165,9 @@ def airflow_deployment_index_v4_contract() -> GitOpsSchemaContract:
     schema["title"] = "dpone GitOps executable Airflow deployment index v4"
     schema["properties"]["schema"] = {"const": kind}
     schema["properties"]["development_authority_required"] = {"const": True}
+    delivery = schema["properties"]["runtime_artifact_delivery"]
+    delivery["properties"]["runtime_authority"] = runtime_authority_source_schema()
+    delivery["required"] = [*delivery["required"], "runtime_authority"]
     schema["required"] = [field for field in schema["required"] if field != "mssql_asset_outlet_projection"]
     schema["required"].append("development_authority_required")
     return GitOpsSchemaContract(
@@ -173,8 +177,31 @@ def airflow_deployment_index_v4_contract() -> GitOpsSchemaContract:
     )
 
 
+def deployment_set_v4_contract() -> GitOpsSchemaContract:
+    """Development-authorized deployment with an optional MSSQL projection."""
+
+    source = deployment_set_v3_contract()
+    schema = deepcopy(source.schema)
+    kind = "dpone.deployment-set.v4"
+    schema["$id"] = schema["$id"].replace("deployment-set-v3", "deployment-set-v4")
+    schema["title"] = "dpone GitOps executable deployment-set v4"
+    schema["properties"]["schema"] = {"const": kind}
+    schema["properties"]["development_authority_required"] = {"const": True}
+    delivery = schema["properties"]["runtime_artifact_delivery"]
+    delivery["properties"]["runtime_authority"] = runtime_authority_source_schema()
+    delivery["required"] = [*delivery["required"], "runtime_authority"]
+    schema["required"] = [field for field in schema["required"] if field != "mssql_asset_outlet_projection"]
+    schema["required"].append("development_authority_required")
+    return GitOpsSchemaContract(
+        name="deployment-set-v4",
+        kind=kind,
+        schema=schema,
+    )
+
+
 __all__ = [
     "airflow_deployment_index_v3_contract",
     "airflow_deployment_index_v4_contract",
     "deployment_set_v3_contract",
+    "deployment_set_v4_contract",
 ]

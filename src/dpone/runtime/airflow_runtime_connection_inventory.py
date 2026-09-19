@@ -52,7 +52,11 @@ def validate_deployment_auxiliary_files(
 ) -> None:
     """Validate environment-specific files against deployment authority."""
 
-    if deployment.get("schema") in {"dpone.deployment-set.v2", "dpone.deployment-set.v3"}:
+    if deployment.get("schema") in {
+        "dpone.deployment-set.v2",
+        "dpone.deployment-set.v3",
+        "dpone.deployment-set.v4",
+    }:
         _validate_strict_runtime_connection_files(deployment, deployment_dir)
         return
     binding_ref = deployment.get("binding_set_ref")

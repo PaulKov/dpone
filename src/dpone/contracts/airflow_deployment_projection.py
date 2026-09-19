@@ -18,6 +18,7 @@ _MIRRORED_FIELDS = (
     "runtime_artifact_delivery",
     "dev_evidence_delivery",
     "mssql_asset_outlet_projection",
+    "development_authority_required",
 )
 _DELIVERY_MODES = frozenset({"local_preview", "init_fetch", "shared_pvc", "embedded_bundle", "csi_volume", "inline"})
 _OPTIONAL_DIGEST_FIELDS = (
@@ -31,6 +32,7 @@ _EXECUTABLE_DEPLOYMENT_SCHEMAS = frozenset(
     {
         "dpone.deployment-set.v2",
         "dpone.deployment-set.v3",
+        "dpone.deployment-set.v4",
     }
 )
 

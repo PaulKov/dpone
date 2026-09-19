@@ -411,6 +411,7 @@ def test_gitops_schema_contract_catalog_is_public_and_documented() -> None:
         "deployment-set",
         "deployment-set-v2",
         "deployment-set-v3",
+        "deployment-set-v4",
         "airflow-deployment-index-v2",
         "airflow-deployment-index-v3",
         "airflow-deployment-index-v4",

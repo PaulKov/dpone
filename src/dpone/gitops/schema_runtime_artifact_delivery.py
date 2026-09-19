@@ -191,6 +191,25 @@ def config_map_ref_schema() -> dict[str, Any]:
     }
 
 
+def runtime_authority_source_schema() -> dict[str, Any]:
+    """Describe value-free coordinates for the protected runtime Secret."""
+
+    return {
+        "type": "object",
+        "required": ["mode", "secret_name", "secret_key"],
+        "additionalProperties": False,
+        "properties": {
+            "mode": {"const": "kubernetes_secret_volume"},
+            "secret_name": kubernetes_dns_label_schema(),
+            "secret_key": {
+                "type": "string",
+                "pattern": CONFIG_MAP_KEY_PATTERN,
+                "maxLength": 253,
+            },
+        },
+    }
+
+
 def kubernetes_dns_label_schema() -> dict[str, Any]:
     return {
         "type": "string",
@@ -213,6 +232,7 @@ __all__ = [
     "artifact_registry_logical_ref_schema",
     "config_map_ref_schema",
     "runtime_artifact_delivery_schema",
+    "runtime_authority_source_schema",
     "runtime_image_ref_schema",
     "strict_init_fetch_delivery_schema",
 ]

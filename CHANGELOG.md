@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.81.4 - 2026-09-19
+
 ### Added
 
 - Add an explicit, fail-closed ClickHouse `external` replication mode for
@@ -11,6 +13,13 @@
   generation, and publishes through one correlated cluster DDL. Existing local
   and internal-replication routes remain unchanged; live production
   certification is still unverified.
+
+- Project deployment-owned external runtime-authority configuration into
+  protected development KubernetesPodOperator pods through one closed
+  Kubernetes Secret reference. Both init-fetch and base containers receive the
+  same fixed read-only file path; ordinary/production plans remain unchanged,
+  missing or malformed configuration fails closed, and Secret values never
+  enter plans, operator arguments, logs, or XCom.
 
 ### Fixed
 
