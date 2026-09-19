@@ -50,11 +50,17 @@ The exact-commit performance producer writes:
 test_artifacts/clickhouse-external-publication/benchmark-receipt.json
 ```
 
-Schema `dpone.clickhouse.external-publication-benchmark.v1` records the tracked
+New receipts use schema `dpone.clickhouse.external-publication-benchmark.v2`.
+The verifier retains a bounded reader for historical v1 receipts: v1 has no
+observation envelope or `max_source_bytes`, while v2 requires both. Unknown or
+mixed schemas fail closed. The receipt records the tracked
 budget digest, source commit/tree, fixture digest, environment, measured trial
 durations, exact member counts, content-digest equality, publication phase,
 cleanup proof, observation ID, producer command, test node, and start/finish
-times. Its verdict is `PASS` only when both the canonical-digest
+times. The v2 verifier accepts only the pinned ClickHouse fixture version and
+exact documented fields, recomputes the canonical digest, median, maximum, and
+aggregate verdict, and rejects non-finite or boolean measurements. Its verdict
+is `PASS` only when both the canonical-digest
 and two-member fan-out sections pass their tracked budgets and correctness
 checks. The receipt deliberately omits endpoints, database names, SQL,
 credentials, and row values. It is generated after the reviewed commit and
@@ -65,8 +71,8 @@ delete it. A second observation therefore requires a fresh checkout or a new
 artifact identity after the first receipt has been preserved; never delete a
 failed or slow observation to obtain a passing sample.
 
-The receipt must bind the exact commit and fixture-configuration digests, label
-its scope `mocked_in_process`, list each scenario independently, and use only
+The mocked receipt must bind the exact commit and fixture-configuration digests,
+label its scope `mocked_in_process`, list each scenario independently, and use only
 `PASS`, `FAIL`, `SKIP`, or `UNVERIFIED`. It must contain opaque member IDs and
 digests only—never endpoints, credentials, source values, SQL text, or local
 filesystem paths.
