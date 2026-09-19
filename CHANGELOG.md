@@ -25,8 +25,8 @@
 - Return exit code `1` for blocked external publication plans, route typed
   external runtime failures to stderr, require absolute artifact-store paths,
   and cover empty generations plus receipt-before-source-state ordering.
-- Reject `Shared*MergeTree` before source access, bind retained source schema,
-  mapped schema, ordered rows, and byte size to the artifact identity, preserve
+- Reject `Shared*MergeTree` before source access, validate the retained artifact
+  envelope version, bind source schema, mapped schema, ordered rows, and byte size to its identity, preserve
   canonical runtime error codes, expose plan blockers in every output format,
   and classify terminal DDL failures without indefinite in-progress retries.
 

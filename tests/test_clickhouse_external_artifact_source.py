@@ -98,7 +98,10 @@ def test_retained_artifact_reopens_after_source_instance_is_gone(tmp_path: Path)
     assert list(tmp_path.iterdir()) == []
 
 
-@pytest.mark.parametrize("corruption", ["row_order", "schema", "identity_schema", "identity_size"])
+@pytest.mark.parametrize(
+    "corruption",
+    ["row_order", "schema", "identity_schema", "identity_size", "unknown_version", "non_object_envelope"],
+)
 def test_retained_artifact_reopen_recomputes_complete_immutable_identity(
     corruption: str,
     tmp_path: Path,
@@ -112,7 +115,11 @@ def test_retained_artifact_reopen_recomputes_complete_immutable_identity(
     source.persist(tmp_path)
     path = tmp_path / f"{source.binding_id}.json"
     document = json.loads(path.read_text(encoding="utf-8"))
-    if corruption == "row_order":
+    if corruption == "non_object_envelope":
+        document = []
+    elif corruption == "unknown_version":
+        document["version"] = 2
+    elif corruption == "row_order":
         document["rows"].reverse()
     elif corruption == "schema":
         document["schema"][0][1] = "UInt64"

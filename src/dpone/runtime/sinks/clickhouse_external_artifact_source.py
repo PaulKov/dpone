@@ -144,6 +144,8 @@ class ClickHouseExternalArtifactSource:
             document = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             raise ExternalContractError("ARTIFACT_UNAVAILABLE", "retained artifact is unavailable") from exc
+        if not isinstance(document, Mapping) or document.get("version") != 1:
+            raise ExternalContractError("ARTIFACT_CHANGED", "retained artifact envelope changed")
         try:
             identity = ArtifactIdentity(**document.get("identity", {}))
             schema = tuple((str(name), str(dtype)) for name, dtype in document.get("schema", ()))
