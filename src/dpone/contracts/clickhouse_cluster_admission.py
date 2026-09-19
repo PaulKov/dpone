@@ -19,7 +19,14 @@ CLICKHOUSE_CLUSTER_EXTERNAL_ENGINE_REQUIRED = (
 CLICKHOUSE_CLUSTER_REPLICATION_MODE_INVALID = "clickhouse_cluster_publication.replication_mode_invalid"
 
 _REPLICATED_MERGE_TREE = re.compile(r"^Replicated[A-Za-z0-9_]*MergeTree(?:\s*\(|\s*$)")
-_MERGE_TREE = re.compile(r"^[A-Za-z0-9_]*MergeTree(?:\s*\(|\s*$)")
+_MERGE_TREE = re.compile(r"^[A-Za-z0-9_]*MergeTree(?:\s|\(|$)")
+
+
+def is_external_merge_tree_engine(engine: str) -> bool:
+    """Return whether an engine is safe for member-local external replication."""
+
+    normalized = engine.lstrip()
+    return not normalized.startswith(("Replicated", "Shared")) and _MERGE_TREE.match(normalized) is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,7 +107,7 @@ def evaluate_clickhouse_cluster_admission(
         blockers.append(CLICKHOUSE_CLUSTER_REPLICATION_MODE_INVALID)
     elif replication_mode == "internal" and not _REPLICATED_MERGE_TREE.match(engine):
         blockers.append(CLICKHOUSE_CLUSTER_ENGINE_REQUIRED)
-    elif replication_mode == "external" and (_REPLICATED_MERGE_TREE.match(engine) or not _MERGE_TREE.match(engine)):
+    elif replication_mode == "external" and not is_external_merge_tree_engine(engine):
         blockers.append(CLICKHOUSE_CLUSTER_EXTERNAL_ENGINE_REQUIRED)
     if request.staging_database.strip() != request.target_database.strip():
         blockers.append(CLICKHOUSE_CLUSTER_STAGING_DATABASE_UNSUPPORTED)

@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import json
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -306,6 +307,17 @@ def test_typed_authority_failure_is_not_masked_as_generic_conflict() -> None:
     assert raised.value is expected
     assert raised.value.code == "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_IN_PROGRESS"
     assert raised.value.evidence == {"phase": "PUBLICATION_DISPATCHING"}
+
+
+def test_invalid_request_preserves_one_canonical_error_prefix() -> None:
+    service = _SyntheticExternalService()
+    request = replace(_request(), plan_sha256="not-a-digest")
+
+    with pytest.raises(ExternalPublicationError) as raised:
+        _runtime(service).run(request)
+
+    assert raised.value.code == "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_IDENTITY_INVALID"
+    assert service.authority == {}
 
 
 def test_lost_member_stage_ack_is_reconciled_without_duplicate_insert() -> None:

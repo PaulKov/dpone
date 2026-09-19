@@ -22,7 +22,7 @@ def validate_request(request: Any, fail: Fail) -> None:
         request.validate()
     except ValueError as error:
         code = str(getattr(error, "code", "REQUEST_INVALID"))
-        fail(f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{code}")
+        fail(code)
 
 
 def candidate_state(candidate: Mapping[str, Any] | None) -> dict[str, Any]:

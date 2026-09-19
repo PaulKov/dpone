@@ -282,7 +282,7 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 | `dpone.runtime` | `dpone.ports` | 67 |
 | `dpone.ops` | `dpone.runtime` | 59 |
 | `dpone.runtime` | `dpone.backfill` | 57 |
-| `dpone.ports` | `dpone.contracts` | 55 |
+| `dpone.ports` | `dpone.contracts` | 56 |
 | `dpone.runtime` | `dpone.readiness` | 55 |
 | `dpone.app` | `dpone.adapters` | 52 |
 | `dpone.manifest` | `dpone.contracts` | 48 |

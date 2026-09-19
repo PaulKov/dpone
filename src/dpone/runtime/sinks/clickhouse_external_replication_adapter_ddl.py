@@ -46,7 +46,9 @@ def observe_publication(adapter: Any, operation_id: str) -> Mapping[str, str]:
     queue = entry.state_for(_ids(record))
     if MemberPublicationState.UNKNOWN in states.values() or queue is QueueState.UNKNOWN:
         _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_DDL_UNKNOWN", record)
-    if queue in {QueueState.TERMINAL_SUCCESS, QueueState.TERMINAL_FAILURE} and len(set(states.values())) > 1:
+    if queue in {QueueState.TERMINAL_SUCCESS, QueueState.TERMINAL_FAILURE} and set(states.values()) != {
+        MemberPublicationState.COMMITTED
+    }:
         _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_PARTIAL_TERMINAL", record)
     return {
         member_id: "desired" if state is MemberPublicationState.COMMITTED else "predecessor"
@@ -70,16 +72,16 @@ def dispatch_cleanup_once(adapter: Any, *, operation_id: str, member_ids: tuple[
 
 def observe_cleanup(adapter: Any, operation_id: str) -> Mapping[str, bool]:
     record = adapter._current(operation_id).record
-    if (
-        record.phase is ExternalAuthorityPhase.CLEANUP_DISPATCHING
-        and _has_predecessor(record)
-        and require_queue_entry(adapter._ddl, adapter._cluster, record, cleanup=True, fail=_error).state_for(
+    states = cleanup_states(adapter, record)
+    if record.phase is ExternalAuthorityPhase.CLEANUP_DISPATCHING and _has_predecessor(record):
+        queue = require_queue_entry(adapter._ddl, adapter._cluster, record, cleanup=True, fail=_error).state_for(
             _ids(record)
         )
-        is QueueState.UNKNOWN
-    ):
-        _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", record)
-    return cleanup_states(adapter, record)
+        if queue is QueueState.UNKNOWN or (
+            queue in {QueueState.TERMINAL_SUCCESS, QueueState.TERMINAL_FAILURE} and any(states.values())
+        ):
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", record)
+    return states
 
 
 def require_publication(
@@ -103,12 +105,13 @@ def require_cleanup(
         if _has_predecessor(record)
         else None
     )
-    if entry is not None and entry.state_for(_ids(record)) not in {
-        QueueState.TERMINAL_SUCCESS,
-        QueueState.TERMINAL_FAILURE,
-    }:
+    queue = None if entry is None else entry.state_for(_ids(record))
+    states = cleanup_states(adapter, record)
+    if queue is not None and queue not in {QueueState.TERMINAL_SUCCESS, QueueState.TERMINAL_FAILURE}:
         _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", record)
-    if any(cleanup_states(adapter, record).values()):
+    if any(states.values()):
+        if queue in {QueueState.TERMINAL_SUCCESS, QueueState.TERMINAL_FAILURE}:
+            _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_UNKNOWN", record)
         _error("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_CLEANUP_IN_PROGRESS", record)
     return entry, tuple(replace(member, cleanup_complete=True) for member in record.members)
 

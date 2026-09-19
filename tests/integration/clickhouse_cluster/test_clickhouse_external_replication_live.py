@@ -198,20 +198,25 @@ def test_external_replication_reconciles_lost_responses_and_staging_restart() ->
     interrupted_facade = interrupted_sink._full_refresh_publication._external
     normal_factory = interrupted_facade._service_factory
     interrupted = False
+    staged_before_restart: list[tuple[str, int]] = []
+    stage_attempts = 0
 
     def interrupted_factory(*args: object, **kwargs: object) -> object:
-        nonlocal interrupted
+        nonlocal interrupted, stage_attempts
         adapter = normal_factory(*args, **kwargs)
         original_stage = adapter.stage_member_once
 
-        def stop_before_load(*call_args: object, **call_kwargs: object) -> object:
-            nonlocal interrupted
-            if not interrupted:
+        def stop_before_second_load(*call_args: object, **call_kwargs: object) -> object:
+            nonlocal interrupted, stage_attempts
+            stage_attempts += 1
+            if stage_attempts == 2 and not interrupted:
                 interrupted = True
-                raise RuntimeError("injected worker interruption before member load")
-            return original_stage(*call_args, **call_kwargs)
+                raise RuntimeError("injected worker interruption before second member load")
+            result = original_stage(*call_args, **call_kwargs)
+            staged_before_restart.append((str(call_args[0]), int(result["row_count"])))
+            return result
 
-        adapter.stage_member_once = stop_before_load
+        adapter.stage_member_once = stop_before_second_load
         return adapter
 
     interrupted_facade._service_factory = interrupted_factory
@@ -220,9 +225,28 @@ def test_external_replication_reconciles_lost_responses_and_staging_restart() ->
         interrupted_facade.stage(interrupted_admitted, interrupted_payload)
 
     fresh_sink, _, _, _ = _publication_case("restart", database=interrupted_database, initialize=False)
+    fresh_facade = fresh_sink._full_refresh_publication._external
+    fresh_factory = fresh_facade._service_factory
+    staged_after_restart: list[str] = []
+
+    def observed_recovery_factory(*args: object, **kwargs: object) -> object:
+        adapter = fresh_factory(*args, **kwargs)
+        original_stage = adapter.stage_member_once
+
+        def record_recovery_stage(*call_args: object, **call_kwargs: object) -> object:
+            staged_after_restart.append(str(call_args[0]))
+            return original_stage(*call_args, **call_kwargs)
+
+        adapter.stage_member_once = record_recovery_stage
+        return adapter
+
+    fresh_facade._service_factory = observed_recovery_factory
     recovered = fresh_sink._full_refresh_publication.prepare_admission(interrupted_config)
     replay = fresh_sink._full_refresh_publication.replay_result(recovered)
     assert interrupted is True
+    assert len(staged_before_restart) == 1 and staged_before_restart[0][1] == 2
+    assert len(staged_after_restart) == 1
+    assert staged_after_restart[0] != staged_before_restart[0][0]
     assert replay is not None and replay.total_rows == 2
     for port in (18123, 28123):
         assert _execute(port, f"SELECT groupArray(id) FROM {interrupted_database}.target") == [("[10,20]",)]
@@ -230,7 +254,12 @@ def test_external_replication_reconciles_lost_responses_and_staging_restart() ->
         "external_replication_staging_fresh_service_recovery",
         "PASS",
         server_version=server_version,
-        details={"operation_id": replay.commit_receipt_id, "production_composition": True},
+        details={
+            "operation_id": replay.commit_receipt_id,
+            "production_composition": True,
+            "members_ready_before_restart": len(staged_before_restart),
+            "members_staged_after_restart": len(staged_after_restart),
+        },
     )
 
 

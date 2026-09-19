@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import replace
 from typing import Any
@@ -14,6 +13,7 @@ from dpone.ports.clickhouse_external_replication import (
     MemberGenerationObservation,
     PhysicalGeneration,
     digest_payload,
+    is_external_merge_tree_engine,
 )
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.sinks.clickhouse_external_replication_canonical import (
@@ -333,11 +333,7 @@ def _row_count(connector: Any, database: str, table: str, params: Mapping[str, s
 
 
 def _require_non_replicated_merge_tree(engine_full: str) -> None:
-    normalized = engine_full.lstrip()
-    if (
-        normalized.startswith(("Replicated", "Shared"))
-        or re.match(r"^[A-Za-z]*MergeTree(?:\s|\(|$)", normalized) is None
-    ):
+    if not is_external_merge_tree_engine(engine_full):
         raise ExternalContractError("ENGINE_UNSUPPORTED", "external mode requires non-replicated MergeTree")
 
 

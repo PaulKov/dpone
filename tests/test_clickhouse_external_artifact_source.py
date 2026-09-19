@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -95,3 +96,35 @@ def test_retained_artifact_reopens_after_source_instance_is_gone(tmp_path: Path)
     assert str(tmp_path) not in repr(reopened)
     reopened.release(tmp_path)
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("corruption", ["row_order", "schema", "identity_schema", "identity_size"])
+def test_retained_artifact_reopen_recomputes_complete_immutable_identity(
+    corruption: str,
+    tmp_path: Path,
+) -> None:
+    source = ClickHouseExternalArtifactSource(
+        sink=_Sink(),
+        load_config=object(),
+        payload=_payload([{"id": 1}, {"id": 2}]),
+        maximum_rows=2,
+    )
+    source.persist(tmp_path)
+    path = tmp_path / f"{source.binding_id}.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if corruption == "row_order":
+        document["rows"].reverse()
+    elif corruption == "schema":
+        document["schema"][0][1] = "UInt64"
+    elif corruption == "identity_schema":
+        document["identity_schema"][0][1] = "UInt64"
+    else:
+        document["identity"]["byte_size"] += 1
+    path.write_text(json.dumps(document, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+
+    with pytest.raises(ExternalContractError, match="ARTIFACT_CHANGED"):
+        ClickHouseExternalArtifactSource.reopen(
+            root=tmp_path,
+            binding_id=source.binding_id,
+            expected=source.identity,
+        )

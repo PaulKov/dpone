@@ -213,6 +213,16 @@ def _entry(name: str, token: str | None, query_digest: str | None) -> QueueEntry
     )
 
 
+def _failed_entry(name: str, token: str | None, query_digest: str | None) -> QueueEntry:
+    assert token is not None and query_digest is not None
+    return QueueEntry(
+        entry=f"{name}-{token}",
+        query_digest=query_digest,
+        correlation_token=token,
+        hosts=tuple(QueueHostResult(member, "Finished", 999, "terminal failure") for member in _members()),
+    )
+
+
 def _members() -> tuple[str, ...]:
     return tuple(member.member_id for member in _Topology().value.ordered_members)
 
@@ -318,6 +328,50 @@ def test_adapter_never_dispatches_without_verified_cas_permit() -> None:
 
     assert ddl.publication_calls == 0
     assert ddl.cleanup_calls == 0
+
+
+def test_terminal_publication_failure_with_all_predecessors_is_not_reported_as_active() -> None:
+    runtime, authority, _, _, ddl = _runtime()
+    request = _request()
+
+    def fail_publication(record, permit, *, cluster):
+        del permit, cluster
+        ddl.publication_calls += 1
+        ddl.entries.append(
+            _failed_entry("publication", record.publication_correlation_token, record.publication_query_digest)
+        )
+
+    ddl.dispatch_publication = fail_publication  # type: ignore[method-assign]
+
+    with pytest.raises(ExternalPublicationError, match="PUBLICATION_PARTIAL_TERMINAL"):
+        runtime.run(request)
+    with pytest.raises(ExternalPublicationError, match="PUBLICATION_PARTIAL_TERMINAL"):
+        runtime.run(request)
+
+    assert ddl.publication_calls == 1
+    assert authority.current is not None
+    assert authority.current.record.phase is ExternalAuthorityPhase.PUBLICATION_DISPATCHING
+
+
+def test_terminal_cleanup_failure_with_all_predecessors_is_not_reported_as_active() -> None:
+    runtime, authority, _, _, ddl = _runtime()
+    request = _request()
+
+    def fail_cleanup(record, permit, *, cluster):
+        del permit, cluster
+        ddl.cleanup_calls += 1
+        ddl.entries.append(_failed_entry("cleanup", record.cleanup_correlation_token, record.cleanup_query_digest))
+
+    ddl.drop_predecessor = fail_cleanup  # type: ignore[method-assign]
+
+    with pytest.raises(ExternalPublicationError, match="CLEANUP_UNKNOWN"):
+        runtime.run(request)
+    with pytest.raises(ExternalPublicationError, match="CLEANUP_UNKNOWN"):
+        runtime.run(request)
+
+    assert ddl.cleanup_calls == 1
+    assert authority.current is not None
+    assert authority.current.record.phase is ExternalAuthorityPhase.CLEANUP_DISPATCHING
 
 
 @pytest.mark.parametrize("replaced_slot", ["target", "candidate"])

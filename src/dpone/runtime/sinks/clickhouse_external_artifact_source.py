@@ -30,6 +30,32 @@ from dpone.runtime.support.bulk_text_codec import is_bulk_text_type
 from dpone.runtime.support.clickhouse_tsv_codec import ClickHouseTabSeparatedCodec
 
 
+def _artifact_identity(
+    replay_schema: Sequence[tuple[str, str]],
+    identity_schema: Sequence[tuple[str, str]],
+    rows: Sequence[Sequence[Any]],
+) -> ArtifactIdentity:
+    schema_rows = tuple((name, dtype, "", "", index) for index, (name, dtype) in enumerate(identity_schema, 1))
+    canonical = json.dumps(
+        {
+            "rows": json.loads(canonical_rows_json(rows)),
+            "schema": list(replay_schema),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    identity = ArtifactIdentity(
+        sha256=hashlib.sha256(canonical).hexdigest(),
+        byte_size=len(canonical),
+        row_count=len(rows),
+        schema_digest=canonical_schema_digest(schema_rows),
+        wire_digest=canonical_rows_digest(rows),
+    )
+    identity.validate()
+    return identity
+
+
 class ClickHouseExternalArtifactSource:
     """Seal one bounded payload into a path-free, replayable row snapshot."""
 
@@ -42,7 +68,7 @@ class ClickHouseExternalArtifactSource:
         self._maximum_rows = maximum_rows
         options = getattr(load_config, "options", {}) or {}
         self._maximum_bytes = int(options.get(SOURCE_BYTE_BUDGET_OPTION, MAX_SOURCE_BYTE_BUDGET))
-        self._sealed_payload, self._identity = self._seal()
+        self._sealed_payload, self._identity, self._identity_schema = self._seal()
         sealed = self._sealed_payload.artifact
         if not isinstance(sealed, InMemoryRowsArtifact):
             raise AssertionError("external artifact seal must produce in-memory rows")
@@ -86,6 +112,7 @@ class ClickHouseExternalArtifactSource:
                 "wire_digest": self.identity.wire_digest,
             },
             "schema": list(self._sealed_payload.schema),
+            "identity_schema": list(self._identity_schema),
             "rows": json.loads(canonical_rows_json(typed_rows)),
         }
         encoded = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
@@ -117,12 +144,23 @@ class ClickHouseExternalArtifactSource:
             document = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             raise ExternalContractError("ARTIFACT_UNAVAILABLE", "retained artifact is unavailable") from exc
-        identity = ArtifactIdentity(**document.get("identity", {}))
-        if document.get("binding_id") != binding_id or identity != expected:
-            raise ExternalContractError("ARTIFACT_CHANGED", "retained artifact identity changed")
-        schema = tuple((str(name), str(dtype)) for name, dtype in document.get("schema", ()))
-        rows = [tuple(_decode_canonical_value(value) for value in row) for row in document.get("rows", ())]
-        if canonical_rows_digest(rows) != expected.wire_digest or len(rows) != expected.row_count:
+        try:
+            identity = ArtifactIdentity(**document.get("identity", {}))
+            schema = tuple((str(name), str(dtype)) for name, dtype in document.get("schema", ()))
+            identity_schema = tuple((str(name), str(dtype)) for name, dtype in document.get("identity_schema", ()))
+            rows = [tuple(_decode_canonical_value(value) for value in row) for row in document.get("rows", ())]
+            observed = _artifact_identity(schema, identity_schema, rows)
+            expected_binding = digest_payload(
+                {"version": 1, "artifact": observed.sha256, "schema": observed.schema_digest}
+            )
+        except (TypeError, ValueError) as exc:
+            raise ExternalContractError("ARTIFACT_CHANGED", "retained artifact content changed") from exc
+        if (
+            document.get("binding_id") != binding_id
+            or expected_binding != binding_id
+            or identity != expected
+            or observed != expected
+        ):
             raise ExternalContractError("ARTIFACT_CHANGED", "retained artifact content changed")
         instance = object.__new__(cls)
         instance._sink = None
@@ -134,6 +172,7 @@ class ClickHouseExternalArtifactSource:
         instance._sealed_payload = instance._payload.rebind(artifact=InMemoryRowsArtifact(replay_rows))
         instance._sealed_rows = tuple(replay_rows)
         instance._identity = identity
+        instance._identity_schema = identity_schema
         instance._binding_id = binding_id
         return instance
 
@@ -142,27 +181,17 @@ class ClickHouseExternalArtifactSource:
 
         (root / f"{self.binding_id}.json").unlink(missing_ok=True)
 
-    def _seal(self) -> tuple[LoadPayload, ArtifactIdentity]:
+    def _seal(self) -> tuple[LoadPayload, ArtifactIdentity, tuple[tuple[str, str], ...]]:
         mapped_schema = self._mapped_schema()
         columns = tuple(column for column, _ in mapped_schema)
         rows = self._typed_rows(columns, tuple(dtype for _, dtype in mapped_schema))
         if len(rows) > self._maximum_rows:
             raise ExternalContractError("CONTENT_BUDGET_EXCEEDED", "artifact row budget exceeded")
-        schema_rows = tuple((name, dtype, "", "", index) for index, (name, dtype) in enumerate(mapped_schema, 1))
-        wire_digest = canonical_rows_digest(rows)
-        canonical = canonical_rows_json(rows).encode("utf-8")
-        if len(canonical) > self._maximum_bytes:
+        identity = _artifact_identity(self._payload.schema, mapped_schema, rows)
+        if identity.byte_size > self._maximum_bytes:
             raise ExternalContractError("CONTENT_BUDGET_EXCEEDED", "artifact byte budget exceeded")
-        identity = ArtifactIdentity(
-            sha256=hashlib.sha256(canonical).hexdigest(),
-            byte_size=len(canonical),
-            row_count=len(rows),
-            schema_digest=canonical_schema_digest(schema_rows),
-            wire_digest=wire_digest,
-        )
-        identity.validate()
         replay_rows = [dict(zip(columns, row, strict=True)) for row in rows]
-        return self._payload.rebind(artifact=InMemoryRowsArtifact(replay_rows)), identity
+        return self._payload.rebind(artifact=InMemoryRowsArtifact(replay_rows)), identity, mapped_schema
 
     def _mapped_schema(self) -> tuple[tuple[str, str], ...]:
         mapper = getattr(self._sink._payload_ingestion, "_clickhouse_schema", None)

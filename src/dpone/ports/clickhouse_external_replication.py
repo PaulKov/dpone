@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 from dpone._compat import StrEnum
 from dpone.contracts import clickhouse_cluster_publication as cluster_contract
+from dpone.contracts.clickhouse_cluster_admission import is_external_merge_tree_engine
 from dpone.contracts.clickhouse_cluster_publication import QueueEntry, QueueState
 from dpone.contracts.clickhouse_external_replication import (
     EXTERNAL_AUTHORITY_SCHEMA_VERSION,
@@ -296,4 +297,5 @@ __all__ = [
     "derive_operation_id",
     "derive_target_key",
     "digest_payload",
+    "is_external_merge_tree_engine",
 ]

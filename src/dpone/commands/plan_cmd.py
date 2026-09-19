@@ -17,6 +17,8 @@ from dpone.commands.plan_contract_render import (
 from dpone.commands.plan_contract_render import (
     render_external_target_contract_text as _render_external_target_contract_text,
 )
+from dpone.commands.plan_contract_render import render_publication_decision_md as _render_publication_decision_md
+from dpone.commands.plan_contract_render import render_publication_decision_text as _render_publication_decision_text
 from dpone.commands.plan_contract_render import (
     render_replay_contract_md as _render_replay_contract_md,
 )
@@ -68,6 +70,7 @@ def _render_text(payload: dict) -> str:
         )
     lines.extend(render_mssql_native(payload.get("mssql_native") or {}))
     lines.extend(_render_external_target_contract_text(payload.get("physical_design") or {}))
+    lines.extend(_render_publication_decision_text(payload.get("publication") or {}))
     lines.extend(_render_runtime_storage_text(payload.get("runtime_storage") or {}))
     lines.extend(_render_native_execution_text(payload.get("native_transfer_execution") or {}))
     lines.extend(_render_native_transport_text(payload.get("native_transfer_transport") or {}))
@@ -126,6 +129,7 @@ def _render_md(payload: dict) -> str:
         )
     lines.extend(render_mssql_native(payload.get("mssql_native") or {}, markdown=True))
     lines.extend(_render_external_target_contract_md(payload.get("physical_design") or {}))
+    lines.extend(_render_publication_decision_md(payload.get("publication") or {}))
     strategy = payload.get("strategy_intelligence") or {}
     native_transfer = (strategy.get("decision") or {}).get("native_transfer_plan") or {}
     runtime_storage = payload.get("runtime_storage") or {}

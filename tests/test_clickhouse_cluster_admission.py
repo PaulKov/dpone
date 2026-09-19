@@ -83,6 +83,16 @@ def test_external_cluster_admission_rejects_replicated_engine_without_fallback()
     assert decision.no_fallback is True
 
 
+def test_external_cluster_admission_rejects_shared_engine_before_runtime() -> None:
+    decision = evaluate_clickhouse_cluster_admission(
+        _request(replication_mode="external", engine="SharedMergeTree('/clickhouse/tables/{uuid}')")
+    )
+
+    assert decision.selected is False
+    assert decision.runtime_admission_required is False
+    assert decision.blockers == (CLICKHOUSE_CLUSTER_EXTERNAL_ENGINE_REQUIRED,)
+
+
 def test_cluster_admission_rejects_unknown_replication_mode() -> None:
     decision = evaluate_clickhouse_cluster_admission(_request(replication_mode="automatic"))
 

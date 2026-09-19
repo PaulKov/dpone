@@ -103,9 +103,9 @@ Do not broaden the table-name or queue-entry predicate, and do not issue
 | Candidate UUID is foreign or content diverges | staging divergence | stop; retain objects and escalate |
 | Every member is `READY`, authority is `STAGED` | ready to publish | retry the same operation; only a new acknowledged fence CAS may dispatch |
 | Publication queue entry is active and members are mixed | publication in progress | wait or retry observation of the original entry only |
-| Queue entry is terminal but member generations are mixed | terminal partial | stop; retain all generations and escalate |
+| Queue entry is terminal but targets are not uniformly desired, including all-predecessor state | terminal publication failure | stop; retain all generations and escalate; do not redispatch |
 | Every target is desired and the receipt is durable | committed | resume exact predecessor cleanup if required |
-| Cleanup entry or object identity is unknown | cleanup unknown | retain predecessors; restore evidence and retry observation |
+| Cleanup entry is terminal while any predecessor remains, or object identity is unknown | cleanup unknown | retain predecessors; restore evidence and retry observation; do not redispatch |
 | Every target is desired and every predecessor is proven absent | completed | verify the authority reaches `COMPLETED` |
 
 Row-count equality is diagnostic only. External staging requires the canonical

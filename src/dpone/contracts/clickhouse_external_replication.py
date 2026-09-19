@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from dpone._compat import StrEnum
+from dpone.contracts.clickhouse_cluster_admission import is_external_merge_tree_engine
 from dpone.contracts.clickhouse_external_replication_codec import (
     decode_dataclass as _decode_dataclass,
 )
@@ -220,8 +221,7 @@ class PhysicalGeneration:
     def validate(self) -> None:
         if not self.uuid or not self.engine_full:
             raise ExternalContractError("GENERATION_INVALID", "physical identity is incomplete")
-        replicated = self.engine_full.lstrip().startswith("Replicated")
-        if replicated or "MergeTree" not in self.engine_full:
+        if not is_external_merge_tree_engine(self.engine_full):
             raise ExternalContractError("ENGINE_UNSUPPORTED", "external mode requires non-replicated MergeTree")
         _require_digest(self.schema_digest, "schema")
         _require_digest(self.content_digest, "content")
