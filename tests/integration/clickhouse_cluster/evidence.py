@@ -2,23 +2,18 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
-import subprocess
 from pathlib import Path
 from typing import Any
 
+from tests.integration.clickhouse_cluster.evidence_identity import FIXTURE_FILES
+from tests.integration.clickhouse_cluster.evidence_identity import fixture_digest as _fixture_digest
+from tests.integration.clickhouse_cluster.evidence_identity import source_binding as _source_binding
+
+_FIXTURE_FILES = FIXTURE_FILES
+
 RECEIPT = Path("test_artifacts/clickhouse-cluster-publication/docker-receipt.json")
 EXTERNAL_RECEIPT = Path("test_artifacts/clickhouse-external-publication/docker-receipt.json")
-_FIXTURE_FILES = (
-    Path("tests/integration/clickhouse_cluster/docker-compose.yml"),
-    Path("tests/integration/clickhouse_cluster/conftest.py"),
-    Path("tests/integration/clickhouse_cluster/evidence.py"),
-    Path("tests/integration/clickhouse_cluster/test_clickhouse_external_replication_live.py"),
-    Path("tests/integration/clickhouse_cluster/config/keeper/keeper.xml"),
-    Path("tests/integration/clickhouse_cluster/config/node1/cluster.xml"),
-    Path("tests/integration/clickhouse_cluster/config/node2/cluster.xml"),
-)
 
 SCENARIOS = (
     "keeper_cas_and_log_comment",
@@ -106,7 +101,9 @@ def record_external_scenario(
     if name not in EXTERNAL_SCENARIOS:
         raise ValueError(f"unknown external publication scenario: {name}")
     evidence = json.loads(EXTERNAL_RECEIPT.read_text()) if EXTERNAL_RECEIPT.exists() else {}
-    scenarios = {item: {"status": "UNVERIFIED", "evidence_scope": "local_synthetic"} for item in EXTERNAL_SCENARIOS}
+    scenarios: dict[str, dict[str, Any]] = {
+        item: {"status": "UNVERIFIED", "evidence_scope": "local_synthetic"} for item in EXTERNAL_SCENARIOS
+    }
     scenarios.update(evidence.get("scenarios", {}))
     scenarios[name] = {
         "status": result,
@@ -131,34 +128,3 @@ def record_external_scenario(
     )
     EXTERNAL_RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     EXTERNAL_RECEIPT.write_text(json.dumps(evidence, sort_keys=True) + "\n")
-
-
-def _git(*args: str, text: bool = True) -> str | bytes:
-    return subprocess.run(
-        ("git", *args),
-        check=True,
-        capture_output=True,
-        text=text,
-    ).stdout
-
-
-def _source_binding() -> tuple[str, str]:
-    if str(_git("status", "--porcelain=v1", "--untracked-files=no")).strip():
-        raise RuntimeError("tracked worktree must be clean before writing Docker evidence")
-    return (
-        str(_git("rev-parse", "HEAD")).strip(),
-        str(_git("rev-parse", "HEAD^{tree}")).strip(),
-    )
-
-
-def _fixture_digest(source_commit: str) -> str:
-    digest = hashlib.sha256()
-    for path in _FIXTURE_FILES:
-        digest.update(path.as_posix().encode("utf-8"))
-        digest.update(b"\0")
-        content = _git("show", f"{source_commit}:{path.as_posix()}", text=False)
-        if not isinstance(content, bytes):
-            raise TypeError("git blob output must be bytes")
-        digest.update(content)
-        digest.update(b"\0")
-    return digest.hexdigest()

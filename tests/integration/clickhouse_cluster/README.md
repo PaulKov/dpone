@@ -18,6 +18,27 @@ The test writes its machine-readable receipt beneath
 `test_artifacts/clickhouse-cluster-publication/`. Generated receipts are not
 source files and must not be hand-edited or committed.
 
+The external-replication performance contract has a separate focused command:
+
+```bash
+DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION=1 uv run --extra clickhouse pytest \
+  tests/integration/clickhouse_cluster/test_clickhouse_external_replication_performance_live.py::test_external_replication_performance_budget \
+  -q
+```
+
+Its tracked budget is
+`external_replication_performance_budget.json`. The fixture measures a
+100,000-row canonical digest and a production-composed 10,000-row load fanned
+out to both pinned members. A pass requires every measured trial to stay within
+budget, exact per-member counts and content digests, `COMMITTED` publication,
+and proven owned-candidate cleanup. Startup is excluded by the session
+readiness probe and one unmeasured warmup. Do not rerun to select a faster
+sample. The producer creates the canonical receipt with atomic no-clobber
+semantics and fails if that path already exists. Preserve the prior receipt
+byte-identically under a distinct evidence identity before starting a new
+observation from a fresh checkout; fixture setup never deletes benchmark
+evidence.
+
 The fault profile deterministically exercises three recovery boundaries that a
 normal happy-path run cannot create:
 

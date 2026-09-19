@@ -1,0 +1,20 @@
+{
+  "benchmark_config_base64": "ewogICJzY2hlbWFfdmVyc2lvbiI6ICJkcG9uZS5jbGlja2hvdXNlLmV4dGVybmFsLXB1YmxpY2F0aW9uLWJlbmNobWFyay1jb25maWcudjEiLAogICJjYW5vbmljYWxfZGlnZXN0IjogewogICAgInJvd3MiOiAxMDAwMDAsCiAgICAiY29sdW1ucyI6IDMsCiAgICAid2FybXVwcyI6IDEsCiAgICAidHJpYWxzIjogNSwKICAgICJtYXhfdHJpYWxfc2Vjb25kcyI6IDIuMAogIH0sCiAgIm1lbWJlcl9mYW5vdXQiOiB7CiAgICAibWVtYmVycyI6IDIsCiAgICAibG9naWNhbF9yb3dzIjogMTAwMDAsCiAgICAicGh5c2ljYWxfcm93cyI6IDIwMDAwLAogICAgImNvbHVtbnMiOiAxLAogICAgIndhcm11cHMiOiAxLAogICAgInRyaWFscyI6IDMsCiAgICAibWF4X3RyaWFsX3NlY29uZHMiOiAzMC4wLAogICAgIm1heF9zb3VyY2VfYnl0ZXMiOiAxMDQ4NTc2CiAgfQp9Cg==",
+  "benchmark_config_sha256": "5caef54d4e33c1f0b6cf2c552c1506f319c7d7c253af9e211e8e37dcb4650871",
+  "fixture_digest": "a6dfa6864c7181a41666a470866f86b9058c3622ca0c681c6a2edfcd7d3f6d7c",
+  "fixture_files": [
+    {"path": "tests/integration/clickhouse_cluster/docker-compose.yml", "sha256": "4a03bf63ce84a625159a4a407ffb0a5f2dd9fa218130cf1ea7b8af71ee28a121", "size": 824},
+    {"path": "tests/integration/clickhouse_cluster/conftest.py", "sha256": "03072984381dcb92690f29d0914a06cc229f78dbb2572f220248ef03e20d2952", "size": 1469},
+    {"path": "tests/integration/clickhouse_cluster/evidence.py", "sha256": "553f7fb76a28ec78a5c9efa027341233287c1c2c99111436071496ea97b0a697", "size": 8205},
+    {"path": "tests/integration/clickhouse_cluster/external_replication_live_support.py", "sha256": "cb85c7ab2085fbd94bf39002737de60977d21f9b819e0365442fdf694a3c76d5", "size": 4208},
+    {"path": "tests/integration/clickhouse_cluster/external_replication_performance_budget.json", "sha256": "5caef54d4e33c1f0b6cf2c552c1506f319c7d7c253af9e211e8e37dcb4650871", "size": 430},
+    {"path": "tests/integration/clickhouse_cluster/test_clickhouse_external_replication_live.py", "sha256": "c2c6f72c4a09f504fda02f5b20441b0a31089b612ab059bf183258a9c67aa5b2", "size": 14450},
+    {"path": "tests/integration/clickhouse_cluster/test_clickhouse_external_replication_performance_live.py", "sha256": "cfa63cd78351b18414fd28b2b3c2be67fc1444e6006fe89e61695ae700b1b3b7", "size": 7708},
+    {"path": "tests/integration/clickhouse_cluster/config/keeper/keeper.xml", "sha256": "1f4bfe6d9318e55c1c7a08fb4809721941772e0885556acfde859c67ab9fa0e1", "size": 628},
+    {"path": "tests/integration/clickhouse_cluster/config/node1/cluster.xml", "sha256": "a92b1b1556fcc7c0664a070bda8ec463f5e5d624f47665d0302d1a9f91f2a360", "size": 823},
+    {"path": "tests/integration/clickhouse_cluster/config/node2/cluster.xml", "sha256": "35155f693586268f21e30d901a6bd77b44ccfec5fb8f6a333275169acf190d95", "size": 823}
+  ],
+  "schema_version": "dpone.clickhouse.external-publication-benchmark-source-binding.v1",
+  "source_commit": "5451b1989796258a022c21cdd3059e442f81b1dc",
+  "source_tree": "b5c90123c42fef1a7059a5bcff450ff4e42122e9"
+}

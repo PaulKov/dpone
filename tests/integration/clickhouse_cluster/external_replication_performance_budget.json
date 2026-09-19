@@ -1,0 +1,20 @@
+{
+  "schema_version": "dpone.clickhouse.external-publication-benchmark-config.v1",
+  "canonical_digest": {
+    "rows": 100000,
+    "columns": 3,
+    "warmups": 1,
+    "trials": 5,
+    "max_trial_seconds": 2.0
+  },
+  "member_fanout": {
+    "members": 2,
+    "logical_rows": 10000,
+    "physical_rows": 20000,
+    "columns": 1,
+    "warmups": 1,
+    "trials": 3,
+    "max_trial_seconds": 30.0,
+    "max_source_bytes": 1048576
+  }
+}

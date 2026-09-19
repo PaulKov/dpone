@@ -1,0 +1,47 @@
+{
+  "benchmark_config_sha256": "5caef54d4e33c1f0b6cf2c552c1506f319c7d7c253af9e211e8e37dcb4650871",
+  "canonical_digest": {
+    "budget_max_seconds": 2.0,
+    "columns": 3,
+    "digest": "c4370bf4ec0e4f1ca8df2645c7785a79d7ee4a8970b5fb20977c3dcbf8aa4655",
+    "max_seconds": 0.688094,
+    "median_seconds": 0.514692,
+    "rows": 100000,
+    "stable_across_trials": true,
+    "status": "PASS",
+    "trial_seconds": [0.500831, 0.484414, 0.688094, 0.600156, 0.514692],
+    "trials": 5,
+    "warmups": 1
+  },
+  "environment": {
+    "clickhouse_version": "24.8.14.39",
+    "cpu_count": 10,
+    "platform": "macOS-26.3.2-arm64-arm-64bit",
+    "python_version": "3.12.11"
+  },
+  "evidence_scope": "local_synthetic",
+  "fixture_digest": "a6dfa6864c7181a41666a470866f86b9058c3622ca0c681c6a2edfcd7d3f6d7c",
+  "member_fanout": {
+    "budget_max_seconds": 30.0,
+    "cleanup_proven": true,
+    "columns": 1,
+    "content_digests_equal": true,
+    "logical_rows": 10000,
+    "max_seconds": 8.383884,
+    "median_seconds": 7.367093,
+    "members": 2,
+    "per_member_row_counts": [10000, 10000],
+    "physical_rows": 20000,
+    "publication_phase": "COMMITTED",
+    "status": "PASS",
+    "trial_seconds": [7.367093, 4.526851, 8.383884],
+    "trials": 3,
+    "warmups": 1
+  },
+  "production_certification": "UNVERIFIED",
+  "schema_version": "dpone.clickhouse.external-publication-benchmark.v1",
+  "source_commit": "5451b1989796258a022c21cdd3059e442f81b1dc",
+  "source_tree": "b5c90123c42fef1a7059a5bcff450ff4e42122e9",
+  "status": "PASS",
+  "tracked_tree_status": "clean"
+}
