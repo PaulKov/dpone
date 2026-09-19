@@ -12,10 +12,14 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import yaml
+
+from dpone.runtime.sinks.clickhouse_external_replication_canonical import canonical_rows_digest
 from tests.integration.clickhouse_cluster.evidence_identity import fixture_digest, source_binding
 
 EXTERNAL_PERFORMANCE_RECEIPT = Path("test_artifacts/clickhouse-external-publication/benchmark-receipt.json")
 EXTERNAL_PERFORMANCE_BUDGET = Path("tests/integration/clickhouse_cluster/external_replication_performance_budget.json")
+CLICKHOUSE_CLUSTER_COMPOSE = Path("tests/integration/clickhouse_cluster/docker-compose.yml")
 EXTERNAL_PERFORMANCE_TEST_NODEID = (
     "tests/integration/clickhouse_cluster/"
     "test_clickhouse_external_replication_performance_live.py::"
@@ -116,6 +120,9 @@ def validate_external_performance_receipt(
     observation = evidence.get("observation")
     if not isinstance(observation, Mapping) or not _valid_observation(observation):
         errors.append("observation")
+    environment = evidence.get("environment")
+    if not isinstance(environment, Mapping) or not _valid_environment(environment):
+        errors.append("environment")
     if errors:
         raise ValueError("external performance receipt failed validation: " + ",".join(sorted(set(errors))))
 
@@ -138,7 +145,10 @@ def _identity_errors(
         "fixture_digest": fixture_digest,
         "benchmark_config_sha256": benchmark_config_sha256,
     }
-    return [field for field, value in expected.items() if evidence.get(field) != value]
+    errors = [field for field, value in expected.items() if evidence.get(field) != value]
+    if set(evidence) != _TOP_LEVEL_FIELDS:
+        errors.append("top_level_fields")
+    return errors
 
 
 def _validate_sections(
@@ -154,6 +164,7 @@ def _validate_sections(
         canonical.get("stable_across_trials") is True
         and _within_budget(canonical)
         and _valid_measurement(canonical)
+        and canonical.get("digest") == _expected_canonical_digest(budget)
         and canonical.get("status") == "PASS"
     )
     counts = fanout.get("per_member_row_counts")
@@ -247,6 +258,50 @@ def _valid_observation(observation: Mapping[str, Any]) -> bool:
     return started.tzinfo is not None and finished.tzinfo is not None and started <= finished
 
 
+def _valid_environment(environment: Mapping[str, Any]) -> bool:
+    if set(environment) != _ENVIRONMENT_FIELDS:
+        return False
+    return (
+        environment.get("clickhouse_version") == _pinned_clickhouse_version()
+        and isinstance(environment.get("python_version"), str)
+        and bool(environment["python_version"])
+        and isinstance(environment.get("platform"), str)
+        and bool(environment["platform"])
+        and isinstance(environment.get("cpu_count"), int)
+        and environment["cpu_count"] > 0
+    )
+
+
+def _pinned_clickhouse_version() -> str:
+    payload = yaml.safe_load(CLICKHOUSE_CLUSTER_COMPOSE.read_text(encoding="utf-8"))
+    services = payload.get("services") if isinstance(payload, Mapping) else None
+    if not isinstance(services, Mapping):
+        raise ValueError("ClickHouse fixture does not declare services")
+    versions = {
+        str(service["image"]).rsplit(":", 1)[1]
+        for service in services.values()
+        if isinstance(service, Mapping)
+        and isinstance(service.get("image"), str)
+        and str(service["image"]).startswith("clickhouse/clickhouse-server:")
+    }
+    if len(versions) != 1:
+        raise ValueError("ClickHouse fixture must pin one exact server version")
+    return versions.pop()
+
+
+def _expected_canonical_digest(budget: Mapping[str, Any]) -> str:
+    canonical_budget = budget.get("canonical_digest")
+    if not isinstance(canonical_budget, Mapping):
+        return ""
+    rows = canonical_budget.get("rows")
+    columns = canonical_budget.get("columns")
+    if not isinstance(rows, int) or rows <= 0 or columns != 3:
+        return ""
+    return canonical_rows_digest(
+        (index, f"value-{index % 1000:04d}", None if index % 7 == 0 else index % 97) for index in range(rows)
+    )
+
+
 def _write_json_exclusive(target: Path, evidence: Mapping[str, Any]) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.parent / f".{target.name}.{uuid4().hex}.tmp"
@@ -299,6 +354,22 @@ _FANOUT_FIELDS = {
     "trials",
     "warmups",
 }
+_TOP_LEVEL_FIELDS = {
+    "benchmark_config_sha256",
+    "canonical_digest",
+    "environment",
+    "evidence_scope",
+    "fixture_digest",
+    "member_fanout",
+    "observation",
+    "production_certification",
+    "schema_version",
+    "source_commit",
+    "source_tree",
+    "status",
+    "tracked_tree_status",
+}
+_ENVIRONMENT_FIELDS = {"clickhouse_version", "cpu_count", "platform", "python_version"}
 
 
 __all__ = [
