@@ -14,6 +14,7 @@ from dpone.readiness.airflow_deployment_artifacts import (
 
 DEPLOYMENT_SET_SCHEMA_V2 = "dpone.deployment-set.v2"
 DEPLOYMENT_SET_SCHEMA_V3 = "dpone.deployment-set.v3"
+DEPLOYMENT_SET_SCHEMA_V4 = "dpone.deployment-set.v4"
 AIRFLOW_INDEX_SCHEMA_V2 = "dpone.airflow-deployment-index.v2"
 AIRFLOW_INDEX_SCHEMA_V3 = "dpone.airflow-deployment-index.v3"
 AIRFLOW_INDEX_SCHEMA_V4 = "dpone.airflow-deployment-index.v4"
@@ -53,11 +54,12 @@ def build_environment_deployment_documents(
     optional_projection = (
         {"mssql_asset_outlet_projection": dict(mssql_outlet_projection)} if mssql_outlet_projection is not None else {}
     )
-    deployment_runtime_delivery = {
-        str(key): value for key, value in runtime_delivery.items() if key != "runtime_authority"
-    }
     deployment: dict[str, Any] = {
-        "schema": DEPLOYMENT_SET_SCHEMA_V3 if use_v3 else DEPLOYMENT_SET_SCHEMA_V2,
+        "schema": (
+            DEPLOYMENT_SET_SCHEMA_V4
+            if development_authority_required
+            else (DEPLOYMENT_SET_SCHEMA_V3 if use_v3 else DEPLOYMENT_SET_SCHEMA_V2)
+        ),
         "deployment_id": "",
         "deployment_type": "environment",
         "runnable": True,
@@ -72,10 +74,11 @@ def build_environment_deployment_documents(
         "runtime_image_digest": runtime_image_digest,
         **runtime_image_dbt_fields,
         "airflow_bundle_ref": airflow_bundle_ref,
-        "runtime_artifact_delivery": deployment_runtime_delivery,
+        "runtime_artifact_delivery": runtime_delivery,
         **({"dev_evidence_delivery": dev_evidence_delivery} if dev_evidence_delivery is not None else {}),
         "workloads": list(workload_inventory),
         **optional_projection,
+        **({"development_authority_required": True} if development_authority_required else {}),
     }
     computed_deployment_id = deployment_id(deployment)
     deployment["deployment_id"] = computed_deployment_id
@@ -122,5 +125,6 @@ __all__ = [
     "AIRFLOW_INDEX_SCHEMA_V4",
     "DEPLOYMENT_SET_SCHEMA_V2",
     "DEPLOYMENT_SET_SCHEMA_V3",
+    "DEPLOYMENT_SET_SCHEMA_V4",
     "build_environment_deployment_documents",
 ]

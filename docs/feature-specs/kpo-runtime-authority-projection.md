@@ -3,7 +3,7 @@
 - Status: APPROVED
 - Owner: dpone maintainers
 - Issue: TBD
-- Target release: TBD
+- Target release: 0.81.4
 Last verified: 2026-09-19
 
 ## Executive summary
@@ -58,8 +58,8 @@ malformed, or misplaced configuration rejects the deployment or pod composition.
 `--runtime-authority-secret-name` and optional
 `--runtime-authority-secret-key` (default `authority.json`). Protected
 development deployments require the complete reference. Ordinary and production
-indexes reject the authority field. Index v4 adds the required closed
-`runtime_authority` object; runtime plan v4 keeps its existing explicit
+indexes reject the authority field. Deployment/index v4 add the required
+closed `runtime_authority` object; runtime plan v4 keeps its existing explicit
 `development_authority_required: true` marker and contains no Secret value.
 
 The pod contract owns:
@@ -79,8 +79,8 @@ uses an earlier exact package set and deployment index.
 
 1. Deployment build detects the existing development-authority release marker.
 2. It requires and validates one Secret source without reading its value.
-3. The index publishes the reference as part of its closed v4 bytes; the
-   deployment-set v2/v3 contracts and their identity bytes remain unchanged.
+3. The closed deployment/index v4 pair publishes the reference symmetrically;
+   the deployment-set v2/v3 contracts and their identity bytes remain unchanged.
 4. The parse-safe provider requires the source iff development authority is
    required; any unknown field, invalid DNS name/key, or ordinary-plan source is
    rejected before operator construction.

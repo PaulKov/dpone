@@ -128,7 +128,11 @@ def build_publish_inventory(
         for name in deployment_names
     ]
     validate_deployment_auxiliary_files(projection.deployment, deployment_dir)
-    if projection.deployment.get("schema") in {"dpone.deployment-set.v2", "dpone.deployment-set.v3"}:
+    if projection.deployment.get("schema") in {
+        "dpone.deployment-set.v2",
+        "dpone.deployment-set.v3",
+        "dpone.deployment-set.v4",
+    }:
         deployment_files.extend(
             _runtime_connection_artifact(item)
             for item in runtime_connection_publication_files(
