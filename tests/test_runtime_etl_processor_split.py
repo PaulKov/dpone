@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from dpone.config import LoadConfig, LoadStrategy
+from dpone.contracts.clickhouse_external_replication import ExternalPublicationError
 from dpone.runtime.artifact_models import StagingTableArtifact
 from dpone.runtime.etl.load_config_runtime import LoadConfigRuntimeService
 from dpone.runtime.etl.processor import ETLProcessor
@@ -15,6 +16,7 @@ from dpone.runtime.etl.run_state_tracker import RunStateTracker
 from dpone.runtime.etl.source_state import SourceStateService
 from dpone.runtime.governance.service import LoadGovernanceService
 from dpone.runtime.kafka.offsets import KafkaOffsetState
+from dpone.runtime.lineage.audit import LoadIdentityService
 from dpone.runtime.sinks.base import LoadResult
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome
 from dpone.runtime.state.xmin_storage import XMinState
@@ -344,6 +346,112 @@ def test_receipt_backed_commit_survives_post_commit_run_state_write_failure() ->
     assert result["commit_receipt_id"] == "receipt-1"
     assert len(storage.updated) == 1
     assert any("stage=run_state_post_commit" in warning for warning in logger.warnings)
+
+
+def test_external_publication_receipt_precedes_commit_and_source_state() -> None:
+    events: list[str] = []
+    receipt = {
+        "phase": "COMMITTED",
+        "operation_id": "external-operation",
+        "evidence_scope": "runtime",
+        "evidence_status": "UNVERIFIED",
+    }
+
+    class ExternalSink(StubSink):
+        def load(self, load_config, payload):
+            self.received_load_config = load_config
+            self.received_payload = payload
+            events.append("publication_receipt_durable")
+            return LoadResult(
+                inserted_rows=2,
+                updated_rows=0,
+                total_rows=2,
+                staging_rows=2,
+                commit_receipt_id="external-operation",
+                commit_outcome=AtomicCommitOutcome.COMMITTED,
+                reconciliation_metrics={"clickhouse_cluster_external_full_refresh": receipt},
+            )
+
+    class ObservedIdentity(LoadIdentityService):
+        def mark_committed(self, record, load_result):
+            assert load_result.reconciliation_metrics["clickhouse_cluster_external_full_refresh"] == receipt
+            events.append("target_commit_callback")
+            return super().mark_committed(record, load_result)
+
+    class ObservedSourceState(SourceStateService):
+        def persist_after_load(self, **kwargs):
+            load_result = kwargs["load_result"]
+            assert load_result.commit_outcome is AtomicCommitOutcome.COMMITTED
+            assert load_result.commit_receipt_id == "external-operation"
+            assert (
+                load_result.reconciliation_metrics["clickhouse_cluster_external_full_refresh"]["phase"] == "COMMITTED"
+            )
+            events.append("source_checkpoint")
+
+    source = StubSource(
+        SimpleNamespace(
+            artifact=SimpleNamespace(column_timezone=None),
+            schema=[],
+            state=None,
+            force_full_refresh=False,
+        )
+    )
+    result = ETLProcessor(
+        source=source,
+        sink=ExternalSink(),
+        etl_logger=StubLogger(),
+        load_identity_service=ObservedIdentity(),
+        source_state_service=ObservedSourceState(),
+    ).run(make_load_config(load_strategy=LoadStrategy.FULL_REFRESH))
+
+    assert result["status"] == "success"
+    assert events == ["publication_receipt_durable", "target_commit_callback", "source_checkpoint"]
+
+
+def test_external_partial_publication_never_commits_or_advances_source_state() -> None:
+    events: list[str] = []
+
+    class PartialSink(StubSink):
+        def load(self, load_config, payload):
+            del load_config, payload
+            events.append("publication_partial")
+            raise ExternalPublicationError(
+                "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_PARTIAL_TERMINAL",
+                evidence={"phase": "PUBLICATION_DISPATCHING"},
+            )
+
+    class ObservedIdentity(LoadIdentityService):
+        def mark_committed(self, record, load_result):
+            del record, load_result
+            events.append("unexpected_commit")
+            raise AssertionError("partial publication must not commit")
+
+    class ObservedSourceState(SourceStateService):
+        def persist_after_load(self, **kwargs):
+            del kwargs
+            events.append("unexpected_checkpoint")
+            raise AssertionError("partial publication must not advance source state")
+
+    source = StubSource(
+        SimpleNamespace(
+            artifact=SimpleNamespace(column_timezone=None),
+            schema=[],
+            state=None,
+            force_full_refresh=False,
+        )
+    )
+    processor = ETLProcessor(
+        source=source,
+        sink=PartialSink(),
+        etl_logger=StubLogger(),
+        load_identity_service=ObservedIdentity(),
+        source_state_service=ObservedSourceState(),
+    )
+
+    with pytest.raises(ExternalPublicationError, match="PUBLICATION_PARTIAL_TERMINAL"):
+        processor.run(make_load_config(load_strategy=LoadStrategy.FULL_REFRESH))
+
+    assert events == ["publication_partial"]
 
 
 def test_non_receipt_run_state_write_failure_remains_fail_closed() -> None:

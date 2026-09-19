@@ -27,6 +27,7 @@ from dpone.runtime.sinks.clickhouse_external_replication_member_driver import (
     ClickHouseExternalReplicationMemberDriver,
     canonical_rows_digest,
     canonical_schema_digest,
+    insert_external_rows,
 )
 from dpone.runtime.sinks.load_payload import LoadPayload
 
@@ -284,6 +285,27 @@ def test_load_accepts_only_sealed_load_payload_and_calls_sink_once(load_config: 
     with pytest.raises(ValueError, match="ARTIFACT_UNSUPPORTED"):
         driver.load_candidate(connector, record, mismatched)
     assert len(sink.loaded) == 1
+
+
+def test_empty_generation_skips_insert_transport(load_config: LoadConfig) -> None:
+    payload = LoadPayload(
+        artifact=InMemoryRowsArtifact([]),
+        schema=(("id", "bigint"), ("label", "varchar")),
+    )
+    sink = SimpleNamespace(connector=object())
+
+    inserted = insert_external_rows(
+        sink,
+        load_config,
+        payload,
+        query_id="empty-generation",
+        deduplication_token="empty-generation-token",
+        map_schema=lambda _config, schema: schema,
+        coerce_row=lambda row, _types: row,
+    )
+
+    assert inserted == 0
+    assert canonical_rows_digest(()) == canonical_rows_digest([])
 
 
 def test_drop_mutates_only_the_exact_expected_candidate_uuid(load_config: LoadConfig) -> None:

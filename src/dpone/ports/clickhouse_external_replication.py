@@ -91,8 +91,8 @@ class ExternalReplicationReceipt:
     authority_version: int
     phase: str = "COMPLETED"
     replication_mode: str = "external"
-    evidence_status: str = "PASS"
-    evidence_scope: str = "local_synthetic"
+    evidence_status: str = "UNVERIFIED"
+    evidence_scope: str = "runtime"
     schema_version: str = EXTERNAL_RECEIPT_SCHEMA_VERSION
 
     @classmethod
@@ -115,7 +115,11 @@ class ExternalReplicationReceipt:
 
     @classmethod
     def from_state(
-        cls, state: dict[str, Any], *, evidence_scope: str = "local_synthetic"
+        cls,
+        state: dict[str, Any],
+        *,
+        evidence_scope: str,
+        evidence_status: str,
     ) -> ExternalReplicationReceipt:
         """Create a receipt from the high-level durable runtime state."""
 
@@ -130,6 +134,7 @@ class ExternalReplicationReceipt:
             authority_version=int(state["version"]),
             phase=str(state["phase"]),
             evidence_scope=evidence_scope,
+            evidence_status=evidence_status,
         )
 
     def to_dict(self) -> dict[str, Any]:

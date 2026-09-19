@@ -80,6 +80,7 @@ class ClickHouseExternalReplicationServiceAdapter:
         target: str,
         token_factory: Callable[[], str] | None = None,
         evidence_scope: str = "mocked_in_process",
+        evidence_status: str = "UNVERIFIED",
     ) -> None:
         self._topology_port = topology
         self._authority = authority
@@ -90,6 +91,7 @@ class ClickHouseExternalReplicationServiceAdapter:
         self._target = target
         self._token = token_factory or (lambda: secrets.token_hex(16))
         self.evidence_scope = evidence_scope
+        self.evidence_status = evidence_status
         self._inventory_digest: str | None = None
         self._permits: dict[tuple[str, str], ExternalDispatchPermit] = {}
 

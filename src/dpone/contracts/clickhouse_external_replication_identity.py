@@ -6,18 +6,25 @@ from collections.abc import Mapping
 
 from dpone.contracts.clickhouse_cluster_publication import canonical_json, digest_payload
 
+_ERROR_PREFIX = "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_"
+
+
+def _public_error_code(code: str) -> str:
+    return code if code.startswith(_ERROR_PREFIX) else f"{_ERROR_PREFIX}{code}"
+
 
 class ExternalContractError(ValueError):
     def __init__(self, code: str, detail: str) -> None:
-        self.code = code
-        super().__init__(f"DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_{code}:{detail}")
+        self.code = _public_error_code(code)
+        self.detail = detail
+        super().__init__(f"{self.code}:{detail}")
 
 
 class ExternalPublicationError(RuntimeError):
     def __init__(self, code: str, *, evidence: Mapping[str, object] | None = None) -> None:
-        self.code = code
+        self.code = _public_error_code(code)
         self.evidence = dict(evidence or {})
-        super().__init__(code)
+        super().__init__(self.code)
 
 
 def require_digest(value: str, label: str) -> None:

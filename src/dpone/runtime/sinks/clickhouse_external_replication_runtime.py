@@ -24,6 +24,9 @@ from dpone.runtime.sinks import clickhouse_external_replication_runtime_support 
 class ExternalReplicationRuntimeService(Protocol):
     """Durable effects required by the pure runtime coordinator."""
 
+    evidence_scope: str
+    evidence_status: str
+
     def inventory(self, cluster: str) -> tuple[str, ...]: ...
     def inventory_digest(self) -> str: ...
     def read_authority(self, target_key: str) -> Mapping[str, Any] | None: ...

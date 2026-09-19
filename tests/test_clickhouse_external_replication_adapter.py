@@ -313,7 +313,7 @@ def test_process_death_after_create_recovers_from_prebound_uuid() -> None:
 def test_adapter_never_dispatches_without_verified_cas_permit() -> None:
     runtime, _, _, _, ddl = _runtime(unknown_dispatch=True)
 
-    with pytest.raises(ExternalPublicationError, match="AUTHORITY_CONFLICT"):
+    with pytest.raises(ExternalPublicationError, match="CAS_UNKNOWN"):
         runtime.run(_request())
 
     assert ddl.publication_calls == 0
@@ -332,7 +332,7 @@ def test_adapter_reproves_bound_generations_before_publication_dispatch(replaced
         **{replaced_slot: _generation(f"foreign-{replaced_slot}", _digest("9"))},
     )
 
-    with pytest.raises(ExternalPublicationError, match="AUTHORITY_CONFLICT"):
+    with pytest.raises(ExternalPublicationError, match="GENERATION_DIVERGED"):
         runtime.publish(request)
 
     assert ddl.publication_calls == 0

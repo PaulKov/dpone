@@ -25,6 +25,12 @@ Key commands:
 - `dpone perf advise`
 - `dpone studio`
 
+For external ClickHouse cluster publication, a blocked `dpone plan` still
+renders its decision but exits `1`. A typed runtime publication failure is a
+stderr-only structured document; stdout is reserved for a successful runtime
+result. This fail-closed exception prevents automation from accepting an error
+as a publication receipt.
+
 ## Low-code and GitOps
 
 A low/no-code workflow should still produce versioned manifests, `.env.example` files, smoke commands, quality gates, and pull-request friendly artifacts. Studio and CLI features must reuse the same service APIs so the UI never becomes a second runtime.

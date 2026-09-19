@@ -11,6 +11,7 @@ from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactSourcePort,
     ExternalPublicationRequest,
 )
+from dpone.runtime.sinks import clickhouse_external_replication_runtime_support as runtime_support
 from dpone.runtime.sinks.clickhouse_external_artifact_source import (
     ClickHouseExternalArtifactSource,
     external_artifact_store_root,
@@ -136,9 +137,7 @@ class ClickHouseExternalReplicationFacade:
                 scheduler_invocation=scheduler_invocation,
                 plan_sha256=plan_sha256,
             )
-            expected = ExternalReplicationReceipt.from_state(
-                dict(state), evidence_scope=str(getattr(service, "evidence_scope", "local_synthetic"))
-            )
+            expected = runtime_support.receipt(service, dict(state))
             if phase == "STAGING":
                 source = ClickHouseExternalArtifactSource.reopen(
                     root=external_artifact_store_root(load_config),
@@ -157,9 +156,7 @@ class ClickHouseExternalReplicationFacade:
                 source.release(external_artifact_store_root(load_config))
                 state = _read_authority(service, request.target_key)
                 phase = str(state.get("phase") or "")
-                expected = ExternalReplicationReceipt.from_state(
-                    dict(state), evidence_scope=str(getattr(service, "evidence_scope", "local_synthetic"))
-                )
+                expected = runtime_support.receipt(service, dict(state))
             if phase == "STAGED":
                 runtime.validate_staged(request, expected)
             if phase in {"STAGED", "PUBLICATION_DISPATCHING"}:
@@ -170,8 +167,7 @@ class ClickHouseExternalReplicationFacade:
             state = _read_authority(service, request.target_key)
         if state.get("phase") != "COMPLETED":
             return load_config
-        scope = str(getattr(service, "evidence_scope", "local_synthetic"))
-        receipt = ExternalReplicationReceipt.from_state(dict(state), evidence_scope=scope)
+        receipt = runtime_support.receipt(service, dict(state))
         options = dict(_options(load_config))
         options[EXTERNAL_REPLAY_OPTION] = _load_result(
             receipt, staged_rows=int(state["artifact_row_count"]), replay=True

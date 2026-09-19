@@ -68,6 +68,30 @@ and the owning platform's read-only ClickHouse/Keeper diagnostics for:
 Do not paste direct catalog output containing endpoints into tickets or durable
 evidence. The public diagnostic representation uses opaque member IDs.
 
+The following ClickHouse queries are read-only starting points. Restrict their
+output before attaching it to an incident because `system.clusters` contains
+network identity:
+
+```sql
+SELECT cluster, shard_num, replica_num, host_name, port,
+       internal_replication
+FROM system.clusters
+WHERE cluster = 'analytics_cluster'
+ORDER BY shard_num, replica_num;
+
+SELECT database, name, uuid, engine
+FROM system.tables
+WHERE database = 'analytics'
+  AND name IN ('target_table', '<exact-recorded-candidate>');
+
+SELECT entry, status, exception_code, num_hosts_remaining
+FROM system.distributed_ddl_queue
+WHERE entry = '<exact-authority-bound-entry>';
+```
+
+Do not broaden the table-name or queue-entry predicate, and do not issue
+`DROP`, `RENAME`, `EXCHANGE`, `INSERT`, or Keeper mutations during diagnosis.
+
 ## 3. Classify the phase
 
 | Observation | Classification | Safe next action |

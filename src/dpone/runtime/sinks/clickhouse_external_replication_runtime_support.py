@@ -23,7 +23,8 @@ def inventory_digest(service: Any, members: tuple[str, ...]) -> str:
 def receipt(service: Any, state: dict[str, Any]) -> ExternalReplicationReceipt:
     return ExternalReplicationReceipt.from_state(
         state,
-        evidence_scope=str(getattr(service, "evidence_scope", "runtime")),
+        evidence_scope=str(service.evidence_scope),
+        evidence_status=str(service.evidence_status),
     )
 
 
@@ -37,6 +38,8 @@ def compare_and_swap(
     version = None if current is None else int(current["version"])
     try:
         return dict(service.compare_and_swap_authority(target_key, version, desired))
+    except ExternalPublicationError:
+        raise
     except Exception:
         fail("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_AUTHORITY_CONFLICT", state=current)
 
@@ -63,6 +66,7 @@ def fail(
 ) -> NoReturn:
     evidence: dict[str, object] = {
         "evidence_scope": str(getattr(service, "evidence_scope", "runtime")),
+        "evidence_status": "FAIL",
         "member_ids": list(member_ids or tuple(state.get("member_ids", ())) if state else member_ids),
     }
     if state is not None:

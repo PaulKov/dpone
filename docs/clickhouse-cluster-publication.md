@@ -114,7 +114,9 @@ The static plan includes this additive publication decision:
 `runtime_admission_required` is intentional: a static plan cannot prove the
 current member inventory, grants, Keeper state, or direct-member connectivity.
 Fix every blocker before proceeding. Do not reinterpret a static pass as live
-certification.
+certification. `dpone plan` returns exit code `1` when the external publication
+decision contains blockers, even though it still renders the complete decision
+document for automation and diagnosis.
 
 `lineage: false` is required for this bounded V2 route because it publishes the
 sealed source artifact unchanged. Lineage projection and decoder-dependent
@@ -129,7 +131,8 @@ only inside a deployment-provided, verified
 [runtime startup diagnostics](airflow-runtime-startup-diagnostics.md). Retain
 the artifact spool on durable worker storage by setting
 `DPONE_EXTERNAL_ARTIFACT_STORE` (or the schema-declared
-`options.external_artifact_store_path`). External admission fails before the
+`options.external_artifact_store_path`). The configured value must be an
+absolute path. External admission fails before the
 Keeper lock when neither is configured; there is no local `/tmp` fallback.
 For multi-worker deployments the path must resolve to the same durable storage
 on every eligible worker.
@@ -139,6 +142,20 @@ dpone run \
   examples/batch/clickhouse-external-replication-full-refresh.batch.yaml \
   --run-id external-cluster-full-refresh-001 \
   --format json
+```
+
+The public Python API uses the same admission, authority, receipt, and recovery
+path:
+
+```python
+import dpone
+
+report = dpone.run(
+    "examples/batch/clickhouse-external-replication-full-refresh.batch.yaml",
+    run_id="external-cluster-full-refresh-001",
+)
+if not report.passed:
+    raise RuntimeError(report.result.errors)
 ```
 
 ## What dpone does
@@ -181,9 +198,15 @@ A successful external run has all of these properties:
 
 Structured output uses opaque member IDs and digests. It excludes endpoints,
 credentials, raw SQL values, source rows, and local artifact paths. Structured
-runtime success and failure documents are written to stdout; a failure also
-exits non-zero. Stderr is reserved for argument parsing and launcher
-diagnostics.
+runtime success documents are written to stdout. Typed external-publication
+failure documents are written to stderr and exit non-zero, leaving stdout empty
+so a partial success document cannot be mistaken for a committed receipt.
+
+The receipt embedded in an ordinary runtime result has
+`evidence_scope: runtime` and `evidence_status: UNVERIFIED`. It proves the
+runtime protocol outcome; it is not a certification receipt. Only the separate
+exact-commit live-certification workflow may emit `PASS` certification
+evidence.
 
 ## Retry and recovery boundary
 

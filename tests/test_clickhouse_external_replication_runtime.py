@@ -47,6 +47,7 @@ class _SyntheticExternalService:
     """Narrow stateful fake for the external service port expected by runtime."""
 
     evidence_scope = "local_synthetic"
+    evidence_status = "PASS"
 
     def __init__(self) -> None:
         self.members = ("member-a", "member-b")
@@ -285,6 +286,26 @@ def test_external_runtime_stages_and_publishes_complete_generation_on_every_memb
     assert service.cleanup_calls == 1
     assert all(rows == _ROWS for rows in service.target_rows.values())
     assert all(candidate is None for candidate in service.candidates.values())
+
+
+def test_typed_authority_failure_is_not_masked_as_generic_conflict() -> None:
+    service = _SyntheticExternalService()
+    expected = ExternalPublicationError(
+        "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_IN_PROGRESS",
+        evidence={"phase": "PUBLICATION_DISPATCHING"},
+    )
+
+    def fail_typed(*_args: Any, **_kwargs: Any) -> Mapping[str, Any]:
+        raise expected
+
+    service.compare_and_swap_authority = fail_typed  # type: ignore[method-assign]
+
+    with pytest.raises(ExternalPublicationError) as raised:
+        _runtime(service).run(_request())
+
+    assert raised.value is expected
+    assert raised.value.code == "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_IN_PROGRESS"
+    assert raised.value.evidence == {"phase": "PUBLICATION_DISPATCHING"}
 
 
 def test_lost_member_stage_ack_is_reconciled_without_duplicate_insert() -> None:

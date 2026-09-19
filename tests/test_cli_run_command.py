@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from dpone.commands import run_cmd
-from dpone.contracts.clickhouse_external_replication import ExternalPublicationError
+from dpone.contracts.clickhouse_external_replication import ExternalContractError, ExternalPublicationError
 from dpone.contracts.quality_failure import QualityGateFailureOutcome
 from dpone.governance.quality import QualityGateReport, QualityGateResult
 from dpone.runtime.governance.service import QualityGateFailure
@@ -102,6 +102,23 @@ def test_enriched_quality_failure_json_preserves_actual_safe_outcome_and_redacti
     assert str(tmp_path) not in serialized
 
 
+def test_external_contract_failure_uses_prefixed_code_and_stderr(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    run_cmd._write_run_failure(
+        _args(output_format="json"),
+        ExternalContractError("ARTIFACT_UNAVAILABLE", "retained artifact is unavailable"),
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["result"]["error_code"] == "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNAVAILABLE"
+    assert payload["result"]["errors"] == [
+        "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNAVAILABLE:retained artifact is unavailable"
+    ]
+
+
 def test_old_quality_failure_constructor_keeps_legacy_zero_outcome_shape(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -133,7 +150,9 @@ def test_external_publication_failure_exposes_only_redacted_recovery_evidence(
 
     run_cmd._write_run_failure(_args(output_format="json"), error)
 
-    payload = json.loads(capsys.readouterr().out)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
     evidence = payload["result"]["evidence"]
     assert evidence["phase"] == "STAGING"
     assert evidence["operation_id"] == "opaque-operation"

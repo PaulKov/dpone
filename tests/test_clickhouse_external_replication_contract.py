@@ -198,6 +198,13 @@ def test_orchestration_request_derives_identity_and_public_error_is_redacted() -
     assert "artifact-v1" not in json.dumps(error.evidence)
 
 
+def test_contract_errors_expose_the_stable_public_error_family() -> None:
+    error = ExternalContractError("ARTIFACT_UNAVAILABLE", "retained artifact is unavailable")
+
+    assert error.code == "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNAVAILABLE"
+    assert str(error) == "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNAVAILABLE:retained artifact is unavailable"
+
+
 @pytest.mark.parametrize(
     ("target", "candidate", "expected"),
     [

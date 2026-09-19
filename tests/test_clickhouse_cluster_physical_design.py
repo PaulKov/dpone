@@ -132,6 +132,10 @@ def test_manifest_schemas_expose_identical_external_artifact_store_contract() ->
     assert contracts[0] == contracts[1]
     assert contracts[0]["type"] == "string"
     assert contracts[0]["minLength"] == 1
+    assert contracts[0]["pattern"] == "^/"
+    validator = Draft7Validator(contracts[0])
+    assert validator.is_valid("/var/lib/dpone/external-artifacts")
+    assert not validator.is_valid("relative/external-artifacts")
 
 
 @pytest.mark.parametrize(

@@ -27,6 +27,7 @@ from dpone.runtime.sinks.clickhouse_external_replication_connection_provider imp
     ExternalReplicaConnectionProvider,
     managed_member_connection,
 )
+from dpone.runtime.sinks.clickhouse_external_topology_identity import admit_member_endpoints
 
 _MUTATION_SETTINGS = {"keeper_map_strict_mode": 1, "insert_keeper_max_retries": 0}
 _INVENTORY_SQL = (
@@ -45,6 +46,10 @@ class ClickHouseExternalTopologyCatalog:
         self._inventory_digest: str | None = None
 
     def inventory(self, cluster: str) -> ExternalTopology:
+        self._member_ids_by_host = {}
+        self._member_endpoints = {}
+        self._bootstrap_hosts = ()
+        self._inventory_digest = None
         rows = _inventory_rows(self._connector, cluster)
         members = tuple(_member(row) for row in rows)
         topology = ExternalTopology(
@@ -53,15 +58,9 @@ class ClickHouseExternalTopologyCatalog:
             members=members,
         )
         topology.validate()
-        self._member_ids_by_host = {
-            host: member.member_id
-            for row, member in zip(rows, members, strict=True)
-            for host in (str(row[0]), str(row[1]))
-        }
-        self._member_endpoints = {
-            member.member_id: self._resolve_endpoint(str(row[0]), str(row[1]), int(row[2]))
-            for row, member in zip(rows, members, strict=True)
-        }
+        aliases, endpoints = admit_member_endpoints(rows, members, self._resolve_endpoint)
+        self._member_ids_by_host = aliases
+        self._member_endpoints = endpoints
         self._bootstrap_hosts = tuple(str(row[0]) for row in rows)
         self._inventory_digest = digest_payload(
             [

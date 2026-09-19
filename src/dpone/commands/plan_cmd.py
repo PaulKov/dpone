@@ -363,7 +363,11 @@ def cmd_plan(args: argparse.Namespace, *, ctx: object, logger: logging.Logger) -
         write_text(_render_md(payload))
     else:
         write_text(_render_text(payload))
-    return 0
+    publication = payload.get("publication") if isinstance(payload, dict) else None
+    blocked = (
+        isinstance(publication, dict) and publication.get("requested") is True and bool(publication.get("blockers"))
+    )
+    return 1 if blocked else 0
 
 
 def register_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:

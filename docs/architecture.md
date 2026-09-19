@@ -1540,6 +1540,22 @@ ClickHouse target type through the `ClickHouseSourceTypeMapper` protocol. Future
 targets reuse the generic nullability taxonomy by adding their own
 `TargetNullabilityDialect` and target-specific insert policy.
 
+### External ClickHouse cluster publication boundary
+
+Bounded external-replication full refresh is a sink-owned protocol shared by
+all source families. Composition first requires an explicit endpoint-cloning
+capability; the base ClickHouse connector port does not promise direct-member
+fan-out. Admission resolves an injective opaque-member-to-endpoint map before
+authority access or source I/O. Duplicate aliases or resolved endpoints fail
+closed, and a rejected refresh invalidates the previous topology snapshot.
+
+Keeper CAS owns phase authority, while the runtime service owns staging,
+one-shot distributed DDL, reconciliation, and durable receipt creation. A
+typed publication error crosses these layers unchanged. Source state advances
+only after the external receipt is durable. Runtime receipts deliberately use
+`runtime / UNVERIFIED`; exact-commit live certification is produced outside the
+execution path and cannot be inferred from runtime success.
+
 ## GitOps Workload Catalog And Compact Airflow Pack
 
 `dpone.gitops.workload_catalog` is the connector-neutral resolver for large

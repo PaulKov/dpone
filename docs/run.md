@@ -279,7 +279,10 @@ status, row counts, duration, and errors. For example:
 Pre-execution and runtime failures requested as JSON keep the same top-level
 identity fields, set `passed` to `false`, and expose the safe message in
 `result.errors`; typed failures also expose `result.error_code`. These reports
-still go to stdout so automation receives one parseable channel. Argparse
+normally go to stdout so automation receives one parseable channel. The
+fail-closed ClickHouse external-publication route is stricter: its typed runtime
+failure document goes to stderr while stdout remains empty, preventing a
+consumer from confusing failure output with a committed receipt. Argparse
 usage errors, such as an unknown option, go to stderr and exit `2`. Secrets and
 absolute local paths are redacted from every public format.
 

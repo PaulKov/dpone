@@ -111,3 +111,6 @@ The shared credential flow supports all first-class source/sink families:
 - For Airflow runtime rotation and recovery, use the [credential resolver lifecycle](../airflow-credential-resolver-lifecycle.md) runbook.
 - Run `dpone doctor --profile local` before a first run.
 - Keep secrets out of manifests unless they are placeholders resolved by environment variables.
+- For external ClickHouse publication, set the non-secret
+  `DPONE_EXTERNAL_ARTIFACT_STORE` to an absolute durable path shared by all
+  eligible workers. Do not put credentials or endpoint URLs in that path.

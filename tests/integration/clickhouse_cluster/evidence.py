@@ -15,6 +15,7 @@ _FIXTURE_FILES = (
     Path("tests/integration/clickhouse_cluster/conftest.py"),
     Path("tests/integration/clickhouse_cluster/evidence.py"),
     Path("tests/integration/clickhouse_cluster/test_clickhouse_external_replication_live.py"),
+    Path("tests/integration/clickhouse_cluster/config/keeper/keeper.xml"),
     Path("tests/integration/clickhouse_cluster/config/node1/cluster.xml"),
     Path("tests/integration/clickhouse_cluster/config/node2/cluster.xml"),
 )
@@ -39,14 +40,21 @@ EXTERNAL_SCENARIOS = (
     "external_replication_lost_publication_response",
     "external_replication_lost_cleanup_response",
     "external_replication_staging_fresh_service_recovery",
+    "external_replication_empty_generation",
+    "external_replication_terminal_partial_no_redispatch",
 )
 
 
 def reset_receipt() -> None:
-    """Start one pytest session without reusing stale generated evidence."""
+    """Discard only stale internal-publication evidence."""
 
     if RECEIPT.exists():
         RECEIPT.unlink()
+
+
+def reset_external_receipt() -> None:
+    """Discard only stale external-publication evidence."""
+
     if EXTERNAL_RECEIPT.exists():
         EXTERNAL_RECEIPT.unlink()
 
@@ -66,11 +74,14 @@ def record_scenario(
     results = {item: "unverified" for item in SCENARIOS}
     results.update(evidence.get("scenario_results", {}))
     results[name] = result
+    source_commit, source_tree = _source_binding()
     evidence.update(
         {
             "schema_version": "dpone.clickhouse.cluster-publication-docker.v1",
-            "source_commit": _source_commit(),
-            "fixture_digest": _fixture_digest(),
+            "source_commit": source_commit,
+            "source_tree": source_tree,
+            "tracked_tree_status": "clean",
+            "fixture_digest": _fixture_digest(source_commit),
             "server_version": server_version,
             "replicas": 2,
             "scenario_results": results,
@@ -102,11 +113,14 @@ def record_external_scenario(
         "evidence_scope": "local_synthetic",
         "details": details or {},
     }
+    source_commit, source_tree = _source_binding()
     evidence.update(
         {
             "schema_version": "dpone.clickhouse.external-publication-docker.v1",
-            "source_commit": _source_commit(),
-            "fixture_digest": _fixture_digest(),
+            "source_commit": source_commit,
+            "source_tree": source_tree,
+            "tracked_tree_status": "clean",
+            "fixture_digest": _fixture_digest(source_commit),
             "server_version": server_version,
             "replicas": 2,
             "evidence_scope": "local_synthetic",
@@ -119,20 +133,32 @@ def record_external_scenario(
     EXTERNAL_RECEIPT.write_text(json.dumps(evidence, sort_keys=True) + "\n")
 
 
-def _source_commit() -> str:
+def _git(*args: str, text: bool = True) -> str | bytes:
     return subprocess.run(
-        ("git", "rev-parse", "HEAD"),
+        ("git", *args),
         check=True,
         capture_output=True,
-        text=True,
-    ).stdout.strip()
+        text=text,
+    ).stdout
 
 
-def _fixture_digest() -> str:
+def _source_binding() -> tuple[str, str]:
+    if str(_git("status", "--porcelain=v1", "--untracked-files=no")).strip():
+        raise RuntimeError("tracked worktree must be clean before writing Docker evidence")
+    return (
+        str(_git("rev-parse", "HEAD")).strip(),
+        str(_git("rev-parse", "HEAD^{tree}")).strip(),
+    )
+
+
+def _fixture_digest(source_commit: str) -> str:
     digest = hashlib.sha256()
     for path in _FIXTURE_FILES:
         digest.update(path.as_posix().encode("utf-8"))
         digest.update(b"\0")
-        digest.update(path.read_bytes())
+        content = _git("show", f"{source_commit}:{path.as_posix()}", text=False)
+        if not isinstance(content, bytes):
+            raise TypeError("git blob output must be bytes")
+        digest.update(content)
         digest.update(b"\0")
     return digest.hexdigest()

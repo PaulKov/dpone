@@ -85,6 +85,8 @@ def test_external_replication_stages_each_member_and_fresh_service_cleans_exact_
 
     assert result.total_rows == 2
     assert receipt["phase"] == "COMMITTED"
+    assert receipt["evidence_scope"] == "runtime"
+    assert receipt["evidence_status"] == "UNVERIFIED"
     assert len(receipt["member_ids"]) == 2
     for port in (18123, 28123):
         assert _execute(port, f"SELECT groupArray(id) FROM {database}.target") == [("[10,20]",)]
@@ -101,6 +103,38 @@ def test_external_replication_stages_each_member_and_fresh_service_cleans_exact_
             "member_count": len(receipt["member_ids"]),
             "production_composition": True,
         },
+    )
+
+
+@pytest.mark.skipif(
+    os.getenv("DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION") != "1",
+    reason="set DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION=1 for the opt-in Docker fixture",
+)
+def test_external_replication_publishes_verified_empty_generation() -> None:
+    sink, config, payload, database = _publication_case("empty", rows=[])
+
+    admitted = sink._full_refresh_publication.prepare_admission(config)
+    sink.preflight_before_extract(load_config=admitted)
+    result = sink.load(admitted, payload)
+    receipt = (result.reconciliation_metrics or {})["clickhouse_cluster_external_full_refresh"]
+
+    assert result.total_rows == 0
+    assert result.staging_rows == 0
+    assert result.commit_receipt_id
+    assert receipt["phase"] == "COMMITTED"
+    assert receipt["evidence_scope"] == "runtime"
+    assert receipt["evidence_status"] == "UNVERIFIED"
+    for port in (18123, 28123):
+        assert _execute(port, f"SELECT count() FROM {database}.target") == [("0",)]
+        assert _execute(
+            port,
+            f"SELECT count() FROM system.tables WHERE database='{database}' AND name LIKE 'target__dpone_ext_%'",
+        ) == [("0",)]
+    record_external_scenario(
+        "external_replication_empty_generation",
+        "PASS",
+        server_version=_execute(18123, "SELECT version()")[0][0],
+        details={"operation_id": result.commit_receipt_id, "row_count": 0},
     )
 
 
@@ -200,11 +234,67 @@ def test_external_replication_reconciles_lost_responses_and_staging_restart() ->
     )
 
 
+@pytest.mark.skipif(
+    os.getenv("DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION") != "1",
+    reason="set DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION=1 for the opt-in Docker fixture",
+)
+def test_external_replication_terminal_partial_is_retained_without_redispatch() -> None:
+    from dpone.contracts.clickhouse_external_replication import ExternalPublicationError
+
+    sink, config, payload, database = _publication_case("terminal_partial")
+    facade = sink._full_refresh_publication._external
+    original_factory = facade._service_factory
+    dispatches = 0
+
+    def faulting_factory(*args: object, **kwargs: object) -> object:
+        adapter = original_factory(*args, **kwargs)
+        original_publication = adapter.dispatch_publication_once
+
+        def terminal_partial(*call_args: object, **call_kwargs: object) -> None:
+            nonlocal dispatches
+            dispatches += 1
+            original_publication(*call_args, **call_kwargs)
+            candidate = str(call_kwargs["candidate_name"])
+            _execute(18123, f"EXCHANGE TABLES {database}.target AND {database}.{candidate}")
+            raise RuntimeError("injected lost response after one-member rollback")
+
+        adapter.dispatch_publication_once = terminal_partial
+        return adapter
+
+    facade._service_factory = faulting_factory
+    admitted = sink._full_refresh_publication.prepare_admission(config)
+
+    for _attempt in range(2):
+        with pytest.raises(ExternalPublicationError, match="PUBLICATION_PARTIAL_TERMINAL"):
+            sink.load(admitted, payload)
+
+    assert dispatches == 1
+    assert _execute(18123, f"SELECT groupArray(id) FROM {database}.target") == [("[1]",)]
+    assert _execute(28123, f"SELECT groupArray(id) FROM {database}.target") == [("[10,20]",)]
+    assert (
+        int(
+            _execute(
+                18123,
+                "SELECT uniqExact(entry) FROM system.distributed_ddl_queue "
+                f"WHERE cluster='{_CLUSTER}' AND position(query, '{database}') > 0",
+            )[0][0]
+        )
+        == 1
+    )
+    record_external_scenario(
+        "external_replication_terminal_partial_no_redispatch",
+        "PASS",
+        server_version=_execute(18123, "SELECT version()")[0][0],
+        details={"dispatch_count": dispatches, "retained_mixed_generation": True},
+    )
+
+
 def _publication_case(
     label: str,
     *,
     database: str | None = None,
     initialize: bool = True,
+    rows: list[dict[str, int]] | None = None,
 ) -> tuple[object, object, object, str]:
     from dpone.config.load_config import LoadConfig
     from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
@@ -260,7 +350,7 @@ def _publication_case(
         },
     )
     payload = LoadPayload(
-        artifact=InMemoryRowsArtifact([{"id": 10}, {"id": 20}]),
+        artifact=InMemoryRowsArtifact([{"id": 10}, {"id": 20}] if rows is None else rows),
         schema=(("id", "bigint"),),
     )
     return ClickHouseSink(connector), config, payload, database

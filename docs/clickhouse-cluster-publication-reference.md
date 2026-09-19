@@ -17,6 +17,12 @@ The cluster configuration is nested under
 | `replication_mode` | `internal` or `external` | `internal` | Explicitly selects the physical staging and generation protocol |
 | `external_content_row_budget` | positive integer | `100000` | Bounds the rows sealed and re-observed for exact typed-content proof in external mode |
 
+External mode also requires
+`sink.options.external_artifact_store_path` or the
+`DPONE_EXTERNAL_ARTIFACT_STORE` environment variable. The path must be
+absolute; a relative path is schema-invalid and there is no implicit `/tmp`
+fallback.
+
 All cluster full-refresh modes also require:
 
 - `sink.strategy.mode: full_refresh`;
@@ -59,11 +65,10 @@ external decision is additive to the existing result:
 }
 ```
 
-A static blocker produces a non-zero validation result. JSON validation errors
-use stable codes on stdout according to the existing check/plan contract.
-Runtime failures occur after live admission begins, emit a structured document
-on stdout, and exit non-zero. Stderr is reserved for parser or launcher
-diagnostics. No error path changes the request to local publication.
+A static blocker makes `dpone plan` return exit code `1` after rendering the
+decision document. Runtime failures after external live admission emit a
+structured typed document on stderr, leave stdout empty, and exit non-zero.
+No error path changes the request to local publication.
 
 ## Runtime admission
 
@@ -152,6 +157,11 @@ Evidence and errors never include hostnames, addresses, credentials, source
 SQL, row values, or local filesystem paths. A synthetic evidence receipt must
 identify its scope as `local_synthetic` and bind the exact commit and fixture
 configuration. It is not live certification.
+
+An ordinary production-composed runtime receipt uses `evidence_scope: runtime`
+and `evidence_status: UNVERIFIED`, including after a successful publication.
+Certification status is owned by the separate exact-commit evidence producer;
+runtime execution cannot self-certify.
 
 ## Publication and cleanup semantics
 

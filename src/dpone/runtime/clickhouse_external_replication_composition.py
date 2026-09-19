@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from dpone.ports.clickhouse_connector import ClickHouseEndpointClonePort
+from dpone.ports.clickhouse_external_replication import ExternalContractError
 from dpone.runtime.sinks.clickhouse_cluster_publication_bootstrap import (
     ClickHouseClusterAuthorityBootstrap,
 )
@@ -52,6 +54,11 @@ def build_clickhouse_external_replication(sink: Any) -> ClickHouseExternalReplic
         payload: Any | None = None,
         maximum_rows: int | None = None,
     ) -> ClickHouseExternalReplicationServiceAdapter:
+        if not callable(getattr(connector, "clone_for_endpoint", None)):
+            raise ExternalContractError(
+                "INVENTORY_INVALID",
+                "direct endpoint clone capability is unavailable",
+            )
         catalog = ClickHouseClusterPublicationCatalog(connector)
         topology = ClickHouseExternalTopologyCatalog(
             connector,
@@ -93,7 +100,8 @@ def build_clickhouse_external_replication(sink: Any) -> ClickHouseExternalReplic
             cluster=cluster,
             database=database,
             target=target,
-            evidence_scope="production_live",
+            evidence_scope="runtime",
+            evidence_status="UNVERIFIED",
         )
         return adapter
 
@@ -103,7 +111,12 @@ def build_clickhouse_external_replication(sink: Any) -> ClickHouseExternalReplic
     )
 
 
-def _direct_member_connection(base: Any, host_name: str, host_address: str, port: int) -> Any:
+def _direct_member_connection(
+    base: ClickHouseEndpointClonePort,
+    host_name: str,
+    host_address: str,
+    port: int,
+) -> Any:
     endpoint = host_name or host_address
     direct = base.clone_for_endpoint(endpoint, port, application_suffix="external-member", driver="native")
     return direct

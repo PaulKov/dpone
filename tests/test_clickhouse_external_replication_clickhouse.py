@@ -11,6 +11,7 @@ from dpone.contracts.clickhouse_external_replication import (
     ArtifactIdentity,
     ExternalAuthorityPhase,
     ExternalAuthorityRecord,
+    ExternalContractError,
     ExternalMember,
     ExternalMemberRecord,
     ExternalMemberStageState,
@@ -151,6 +152,68 @@ def test_topology_catalog_rejects_internal_replication_without_fallback() -> Non
 
     with pytest.raises(ValueError, match="MODE_MISMATCH"):
         ClickHouseExternalTopologyCatalog(connector).inventory("analytics_cluster")
+
+
+@pytest.mark.parametrize(
+    ("rows", "resolver"),
+    [
+        (
+            [
+                ("shared-host", "192.0.2.1", 9000, 1, 1, 0),
+                ("shared-host", "192.0.2.2", 9001, 1, 2, 0),
+            ],
+            None,
+        ),
+        (
+            [
+                ("node_1", "192.0.2.1", 9000, 1, 1, 0),
+                ("node_2", "192.0.2.2", 9000, 1, 2, 0),
+            ],
+            lambda *_args: ("127.0.0.1", "127.0.0.1", 19000),
+        ),
+        (
+            [
+                ("node_1", "192.0.2.1", 9000, 1, 1, 0),
+                ("node_2", "192.0.2.2", 9000, 1, 2, 0),
+            ],
+            lambda host, *_args: ("shared-proxy", host, 19000),
+        ),
+    ],
+)
+def test_topology_catalog_rejects_ambiguous_queue_aliases_and_endpoints(
+    rows: list[tuple[Any, ...]],
+    resolver: Any,
+) -> None:
+    connector = _Connector(rows)
+
+    with pytest.raises(ExternalContractError, match="INVENTORY_INVALID"):
+        ClickHouseExternalTopologyCatalog(connector, resolve_endpoint=resolver).inventory("analytics_cluster")
+
+
+def test_rejected_inventory_invalidates_the_previous_admitted_snapshot() -> None:
+    connector = _Connector(
+        [
+            ("node_1", "192.0.2.1", 9000, 1, 1, 0),
+            ("node_2", "192.0.2.2", 9000, 1, 2, 0),
+        ]
+    )
+    catalog = ClickHouseExternalTopologyCatalog(connector)
+    catalog.inventory("analytics_cluster")
+    assert catalog.member_identity("node_1")
+
+    connector.rows = [
+        ("shared-host", "192.0.2.1", 9000, 1, 1, 0),
+        ("shared-host", "192.0.2.2", 9001, 1, 2, 0),
+    ]
+    with pytest.raises(ExternalContractError, match="INVENTORY_INVALID"):
+        catalog.inventory("analytics_cluster")
+
+    assert catalog.bootstrap_hosts == ()
+    assert catalog.member_ids() == ()
+    with pytest.raises(ExternalContractError, match="INVENTORY_INVALID"):
+        catalog.member_identity("node_1")
+    with pytest.raises(ExternalContractError, match="INVENTORY_INVALID"):
+        _ = catalog.inventory_digest
 
 
 def test_connection_provider_resolves_an_opaque_member_through_injected_factory() -> None:
