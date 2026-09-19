@@ -22,6 +22,19 @@ FIXTURE_FILES = (
     Path("tests/integration/clickhouse_cluster/config/node2/cluster.xml"),
 )
 
+PERFORMANCE_V1_FIXTURE_FILES = (
+    Path("tests/integration/clickhouse_cluster/docker-compose.yml"),
+    Path("tests/integration/clickhouse_cluster/conftest.py"),
+    Path("tests/integration/clickhouse_cluster/evidence.py"),
+    Path("tests/integration/clickhouse_cluster/external_replication_live_support.py"),
+    Path("tests/integration/clickhouse_cluster/external_replication_performance_budget.json"),
+    Path("tests/integration/clickhouse_cluster/test_clickhouse_external_replication_live.py"),
+    Path("tests/integration/clickhouse_cluster/test_clickhouse_external_replication_performance_live.py"),
+    Path("tests/integration/clickhouse_cluster/config/keeper/keeper.xml"),
+    Path("tests/integration/clickhouse_cluster/config/node1/cluster.xml"),
+    Path("tests/integration/clickhouse_cluster/config/node2/cluster.xml"),
+)
+
 
 def source_binding() -> tuple[str, str]:
     """Return exact commit/tree only when the tracked checkout is clean."""
@@ -37,8 +50,23 @@ def source_binding() -> tuple[str, str]:
 def fixture_digest(source_commit: str) -> str:
     """Digest exact tracked fixture bytes from the bound commit."""
 
+    return _fixture_digest(source_commit, FIXTURE_FILES)
+
+
+def performance_fixture_digest(source_commit: str, schema_version: str) -> str:
+    """Reproduce the fixture identity algorithm owned by each evidence schema."""
+
+    files = (
+        PERFORMANCE_V1_FIXTURE_FILES
+        if schema_version == "dpone.clickhouse.external-publication-benchmark.v1"
+        else FIXTURE_FILES
+    )
+    return _fixture_digest(source_commit, files)
+
+
+def _fixture_digest(source_commit: str, files: tuple[Path, ...]) -> str:
     digest = hashlib.sha256()
-    for path in FIXTURE_FILES:
+    for path in files:
         digest.update(path.as_posix().encode("utf-8"))
         digest.update(b"\0")
         content = _git("show", f"{source_commit}:{path.as_posix()}", text=False)
@@ -58,4 +86,4 @@ def _git(*args: str, text: bool = True) -> str | bytes:
     ).stdout
 
 
-__all__ = ["FIXTURE_FILES", "fixture_digest", "source_binding"]
+__all__ = ["FIXTURE_FILES", "fixture_digest", "performance_fixture_digest", "source_binding"]
