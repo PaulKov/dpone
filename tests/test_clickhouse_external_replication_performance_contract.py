@@ -339,6 +339,29 @@ def test_historical_v1_binding_rejects_tampered_budget_bytes(
         )
 
 
+@pytest.mark.parametrize(("field", "tampered_value"), (("sha256", "f" * 64), ("size", 1)))
+@pytest.mark.parametrize("fixture_index", (0, 1, 2, 3, 5, 6, 7, 8, 9))
+def test_historical_v1_binding_rejects_tampered_non_budget_inventory(
+    fixture_index: int,
+    field: str,
+    tampered_value: str | int,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding_path = Path("tests/fixtures/release_evidence/clickhouse-external-benchmark-v1-source-binding-5451b198.json")
+    payload = json.loads(binding_path.read_text(encoding="utf-8"))
+    payload["fixture_files"][fixture_index][field] = tampered_value
+    tampered_path = tmp_path / "binding.json"
+    tampered_path.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(evidence_identity, "_PERFORMANCE_V1_SOURCE_BINDING", tampered_path)
+
+    with pytest.raises(ValueError, match="reviewed source identities"):
+        evidence_identity.historical_performance_binding(
+            "5451b1989796258a022c21cdd3059e442f81b1dc",
+            SCHEMA_V1,
+        )
+
+
 def test_historical_v1_verification_passes_in_branch_only_clone(tmp_path: Path) -> None:
     bundle_path = tmp_path / "candidate.bundle"
     clone_path = tmp_path / "candidate"

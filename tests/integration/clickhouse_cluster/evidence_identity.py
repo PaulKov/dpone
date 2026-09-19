@@ -47,6 +47,58 @@ _PERFORMANCE_V1_BINDING_SCHEMA = "dpone.clickhouse.external-publication-benchmar
 PERFORMANCE_V1_SOURCE_COMMIT = "5451b1989796258a022c21cdd3059e442f81b1dc"
 _PERFORMANCE_V1_SOURCE_TREE = "b5c90123c42fef1a7059a5bcff450ff4e42122e9"
 _PERFORMANCE_V1_FIXTURE_DIGEST = "a6dfa6864c7181a41666a470866f86b9058c3622ca0c681c6a2edfcd7d3f6d7c"
+_PERFORMANCE_V1_FIXTURE_INVENTORY = (
+    (
+        PERFORMANCE_V1_FIXTURE_FILES[0].as_posix(),
+        "4a03bf63ce84a625159a4a407ffb0a5f2dd9fa218130cf1ea7b8af71ee28a121",
+        824,
+    ),
+    (
+        PERFORMANCE_V1_FIXTURE_FILES[1].as_posix(),
+        "03072984381dcb92690f29d0914a06cc229f78dbb2572f220248ef03e20d2952",
+        1469,
+    ),
+    (
+        PERFORMANCE_V1_FIXTURE_FILES[2].as_posix(),
+        "553f7fb76a28ec78a5c9efa027341233287c1c2c99111436071496ea97b0a697",
+        8205,
+    ),
+    (
+        PERFORMANCE_V1_FIXTURE_FILES[3].as_posix(),
+        "cb85c7ab2085fbd94bf39002737de60977d21f9b819e0365442fdf694a3c76d5",
+        4208,
+    ),
+    (
+        PERFORMANCE_V1_FIXTURE_FILES[4].as_posix(),
+        "5caef54d4e33c1f0b6cf2c552c1506f319c7d7c253af9e211e8e37dcb4650871",
+        430,
+    ),
+    (
+        PERFORMANCE_V1_FIXTURE_FILES[5].as_posix(),
+        "c2c6f72c4a09f504fda02f5b20441b0a31089b612ab059bf183258a9c67aa5b2",
+        14450,
+    ),
+    (
+        PERFORMANCE_V1_FIXTURE_FILES[6].as_posix(),
+        "cfa63cd78351b18414fd28b2b3c2be67fc1444e6006fe89e61695ae700b1b3b7",
+        7708,
+    ),
+    (
+        PERFORMANCE_V1_FIXTURE_FILES[7].as_posix(),
+        "1f4bfe6d9318e55c1c7a08fb4809721941772e0885556acfde859c67ab9fa0e1",
+        628,
+    ),
+    (
+        PERFORMANCE_V1_FIXTURE_FILES[8].as_posix(),
+        "a92b1b1556fcc7c0664a070bda8ec463f5e5d624f47665d0302d1a9f91f2a360",
+        823,
+    ),
+    (
+        PERFORMANCE_V1_FIXTURE_FILES[9].as_posix(),
+        "35155f693586268f21e30d901a6bd77b44ccfec5fb8f6a333275169acf190d95",
+        823,
+    ),
+)
 _PERFORMANCE_V1_SOURCE_BINDING = Path(
     "tests/fixtures/release_evidence/clickhouse-external-benchmark-v1-source-binding-5451b198.json"
 )
@@ -146,8 +198,7 @@ def historical_performance_binding(
 def _validate_historical_fixture_files(value: Any) -> None:
     if not isinstance(value, list) or len(value) != len(PERFORMANCE_V1_FIXTURE_FILES):
         raise ValueError("historical fixture inventory is incomplete")
-    expected_paths = [path.as_posix() for path in PERFORMANCE_V1_FIXTURE_FILES]
-    actual_paths: list[str] = []
+    actual_inventory: list[tuple[str, str, int]] = []
     for item in value:
         if not isinstance(item, dict) or set(item) != {"path", "sha256", "size"}:
             raise ValueError("historical fixture inventory entry is invalid")
@@ -156,9 +207,9 @@ def _validate_historical_fixture_files(value: Any) -> None:
             raise ValueError("historical fixture inventory identity is invalid")
         if type(size) is not int or size <= 0:
             raise ValueError("historical fixture inventory size is invalid")
-        actual_paths.append(path)
-    if actual_paths != expected_paths:
-        raise ValueError("historical fixture inventory paths are not canonical")
+        actual_inventory.append((path, digest, size))
+    if tuple(actual_inventory) != _PERFORMANCE_V1_FIXTURE_INVENTORY:
+        raise ValueError("historical fixture inventory does not match the reviewed source identities")
 
 
 def _fixture_digest(source_commit: str, files: tuple[Path, ...]) -> str:
