@@ -283,7 +283,8 @@ dpone airflow build \
   --runtime-authority-secret-key authority.json
 ```
 
-Only the Secret name and key enter the immutable deployment/index. The provider
+Only the Secret name and key enter the immutable v4 Airflow index; existing
+deployment-set v2/v3 bytes remain unchanged. The provider
 mounts that key as
 `/run/secrets/dpone/runtime-authority/authority`, read-only, in both the
 `dpone-runtime-init-fetch` and `base` containers and sets

@@ -431,30 +431,6 @@
           ],
           "type": "object"
         },
-        "runtime_authority": {
-          "additionalProperties": false,
-          "properties": {
-            "mode": {
-              "const": "kubernetes_secret_volume"
-            },
-            "secret_key": {
-              "maxLength": 253,
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
-              "type": "string"
-            },
-            "secret_name": {
-              "maxLength": 63,
-              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-              "type": "string"
-            }
-          },
-          "required": [
-            "mode",
-            "secret_name",
-            "secret_key"
-          ],
-          "type": "object"
-        },
         "source": {
           "additionalProperties": false,
           "properties": {

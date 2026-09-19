@@ -20,7 +20,7 @@ from dpone_airflow_pack.pack_identity import (
 )
 
 from dpone.cli import main as cli_main
-from dpone.commands import airflow_artifact_attestation_cmd
+from dpone.commands import airflow_artifact_attestation_cmd, airflow_deployment_build_cmd
 from dpone.contracts.airflow_deployment import release_id as compute_release_id
 from dpone.gitops.airflow_compact_pack_bootstrap import inline_workload_archive
 from dpone.gitops.schema_validation import GitOpsSchemaValidator
@@ -2335,6 +2335,87 @@ def test_airflow_build_rejects_partial_registry_config_arguments_before_side_eff
     assert stderr == ""
     payload = json.loads(stdout)
     assert payload["errors"][0]["code"] == "DPONE_DEPLOYMENT_CONFIG_REF_INVALID"
+    assert not (tmp_path / ".dpone-cache" / "deployments").exists()
+
+
+def test_airflow_build_forwards_closed_runtime_authority_reference_with_default_key(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    def build_result(**kwargs: object) -> SelfServiceResult:
+        captured.update(kwargs)
+        return SelfServiceResult(passed=True, details={"kind": "test"})
+
+    monkeypatch.setattr(airflow_deployment_build_cmd, "build_deployment_result", build_result)
+    digest = "sha256:" + "b" * 64
+
+    code, stdout, stderr = _run_cli(
+        [
+            "airflow",
+            "build",
+            "--release-id",
+            "sha256:" + "a" * 64,
+            "--environment",
+            "dev",
+            *_strict_airflow_build_args(digest),
+            "--runtime-authority-secret-name",
+            "dpone-runtime-authority",
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+
+    assert code == 0
+    assert stderr == ""
+    assert json.loads(stdout)["passed"] is True
+    assert captured["runtime_authority_ref"] == {
+        "kind": "kubernetes_secret",
+        "name": "dpone-runtime-authority",
+        "key": "authority.json",
+    }
+    assert "synthetic-secret-value" not in stdout
+
+
+@pytest.mark.parametrize(
+    "authority_args",
+    [
+        ["--runtime-authority-secret-name", "dpone-runtime-authority"],
+        ["--runtime-authority-secret-key", "authority.json"],
+    ],
+)
+def test_airflow_build_rejects_authority_for_ordinary_release_without_writes(
+    authority_args: list[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _run_cli(["init", "project", "--airflow", "--format", "json"], capsys)
+    release_id = _write_airflow_build_release(tmp_path)
+    digest = "sha256:" + "b" * 64
+
+    code, stdout, stderr = _run_cli(
+        [
+            "airflow",
+            "build",
+            "--release-id",
+            release_id,
+            "--environment",
+            "dev",
+            *_strict_airflow_build_args(digest),
+            *authority_args,
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+
+    assert code == 1
+    assert stderr == ""
+    assert json.loads(stdout)["errors"][0]["code"] == "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID"
     assert not (tmp_path / ".dpone-cache" / "deployments").exists()
 
 

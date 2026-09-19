@@ -53,6 +53,9 @@ def build_environment_deployment_documents(
     optional_projection = (
         {"mssql_asset_outlet_projection": dict(mssql_outlet_projection)} if mssql_outlet_projection is not None else {}
     )
+    deployment_runtime_delivery = {
+        str(key): value for key, value in runtime_delivery.items() if key != "runtime_authority"
+    }
     deployment: dict[str, Any] = {
         "schema": DEPLOYMENT_SET_SCHEMA_V3 if use_v3 else DEPLOYMENT_SET_SCHEMA_V2,
         "deployment_id": "",
@@ -69,7 +72,7 @@ def build_environment_deployment_documents(
         "runtime_image_digest": runtime_image_digest,
         **runtime_image_dbt_fields,
         "airflow_bundle_ref": airflow_bundle_ref,
-        "runtime_artifact_delivery": runtime_delivery,
+        "runtime_artifact_delivery": deployment_runtime_delivery,
         **({"dev_evidence_delivery": dev_evidence_delivery} if dev_evidence_delivery is not None else {}),
         "workloads": list(workload_inventory),
         **optional_projection,

@@ -79,7 +79,8 @@ uses an earlier exact package set and deployment index.
 
 1. Deployment build detects the existing development-authority release marker.
 2. It requires and validates one Secret source without reading its value.
-3. The index hashes and publishes the reference as part of its closed v4 bytes.
+3. The index publishes the reference as part of its closed v4 bytes; the
+   deployment-set v2/v3 contracts and their identity bytes remain unchanged.
 4. The parse-safe provider requires the source iff development authority is
    required; any unknown field, invalid DNS name/key, or ordinary-plan source is
    rejected before operator construction.

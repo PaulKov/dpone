@@ -139,7 +139,7 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
         "secret_name": "dpone-runtime-authority",
         "secret_key": "authority.json",
     }
-    assert projection.deployment["runtime_artifact_delivery"]["runtime_authority"] == expected_source
+    assert "runtime_authority" not in projection.deployment["runtime_artifact_delivery"]
     assert projection.airflow_index["runtime_artifact_delivery"]["runtime_authority"] == expected_source
     assert "synthetic-secret-value" not in json.dumps(projection.to_dict(), sort_keys=True)
     context = init_fetch_context_from_payload(projection.airflow_index)

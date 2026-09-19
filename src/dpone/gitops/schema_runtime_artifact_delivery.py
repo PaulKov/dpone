@@ -21,12 +21,11 @@ def runtime_artifact_delivery_schema(
     *,
     require_mode: bool = True,
     strict_init_fetch: bool = False,
-    runtime_authority: bool = False,
 ) -> dict[str, Any]:
     """Build either the frozen v1 delivery schema or the strict v2 contract."""
 
     if strict_init_fetch:
-        return strict_init_fetch_delivery_schema(runtime_authority=runtime_authority)
+        return strict_init_fetch_delivery_schema()
     schema: dict[str, Any] = {
         "type": "object",
         "additionalProperties": True,
@@ -54,7 +53,7 @@ def runtime_artifact_delivery_schema(
     return schema
 
 
-def strict_init_fetch_delivery_schema(*, runtime_authority: bool = False) -> dict[str, Any]:
+def strict_init_fetch_delivery_schema() -> dict[str, Any]:
     """Build the closed executable init-fetch delivery contract."""
 
     return {
@@ -69,7 +68,6 @@ def strict_init_fetch_delivery_schema(*, runtime_authority: bool = False) -> dic
             "registry_config_ref": config_map_ref_schema(),
             "source": init_fetch_source_schema(strict=True),
             "trust_policy_ref": config_map_ref_schema(),
-            **({"runtime_authority": runtime_authority_source_schema()} if runtime_authority else {}),
             "verify": init_fetch_verification_schema(strict=True),
         },
         "allOf": [
@@ -234,6 +232,7 @@ __all__ = [
     "artifact_registry_logical_ref_schema",
     "config_map_ref_schema",
     "runtime_artifact_delivery_schema",
+    "runtime_authority_source_schema",
     "runtime_image_ref_schema",
     "strict_init_fetch_delivery_schema",
 ]

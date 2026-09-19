@@ -81,10 +81,12 @@ def test_development_plan_projects_one_read_only_source_to_init_and_base() -> No
 def test_object_pod_projection_updates_init_and_base_without_replacing_other_fields() -> None:
     base = SimpleNamespace(name="base", env=[], volume_mounts=[SimpleNamespace(name="existing")])
     init = SimpleNamespace(name="dpone-runtime-init-fetch", env=[], volume_mounts=[])
+    sidecar = SimpleNamespace(name="airflow-xcom-sidecar", env=[], volume_mounts=[])
+    mesh_init = SimpleNamespace(name="mesh-init", env=[], volume_mounts=[])
     pod = SimpleNamespace(
         spec=SimpleNamespace(
-            containers=[base],
-            init_containers=[init],
+            containers=[base, sidecar],
+            init_containers=[mesh_init, init],
             volumes=[SimpleNamespace(name="existing")],
         )
     )
@@ -107,6 +109,50 @@ def test_object_pod_projection_updates_init_and_base_without_replacing_other_fie
         assert [item.value for item in container.env if item.name == RUNTIME_AUTHORITY_PATH_ENV] == [
             RUNTIME_AUTHORITY_PATH
         ]
+    for container in (sidecar, mesh_init):
+        assert container.volume_mounts == []
+        assert container.env == []
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "missing_base",
+        "duplicate_init",
+        "volume_collision",
+        "mount_collision",
+        "env_collision",
+    ],
+)
+def test_projection_rejects_missing_duplicate_or_colliding_owned_pod_fields(mutation: str) -> None:
+    pod: dict[str, object] = {
+        "spec": {
+            "initContainers": [{"name": "dpone-runtime-init-fetch", "env": [], "volumeMounts": []}],
+            "containers": [{"name": "base", "env": [], "volumeMounts": []}],
+            "volumes": [],
+        }
+    }
+    spec = pod["spec"]
+    assert isinstance(spec, dict)
+    if mutation == "missing_base":
+        spec["containers"] = [{"name": "airflow-xcom-sidecar"}]
+    elif mutation == "duplicate_init":
+        spec["initContainers"] = [
+            {"name": "dpone-runtime-init-fetch"},
+            {"name": "dpone-runtime-init-fetch"},
+        ]
+    elif mutation == "volume_collision":
+        spec["volumes"] = [{"name": RUNTIME_AUTHORITY_VOLUME}]
+    elif mutation == "mount_collision":
+        spec["containers"][0]["volumeMounts"] = [{"name": RUNTIME_AUTHORITY_VOLUME}]  # type: ignore[index]
+    else:
+        spec["initContainers"][0]["env"] = [{"name": RUNTIME_AUTHORITY_PATH_ENV}]  # type: ignore[index]
+    source = init_fetch_context_from_payload(_development_index()).runtime_authority
+
+    with pytest.raises(InitFetchProviderError) as exc_info:
+        patch_pod_spec_runtime_authority(pod, source)
+
+    assert exc_info.value.code == "DPONE_INIT_FETCH_RESERVED_COLLISION"
 
 
 @pytest.mark.parametrize(
