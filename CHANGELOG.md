@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.81.4 - 2026-09-19
+
 ### Added
 
 - Add an explicit, fail-closed ClickHouse `external` replication mode for
