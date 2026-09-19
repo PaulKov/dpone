@@ -191,7 +191,11 @@ def test_read_cache_status_does_not_false_missing_when_exact_index_present(tmp_p
     assert not any(item["code"] == "airflow_pack_json_missing" for item in status["blockers"])
 
 
-def test_read_cache_status_blocks_v2_without_current_pointer_activation(tmp_path: Path) -> None:
+@pytest.mark.parametrize("schema_version", ("v2", "v3", "v4"))
+def test_read_cache_status_blocks_strict_index_without_current_pointer_activation(
+    tmp_path: Path,
+    schema_version: str,
+) -> None:
     cache = tmp_path / ".dpone-cache"
     deployment_id = "sha256:" + "b" * 64
     activation = _activation_dir(cache, deployment_id)
@@ -199,7 +203,7 @@ def test_read_cache_status_blocks_v2_without_current_pointer_activation(tmp_path
     (activation / "airflow-index.json").write_text(
         json.dumps(
             {
-                "schema": "dpone.airflow-deployment-index.v2",
+                "schema": f"dpone.airflow-deployment-index.{schema_version}",
                 "release_id": "sha256:" + "a" * 64,
                 "deployment_id": deployment_id,
                 "dag_specs": [],

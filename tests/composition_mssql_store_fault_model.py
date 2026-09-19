@@ -205,7 +205,13 @@ def mutate(data, sql, p):
             return [(guard,)]
     elif "UPDATE [dpone_control].[composition_owners] SET state" in sql:
         state, key, identifier, digest, document, size, before = p
-        assert "subject_document = ? AND DATALENGTH(subject_document) = ? AND state = ?" in sql
+        # ODBC may bind documents larger than 8 KiB as legacy ``image``.
+        # SQL Server cannot compare varbinary(max) to image until the parameter
+        # is explicitly normalized, so every lifecycle CAS must retain this
+        # conversion at the SQL boundary.
+        assert (
+            "subject_document = CONVERT(varbinary(max), ?) AND DATALENGTH(subject_document) = ? AND state = ?"
+        ) in sql
         assert "OUTPUT inserted.state INTO @changed" in sql
         record = data["owners"].get(key)
         if record == (key, "execution", identifier, digest, document, before) and len(document) == size:

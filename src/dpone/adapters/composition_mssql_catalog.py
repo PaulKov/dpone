@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from dpone.adapters import composition_mssql_check_definitions as reference
 from dpone.adapters import composition_mssql_gate_check_definitions as gate_reference
+from dpone.adapters.composition_mssql_catalog_query import require_exact_catalog_rows as _require
 from dpone.adapters.composition_mssql_gate_layout import COMPOSITION_GATE_TABLES
 from dpone.adapters.composition_mssql_gate_schema import gate_table_trigger, render_composition_mssql_login_gate
 from dpone.adapters.composition_mssql_layout import (
@@ -25,6 +26,11 @@ from dpone.adapters.composition_mssql_layout import (
     require_control_schema,
 )
 from dpone.adapters.composition_mssql_schema import composition_invariant_trigger_sql, render_composition_mssql_schema
+from dpone.adapters.composition_mssql_server_capabilities import (
+    ledger_catalog_projections,
+    require_database_collation,
+    supports_ledger_catalog,
+)
 from dpone.contracts.composition_identity import CompositionAdmissionError
 from dpone.ports.sql_connection import SqlControlCursor
 
@@ -75,24 +81,6 @@ def require_check_reference(
                 raise CompositionAdmissionError(reason)
 
 
-def require_check_collation(cursor: SqlControlCursor, collation: str) -> None:
-    """Read the current database default independently of captured reference bytes."""
-    _require(cursor, "collation", "d.collation_name FROM sys.databases d WHERE d.database_id=DB_ID();", ((collation,),))
-
-
-def _require(cursor: SqlControlCursor, part: str, query: str, expected: Rows, *parameters: object) -> None:
-    cursor.execute(f"SELECT TOP ({len(expected) + 1}) /* composition_schema:{part} */ " + query, *parameters)
-    actual = tuple(tuple(row) for row in cursor.fetchall())
-    if actual != expected or any(
-        (
-            type(value) is not type(wanted)
-            for row, expected_row in zip(actual, expected, strict=True)
-            for value, wanted in zip(row, expected_row, strict=True)
-        )
-    ):
-        raise CompositionAdmissionError("control_schema_" + part)
-
-
 def require_composition_mssql_schema(cursor: SqlControlCursor, control_schema: str) -> None:
     """Audit eight complete core definitions; never connect, mutate or repair.
 
@@ -117,7 +105,8 @@ def require_composition_mssql_schema(cursor: SqlControlCursor, control_schema: s
             "control_schema_reference",
         )
         require_composition_catalog_visibility(cursor, schema)
-        require_check_collation(cursor, collation)
+        require_database_collation(cursor, collation)
+        ledger_catalog_supported = supports_ledger_catalog(cursor)
         legacy = ",".join("N'composition_" + name + "'" for name in LEGACY_COMPOSITION_OBJECTS)
         _require(
             cursor, "legacy", f"name FROM sys.objects WHERE schema_id=SCHEMA_ID(?) AND name IN ({legacy});", (), schema
@@ -134,6 +123,7 @@ def require_composition_mssql_schema(cursor: SqlControlCursor, control_schema: s
                     composition_invariant_trigger_sql(schema, table.name),
                     ("DELETE", "INSERT", "UPDATE"),
                 ),
+                ledger_catalog_supported=ledger_catalog_supported,
             )
     except CompositionAdmissionError:
         raise
@@ -159,14 +149,17 @@ def inspect_composition_table(
     checks: dict[str, str],
     metadata: dict[str, tuple[int, int]],
     trigger: CompositionTrigger,
+    *,
+    ledger_catalog_supported: bool,
 ) -> None:
     """Inspect fixed metadata from a closed core/gate wrapper; no admission alone."""
     name = f"[{schema}].[composition_{table.name}]"
     order = " COLLATE " + COMPOSITION_COLLATION
+    ledger_type, dropped_ledger, ledger_view = ledger_catalog_projections(ledger_catalog_supported)
     _require(
         cursor,
         "table",
-        "SCHEMA_NAME(t.schema_id),t.name,CONVERT(int,t.uses_ansi_nulls),HAS_PERMS_BY_NAME(QUOTENAME(SCHEMA_NAME(t.schema_id))+N'.'+QUOTENAME(t.name),N'OBJECT',N'VIEW DEFINITION'),t.temporal_type,CONVERT(int,t.is_memory_optimized),CONVERT(int,t.is_filetable),CONVERT(int,t.is_external),CONVERT(int,t.is_node),CONVERT(int,t.is_edge),t.ledger_type,CONVERT(int,t.is_dropped_ledger_table),t.durability,CONVERT(int,t.is_remote_data_archive_enabled),CONVERT(int,t.is_replicated),CONVERT(int,t.has_replication_filter),CONVERT(int,t.is_merge_published),CONVERT(int,t.is_sync_tran_subscribed),CONVERT(int,t.is_tracked_by_cdc),CASE WHEN EXISTS (SELECT 1 FROM sys.fulltext_indexes f WHERE f.object_id=t.object_id) THEN 1 ELSE 0 END,CASE WHEN EXISTS (SELECT 1 FROM sys.change_tracking_tables c WHERE c.object_id=t.object_id) THEN 1 ELSE 0 END,t.history_table_id,t.ledger_view_id FROM sys.tables t WHERE t.object_id=OBJECT_ID(?,N'U');",
+        f"SCHEMA_NAME(t.schema_id),t.name,CONVERT(int,t.uses_ansi_nulls),HAS_PERMS_BY_NAME(QUOTENAME(SCHEMA_NAME(t.schema_id))+N'.'+QUOTENAME(t.name),N'OBJECT',N'VIEW DEFINITION'),t.temporal_type,CONVERT(int,t.is_memory_optimized),CONVERT(int,t.is_filetable),CONVERT(int,t.is_external),CONVERT(int,t.is_node),CONVERT(int,t.is_edge),{ledger_type},{dropped_ledger},t.durability,CONVERT(int,t.is_remote_data_archive_enabled),CONVERT(int,t.is_replicated),CONVERT(int,t.has_replication_filter),CONVERT(int,t.is_merge_published),CONVERT(int,t.is_sync_tran_subscribed),CONVERT(int,t.is_tracked_by_cdc),CASE WHEN EXISTS (SELECT 1 FROM sys.fulltext_indexes f WHERE f.object_id=t.object_id) THEN 1 ELSE 0 END,CASE WHEN EXISTS (SELECT 1 FROM sys.change_tracking_tables c WHERE c.object_id=t.object_id) THEN 1 ELSE 0 END,t.history_table_id,{ledger_view} FROM sys.tables t WHERE t.object_id=OBJECT_ID(?,N'U');",
         ((schema, "composition_" + table.name, 1, 1, *[0] * 17, None, None),),
         name,
     )
@@ -356,9 +349,18 @@ def require_composition_mssql_gate_schema(cursor: SqlControlCursor, control_sche
             "login_gate_schema_reference",
         )
         require_composition_catalog_visibility(cursor, schema)
-        require_check_collation(cursor, collation)
+        require_database_collation(cursor, collation)
+        ledger_catalog_supported = supports_ledger_catalog(cursor)
         for table in COMPOSITION_GATE_TABLES:
-            inspect_composition_table(cursor, schema, table, values, metadata, gate_table_trigger(schema, table.name))
+            inspect_composition_table(
+                cursor,
+                schema,
+                table,
+                values,
+                metadata,
+                gate_table_trigger(schema, table.name),
+                ledger_catalog_supported=ledger_catalog_supported,
+            )
     except CompositionAdmissionError:
         raise
     except Exception:

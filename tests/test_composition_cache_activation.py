@@ -66,3 +66,26 @@ def test_post_pointer_failure_is_explicit_parent_commit_unknown(tmp_path):
         saga.activate_occurrence(acknowledged("PREPARED"), projection_root=tmp_path)
     assert failure.value.code == "DPONE_COMPOSITION_ACTIVATION_COMMIT_UNKNOWN"
     assert failure.value.details["state_may_have_changed"] is True
+
+
+def test_existing_active_parent_is_reused_without_lifecycle_replay(tmp_path):
+    calls = []
+
+    def prepare(**kwargs):
+        calls.append("parent_prepare")
+        return acknowledged("ACTIVE")
+
+    def require_active(**kwargs):
+        calls.append("parent_require_active")
+        return acknowledged("ACTIVE")
+
+    parent = SimpleNamespace(
+        prepare=prepare,
+        activate=lambda *args, **kwargs: pytest.fail("ACTIVE must not be replayed"),
+        require_active=require_active,
+    )
+    saga = DeploymentCacheWorkspaceActivation(None, composition_coordinator=parent)
+    active = saga.prepare_occurrence(**coordinates(tmp_path))
+    saga.activate_occurrence(active, projection_root=tmp_path)
+
+    assert calls == ["parent_prepare", "parent_require_active"]

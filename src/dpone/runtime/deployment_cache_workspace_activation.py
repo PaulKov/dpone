@@ -63,7 +63,7 @@ class DeploymentCacheWorkspaceActivation:
             )
             prepared.__post_init__()
             if dbt_wire == COMPOSITION_ADMISSION:
-                _require_parent_state(prepared, "PREPARED")
+                _require_parent_state_in(prepared, {"PREPARED", "ACTIVE"})
             return prepared
         except DeploymentCacheError:
             raise
@@ -81,7 +81,18 @@ class DeploymentCacheWorkspaceActivation:
             )
             if coordinator is None:
                 raise ValueError("workspace activation coordinator disappeared")
-            active = coordinator.activate(prepared, projection_root=projection_root)
+            if isinstance(prepared, CompositionActivationOccurrence) and prepared.receipt.state == "ACTIVE":
+                request = prepared.request
+                active = coordinator.require_active(
+                    projection_root=projection_root,
+                    activation_id=request.activation_id,
+                    environment=request.environment,
+                    release_id=request.release_id,
+                    deployment_id=request.deployment_id,
+                    previous_deployment_id=request.previous_deployment_id,
+                )
+            else:
+                active = coordinator.activate(prepared, projection_root=projection_root)
             _require_coordinates(
                 active.request,
                 activation_id=prepared.request.activation_id,
@@ -151,6 +162,14 @@ def _require_parent_state(value: object, state: str) -> None:
     if not isinstance(value, CompositionActivationOccurrence):
         raise ValueError("composition requires complete typed parent authority")
     value.require_state(state)
+
+
+def _require_parent_state_in(value: object, states: set[str]) -> None:
+    if not isinstance(value, CompositionActivationOccurrence):
+        raise ValueError("composition requires complete typed parent authority")
+    value.__post_init__()
+    if value.receipt.state not in states:
+        raise ValueError("composition parent state is not reusable")
 
 
 def _require_coordinates(

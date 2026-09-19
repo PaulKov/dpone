@@ -160,7 +160,8 @@ class CompositionMssqlLedger:
             "DECLARE @changed TABLE (state varchar(16)); "
             f"UPDATE {self.table('owners')} SET state = ? OUTPUT inserted.state INTO @changed "
             "WHERE owner_key = ? AND owner_kind = 'execution' AND owner_id = ? AND subject_sha256 = ? "
-            "AND subject_document = ? AND DATALENGTH(subject_document) = ? AND state = ?; SELECT state FROM @changed;",
+            "AND subject_document = CONVERT(varbinary(max), ?) "
+            "AND DATALENGTH(subject_document) = ? AND state = ?; SELECT state FROM @changed;",
             state,
             CompositionOwnerReference("execution", request.activation_id).owner_key,
             request.activation_id,

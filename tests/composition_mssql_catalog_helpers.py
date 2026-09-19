@@ -21,6 +21,7 @@ from dpone.adapters.composition_mssql_schema import render_composition_mssql_sch
 def expected_rows(schema="control", *, tables=COMPOSITION_TABLES, definitions=None, metadata=None, trigger_for=None):
     """Independent projected values from the frozen physical layout."""
     rows: dict[tuple[str, str], tuple[tuple[object, ...], ...]] = {
+        ("database", "server_capabilities"): ((15, 3),),
         (schema, "visibility"): ((schema, 1, 1, 0),),
         (schema, "legacy"): (),
         ("database", "collation"): (("Latin1_General_100_BIN2",),),

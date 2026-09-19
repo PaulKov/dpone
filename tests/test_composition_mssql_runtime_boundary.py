@@ -85,7 +85,7 @@ def test_same_observed_transaction_commits_once_after_body(connection):
     assert observed == [7]
     assert connection.commits == 1 and connection.rollbacks == 0
     assert connection.closed and connection.value.closed
-    assert len(connection.value.catalog.calls) == 3 + len(COMPOSITION_TABLES) * 9
+    assert len(connection.value.catalog.calls) == 4 + len(COMPOSITION_TABLES) * 9
 
 
 @pytest.mark.parametrize(

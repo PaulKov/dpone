@@ -38,7 +38,7 @@ def gate_catalog(monkeypatch):
 
 def test_complete_gate_catalog_keeps_exact_existing_update_delete_events(gate_catalog):
     require_composition_mssql_gate_schema(gate_catalog, "control")
-    assert len(gate_catalog.calls) == 2 + 4 * 9
+    assert len(gate_catalog.calls) == 3 + 4 * 9
     for table in COMPOSITION_GATE_TABLES:
         key = f"[control].[composition_{table.name}]"
         events = gate_catalog.rows[key, "events"]
