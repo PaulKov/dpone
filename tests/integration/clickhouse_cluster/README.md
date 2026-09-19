@@ -9,7 +9,7 @@ Run:
 
 ```bash
 docker compose -f tests/integration/clickhouse_cluster/docker-compose.yml up -d --wait
-DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION=1 uv run pytest \
+DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION=1 uv run --extra clickhouse pytest \
   tests/integration/clickhouse_cluster -q
 docker compose -f tests/integration/clickhouse_cluster/docker-compose.yml down -v
 ```
