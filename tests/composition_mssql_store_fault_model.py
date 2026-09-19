@@ -210,8 +210,7 @@ def mutate(data, sql, p):
         # is explicitly normalized, so every lifecycle CAS must retain this
         # conversion at the SQL boundary.
         assert (
-            "subject_document = CONVERT(varbinary(max), ?) "
-            "AND DATALENGTH(subject_document) = ? AND state = ?"
+            "subject_document = CONVERT(varbinary(max), ?) AND DATALENGTH(subject_document) = ? AND state = ?"
         ) in sql
         assert "OUTPUT inserted.state INTO @changed" in sql
         record = data["owners"].get(key)

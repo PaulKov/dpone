@@ -81,10 +81,7 @@ class DeploymentCacheWorkspaceActivation:
             )
             if coordinator is None:
                 raise ValueError("workspace activation coordinator disappeared")
-            if (
-                isinstance(prepared, CompositionActivationOccurrence)
-                and prepared.receipt.state == "ACTIVE"
-            ):
+            if isinstance(prepared, CompositionActivationOccurrence) and prepared.receipt.state == "ACTIVE":
                 request = prepared.request
                 active = coordinator.require_active(
                     projection_root=projection_root,
