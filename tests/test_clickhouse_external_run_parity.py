@@ -12,6 +12,7 @@ import pytest
 
 from dpone.config import LoadConfig
 from dpone.contracts.clickhouse_external_replication import ExternalPublicationError
+from dpone.ports.clickhouse_external_replication import ExternalReplicationReceipt
 from dpone.ports.runtime_hydrator import RuntimeBindings
 from dpone.runtime.bootstrap_runner import DefaultProcessRunner
 from dpone.runtime.lineage.audit import LoadIdentityService
@@ -21,21 +22,17 @@ from dpone.runtime.sinks.load_result import AtomicCommitOutcome
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTED_MANIFEST = ROOT / "examples/batch/clickhouse-external-replication-full-refresh.batch.yaml"
-RECEIPT = {
-    "schema_version": "dpone.clickhouse.external-publication-receipt.v1",
-    "phase": "COMMITTED",
-    "target_key": "1" * 64,
-    "operation_id": "external-operation",
-    "generation_id": "2" * 64,
-    "inventory_digest": "3" * 64,
-    "plan_digest": "4" * 64,
-    "artifact_sha256": "5" * 64,
-    "member_ids": ["6" * 64, "7" * 64],
-    "authority_version": 3,
-    "replication_mode": "external",
-    "evidence_scope": "runtime",
-    "evidence_status": "UNVERIFIED",
-}
+RECEIPT = ExternalReplicationReceipt(
+    target_key="1" * 64,
+    operation_id="8" * 64,
+    generation_id="2" * 64,
+    inventory_digest="3" * 64,
+    plan_digest="4" * 64,
+    artifact_sha256="5" * 64,
+    member_ids=("6" * 64, "7" * 64),
+    authority_version=3,
+    phase="COMMITTED",
+).to_dict()
 
 
 class StubLogger:
@@ -112,7 +109,7 @@ class ExternalSink:
             updated_rows=0,
             total_rows=2,
             staging_rows=2,
-            commit_receipt_id="external-operation",
+            commit_receipt_id=str(RECEIPT["operation_id"]),
             commit_outcome=AtomicCommitOutcome.COMMITTED,
             reconciliation_metrics={"clickhouse_cluster_external_full_refresh": dict(RECEIPT)},
         )

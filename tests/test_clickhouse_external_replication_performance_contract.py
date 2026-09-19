@@ -18,6 +18,7 @@ from tests.integration.clickhouse_cluster.external_replication_performance_evide
     EXTERNAL_PERFORMANCE_COMMAND,
     EXTERNAL_PERFORMANCE_TEST_NODEID,
     validate_external_performance_receipt,
+    verify_external_performance_receipt,
     write_external_performance_receipt,
 )
 from tests.integration.clickhouse_cluster.external_replication_performance_validation import SCHEMA_V1, SCHEMA_V2
@@ -275,6 +276,22 @@ def test_historical_v1_fixture_digest_matches_immutable_release_observation() ->
     assert evidence_identity.performance_fixture_digest("5451b1989796258a022c21cdd3059e442f81b1dc", SCHEMA_V1) == (
         "a6dfa6864c7181a41666a470866f86b9058c3622ca0c681c6a2edfcd7d3f6d7c"
     )
+
+
+def test_historical_v1_receipt_verifies_end_to_end_against_trusted_commit() -> None:
+    receipt_path = Path("tests/fixtures/release_evidence/clickhouse-external-benchmark-v1-5451b198.json")
+    receipt = verify_external_performance_receipt(
+        expected_source_commit="5451b1989796258a022c21cdd3059e442f81b1dc",
+        receipt_path=receipt_path,
+    )
+
+    assert receipt["schema_version"] == SCHEMA_V1
+    assert receipt["status"] == "PASS"
+    with pytest.raises(ValueError, match="failed validation"):
+        verify_external_performance_receipt(
+            expected_source_commit="c2bfef311180092ccbef00d070441d98045509fc",
+            receipt_path=receipt_path,
+        )
 
 
 def test_performance_receipt_v2_requires_observation_and_source_budget(tmp_path: Path) -> None:
