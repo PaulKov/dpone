@@ -102,7 +102,10 @@ def deployment_set_v2_contract() -> GitOpsSchemaContract:
             "runtime_image_ref": runtime_image_ref_schema(),
             "runtime_image_digest": {"$ref": "#/$defs/identity"},
             "airflow_bundle_ref": {"type": ["string", "null"]},
-            "runtime_artifact_delivery": runtime_artifact_delivery_schema(strict_init_fetch=True),
+            "runtime_artifact_delivery": runtime_artifact_delivery_schema(
+                strict_init_fetch=True,
+                runtime_authority=True,
+            ),
             "dev_evidence_delivery": dev_evidence_delivery_schema(),
             "workloads": deployment_workload_inventory_v2_schema(),
         },

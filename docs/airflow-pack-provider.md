@@ -265,6 +265,36 @@ expired, revoked, or mismatched authority fails with
 `DPONE_DEVELOPMENT_RUNTIME_AUTHORITY_REQUIRED`. Adapter results are never
 written to XCom or persisted as credentials.
 
+The protected deployment must also name the Kubernetes Secret key containing
+the adapter's external configuration:
+
+```bash
+dpone airflow build \
+  --release-id "$RELEASE_ID" \
+  --environment development \
+  --trust-tier non_production \
+  --runtime-image-ref "$RUNTIME_IMAGE_REF" \
+  --runtime-image-digest "$RUNTIME_IMAGE_DIGEST" \
+  --artifact-registry-ref artifacts \
+  --registry-config-map-name dpone-artifact-registry \
+  --registry-config-map-key registry.json \
+  --registry-config-sha256 "$REGISTRY_CONFIG_SHA256" \
+  --runtime-authority-secret-name dpone-runtime-authority \
+  --runtime-authority-secret-key authority.json
+```
+
+Only the Secret name and key enter the immutable deployment/index. The provider
+mounts that key as
+`/run/secrets/dpone/runtime-authority/authority`, read-only, in both the
+`dpone-runtime-init-fetch` and `base` containers and sets
+`DPONE_RUNTIME_AUTHORITY_PATH` to that fixed path. The scheduler never reads the
+value. Pack fields and `operator_overrides` cannot choose the Secret, mount,
+path, volume, or environment variable. Create the Secret in the deployment
+namespace before the task starts; a missing Kubernetes object prevents pod
+startup, while a missing or malformed build reference fails before DAG task
+construction. Remove the options entirely for ordinary and production
+releases—supplying them there is rejected rather than ignored.
+
 An image-owned adapter package registers one zero-argument factory:
 
 ```toml

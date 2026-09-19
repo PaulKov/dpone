@@ -634,6 +634,11 @@ def _development_projection(
         artifact_registry_ref="synthetic-artifacts",
         registry_config_ref=_config_map_ref("registry", "1"),
         trust_policy_ref=_config_map_ref("policy", "2"),
+        runtime_authority_ref={
+            "kind": "kubernetes_secret",
+            "name": "dpone-runtime-authority",
+            "key": "authority.json",
+        },
         airflow_bundle_ref="git:" + "d" * 40,
     )
     return cache, release["release_id"], projection.deployment["deployment_id"]

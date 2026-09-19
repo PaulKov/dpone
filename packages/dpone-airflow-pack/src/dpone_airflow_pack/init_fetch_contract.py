@@ -154,6 +154,22 @@ class DevEvidenceDelivery:
 
 
 @dataclass(frozen=True, slots=True)
+class RuntimeAuthoritySource:
+    """Value-free coordinates for one deployment-owned Kubernetes Secret key."""
+
+    mode: str
+    secret_name: str
+    secret_key: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "mode": self.mode,
+            "secret_name": self.secret_name,
+            "secret_key": self.secret_key,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class EncodedInitFetchPlan:
     """Canonical plan bytes and their immutable transport projections."""
 
@@ -189,6 +205,7 @@ class InitFetchDeliveryContext:
     runtime_image_dbt_digest: str | None = None
     mssql_asset_uri_by_ref: Mapping[str, str] | None = None
     development_authority_required: bool = False
+    runtime_authority: RuntimeAuthoritySource | None = None
 
     def workload_pack(self, workload_id: str) -> ExactWorkloadPack:
         for workload in self.workload_packs:
@@ -389,6 +406,7 @@ __all__ = [
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2",
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3",
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4",
+    "RuntimeAuthoritySource",
     "VerificationPolicy",
     "WorkloadIdentity",
     "init_fetch_context_from_payload",

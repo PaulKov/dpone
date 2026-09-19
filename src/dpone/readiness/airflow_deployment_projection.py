@@ -100,6 +100,7 @@ class AirflowDeploymentProjectionService:
         dev_evidence_pvc_claim: str | None = None,
         dev_evidence_worker_queue: str | None = None,
         semantic_refresh_sidecars: SemanticRefreshDagSidecarFactory | None = None,
+        runtime_authority_ref: Mapping[str, Any] | None = None,
     ) -> AirflowDeploymentProjection:
         """Materialize a strict executable v2 environment projection."""
 
@@ -132,11 +133,22 @@ class AirflowDeploymentProjectionService:
                 artifact_registry_ref=artifact_registry_ref,
                 registry_config_ref=registry_config_ref,
                 trust_policy_ref=trust_policy_ref,
+                runtime_authority_ref=runtime_authority_ref,
             )
         except InitFetchProjectionContractError as exc:
             raise AirflowDeploymentProjectionError(exc.code, str(exc)) from exc
         normalized_trust_tier = str(runtime_delivery["trust_tier"])
         require_runtime_payload_authority(inputs.release_schema, bool(inputs.runtime_payloads), normalized_trust_tier)
+        if inputs.development_authority_required and runtime_authority_ref is None:
+            raise AirflowDeploymentProjectionError(
+                "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_REQUIRED",
+                "development deployment requires a runtime-authority Kubernetes Secret reference",
+            )
+        if not inputs.development_authority_required and runtime_authority_ref is not None:
+            raise AirflowDeploymentProjectionError(
+                "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID",
+                "runtime-authority configuration is allowed only for protected development releases",
+            )
         dev_evidence_delivery = build_dev_evidence_delivery(
             trust_tier=normalized_trust_tier,
             claim_name=dev_evidence_pvc_claim,

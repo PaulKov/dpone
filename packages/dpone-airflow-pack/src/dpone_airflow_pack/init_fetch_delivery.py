@@ -12,6 +12,7 @@ from dpone_airflow_pack.init_fetch_contract import (
     ConfigMapReference,
     DevEvidenceDelivery,
     InitFetchProviderError,
+    RuntimeAuthoritySource,
     VerificationPolicy,
     WorkloadIdentity,
 )
@@ -35,6 +36,7 @@ _DELIVERY_KEYS = frozenset(
         "trust_policy_ref",
         "source",
         "verify",
+        "runtime_authority",
     }
 )
 _DEV_EVIDENCE_KEYS = frozenset({"mode", "claim_name", "mount_path", "worker_queue"})
@@ -53,6 +55,7 @@ class ParsedInitFetchDelivery:
     identity: WorkloadIdentity
     verify: VerificationPolicy
     dev_evidence_delivery: DevEvidenceDelivery | None
+    runtime_authority: RuntimeAuthoritySource | None
 
 
 def parse_init_fetch_delivery(
@@ -66,7 +69,7 @@ def parse_init_fetch_delivery(
         payload.get("runtime_artifact_delivery"),
         "runtime_artifact_delivery",
         _DELIVERY_KEYS,
-        optional=frozenset({"trust_policy_ref"}),
+        optional=frozenset({"trust_policy_ref", "runtime_authority"}),
         path=path,
     )
     if delivery["mode"] != "init_fetch":
@@ -97,6 +100,28 @@ def parse_init_fetch_delivery(
             trust_tier=trust_tier,
             path=path,
         ),
+        runtime_authority=_runtime_authority(delivery.get("runtime_authority"), path),
+    )
+
+
+def _runtime_authority(value: object, path: Path | None) -> RuntimeAuthoritySource | None:
+    if value is None:
+        return None
+    item = exact_mapping(
+        value,
+        "runtime_artifact_delivery.runtime_authority",
+        frozenset({"mode", "secret_name", "secret_key"}),
+        path=path,
+    )
+    if item["mode"] != "kubernetes_secret_volume":
+        raise field_invalid("runtime authority mode must be kubernetes_secret_volume", path)
+    key = item["secret_key"]
+    if not isinstance(key, str) or CONFIG_KEY_RE.fullmatch(key) is None:
+        raise field_invalid("runtime authority secret_key is invalid", path)
+    return RuntimeAuthoritySource(
+        mode="kubernetes_secret_volume",
+        secret_name=dns_label(item["secret_name"], "runtime_authority.secret_name", path),
+        secret_key=key,
     )
 
 

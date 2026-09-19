@@ -48,6 +48,7 @@ from dpone_airflow_pack.provider_execution import (
     WORKLOAD_ID_METADATA_KEY,
     require_provider_execution,
 )
+from dpone_airflow_pack.runtime_authority_projection import patch_pod_spec_runtime_authority
 from dpone_airflow_pack.xcom_sidecar import require_strict_xcom_sidecar_image
 
 _PRESERVED_KPO_FIELDS = frozenset(
@@ -156,14 +157,17 @@ def compose_init_fetch_operator_kwargs(
             "env_vars": env_vars,
             "annotations": annotations,
             "labels": runtime_labels,
-            "full_pod_spec": _strict_pod(
-                projection.pod_spec,
-                context=context,
-                env_vars=env_vars,
-                plan_sha256=encoded.sha256,
-                name=str(clean.get("name") or clean.get("task_id") or "dpone-runtime"),
-                labels=runtime_labels,
-                workload_id=workload_id,
+            "full_pod_spec": patch_pod_spec_runtime_authority(
+                _strict_pod(
+                    projection.pod_spec,
+                    context=context,
+                    env_vars=env_vars,
+                    plan_sha256=encoded.sha256,
+                    name=str(clean.get("name") or clean.get("task_id") or "dpone-runtime"),
+                    labels=runtime_labels,
+                    workload_id=workload_id,
+                ),
+                context.runtime_authority,
             ),
         }
     )

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
 from dpone.contracts.airflow_deployment import deployment_id
 from dpone.contracts.runtime_artifact_delivery import (
+    CONFIG_MAP_KEY_PATTERN,
     attestations_for_trust_tier,
     is_safe_artifact_registry_logical_ref,
     normalize_config_map_ref,
@@ -14,6 +16,8 @@ from dpone.contracts.runtime_artifact_delivery import (
     validate_runtime_image_reference,
 )
 from dpone.kubernetes_names import is_valid_kubernetes_dns_label
+
+_RUNTIME_AUTHORITY_KEY_RE = re.compile(CONFIG_MAP_KEY_PATTERN)
 
 
 class InitFetchProjectionContractError(ValueError):
@@ -33,6 +37,7 @@ def build_init_fetch_delivery(
     artifact_registry_ref: object,
     registry_config_ref: object,
     trust_policy_ref: object | None,
+    runtime_authority_ref: object | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Validate and return the exact image plus secret-free delivery block."""
 
@@ -89,7 +94,39 @@ def build_init_fetch_delivery(
     }
     if trust_ref is not None:
         delivery["trust_policy_ref"] = trust_ref
+    if runtime_authority_ref is not None:
+        delivery["runtime_authority"] = _runtime_authority_source(runtime_authority_ref)
     return image_ref, delivery
+
+
+def _runtime_authority_source(value: object) -> dict[str, str]:
+    if not isinstance(value, Mapping) or frozenset(str(key) for key in value) != {"kind", "name", "key"}:
+        raise InitFetchProjectionContractError(
+            "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID",
+            "runtime authority reference requires exactly kind, name, and key",
+        )
+    if value.get("kind") != "kubernetes_secret":
+        raise InitFetchProjectionContractError(
+            "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID",
+            "runtime authority reference kind must be kubernetes_secret",
+        )
+    name = value.get("name")
+    key = value.get("key")
+    if not is_valid_kubernetes_dns_label(name):
+        raise InitFetchProjectionContractError(
+            "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID",
+            "runtime authority Secret name must be a safe Kubernetes DNS label",
+        )
+    if not isinstance(key, str) or _RUNTIME_AUTHORITY_KEY_RE.fullmatch(key) is None:
+        raise InitFetchProjectionContractError(
+            "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID",
+            "runtime authority Secret key is invalid",
+        )
+    return {
+        "mode": "kubernetes_secret_volume",
+        "secret_name": str(name),
+        "secret_key": key,
+    }
 
 
 def _build_local_safe_sample_delivery(

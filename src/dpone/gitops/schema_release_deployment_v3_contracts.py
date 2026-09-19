@@ -29,6 +29,7 @@ from dpone.gitops.schema_release_deployment_v2_contracts import (
 )
 from dpone.gitops.schema_runtime_artifact_delivery import (
     runtime_artifact_delivery_schema,
+    runtime_authority_source_schema,
     runtime_image_ref_schema,
 )
 from dpone.gitops.schema_runtime_connection_context import (
@@ -79,7 +80,10 @@ def deployment_set_v3_contract() -> GitOpsSchemaContract:
             "runtime_image_ref": runtime_image_ref_schema(),
             "runtime_image_digest": {"$ref": "#/$defs/identity"},
             "airflow_bundle_ref": {"type": ["string", "null"]},
-            "runtime_artifact_delivery": runtime_artifact_delivery_schema(strict_init_fetch=True),
+            "runtime_artifact_delivery": runtime_artifact_delivery_schema(
+                strict_init_fetch=True,
+                runtime_authority=True,
+            ),
             "dev_evidence_delivery": dev_evidence_delivery_schema(),
             "workloads": deployment_workload_inventory_v2_schema(),
             **MSSQL_OUTLET_PROJECTION_PROPERTY,
@@ -164,6 +168,9 @@ def airflow_deployment_index_v4_contract() -> GitOpsSchemaContract:
     schema["title"] = "dpone GitOps executable Airflow deployment index v4"
     schema["properties"]["schema"] = {"const": kind}
     schema["properties"]["development_authority_required"] = {"const": True}
+    delivery = schema["properties"]["runtime_artifact_delivery"]
+    delivery["properties"]["runtime_authority"] = runtime_authority_source_schema()
+    delivery["required"] = [*delivery["required"], "runtime_authority"]
     schema["required"] = [field for field in schema["required"] if field != "mssql_asset_outlet_projection"]
     schema["required"].append("development_authority_required")
     return GitOpsSchemaContract(

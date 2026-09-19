@@ -21,11 +21,12 @@ def runtime_artifact_delivery_schema(
     *,
     require_mode: bool = True,
     strict_init_fetch: bool = False,
+    runtime_authority: bool = False,
 ) -> dict[str, Any]:
     """Build either the frozen v1 delivery schema or the strict v2 contract."""
 
     if strict_init_fetch:
-        return strict_init_fetch_delivery_schema()
+        return strict_init_fetch_delivery_schema(runtime_authority=runtime_authority)
     schema: dict[str, Any] = {
         "type": "object",
         "additionalProperties": True,
@@ -53,7 +54,7 @@ def runtime_artifact_delivery_schema(
     return schema
 
 
-def strict_init_fetch_delivery_schema() -> dict[str, Any]:
+def strict_init_fetch_delivery_schema(*, runtime_authority: bool = False) -> dict[str, Any]:
     """Build the closed executable init-fetch delivery contract."""
 
     return {
@@ -68,6 +69,7 @@ def strict_init_fetch_delivery_schema() -> dict[str, Any]:
             "registry_config_ref": config_map_ref_schema(),
             "source": init_fetch_source_schema(strict=True),
             "trust_policy_ref": config_map_ref_schema(),
+            **({"runtime_authority": runtime_authority_source_schema()} if runtime_authority else {}),
             "verify": init_fetch_verification_schema(strict=True),
         },
         "allOf": [
@@ -186,6 +188,25 @@ def config_map_ref_schema() -> dict[str, Any]:
             "sha256": {
                 "type": "string",
                 "pattern": "^sha256:[0-9a-f]{64}$",
+            },
+        },
+    }
+
+
+def runtime_authority_source_schema() -> dict[str, Any]:
+    """Describe value-free coordinates for the protected runtime Secret."""
+
+    return {
+        "type": "object",
+        "required": ["mode", "secret_name", "secret_key"],
+        "additionalProperties": False,
+        "properties": {
+            "mode": {"const": "kubernetes_secret_volume"},
+            "secret_name": kubernetes_dns_label_schema(),
+            "secret_key": {
+                "type": "string",
+                "pattern": CONFIG_MAP_KEY_PATTERN,
+                "maxLength": 253,
             },
         },
     }

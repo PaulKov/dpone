@@ -19,7 +19,10 @@ from dpone.contracts.development_delivery_authority import (
     DevelopmentAuthorityReceipt,
 )
 from dpone.readiness.airflow_compact_pack_release import materialize_compact_pack_release
-from dpone.readiness.airflow_deployment_projection import AirflowDeploymentProjectionService
+from dpone.readiness.airflow_deployment_projection import (
+    AirflowDeploymentProjectionError,
+    AirflowDeploymentProjectionService,
+)
 from dpone.runtime.airflow_runtime_connection_inventory import runtime_connection_publication_files
 from dpone.runtime.init_fetch_contract import InitFetchError
 from dpone.runtime.runtime_init_fetch_plan_codec import decode_runtime_init_fetch_plan
@@ -96,10 +99,25 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
     assert release["promotion"]["profile"] == DEVELOPMENT_COMPOSITION_PROFILE
     assert release["development_authority"] == authority.release_projection()
     _write_environment(tmp_path)
-    projection = AirflowDeploymentProjectionService(
+    service = AirflowDeploymentProjectionService(
         root=tmp_path,
         cache_root=tmp_path / "cache",
-    ).materialize(
+    )
+    with pytest.raises(AirflowDeploymentProjectionError) as exc_info:
+        service.materialize(
+            release_id=materialized.release_id,
+            environment="prod",
+            trust_tier="non_production",
+            runtime_image_ref=IMAGE,
+            runtime_image_digest=IMAGE.split("@")[-1],
+            artifact_registry_ref="synthetic-artifacts",
+            registry_config_ref=_config_map_ref("registry", "1"),
+            trust_policy_ref=_config_map_ref("policy", "2"),
+            airflow_bundle_ref="git:" + "d" * 40,
+        )
+    assert getattr(exc_info.value, "code", None) == "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_REQUIRED"
+
+    projection = service.materialize(
         release_id=materialized.release_id,
         environment="prod",
         trust_tier="non_production",
@@ -108,9 +126,22 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
         artifact_registry_ref="synthetic-artifacts",
         registry_config_ref=_config_map_ref("registry", "1"),
         trust_policy_ref=_config_map_ref("policy", "2"),
+        runtime_authority_ref={
+            "kind": "kubernetes_secret",
+            "name": "dpone-runtime-authority",
+            "key": "authority.json",
+        },
         airflow_bundle_ref="git:" + "d" * 40,
     )
     assert projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v4"
+    expected_source = {
+        "mode": "kubernetes_secret_volume",
+        "secret_name": "dpone-runtime-authority",
+        "secret_key": "authority.json",
+    }
+    assert projection.deployment["runtime_artifact_delivery"]["runtime_authority"] == expected_source
+    assert projection.airflow_index["runtime_artifact_delivery"]["runtime_authority"] == expected_source
+    assert "synthetic-secret-value" not in json.dumps(projection.to_dict(), sort_keys=True)
     context = init_fetch_context_from_payload(projection.airflow_index)
     assert context.development_authority_required is True
     encoded = context.encode_plan(
