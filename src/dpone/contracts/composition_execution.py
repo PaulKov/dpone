@@ -36,7 +36,7 @@ def composition_transfer_cell(manifest: Mapping[str, Any]) -> str:
     if sink.get("strategy") != {"mode": "full_refresh"}:
         raise CompositionAdmissionError("transfer_strategy")
     route = source.get("type"), sink.get("type")
-    if route == ("postgres", "mssql"):
+    if route in {("postgres", "mssql"), ("clickhouse", "mssql")}:
         state = manifest.get("state")
         if (
             not isinstance(state, Mapping)
@@ -47,7 +47,11 @@ def composition_transfer_cell(manifest: Mapping[str, Any]) -> str:
             or not state["connection_ref"].strip()
         ):
             raise CompositionAdmissionError("external_target_atomic_state_required")
-        return "postgres_mssql_full_refresh_v1"
+        return (
+            "postgres_mssql_full_refresh_v1"
+            if route[0] == "postgres"
+            else "clickhouse_mssql_full_refresh_v1"
+        )
     raise CompositionAdmissionError("transfer_route_capability")
 
 

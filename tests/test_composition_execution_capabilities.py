@@ -13,6 +13,13 @@ def test_explicit_postgres_to_mssql_full_refresh_cell():
     assert composition_transfer_cell(transfer()) == "postgres_mssql_full_refresh_v1"
 
 
+def test_explicit_clickhouse_to_mssql_full_refresh_cell():
+    manifest = transfer()
+    manifest["source"]["type"] = "clickhouse"
+
+    assert composition_transfer_cell(manifest) == "clickhouse_mssql_full_refresh_v1"
+
+
 def test_clickhouse_cell_is_not_authority_for_an_ordinary_workload():
     manifest = transfer()
     manifest.pop("state")
