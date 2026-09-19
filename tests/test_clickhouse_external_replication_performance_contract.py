@@ -150,14 +150,20 @@ def test_performance_receipt_fails_closed_and_rejects_tampering(
     valid["canonical_digest"] = passing_canonical
     valid["member_fanout"] = passing_fanout
     _validate(valid, budget_path)
-    for mutation in ("commit", "budget", "secret"):
+    for mutation in ("commit", "budget", "section_secret", "top_level_secret", "digest", "environment"):
         tampered = deepcopy(valid)
         if mutation == "commit":
             tampered["source_commit"] = "d" * 40
         elif mutation == "budget":
             tampered["member_fanout"]["logical_rows"] = 1
-        else:
+        elif mutation == "section_secret":
             tampered["canonical_digest"]["detail"] = "sensitive-row-value"
+        elif mutation == "top_level_secret":
+            tampered["credential"] = "plaintext-secret"
+        elif mutation == "digest":
+            tampered["canonical_digest"]["digest"] = "not-a-sha256"
+        else:
+            tampered["environment"]["clickhouse_version"] = "forged"
         with pytest.raises(ValueError, match="failed validation"):
             _validate(tampered, budget_path)
 
@@ -186,7 +192,7 @@ def _passing_sections() -> tuple[dict[str, Any], dict[str, Any]]:
         "median_seconds": 0.1,
         "max_seconds": 0.1,
         "budget_max_seconds": canonical_budget["max_trial_seconds"],
-        "digest": "d" * 64,
+        "digest": "c4370bf4ec0e4f1ca8df2645c7785a79d7ee4a8970b5fb20977c3dcbf8aa4655",
         "stable_across_trials": True,
         "status": "PASS",
     }
