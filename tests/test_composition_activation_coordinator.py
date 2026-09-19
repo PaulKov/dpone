@@ -115,6 +115,16 @@ def test_retry_uses_original_admission_instead_of_mutable_catalog_digest(tmp_pat
     assert "full_physical_preparation" not in h.events
 
 
+def test_active_consumer_reuses_exact_original_admission(tmp_path):
+    h = Harness()
+    prepared = h.coordinator.prepare(**h.args(tmp_path))
+    active = h.coordinator.activate(prepared, projection_root=tmp_path)
+    h.events.clear()
+
+    assert h.coordinator.prepare(**h.args(tmp_path)) == active
+    assert h.events == ["read", "stable_binding_check"]
+
+
 def test_changed_epochs_cannot_acknowledge_same_activation(tmp_path):
     h = Harness()
     prepared = h.coordinator.prepare(**h.args(tmp_path))

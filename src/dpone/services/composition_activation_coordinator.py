@@ -106,7 +106,9 @@ class CompositionActivationCoordinator:
         store = self._stores.build(projection_root=projection_root, context=context)
         existing = store.read(activation_id)
         if existing is not None:
-            existing.require_state("PREPARED")
+            existing.__post_init__()
+            if existing.receipt.state not in {"PREPARED", "ACTIVE"}:
+                raise CompositionAdmissionError("occurrence_state")
             self._preparation.require_existing(existing.request, sources=sources, context=context)
             return existing
         request = self._preparation.prepare(sources=sources, context=context)
