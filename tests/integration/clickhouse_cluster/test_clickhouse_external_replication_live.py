@@ -277,7 +277,8 @@ def test_external_replication_terminal_partial_is_retained_without_redispatch() 
             _execute(
                 18123,
                 "SELECT uniqExact(entry) FROM system.distributed_ddl_queue "
-                f"WHERE cluster='{_CLUSTER}' AND position(query, '{database}') > 0",
+                f"WHERE cluster='{_CLUSTER}' AND position(query, '{database}') > 0 "
+                "AND position(query, 'EXCHANGE TABLES') > 0",
             )[0][0]
         )
         == 1
