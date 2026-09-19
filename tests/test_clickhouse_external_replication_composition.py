@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from dpone.contracts.clickhouse_external_replication import ExternalContractError
 from dpone.ports.clickhouse_connector import ClickHouseConnectorPort, ClickHouseEndpointClonePort
 from dpone.runtime import clickhouse_external_replication_composition as composition
 
@@ -90,7 +91,7 @@ def test_missing_endpoint_clone_capability_fails_before_inventory_or_authority(
     monkeypatch.setattr(composition, "ClickHouseExternalTopologyCatalog", Topology)
     facade = composition.build_clickhouse_external_replication(SimpleNamespace(connector=object()))
 
-    with pytest.raises(composition.ExternalContractError, match="INVENTORY_INVALID"):
+    with pytest.raises(ExternalContractError, match="INVENTORY_INVALID"):
         facade._service_factory("analytics_cluster", "analytics", "target_table")
 
     assert events == []

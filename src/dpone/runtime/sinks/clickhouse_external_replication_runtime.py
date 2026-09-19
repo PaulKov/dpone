@@ -8,11 +8,13 @@ from typing import Any, NoReturn, Protocol
 from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactReceipt,
     ExternalArtifactSourcePort,
+    ExternalPublicationError,
     ExternalPublicationRequest,
     ExternalReplicationReceipt,
     derive_generation_id,
     derive_operation_id,
     derive_target_key,
+    digest_payload,
 )
 from dpone.runtime.sinks import clickhouse_external_replication_authority as authority_ops
 from dpone.runtime.sinks import (
@@ -230,7 +232,7 @@ class ClickHouseExternalReplicationRuntime:
         self._cas(state, {**phase_ops.without_version(state), "phase": "ABORTED"})
 
     def _receipt(self, state: dict[str, Any]) -> ExternalReplicationReceipt:
-        return runtime_support.receipt(self._service, state)
+        return runtime_support.receipt(self._service, state, ExternalReplicationReceipt.from_state)
 
     def _lock_values(
         self,
@@ -247,7 +249,7 @@ class ClickHouseExternalReplicationRuntime:
             candidate_name=phase_ops.candidate_name(target, operation_id),
             plan_sha256=plan_sha256,
             members=members,
-            inventory_digest=runtime_support.inventory_digest(self._service, members),
+            inventory_digest=runtime_support.inventory_digest(self._service, members, digest_payload),
             read=self._read,
             cas=self._cas,
             fail=self._fail,
@@ -351,7 +353,13 @@ class ClickHouseExternalReplicationRuntime:
         return self._cas(state, {**phase_ops.without_version(state), "member_states": members})
 
     def _cas(self, current: dict[str, Any] | None, desired: Mapping[str, Any]) -> dict[str, Any]:
-        return runtime_support.compare_and_swap(self._service, current, desired, self._fail)
+        return runtime_support.compare_and_swap(
+            self._service,
+            current,
+            desired,
+            self._fail,
+            ExternalPublicationError,
+        )
 
     def _read(self, target_key: str) -> dict[str, Any] | None:
         value = self._service.read_authority(target_key)
@@ -360,13 +368,18 @@ class ClickHouseExternalReplicationRuntime:
     def _require_same_inputs(
         self, state: Mapping[str, Any], request: ExternalPublicationRequest, members: tuple[str, ...]
     ) -> None:
-        runtime_support.require_same_inputs(
-            service=self._service,
-            artifact_source=self._artifact_source,
-            state=state,
-            request=request,
-            members=members,
-            fail=self._fail,
+        binding = (
+            None
+            if self._artifact_source is None or "artifact_binding_id" not in state
+            else self._artifact_source.binding_id
+        )
+        phase_ops.require_same_inputs(
+            state,
+            request,
+            members,
+            runtime_support.inventory_digest(self._service, members, digest_payload),
+            binding,
+            self._fail,
         )
 
     def _require_source(self) -> ExternalArtifactSourcePort:
@@ -381,7 +394,13 @@ class ClickHouseExternalReplicationRuntime:
         state: Mapping[str, Any] | None = None,
         member_ids: tuple[str, ...] = (),
     ) -> NoReturn:
-        runtime_support.fail(self._service, code, state=state, member_ids=member_ids)
+        runtime_support.fail(
+            self._service,
+            code,
+            state=state,
+            member_ids=member_ids,
+            error_factory=ExternalPublicationError,
+        )
 
 
 __all__ = ["ClickHouseExternalReplicationRuntime", "ExternalReplicationRuntimeService"]

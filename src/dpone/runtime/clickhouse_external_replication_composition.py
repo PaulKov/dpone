@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from dpone.contracts.clickhouse_external_replication import ExternalContractError
 from dpone.runtime.sinks.clickhouse_cluster_publication_bootstrap import (
     ClickHouseClusterAuthorityBootstrap,
 )
@@ -21,6 +20,7 @@ from dpone.runtime.sinks.clickhouse_external_replication_clickhouse import (
     ClickHouseExternalReplicaConnectionProvider,
     ClickHouseExternalReplicaStaging,
     ClickHouseExternalTopologyCatalog,
+    require_endpoint_clone_capability,
 )
 from dpone.runtime.sinks.clickhouse_external_replication_ddl import ClickHouseExternalClusterDdl
 from dpone.runtime.sinks.clickhouse_external_replication_facade import (
@@ -53,11 +53,7 @@ def build_clickhouse_external_replication(sink: Any) -> ClickHouseExternalReplic
         payload: Any | None = None,
         maximum_rows: int | None = None,
     ) -> ClickHouseExternalReplicationServiceAdapter:
-        if not callable(getattr(connector, "clone_for_endpoint", None)):
-            raise ExternalContractError(
-                "INVENTORY_INVALID",
-                "direct endpoint clone capability is unavailable",
-            )
+        require_endpoint_clone_capability(connector)
         catalog = ClickHouseClusterPublicationCatalog(connector)
         topology = ClickHouseExternalTopologyCatalog(
             connector,
