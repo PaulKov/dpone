@@ -20,7 +20,6 @@ def _fresh_cluster_publication_receipt() -> None:
 def _prepare_cluster_publication_session() -> None:
     evidence.reset_receipt()
     evidence.reset_external_receipt()
-    evidence.reset_external_performance_receipt()
     _wait_for_distributed_ddl()
 
 

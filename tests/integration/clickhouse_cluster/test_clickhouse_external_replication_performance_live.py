@@ -6,19 +6,24 @@ import json
 import os
 import statistics
 import time
+from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
 import pytest
 
 from dpone.runtime.sinks.clickhouse_external_replication_canonical import canonical_rows_digest
-from tests.integration.clickhouse_cluster.evidence import (
-    EXTERNAL_PERFORMANCE_BUDGET,
-    write_external_performance_receipt,
-)
 from tests.integration.clickhouse_cluster.external_replication_live_support import (
     CLUSTER,
     execute,
     publication_case,
+)
+from tests.integration.clickhouse_cluster.external_replication_performance_evidence import (
+    EXTERNAL_PERFORMANCE_BUDGET,
+    EXTERNAL_PERFORMANCE_COMMAND,
+    EXTERNAL_PERFORMANCE_TEST_NODEID,
+    verify_external_performance_receipt,
+    write_external_performance_receipt,
 )
 
 pytestmark = pytest.mark.integration_live
@@ -31,10 +36,12 @@ pytestmark = pytest.mark.integration_live
 def test_external_replication_performance_budget() -> None:
     """Measure the real digest and two-member sink path against declared budgets."""
 
+    started_at = datetime.now(UTC)
+    observation_id = uuid4().hex
     budget = json.loads(EXTERNAL_PERFORMANCE_BUDGET.read_text(encoding="utf-8"))
     server_version = execute(18123, "SELECT version()")[0][0]
-    canonical_result: dict[str, Any] = {"status": "FAIL", "error_type": "not_run"}
-    fanout_result: dict[str, Any] = {"status": "FAIL", "error_type": "not_run"}
+    canonical_result = _empty_canonical_result(budget["canonical_digest"])
+    fanout_result = _empty_fanout_result(budget["member_fanout"])
     try:
         canonical_result = _benchmark_canonical_digest(budget["canonical_digest"])
         fanout_result = _benchmark_member_fanout(budget["member_fanout"])
@@ -45,6 +52,7 @@ def test_external_replication_performance_budget() -> None:
         write_external_performance_receipt(
             canonical_digest=canonical_result,
             member_fanout=fanout_result,
+            observation=_observation(observation_id, started_at),
             server_version=server_version,
         )
         raise
@@ -52,13 +60,15 @@ def test_external_replication_performance_budget() -> None:
     write_external_performance_receipt(
         canonical_digest=canonical_result,
         member_fanout=fanout_result,
+        observation=_observation(observation_id, started_at),
         server_version=server_version,
     )
-    assert canonical_result["status"] == "PASS"
-    assert fanout_result["status"] == "PASS"
+    persisted = verify_external_performance_receipt()
+    assert persisted["status"] == "PASS"
 
 
 def _benchmark_canonical_digest(budget: dict[str, Any]) -> dict[str, Any]:
+    _require_positive_budget(budget, "rows", "trials")
     rows = [
         (index, f"value-{index % 1000:04d}", None if index % 7 == 0 else index % 97)
         for index in range(int(budget["rows"]))
@@ -93,6 +103,7 @@ def _benchmark_canonical_digest(budget: dict[str, Any]) -> dict[str, Any]:
 
 
 def _benchmark_member_fanout(budget: dict[str, Any]) -> dict[str, Any]:
+    _require_positive_budget(budget, "members", "logical_rows", "physical_rows", "trials", "max_source_bytes")
     logical_rows = int(budget["logical_rows"])
     members = int(budget["members"])
     warmups = int(budget["warmups"])
@@ -149,6 +160,7 @@ def _benchmark_member_fanout(budget: dict[str, Any]) -> dict[str, Any]:
         "median_seconds": round(statistics.median(trial_seconds), 6),
         "max_seconds": round(maximum, 6),
         "budget_max_seconds": float(budget["max_trial_seconds"]),
+        "max_source_bytes": int(budget["max_source_bytes"]),
         "per_member_row_counts": last_counts,
         "content_digests_equal": digests_equal,
         "publication_phase": publication_phase,
@@ -196,3 +208,53 @@ def _require_correct_fanout(
 
 def _rounded(values: list[float]) -> list[float]:
     return [round(value, 6) for value in values]
+
+
+def _observation(observation_id: str, started_at: datetime) -> dict[str, str]:
+    return {
+        "observation_id": observation_id,
+        "started_at": started_at.isoformat(),
+        "finished_at": datetime.now(UTC).isoformat(),
+        "command": EXTERNAL_PERFORMANCE_COMMAND,
+        "test_nodeid": EXTERNAL_PERFORMANCE_TEST_NODEID,
+    }
+
+
+def _empty_canonical_result(budget: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "rows": int(budget["rows"]),
+        "columns": int(budget["columns"]),
+        "warmups": int(budget["warmups"]),
+        "trials": int(budget["trials"]),
+        "trial_seconds": [],
+        "max_seconds": 0.0,
+        "budget_max_seconds": float(budget["max_trial_seconds"]),
+        "status": "FAIL",
+        "error_type": "not_run",
+    }
+
+
+def _empty_fanout_result(budget: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "members": int(budget["members"]),
+        "logical_rows": int(budget["logical_rows"]),
+        "physical_rows": int(budget["physical_rows"]),
+        "columns": int(budget["columns"]),
+        "warmups": int(budget["warmups"]),
+        "trials": int(budget["trials"]),
+        "trial_seconds": [],
+        "max_seconds": 0.0,
+        "budget_max_seconds": float(budget["max_trial_seconds"]),
+        "max_source_bytes": int(budget["max_source_bytes"]),
+        "per_member_row_counts": [],
+        "status": "FAIL",
+        "error_type": "not_run",
+    }
+
+
+def _require_positive_budget(budget: dict[str, Any], *fields: str) -> None:
+    invalid = [field for field in fields if int(budget[field]) <= 0]
+    if int(budget["warmups"]) < 0 or float(budget["max_trial_seconds"]) <= 0:
+        invalid.append("timing")
+    if invalid:
+        raise ValueError("benchmark budget must be positive: " + ",".join(invalid))

@@ -14,13 +14,16 @@
     "tests/integration/clickhouse_cluster/README.md",
     "tests/integration/clickhouse_cluster/conftest.py",
     "tests/integration/clickhouse_cluster/evidence.py",
+    "tests/integration/clickhouse_cluster/evidence_identity.py",
     "tests/integration/clickhouse_cluster/external_replication_live_support.py",
     "tests/integration/clickhouse_cluster/external_replication_performance_budget.json",
+    "tests/integration/clickhouse_cluster/external_replication_performance_evidence.py",
     "tests/integration/clickhouse_cluster/test_clickhouse_external_replication_live.py",
     "tests/integration/clickhouse_cluster/test_clickhouse_external_replication_performance_live.py",
     "tests/test_clickhouse_external_replication_performance_contract.py",
     "tests/test_native_acceleration_contracts.py",
     "tests/test_oss_release_readiness.py",
+    "tests/test_run_cli_api_parity.py",
     "tests/test_snapshot_version.py",
     "uv.lock"
   ],
@@ -99,8 +102,8 @@
     }
   ],
   "control_surface_changed": true,
-  "generated_at": "2026-09-19T13:57:30+00:00",
-  "head_commit": "543dae87b06d474ce72ee3cc93510e078aeafd12",
+  "generated_at": "2026-09-19T14:19:22+00:00",
+  "head_commit": "5451b1989796258a022c21cdd3059e442f81b1dc",
   "risks": [
     "AG-001",
     "AG-002",

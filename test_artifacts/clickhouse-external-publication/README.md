@@ -53,12 +53,17 @@ test_artifacts/clickhouse-external-publication/benchmark-receipt.json
 Schema `dpone.clickhouse.external-publication-benchmark.v1` records the tracked
 budget digest, source commit/tree, fixture digest, environment, measured trial
 durations, exact member counts, content-digest equality, publication phase,
-and cleanup proof. Its verdict is `PASS` only when both the canonical-digest
+cleanup proof, observation ID, producer command, test node, and start/finish
+times. Its verdict is `PASS` only when both the canonical-digest
 and two-member fan-out sections pass their tracked budgets and correctness
 checks. The receipt deliberately omits endpoints, database names, SQL,
 credentials, and row values. It is generated after the reviewed commit and
 stored byte-identically with its SHA-256 in release evidence; it is not added
-back to the commit whose identity it records.
+back to the commit whose identity it records. Creation is atomic and exclusive:
+the producer refuses to replace an existing receipt, and fixture setup does not
+delete it. A second observation therefore requires a fresh checkout or a new
+artifact identity after the first receipt has been preserved; never delete a
+failed or slow observation to obtain a passing sample.
 
 The receipt must bind the exact commit and fixture-configuration digests, label
 its scope `mocked_in_process`, list each scenario independently, and use only
