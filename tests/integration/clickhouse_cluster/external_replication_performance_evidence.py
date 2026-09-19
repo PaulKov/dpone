@@ -12,8 +12,11 @@ from typing import Any
 from uuid import uuid4
 
 from tests.integration.clickhouse_cluster.evidence_identity import (
+    PERFORMANCE_V1_SOURCE_COMMIT,
     fixture_digest,
+    historical_performance_binding,
     performance_fixture_digest,
+    require_exact_source_commit,
     source_binding,
     tracked_file_bytes,
     tracked_source_tree,
@@ -83,20 +86,33 @@ def verify_external_performance_receipt(
 ) -> dict[str, Any]:
     """Validate a receipt against a caller-trusted commit, defaulting to clean HEAD."""
 
+    resolved_source_tree: str | None = None
+    if expected_source_commit is not None:
+        require_exact_source_commit(expected_source_commit)
+        if expected_source_commit != PERFORMANCE_V1_SOURCE_COMMIT:
+            resolved_source_tree = tracked_source_tree(expected_source_commit)
+    evidence = json.loads((receipt_path or EXTERNAL_PERFORMANCE_RECEIPT).read_text(encoding="utf-8"))
+    schema_version = str(evidence.get("schema_version") or "")
     if expected_source_commit is None:
         source_commit, source_tree = source_binding()
+        benchmark_config = EXTERNAL_PERFORMANCE_BUDGET.read_bytes()
+        bound_fixture_digest = performance_fixture_digest(source_commit, schema_version)
     else:
         source_commit = expected_source_commit
-        source_tree = tracked_source_tree(source_commit)
-    target = receipt_path or EXTERNAL_PERFORMANCE_RECEIPT
-    evidence = json.loads(target.read_text(encoding="utf-8"))
-    schema_version = str(evidence.get("schema_version") or "")
-    benchmark_config = tracked_file_bytes(source_commit, EXTERNAL_PERFORMANCE_BUDGET)
+        historical = historical_performance_binding(source_commit, schema_version)
+        if historical is None:
+            source_tree = resolved_source_tree or tracked_source_tree(source_commit)
+            benchmark_config = tracked_file_bytes(source_commit, EXTERNAL_PERFORMANCE_BUDGET)
+            bound_fixture_digest = performance_fixture_digest(source_commit, schema_version)
+        else:
+            source_tree = historical.source_tree
+            benchmark_config = historical.benchmark_config
+            bound_fixture_digest = historical.fixture_digest
     validate_external_performance_receipt(
         evidence,
         source_commit=source_commit,
         source_tree=source_tree,
-        fixture_digest=performance_fixture_digest(source_commit, schema_version),
+        fixture_digest=bound_fixture_digest,
         benchmark_config_sha256=hashlib.sha256(benchmark_config).hexdigest(),
         budget=json.loads(benchmark_config),
     )

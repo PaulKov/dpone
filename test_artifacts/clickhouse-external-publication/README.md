@@ -53,7 +53,15 @@ test_artifacts/clickhouse-external-publication/benchmark-receipt.json
 New receipts use schema `dpone.clickhouse.external-publication-benchmark.v2`.
 The verifier retains a bounded reader for historical v1 receipts: v1 has no
 observation envelope or `max_source_bytes`, while v2 requires both. Unknown or
-mixed schemas fail closed. The receipt records the tracked
+mixed schemas fail closed. The retained v1 receipt is verified with the
+reviewed, self-contained source binding under `tests/fixtures/release_evidence/`.
+That binding freezes the original commit/tree, ordered fixture inventory and
+blob identities, aggregate fixture digest, and exact benchmark-config bytes;
+verification therefore does not depend on an orphan Git object or an
+environment-specific remote ref. Binding schema, inventory, digests, sizes, or
+budget-byte drift fails closed. A branch-only clone regression proves the
+historical verification contract remains available from current ancestry.
+The receipt records the tracked
 budget digest, source commit/tree, fixture digest, environment, measured trial
 durations, exact member counts, content-digest equality, publication phase,
 cleanup proof, observation ID, producer command, test node, and start/finish

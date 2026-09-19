@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
+import sys
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,8 @@ from tests.integration.clickhouse_cluster.external_replication_performance_valid
 from tests.integration.clickhouse_cluster.test_clickhouse_external_replication_performance_live import (
     _benchmark_canonical_digest,
 )
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_external_performance_budget_is_bounded_and_internally_consistent() -> None:
@@ -273,9 +277,25 @@ def test_v1_fixture_digest_uses_schema_owned_file_manifest(monkeypatch: pytest.M
     )
 
 
-def test_historical_v1_fixture_digest_matches_immutable_release_observation() -> None:
-    assert evidence_identity.performance_fixture_digest("5451b1989796258a022c21cdd3059e442f81b1dc", SCHEMA_V1) == (
-        "a6dfa6864c7181a41666a470866f86b9058c3622ca0c681c6a2edfcd7d3f6d7c"
+def test_historical_v1_binding_matches_immutable_release_observation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        evidence_identity,
+        "_git",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("historical binding must not read Git")),
+    )
+
+    binding = evidence_identity.historical_performance_binding(
+        "5451b1989796258a022c21cdd3059e442f81b1dc",
+        SCHEMA_V1,
+    )
+
+    assert binding is not None
+    assert binding.source_tree == "b5c90123c42fef1a7059a5bcff450ff4e42122e9"
+    assert binding.fixture_digest == "a6dfa6864c7181a41666a470866f86b9058c3622ca0c681c6a2edfcd7d3f6d7c"
+    assert hashlib.sha256(binding.benchmark_config).hexdigest() == (
+        "5caef54d4e33c1f0b6cf2c552c1506f319c7d7c253af9e211e8e37dcb4650871"
     )
 
 
@@ -288,11 +308,80 @@ def test_historical_v1_receipt_verifies_end_to_end_against_trusted_commit() -> N
 
     assert receipt["schema_version"] == SCHEMA_V1
     assert receipt["status"] == "PASS"
+    current_commit = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     with pytest.raises(ValueError, match="failed validation"):
         verify_external_performance_receipt(
-            expected_source_commit="c2bfef311180092ccbef00d070441d98045509fc",
+            expected_source_commit=current_commit,
             receipt_path=receipt_path,
         )
+
+
+def test_historical_v1_binding_rejects_tampered_budget_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding_path = Path("tests/fixtures/release_evidence/clickhouse-external-benchmark-v1-source-binding-5451b198.json")
+    payload = json.loads(binding_path.read_text(encoding="utf-8"))
+    payload["benchmark_config_base64"] = payload["benchmark_config_base64"][:-4] + "AAAA"
+    tampered_path = tmp_path / "binding.json"
+    tampered_path.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(evidence_identity, "_PERFORMANCE_V1_SOURCE_BINDING", tampered_path)
+
+    with pytest.raises(ValueError, match="digest does not match"):
+        evidence_identity.historical_performance_binding(
+            "5451b1989796258a022c21cdd3059e442f81b1dc",
+            SCHEMA_V1,
+        )
+
+
+def test_historical_v1_verification_passes_in_branch_only_clone(tmp_path: Path) -> None:
+    bundle_path = tmp_path / "candidate.bundle"
+    clone_path = tmp_path / "candidate"
+    subprocess.run(
+        ("git", "bundle", "create", str(bundle_path), "HEAD"),
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ("git", "clone", "--quiet", str(bundle_path), str(clone_path)),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    orphan = subprocess.run(
+        ("git", "cat-file", "-e", "5451b1989796258a022c21cdd3059e442f81b1dc^{commit}"),
+        cwd=clone_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert orphan.returncode != 0
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = os.pathsep.join((str(clone_path / "src"), str(clone_path)))
+    completed = subprocess.run(
+        (
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/test_clickhouse_external_replication_performance_contract.py::test_historical_v1_binding_matches_immutable_release_observation",
+            "tests/test_clickhouse_external_replication_performance_contract.py::test_historical_v1_receipt_verifies_end_to_end_against_trusted_commit",
+            "-q",
+        ),
+        cwd=clone_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
 @pytest.mark.parametrize(
