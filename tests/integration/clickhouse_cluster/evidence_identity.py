@@ -86,6 +86,12 @@ def tracked_file_bytes(source_commit: str, path: Path) -> bytes:
     return content
 
 
+def tracked_source_tree(source_commit: str) -> str:
+    """Resolve the immutable tree object for an explicitly trusted commit."""
+
+    return str(_git("rev-parse", f"{source_commit}^{{tree}}")).strip()
+
+
 def _git(*args: str, text: bool = True) -> str | bytes:
     return subprocess.run(
         ("git", *args),
@@ -95,4 +101,11 @@ def _git(*args: str, text: bool = True) -> str | bytes:
     ).stdout
 
 
-__all__ = ["FIXTURE_FILES", "fixture_digest", "performance_fixture_digest", "source_binding", "tracked_file_bytes"]
+__all__ = [
+    "FIXTURE_FILES",
+    "fixture_digest",
+    "performance_fixture_digest",
+    "source_binding",
+    "tracked_file_bytes",
+    "tracked_source_tree",
+]

@@ -16,6 +16,7 @@ from tests.integration.clickhouse_cluster.evidence_identity import (
     performance_fixture_digest,
     source_binding,
     tracked_file_bytes,
+    tracked_source_tree,
 )
 from tests.integration.clickhouse_cluster.external_replication_performance_validation import (
     EXTERNAL_PERFORMANCE_COMMAND,
@@ -75,17 +76,22 @@ def write_external_performance_receipt(
     return evidence
 
 
-def verify_external_performance_receipt() -> dict[str, Any]:
-    """Re-read and validate the persisted receipt against the current exact commit."""
+def verify_external_performance_receipt(
+    *,
+    expected_source_commit: str | None = None,
+    receipt_path: Path | None = None,
+) -> dict[str, Any]:
+    """Validate a receipt against a caller-trusted commit, defaulting to clean HEAD."""
 
-    source_commit, source_tree = source_binding()
-    evidence = json.loads(EXTERNAL_PERFORMANCE_RECEIPT.read_text(encoding="utf-8"))
+    if expected_source_commit is None:
+        source_commit, source_tree = source_binding()
+    else:
+        source_commit = expected_source_commit
+        source_tree = tracked_source_tree(source_commit)
+    target = receipt_path or EXTERNAL_PERFORMANCE_RECEIPT
+    evidence = json.loads(target.read_text(encoding="utf-8"))
     schema_version = str(evidence.get("schema_version") or "")
-    benchmark_config = (
-        tracked_file_bytes(source_commit, EXTERNAL_PERFORMANCE_BUDGET)
-        if schema_version == "dpone.clickhouse.external-publication-benchmark.v1"
-        else EXTERNAL_PERFORMANCE_BUDGET.read_bytes()
-    )
+    benchmark_config = tracked_file_bytes(source_commit, EXTERNAL_PERFORMANCE_BUDGET)
     validate_external_performance_receipt(
         evidence,
         source_commit=source_commit,
