@@ -294,6 +294,40 @@ def test_historical_v1_receipt_verifies_end_to_end_against_trusted_commit() -> N
         )
 
 
+@pytest.mark.parametrize(
+    "mutable_or_noncanonical_ref",
+    (
+        "HEAD",
+        "5451b198",
+        "5451B1989796258A022C21CDD3059E442F81B1DC",
+        "5451b1989796258a022c21cdd3059e442f81b1dc^{commit}",
+    ),
+)
+def test_historical_receipt_rejects_mutable_or_noncanonical_source_refs(
+    mutable_or_noncanonical_ref: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unexpected_git(*args: str, text: bool = True) -> str:
+        del args, text
+        raise AssertionError("invalid commit identity must fail before invoking git")
+
+    monkeypatch.setattr(evidence_identity, "_git", unexpected_git)
+
+    with pytest.raises(ValueError, match="full lowercase 40-character SHA-1"):
+        verify_external_performance_receipt(
+            expected_source_commit=mutable_or_noncanonical_ref,
+            receipt_path=Path("must-not-be-read.json"),
+        )
+
+
+def test_historical_receipt_rejects_nonexistent_full_source_sha() -> None:
+    with pytest.raises(ValueError, match="resolve to an existing commit"):
+        verify_external_performance_receipt(
+            expected_source_commit="f" * 40,
+            receipt_path=Path("must-not-be-read.json"),
+        )
+
+
 def test_performance_receipt_v2_requires_observation_and_source_budget(tmp_path: Path) -> None:
     budget_path = tmp_path / "budget.json"
     budget_path.write_text(EXTERNAL_PERFORMANCE_BUDGET.read_text(encoding="utf-8"), encoding="utf-8")

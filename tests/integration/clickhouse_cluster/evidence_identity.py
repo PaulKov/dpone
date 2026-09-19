@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import subprocess
 from pathlib import Path
 
@@ -34,6 +35,8 @@ PERFORMANCE_V1_FIXTURE_FILES = (
     Path("tests/integration/clickhouse_cluster/config/node1/cluster.xml"),
     Path("tests/integration/clickhouse_cluster/config/node2/cluster.xml"),
 )
+
+_FULL_LOWERCASE_SHA1 = re.compile(r"[0-9a-f]{40}")
 
 
 def source_binding() -> tuple[str, str]:
@@ -87,8 +90,16 @@ def tracked_file_bytes(source_commit: str, path: Path) -> bytes:
 
 
 def tracked_source_tree(source_commit: str) -> str:
-    """Resolve the immutable tree object for an explicitly trusted commit."""
+    """Resolve the tree only for an existing, exact lowercase commit SHA."""
 
+    if _FULL_LOWERCASE_SHA1.fullmatch(source_commit) is None:
+        raise ValueError("source commit must be a full lowercase 40-character SHA-1")
+    try:
+        resolved_commit = str(_git("rev-parse", "--verify", f"{source_commit}^{{commit}}")).strip()
+    except subprocess.CalledProcessError as error:
+        raise ValueError("source commit must resolve to an existing commit") from error
+    if resolved_commit != source_commit:
+        raise ValueError("source commit must resolve to the exact requested commit")
     return str(_git("rev-parse", f"{source_commit}^{{tree}}")).strip()
 
 
