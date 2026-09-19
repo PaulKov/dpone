@@ -77,6 +77,15 @@ def _fixture_digest(source_commit: str, files: tuple[Path, ...]) -> str:
     return digest.hexdigest()
 
 
+def tracked_file_bytes(source_commit: str, path: Path) -> bytes:
+    """Read one immutable tracked input from the receipt's source commit."""
+
+    content = _git("show", f"{source_commit}:{path.as_posix()}", text=False)
+    if not isinstance(content, bytes):
+        raise TypeError("git blob output must be bytes")
+    return content
+
+
 def _git(*args: str, text: bool = True) -> str | bytes:
     return subprocess.run(
         ("git", *args),
@@ -86,4 +95,4 @@ def _git(*args: str, text: bool = True) -> str | bytes:
     ).stdout
 
 
-__all__ = ["FIXTURE_FILES", "fixture_digest", "performance_fixture_digest", "source_binding"]
+__all__ = ["FIXTURE_FILES", "fixture_digest", "performance_fixture_digest", "source_binding", "tracked_file_bytes"]

@@ -12,6 +12,7 @@ import pytest
 
 from tests.integration.clickhouse_cluster import evidence_identity
 from tests.integration.clickhouse_cluster import external_replication_performance_evidence as evidence
+from tests.integration.clickhouse_cluster import external_replication_performance_validation as validation
 from tests.integration.clickhouse_cluster.external_replication_performance_evidence import (
     EXTERNAL_PERFORMANCE_BUDGET,
     EXTERNAL_PERFORMANCE_COMMAND,
@@ -214,7 +215,10 @@ def test_performance_receipt_fails_closed_and_rejects_tampering(
             _validate(tampered, budget_path)
 
 
-def test_performance_receipt_reads_bounded_historical_v1_contract(tmp_path: Path) -> None:
+def test_performance_receipt_reads_bounded_historical_v1_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     budget_path = tmp_path / "budget.json"
     budget_path.write_text(EXTERNAL_PERFORMANCE_BUDGET.read_text(encoding="utf-8"), encoding="utf-8")
     canonical, fanout = _passing_sections()
@@ -223,6 +227,12 @@ def test_performance_receipt_reads_bounded_historical_v1_contract(tmp_path: Path
     payload["schema_version"] = SCHEMA_V1
     payload.pop("observation")
 
+    monkeypatch.setattr(validation, "_pinned_clickhouse_version", lambda: "future-compose-version")
+    monkeypatch.setattr(
+        validation,
+        "canonical_rows_digest",
+        lambda rows: (_ for _ in ()).throw(AssertionError("v1 must not use the future digest algorithm")),
+    )
     _validate(payload, budget_path)
 
     mixed = deepcopy(payload)
@@ -258,6 +268,12 @@ def test_v1_fixture_digest_uses_schema_owned_file_manifest(monkeypatch: pytest.M
             )
         )
         for path in requested
+    )
+
+
+def test_historical_v1_fixture_digest_matches_immutable_release_observation() -> None:
+    assert evidence_identity.performance_fixture_digest("5451b1989796258a022c21cdd3059e442f81b1dc", SCHEMA_V1) == (
+        "a6dfa6864c7181a41666a470866f86b9058c3622ca0c681c6a2edfcd7d3f6d7c"
     )
 
 
