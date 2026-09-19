@@ -31,6 +31,9 @@
   `runtime / UNVERIFIED`, isolate internal and external evidence cleanup, and
   bind Docker evidence to an exact clean tracked tree plus the full fixture
   configuration.
+- Version local external-publication benchmark evidence as v2 with strict
+  field and numeric-type validation, recomputed measurements, and a bounded
+  read-only v1 verifier that preserves the original fixture identity algorithm.
 - Return exit code `1` for blocked external publication plans, route typed
   external runtime failures to stderr, require absolute artifact-store paths,
   and cover empty generations plus receipt-before-source-state ordering.

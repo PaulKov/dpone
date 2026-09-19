@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from tests.integration.clickhouse_cluster import evidence_identity
 from tests.integration.clickhouse_cluster import external_replication_performance_evidence as evidence
 from tests.integration.clickhouse_cluster.external_replication_performance_evidence import (
     EXTERNAL_PERFORMANCE_BUDGET,
@@ -165,6 +166,12 @@ def test_performance_receipt_fails_closed_and_rejects_tampering(
         "forged_maximum",
         "not_finite",
         "boolean_number",
+        "float_integer",
+        "boolean_warmup",
+        "float_rows",
+        "boolean_columns",
+        "float_physical_rows",
+        "tiny_median_drift",
     ):
         tampered = deepcopy(valid)
         if mutation == "commit":
@@ -189,8 +196,20 @@ def test_performance_receipt_fails_closed_and_rejects_tampering(
             tampered["member_fanout"]["max_seconds"] = 0.5
         elif mutation == "not_finite":
             tampered["member_fanout"]["trial_seconds"][0] = float("nan")
-        else:
+        elif mutation == "boolean_number":
             tampered["canonical_digest"]["rows"] = True
+        elif mutation == "float_integer":
+            tampered["member_fanout"]["max_source_bytes"] = 1_048_576.0
+        elif mutation == "boolean_warmup":
+            tampered["canonical_digest"]["warmups"] = True
+        elif mutation == "float_rows":
+            tampered["canonical_digest"]["rows"] = 100_000.0
+        elif mutation == "boolean_columns":
+            tampered["member_fanout"]["columns"] = True
+        elif mutation == "float_physical_rows":
+            tampered["member_fanout"]["physical_rows"] = 20_000.0
+        else:
+            tampered["canonical_digest"]["median_seconds"] += 0.0000005
         with pytest.raises(ValueError, match="failed validation"):
             _validate(tampered, budget_path)
 
@@ -205,6 +224,41 @@ def test_performance_receipt_reads_bounded_historical_v1_contract(tmp_path: Path
     payload.pop("observation")
 
     _validate(payload, budget_path)
+
+    mixed = deepcopy(payload)
+    mixed["member_fanout"]["max_source_bytes"] = "v2-only"
+    with pytest.raises(ValueError, match="failed validation"):
+        _validate(mixed, budget_path)
+
+
+def test_v1_fixture_digest_uses_schema_owned_file_manifest(monkeypatch: pytest.MonkeyPatch) -> None:
+    requested: list[str] = []
+
+    def git(*args: str, text: bool = True) -> bytes:
+        del text
+        assert args[0] == "show"
+        requested.append(args[1])
+        return args[1].encode()
+
+    monkeypatch.setattr(evidence_identity, "_git", git)
+
+    digest = evidence_identity.performance_fixture_digest(
+        "a" * 40,
+        SCHEMA_V1,
+    )
+
+    assert len(digest) == 64
+    assert requested
+    assert not any(
+        path.endswith(
+            (
+                "evidence_identity.py",
+                "external_replication_performance_evidence.py",
+                "external_replication_performance_validation.py",
+            )
+        )
+        for path in requested
+    )
 
 
 def test_performance_receipt_v2_requires_observation_and_source_budget(tmp_path: Path) -> None:

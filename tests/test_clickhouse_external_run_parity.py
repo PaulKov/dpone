@@ -1,4 +1,4 @@
-"""Executable CLI/Python parity contracts for the documented external route."""
+"""Production-runner CLI/Python parity contracts for the documented external route."""
 
 from __future__ import annotations
 
@@ -9,18 +9,15 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-import yaml
 
 from dpone.config import LoadConfig
 from dpone.contracts.clickhouse_external_replication import ExternalPublicationError
-from dpone.contracts.process_types import ProcessResult
 from dpone.ports.runtime_hydrator import RuntimeBindings
-from dpone.runtime.etl.processor import ETLProcessor
-from dpone.runtime.etl.source_state import SourceStateService
+from dpone.runtime.bootstrap_runner import DefaultProcessRunner
 from dpone.runtime.lineage.audit import LoadIdentityService
+from dpone.runtime.route_runtime_factory import RouteCapabilityRuntimeFactory
 from dpone.runtime.sinks.base import LoadResult
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome
-from dpone.services.run_manifest import RunManifestService
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTED_MANIFEST = ROOT / "examples/batch/clickhouse-external-replication-full-refresh.batch.yaml"
@@ -53,8 +50,9 @@ class StubLogger:
 
 
 class StubSource:
-    def __init__(self) -> None:
+    def __init__(self, events: list[str]) -> None:
         self.connector = SimpleNamespace()
+        self._events = events
 
     def get_incremental_state(self, load_config: LoadConfig) -> None:
         del load_config
@@ -63,11 +61,15 @@ class StubSource:
     def extract(self, load_config: LoadConfig, state: Any) -> Any:
         del load_config, state
         return SimpleNamespace(
-            artifact=SimpleNamespace(column_timezone=None),
+            artifact=SimpleNamespace(column_timezone=None, row_count=2),
             schema=[],
-            state={"cursor": 1},
+            state=None,
             force_full_refresh=False,
         )
+
+    def save_state(self, load_config: LoadConfig, state: Any) -> None:
+        del load_config, state
+        self._events.append("source_checkpoint")
 
 
 class ExternalSink:
@@ -75,6 +77,14 @@ class ExternalSink:
         self.connector = SimpleNamespace()
         self.events = events
         self._fail = fail
+
+    def prepare_runtime_admission(self, load_config: LoadConfig, **kwargs: Any) -> LoadConfig:
+        del kwargs
+        cluster = load_config.options["physical_design"]["storage"]["clickhouse"]["cluster"]
+        assert cluster["replication_mode"] == "external"
+        assert cluster["ddl_scope"] == "cluster"
+        self.events.append("runtime_admission")
+        return load_config
 
     def load(self, load_config: LoadConfig, payload: Any) -> LoadResult:
         del load_config, payload
@@ -100,6 +110,7 @@ class ExternalSink:
 
     def save_state(self, load_config: LoadConfig, state: Any) -> None:
         del load_config, state
+        self.events.append("source_checkpoint")
 
 
 class ObservedIdentity(LoadIdentityService):
@@ -114,132 +125,134 @@ class ObservedIdentity(LoadIdentityService):
         self._events.append("target_commit_callback")
         return super().mark_committed(record, load_result)
 
-
-class ObservedSourceState(SourceStateService):
-    def __init__(self, events: list[str]) -> None:
-        self._events = events
-
-    def persist_after_load(self, **kwargs: Any) -> None:
-        load_result = kwargs["load_result"]
-        assert load_result.commit_outcome is AtomicCommitOutcome.COMMITTED
-        self._events.append("source_checkpoint")
-
-
-class ProcessorBackedProcess:
-    def __init__(self, *, config: Any, config_path: str) -> None:
-        del config_path
-        self._config = config
-
-    def run(self, *, context: Any, dag_id: str | None, execution_date: Any) -> ProcessResult:
-        events = self._config.sink_obj.events
-        result = ETLProcessor(
-            source=self._config.source_obj,
-            sink=self._config.sink_obj,
-            etl_logger=self._config.etl_logger,
-            load_identity_service=ObservedIdentity(events),
-            source_state_service=ObservedSourceState(events),
-        ).run(
-            self._config.load_config,
-            run_context=context,
-            dag_id=dag_id,
-            execution_date=execution_date,
-        )
-        details = {
-            "reconciliation_metrics": result["reconciliation_metrics"],
-            "commit_receipt_id": result["commit_receipt_id"],
-            "events": list(events),
-        }
-        return ProcessResult(
-            status=result["status"],
-            inserted_rows=result["inserted_rows"],
-            updated_rows=result["updated_rows"],
-            final_rows=result["final_rows"],
-            extracted_rows=result["extracted_rows"],
-            duration_seconds=result["duration_seconds"],
-            errors=result["errors"],
-            details=details,
-        )
+    def mark_failed(self, record: Any, error: BaseException) -> Any:
+        self._events.append("target_failed_callback")
+        return super().mark_failed(record, error)
 
 
 class Hydrator:
     def __init__(self, *, fail: bool) -> None:
         self._fail = fail
+        self.events_by_run: list[list[str]] = []
+        self.normalized_routes: list[dict[str, Any]] = []
 
     def build(self, *, config: dict[str, Any], load_config: LoadConfig) -> RuntimeBindings:
-        del config, load_config
+        del config
+        cluster = load_config.options["physical_design"]["storage"]["clickhouse"]["cluster"]
+        self.normalized_routes.append(
+            {
+                "source": load_config.options["source_type"],
+                "sink": load_config.options["sink_type"],
+                "strategy": load_config.load_strategy.value,
+                "target": f"{load_config.target_schema}.{load_config.target_table}",
+                "cluster": dict(cluster),
+            }
+        )
         events: list[str] = []
-        source = StubSource()
-        sink = ExternalSink(events, fail=self._fail)
-        return RuntimeBindings(source_obj=source, sink_obj=sink, etl_logger=StubLogger())
+        self.events_by_run.append(events)
+        return RuntimeBindings(
+            source_obj=StubSource(events),
+            sink_obj=ExternalSink(events, fail=self._fail),
+            etl_logger=StubLogger(),
+            load_identity_service=ObservedIdentity(events),
+        )
 
 
-def test_documented_external_route_has_processor_backed_cli_python_parity(
-    tmp_path: Path,
+class ObservedRouteFactory:
+    def __init__(self) -> None:
+        self._delegate = RouteCapabilityRuntimeFactory()
+        self.routes: list[tuple[str, str, str]] = []
+
+    def build(self, *, load_config: LoadConfig, source: Any, sink: Any, logger: Any) -> Any:
+        self.routes.append(
+            (
+                load_config.options["source_type"],
+                load_config.options["sink_type"],
+                load_config.load_strategy.value,
+            )
+        )
+        return self._delegate.build(load_config=load_config, source=source, sink=sink, logger=logger)
+
+
+def test_documented_external_route_has_default_runner_cli_python_parity(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     from dpone import api
     from dpone.commands import run_cmd
-    from dpone.ports import runtime_hydrator
 
-    manifest = _runtime_manifest_without_quality_gate(tmp_path)
-    monkeypatch.setattr(runtime_hydrator, "_RUNTIME_HYDRATOR", Hydrator(fail=False))
-    service = lambda: RunManifestService(process_factory=ProcessorBackedProcess)  # noqa: E731
-    monkeypatch.setattr(run_cmd, "RunManifestService", service)
-    monkeypatch.setattr(api, "RunManifestService", service)
-    args = _run_args(manifest, run_id="external-cluster-full-refresh-parity")
+    hydrator, route_factory = _install_runtime(monkeypatch, fail=False)
+    args = _run_args(run_id="external-cluster-full-refresh-parity")
 
     assert run_cmd.cmd_run(args, ctx=object(), logger=logging.getLogger("test")) == 0
     cli_payload = json.loads(capsys.readouterr().out)
-    python_payload = api.run(manifest, run_id=args.run_id).to_dict()
+    python_payload = api.run(DOCUMENTED_MANIFEST, run_id=args.run_id).to_dict()
 
-    assert cli_payload["result"]["status"] == python_payload["result"]["status"] == "success"
-    for field in ("inserted_rows", "updated_rows", "final_rows", "extracted_rows", "errors", "details"):
+    for field in ("status", "inserted_rows", "updated_rows", "final_rows", "extracted_rows", "errors"):
         assert cli_payload["result"][field] == python_payload["result"][field]
-    details = python_payload["result"]["details"]
-    assert details["commit_receipt_id"] == "external-operation"
-    assert details["events"] == ["publication_receipt_durable", "target_commit_callback", "source_checkpoint"]
-    receipt = details["reconciliation_metrics"]["clickhouse_cluster_external_full_refresh"]
-    assert all(receipt[field] == value for field, value in RECEIPT.items())
+    assert python_payload["result"]["status"] == "success"
+    assert hydrator.events_by_run == [
+        ["runtime_admission", "publication_receipt_durable", "target_commit_callback"],
+        ["runtime_admission", "publication_receipt_durable", "target_commit_callback"],
+    ]
+    assert hydrator.normalized_routes == [hydrator.normalized_routes[0], hydrator.normalized_routes[0]]
+    assert hydrator.normalized_routes[0]["cluster"]["replication_mode"] == "external"
+    assert route_factory.routes == [("mssql", "clickhouse", "full_refresh")] * 2
+    for payload in (cli_payload, python_payload):
+        receipt = payload["result"]["details"]["reconciliation_metrics"]["clickhouse_cluster_external_full_refresh"]
+        assert all(receipt[field] == value for field, value in RECEIPT.items())
 
 
-def test_external_route_processor_failure_preserves_typed_recovery_evidence(
-    tmp_path: Path,
+def test_external_route_default_runner_failure_never_commits_or_checkpoints(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     from dpone import api
     from dpone.commands import run_cmd
-    from dpone.ports import runtime_hydrator
 
-    manifest = _runtime_manifest_without_quality_gate(tmp_path)
-    monkeypatch.setattr(runtime_hydrator, "_RUNTIME_HYDRATOR", Hydrator(fail=True))
-    service = lambda: RunManifestService(process_factory=ProcessorBackedProcess)  # noqa: E731
-    monkeypatch.setattr(run_cmd, "RunManifestService", service)
-    monkeypatch.setattr(api, "RunManifestService", service)
-    args = _run_args(manifest, run_id="external-cluster-full-refresh-failure")
+    hydrator, route_factory = _install_runtime(monkeypatch, fail=True)
+    args = _run_args(run_id="external-cluster-full-refresh-failure")
 
     assert run_cmd.cmd_run(args, ctx=object(), logger=logging.getLogger("test")) == 1
     cli_error = json.loads(capsys.readouterr().err)
     with pytest.raises(ExternalPublicationError) as raised:
-        api.run(manifest, run_id=args.run_id)
+        api.run(DOCUMENTED_MANIFEST, run_id=args.run_id)
 
     assert raised.value.code == "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_PUBLICATION_PARTIAL_TERMINAL"
     assert cli_error["result"]["error_code"] == raised.value.code
     assert cli_error["result"]["evidence"] == raised.value.evidence
+    assert route_factory.routes == [("mssql", "clickhouse", "full_refresh")] * 2
+    assert hydrator.events_by_run == [
+        ["runtime_admission", "publication_partial", "target_failed_callback"],
+        ["runtime_admission", "publication_partial", "target_failed_callback"],
+    ]
+    assert all(
+        "target_commit_callback" not in events and "source_checkpoint" not in events
+        for events in hydrator.events_by_run
+    )
 
 
-def _runtime_manifest_without_quality_gate(tmp_path: Path) -> Path:
-    payload = yaml.safe_load(DOCUMENTED_MANIFEST.read_text(encoding="utf-8"))
-    payload.pop("quality")
-    target = tmp_path / DOCUMENTED_MANIFEST.name
-    target.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-    return target
+def _install_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    fail: bool,
+) -> tuple[Hydrator, ObservedRouteFactory]:
+    from dpone.ports import process_runner, runtime_hydrator
+
+    hydrator = Hydrator(fail=fail)
+    route_factory = ObservedRouteFactory()
+    monkeypatch.setattr(runtime_hydrator, "_RUNTIME_HYDRATOR", hydrator)
+    monkeypatch.setattr(
+        process_runner,
+        "_PROCESS_RUNNER",
+        DefaultProcessRunner(route_capability_factory=route_factory),
+    )
+    return hydrator, route_factory
 
 
-def _run_args(path: Path, *, run_id: str) -> SimpleNamespace:
+def _run_args(*, run_id: str) -> SimpleNamespace:
     return SimpleNamespace(
-        path=path,
+        path=DOCUMENTED_MANIFEST,
         selector=None,
         run_id=run_id,
         dag_id=None,

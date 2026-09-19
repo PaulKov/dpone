@@ -7,7 +7,7 @@ import statistics
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard
 
 import yaml
 
@@ -103,7 +103,9 @@ def _validate_sections(
 ) -> None:
     if not _valid_section_fields(canonical, _CANONICAL_REQUIRED, _CANONICAL_FIELDS):
         errors.append("canonical_fields")
-    if not _valid_section_fields(fanout, _FANOUT_REQUIRED, _FANOUT_FIELDS):
+    fanout_required = _FANOUT_REQUIRED_V2 if schema == SCHEMA_V2 else _FANOUT_REQUIRED_V1
+    fanout_allowed = _FANOUT_FIELDS_V2 if schema == SCHEMA_V2 else _FANOUT_FIELDS_V1
+    if not _valid_section_fields(fanout, fanout_required, fanout_allowed):
         errors.append("fanout_fields")
     canonical_measurement = _valid_measurement(canonical)
     fanout_measurement = _valid_measurement(fanout)
@@ -171,11 +173,7 @@ def _valid_measurement(section: Mapping[str, Any]) -> bool:
         return False
     if not _finite_non_negative(maximum) or not _finite_non_negative(median):
         return False
-    return math.isclose(maximum, max(trials), abs_tol=1e-6) and math.isclose(
-        median,
-        statistics.median(trials),
-        abs_tol=1e-6,
-    )
+    return maximum == max(trials) and median == statistics.median(trials)
 
 
 def _within_budget(section: Mapping[str, Any]) -> bool:
@@ -225,9 +223,9 @@ def _validate_measured_budget(
     }
     if schema == SCHEMA_V2:
         fanout_expected["max_source_bytes"] = fanout_budget.get("max_source_bytes")
-    if any(canonical.get(field) != value for field, value in canonical_expected.items()):
+    if any(not _same_typed_value(canonical.get(field), value) for field, value in canonical_expected.items()):
         errors.append("canonical_budget")
-    if any(fanout.get(field) != value for field, value in fanout_expected.items()):
+    if any(not _same_typed_value(fanout.get(field), value) for field, value in fanout_expected.items()):
         errors.append("fanout_budget")
 
 
@@ -293,27 +291,31 @@ def _expected_canonical_digest(budget: Mapping[str, Any]) -> str:
     )
 
 
-def _finite_non_negative(value: Any) -> bool:
+def _finite_non_negative(value: Any) -> TypeGuard[int | float]:
     return isinstance(value, int | float) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
 
 
-def _finite_positive(value: Any) -> bool:
+def _finite_positive(value: Any) -> TypeGuard[int | float]:
     return _finite_non_negative(value) and value > 0
 
 
-def _positive_int(value: Any) -> bool:
+def _positive_int(value: Any) -> TypeGuard[int]:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
-def _non_negative_int(value: Any) -> bool:
+def _non_negative_int(value: Any) -> TypeGuard[int]:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _same_typed_value(actual: Any, expected: Any) -> bool:
+    return type(actual) is type(expected) and actual == expected
 
 
 _CANONICAL_REQUIRED = frozenset(
     {"budget_max_seconds", "columns", "max_seconds", "rows", "status", "trial_seconds", "trials", "warmups"}
 )
 _CANONICAL_FIELDS = _CANONICAL_REQUIRED | {"digest", "error_type", "median_seconds", "stable_across_trials"}
-_FANOUT_REQUIRED = frozenset(
+_FANOUT_REQUIRED_V1 = frozenset(
     {
         "budget_max_seconds",
         "columns",
@@ -328,14 +330,15 @@ _FANOUT_REQUIRED = frozenset(
         "warmups",
     }
 )
-_FANOUT_FIELDS = _FANOUT_REQUIRED | {
+_FANOUT_FIELDS_V1 = _FANOUT_REQUIRED_V1 | {
     "cleanup_proven",
     "content_digests_equal",
     "error_type",
-    "max_source_bytes",
     "median_seconds",
     "publication_phase",
 }
+_FANOUT_REQUIRED_V2 = _FANOUT_REQUIRED_V1 | {"max_source_bytes"}
+_FANOUT_FIELDS_V2 = _FANOUT_FIELDS_V1 | {"max_source_bytes"}
 _BASE_TOP_LEVEL_FIELDS = frozenset(
     {
         "benchmark_config_sha256",
