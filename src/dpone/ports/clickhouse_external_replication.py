@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -157,6 +158,36 @@ class ExternalReplicationReceipt:
         }
 
 
+class ExternalReplicationRuntimeService(Protocol):
+    """Durable effects required by the external publication coordinator."""
+
+    evidence_scope: str
+    evidence_status: str
+
+    def inventory(self, cluster: str) -> tuple[str, ...]: ...
+    def read_authority(self, target_key: str) -> Mapping[str, Any] | None: ...
+    def compare_and_swap_authority(
+        self, target_key: str, expected_version: int | None, desired: Mapping[str, Any]
+    ) -> Mapping[str, Any]: ...
+    def observe_candidate(self, member_id: str, candidate_name: str) -> Mapping[str, Any]: ...
+    def stage_member_once(
+        self,
+        member_id: str,
+        *,
+        operation_id: str,
+        candidate_name: str,
+        artifact: ExternalArtifactReceipt,
+        source: ExternalArtifactSourcePort,
+    ) -> Mapping[str, Any]: ...
+    def drop_owned_candidate(self, member_id: str, *, candidate_uuid: str) -> None: ...
+    def dispatch_publication_once(
+        self, *, operation_id: str, candidate_name: str, member_ids: tuple[str, ...]
+    ) -> None: ...
+    def observe_publication(self, operation_id: str) -> Mapping[str, str]: ...
+    def dispatch_cleanup_once(self, *, operation_id: str, member_ids: tuple[str, ...]) -> None: ...
+    def observe_cleanup(self, operation_id: str) -> Mapping[str, bool]: ...
+
+
 class ExternalTopologyCatalogPort(Protocol):
     """Return one complete, normalized external-replication inventory."""
 
@@ -246,6 +277,7 @@ __all__ = [
     "ExternalPublicationError",
     "ExternalPublicationRequest",
     "ExternalReplicationReceipt",
+    "ExternalReplicationRuntimeService",
     "ExternalReplicaStagingPort",
     "ExternalTopology",
     "ExternalTopologyCatalogPort",

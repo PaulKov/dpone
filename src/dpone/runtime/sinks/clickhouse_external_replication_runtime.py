@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, NoReturn, Protocol
+from typing import Any, NoReturn
 
 from dpone.ports.clickhouse_external_replication import (
     ExternalArtifactReceipt,
@@ -11,6 +11,7 @@ from dpone.ports.clickhouse_external_replication import (
     ExternalPublicationError,
     ExternalPublicationRequest,
     ExternalReplicationReceipt,
+    ExternalReplicationRuntimeService,
     derive_generation_id,
     derive_operation_id,
     derive_target_key,
@@ -21,37 +22,6 @@ from dpone.runtime.sinks import (
     clickhouse_external_replication_phases as phase_ops,
 )
 from dpone.runtime.sinks import clickhouse_external_replication_runtime_support as runtime_support
-
-
-class ExternalReplicationRuntimeService(Protocol):
-    """Durable effects required by the pure runtime coordinator."""
-
-    evidence_scope: str
-    evidence_status: str
-
-    def inventory(self, cluster: str) -> tuple[str, ...]: ...
-    def inventory_digest(self) -> str: ...
-    def read_authority(self, target_key: str) -> Mapping[str, Any] | None: ...
-    def compare_and_swap_authority(
-        self, target_key: str, expected_version: int | None, desired: Mapping[str, Any]
-    ) -> Mapping[str, Any]: ...
-    def observe_candidate(self, member_id: str, candidate_name: str) -> Mapping[str, Any]: ...
-    def stage_member_once(
-        self,
-        member_id: str,
-        *,
-        operation_id: str,
-        candidate_name: str,
-        artifact: ExternalArtifactReceipt,
-        source: ExternalArtifactSourcePort,
-    ) -> Mapping[str, Any]: ...
-    def drop_owned_candidate(self, member_id: str, *, candidate_uuid: str) -> None: ...
-    def dispatch_publication_once(
-        self, *, operation_id: str, candidate_name: str, member_ids: tuple[str, ...]
-    ) -> None: ...
-    def observe_publication(self, operation_id: str) -> Mapping[str, str]: ...
-    def dispatch_cleanup_once(self, *, operation_id: str, member_ids: tuple[str, ...]) -> None: ...
-    def observe_cleanup(self, operation_id: str) -> Mapping[str, bool]: ...
 
 
 class ClickHouseExternalReplicationRuntime:

@@ -108,13 +108,8 @@ class ClickHouseExternalTopologyCatalog:
 
 
 def require_endpoint_clone_capability(connector: Any) -> None:
-    """Fail before topology or authority I/O when direct cloning is unavailable."""
-
     if not callable(getattr(connector, "clone_for_endpoint", None)):
-        raise ExternalContractError(
-            "INVENTORY_INVALID",
-            "direct endpoint clone capability is unavailable",
-        )
+        raise ExternalContractError("INVENTORY_INVALID", "direct endpoint clone capability is unavailable")
 
 
 class ClickHouseExternalReplicaConnectionProvider(ExternalReplicaConnectionProvider):
