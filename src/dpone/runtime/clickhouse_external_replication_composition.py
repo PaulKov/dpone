@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from dpone.ports.clickhouse_connector import ClickHouseEndpointClonePort
-from dpone.ports.clickhouse_external_replication import ExternalContractError
+from dpone.contracts.clickhouse_external_replication import ExternalContractError
 from dpone.runtime.sinks.clickhouse_cluster_publication_bootstrap import (
     ClickHouseClusterAuthorityBootstrap,
 )
@@ -112,7 +111,7 @@ def build_clickhouse_external_replication(sink: Any) -> ClickHouseExternalReplic
 
 
 def _direct_member_connection(
-    base: ClickHouseEndpointClonePort,
+    base: Any,
     host_name: str,
     host_address: str,
     port: int,

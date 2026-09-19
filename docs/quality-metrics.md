@@ -251,7 +251,7 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 
 | From layer | To layer | Edges |
 |---|---|---:|
-| `dpone.runtime` | `dpone.contracts` | 214 |
+| `dpone.runtime` | `dpone.contracts` | 217 |
 | `dpone.services` | `dpone.contracts` | 160 |
 | `dpone.adapters` | `dpone.contracts` | 121 |
 | `dpone.adapters` | `dpone.ports` | 114 |
@@ -271,7 +271,7 @@ Approved stable high fan-in contracts are expected shared DTO/port modules; they
 
 | From slice | To slice | Edges |
 |---|---|---:|
-| `dpone.runtime` | `dpone.contracts` | 214 |
+| `dpone.runtime` | `dpone.contracts` | 217 |
 | `dpone.adapters` | `dpone.contracts` | 121 |
 | `dpone.adapters` | `dpone.ports` | 114 |
 | `dpone.services.gitops` | `dpone.gitops` | 102 |

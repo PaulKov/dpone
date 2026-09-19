@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, NoReturn
 
 from dpone.ports import clickhouse_external_replication as ports
 from dpone.ports.clickhouse_external_replication import (
@@ -58,7 +58,12 @@ class ClickHouseExternalTopologyCatalog:
             members=members,
         )
         topology.validate()
-        aliases, endpoints = admit_member_endpoints(rows, members, self._resolve_endpoint)
+        aliases, endpoints = admit_member_endpoints(
+            rows,
+            tuple(member.member_id for member in members),
+            self._resolve_endpoint,
+            _invalid_inventory,
+        )
         self._member_ids_by_host = aliases
         self._member_endpoints = endpoints
         self._bootstrap_hosts = tuple(str(row[0]) for row in rows)
@@ -315,6 +320,10 @@ def _inventory_rows(connector: Any, cluster: str) -> list[Any]:
 
 def _identity_endpoint(host: str, address: str, port: int) -> tuple[str, str, int]:
     return host, address, port
+
+
+def _invalid_inventory(detail: str) -> NoReturn:
+    raise ExternalContractError("INVENTORY_INVALID", detail)
 
 
 def _member(row: Sequence[Any]) -> ExternalMember:
