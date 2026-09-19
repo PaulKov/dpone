@@ -264,9 +264,10 @@ def test_external_replication_terminal_partial_is_retained_without_redispatch() 
     facade._service_factory = faulting_factory
     admitted = sink._full_refresh_publication.prepare_admission(config)
 
-    for _attempt in range(2):
-        with pytest.raises(ExternalPublicationError, match="PUBLICATION_PARTIAL_TERMINAL"):
-            sink.load(admitted, payload)
+    with pytest.raises(ExternalPublicationError, match="PUBLICATION_PARTIAL_TERMINAL"):
+        sink.load(admitted, payload)
+    with pytest.raises(ExternalPublicationError, match="PUBLICATION_PARTIAL_TERMINAL"):
+        sink._full_refresh_publication.prepare_admission(config)
 
     assert dispatches == 1
     assert _execute(18123, f"SELECT groupArray(id) FROM {database}.target") == [("[1]",)]
