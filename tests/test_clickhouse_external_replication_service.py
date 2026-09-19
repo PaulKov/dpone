@@ -33,6 +33,9 @@ def _runtime(service: _Service) -> ClickHouseExternalReplicationRuntime:
 
 
 class _Service:
+    evidence_scope = "local_synthetic"
+    evidence_status = "PASS"
+
     def __init__(self) -> None:
         self.members = ("member-a", "member-b")
         self.authority: dict[str, Any] | None = None
