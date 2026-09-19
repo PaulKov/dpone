@@ -71,6 +71,7 @@ class CompositionWorkloadAdmission:
         if self.execution_cell not in {
             "sqlserver_dbt_v1",
             "postgres_mssql_full_refresh_v1",
+            "clickhouse_mssql_full_refresh_v1",
             "mssql_clickhouse_full_refresh_v1",
         }:
             raise CompositionAdmissionError("execution_capability")

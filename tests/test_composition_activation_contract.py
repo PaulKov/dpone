@@ -68,6 +68,15 @@ def test_native_only_subset_cannot_be_parent_authority():
         replace(value, workloads=value.workloads[:1])
 
 
+def test_clickhouse_to_mssql_standalone_cell_is_admitted():
+    value = request()
+    standalone = replace(value.workloads[1], execution_cell="clickhouse_mssql_full_refresh_v1")
+
+    admitted = replace(value, workloads=(value.workloads[0], standalone))
+
+    assert admitted.workloads[1].execution_cell == "clickhouse_mssql_full_refresh_v1"
+
+
 def test_missing_or_duplicate_physical_write_is_rejected():
     value = request()
     with pytest.raises(CompositionAdmissionError, match="physical_partition"):
