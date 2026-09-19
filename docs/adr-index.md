@@ -84,3 +84,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0067: Keeper is the authority for replicated ClickHouse publication (Accepted)](adr/0067-clickhouse-cluster-publication-authority.md)
 
 - [ADR 0068: Development runtime authority is image-installed and rechecked per process (Accepted)](adr/0068-image-installed-development-runtime-authority.md)
+
+- [ADR 0069: External ClickHouse replication uses fenced per-member generations (Accepted)](adr/0069-clickhouse-external-replication-publication.md)

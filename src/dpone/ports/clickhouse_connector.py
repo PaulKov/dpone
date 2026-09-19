@@ -38,3 +38,17 @@ class ClickHouseConnectorPort(Protocol):
 
     def clone_for_partition(self, partition_index: int) -> ClickHouseConnectorPort:
         """Return an equivalent connector for parallel partition work."""
+
+
+class ClickHouseEndpointClonePort(Protocol):
+    """Optional direct-endpoint capability required only by external publication."""
+
+    def clone_for_endpoint(
+        self,
+        host: str,
+        port: int,
+        *,
+        application_suffix: str,
+        driver: str | None = None,
+    ) -> ClickHouseConnectorPort:
+        """Return an equivalent connector for one admitted direct member."""

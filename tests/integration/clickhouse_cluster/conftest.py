@@ -8,7 +8,7 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from tests.integration.clickhouse_cluster.evidence import reset_receipt
+from tests.integration.clickhouse_cluster import evidence
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -18,7 +18,8 @@ def _fresh_cluster_publication_receipt() -> None:
 
 
 def _prepare_cluster_publication_session() -> None:
-    reset_receipt()
+    evidence.reset_receipt()
+    evidence.reset_external_receipt()
     _wait_for_distributed_ddl()
 
 

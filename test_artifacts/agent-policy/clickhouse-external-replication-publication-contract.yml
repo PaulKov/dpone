@@ -1,0 +1,192 @@
+schema_version: 1
+task_id: "DPONE-CLICKHOUSE-EXTERNAL-PUBLICATION"
+title: "Safe ClickHouse external-replication full-refresh publication"
+goal: "Stage and publish one complete generation on every required external-replication member without duplicate insert or false success."
+specification: "docs/feature-design-clickhouse-external-replication-publication-v1.md"
+base_commit: "ee9c8fc842e52bbdb6e333b6669d0b013009035d"
+integrator: "primary-agent"
+
+acceptance_criteria:
+  - "Uniform internal_replication=false is admitted only with explicit external mode and non-replicated MergeTree."
+  - "Authority is acquired before member candidate mutation."
+  - "Every required member receives and verifies one complete immutable generation without blind append retry."
+  - "Operation, generation, member, artifact, inventory, and plan identities are deterministic and fenced."
+  - "Partial staging or publication never advances source state or reports success."
+  - "Same-operation retry and completed replay are idempotent."
+  - "Cleanup removes only exact predecessor identities and remains recoverable."
+  - "Internal replication, local publication, legacy behavior, and V1 receipt recovery remain compatible."
+  - "Evidence is redacted and live external certification is UNVERIFIED without an approved environment."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - manifest
+    - runtime
+    - state
+    - evidence
+    - documentation
+  migration_required: true
+
+owned_paths:
+  - docs/feature-design-clickhouse-external-replication-publication-v1.md
+  - docs/adr/0069-clickhouse-external-replication-publication.md
+  - src/dpone/contracts/clickhouse_external_replication.py
+  - src/dpone/ports/clickhouse_external_replication.py
+  - src/dpone/runtime/sinks/clickhouse_external_replication_*.py
+  - tests/test_clickhouse_external_replication_*.py
+  - tests/integration/clickhouse_cluster/**
+  - docs/clickhouse-cluster-publication*.md
+  - docs/errors/CLICKHOUSE_CLUSTER_EXTERNAL_*.md
+  - examples/batch/clickhouse-external-replication-full-refresh.batch.yaml
+  - test_artifacts/clickhouse-external-publication/**
+
+integrator_owned_paths:
+  - CHANGELOG.md
+  - mkdocs.yml
+  - docs/architecture.md
+  - docs/run.md
+  - docs/ux.md
+  - docs/getting-started/credentials-quickstart.md
+  - docs/airflow-runtime-startup-diagnostics.md
+  - docs/adr-index.md
+  - docs/clickhouse.md
+  - docs/load-strategies.md
+  - docs/physical-design.md
+  - docs/reference/configuration.md
+  - docs/source-sink-matrix.md
+  - docs/source-sink/mssql-to-clickhouse.md
+  - docs/compatibility.md
+  - src/dpone/schema/**
+  - src/dpone/contracts/clickhouse_cluster_admission.py
+  - src/dpone/contracts/clickhouse_cluster_publication.py
+  - src/dpone/contracts/clickhouse_external_replication_identity.py
+  - src/dpone/contracts/clickhouse_external_replication_classification.py
+  - src/dpone/runtime/sinks/clickhouse_external_artifact_verifier.py
+  - src/dpone/manifest/validation_clickhouse_cluster.py
+  - src/dpone/ports/clickhouse_cluster_publication.py
+  - src/dpone/runtime/clickhouse_cluster_publication_composition.py
+  - src/dpone/runtime/clickhouse_staging_composition.py
+  - src/dpone/runtime/connectors/clickhouse.py
+  - src/dpone/runtime/sinks/clickhouse_full_refresh_router.py
+  - src/dpone/runtime/sinks/clickhouse_staged_load.py
+  - src/dpone/runtime/sinks/clickhouse_sink.py
+  - src/dpone/runtime/sinks/clickhouse_cluster_preflight.py
+  - src/dpone/runtime/sinks/clickhouse_table_ddl.py
+  - src/dpone/runtime/etl/processor_runtime.py
+  - src/dpone/runtime/connectors/clickhouse_tsv_codec.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_queryout_artifacts.py
+  - src/dpone/commands/run_failure_output.py
+  - src/dpone/commands/plan_cmd.py
+  - src/dpone/ports/clickhouse_connector.py
+  - tests/test_clickhouse_cluster_admission.py
+  - tests/test_clickhouse_cluster_topology_preflight.py
+  - tests/test_runtime_clickhouse_tsv_codec.py
+  - tests/test_clickhouse_bulk_path_resolution.py
+  - tests/test_run_failure_output.py
+  - tests/test_cli_plan_command.py
+  - tests/test_runtime_etl_processor_split.py
+  - tests/conftest.py
+
+read_only_paths:
+  - docs/feature-design-clickhouse-cluster-full-refresh-publication-v1.md
+  - docs/adr/0067-clickhouse-cluster-publication-authority.md
+  - src/dpone/runtime/sinks/clickhouse_cluster_full_refresh_publication.py
+  - src/dpone/runtime/sinks/clickhouse_cluster_publication_authority.py
+  - src/dpone/runtime/sinks/clickhouse_cluster_publication_ddl.py
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - docs/release.md
+  - docs/agent-release-protocol.md
+  - docs/adr-index.md
+  - docs/architecture.md
+  - docs/run.md
+  - docs/ux.md
+  - docs/getting-started/credentials-quickstart.md
+  - docs/airflow-runtime-startup-diagnostics.md
+  - docs/clickhouse.md
+  - docs/compatibility.md
+  - docs/load-strategies.md
+  - docs/physical-design.md
+  - docs/reference/configuration.md
+  - docs/source-sink-matrix.md
+  - docs/source-sink/mssql-to-clickhouse.md
+  - src/dpone/schema
+  - src/dpone/contracts/clickhouse_cluster_admission.py
+  - src/dpone/contracts/clickhouse_cluster_publication.py
+  - src/dpone/contracts/clickhouse_external_replication_classification.py
+  - src/dpone/contracts/clickhouse_external_replication_identity.py
+  - src/dpone/manifest/validation_clickhouse_cluster.py
+  - src/dpone/ports/clickhouse_cluster_publication.py
+  - src/dpone/commands/run_failure_output.py
+  - src/dpone/commands/plan_cmd.py
+  - src/dpone/ports/clickhouse_connector.py
+  - src/dpone/runtime/clickhouse_cluster_publication_composition.py
+  - src/dpone/runtime/clickhouse_staging_composition.py
+  - src/dpone/runtime/connectors/clickhouse.py
+  - src/dpone/runtime/connectors/clickhouse_tsv_codec.py
+  - src/dpone/runtime/etl/processor_runtime.py
+  - src/dpone/runtime/sinks/clickhouse_cluster_preflight.py
+  - src/dpone/runtime/sinks/clickhouse_external_artifact_verifier.py
+  - src/dpone/runtime/sinks/clickhouse_full_refresh_router.py
+  - src/dpone/runtime/sinks/clickhouse_staged_load.py
+  - src/dpone/runtime/sinks/clickhouse_sink.py
+  - src/dpone/runtime/sinks/clickhouse_table_ddl.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_queryout_artifacts.py
+  - tests/test_clickhouse_bulk_path_resolution.py
+  - tests/test_clickhouse_cluster_admission.py
+  - tests/test_clickhouse_cluster_topology_preflight.py
+  - tests/test_run_failure_output.py
+  - tests/test_cli_plan_command.py
+  - tests/test_runtime_etl_processor_split.py
+  - tests/test_runtime_clickhouse_tsv_codec.py
+  - tests/conftest.py
+
+shared_file_owner: "primary-agent"
+
+dependencies:
+  - "ADR 0067 Keeper authority and one-shot DDL protocol"
+  - "Approved external-replication feature design"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_clickhouse_external_replication_contract.py tests/test_clickhouse_external_replication_runtime.py tests/test_clickhouse_cluster_admission.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run pytest tests/test_docs_language_contracts.py -q"
+    - "uv run mkdocs build --strict"
+  live:
+    - "Opt-in local synthetic two-member external-replication fixture"
+    - "Production external topology certification: UNVERIFIED unless separately approved"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

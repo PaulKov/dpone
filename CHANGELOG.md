@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### Added
+
+- Add an explicit, fail-closed ClickHouse `external` replication mode for
+  bounded full refreshes to one-shard clusters of independent MergeTree
+  members. The protocol fences the target before mutation, replays one sealed
+  artifact directly to every required member, verifies a complete logical
+  generation, and publishes through one correlated cluster DDL. Existing local
+  and internal-replication routes remain unchanged; live production
+  certification is still unverified.
+
+### Fixed
+
+- Reject ambiguous external ClickHouse member aliases and resolved endpoints,
+  invalidate stale topology snapshots, preserve typed CAS/publication errors,
+  and require an explicit direct-member connector capability before topology or
+  authority side effects.
+- Keep ordinary external-publication runtime receipts fail-closed as
+  `runtime / UNVERIFIED`, isolate internal and external evidence cleanup, and
+  bind Docker evidence to an exact clean tracked tree plus the full fixture
+  configuration.
+- Return exit code `1` for blocked external publication plans, route typed
+  external runtime failures to stderr, require absolute artifact-store paths,
+  and cover empty generations plus receipt-before-source-state ordering.
+- Reject `Shared*MergeTree` before source access, validate the retained artifact
+  envelope version, bind source schema, mapped schema, ordered rows, and byte size to its identity, preserve
+  canonical runtime error codes, expose plan blockers in every output format,
+  and classify terminal DDL failures without indefinite in-progress retries.
+
 ## 0.81.3 - 2026-09-18
 
 ### Fixed

@@ -2856,6 +2856,12 @@
               "markdownDescription": "Настройки логирования и дедупликации",
               "additionalProperties": false,
               "properties": {
+                "external_artifact_store_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^/",
+                  "description": "Absolute durable/shared artifact-store path required by ClickHouse external-replication recovery. May alternatively be supplied through DPONE_EXTERNAL_ARTIFACT_STORE at runtime."
+                },
                 "log_sample_rows": {
                   "type": "integer",
                   "title": "📝 Логировать N строк",
@@ -4901,6 +4907,21 @@
                                         "cluster"
                                       ],
                                       "default": "cluster"
+                                    },
+                                    "replication_mode": {
+                                      "type": "string",
+                                      "enum": [
+                                        "internal",
+                                        "external"
+                                      ],
+                                      "default": "internal",
+                                      "description": "Data replication owner. External mode requires independent non-replicated MergeTree members and strict runtime admission."
+                                    },
+                                    "external_content_row_budget": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "default": 100000,
+                                      "description": "Maximum rows that external mode may seal and re-observe for exact typed-content proof."
                                     },
                                     "on_cluster": {
                                       "type": "boolean",

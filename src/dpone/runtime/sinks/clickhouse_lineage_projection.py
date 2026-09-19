@@ -101,6 +101,7 @@ class ClickHouseSinkSideLineageProjector:
             finalization_config=projected_config,
             decoded_config=handle.decoded_config,
             metadata=_projected_metadata(handle, projected_config, plan.schema_columns),
+            sink_state=handle.sink_state,
         )
         return GovernanceLineageProjectionResult(
             handle=projected_handle,

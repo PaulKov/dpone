@@ -1265,6 +1265,20 @@ prevents this replacement defect; it cannot reconstruct constraints lost by an
 earlier runtime. Restore them from approved DDL using the
 [PostgreSQL recovery runbook](source-sink/postgres-to-postgres.md#recover-a-previously-replaced-target).
 
+## ClickHouse external-replication publication
+
+External publication is additive and opt-in through
+`physical_design.storage.clickhouse.cluster.replication_mode: external`.
+Omitted mode remains `internal`, so existing local and replicated-cluster
+manifests keep their prior routing. The external route requires a bounded
+`full_refresh`, `lineage: false`, direct non-replicated MergeTree-family tables,
+native connectivity to every admitted member, and an Atomic database. It never
+falls back to local or internal publication. A coordinator may connect over
+HTTP; per-member mutation uses native endpoints from the admitted topology, with
+an injected resolver for explicit network translation. Stop new external runs
+and follow the [recovery runbook](clickhouse-cluster-publication-runbook.md)
+before downgrading while authority is non-terminal.
+
 ## Explicit validated ClickHouse file staging
 
 `stage_validated_file` is additive and requires caller opt-in. Existing `load`,

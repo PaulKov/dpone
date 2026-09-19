@@ -262,6 +262,10 @@ nav:
       - MSSQL: mssql.md
       - ClickHouse: clickhouse.md
       - ClickHouse cluster publication design: feature-design-clickhouse-cluster-full-refresh-publication-v1.md
+      - ClickHouse external cluster publication: clickhouse-cluster-publication.md
+      - ClickHouse cluster publication reference: clickhouse-cluster-publication-reference.md
+      - ClickHouse cluster publication recovery: clickhouse-cluster-publication-runbook.md
+      - ClickHouse external publication design: feature-design-clickhouse-external-replication-publication-v1.md
       - BigQuery: bigquery.md
       - Kafka: kafka.md
       - REST API: rest-api.md
@@ -654,6 +658,7 @@ nav:
       - ADR 0062: adr/0062-isolated-mssql-switch-activation.md
       - ADR 0064: adr/0064-validated-file-clickhouse-staging.md
       - ADR 0065: adr/0065-trusted-isolated-native-generation-execution.md
+      - ADR 0069: adr/0069-clickhouse-external-replication-publication.md
 
 extra:
   generator: false

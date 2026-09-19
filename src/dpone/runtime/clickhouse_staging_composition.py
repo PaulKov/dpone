@@ -60,6 +60,11 @@ class ClickHouseFullRefreshPublicationMixin:
 
         return self._full_refresh_publication.replay_result(load_config)
 
+    def abort_runtime_admission(self, load_config: LoadConfig) -> None:
+        """Close an unused external publication lock after pre-stage failure."""
+
+        self._full_refresh_publication.abort_prepared_admission(load_config)
+
     def _cleanup_full_refresh_publication(self, receipt: Any) -> None:
         self._full_refresh_publication.cleanup(receipt)
 
@@ -121,6 +126,12 @@ def build_clickhouse_staging_components(
     )
     full_refresh_publication = ClickHouseFullRefreshPublicationRouter.from_connector(connector)
     return ClickHouseStagingComponents(validated_file, decoder, finalizer, full_refresh_publication)
+
+
+def build_full_refresh_publication_router(sink: Any) -> ClickHouseFullRefreshPublicationRouter:
+    """Complete publication wiring after the sink composition root exists."""
+
+    return ClickHouseFullRefreshPublicationRouter.from_sink(sink)
 
 
 def build_file_runner(

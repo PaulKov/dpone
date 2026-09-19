@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from contextlib import redirect_stdout
 from typing import Any
 
 from dpone.commands.run_output import write_json, write_text
@@ -15,7 +17,23 @@ def write_run_failure(args: argparse.Namespace, exc: Exception) -> None:
     """Render one runtime failure without exposing paths or credentials."""
 
     stable_code = getattr(exc, "code", None)
-    raw_message = f"{stable_code}: {exc}" if isinstance(stable_code, str) else f"{exc.__class__.__name__}: {exc}"
+    if isinstance(stable_code, str) and stable_code.startswith("DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_"):
+        with redirect_stdout(sys.stderr):
+            _render_run_failure(args, exc)
+        return
+    _render_run_failure(args, exc)
+
+
+def _render_run_failure(args: argparse.Namespace, exc: Exception) -> None:
+    """Render to the caller-selected stream without changing the envelope."""
+
+    stable_code = getattr(exc, "code", None)
+    detail = str(exc)
+    raw_message = (
+        (detail if isinstance(stable_code, str) and detail.startswith(stable_code) else f"{stable_code}: {detail}")
+        if isinstance(stable_code, str)
+        else f"{exc.__class__.__name__}: {detail}"
+    )
     message = redact_absolute_paths(redact_text(raw_message))
     if args.format == "json":
         result: dict[str, Any] = {
@@ -33,6 +51,9 @@ def write_run_failure(args: argparse.Namespace, exc: Exception) -> None:
             result["quality_gates"] = redact_value(to_jsonable())
         if isinstance(stable_code, str):
             result["error_code"] = stable_code
+        evidence = getattr(exc, "evidence", None)
+        if isinstance(evidence, dict):
+            result["evidence"] = redact_value(evidence)
         outcome = getattr(exc, "outcome", None)
         if isinstance(outcome, QualityGateFailureOutcome):
             result.update(outcome.result_fields())

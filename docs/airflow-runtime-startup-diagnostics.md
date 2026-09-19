@@ -33,6 +33,12 @@ verified launcher supplies that context automatically. If a separate hook report
 that the pinned runtime image includes the hook context-handoff fix, then rebuild
 and activate the deployment with the matching packages.
 
+For external ClickHouse publication, also verify that the Pod receives an
+absolute `DPONE_EXTERNAL_ARTIFACT_STORE` path backed by durable storage shared
+across eligible retry workers. Typed external-publication failures are expected
+in `runtime-stderr.log`; an empty stdout is intentional and is not missing
+success evidence.
+
 Ordinary runtime retains the XCom outcome-gate exit policy. dbt and hooks retain
 the real child exit code; failed hooks block downstream `all_success` runtime
 tasks and do not gain automatic retries. An OS failure in preparation, capture

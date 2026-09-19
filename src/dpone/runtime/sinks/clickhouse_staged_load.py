@@ -14,8 +14,10 @@ from dpone.runtime.governance.ports import (
     staged_load_failure_details,
 )
 from dpone.runtime.process_io import add_exception_note
+from dpone.runtime.sinks.clickhouse_external_staged_lifecycle import ClickHouseExternalStagedLifecycle
 from dpone.runtime.sinks.clickhouse_full_refresh_staged import finalize_full_refresh, publication_cleanup_plan
 from dpone.runtime.sinks.clickhouse_production_finalize import ClickHouseProductionFinalizer
+from dpone.runtime.sinks.clickhouse_staged_cleanup import drop_staging_configs
 from dpone.runtime.sinks.clickhouse_staged_evidence import enforce_source_byte_budget, staged_handle_metadata
 from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.merge_policy import (
@@ -43,9 +45,12 @@ class ClickHouseStagedLoadService:
         self._plan_staging_table = plan_staging_table
         self._create_planned_staging_table = create_planned_staging_table
         self._production = ClickHouseProductionFinalizer(sink)
+        self._external = ClickHouseExternalStagedLifecycle(sink)
 
     def stage(self, load_config: Any, payload: Any) -> StagedLoadHandle:
         load_config = self._effective_config(load_config)
+        if self._external.is_enabled(load_config):
+            return self._external.stage(load_config, payload)
         staging_config = self._create_staging(load_config, payload)
         finalization_config = decoded_config = None
         try:
@@ -130,6 +135,8 @@ class ClickHouseStagedLoadService:
         """Finalize a handle whose exact effective table already passed validation."""
 
         load_config = self._effective_config(load_config)
+        if (external_result := self._external.publish(handle, validation_token)) is not None:
+            return external_result
         self._sink._staging_finalizer.require_strategy_staging_validation(
             validation_token,
             load_config,
@@ -159,6 +166,8 @@ class ClickHouseStagedLoadService:
         """Validate the exact post-projection table before target finalization."""
 
         load_config = self._effective_config(load_config)
+        if (external_validation := self._external.validate(handle)) is not None:
+            return external_validation
         return self._sink._staging_finalizer.validate_strategy_staging_key_integrity(
             load_config,
             self._finalization_config(handle),
@@ -170,6 +179,8 @@ class ClickHouseStagedLoadService:
         return replace(load_config, load_strategy=backfill_inner_strategy(load_config))
 
     def cleanup(self, handle: StagedLoadHandle) -> None:
+        if self._external.cleanup(handle, abort=False):
+            return
         finalizer = getattr(self._sink, "_staging_finalizer", None)
         retire = getattr(finalizer, "retire_strategy_staging_validations", None)
         if callable(retire):
@@ -182,6 +193,8 @@ class ClickHouseStagedLoadService:
         self._sink._cleanup_full_refresh_publication(publication)
 
     def abort(self, handle: StagedLoadHandle) -> None:
+        if self._external.cleanup(handle, abort=True):
+            return
         self.cleanup(handle)
 
     def _create_staging(self, load_config: Any, payload: Any) -> Any:
@@ -351,27 +364,7 @@ class ClickHouseStagedLoadService:
         return handle.finalization_config or handle.staging_config
 
     def _drop_configs(self, *configs: Any | None) -> None:
-        seen: set[str] = set()
-        first_error: Exception | None = None
-        for config in configs:
-            if config is None or not getattr(config, "target_table", None):
-                continue
-            table = self._sink._table(config)
-            if table in seen:
-                continue
-            seen.add(table)
-            try:
-                self._sink._drop_table(table, config)
-            except Exception as error:
-                if first_error is None:
-                    first_error = error
-                else:
-                    add_exception_note(
-                        first_error,
-                        f"additional staging cleanup failed: {type(error).__name__}",
-                    )
-        if first_error is not None:
-            raise first_error
+        drop_staging_configs(self._sink, *configs)
 
 
 __all__ = ["ClickHouseStagedLoadService"]

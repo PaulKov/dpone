@@ -17,6 +17,7 @@ from dpone.runtime.clickhouse_file_stage_contract import (
 from dpone.runtime.clickhouse_staging_composition import (
     ClickHouseFullRefreshPublicationMixin,
     build_clickhouse_staging_components,
+    build_full_refresh_publication_router,
 )
 from dpone.runtime.clickhouse_staging_composition import (
     build_file_runner as build_file_runner,
@@ -97,6 +98,7 @@ class ClickHouseSink(
         self._staging_finalizer = staging.finalizer
         self._full_refresh_publication = staging.full_refresh_publication
         self._payload_ingestion = ClickHousePayloadIngestionService(self, sink_factory=self._clone_sink)
+        self._full_refresh_publication = build_full_refresh_publication_router(self)
         self._staged_load = ClickHouseStagedLoadService(
             self,
             plan_staging_table=lambda config: self._operation_table_config(config, "staging"),

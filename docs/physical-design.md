@@ -198,6 +198,13 @@ where possible.
 
 ### ClickHouse
 
+Clustered `full_refresh` also treats replication ownership as physical design.
+Use `cluster.replication_mode: internal` (the default) for direct
+`Replicated*MergeTree` tables and `external` for independent non-replicated
+`MergeTree` members. The latter uses the
+[external publication protocol](clickhouse-cluster-publication.md), requires
+cluster DDL scope, and never falls back to local publication.
+
 ```yaml
 sink:
   options:

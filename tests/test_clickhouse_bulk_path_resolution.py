@@ -57,6 +57,26 @@ def test_mssql_source_does_not_emit_clickhouse_tsv_for_python_sink_path() -> Non
     assert not factory.should_encode_for_clickhouse_direct(_load_config({"clickhouse_bulk": {"mode": "python"}}))
 
 
+def test_external_publication_emits_lossless_tsv_independently_of_sink_transport() -> None:
+    factory = MSSQLQueryoutArtifactFactory(connector=object(), logger=object(), sink_connector=ClickHouseConnector())
+    options = {
+        "clickhouse_bulk": {"mode": "python"},
+        "physical_design": {
+            "storage": {
+                "clickhouse": {
+                    "cluster": {
+                        "name": "analytics_cluster",
+                        "ddl_scope": "cluster",
+                        "replication_mode": "external",
+                    }
+                }
+            }
+        },
+    }
+
+    assert factory.should_encode_for_clickhouse_direct(_load_config(options))
+
+
 def test_mssql_source_does_not_emit_clickhouse_tsv_for_native_tcp_sink_path() -> None:
     factory = MSSQLQueryoutArtifactFactory(connector=object(), logger=object(), sink_connector=ClickHouseConnector())
 

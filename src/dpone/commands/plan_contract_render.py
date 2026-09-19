@@ -115,11 +115,43 @@ def render_evidence_contract_md(contract: dict) -> list[str]:
     ]
 
 
+def render_publication_decision_text(publication: dict) -> list[str]:
+    if not publication:
+        return []
+    lines = [
+        f"- publication_mode: {publication.get('mode')}",
+        f"- publication_replication_mode: {publication.get('replication_mode')}",
+        f"- publication_selected: {publication.get('selected')}",
+        f"- publication_runtime_admission_required: {publication.get('runtime_admission_required')}",
+        f"- publication_no_fallback: {publication.get('no_fallback')}",
+    ]
+    lines.extend(f"- publication_blocker: {blocker}" for blocker in publication.get("blockers") or [])
+    return lines
+
+
+def render_publication_decision_md(publication: dict) -> list[str]:
+    if not publication:
+        return []
+    return [
+        "",
+        "## Publication decision",
+        "",
+        f"- mode: `{publication.get('mode')}`",
+        f"- replication_mode: `{publication.get('replication_mode')}`",
+        f"- selected: `{publication.get('selected')}`",
+        f"- runtime_admission_required: `{publication.get('runtime_admission_required')}`",
+        f"- no_fallback: `{publication.get('no_fallback')}`",
+        *(f"- blocker: `{blocker}`" for blocker in publication.get("blockers") or []),
+    ]
+
+
 __all__ = [
     "render_evidence_contract_md",
     "render_evidence_contract_text",
     "render_external_target_contract_md",
     "render_external_target_contract_text",
+    "render_publication_decision_md",
+    "render_publication_decision_text",
     "render_replay_contract_md",
     "render_replay_contract_text",
     "render_transport_contract_md",

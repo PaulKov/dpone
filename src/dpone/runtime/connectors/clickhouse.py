@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 import os
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 from dpone.runtime.connector_logging import etl_logger
@@ -72,6 +72,7 @@ class ClickHouseConnector(AbstractConnector):
         gcs_hmac_secret: str | None = None,
         gcs_hmac_vault_path: str | None = None,
         logger: ETLLogger | None = None,
+        external_member_endpoint_resolver: Callable[[str, str, int], tuple[str, str, int]] | None = None,
     ):
         self.host = host
         self.driver = _normalize_driver(driver)
@@ -85,6 +86,7 @@ class ClickHouseConnector(AbstractConnector):
         self.connect_timeout = connect_timeout
         self.send_receive_timeout = send_receive_timeout
         self.ca_cert = ca_cert
+        self.external_member_endpoint_resolver = external_member_endpoint_resolver
         self.gcs_hmac_key = gcs_hmac_key
         self.gcs_hmac_secret = gcs_hmac_secret
         self.gcs_hmac_vault_path = gcs_hmac_vault_path
@@ -255,13 +257,29 @@ class ClickHouseConnector(AbstractConnector):
 
     def clone_for_partition(self, partition_index: int) -> ClickHouseConnector:
         """Return an isolated connector for one parallel partition worker."""
+        return self.clone_for_endpoint(
+            self.host,
+            self.port,
+            application_suffix=f"partition-{partition_index}",
+        )
+
+    def clone_for_endpoint(
+        self,
+        host: str,
+        port: int,
+        *,
+        application_suffix: str,
+        driver: str | None = None,
+    ) -> ClickHouseConnector:
+        """Reuse resolved credentials for one explicitly admitted direct member."""
+
         return ClickHouseConnector(
-            host=self.host,
-            port=self.port,
+            host=host,
+            port=port,
             database=self.database,
             user=self.user,
             password=self.password,
-            application_name=f"{self.application_name}-partition-{partition_index}",
+            application_name=f"{self.application_name}-{application_suffix}",
             secure=self.secure,
             compression=self.compression,
             connect_timeout=self.connect_timeout,
@@ -270,8 +288,9 @@ class ClickHouseConnector(AbstractConnector):
             gcs_hmac_key=self.gcs_hmac_key,
             gcs_hmac_secret=self.gcs_hmac_secret,
             gcs_hmac_vault_path=self.gcs_hmac_vault_path,
-            driver=self.driver,
+            driver=driver or self.driver,
             ca_cert=self.ca_cert,
+            external_member_endpoint_resolver=self.external_member_endpoint_resolver,
             logger=self.logger,
         )
 

@@ -16,6 +16,8 @@ from dpone.contracts.clickhouse_cluster_admission import (
     CLICKHOUSE_CLUSTER_ACCESS_TABLE_UNSUPPORTED,
     CLICKHOUSE_CLUSTER_DDL_SCOPE_REQUIRED,
     CLICKHOUSE_CLUSTER_ENGINE_REQUIRED,
+    CLICKHOUSE_CLUSTER_EXTERNAL_ENGINE_REQUIRED,
+    CLICKHOUSE_CLUSTER_REPLICATION_MODE_INVALID,
     CLICKHOUSE_CLUSTER_SOURCE_BUDGET_REQUIRED,
     CLICKHOUSE_CLUSTER_STAGING_DATABASE_UNSUPPORTED,
     ClickHouseClusterAdmissionInput,
@@ -43,6 +45,7 @@ def _request(**overrides: object) -> ClickHouseClusterAdmissionInput:
         "engine": "ReplicatedMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}')",
         "cluster_name": "analytics_cluster",
         "ddl_scope": "cluster",
+        "replication_mode": "internal",
         "access_table_enabled": False,
         "target_database": "analytics",
         "staging_database": "analytics",
@@ -60,6 +63,41 @@ def test_cluster_admission_selects_only_complete_bounded_contract() -> None:
     assert decision.mode == "cluster"
     assert decision.runtime_admission_required is True
     assert decision.no_fallback is True
+    assert decision.replication_mode == "internal"
+
+
+def test_external_cluster_admission_requires_explicit_mode_and_non_replicated_engine() -> None:
+    decision = evaluate_clickhouse_cluster_admission(_request(replication_mode="external", engine="MergeTree"))
+
+    assert decision.selected is True
+    assert decision.mode == "cluster_external"
+    assert decision.replication_mode == "external"
+    assert decision.no_fallback is True
+
+
+def test_external_cluster_admission_rejects_replicated_engine_without_fallback() -> None:
+    decision = evaluate_clickhouse_cluster_admission(_request(replication_mode="external"))
+
+    assert decision.selected is False
+    assert decision.blockers == (CLICKHOUSE_CLUSTER_EXTERNAL_ENGINE_REQUIRED,)
+    assert decision.no_fallback is True
+
+
+def test_external_cluster_admission_rejects_shared_engine_before_runtime() -> None:
+    decision = evaluate_clickhouse_cluster_admission(
+        _request(replication_mode="external", engine="SharedMergeTree('/clickhouse/tables/{uuid}')")
+    )
+
+    assert decision.selected is False
+    assert decision.runtime_admission_required is False
+    assert decision.blockers == (CLICKHOUSE_CLUSTER_EXTERNAL_ENGINE_REQUIRED,)
+
+
+def test_cluster_admission_rejects_unknown_replication_mode() -> None:
+    decision = evaluate_clickhouse_cluster_admission(_request(replication_mode="automatic"))
+
+    assert decision.selected is False
+    assert decision.blockers == (CLICKHOUSE_CLUSTER_REPLICATION_MODE_INVALID,)
 
 
 def test_local_full_refresh_remains_local_and_legacy_unbounded_compatible() -> None:
@@ -150,6 +188,29 @@ def test_router_selects_cluster_without_hidden_enable_flag() -> None:
 
     assert cluster.prepared == cluster.published == 1
     assert local.prepared == local.published == 0
+
+
+def test_router_selects_external_without_internal_or_local_fallback() -> None:
+    local, internal, external = _Publisher(), _Publisher(), _Publisher()
+    router = ClickHouseFullRefreshPublicationRouter(local, internal, external)
+    config = _runtime_config()
+    physical = dict(config.options["physical_design"])
+    storage = dict(physical["storage"])
+    clickhouse = dict(storage["clickhouse"])
+    clickhouse["engine"] = "MergeTree"
+    clickhouse["cluster"] = {
+        "name": "analytics_cluster",
+        "ddl_scope": "cluster",
+        "replication_mode": "external",
+    }
+    storage["clickhouse"] = clickhouse
+    physical["storage"] = storage
+    config = replace(config, options={**config.options, "physical_design": physical})
+
+    router.prepare_admission(config)
+
+    assert external.prepared == 1
+    assert internal.prepared == local.prepared == 0
 
 
 def test_router_publishes_cluster_selection_to_decision_audit() -> None:
@@ -425,6 +486,7 @@ sink:
         "runtime_admission_required": True,
         "blockers": [],
         "no_fallback": True,
+        "replication_mode": "internal",
     }
 
 

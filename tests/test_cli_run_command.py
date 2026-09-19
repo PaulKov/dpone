@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from dpone.commands import run_cmd
+from dpone.contracts.clickhouse_external_replication import ExternalContractError, ExternalPublicationError
 from dpone.contracts.quality_failure import QualityGateFailureOutcome
 from dpone.governance.quality import QualityGateReport, QualityGateResult
 from dpone.runtime.governance.service import QualityGateFailure
@@ -101,6 +102,23 @@ def test_enriched_quality_failure_json_preserves_actual_safe_outcome_and_redacti
     assert str(tmp_path) not in serialized
 
 
+def test_external_contract_failure_uses_prefixed_code_and_stderr(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    run_cmd._write_run_failure(
+        _args(output_format="json"),
+        ExternalContractError("ARTIFACT_UNAVAILABLE", "retained artifact is unavailable"),
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    assert payload["result"]["error_code"] == "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNAVAILABLE"
+    assert payload["result"]["errors"] == [
+        "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_ARTIFACT_UNAVAILABLE:retained artifact is unavailable"
+    ]
+
+
 def test_old_quality_failure_constructor_keeps_legacy_zero_outcome_shape(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -115,6 +133,33 @@ def test_old_quality_failure_constructor_keeps_legacy_zero_outcome_shape(
     assert payload["result"]["final_rows"] == 0
     assert payload["result"]["extracted_rows"] == 0
     assert "failure_context" not in payload["result"]
+
+
+def test_external_publication_failure_exposes_only_redacted_recovery_evidence(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    error = ExternalPublicationError(
+        "DPONE_CLICKHOUSE_CLUSTER_EXTERNAL_STAGING_INCOMPLETE",
+        evidence={
+            "phase": "STAGING",
+            "operation_id": "opaque-operation",
+            "password": "must-not-leak",
+            "path": "/Users/operator/private/artifact.json",
+        },
+    )
+
+    run_cmd._write_run_failure(_args(output_format="json"), error)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    payload = json.loads(captured.err)
+    evidence = payload["result"]["evidence"]
+    assert evidence["phase"] == "STAGING"
+    assert evidence["operation_id"] == "opaque-operation"
+    assert evidence["password"] == REDACTION_TOKEN
+    serialized = json.dumps(payload)
+    assert "must-not-leak" not in serialized
+    assert "/Users/operator" not in serialized
 
 
 class _PublicReport:

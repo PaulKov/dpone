@@ -144,6 +144,12 @@ Sinks:
 - Automatic schema evolution is enabled by default and fail-closed for breaking changes.
 - Type conversion must be explicit when vendor-specific types are involved.
 - State is advanced only after sink commit succeeds.
+- Bounded `full_refresh` into one-shard ClickHouse supports explicit internal or
+  external replication ownership; external fan-out requires the
+  [cluster publication contract](clickhouse-cluster-publication.md), native
+  direct-member admission, an absolute durable artifact-store path, and
+  `lineage: false`. This applies equally to MSSQL -> ClickHouse and every other
+  bounded source route that reaches the same connector-neutral sink protocol.
 - Physical deletes require CDC/tombstones or snapshot reconciliation; they are never inferred silently from incremental cursors.
 - Kafka is batch ETL/event-log integration in this release, not an infinite streaming runtime.
 

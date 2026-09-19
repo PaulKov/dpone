@@ -428,6 +428,19 @@ V1 admits exactly one shard, at least two
 replicas, an Atomic database, direct `Replicated*MergeTree` target/candidate
 tables, complete catalog visibility, and a platform-owned KeeperMap authority
 table. It does not admit a `Distributed` facade or multi-shard publication.
+
+For `internal_replication=false`, explicitly select `replication_mode: external`
+and use direct non-replicated `MergeTree`-family tables. This V2 path seals one
+replayable artifact and stages it on every admitted member before fenced
+`ON CLUSTER` publication. The coordinator connection may use HTTP, but direct
+member staging uses the native ports advertised by `system.clusters`; deployments
+with address translation must inject a member-endpoint resolver. Admission binds
+the resolved endpoints into the inventory digest and opens every direct
+connection before source extraction. External mode currently requires
+`options.lineage: false`. See the [cluster publication guide](clickhouse-cluster-publication.md),
+[exact reference](clickhouse-cluster-publication-reference.md), and
+[recovery runbook](clickhouse-cluster-publication-runbook.md).
+
 The pinned Docker profile verifies active partial convergence,
 terminal-partial retention, identity drift fencing, and the exhaustive queue
 status/host classifier. This is internal protocol evidence, not certification

@@ -1,14 +1,15 @@
 # ClickHouse cluster publication acceptance
 
 This opt-in fixture pins ClickHouse `24.8.14.39` and creates one shard with two
-replicas plus one Keeper node. It is synthetic protocol evidence, not external
-deployment certification.
+replicas plus one Keeper node. It exposes both an internally replicated cluster
+and an `internal_replication=false` cluster for the external-publication route.
+It is synthetic protocol evidence, not external deployment certification.
 
 Run:
 
 ```bash
 docker compose -f tests/integration/clickhouse_cluster/docker-compose.yml up -d --wait
-DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION=1 uv run pytest \
+DPONE_RUN_CLICKHOUSE_CLUSTER_PUBLICATION=1 uv run --extra clickhouse pytest \
   tests/integration/clickhouse_cluster -q
 docker compose -f tests/integration/clickhouse_cluster/docker-compose.yml down -v
 ```

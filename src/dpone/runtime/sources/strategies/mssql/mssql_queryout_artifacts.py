@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
 from dpone.runtime.bulk_wire import should_use_source_encoded_tsv
@@ -49,6 +49,14 @@ QueryoutArtifact = (
     | PartitionedTransferPlanArtifact
     | PhysicalChunkedFileExportArtifact
 )
+
+
+def _external_replication_requested(options: Mapping[str, Any]) -> bool:
+    physical = options.get("physical_design")
+    storage = physical.get("storage") if isinstance(physical, Mapping) else None
+    clickhouse = storage.get("clickhouse") if isinstance(storage, Mapping) else None
+    cluster = clickhouse.get("cluster") if isinstance(clickhouse, Mapping) else None
+    return isinstance(cluster, Mapping) and str(cluster.get("replication_mode") or "").strip().lower() == "external"
 
 
 class MSSQLQueryoutArtifactFactory:
@@ -223,6 +231,10 @@ class MSSQLQueryoutArtifactFactory:
             return False
         if not should_use_source_encoded_tsv(getattr(load_config, "options", {}) or {}):
             return False
+        if _external_replication_requested(getattr(load_config, "options", {}) or {}):
+            # External publication seals this codec into canonical typed rows;
+            # it does not depend on the final ClickHouse bulk transport.
+            return True
         path = resolve_clickhouse_bulk_path(getattr(load_config, "options", {}) or {})
         return clickhouse_path_supports_native_tsv(path)
 

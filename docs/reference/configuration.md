@@ -665,6 +665,19 @@ the cluster name is still needed for a `Distributed` facade. Legacy
 `access_table` renders an optional `Distributed` facade in physical DDL plans;
 omit it for one-shard replicated clusters.
 
+For a bounded full refresh into independent non-replicated members, use the
+object form with `ddl_scope: cluster` and `replication_mode: external`, and set
+`sink.options.lineage: false`. This activates fail-closed direct-member
+publication rather than the default internal-replication protocol. The runtime
+opens every native member endpoint before extraction; network address
+translation is supplied through the injected connector endpoint resolver, not a
+manifest secret. See [ClickHouse cluster publication](../clickhouse-cluster-publication.md).
+
+External mode also requires `sink.options.external_artifact_store_path` or
+`DPONE_EXTERNAL_ARTIFACT_STORE`. The value must be an absolute path on durable
+storage shared by every eligible worker; relative paths are rejected by the
+manifest schema.
+
 ## Load lineage
 
 ```yaml
