@@ -36,8 +36,8 @@ from dpone.readiness.development_runtime_authorization import (
     require_fetched_development_authority,
 )
 from dpone.runtime.init_fetch_contract import InitFetchError
-from dpone.runtime.runtime_authority_payload import ImmutableRuntimeAuthorityPayload
 from dpone.runtime.runtime_init_fetch_execution import RuntimeExecutionSelection
+from dpone.runtime.runtime_init_fetch_payload import ImmutableRuntimeAuthorityPayload
 from dpone.runtime.runtime_init_fetch_plan import (
     canonical_runtime_init_fetch_plan_bytes,
     runtime_init_fetch_plan_sha256,

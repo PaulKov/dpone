@@ -11,7 +11,7 @@ from typing import Any
 
 from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
 from dpone.runtime.init_fetch_contract import InitFetchError
-from dpone.runtime.runtime_authority_payload import ImmutableRuntimeAuthorityPayload
+from dpone.runtime.runtime_init_fetch_payload import ImmutableRuntimeAuthorityPayload
 from dpone.runtime.runtime_init_fetch_plan import (
     MAX_RUNTIME_INIT_FETCH_PLAN_BYTES,
     RUNTIME_INIT_FETCH_PLAN_SCHEMA,

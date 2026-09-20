@@ -18,13 +18,13 @@ from dpone.contracts.runtime_artifact_delivery import (
 )
 from dpone.kubernetes_names import is_valid_kubernetes_dns_label
 from dpone.runtime.init_fetch_contract import cache_relative_path
-from dpone.runtime.runtime_authority_payload import ImmutableRuntimeAuthorityPayload
 from dpone.runtime.runtime_init_fetch_execution import (
     RuntimeExecutionSelection,
     require_execution_token,
 )
 from dpone.runtime.runtime_init_fetch_payload import (
     MAX_SELECTED_RUNTIME_PAYLOADS,
+    ImmutableRuntimeAuthorityPayload,
     RuntimePayloadDescriptor,
 )
 from dpone.runtime.runtime_init_fetch_schema import runtime_init_fetch_schema

@@ -16,7 +16,7 @@ from dpone.contracts.runtime_artifact_delivery import (
     validate_runtime_image_reference,
 )
 from dpone.kubernetes_names import is_valid_kubernetes_dns_label
-from dpone.runtime.runtime_authority_payload import ImmutableRuntimeAuthorityPayload
+from dpone.runtime.runtime_init_fetch_payload import ImmutableRuntimeAuthorityPayload
 
 _RUNTIME_AUTHORITY_KEY_RE = re.compile(CONFIG_MAP_KEY_PATTERN)
 

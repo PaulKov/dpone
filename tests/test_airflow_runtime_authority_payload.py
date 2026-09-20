@@ -13,7 +13,7 @@ from dpone.readiness.airflow_runtime_authority_input import (
     immutable_runtime_authority_payload_from_file,
 )
 from dpone.runtime.init_fetch_contract import InitFetchError
-from dpone.runtime.runtime_authority_payload import (
+from dpone.runtime.runtime_init_fetch_payload import (
     MAX_RUNTIME_AUTHORITY_PAYLOAD_BYTES,
     ImmutableRuntimeAuthorityPayload,
     materialize_runtime_authority_payload,

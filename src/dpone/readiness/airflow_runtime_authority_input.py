@@ -6,7 +6,7 @@ import os
 import stat
 from pathlib import Path
 
-from dpone.runtime.runtime_authority_payload import (
+from dpone.runtime.runtime_init_fetch_payload import (
     MAX_RUNTIME_AUTHORITY_PAYLOAD_BYTES,
     ImmutableRuntimeAuthorityPayload,
 )
