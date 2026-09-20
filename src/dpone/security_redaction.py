@@ -86,7 +86,7 @@ _EXACT_SENSITIVE_KEYS = frozenset(
         "client_secret",
         "connection_string",
         "lease_id",
-        "private_key",
+        "payload_b64",
         "secret",
         "secret_id",
         "secret_key",

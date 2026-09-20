@@ -16,14 +16,20 @@ from pathlib import Path
 from typing import Any
 
 from dpone_airflow_pack.deployment_index_errors import AirflowDeploymentIndexError
+from dpone_airflow_pack.runtime_authority_source import (
+    ImmutableRuntimeAuthoritySource,
+    RuntimeAuthoritySource,
+)
 
 AIRFLOW_INDEX_SCHEMA_V2 = "dpone.airflow-deployment-index.v2"
 AIRFLOW_INDEX_SCHEMA_V3 = "dpone.airflow-deployment-index.v3"
 AIRFLOW_INDEX_SCHEMA_V4 = "dpone.airflow-deployment-index.v4"
+AIRFLOW_INDEX_SCHEMA_V5 = "dpone.airflow-deployment-index.v5"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA = "dpone.airflow-runtime-init-fetch-plan.v1"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2 = "dpone.airflow-runtime-init-fetch-plan.v2"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3 = "dpone.airflow-runtime-init-fetch-plan.v3"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4 = "dpone.airflow-runtime-init-fetch-plan.v4"
+RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5 = "dpone.airflow-runtime-init-fetch-plan.v5"
 MAX_RUNTIME_INIT_FETCH_PLAN_BYTES = 16 * 1024
 MAX_SELECTED_RUNTIME_PAYLOADS = 16
 
@@ -154,22 +160,6 @@ class DevEvidenceDelivery:
 
 
 @dataclass(frozen=True, slots=True)
-class RuntimeAuthoritySource:
-    """Value-free coordinates for one deployment-owned Kubernetes Secret key."""
-
-    mode: str
-    secret_name: str
-    secret_key: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "mode": self.mode,
-            "secret_name": self.secret_name,
-            "secret_key": self.secret_key,
-        }
-
-
-@dataclass(frozen=True, slots=True)
 class EncodedInitFetchPlan:
     """Canonical plan bytes and their immutable transport projections."""
 
@@ -205,7 +195,7 @@ class InitFetchDeliveryContext:
     runtime_image_dbt_digest: str | None = None
     mssql_asset_uri_by_ref: Mapping[str, str] | None = None
     development_authority_required: bool = False
-    runtime_authority: RuntimeAuthoritySource | None = None
+    runtime_authority: RuntimeAuthoritySource | ImmutableRuntimeAuthoritySource | None = None
 
     def workload_pack(self, workload_id: str) -> ExactWorkloadPack:
         for workload in self.workload_packs:
@@ -304,7 +294,9 @@ class InitFetchDeliveryContext:
         image_ref, image_digest = self.runtime_image_for_workload(workload_id)
         plan: dict[str, Any] = {
             "schema": (
-                RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4
+                RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5
+                if isinstance(self.runtime_authority, ImmutableRuntimeAuthoritySource)
+                else RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4
                 if self.development_authority_required
                 else RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3
             ),
@@ -341,6 +333,8 @@ class InitFetchDeliveryContext:
         }
         if self.development_authority_required:
             plan["development_authority_required"] = True
+        if isinstance(self.runtime_authority, ImmutableRuntimeAuthoritySource):
+            plan["runtime_authority"] = self.runtime_authority.to_dict()
         payload = json.dumps(
             plan,
             ensure_ascii=False,
@@ -392,6 +386,7 @@ __all__ = [
     "AIRFLOW_INDEX_SCHEMA_V2",
     "AIRFLOW_INDEX_SCHEMA_V3",
     "AIRFLOW_INDEX_SCHEMA_V4",
+    "AIRFLOW_INDEX_SCHEMA_V5",
     "ConfigMapReference",
     "DevEvidenceDelivery",
     "EncodedInitFetchPlan",
@@ -406,6 +401,7 @@ __all__ = [
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2",
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3",
     "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4",
+    "RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5",
     "RuntimeAuthoritySource",
     "VerificationPolicy",
     "WorkloadIdentity",

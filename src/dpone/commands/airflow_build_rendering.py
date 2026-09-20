@@ -56,7 +56,7 @@ def self_service_airflow_build_text(payload: Mapping[str, object]) -> str | None
         lines.append(f"- airflow index: {airflow_index_path}")
     if deployment_dir:
         lines.append(_cache_sync_action(deployment_dir, environment))
-    lines.append("- details: rerun with --format json for fingerprints and full deployment projection")
+    lines.append("- details: rerun with --format json for fingerprints and redacted deployment projection")
     return "\n".join(lines) + "\n"
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,8 +38,48 @@ from dpone.runtime.runtime_init_fetch_plan import RuntimeInitFetchPlan
 
 DEFAULT_REGISTRY_CONFIG_PATH = Path("/etc/dpone/artifact-registry/registry.json")
 DEFAULT_TRUST_POLICY_PATH = Path("/etc/dpone/artifact-trust/policy.json")
+DEV_EVIDENCE_BOOTSTRAP_ROOT_ENV = "DPONE_DBT_EVIDENCE_BOOTSTRAP_ROOT"
+DEFAULT_DEV_EVIDENCE_BOOTSTRAP_ROOT = Path("/var/lib/dpone/dev-evidence-bootstrap")
 _MAX_CONFIG_BYTES = 64 * 1024
 _MAX_TRUST_POLICY_BYTES = 1024 * 1024
+
+
+def ensure_dev_evidence_spool(
+    environment: Mapping[str, str] | None,
+    *,
+    expected_root: Path,
+) -> None:
+    """Create the provider-owned development evidence spool safely."""
+
+    values = os.environ if environment is None else environment
+    raw_root = values.get(DEV_EVIDENCE_BOOTSTRAP_ROOT_ENV)
+    if raw_root is None:
+        return
+    root = Path(raw_root)
+    if root != expected_root:
+        raise InitFetchError(
+            "DPONE_DEV_EVIDENCE_BOOTSTRAP_INVALID",
+            "dev evidence bootstrap root is not provider-owned",
+        )
+    try:
+        metadata = root.lstat()
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+            raise OSError("unsafe root")
+        spool = root / "dbt-spool"
+        try:
+            spool.mkdir(mode=0o750)
+        except FileExistsError:
+            pass
+        spool_metadata = spool.lstat()
+        if stat.S_ISLNK(spool_metadata.st_mode) or not stat.S_ISDIR(spool_metadata.st_mode):
+            raise OSError("unsafe spool")
+        if metadata.st_dev != spool_metadata.st_dev:
+            raise OSError("spool escaped mounted filesystem")
+    except OSError as exc:
+        raise InitFetchError(
+            "DPONE_DEV_EVIDENCE_BOOTSTRAP_INVALID",
+            "dev evidence spool could not be initialized safely",
+        ) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,10 +344,13 @@ def _config_error(message: str) -> InitFetchError:
 
 
 __all__ = [
+    "DEFAULT_DEV_EVIDENCE_BOOTSTRAP_ROOT",
     "DEFAULT_REGISTRY_CONFIG_PATH",
     "DEFAULT_TRUST_POLICY_PATH",
+    "DEV_EVIDENCE_BOOTSTRAP_ROOT_ENV",
     "RuntimeAttestationAuthority",
     "RuntimeRegistryConfiguration",
+    "ensure_dev_evidence_spool",
     "registry_configuration",
     "stock_attestation_verifier",
     "trusted_attestation_authority",

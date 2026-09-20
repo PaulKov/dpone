@@ -1,6 +1,7 @@
 """Native two-project compile/delivery; synthetic authority is not SQL certification."""
 
 import base64
+import hashlib
 import json
 import shutil
 from copy import deepcopy
@@ -152,6 +153,37 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
         hook_execution="externalized",
     )
     assert json.loads(encoded.payload)["schema"] == "dpone.airflow-runtime-init-fetch-plan.v4"
+
+    raw_authority = b'{"mode":"synthetic"}\n'
+    immutable_projection = service.materialize(
+        release_id=materialized.release_id,
+        environment="prod",
+        trust_tier="non_production",
+        runtime_image_ref=IMAGE,
+        runtime_image_digest=IMAGE.split("@")[-1],
+        artifact_registry_ref="synthetic-artifacts",
+        registry_config_ref=_config_map_ref("registry", "1"),
+        trust_policy_ref=_config_map_ref("policy", "2"),
+        runtime_authority_ref={
+            "kind": "immutable_payload",
+            "mode": "immutable_payload",
+            "encoding": "base64",
+            "payload_b64": base64.b64encode(raw_authority).decode("ascii"),
+            "bytes": len(raw_authority),
+            "sha256": "sha256:" + hashlib.sha256(raw_authority).hexdigest(),
+        },
+        airflow_bundle_ref="git:" + "d" * 40,
+    )
+    assert immutable_projection.deployment["schema"] == "dpone.deployment-set.v5"
+    assert immutable_projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v5"
+    immutable_context = init_fetch_context_from_payload(immutable_projection.airflow_index)
+    immutable_plan = immutable_context.encode_plan(
+        workload_id=str(immutable_projection.airflow_index["workload_packs"][0]["id"]),
+        execution_kind="runtime",
+        execution_scope="workload",
+        hook_execution="externalized",
+    )
+    assert json.loads(immutable_plan.payload)["schema"] == "dpone.airflow-runtime-init-fetch-plan.v5"
 
 
 def verify_delivery(tmp_path, compiled):

@@ -11,12 +11,14 @@ from typing import Any
 
 from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
 from dpone.runtime.init_fetch_contract import InitFetchError
+from dpone.runtime.runtime_init_fetch_payload import ImmutableRuntimeAuthorityPayload
 from dpone.runtime.runtime_init_fetch_plan import (
     MAX_RUNTIME_INIT_FETCH_PLAN_BYTES,
     RUNTIME_INIT_FETCH_PLAN_SCHEMA,
     RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2,
     RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3,
     RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4,
+    RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5,
     RuntimeArtifactDescriptor,
     RuntimeExecutionSelection,
     RuntimeInitFetchPlan,
@@ -49,6 +51,7 @@ _ROOT_KEYS = frozenset(
 _ROOT_KEYS_V2 = _ROOT_KEYS | {"runtime_payloads"}
 _ROOT_KEYS_V3 = _ROOT_KEYS_V2
 _ROOT_KEYS_V4 = _ROOT_KEYS_V3 | {"development_authority_required"}
+_ROOT_KEYS_V5 = _ROOT_KEYS_V4 | {"runtime_authority"}
 
 
 def decode_runtime_init_fetch_plan(
@@ -100,6 +103,8 @@ def _plan_from_mapping(raw: Mapping[str, Any]) -> RuntimeInitFetchPlan:
         _require_keys("plan", raw, _ROOT_KEYS_V3)
     elif schema == RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4:
         _require_keys("plan", raw, _ROOT_KEYS_V4)
+    elif schema == RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5:
+        _require_keys("plan", raw, _ROOT_KEYS_V5)
     else:
         raise ValueError("runtime init-fetch plan schema is unsupported")
     runtime_image = _mapping(raw["runtime_image"], "runtime_image", {"ref", "digest"})
@@ -145,26 +150,42 @@ def _plan_from_mapping(raw: Mapping[str, Any]) -> RuntimeInitFetchPlan:
         workload_pack=_workload_pack(raw["workload_pack"]),
         execution=_execution(
             raw["execution"],
-            explicit_hook_execution=schema in {RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3, RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4},
+            explicit_hook_execution=schema
+            in {
+                RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3,
+                RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4,
+                RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5,
+            },
         ),
         verify=_mapping(raw["verify"], "verify", {"checksums", "attestations"}),
         runtime_payloads=(
             _runtime_payloads(
                 raw["runtime_payloads"],
-                allow_empty=schema in {RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3, RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4},
+                allow_empty=schema
+                in {
+                    RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3,
+                    RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4,
+                    RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5,
+                },
             )
             if schema
             in {
                 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2,
                 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3,
                 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4,
+                RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5,
             }
             else ()
         ),
         development_authority_required=(
             _literal_true(raw["development_authority_required"], "development_authority_required")
-            if schema == RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4
+            if schema in {RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4, RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5}
             else False
+        ),
+        runtime_authority=(
+            ImmutableRuntimeAuthorityPayload.from_mapping(raw["runtime_authority"])
+            if schema == RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5
+            else None
         ),
     )
 

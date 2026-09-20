@@ -56,6 +56,7 @@ def validate_deployment_auxiliary_files(
         "dpone.deployment-set.v2",
         "dpone.deployment-set.v3",
         "dpone.deployment-set.v4",
+        "dpone.deployment-set.v5",
     }:
         _validate_strict_runtime_connection_files(deployment, deployment_dir)
         return

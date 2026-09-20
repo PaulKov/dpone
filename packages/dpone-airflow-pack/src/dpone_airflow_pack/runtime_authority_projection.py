@@ -9,6 +9,7 @@ from typing import Any
 from dpone_airflow_pack.init_fetch_contract import RuntimeAuthoritySource
 from dpone_airflow_pack.init_fetch_pod_contract import INIT_CONTAINER_NAME
 from dpone_airflow_pack.init_fetch_pod_guard import reserved_collision
+from dpone_airflow_pack.runtime_authority_source import ImmutableRuntimeAuthoritySource
 
 RUNTIME_AUTHORITY_VOLUME = "dpone-runtime-authority"
 RUNTIME_AUTHORITY_DIRECTORY = "/run/secrets/dpone/runtime-authority"
@@ -19,9 +20,9 @@ _BASE_CONTAINER_NAME = "base"
 
 def patch_pod_spec_runtime_authority(
     pod: object,
-    source: RuntimeAuthoritySource | None,
+    source: RuntimeAuthoritySource | ImmutableRuntimeAuthoritySource | None,
 ) -> object:
-    """Mount one referenced Secret key read-only in every runtime container."""
+    """Project the declared runtime-authority source into every runtime container."""
 
     if pod is None or source is None:
         return pod
@@ -49,7 +50,8 @@ def patch_pod_spec_runtime_authority(
         container_fields.append((container, mounts, hasattr(container, "volume_mounts"), env))
     setattr(spec, "volumes", [*volumes, _object_resource(_volume(source), kind="volume")])
     for container, mounts, uses_snake_case, env in container_fields:
-        patched_mounts = [*mounts, _object_resource(_mount(), kind="mount")]
+        read_only = not (container is init and isinstance(source, ImmutableRuntimeAuthoritySource))
+        patched_mounts = [*mounts, _object_resource(_mount(read_only=read_only), kind="mount")]
         setattr(container, "volume_mounts" if uses_snake_case else "volumeMounts", patched_mounts)
         setattr(
             container,
@@ -61,7 +63,7 @@ def patch_pod_spec_runtime_authority(
 
 def _patch_mapping_pod(
     pod: dict[str, object],
-    source: RuntimeAuthoritySource,
+    source: RuntimeAuthoritySource | ImmutableRuntimeAuthoritySource,
 ) -> dict[str, object]:
     spec = pod.get("spec")
     if not isinstance(spec, Mapping):
@@ -74,33 +76,42 @@ def _patch_mapping_pod(
     volumes = _mapping_list(projected.get("volumes"), "volumes")
     _reject_named_collision(volumes, RUNTIME_AUTHORITY_VOLUME, "volume")
     projected["volumes"] = [*volumes, _volume(source)]
-    projected["initContainers"] = _patch_mapping_container_at(init_containers, init_index)
-    projected["containers"] = _patch_mapping_container_at(base_containers, base_index)
+    projected["initContainers"] = _patch_mapping_container_at(
+        init_containers,
+        init_index,
+        read_only=not isinstance(source, ImmutableRuntimeAuthoritySource),
+    )
+    projected["containers"] = _patch_mapping_container_at(base_containers, base_index, read_only=True)
     pod["spec"] = projected
     return pod
 
 
-def _patch_mapping_container_at(containers: object, index: int) -> list[object]:
+def _patch_mapping_container_at(containers: object, index: int, *, read_only: bool) -> list[object]:
     assert isinstance(containers, list)
     result = list(containers)
     container = containers[index]
     assert isinstance(container, Mapping)
-    result[index] = _patch_mapping_container(container)
+    result[index] = _patch_mapping_container(container, read_only=read_only)
     return result
 
 
-def _patch_mapping_container(container: Mapping[str, object]) -> dict[str, object]:
+def _patch_mapping_container(container: Mapping[str, object], *, read_only: bool) -> dict[str, object]:
     result = dict(container)
     mounts = _mapping_list(result.get("volumeMounts"), "volumeMounts")
     _reject_named_collision(mounts, RUNTIME_AUTHORITY_VOLUME, "volume mount")
     env = _mapping_list(result.get("env"), "env")
     _reject_named_collision(env, RUNTIME_AUTHORITY_PATH_ENV, "environment variable")
-    result["volumeMounts"] = [*mounts, _mount()]
+    result["volumeMounts"] = [*mounts, _mount(read_only=read_only)]
     result["env"] = [*env, {"name": RUNTIME_AUTHORITY_PATH_ENV, "value": RUNTIME_AUTHORITY_PATH}]
     return result
 
 
-def _volume(source: RuntimeAuthoritySource) -> dict[str, object]:
+def _volume(source: RuntimeAuthoritySource | ImmutableRuntimeAuthoritySource) -> dict[str, object]:
+    if isinstance(source, ImmutableRuntimeAuthoritySource):
+        return {
+            "name": RUNTIME_AUTHORITY_VOLUME,
+            "emptyDir": {"medium": "Memory", "sizeLimit": "8Ki"},
+        }
     return {
         "name": RUNTIME_AUTHORITY_VOLUME,
         "secret": {
@@ -111,11 +122,11 @@ def _volume(source: RuntimeAuthoritySource) -> dict[str, object]:
     }
 
 
-def _mount() -> dict[str, object]:
+def _mount(*, read_only: bool) -> dict[str, object]:
     return {
         "name": RUNTIME_AUTHORITY_VOLUME,
         "mountPath": RUNTIME_AUTHORITY_DIRECTORY,
-        "readOnly": True,
+        "readOnly": read_only,
     }
 
 
@@ -177,7 +188,14 @@ def _object_env_var(name: str, value: str) -> object:
 
 def _namespace(value: object) -> object:
     if isinstance(value, Mapping):
-        return SimpleNamespace(**{str(key): _namespace(item) for key, item in value.items()})
+        aliases = {
+            "secretName": "secret_name",
+            "mountPath": "mount_path",
+            "readOnly": "read_only",
+            "sizeLimit": "size_limit",
+            "emptyDir": "empty_dir",
+        }
+        return SimpleNamespace(**{aliases.get(str(key), str(key)): _namespace(item) for key, item in value.items()})
     if isinstance(value, list):
         return [_namespace(item) for item in value]
     return value

@@ -86,3 +86,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0068: Development runtime authority is image-installed and rechecked per process (Accepted)](adr/0068-image-installed-development-runtime-authority.md)
 
 - [ADR 0069: External ClickHouse replication uses fenced per-member generations (Accepted)](adr/0069-clickhouse-external-replication-publication.md)
+
+- [ADR 0070: Non-secret runtime-authority payloads use a closed immutable v5 wire (Accepted)](adr/0070-immutable-runtime-authority-payload.md)

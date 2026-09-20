@@ -181,6 +181,7 @@ def test_recursive_public_redactor_keeps_uri_key_collisions_idempotent() -> None
         "vaultTokens",
         "clientSecrets",
         "connectionStrings",
+        "payload_b64",
         "config[password]",
         "vault/password",
         "config:apiKey",

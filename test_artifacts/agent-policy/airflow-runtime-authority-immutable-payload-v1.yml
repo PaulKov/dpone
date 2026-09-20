@@ -1,0 +1,110 @@
+schema_version: 1
+task_id: "airflow-runtime-authority-immutable-payload-v1"
+title: "Project bounded immutable runtime-authority payloads"
+goal: >-
+  Add a non-secret, digest-bound immutable payload source for protected Airflow
+  runtime authority while preserving the Kubernetes Secret source unchanged.
+specification: "docs/feature-specs/kpo-runtime-authority-immutable-payload.md"
+base_commit: "bb1c6ea7"
+integrator: "primary-agent"
+
+acceptance_criteria:
+  - "Secret and immutable payload modes are a closed mutually exclusive union."
+  - "Payload bytes are non-empty, bounded, canonical Base64, size-bound, and SHA-256-bound at build, parse, init materialization, and base verification."
+  - "Immutable mode creates or reads no deployment-specific Kubernetes Secret or ConfigMap."
+  - "Init-fetch and base receive the same fixed read-only verified file."
+  - "Legacy Secret behavior and v2/v3/no-authority contracts remain compatible."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - CLI
+    - Python build API
+    - deployment/index/runtime-plan v5 schemas
+    - Airflow provider pod contract
+    - documentation
+    - package versions
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/commands/airflow_deployment_build_cmd.py"
+  - "src/dpone/readiness/airflow_init_fetch_projection.py"
+  - "src/dpone/readiness/airflow_runtime_authority_input.py"
+  - "src/dpone/runtime/runtime_init_fetch_payload.py"
+  - "src/dpone/runtime/runtime_init_fetch_plan.py"
+  - "src/dpone/runtime/runtime_init_fetch_plan_codec.py"
+  - "src/dpone/readiness/airflow_runtime_init_fetch.py"
+  - "src/dpone/gitops/schema_runtime_artifact_delivery.py"
+  - "src/dpone/gitops/schema_airflow_runtime_init_fetch_contracts.py"
+  - "src/dpone/gitops/schema_release_deployment_v3_contracts.py"
+  - "packages/dpone-airflow-pack/src/dpone_airflow_pack/"
+  - "tests/"
+  - "docs/feature-specs/kpo-runtime-authority-immutable-payload.md"
+  - "docs/adr/0070-immutable-runtime-authority-payload.md"
+  - "docs/adr-index.md"
+  - "docs/airflow-pack-provider.md"
+  - "docs/airflow-provider-api.md"
+  - "docs/architecture.md"
+  - "docs/compatibility.md"
+  - "docs/airflow-runtime-authority.md"
+  - "docs/runbooks/airflow-runtime-authority.md"
+  - "test_artifacts/airflow-runtime-authority-immutable-payload-v1/"
+integrator_owned_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - "docs/schemas/"
+  - "docs/module_size_baseline.json"
+  - ".agents/policy/ci-shadow-reconciliation-observation-bundle-v1.yml"
+read_only_paths:
+  - ".github/workflows/"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "CHANGELOG.md"
+  - "mkdocs.yml"
+  - "docs/schemas/"
+  - "docs/module_size_baseline.json"
+  - ".github/workflows/"
+  - ".agents/policy/ci-shadow-reconciliation-observation-bundle-v1.yml"
+  - "credentials"
+
+shared_file_owner: "primary-agent"
+
+dependencies:
+  - "Kubernetes emptyDir and init-container contracts"
+  - "Airflow KubernetesPodOperator full_pod_spec contract"
+  - "ADR 0070"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_airflow_runtime_authority_projection.py tests/test_airflow_runtime_authority_payload.py tests/test_airflow_self_service_cli.py tests/test_dbt_compact_wire_v2.py tests/test_gitops_schema_contracts.py -q"
+  broad:
+    - "change-aware checks from tools/agent_policy/select_checks.py"
+    - "repository Python quality gates"
+    - "strict documentation gates"
+    - "all four package builds and twine check"
+  live:
+    - "Live Kubernetes projection certification when an approved environment exists; otherwise UNVERIFIED"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
+  - "A payload would be represented as confidential or Secret-equivalent."

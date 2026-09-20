@@ -16,6 +16,7 @@ from dpone.contracts.runtime_artifact_delivery import (
     validate_runtime_image_reference,
 )
 from dpone.kubernetes_names import is_valid_kubernetes_dns_label
+from dpone.runtime.runtime_init_fetch_payload import ImmutableRuntimeAuthorityPayload
 
 _RUNTIME_AUTHORITY_KEY_RE = re.compile(CONFIG_MAP_KEY_PATTERN)
 
@@ -99,16 +100,32 @@ def build_init_fetch_delivery(
     return image_ref, delivery
 
 
-def _runtime_authority_source(value: object) -> dict[str, str]:
-    if not isinstance(value, Mapping) or frozenset(str(key) for key in value) != {"kind", "name", "key"}:
+def _runtime_authority_source(value: object) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
         raise InitFetchProjectionContractError(
             "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID",
-            "runtime authority reference requires exactly kind, name, and key",
+            "runtime authority source must be a closed object",
+        )
+    if value.get("kind") == "immutable_payload":
+        try:
+            payload = ImmutableRuntimeAuthorityPayload.from_mapping(
+                {key: item for key, item in value.items() if key != "kind"}
+            )
+        except (TypeError, ValueError) as exc:
+            raise InitFetchProjectionContractError(
+                "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID",
+                "runtime authority immutable payload is invalid",
+            ) from exc
+        return payload.to_dict()
+    if frozenset(str(key) for key in value) != {"kind", "name", "key"}:
+        raise InitFetchProjectionContractError(
+            "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID",
+            "runtime authority Secret reference requires exactly kind, name, and key",
         )
     if value.get("kind") != "kubernetes_secret":
         raise InitFetchProjectionContractError(
             "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID",
-            "runtime authority reference kind must be kubernetes_secret",
+            "runtime authority source kind is unsupported",
         )
     name = value.get("name")
     key = value.get("key")

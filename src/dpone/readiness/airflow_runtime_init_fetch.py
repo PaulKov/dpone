@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import stat
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
@@ -35,10 +34,13 @@ from dpone.readiness.airflow_deployment_attestation_verifier import (
     RegistryAirflowDeploymentAttestationVerifier,
 )
 from dpone.readiness.airflow_runtime_init_fetch_config import (
+    DEFAULT_DEV_EVIDENCE_BOOTSTRAP_ROOT,
     DEFAULT_REGISTRY_CONFIG_PATH,
     DEFAULT_TRUST_POLICY_PATH,
+    DEV_EVIDENCE_BOOTSTRAP_ROOT_ENV,  # noqa: F401 - compatibility re-export
     RuntimeAttestationAuthority,
     RuntimeRegistryConfiguration,
+    ensure_dev_evidence_spool,
     stock_attestation_verifier,
     trusted_attestation_authority,
     verified_snapshot,
@@ -51,6 +53,10 @@ from dpone.readiness.development_runtime_authorization import (
     require_fetched_development_authority,
 )
 from dpone.runtime.init_fetch_contract import InitFetchError
+from dpone.runtime.runtime_init_fetch_payload import (
+    materialize_runtime_authority_payload,
+    verify_materialized_runtime_authority_payload,
+)
 from dpone.runtime.runtime_init_fetch_plan_codec import decode_runtime_init_fetch_plan
 from dpone.runtime.runtime_init_fetch_ready import (
     ATTESTATION_REQUIREMENT_REQUIRED,
@@ -66,8 +72,8 @@ PLAN_SHA256_ENV = "DPONE_INIT_FETCH_PLAN_SHA256"
 DEFAULT_ARTIFACT_ROOT = Path("/var/lib/dpone/artifacts")
 DEFAULT_WORKTREE_ROOT = Path("/workspace/repo")
 DEFAULT_TRUST_KEY_ROOT = Path("/etc/dpone/artifact-trust")
-DEV_EVIDENCE_BOOTSTRAP_ROOT_ENV = "DPONE_DBT_EVIDENCE_BOOTSTRAP_ROOT"
-DEFAULT_DEV_EVIDENCE_BOOTSTRAP_ROOT = Path("/var/lib/dpone/dev-evidence-bootstrap")
+RUNTIME_AUTHORITY_PATH_ENV = "DPONE_RUNTIME_AUTHORITY_PATH"
+DEFAULT_RUNTIME_AUTHORITY_PATH = Path("/run/secrets/dpone/runtime-authority/authority")
 
 
 class RuntimeRegistryFactory(Protocol):
@@ -128,6 +134,7 @@ class AirflowRuntimeInitFetchService:
         worktree_root: Path = DEFAULT_WORKTREE_ROOT,
         dev_evidence_bootstrap_root: Path = (DEFAULT_DEV_EVIDENCE_BOOTSTRAP_ROOT),
         development_runtime_authority: DevelopmentRuntimeAuthority | None = None,
+        runtime_authority_path: Path = DEFAULT_RUNTIME_AUTHORITY_PATH,
     ) -> None:
         self._registry_factory = registry_factory or WorkloadIdentityRegistryFactory()
         self._attestation_verifier = attestation_verifier
@@ -139,13 +146,15 @@ class AirflowRuntimeInitFetchService:
         self._worktree_root = worktree_root
         self._dev_evidence_bootstrap_root = dev_evidence_bootstrap_root
         self._development_runtime_authority = development_runtime_authority
+        self._runtime_authority_path = runtime_authority_path
 
     def init_fetch(self, environment: Mapping[str, str] | None = None) -> Mapping[str, Any]:
-        _ensure_dev_evidence_spool(
+        plan, plan_sha256 = _plan_from_environment(environment)
+        self._prepare_runtime_authority(plan, environment=environment, materialize=True)
+        ensure_dev_evidence_spool(
             environment,
             expected_root=self._dev_evidence_bootstrap_root,
         )
-        plan, plan_sha256 = _plan_from_environment(environment)
         development_authorization = authorize_development_runtime(
             plan,
             authority=self._development_runtime_authority,
@@ -275,6 +284,7 @@ class AirflowRuntimeInitFetchService:
         environment: Mapping[str, str] | None = None,
     ) -> VerifiedPackCommand:
         plan, plan_sha256 = _plan_from_environment(environment)
+        self._prepare_runtime_authority(plan, environment=environment, materialize=False)
         development_authorization = authorize_development_runtime(
             plan,
             authority=self._development_runtime_authority,
@@ -296,41 +306,26 @@ class AirflowRuntimeInitFetchService:
             ),
         )
 
-
-def _ensure_dev_evidence_spool(
-    environment: Mapping[str, str] | None,
-    *,
-    expected_root: Path,
-) -> None:
-    values = os.environ if environment is None else environment
-    raw_root = values.get(DEV_EVIDENCE_BOOTSTRAP_ROOT_ENV)
-    if raw_root is None:
-        return
-    root = Path(raw_root)
-    if root != expected_root:
-        raise InitFetchError(
-            "DPONE_DEV_EVIDENCE_BOOTSTRAP_INVALID",
-            "dev evidence bootstrap root is not provider-owned",
-        )
-    try:
-        metadata = root.lstat()
-        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
-            raise OSError("unsafe root")
-        spool = root / "dbt-spool"
-        try:
-            spool.mkdir(mode=0o750)
-        except FileExistsError:
-            pass
-        spool_metadata = spool.lstat()
-        if stat.S_ISLNK(spool_metadata.st_mode) or not stat.S_ISDIR(spool_metadata.st_mode):
-            raise OSError("unsafe spool")
-        if metadata.st_dev != spool_metadata.st_dev:
-            raise OSError("spool escaped mounted filesystem")
-    except OSError as exc:
-        raise InitFetchError(
-            "DPONE_DEV_EVIDENCE_BOOTSTRAP_INVALID",
-            "dev evidence spool could not be initialized safely",
-        ) from exc
+    def _prepare_runtime_authority(
+        self,
+        plan: RuntimeInitFetchPlan,
+        *,
+        environment: Mapping[str, str] | None,
+        materialize: bool,
+    ) -> None:
+        payload = plan.runtime_authority
+        if payload is None:
+            return
+        values = os.environ if environment is None else environment
+        if values.get(RUNTIME_AUTHORITY_PATH_ENV) != str(self._runtime_authority_path):
+            raise InitFetchError(
+                "DPONE_RUNTIME_AUTHORITY_PAYLOAD_INVALID",
+                "runtime authority payload path is not provider-owned",
+            )
+        if materialize:
+            materialize_runtime_authority_payload(payload, self._runtime_authority_path)
+        else:
+            verify_materialized_runtime_authority_payload(payload, self._runtime_authority_path)
 
 
 def _plan_from_environment(
@@ -351,8 +346,10 @@ __all__ = [
     "DEFAULT_TRUST_KEY_ROOT",
     "DEFAULT_TRUST_POLICY_PATH",
     "DEFAULT_WORKTREE_ROOT",
+    "DEFAULT_RUNTIME_AUTHORITY_PATH",
     "PLAN_B64_ENV",
     "PLAN_SHA256_ENV",
+    "RUNTIME_AUTHORITY_PATH_ENV",
     "RuntimeRegistryConfiguration",
     "RuntimeRegistryFactory",
     "WorkloadIdentityRegistryFactory",

@@ -296,6 +296,7 @@ roles:
 | --- | --- | --- |
 | `dpone.release-set.v1` | Remains supported for non-dbt releases; the compact Airflow compatibility transport may include a digest-pinned non-production inventory bounded to 64 distinct payloads, 256 MiB per payload, and 512 MiB of actual release-wide payload bytes. Existing releases are not deleted or relabelled; an oversized candidate must reduce the bridge inventory or migrate to v2. | Build and runtime receipt validation reject a v1 release carrying dbt runtime payloads in the production trust tier; it cannot establish dbt selection, promotion, route-certification, or evidence authority. |
 | `dpone.release-set.v2` | Additive authoritative dbt release contract. | Required for dbt compile, protected promotion, production runtime authority, and evidence. |
+| Airflow protected runtime v4/v5 | v4 remains the frozen Kubernetes Secret projection; v5 adds a closed safe-to-persist immutable payload and runtime plan. | Old readers reject v5. Upgrade core, pack, provider, and runtime image together; roll back by rebuilding with v4 Secret mode or the prior exact set. |
 | `dpone.runtime-artifact-trust-policy.v1` | Parsed for existing non-production deployments. | Has no concrete verifier and cannot satisfy production offline attestation. |
 | `dpone.runtime-artifact-trust-policy.v2` | Additive closed GitHub-attestation verifier policy. | Required for the stock production runtime and CI preflight. |
 

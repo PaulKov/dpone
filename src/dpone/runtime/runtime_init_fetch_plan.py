@@ -22,14 +22,19 @@ from dpone.runtime.runtime_init_fetch_execution import (
     RuntimeExecutionSelection,
     require_execution_token,
 )
+from dpone.runtime.runtime_init_fetch_payload import (
+    MAX_SELECTED_RUNTIME_PAYLOADS,
+    ImmutableRuntimeAuthorityPayload,
+    RuntimePayloadDescriptor,
+)
 from dpone.runtime.runtime_init_fetch_schema import runtime_init_fetch_schema
 
 RUNTIME_INIT_FETCH_PLAN_SCHEMA = "dpone.airflow-runtime-init-fetch-plan.v1"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2 = "dpone.airflow-runtime-init-fetch-plan.v2"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3 = "dpone.airflow-runtime-init-fetch-plan.v3"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4 = "dpone.airflow-runtime-init-fetch-plan.v4"
+RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5 = "dpone.airflow-runtime-init-fetch-plan.v5"
 MAX_RUNTIME_INIT_FETCH_PLAN_BYTES = 16 * 1024
-MAX_SELECTED_RUNTIME_PAYLOADS = 16
 
 _ENVIRONMENT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 _CONTEXT_DIGEST_DIR_RE = re.compile(r"^sha256-[0-9a-f]{64}$")
@@ -82,41 +87,6 @@ class RuntimeWorkloadPackRef:
         }
 
 
-# Exact external runtime payload fetched from the pinned release.
-@dataclass(frozen=True, slots=True)
-class RuntimePayloadDescriptor:
-    id: str
-    kind: str
-    artifact_ref: str
-    sha256: str
-    bytes: int
-    media_type: str
-
-    def __post_init__(self) -> None:
-        require_execution_token("runtime_payload.id", self.id)
-        if self.kind not in {
-            "dbt_project_bundle",
-            "dbt_manifest",
-            "dbt_selection_lock",
-        }:
-            raise ValueError("runtime_payload.kind is unsupported")
-        cache_relative_path(self.artifact_ref)
-        _require_digest("runtime_payload.sha256", self.sha256)
-        _positive_integer(self.bytes, "runtime_payload.bytes")
-        if not isinstance(self.media_type, str) or not self.media_type or len(self.media_type) > 200:
-            raise ValueError("runtime_payload.media_type must be bounded text")
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "kind": self.kind,
-            "artifact_ref": self.artifact_ref,
-            "sha256": self.sha256,
-            "bytes": self.bytes,
-            "media_type": self.media_type,
-        }
-
-
 @dataclass(frozen=True, slots=True)
 class RuntimeInitFetchPlan:
     """Complete immutable plan shared by the init and base containers."""
@@ -141,6 +111,7 @@ class RuntimeInitFetchPlan:
     verify: Mapping[str, str]
     runtime_payloads: tuple[RuntimePayloadDescriptor, ...] = ()
     development_authority_required: bool = False
+    runtime_authority: ImmutableRuntimeAuthorityPayload | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -194,6 +165,7 @@ class RuntimeInitFetchPlan:
                 self.development_authority_required,
                 self.execution.hook_execution is not None,
                 bool(self.runtime_payloads),
+                self.runtime_authority is not None,
             ),
             "environment": self.environment,
             "trust_tier": self.trust_tier,
@@ -222,6 +194,8 @@ class RuntimeInitFetchPlan:
             payload["runtime_payloads"] = [item.to_dict() for item in self.runtime_payloads]
         if self.development_authority_required:
             payload["development_authority_required"] = True
+        if self.runtime_authority is not None:
+            payload["runtime_authority"] = self.runtime_authority.to_dict()
         return payload
 
 
@@ -268,6 +242,8 @@ def _validate_plan(plan: RuntimeInitFetchPlan) -> None:
         raise ValueError("development_authority_required must be boolean")
     if plan.development_authority_required and plan.execution.hook_execution is None:
         raise ValueError("development authority requires explicit hook execution")
+    if plan.runtime_authority is not None and not plan.development_authority_required:
+        raise ValueError("runtime authority payload requires development authority")
     if not _ENVIRONMENT_RE.fullmatch(plan.environment):
         raise ValueError("environment must be a bounded lowercase logical name")
     if plan.trust_tier not in {"production", "non_production"}:

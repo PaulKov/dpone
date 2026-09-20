@@ -1891,7 +1891,7 @@ dpone airflow build: OK
 - output: .dpone-cache/deployments/prod/sha256-...
 - airflow index: .dpone-cache/deployments/prod/sha256-.../airflow-index.json
 - action: dpone airflow cache-sync --deployment-dir .dpone-cache/deployments/prod/sha256-... --environment prod --promoted-by "${DPONE_CI_IDENTITY:?set DPONE_CI_IDENTITY}" --allowed-promoter "${DPONE_CI_IDENTITY:?set DPONE_CI_IDENTITY}" --expect-current-absent --confirm-promote
-- details: rerun with --format json for fingerprints and full deployment projection
+- details: rerun with --format json for fingerprints and redacted deployment projection
 ```
 
 Missing or invalid build inputs use the same command-specific renderer and omit

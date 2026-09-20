@@ -68,4 +68,7 @@ def require_execution_token(field: str, value: object) -> None:
         raise ValueError(f"{field} must be a bounded logical token")
 
 
-__all__ = ["RuntimeExecutionSelection", "require_execution_token"]
+__all__ = [
+    "RuntimeExecutionSelection",
+    "require_execution_token",
+]

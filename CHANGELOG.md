@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 0.83.0 - 2026-09-20
+
+### Added
+
+- Add a closed Airflow protected-runtime v5 source for 1..4,096 bytes of
+  safe-to-persist, digest-bound immutable authority configuration. Init-fetch
+  atomically materializes the verified bytes into a memory-backed Pod-local
+  volume and base independently verifies the same fixed file before authority
+  access, without a deployment-specific Kubernetes Secret or ConfigMap.
+
+### Security
+
+- Preserve the Kubernetes Secret v4 projection unchanged for confidential
+  plaintext. Immutable payload bytes are visible in deployment, scheduler, and
+  Pod-spec surfaces; SHA-256 provides integrity, not confidentiality. CLI,
+  provider, init, and base reject malformed, oversized, noncanonical, truncated,
+  or digest-mismatched values without echoing them. Live Kubernetes behavior
+  remains `UNVERIFIED` pending an explicitly approved environment.
+
 ## 0.82.0 - 2026-09-19
 
 ### Added
