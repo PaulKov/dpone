@@ -23,6 +23,10 @@ from dpone.runtime.runtime_init_fetch_execution import (
     RuntimeExecutionSelection,
     require_execution_token,
 )
+from dpone.runtime.runtime_init_fetch_payload import (
+    MAX_SELECTED_RUNTIME_PAYLOADS,
+    RuntimePayloadDescriptor,
+)
 from dpone.runtime.runtime_init_fetch_schema import runtime_init_fetch_schema
 
 RUNTIME_INIT_FETCH_PLAN_SCHEMA = "dpone.airflow-runtime-init-fetch-plan.v1"
@@ -31,7 +35,6 @@ RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3 = "dpone.airflow-runtime-init-fetch-plan.v3"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4 = "dpone.airflow-runtime-init-fetch-plan.v4"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5 = "dpone.airflow-runtime-init-fetch-plan.v5"
 MAX_RUNTIME_INIT_FETCH_PLAN_BYTES = 16 * 1024
-MAX_SELECTED_RUNTIME_PAYLOADS = 16
 
 _ENVIRONMENT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 _CONTEXT_DIGEST_DIR_RE = re.compile(r"^sha256-[0-9a-f]{64}$")
@@ -81,41 +84,6 @@ class RuntimeWorkloadPackRef:
             "sha256": self.sha256,
             "bytes": self.bytes,
             "pack_fingerprint": self.pack_fingerprint,
-        }
-
-
-# Exact external runtime payload fetched from the pinned release.
-@dataclass(frozen=True, slots=True)
-class RuntimePayloadDescriptor:
-    id: str
-    kind: str
-    artifact_ref: str
-    sha256: str
-    bytes: int
-    media_type: str
-
-    def __post_init__(self) -> None:
-        require_execution_token("runtime_payload.id", self.id)
-        if self.kind not in {
-            "dbt_project_bundle",
-            "dbt_manifest",
-            "dbt_selection_lock",
-        }:
-            raise ValueError("runtime_payload.kind is unsupported")
-        cache_relative_path(self.artifact_ref)
-        _require_digest("runtime_payload.sha256", self.sha256)
-        _positive_integer(self.bytes, "runtime_payload.bytes")
-        if not isinstance(self.media_type, str) or not self.media_type or len(self.media_type) > 200:
-            raise ValueError("runtime_payload.media_type must be bounded text")
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "kind": self.kind,
-            "artifact_ref": self.artifact_ref,
-            "sha256": self.sha256,
-            "bytes": self.bytes,
-            "media_type": self.media_type,
         }
 
 
