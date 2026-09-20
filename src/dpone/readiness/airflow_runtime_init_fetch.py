@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from dpone.ports.runtime_artifact_attestation import (
         RuntimeArtifactAttestationVerifier,
     )
-    from dpone.runtime.runtime_init_fetch_plan import RuntimeInitFetchPlan
     from dpone.runtime.verified_pack_launcher import VerifiedPackCommand
 
 from dpone.adapters.development_runtime_authority import (
@@ -51,12 +50,16 @@ from dpone.readiness.airflow_runtime_init_fetch_config import (
 from dpone.readiness.airflow_runtime_init_fetch_config import (
     registry_configuration as parse_registry_configuration,
 )
+from dpone.readiness.airflow_runtime_init_fetch_environment import (
+    PLAN_B64_ENV,
+    PLAN_SHA256_ENV,
+    plan_from_environment,
+)
 from dpone.readiness.development_runtime_authorization import (
     authorize_development_runtime,
     require_fetched_development_authority,
 )
 from dpone.runtime.init_fetch_contract import InitFetchError
-from dpone.runtime.runtime_init_fetch_plan_codec import decode_runtime_init_fetch_plan
 from dpone.runtime.runtime_init_fetch_ready import (
     ATTESTATION_REQUIREMENT_REQUIRED,
     effective_attestation_requirement,
@@ -66,8 +69,6 @@ from dpone.runtime.verified_pack_launcher import VerifiedPackLauncher
 
 AirflowRuntimeDeliveryError = InitFetchError
 
-PLAN_B64_ENV = "DPONE_INIT_FETCH_PLAN_B64"
-PLAN_SHA256_ENV = "DPONE_INIT_FETCH_PLAN_SHA256"
 DEFAULT_ARTIFACT_ROOT = Path("/var/lib/dpone/artifacts")
 DEFAULT_WORKTREE_ROOT = Path("/workspace/repo")
 DEFAULT_TRUST_KEY_ROOT = Path("/etc/dpone/artifact-trust")
@@ -152,7 +153,7 @@ class AirflowRuntimeInitFetchService:
             environment,
             expected_root=self._dev_evidence_bootstrap_root,
         )
-        plan, plan_sha256 = _plan_from_environment(environment)
+        plan, plan_sha256 = plan_from_environment(environment)
         prepare_runtime_authority(
             plan,
             environment=environment,
@@ -287,7 +288,7 @@ class AirflowRuntimeInitFetchService:
         self,
         environment: Mapping[str, str] | None = None,
     ) -> VerifiedPackCommand:
-        plan, plan_sha256 = _plan_from_environment(environment)
+        plan, plan_sha256 = plan_from_environment(environment)
         prepare_runtime_authority(
             plan,
             environment=environment,
@@ -350,16 +351,6 @@ def _ensure_dev_evidence_spool(
             "DPONE_DEV_EVIDENCE_BOOTSTRAP_INVALID",
             "dev evidence spool could not be initialized safely",
         ) from exc
-
-
-def _plan_from_environment(
-    environment: Mapping[str, str] | None,
-) -> tuple[RuntimeInitFetchPlan, str]:
-    values = environment if environment is not None else os.environ
-    return decode_runtime_init_fetch_plan(
-        str(values.get(PLAN_B64_ENV) or ""),
-        str(values.get(PLAN_SHA256_ENV) or ""),
-    )
 
 
 __all__ = [
