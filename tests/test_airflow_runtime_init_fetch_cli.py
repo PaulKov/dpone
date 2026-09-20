@@ -181,7 +181,7 @@ def test_runtime_receipt_authority_uses_release_inventory_not_plan_selection() -
     assert plan.runtime_payloads == ()
 
 
-def test_init_fetch_bootstraps_scoped_dbt_spool_before_plan_decode(
+def test_init_fetch_rejects_plan_before_bootstrapping_scoped_dbt_spool(
     tmp_path: Path,
 ) -> None:
     bootstrap = tmp_path / "evidence"
@@ -199,9 +199,7 @@ def test_init_fetch_bootstraps_scoped_dbt_spool_before_plan_decode(
             }
         )
 
-    spool = bootstrap / "dbt-spool"
-    assert spool.is_dir()
-    assert not spool.is_symlink()
+    assert not (bootstrap / "dbt-spool").exists()
 
 
 class RecordingRegistry:

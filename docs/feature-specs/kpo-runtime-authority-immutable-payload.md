@@ -146,10 +146,11 @@ using the previous exact version; an older provider rejects the new closed mode.
 5. Secret mode follows the existing v4 code path byte-for-byte. Immutable mode
    reserves one memory-backed volume, its mounts, and the existing fixed path
    environment variable. Any collision fails before operator construction.
-6. Init-fetch decodes the hash-bound v5 plan before authority/registry I/O,
-   validates the payload, writes a private temporary file through its write
-   mount, verifies written bytes, changes mode to `0400`, and atomically renames
-   it to the fixed authority path.
+6. Init-fetch decodes the hash-bound v5 plan, validates the payload, writes a
+   private temporary file through its write mount, verifies written bytes,
+   changes mode to `0400`, and atomically renames it to the fixed authority
+   path. Only after that succeeds may it create the durable development-evidence
+   spool or perform authority/registry I/O.
 7. Base decodes the same plan, opens the file with bounded/no-follow semantics,
    rechecks type, length, and digest, then performs its independent authority
    call. Base mounts the volume read-only.

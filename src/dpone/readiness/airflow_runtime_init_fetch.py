@@ -149,12 +149,12 @@ class AirflowRuntimeInitFetchService:
         self._runtime_authority_path = runtime_authority_path
 
     def init_fetch(self, environment: Mapping[str, str] | None = None) -> Mapping[str, Any]:
+        plan, plan_sha256 = _plan_from_environment(environment)
+        self._prepare_runtime_authority(plan, environment=environment, materialize=True)
         ensure_dev_evidence_spool(
             environment,
             expected_root=self._dev_evidence_bootstrap_root,
         )
-        plan, plan_sha256 = _plan_from_environment(environment)
-        self._prepare_runtime_authority(plan, environment=environment, materialize=True)
         development_authorization = authorize_development_runtime(
             plan,
             authority=self._development_runtime_authority,

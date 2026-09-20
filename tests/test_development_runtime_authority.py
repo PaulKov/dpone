@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import logging
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -26,6 +27,7 @@ from dpone.ports.development_runtime_authority import (
     DevelopmentRuntimeAuthorization,
 )
 from dpone.readiness.airflow_runtime_init_fetch import (
+    DEV_EVIDENCE_BOOTSTRAP_ROOT_ENV,
     PLAN_B64_ENV,
     PLAN_SHA256_ENV,
     RUNTIME_AUTHORITY_PATH_ENV,
@@ -217,6 +219,38 @@ def test_immutable_payload_is_materialized_and_reverified_before_each_authority_
         service.prepare_pack_exec(environment)
     assert exc_info.value.code == "DPONE_RUNTIME_AUTHORITY_PAYLOAD_INVALID"
     assert len(verifier.requests) == 1
+
+
+def test_malformed_immutable_payload_is_rejected_before_durable_spool_creation(tmp_path) -> None:
+    authority_path = tmp_path / "runtime-authority" / "authority"
+    bootstrap = tmp_path / "evidence"
+    authority_path.parent.mkdir()
+    bootstrap.mkdir()
+    raw = b'{"mode":"synthetic"}\n'
+    immutable = ImmutableRuntimeAuthorityPayload.from_bytes(
+        raw,
+        expected_sha256="sha256:" + hashlib.sha256(raw).hexdigest(),
+    )
+    plan = replace(_development_plan(), runtime_authority=immutable)
+    malformed = json.loads(canonical_runtime_init_fetch_plan_bytes(plan))
+    malformed["runtime_authority"]["payload_b64"] = "!!!!"
+    malformed_bytes = (json.dumps(malformed, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    environment = {
+        PLAN_B64_ENV: base64.b64encode(malformed_bytes).decode("ascii"),
+        PLAN_SHA256_ENV: "sha256:" + hashlib.sha256(malformed_bytes).hexdigest(),
+        RUNTIME_AUTHORITY_PATH_ENV: str(authority_path),
+        DEV_EVIDENCE_BOOTSTRAP_ROOT_ENV: str(bootstrap),
+    }
+    service = AirflowRuntimeInitFetchService(
+        runtime_authority_path=authority_path,
+        dev_evidence_bootstrap_root=bootstrap,
+    )
+
+    with pytest.raises(InitFetchError):
+        service.init_fetch(environment)
+
+    assert not authority_path.exists()
+    assert not (bootstrap / "dbt-spool").exists()
 
 
 @pytest.mark.parametrize(

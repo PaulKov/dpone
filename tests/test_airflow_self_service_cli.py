@@ -2389,10 +2389,31 @@ def test_airflow_build_forwards_digest_bound_non_secret_payload(
     source = tmp_path / "authority.json"
     source.write_bytes(raw)
     expected = "sha256:" + hashlib.sha256(raw).hexdigest()
+    encoded = base64.b64encode(raw).decode("ascii")
 
     def build_result(**kwargs: object) -> SelfServiceResult:
         captured.update(kwargs)
-        return SelfServiceResult(passed=True, details={"kind": "test"})
+        authority = dict(kwargs["runtime_authority_ref"])
+        return SelfServiceResult(
+            passed=True,
+            details={
+                "deployment": {
+                    "environment": "dev",
+                    "deployment_id": "sha256:" + "d" * 64,
+                    "release_ref": "sha256:" + "a" * 64,
+                    "runnable": True,
+                    "runtime_authority": authority,
+                },
+                "airflow_index": {
+                    "dag_specs": [],
+                    "workload_packs": [],
+                    "runtime_artifact_delivery": {
+                        "mode": "init_fetch",
+                        "runtime_authority": authority,
+                    },
+                },
+            },
+        )
 
     monkeypatch.setattr(airflow_deployment_build_cmd, "build_deployment_result", build_result)
     code, stdout, stderr = _run_cli(
@@ -2422,7 +2443,33 @@ def test_airflow_build_forwards_digest_bound_non_secret_payload(
     assert authority["bytes"] == len(raw)
     assert authority["sha256"] == expected
     assert base64.b64decode(authority["payload_b64"]) == raw
-    assert "synthetic" not in stdout
+    public = json.loads(stdout)
+    assert public["deployment"]["runtime_authority"]["payload_b64"] == "[REDACTED]"
+    assert public["airflow_index"]["runtime_artifact_delivery"]["runtime_authority"]["payload_b64"] == "[REDACTED]"
+    assert encoded not in stdout
+
+    text_code, text_stdout, text_stderr = _run_cli(
+        [
+            "airflow",
+            "build",
+            "--release-id",
+            "sha256:" + "a" * 64,
+            "--environment",
+            "dev",
+            *_strict_airflow_build_args("sha256:" + "b" * 64),
+            "--runtime-authority-payload-file",
+            str(source),
+            "--runtime-authority-payload-sha256",
+            expected,
+        ],
+        capsys,
+    )
+
+    assert text_code == 0
+    assert text_stderr == ""
+    assert "dpone airflow build: OK" in text_stdout
+    assert encoded not in text_stdout
+    assert "synthetic" not in text_stdout
 
 
 def test_airflow_build_rejects_payload_digest_mismatch_without_calling_builder(
@@ -2788,7 +2835,7 @@ def test_airflow_build_text_output_summarizes_deployment_projection(
         '--allowed-promoter "${DPONE_CI_IDENTITY:?set DPONE_CI_IDENTITY}" '
         "--expect-current-absent --confirm-promote"
     ) in stdout
-    assert "- details: rerun with --format json for fingerprints and full deployment projection" in stdout
+    assert "- details: rerun with --format json for fingerprints and redacted deployment projection" in stdout
     assert "<ci-identity>" not in stdout
     assert str(tmp_path) not in stdout
     assert "dpone self-service: OK" not in stdout
