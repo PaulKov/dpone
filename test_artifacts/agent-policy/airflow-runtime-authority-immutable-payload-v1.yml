@@ -58,6 +58,7 @@ integrator_owned_paths:
   - "CHANGELOG.md"
   - "mkdocs.yml"
   - "docs/schemas/"
+  - "docs/module_size_baseline.json"
   - ".agents/policy/ci-shadow-reconciliation-observation-bundle-v1.yml"
 read_only_paths:
   - ".github/workflows/"
@@ -67,6 +68,7 @@ forbidden_paths:
   - "CHANGELOG.md"
   - "mkdocs.yml"
   - "docs/schemas/"
+  - "docs/module_size_baseline.json"
   - ".github/workflows/"
   - ".agents/policy/ci-shadow-reconciliation-observation-bundle-v1.yml"
   - "credentials"
