@@ -1,10 +1,12 @@
 # Feature design: immutable KPO runtime-authority payload
 
-- Status: APPROVED
+- Status: IMPLEMENTED
 - Owner: dpone maintainers
 - Issue: maintainer request
 - Target release: 0.83.0
 Last verified: 2026-09-20
+
+Implementation evidence: [`validation-report.md`](../../test_artifacts/airflow-runtime-authority-immutable-payload-v1/validation-report.md).
 
 ## Executive summary
 
