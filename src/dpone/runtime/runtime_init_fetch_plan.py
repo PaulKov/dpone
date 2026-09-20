@@ -18,6 +18,7 @@ from dpone.contracts.runtime_artifact_delivery import (
 )
 from dpone.kubernetes_names import is_valid_kubernetes_dns_label
 from dpone.runtime.init_fetch_contract import cache_relative_path
+from dpone.runtime.runtime_authority_payload import ImmutableRuntimeAuthorityPayload
 from dpone.runtime.runtime_init_fetch_execution import (
     RuntimeExecutionSelection,
     require_execution_token,
@@ -28,6 +29,7 @@ RUNTIME_INIT_FETCH_PLAN_SCHEMA = "dpone.airflow-runtime-init-fetch-plan.v1"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2 = "dpone.airflow-runtime-init-fetch-plan.v2"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3 = "dpone.airflow-runtime-init-fetch-plan.v3"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4 = "dpone.airflow-runtime-init-fetch-plan.v4"
+RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5 = "dpone.airflow-runtime-init-fetch-plan.v5"
 MAX_RUNTIME_INIT_FETCH_PLAN_BYTES = 16 * 1024
 MAX_SELECTED_RUNTIME_PAYLOADS = 16
 
@@ -141,6 +143,7 @@ class RuntimeInitFetchPlan:
     verify: Mapping[str, str]
     runtime_payloads: tuple[RuntimePayloadDescriptor, ...] = ()
     development_authority_required: bool = False
+    runtime_authority: ImmutableRuntimeAuthorityPayload | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -194,6 +197,7 @@ class RuntimeInitFetchPlan:
                 self.development_authority_required,
                 self.execution.hook_execution is not None,
                 bool(self.runtime_payloads),
+                self.runtime_authority is not None,
             ),
             "environment": self.environment,
             "trust_tier": self.trust_tier,
@@ -222,6 +226,8 @@ class RuntimeInitFetchPlan:
             payload["runtime_payloads"] = [item.to_dict() for item in self.runtime_payloads]
         if self.development_authority_required:
             payload["development_authority_required"] = True
+        if self.runtime_authority is not None:
+            payload["runtime_authority"] = self.runtime_authority.to_dict()
         return payload
 
 
@@ -268,6 +274,8 @@ def _validate_plan(plan: RuntimeInitFetchPlan) -> None:
         raise ValueError("development_authority_required must be boolean")
     if plan.development_authority_required and plan.execution.hook_execution is None:
         raise ValueError("development authority requires explicit hook execution")
+    if plan.runtime_authority is not None and not plan.development_authority_required:
+        raise ValueError("runtime authority payload requires development authority")
     if not _ENVIRONMENT_RE.fullmatch(plan.environment):
         raise ValueError("environment must be a bounded lowercase logical name")
     if plan.trust_tier not in {"production", "non_production"}:

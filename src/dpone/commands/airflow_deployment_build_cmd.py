@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 
 from dpone.commands.airflow_self_service_output import emit_self_service_result
+from dpone.readiness.airflow_runtime_authority_input import (
+    immutable_runtime_authority_payload_from_file,
+)
 from dpone.readiness.airflow_self_service_deployment import build_deployment_result
 
 
@@ -68,13 +72,22 @@ def register_build_parser(subparsers: argparse._SubParsersAction) -> argparse.Ar
         "--dev-evidence-worker-queue",
         help="Dedicated Airflow worker queue that mounts the dev evidence PVC",
     )
-    parser.add_argument(
+    authority_source = parser.add_mutually_exclusive_group()
+    authority_source.add_argument(
         "--runtime-authority-secret-name",
-        help="Kubernetes Secret containing external runtime-authority configuration for a protected development release",
+        help="Kubernetes Secret containing confidential runtime-authority configuration for a protected development release",
     )
     parser.add_argument(
         "--runtime-authority-secret-key",
         help="Secret key to project read-only; defaults to authority.json when the Secret is selected",
+    )
+    authority_source.add_argument(
+        "--runtime-authority-payload-file",
+        help="Safe-to-persist non-secret authority payload file (1..4096 exact binary bytes); mutually exclusive with Secret mode",
+    )
+    parser.add_argument(
+        "--runtime-authority-payload-sha256",
+        help="Required canonical SHA-256 of exact payload file bytes; provides integrity, not confidentiality",
     )
     parser.add_argument("--format", choices=["text", "json"], default="text")
     return parser
@@ -84,6 +97,19 @@ def cmd_airflow_build(args: argparse.Namespace, *, ctx: object, logger: logging.
     """Build one strict deployment projection and emit its public result."""
 
     del ctx, logger
+    try:
+        runtime_authority_ref = _optional_runtime_authority_ref(
+            secret_name=getattr(args, "runtime_authority_secret_name", None),
+            secret_key=getattr(args, "runtime_authority_secret_key", None),
+            payload_file=getattr(args, "runtime_authority_payload_file", None),
+            payload_sha256=getattr(args, "runtime_authority_payload_sha256", None),
+        )
+    except ValueError:
+        print(
+            "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID: runtime authority source options or payload integrity are invalid",
+            file=sys.stderr,
+        )
+        return 2
     result = build_deployment_result(
         root=".",
         release_id=args.release_id,
@@ -109,10 +135,7 @@ def cmd_airflow_build(args: argparse.Namespace, *, ctx: object, logger: logging.
         airflow_bundle_ref=args.airflow_bundle_ref,
         dev_evidence_pvc_claim=args.dev_evidence_pvc_claim,
         dev_evidence_worker_queue=args.dev_evidence_worker_queue,
-        runtime_authority_ref=_optional_secret_ref(
-            name=getattr(args, "runtime_authority_secret_name", None),
-            key=getattr(args, "runtime_authority_secret_key", None),
-        ),
+        runtime_authority_ref=runtime_authority_ref,
     )
     emit_self_service_result(result, args.format, command="airflow_build")
     if result.exit_code is not None:
@@ -145,6 +168,30 @@ def _optional_secret_ref(*, name: object, key: object) -> dict[str, object] | No
         "name": name,
         "key": key if key is not None else "authority.json",
     }
+
+
+def _optional_runtime_authority_ref(
+    *,
+    secret_name: object,
+    secret_key: object,
+    payload_file: object,
+    payload_sha256: object,
+) -> dict[str, object] | None:
+    secret_selected = secret_name is not None or secret_key is not None
+    payload_selected = payload_file is not None or payload_sha256 is not None
+    if secret_selected and payload_selected:
+        raise ValueError("runtime authority sources are mutually exclusive")
+    if secret_selected:
+        return _optional_secret_ref(name=secret_name, key=secret_key)
+    if not payload_selected:
+        return None
+    if not isinstance(payload_file, str) or not isinstance(payload_sha256, str):
+        raise ValueError("runtime authority payload file and digest are required together")
+    payload = immutable_runtime_authority_payload_from_file(
+        payload_file,
+        expected_sha256=payload_sha256,
+    )
+    return {"kind": "immutable_payload", **payload.to_dict()}
 
 
 __all__ = ["cmd_airflow_build", "register_build_parser"]

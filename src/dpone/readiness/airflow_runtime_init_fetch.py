@@ -51,6 +51,10 @@ from dpone.readiness.development_runtime_authorization import (
     require_fetched_development_authority,
 )
 from dpone.runtime.init_fetch_contract import InitFetchError
+from dpone.runtime.runtime_authority_payload import (
+    materialize_runtime_authority_payload,
+    verify_materialized_runtime_authority_payload,
+)
 from dpone.runtime.runtime_init_fetch_plan_codec import decode_runtime_init_fetch_plan
 from dpone.runtime.runtime_init_fetch_ready import (
     ATTESTATION_REQUIREMENT_REQUIRED,
@@ -68,6 +72,8 @@ DEFAULT_WORKTREE_ROOT = Path("/workspace/repo")
 DEFAULT_TRUST_KEY_ROOT = Path("/etc/dpone/artifact-trust")
 DEV_EVIDENCE_BOOTSTRAP_ROOT_ENV = "DPONE_DBT_EVIDENCE_BOOTSTRAP_ROOT"
 DEFAULT_DEV_EVIDENCE_BOOTSTRAP_ROOT = Path("/var/lib/dpone/dev-evidence-bootstrap")
+RUNTIME_AUTHORITY_PATH_ENV = "DPONE_RUNTIME_AUTHORITY_PATH"
+DEFAULT_RUNTIME_AUTHORITY_PATH = Path("/run/secrets/dpone/runtime-authority/authority")
 
 
 class RuntimeRegistryFactory(Protocol):
@@ -128,6 +134,7 @@ class AirflowRuntimeInitFetchService:
         worktree_root: Path = DEFAULT_WORKTREE_ROOT,
         dev_evidence_bootstrap_root: Path = (DEFAULT_DEV_EVIDENCE_BOOTSTRAP_ROOT),
         development_runtime_authority: DevelopmentRuntimeAuthority | None = None,
+        runtime_authority_path: Path = DEFAULT_RUNTIME_AUTHORITY_PATH,
     ) -> None:
         self._registry_factory = registry_factory or WorkloadIdentityRegistryFactory()
         self._attestation_verifier = attestation_verifier
@@ -139,6 +146,7 @@ class AirflowRuntimeInitFetchService:
         self._worktree_root = worktree_root
         self._dev_evidence_bootstrap_root = dev_evidence_bootstrap_root
         self._development_runtime_authority = development_runtime_authority
+        self._runtime_authority_path = runtime_authority_path
 
     def init_fetch(self, environment: Mapping[str, str] | None = None) -> Mapping[str, Any]:
         _ensure_dev_evidence_spool(
@@ -146,6 +154,7 @@ class AirflowRuntimeInitFetchService:
             expected_root=self._dev_evidence_bootstrap_root,
         )
         plan, plan_sha256 = _plan_from_environment(environment)
+        self._prepare_runtime_authority(plan, environment=environment, materialize=True)
         development_authorization = authorize_development_runtime(
             plan,
             authority=self._development_runtime_authority,
@@ -275,6 +284,7 @@ class AirflowRuntimeInitFetchService:
         environment: Mapping[str, str] | None = None,
     ) -> VerifiedPackCommand:
         plan, plan_sha256 = _plan_from_environment(environment)
+        self._prepare_runtime_authority(plan, environment=environment, materialize=False)
         development_authorization = authorize_development_runtime(
             plan,
             authority=self._development_runtime_authority,
@@ -295,6 +305,27 @@ class AirflowRuntimeInitFetchService:
                 )
             ),
         )
+
+    def _prepare_runtime_authority(
+        self,
+        plan: RuntimeInitFetchPlan,
+        *,
+        environment: Mapping[str, str] | None,
+        materialize: bool,
+    ) -> None:
+        payload = plan.runtime_authority
+        if payload is None:
+            return
+        values = os.environ if environment is None else environment
+        if values.get(RUNTIME_AUTHORITY_PATH_ENV) != str(self._runtime_authority_path):
+            raise InitFetchError(
+                "DPONE_RUNTIME_AUTHORITY_PAYLOAD_INVALID",
+                "runtime authority payload path is not provider-owned",
+            )
+        if materialize:
+            materialize_runtime_authority_payload(payload, self._runtime_authority_path)
+        else:
+            verify_materialized_runtime_authority_payload(payload, self._runtime_authority_path)
 
 
 def _ensure_dev_evidence_spool(
@@ -351,8 +382,10 @@ __all__ = [
     "DEFAULT_TRUST_KEY_ROOT",
     "DEFAULT_TRUST_POLICY_PATH",
     "DEFAULT_WORKTREE_ROOT",
+    "DEFAULT_RUNTIME_AUTHORITY_PATH",
     "PLAN_B64_ENV",
     "PLAN_SHA256_ENV",
+    "RUNTIME_AUTHORITY_PATH_ENV",
     "RuntimeRegistryConfiguration",
     "RuntimeRegistryFactory",
     "WorkloadIdentityRegistryFactory",

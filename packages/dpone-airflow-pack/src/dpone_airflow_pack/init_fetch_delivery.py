@@ -25,6 +25,7 @@ from dpone_airflow_pack.init_fetch_validation import (
     registry_ref,
     required_text,
 )
+from dpone_airflow_pack.runtime_authority_source import ImmutableRuntimeAuthoritySource
 
 _DELIVERY_KEYS = frozenset(
     {
@@ -55,7 +56,7 @@ class ParsedInitFetchDelivery:
     identity: WorkloadIdentity
     verify: VerificationPolicy
     dev_evidence_delivery: DevEvidenceDelivery | None
-    runtime_authority: RuntimeAuthoritySource | None
+    runtime_authority: RuntimeAuthoritySource | ImmutableRuntimeAuthoritySource | None
 
 
 def parse_init_fetch_delivery(
@@ -104,9 +105,17 @@ def parse_init_fetch_delivery(
     )
 
 
-def _runtime_authority(value: object, path: Path | None) -> RuntimeAuthoritySource | None:
+def _runtime_authority(
+    value: object,
+    path: Path | None,
+) -> RuntimeAuthoritySource | ImmutableRuntimeAuthoritySource | None:
     if value is None:
         return None
+    if isinstance(value, Mapping) and value.get("mode") == "immutable_payload":
+        try:
+            return ImmutableRuntimeAuthoritySource.from_mapping(value)
+        except (TypeError, ValueError) as exc:
+            raise field_invalid("runtime authority immutable payload is invalid", path) from exc
     item = exact_mapping(
         value,
         "runtime_artifact_delivery.runtime_authority",

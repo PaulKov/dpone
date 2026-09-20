@@ -28,6 +28,7 @@ from dpone.gitops.schema_release_deployment_v2_contracts import (
     dev_evidence_non_production_guard,
 )
 from dpone.gitops.schema_runtime_artifact_delivery import (
+    immutable_runtime_authority_source_schema,
     runtime_artifact_delivery_schema,
     runtime_authority_source_schema,
     runtime_image_ref_schema,
@@ -199,9 +200,41 @@ def deployment_set_v4_contract() -> GitOpsSchemaContract:
     )
 
 
+def airflow_deployment_index_v5_contract() -> GitOpsSchemaContract:
+    """Protected development index with one immutable non-secret payload."""
+
+    source = airflow_deployment_index_v4_contract()
+    schema = deepcopy(source.schema)
+    kind = "dpone.airflow-deployment-index.v5"
+    schema["$id"] = schema["$id"].replace("airflow-deployment-index-v4", "airflow-deployment-index-v5")
+    schema["title"] = "dpone GitOps executable Airflow deployment index v5"
+    schema["properties"]["schema"] = {"const": kind}
+    schema["properties"]["runtime_artifact_delivery"]["properties"]["runtime_authority"] = (
+        immutable_runtime_authority_source_schema()
+    )
+    return GitOpsSchemaContract(name="airflow-deployment-index-v5", kind=kind, schema=schema)
+
+
+def deployment_set_v5_contract() -> GitOpsSchemaContract:
+    """Protected development deployment with one immutable non-secret payload."""
+
+    source = deployment_set_v4_contract()
+    schema = deepcopy(source.schema)
+    kind = "dpone.deployment-set.v5"
+    schema["$id"] = schema["$id"].replace("deployment-set-v4", "deployment-set-v5")
+    schema["title"] = "dpone GitOps executable deployment-set v5"
+    schema["properties"]["schema"] = {"const": kind}
+    schema["properties"]["runtime_artifact_delivery"]["properties"]["runtime_authority"] = (
+        immutable_runtime_authority_source_schema()
+    )
+    return GitOpsSchemaContract(name="deployment-set-v5", kind=kind, schema=schema)
+
+
 __all__ = [
     "airflow_deployment_index_v3_contract",
     "airflow_deployment_index_v4_contract",
+    "airflow_deployment_index_v5_contract",
     "deployment_set_v3_contract",
     "deployment_set_v4_contract",
+    "deployment_set_v5_contract",
 ]

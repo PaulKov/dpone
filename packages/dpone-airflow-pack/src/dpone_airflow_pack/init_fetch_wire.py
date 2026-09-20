@@ -11,9 +11,11 @@ from dpone_airflow_pack.init_fetch_contract import (
     AIRFLOW_INDEX_SCHEMA_V2,
     AIRFLOW_INDEX_SCHEMA_V3,
     AIRFLOW_INDEX_SCHEMA_V4,
+    AIRFLOW_INDEX_SCHEMA_V5,
     ExactArtifact,
     InitFetchDeliveryContext,
     InitFetchProviderError,
+    RuntimeAuthoritySource,
 )
 from dpone_airflow_pack.init_fetch_delivery import (
     parse_init_fetch_delivery,
@@ -37,6 +39,7 @@ from dpone_airflow_pack.init_fetch_validation import (
 from dpone_airflow_pack.mssql_outlet_projection_contract import (
     parse_mssql_asset_outlet_projection,
 )
+from dpone_airflow_pack.runtime_authority_source import ImmutableRuntimeAuthoritySource
 
 _INDEX_KEYS_V2 = frozenset(
     {
@@ -67,6 +70,7 @@ _INDEX_KEYS_V2 = frozenset(
 )
 _INDEX_KEYS_V3 = _INDEX_KEYS_V2 | frozenset({"mssql_asset_outlet_projection"})
 _INDEX_KEYS_V4 = _INDEX_KEYS_V3 | frozenset({"development_authority_required"})
+_INDEX_KEYS_V5 = _INDEX_KEYS_V4
 _OPTIONAL_INDEX_KEYS_V2 = frozenset(
     {
         "runtime_payloads",
@@ -78,8 +82,11 @@ _OPTIONAL_INDEX_KEYS_V2 = frozenset(
 )
 _OPTIONAL_INDEX_KEYS_V3 = _OPTIONAL_INDEX_KEYS_V2
 _OPTIONAL_INDEX_KEYS_V4 = _OPTIONAL_INDEX_KEYS_V3 | frozenset({"mssql_asset_outlet_projection"})
+_OPTIONAL_INDEX_KEYS_V5 = _OPTIONAL_INDEX_KEYS_V4
 _CONTEXT_DIGEST_DIR_RE = re.compile(r"^sha256-[0-9a-f]{64}$")
-_SUPPORTED_INDEX_SCHEMAS = frozenset({AIRFLOW_INDEX_SCHEMA_V2, AIRFLOW_INDEX_SCHEMA_V3, AIRFLOW_INDEX_SCHEMA_V4})
+_SUPPORTED_INDEX_SCHEMAS = frozenset(
+    {AIRFLOW_INDEX_SCHEMA_V2, AIRFLOW_INDEX_SCHEMA_V3, AIRFLOW_INDEX_SCHEMA_V4, AIRFLOW_INDEX_SCHEMA_V5}
+)
 
 
 def init_fetch_context_from_payload(
@@ -96,21 +103,30 @@ def init_fetch_context_from_payload(
             "Expected a supported strict Airflow deployment index schema",
             path=_path_text(path),
         )
-    is_v3 = schema in {AIRFLOW_INDEX_SCHEMA_V3, AIRFLOW_INDEX_SCHEMA_V4}
+    is_v3 = schema in {AIRFLOW_INDEX_SCHEMA_V3, AIRFLOW_INDEX_SCHEMA_V4, AIRFLOW_INDEX_SCHEMA_V5}
     is_v4 = schema == AIRFLOW_INDEX_SCHEMA_V4
+    is_v5 = schema == AIRFLOW_INDEX_SCHEMA_V5
     exact_mapping(
         payload,
         "airflow deployment index v3" if is_v3 else "airflow deployment index v2",
-        _INDEX_KEYS_V4 if is_v4 else (_INDEX_KEYS_V3 if is_v3 else _INDEX_KEYS_V2),
+        _INDEX_KEYS_V5 if is_v5 else (_INDEX_KEYS_V4 if is_v4 else (_INDEX_KEYS_V3 if is_v3 else _INDEX_KEYS_V2)),
         optional=(
-            _OPTIONAL_INDEX_KEYS_V4 if is_v4 else (_OPTIONAL_INDEX_KEYS_V3 if is_v3 else _OPTIONAL_INDEX_KEYS_V2)
+            _OPTIONAL_INDEX_KEYS_V5
+            if is_v5
+            else _OPTIONAL_INDEX_KEYS_V4
+            if is_v4
+            else (_OPTIONAL_INDEX_KEYS_V3 if is_v3 else _OPTIONAL_INDEX_KEYS_V2)
         ),
         path=path,
     )
     delivery = parse_init_fetch_delivery(payload, path=path)
-    if is_v4 and delivery.runtime_authority is None:
+    if (is_v4 or is_v5) and delivery.runtime_authority is None:
         raise field_invalid("development authority requires runtime_artifact_delivery.runtime_authority", path)
-    if not is_v4 and delivery.runtime_authority is not None:
+    if is_v4 and not isinstance(delivery.runtime_authority, RuntimeAuthoritySource):
+        raise field_invalid("v4 development authority requires kubernetes_secret_volume", path)
+    if is_v5 and not isinstance(delivery.runtime_authority, ImmutableRuntimeAuthoritySource):
+        raise field_invalid("v5 development authority requires immutable_payload", path)
+    if not is_v4 and not is_v5 and delivery.runtime_authority is not None:
         raise field_invalid("runtime authority is allowed only for development-authorized plans", path)
     release_id = digest(payload.get("release_id"), "release_id", path)
     deployment_id = digest(payload.get("deployment_id"), "deployment_id", path)
@@ -189,7 +205,7 @@ def init_fetch_context_from_payload(
         runtime_image_dbt_digest=dbt_digest,
         mssql_asset_uri_by_ref=mssql_projection,
         development_authority_required=(
-            _literal_true(payload.get("development_authority_required"), path) if is_v4 else False
+            _literal_true(payload.get("development_authority_required"), path) if (is_v4 or is_v5) else False
         ),
         runtime_authority=delivery.runtime_authority,
     )

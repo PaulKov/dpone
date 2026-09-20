@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 from copy import deepcopy
 from types import SimpleNamespace
@@ -32,6 +34,21 @@ def _development_index() -> dict[str, object]:
         "mode": "kubernetes_secret_volume",
         "secret_name": "dpone-runtime-authority",
         "secret_key": "authority.json",
+    }
+    return payload
+
+
+def _immutable_development_index(raw: bytes = b'{"mode":"synthetic"}\n') -> dict[str, object]:
+    payload = _development_index()
+    payload["schema"] = "dpone.airflow-deployment-index.v5"
+    delivery = payload["runtime_artifact_delivery"]
+    assert isinstance(delivery, dict)
+    delivery["runtime_authority"] = {
+        "mode": "immutable_payload",
+        "encoding": "base64",
+        "payload_b64": base64.b64encode(raw).decode("ascii"),
+        "bytes": len(raw),
+        "sha256": "sha256:" + hashlib.sha256(raw).hexdigest(),
     }
     return payload
 
@@ -76,6 +93,49 @@ def test_development_plan_projects_one_read_only_source_to_init_and_base() -> No
     serialized = json.dumps(kwargs, sort_keys=True)
     assert "synthetic-secret-value" not in serialized
     assert "password" not in serialized.lower()
+
+
+def test_immutable_payload_uses_v5_plan_and_memory_volume_without_secret_reference() -> None:
+    context = init_fetch_context_from_payload(_immutable_development_index())
+    kwargs = compose_init_fetch_operator_kwargs(
+        pack=_strict_pack(),
+        kwargs=_strict_pack()["provider_execution"]["kpo_kwargs"],
+        context=context,
+        workload_id="orders",
+        execution_kind="runtime",
+        execution_scope="workload",
+        hook_execution="externalized",
+    )
+
+    pod = kwargs["full_pod_spec"]
+    authority_volume = next(item for item in pod["spec"]["volumes"] if item["name"] == RUNTIME_AUTHORITY_VOLUME)
+    assert authority_volume == {
+        "name": RUNTIME_AUTHORITY_VOLUME,
+        "emptyDir": {"medium": "Memory", "sizeLimit": "8Ki"},
+    }
+    init = next(item for item in pod["spec"]["initContainers"] if item["name"] == "dpone-runtime-init-fetch")
+    base = next(item for item in pod["spec"]["containers"] if item["name"] == "base")
+    assert next(item for item in init["volumeMounts"] if item["name"] == RUNTIME_AUTHORITY_VOLUME)["readOnly"] is False
+    assert next(item for item in base["volumeMounts"] if item["name"] == RUNTIME_AUTHORITY_VOLUME)["readOnly"] is True
+    plan = json.loads(base64.b64decode(_env(init)["DPONE_INIT_FETCH_PLAN_B64"]))
+    assert plan["schema"] == "dpone.airflow-runtime-init-fetch-plan.v5"
+    assert plan["runtime_authority"] == context.runtime_authority.to_dict()
+    assert "secretName" not in json.dumps(pod)
+
+
+def test_v4_and_v5_reject_the_other_authority_source_mode() -> None:
+    v4 = _development_index()
+    v4["runtime_artifact_delivery"]["runtime_authority"] = _immutable_development_index()[  # type: ignore[index]
+        "runtime_artifact_delivery"
+    ]["runtime_authority"]  # type: ignore[index]
+    v5 = _immutable_development_index()
+    v5["runtime_artifact_delivery"]["runtime_authority"] = _development_index()[  # type: ignore[index]
+        "runtime_artifact_delivery"
+    ]["runtime_authority"]  # type: ignore[index]
+
+    for payload in (v4, v5):
+        with pytest.raises(InitFetchProviderError):
+            init_fetch_context_from_payload(payload)
 
 
 def test_object_pod_projection_updates_init_and_base_without_replacing_other_fields() -> None:

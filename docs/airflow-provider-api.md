@@ -144,6 +144,8 @@ Mode policy is wire-specific:
 | v2 `init_fetch` | Continue through the strict executable KPO preflight. |
 | v4 protected development `init_fetch` with a closed runtime-authority Secret source | Continue and mount the referenced key read-only in init/base containers. |
 | v4 missing or malformed runtime-authority source | `DPONE_AIRFLOW_INDEX_FIELD_INVALID`. |
+| v5 protected development `init_fetch` with a closed immutable payload | Validate canonical Base64, byte count, SHA-256, and plan bound; project through Pod-local memory storage. |
+| v5 Secret source or v4 immutable source | `DPONE_AIRFLOW_INDEX_FIELD_INVALID`; wire/source modes cannot be relabeled. |
 | v2/v3 with a runtime-authority source | `DPONE_AIRFLOW_INDEX_FIELD_INVALID`; ordinary/production paths cannot opt in. |
 | v2 known non-`init_fetch` mode | `DPONE_RUNTIME_ARTIFACT_DELIVERY_MODE_UNSUPPORTED`. |
 | Unknown mode | `DPONE_AIRFLOW_INDEX_FIELD_INVALID`. |

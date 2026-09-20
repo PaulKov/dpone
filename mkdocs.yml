@@ -116,6 +116,7 @@ nav:
       - Signed catalog bundles: signed-catalog-bundles.md
       - Extension conformance: extension-conformance.md
       - Lightweight Airflow pack provider: airflow-pack-provider.md
+      - Protected runtime authority: airflow-runtime-authority.md
       - Legacy Airflow pack cache hardening design: feature-design-airflow-legacy-pack-cache-hardening-v07332.md
       - Exact Airflow desired-state delivery: airflow-desired-state.md
       - Airflow artifact trust (preview): airflow-artifact-trust.md
@@ -323,6 +324,7 @@ nav:
       - Configuration reference: reference/configuration.md
       - Extras and dependencies: reference/extras.md
   - Operations:
+      - Airflow runtime-authority recovery: runbooks/airflow-runtime-authority.md
       - Production readiness: production-readiness.md
       - Enterprise readiness: enterprise-readiness.md
       - Domain-first operations and recovery: domain-first-operations.md

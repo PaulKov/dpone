@@ -24,7 +24,7 @@ def register_runtime_init_fetch_parser(
         help="Fetch and verify one pinned runtime workload inside a KPO init container",
         description=(
             "Internal KPO init-container command. Reads the canonical "
-            "versioned dpone.airflow-runtime-init-fetch-plan.v1-v4 contract from "
+            "versioned dpone.airflow-runtime-init-fetch-plan.v1-v5 contract from "
             "DPONE_INIT_FETCH_PLAN_B64 and DPONE_INIT_FETCH_PLAN_SHA256, "
             "then publishes runtime-fetch-ready.json only after verification."
         ),

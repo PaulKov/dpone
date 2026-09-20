@@ -836,6 +836,11 @@ Feature slices:
     containers independently reopen current authority before sensitive
     operations, while public core contains no deployment-specific policy or
     credentials
+  - protected development v5 may carry at most 4 KiB of safe-to-persist,
+    digest-bound non-secret adapter configuration in the immutable plan. Init
+    atomically materializes it into a memory-backed Pod-local volume and base
+    independently verifies it before authority access. Confidential plaintext
+    remains on the frozen v4 Kubernetes Secret projection
   - `dpone.gitops.airflow_run_spec` builds `gitops.airflow_run_spec` contracts
     from an already-built `gitops.bundle`
   - `dpone.gitops.airflow_runtime_models` owns `run-spec.json` and

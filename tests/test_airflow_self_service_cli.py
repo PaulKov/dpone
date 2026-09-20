@@ -2379,6 +2379,91 @@ def test_airflow_build_forwards_closed_runtime_authority_reference_with_default_
     assert "synthetic-secret-value" not in stdout
 
 
+def test_airflow_build_forwards_digest_bound_non_secret_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+    raw = b'{"mode":"synthetic"}\n'
+    source = tmp_path / "authority.json"
+    source.write_bytes(raw)
+    expected = "sha256:" + hashlib.sha256(raw).hexdigest()
+
+    def build_result(**kwargs: object) -> SelfServiceResult:
+        captured.update(kwargs)
+        return SelfServiceResult(passed=True, details={"kind": "test"})
+
+    monkeypatch.setattr(airflow_deployment_build_cmd, "build_deployment_result", build_result)
+    code, stdout, stderr = _run_cli(
+        [
+            "airflow",
+            "build",
+            "--release-id",
+            "sha256:" + "a" * 64,
+            "--environment",
+            "dev",
+            *_strict_airflow_build_args("sha256:" + "b" * 64),
+            "--runtime-authority-payload-file",
+            str(source),
+            "--runtime-authority-payload-sha256",
+            expected,
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+
+    assert code == 0
+    assert stderr == ""
+    authority = captured["runtime_authority_ref"]
+    assert isinstance(authority, dict)
+    assert authority["kind"] == "immutable_payload"
+    assert authority["bytes"] == len(raw)
+    assert authority["sha256"] == expected
+    assert base64.b64decode(authority["payload_b64"]) == raw
+    assert "synthetic" not in stdout
+
+
+def test_airflow_build_rejects_payload_digest_mismatch_without_calling_builder(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "authority.json"
+    source.write_bytes(b"synthetic")
+    called = False
+
+    def build_result(**kwargs: object) -> SelfServiceResult:
+        nonlocal called
+        called = True
+        return SelfServiceResult(passed=True)
+
+    monkeypatch.setattr(airflow_deployment_build_cmd, "build_deployment_result", build_result)
+    code, stdout, stderr = _run_cli(
+        [
+            "airflow",
+            "build",
+            "--release-id",
+            "sha256:" + "a" * 64,
+            "--environment",
+            "dev",
+            *_strict_airflow_build_args("sha256:" + "b" * 64),
+            "--runtime-authority-payload-file",
+            str(source),
+            "--runtime-authority-payload-sha256",
+            "sha256:" + "0" * 64,
+        ],
+        capsys,
+    )
+
+    assert code == 2
+    assert stdout == ""
+    assert "DPONE_DEPLOYMENT_RUNTIME_AUTHORITY_INVALID" in stderr
+    assert "synthetic" not in stderr
+    assert called is False
+
+
 @pytest.mark.parametrize(
     "authority_args",
     [

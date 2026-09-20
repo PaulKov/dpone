@@ -33,6 +33,7 @@ _EXECUTABLE_DEPLOYMENT_SCHEMAS = frozenset(
         "dpone.deployment-set.v2",
         "dpone.deployment-set.v3",
         "dpone.deployment-set.v4",
+        "dpone.deployment-set.v5",
     }
 )
 

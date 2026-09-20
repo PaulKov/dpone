@@ -12,8 +12,11 @@ from dpone.gitops.schema_airflow_init_fetch_execution import (
 from dpone.gitops.schema_contract_primitives import artifact_registry_ref_schema, documented_contract
 from dpone.gitops.schema_runtime_artifact_delivery import (
     config_map_ref_schema,
+    immutable_runtime_authority_source_schema,
     init_fetch_identity_schema,
-    runtime_image_ref_schema,
+    runtime_image_schema,
+    runtime_registry_schema,
+    runtime_verification_request_schema,
 )
 from dpone.gitops.schema_runtime_connection_context import (
     exact_runtime_artifact_schema,
@@ -28,6 +31,7 @@ def airflow_runtime_init_fetch_schema_contracts() -> tuple[GitOpsSchemaContract,
         runtime_init_fetch_plan_v2_contract(),
         runtime_init_fetch_plan_v3_contract(),
         _runtime_init_fetch_plan_contract(version=4),
+        _runtime_init_fetch_plan_contract(version=5),
         runtime_fetch_ready_contract(),
     )
 
@@ -71,6 +75,7 @@ def _runtime_init_fetch_plan_contract(*, version: int) -> GitOpsSchemaContract:
             "verify",
             *(("runtime_payloads",) if version >= 2 else ()),
             *(("development_authority_required",) if version >= 4 else ()),
+            *(("runtime_authority",) if version >= 5 else ()),
         ),
         properties={
             "schema": {"const": kind},
@@ -82,7 +87,7 @@ def _runtime_init_fetch_plan_contract(*, version: int) -> GitOpsSchemaContract:
             "release_id": {"$ref": "#/$defs/sha256"},
             "deployment_id": {"$ref": "#/$defs/sha256"},
             "runtime_image": runtime_image_schema(),
-            "registry": registry_schema(),
+            "registry": runtime_registry_schema(),
             "trust_policy": {
                 "anyOf": [
                     config_map_ref_schema(),
@@ -97,7 +102,7 @@ def _runtime_init_fetch_plan_contract(*, version: int) -> GitOpsSchemaContract:
             "credential_runtime": runtime_connection_artifact_schema("credential-runtime.json"),
             "workload_pack": {"$ref": "#/$defs/workloadPack"},
             "execution": init_fetch_execution_schema(explicit_hook_execution=version >= 3),
-            "verify": verification_request_schema(),
+            "verify": runtime_verification_request_schema(),
             **(
                 {
                     "runtime_payloads": {
@@ -111,6 +116,7 @@ def _runtime_init_fetch_plan_contract(*, version: int) -> GitOpsSchemaContract:
                 else {}
             ),
             **({"development_authority_required": {"const": True}} if version >= 4 else {}),
+            **({"runtime_authority": immutable_runtime_authority_source_schema()} if version >= 5 else {}),
         },
         defs=runtime_plan_defs(include_runtime_payloads=version >= 2),
         additional_properties=False,
@@ -199,42 +205,6 @@ def runtime_fetch_ready_contract() -> GitOpsSchemaContract:
         }
     ]
     return result
-
-
-def runtime_image_schema() -> dict[str, Any]:
-    return {
-        "type": "object",
-        "required": ["ref", "digest"],
-        "additionalProperties": False,
-        "properties": {
-            "ref": runtime_image_ref_schema(),
-            "digest": {"$ref": "#/$defs/sha256"},
-        },
-    }
-
-
-def registry_schema() -> dict[str, Any]:
-    return {
-        "type": "object",
-        "required": ["logical_ref", "configuration"],
-        "additionalProperties": False,
-        "properties": {
-            "logical_ref": artifact_registry_ref_schema(),
-            "configuration": config_map_ref_schema(),
-        },
-    }
-
-
-def verification_request_schema() -> dict[str, Any]:
-    return {
-        "type": "object",
-        "required": ["checksums", "attestations"],
-        "additionalProperties": False,
-        "properties": {
-            "checksums": {"const": "required"},
-            "attestations": {"enum": ["optional", "required_for_prod"]},
-        },
-    }
 
 
 def runtime_plan_defs(*, include_runtime_payloads: bool = False) -> dict[str, Any]:

@@ -265,8 +265,11 @@ expired, revoked, or mismatched authority fails with
 `DPONE_DEVELOPMENT_RUNTIME_AUTHORITY_REQUIRED`. Adapter results are never
 written to XCom or persisted as credentials.
 
-The protected deployment must also name the Kubernetes Secret key containing
-the adapter's external configuration:
+The protected deployment must select one closed external configuration source.
+Use immutable v5 only for safe-to-persist non-secret bytes; use the unchanged v4
+Kubernetes Secret source for confidential plaintext. See
+[Protected Airflow runtime-authority inputs](airflow-runtime-authority.md) for
+complete build, inspection, upgrade, and recovery steps. The v4 form is:
 
 ```bash
 dpone airflow build \
@@ -294,7 +297,10 @@ path, volume, or environment variable. Create the Secret in the deployment
 namespace before the task starts; a missing Kubernetes object prevents pod
 startup, while a missing or malformed build reference fails before DAG task
 construction. Remove the options entirely for ordinary and production
-releases—supplying them there is rejected rather than ignored.
+releases—supplying them there is rejected rather than ignored. Immutable v5 uses
+the same fixed path through a memory-backed Pod-local volume, validates
+hash-bound bytes in provider, init, and base, and creates no separate Kubernetes
+object. Its bytes remain visible to artifact, scheduler, and Pod-spec readers.
 
 An image-owned adapter package registers one zero-argument factory:
 

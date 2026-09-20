@@ -210,6 +210,28 @@ def runtime_authority_source_schema() -> dict[str, Any]:
     }
 
 
+def immutable_runtime_authority_source_schema() -> dict[str, Any]:
+    """Describe one bounded safe-to-persist payload bound to exact bytes."""
+
+    return {
+        "type": "object",
+        "required": ["mode", "encoding", "payload_b64", "bytes", "sha256"],
+        "additionalProperties": False,
+        "properties": {
+            "mode": {"const": "immutable_payload"},
+            "encoding": {"const": "base64"},
+            "payload_b64": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 5464,
+                "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+            },
+            "bytes": {"type": "integer", "minimum": 1, "maximum": 4096},
+            "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        },
+    }
+
+
 def kubernetes_dns_label_schema() -> dict[str, Any]:
     return {
         "type": "string",
@@ -228,11 +250,57 @@ def runtime_image_ref_schema(*, nullable: bool = False) -> dict[str, Any]:
     return schema
 
 
+def runtime_image_schema() -> dict[str, Any]:
+    """Describe an exact runtime image reference and matching digest."""
+
+    return {
+        "type": "object",
+        "required": ["ref", "digest"],
+        "additionalProperties": False,
+        "properties": {
+            "ref": runtime_image_ref_schema(),
+            "digest": {"$ref": "#/$defs/sha256"},
+        },
+    }
+
+
+def runtime_registry_schema() -> dict[str, Any]:
+    """Describe the runtime artifact registry and pinned configuration."""
+
+    return {
+        "type": "object",
+        "required": ["logical_ref", "configuration"],
+        "additionalProperties": False,
+        "properties": {
+            "logical_ref": artifact_registry_ref_schema(),
+            "configuration": config_map_ref_schema(),
+        },
+    }
+
+
+def runtime_verification_request_schema() -> dict[str, Any]:
+    """Describe checksum and attestation requirements in a runtime plan."""
+
+    return {
+        "type": "object",
+        "required": ["checksums", "attestations"],
+        "additionalProperties": False,
+        "properties": {
+            "checksums": {"const": "required"},
+            "attestations": {"enum": ["optional", "required_for_prod"]},
+        },
+    }
+
+
 __all__ = [
     "artifact_registry_logical_ref_schema",
     "config_map_ref_schema",
+    "immutable_runtime_authority_source_schema",
     "runtime_artifact_delivery_schema",
     "runtime_authority_source_schema",
     "runtime_image_ref_schema",
+    "runtime_image_schema",
+    "runtime_registry_schema",
+    "runtime_verification_request_schema",
     "strict_init_fetch_delivery_schema",
 ]
