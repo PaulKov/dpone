@@ -23,9 +23,11 @@ class DeploymentCacheWorkspaceActivation:
         coordinator: DbtWorkspaceActivationCoordinatorPort | None,
         *,
         composition_coordinator: CompositionActivationCoordinatorPort | None = None,
+        coordinate_external_activations: bool = True,
     ) -> None:
         self._coordinator = coordinator
         self._composition_coordinator = composition_coordinator
+        self._coordinate_external_activations = coordinate_external_activations
 
     def prepare_occurrence(
         self,
@@ -38,6 +40,8 @@ class DeploymentCacheWorkspaceActivation:
         deployment_id: str,
         previous_deployment_id: str | None,
     ) -> Any | None:
+        if not self._coordinate_external_activations:
+            return None
         failure = release_activation_failure(dbt_wire)
         if failure is None:
             return None
@@ -126,6 +130,8 @@ class DeploymentCacheWorkspaceActivation:
         deployment_id: str,
         previous_deployment_id: str | None,
     ) -> None:
+        if not self._coordinate_external_activations:
+            return
         failure = release_activation_failure(dbt_wire)
         if failure is None:
             return

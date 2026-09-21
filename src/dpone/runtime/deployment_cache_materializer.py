@@ -49,6 +49,7 @@ class DeploymentCacheMaterializer:
         max_artifact_bytes: int = DEFAULT_MAX_CACHE_ARTIFACT_BYTES,
         workspace_activation: DbtWorkspaceActivationCoordinatorPort | None = None,
         composition_activation_coordinator: CompositionActivationCoordinatorPort | None = None,
+        coordinate_external_activations: bool = True,
         development_admission: DevelopmentTargetAdmission | None = None,
         development_admission_verifier: DevelopmentTargetAdmissionVerifier | None = None,
     ) -> None:
@@ -61,7 +62,9 @@ class DeploymentCacheMaterializer:
             error_factory=DeploymentCacheError,
         )
         self._workspace_activation = DeploymentCacheWorkspaceActivation(
-            workspace_activation, composition_coordinator=composition_activation_coordinator
+            workspace_activation,
+            composition_coordinator=composition_activation_coordinator,
+            coordinate_external_activations=coordinate_external_activations,
         )
         self._current_state = DeploymentCacheCurrentState(self._cache_root)
         self._projection_validator = DeploymentCacheProjectionValidator(
@@ -151,7 +154,10 @@ class DeploymentCacheMaterializer:
                     deployment_path=deployment_path,
                     pointer=pointer,
                 )
-                self._workspace_activation.activate_occurrence(workspace_occurrence, projection_root=deployment_path)
+                self._workspace_activation.activate_occurrence(
+                    workspace_occurrence,
+                    projection_root=deployment_path,
+                )
                 result = CurrentDeployment.from_pointer(
                     pointer,
                     current_path=current,

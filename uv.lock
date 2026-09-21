@@ -817,7 +817,7 @@ wheels = [
 
 [[package]]
 name = "dpone"
-version = "0.83.2"
+version = "0.83.3"
 source = { editable = "." }
 dependencies = [
     { name = "dpone-airflow-pack" },
