@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.83.3 - 2026-09-22
+
+### Fixed
+
+- Allow ephemeral Airflow worker caches to materialize and activate a verified
+  local pointer without replaying shared workspace or composition lifecycles.
+
 ## 0.83.2 - 2026-09-21
 
 ### Fixed
