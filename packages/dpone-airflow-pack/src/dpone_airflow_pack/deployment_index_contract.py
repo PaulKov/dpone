@@ -138,7 +138,7 @@ def _load_airflow_deployment_index(
     if not isinstance(schema, str) or schema not in _INDEX_SCHEMAS:
         raise AirflowDeploymentIndexError(
             "DPONE_AIRFLOW_INDEX_SCHEMA_INVALID",
-            f"Expected schema {INDEX_SCHEMA_V1}, {INDEX_SCHEMA_V2}, or {INDEX_SCHEMA_V3}",
+            f"Expected schema {INDEX_SCHEMA_V1}, {INDEX_SCHEMA_V2}, {INDEX_SCHEMA_V3}, or {INDEX_SCHEMA_V4}",
             path=path.as_posix(),
         )
     release = required_sha256(payload, "release_id", path)

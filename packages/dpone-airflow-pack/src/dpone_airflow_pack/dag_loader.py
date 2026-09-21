@@ -46,7 +46,6 @@ from dpone_airflow_pack.dag_spec_loader import (
     redact_parse_error_message,
 )
 from dpone_airflow_pack.deployment_index import (
-    INDEX_SCHEMA_V2,
     AirflowDeploymentIndex,
     AirflowDeploymentIndexError,
     CacheResolver,
@@ -230,7 +229,11 @@ def load_dpone_dags_from_index(
     _validate_policy("duplicate_policy", duplicate_policy, _DUPLICATE_POLICIES)
     _validate_policy("invalid_dag_policy", invalid_dag_policy, _INVALID_DAG_POLICIES)
     report_started_at = started_at if started_at is not None else load_report_started()
-    if index.schema == INDEX_SCHEMA_V2:
+    # A delivery context exists only after the strict deployment-index parser
+    # has accepted and fully validated an executable wire (v2-v4).  Dispatch
+    # on that validated capability instead of one concrete schema version so
+    # newer strict wires cannot fall through to the v1 compatibility loader.
+    if index.delivery_context is not None:
         return load_preflighted_init_fetch_dags(
             globals_dict,
             index=index,

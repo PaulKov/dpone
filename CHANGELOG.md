@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.83.1 - 2026-09-21
+
+### Fixed
+
+- Route validated `dpone.airflow-deployment-index.v4` deployments through the
+  same fail-closed, all-index `init_fetch` preflight used by v2 and v3 instead
+  of falling through to the legacy v1 DAG loader. The public loader diagnostic
+  now lists v4, and a synthetic producer-to-loader regression binds the emitted
+  index, verified artifacts, and strict dispatch without using external data.
+
 ## 0.83.0 - 2026-09-20
 
 ### Added
