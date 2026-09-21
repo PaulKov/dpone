@@ -9,6 +9,12 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 
 import pytest
+from dpone_airflow_pack import dag_loader
+from dpone_airflow_pack.deployment_index import (
+    AirflowDeploymentIndex,
+    LoadReport,
+    load_airflow_deployment_index,
+)
 from dpone_airflow_pack.init_fetch_contract import init_fetch_context_from_payload
 from dpone_airflow_pack.init_fetch_pod import compose_init_fetch_operator_kwargs
 from dpone_airflow_pack.pack_task_runtime import runtime_operator_kwargs
@@ -63,7 +69,10 @@ def _development_authority() -> DevelopmentAuthorityReceipt:
     )
 
 
-def test_development_workspace_materializes_with_distinct_authority_and_stable_wire(tmp_path):
+def test_development_workspace_materializes_with_distinct_authority_and_stable_wire(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     root = tmp_path / "workspace"
     prepare_projects(root)
     compiled = tmp_path / "compiled"
@@ -146,6 +155,36 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
     assert "synthetic-secret-value" not in json.dumps(projection.to_dict(), sort_keys=True)
     context = init_fetch_context_from_payload(projection.airflow_index)
     assert context.development_authority_required is True
+
+    loaded_index = load_airflow_deployment_index(
+        projection.deployment_dir / "airflow-index.json",
+        cache_root=tmp_path / "cache",
+    )
+    strict_loader_schemas: list[str] = []
+
+    def _load_strict_dags(
+        _globals: object,
+        *,
+        index: AirflowDeploymentIndex,
+        **_kwargs: object,
+    ) -> LoadReport:
+        strict_loader_schemas.append(index.schema)
+        return LoadReport(
+            release_id=index.release_id,
+            deployment_id=index.deployment_id,
+        )
+
+    monkeypatch.setattr(dag_loader, "load_preflighted_init_fetch_dags", _load_strict_dags)
+    loaded_report = dag_loader.load_dpone_dags_from_index(
+        {},
+        index=loaded_index,
+        operator_overrides=None,
+        duplicate_policy="skip_and_report",
+        invalid_dag_policy="skip_and_report",
+    )
+    assert loaded_report.release_id == projection.airflow_index["release_id"]
+    assert strict_loader_schemas == ["dpone.airflow-deployment-index.v4"]
+
     encoded = context.encode_plan(
         workload_id=str(projection.airflow_index["workload_packs"][0]["id"]),
         execution_kind="runtime",
