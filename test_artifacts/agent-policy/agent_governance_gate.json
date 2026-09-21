@@ -4,6 +4,7 @@
     ".agents/policy/ci-shadow-reconciliation-observation-bundle-v1.yml",
     "CHANGELOG.md",
     "docs/index.md",
+    "docs/quality-metrics.md",
     "packages/apache-airflow-providers-dpone/pyproject.toml",
     "packages/dpone-airflow-pack/pyproject.toml",
     "packages/dpone-airflow-pack/src/dpone_airflow_pack/dag_loader.py",
@@ -96,8 +97,8 @@
     }
   ],
   "control_surface_changed": true,
-  "generated_at": "2026-09-21T01:00:21+00:00",
-  "head_commit": "362826772036658fcde240fe4b8997ab2c5985d8",
+  "generated_at": "2026-09-21T01:23:58+00:00",
+  "head_commit": "244342919afc0f4a28ceb60ec1be36f717c57cab",
   "risks": [
     "AG-001",
     "AG-002",
