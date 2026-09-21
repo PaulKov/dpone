@@ -186,7 +186,8 @@ module:
 | `dpone.airflow-deployment-index.v2` | `init_fetch` | Build the strict executable KPO path. |
 | `dpone.airflow-deployment-index.v3` | `init_fetch` | Build the strict path with deployment-owned MSSQL outlet projection. |
 | `dpone.airflow-deployment-index.v4` | `init_fetch` | Build the strict development path and require protected runtime authority. |
-| v2-v4 | Any other known mode | Fatal `DPONE_RUNTIME_ARTIFACT_DELIVERY_MODE_UNSUPPORTED`. |
+| `dpone.airflow-deployment-index.v5` | `init_fetch` | Build the strict development path and require digest-bound immutable runtime authority. |
+| v2-v5 | Any other known mode | Fatal `DPONE_RUNTIME_ARTIFACT_DELIVERY_MODE_UNSUPPORTED`. |
 | Either | Unknown or malformed mode | Fatal index field/schema error. |
 
 The executable path is:

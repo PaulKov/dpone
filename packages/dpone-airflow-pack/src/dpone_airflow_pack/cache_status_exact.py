@@ -20,12 +20,13 @@ from dpone_airflow_pack.deployment_index_contract import (
     INDEX_SCHEMA_V2,
     INDEX_SCHEMA_V3,
     INDEX_SCHEMA_V4,
+    INDEX_SCHEMA_V5,
     AirflowDeploymentIndexError,
     infer_cache_root,
     resolve_cache_artifact,
 )
 
-_STRICT_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4})
+_STRICT_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4, INDEX_SCHEMA_V5})
 _SUPPORTED_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V1, *_STRICT_INDEX_SCHEMAS})
 _DEFAULT_MAX_CACHE_JSON_BYTES = 8 * 1024 * 1024
 

@@ -1,4 +1,4 @@
-"""Strict parser for ``dpone.airflow-deployment-index.v2`` / ``.v3`` init-fetch data."""
+"""Strict parser for Airflow deployment-index v2 through v5 init-fetch data."""
 
 from __future__ import annotations
 
@@ -94,7 +94,7 @@ def init_fetch_context_from_payload(
     *,
     path: Path | None = None,
 ) -> InitFetchDeliveryContext:
-    """Validate the strict v2/v3 wire projection without importing core dpone."""
+    """Validate a supported strict index wire without importing core dpone."""
 
     schema = payload.get("schema")
     if schema not in _SUPPORTED_INDEX_SCHEMAS:

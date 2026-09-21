@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.83.2 - 2026-09-21
+
+### Fixed
+
+- Accept the producer-emitted `dpone.airflow-deployment-index.v5` wire in the
+  scheduler loader and exact-cache diagnostics, preserving strict init-fetch,
+  activation, reconciliation, and unknown-version rejection semantics.
+
 ## 0.83.1 - 2026-09-21
 
 ### Fixed

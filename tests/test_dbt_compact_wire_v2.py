@@ -215,6 +215,22 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
     )
     assert immutable_projection.deployment["schema"] == "dpone.deployment-set.v5"
     assert immutable_projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v5"
+    immutable_loaded_index = load_airflow_deployment_index(
+        immutable_projection.deployment_dir / "airflow-index.json",
+        cache_root=tmp_path / "cache",
+    )
+    assert immutable_loaded_index.schema == "dpone.airflow-deployment-index.v5"
+    assert immutable_loaded_index.delivery_context is not None
+    strict_loader_schemas.clear()
+    immutable_loaded_report = dag_loader.load_dpone_dags_from_index(
+        {},
+        index=immutable_loaded_index,
+        operator_overrides=None,
+        duplicate_policy="skip_and_report",
+        invalid_dag_policy="skip_and_report",
+    )
+    assert immutable_loaded_report.release_id == immutable_projection.airflow_index["release_id"]
+    assert strict_loader_schemas == ["dpone.airflow-deployment-index.v5"]
     immutable_context = init_fetch_context_from_payload(immutable_projection.airflow_index)
     immutable_plan = immutable_context.encode_plan(
         workload_id=str(immutable_projection.airflow_index["workload_packs"][0]["id"]),

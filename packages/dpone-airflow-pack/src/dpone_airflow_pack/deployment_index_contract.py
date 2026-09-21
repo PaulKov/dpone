@@ -33,6 +33,7 @@ from dpone_airflow_pack.init_fetch_contract import (
     AIRFLOW_INDEX_SCHEMA_V2,
     AIRFLOW_INDEX_SCHEMA_V3,
     AIRFLOW_INDEX_SCHEMA_V4,
+    AIRFLOW_INDEX_SCHEMA_V5,
     InitFetchDeliveryContext,
     init_fetch_context_from_payload,
 )
@@ -49,9 +50,10 @@ INDEX_SCHEMA_V1 = "dpone.airflow-deployment-index.v1"
 INDEX_SCHEMA_V2 = AIRFLOW_INDEX_SCHEMA_V2
 INDEX_SCHEMA_V3 = AIRFLOW_INDEX_SCHEMA_V3
 INDEX_SCHEMA_V4 = AIRFLOW_INDEX_SCHEMA_V4
+INDEX_SCHEMA_V5 = AIRFLOW_INDEX_SCHEMA_V5
 INDEX_SCHEMA = INDEX_SCHEMA_V1
-_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V1, INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4})
-_STRICT_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4})
+_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V1, INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4, INDEX_SCHEMA_V5})
+_STRICT_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4, INDEX_SCHEMA_V5})
 DEFAULT_MAX_INDEX_BYTES = 8 * 1024 * 1024
 _legacy_missing_bytes_warning_pid: int | None = None
 
@@ -138,7 +140,8 @@ def _load_airflow_deployment_index(
     if not isinstance(schema, str) or schema not in _INDEX_SCHEMAS:
         raise AirflowDeploymentIndexError(
             "DPONE_AIRFLOW_INDEX_SCHEMA_INVALID",
-            f"Expected schema {INDEX_SCHEMA_V1}, {INDEX_SCHEMA_V2}, {INDEX_SCHEMA_V3}, or {INDEX_SCHEMA_V4}",
+            "Expected schema "
+            f"{INDEX_SCHEMA_V1}, {INDEX_SCHEMA_V2}, {INDEX_SCHEMA_V3}, {INDEX_SCHEMA_V4}, or {INDEX_SCHEMA_V5}",
             path=path.as_posix(),
         )
     release = required_sha256(payload, "release_id", path)
@@ -404,6 +407,7 @@ __all__ = [
     "INDEX_SCHEMA_V2",
     "INDEX_SCHEMA_V3",
     "INDEX_SCHEMA_V4",
+    "INDEX_SCHEMA_V5",
     "_is_canonical_sha256_digest",
     "infer_cache_root",
     "load_airflow_deployment_index",
