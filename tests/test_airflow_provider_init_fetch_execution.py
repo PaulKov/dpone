@@ -1699,6 +1699,7 @@ def test_indexed_task_group_threads_the_same_v2_context(
         "dpone.airflow-deployment-index.v2",
         "dpone.airflow-deployment-index.v3",
         "dpone.airflow-deployment-index.v4",
+        "dpone.airflow-deployment-index.v5",
     ],
 )
 def test_strict_all_index_preflight_leaves_globals_unchanged_on_late_contract_failure(

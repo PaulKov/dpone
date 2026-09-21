@@ -191,7 +191,7 @@ def test_read_cache_status_does_not_false_missing_when_exact_index_present(tmp_p
     assert not any(item["code"] == "airflow_pack_json_missing" for item in status["blockers"])
 
 
-@pytest.mark.parametrize("schema_version", ("v2", "v3", "v4"))
+@pytest.mark.parametrize("schema_version", ("v2", "v3", "v4", "v5"))
 def test_read_cache_status_blocks_strict_index_without_current_pointer_activation(
     tmp_path: Path,
     schema_version: str,

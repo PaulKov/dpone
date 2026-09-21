@@ -120,7 +120,7 @@ generated loaders must use the combined load-and-acknowledge API above so cache
 retention cannot delete a parsed but unacknowledged activation.
 
 When `index_path` is provided, the provider reads either the v1 compatibility
-wire or a supported strict `dpone.airflow-deployment-index.v2` through `.v4`.
+wire or a supported strict `dpone.airflow-deployment-index.v2` through `.v5`.
 When `repo_root` is provided
 without `index_path`, the legacy
 `.dpone/gitops/airflow/_dags/*.dag-spec.json` loader is used for compatibility.
