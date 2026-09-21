@@ -62,9 +62,7 @@ class DeploymentCacheMaterializer:
             error_factory=DeploymentCacheError,
         )
         self._workspace_activation = DeploymentCacheWorkspaceActivation(
-            workspace_activation,
-            composition_coordinator=composition_activation_coordinator,
-            coordinate_external_activations=coordinate_external_activations,
+            workspace_activation, composition_activation_coordinator, coordinate_external_activations
         )
         self._current_state = DeploymentCacheCurrentState(self._cache_root)
         self._projection_validator = DeploymentCacheProjectionValidator(

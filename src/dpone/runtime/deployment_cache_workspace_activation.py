@@ -21,7 +21,6 @@ class DeploymentCacheWorkspaceActivation:
     def __init__(
         self,
         coordinator: DbtWorkspaceActivationCoordinatorPort | None,
-        *,
         composition_coordinator: CompositionActivationCoordinatorPort | None = None,
         coordinate_external_activations: bool = True,
     ) -> None:
