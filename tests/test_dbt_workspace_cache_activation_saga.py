@@ -317,6 +317,29 @@ def test_development_activation_requires_exact_nonproduction_admission(tmp_path:
     assert coordinator.events == [("prepare", current.activation_id), ("activate", current.activation_id)]
 
 
+def test_local_cache_consumer_does_not_mutate_composition_authority(tmp_path: Path) -> None:
+    authority = _development_authority()
+    cache, release_id, deployment_id = _development_projection(tmp_path, composed=True)
+    deployment = cache / "deployments" / "development" / deployment_id.replace(":", "-", 1)
+
+    current = DeploymentCacheMaterializer(
+        cache,
+        coordinate_external_activations=False,
+        development_admission=_admission(
+            authority,
+            "activate",
+            release_id,
+            deployment_id,
+        ),
+        development_admission_verifier=_admission_verifier(authority),
+        clock=_clock,
+    ).promote(deployment, environment="development")
+
+    assert current.release_id == release_id
+    assert current.deployment_id == deployment_id
+    assert (cache / "current" / "airflow-index.json").is_file()
+
+
 @pytest.mark.parametrize("composed", [False, True])
 def test_development_activation_rejects_release_changed_after_snapshot(tmp_path: Path, composed: bool) -> None:
     authority = _development_authority()
