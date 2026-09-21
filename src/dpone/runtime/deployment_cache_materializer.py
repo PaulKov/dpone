@@ -152,10 +152,7 @@ class DeploymentCacheMaterializer:
                     deployment_path=deployment_path,
                     pointer=pointer,
                 )
-                self._workspace_activation.activate_occurrence(
-                    workspace_occurrence,
-                    projection_root=deployment_path,
-                )
+                self._workspace_activation.activate_occurrence(workspace_occurrence, projection_root=deployment_path)
                 result = CurrentDeployment.from_pointer(
                     pointer,
                     current_path=current,
