@@ -11,6 +11,7 @@
     "packages/dpone-native-accel/pyproject.toml",
     "pyproject.toml",
     "test_artifacts/agent-policy/agent_governance_gate.json",
+    "test_artifacts/release/v0.83.1/independent-review-36282677.md",
     "tests/agent_policy/_release_candidate_evidence_helpers.py",
     "tests/test_airflow_provider_init_fetch_execution.py",
     "tests/test_dbt_compact_wire_v2.py",
@@ -95,8 +96,8 @@
     }
   ],
   "control_surface_changed": true,
-  "generated_at": "2026-09-21T00:58:13+00:00",
-  "head_commit": "a572a4c202d1d0e7138730210b007cc2bfb6ce6e",
+  "generated_at": "2026-09-21T01:00:21+00:00",
+  "head_commit": "362826772036658fcde240fe4b8997ab2c5985d8",
   "risks": [
     "AG-001",
     "AG-002",
