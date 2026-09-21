@@ -16,7 +16,13 @@ from typing import Any
 import jsonschema
 import pytest
 import yaml
+from dpone_airflow_pack import dag_loader
 from dpone_airflow_pack.asset_outlets import build_asset_outlets, outlet_specs_from_pack, outlet_uris_from_pack
+from dpone_airflow_pack.deployment_index import (
+    AirflowDeploymentIndex,
+    LoadReport,
+    load_airflow_deployment_index,
+)
 from dpone_airflow_pack.init_fetch_contract import InitFetchProviderError, init_fetch_context_from_payload
 from dpone_airflow_pack.mssql_outlet_projection_contract import (
     PROJECTION_MISMATCH,
@@ -46,7 +52,10 @@ _ASSET_REF = {
 }
 
 
-def test_projection_focused_inject_asset_ref_dev_prod_named_instance_e2e(tmp_path: Path) -> None:
+def test_projection_focused_inject_asset_ref_dev_prod_named_instance_e2e(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Projection-focused E2E: inject asset_ref into a ClickHouse-sink pack."""
 
     report = _certified(
@@ -147,6 +156,35 @@ def test_projection_focused_inject_asset_ref_dev_prod_named_instance_e2e(tmp_pat
     for index in (dev.airflow_index, prod.airflow_index):
         jsonschema.Draft202012Validator(index_schema).validate(index)
         jsonschema.Draft202012Validator(projection_schema).validate(index["mssql_asset_outlet_projection"])
+
+    loaded_index = load_airflow_deployment_index(
+        prod.deployment_dir / "airflow-index.json",
+        cache_root=tmp_path / ".dpone-cache",
+    )
+    strict_loader_schemas: list[str] = []
+
+    def _load_strict_dags(
+        _globals: object,
+        *,
+        index: AirflowDeploymentIndex,
+        **_kwargs: object,
+    ) -> LoadReport:
+        strict_loader_schemas.append(index.schema)
+        return LoadReport(
+            release_id=index.release_id,
+            deployment_id=index.deployment_id,
+        )
+
+    monkeypatch.setattr(dag_loader, "load_preflighted_init_fetch_dags", _load_strict_dags)
+    loaded_report = dag_loader.load_dpone_dags_from_index(
+        {},
+        index=loaded_index,
+        operator_overrides=None,
+        duplicate_policy="skip_and_report",
+        invalid_dag_policy="skip_and_report",
+    )
+    assert loaded_report.release_id == prod.airflow_index["release_id"]
+    assert strict_loader_schemas == ["dpone.airflow-deployment-index.v3"]
 
     prod_context = init_fetch_context_from_payload(prod.airflow_index)
     assert prod_context.mssql_asset_uri_by_ref is not None

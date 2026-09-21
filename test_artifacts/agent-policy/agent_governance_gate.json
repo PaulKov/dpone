@@ -10,8 +10,11 @@
     "packages/dpone-airflow-pack/src/dpone_airflow_pack/deployment_index_contract.py",
     "packages/dpone-native-accel/pyproject.toml",
     "pyproject.toml",
+    "test_artifacts/agent-policy/agent_governance_gate.json",
     "tests/agent_policy/_release_candidate_evidence_helpers.py",
+    "tests/test_airflow_provider_init_fetch_execution.py",
     "tests/test_dbt_compact_wire_v2.py",
+    "tests/test_mssql_asset_outlet_projection_e2e.py",
     "tests/test_native_acceleration_contracts.py",
     "tests/test_oss_release_readiness.py",
     "tests/test_snapshot_version.py",
@@ -92,8 +95,8 @@
     }
   ],
   "control_surface_changed": true,
-  "generated_at": "2026-09-21T00:47:41+00:00",
-  "head_commit": "ca0392fd841b8b2d0666f0a76de32c38ada63f9f",
+  "generated_at": "2026-09-21T00:58:13+00:00",
+  "head_commit": "a572a4c202d1d0e7138730210b007cc2bfb6ce6e",
   "risks": [
     "AG-001",
     "AG-002",

@@ -1693,9 +1693,18 @@ def test_indexed_task_group_threads_the_same_v2_context(
     assert captured["delivery_context"] is context
 
 
-def test_v2_all_index_preflight_leaves_globals_unchanged_on_late_contract_failure(
+@pytest.mark.parametrize(
+    "index_schema",
+    [
+        "dpone.airflow-deployment-index.v2",
+        "dpone.airflow-deployment-index.v3",
+        "dpone.airflow-deployment-index.v4",
+    ],
+)
+def test_strict_all_index_preflight_leaves_globals_unchanged_on_late_contract_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    index_schema: str,
 ) -> None:
     context = init_fetch_context_from_payload(_v2_payload())
     artifacts = tuple(
@@ -1710,7 +1719,7 @@ def test_v2_all_index_preflight_leaves_globals_unchanged_on_late_contract_failur
         for dag_id, digit in (("first", "5"), ("second", "6"))
     )
     index = AirflowDeploymentIndex(
-        schema="dpone.airflow-deployment-index.v2",
+        schema=index_schema,
         path=tmp_path / "airflow-index.json",
         cache_root=tmp_path,
         release_id=RELEASE_ID,
