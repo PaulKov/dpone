@@ -64,6 +64,7 @@ from dpone.readiness.airflow_runtime_init_fetch import (
     RuntimeRegistryConfiguration,
     WorkloadIdentityRegistryFactory,
 )
+from dpone.readiness.airflow_runtime_init_fetch_config import registry_configuration
 from dpone.runtime import runtime_init_fetch_receipts as runtime_init_fetch_receipts_module
 from dpone.runtime import runtime_init_fetch_service as runtime_init_fetch_service_module
 from dpone.runtime import runtime_init_fetch_storage as runtime_init_fetch_storage_module
@@ -1789,6 +1790,104 @@ def test_registry_factory_normalizes_parser_failure_without_uri_disclosure(
     assert exc.value.code == "DPONE_ARTIFACT_REGISTRY_CONFIG_INVALID"
     assert "private-bucket" not in str(exc.value)
     assert "secret" not in str(exc.value)
+
+
+def test_registry_factory_uses_declared_airflow_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configuration = RuntimeRegistryConfiguration(
+        logical_ref="runtime-artifacts",
+        registry_uri="s3://example-artifacts/immutable",
+        access_mode="airflow_connection",
+        connection_id="artifact_registry_reader",
+    )
+    observed: dict[str, object] = {}
+
+    def record_build(options: object) -> RecordingRegistry:
+        observed.update(
+            {
+                field: getattr(options, field)
+                for field in (
+                    "registry_uri",
+                    "identity_mode",
+                    "connection_type",
+                    "connection_id",
+                )
+            }
+        )
+        return RecordingRegistry({})
+
+    monkeypatch.setattr(
+        "dpone.readiness.airflow_runtime_init_fetch.ArtifactRegistryOptions.build",
+        record_build,
+    )
+
+    result = WorkloadIdentityRegistryFactory().build(configuration)
+
+    assert isinstance(result, RecordingRegistry)
+    assert observed["registry_uri"] == "s3://example-artifacts/immutable"
+    assert observed["connection_type"] == "airflow"
+    assert observed["connection_id"] == "artifact_registry_reader"
+    assert observed["identity_mode"] is None
+
+
+def test_registry_configuration_accepts_closed_airflow_connection_access() -> None:
+    payload = _json_bytes(
+        {
+            "schema": "dpone.artifact-registry-runtime-config.v1",
+            "registries": {
+                "runtime-artifacts": {
+                    "registry_uri": "s3://example-artifacts/immutable",
+                    "access": {
+                        "mode": "airflow_connection",
+                        "connection_id": "artifact_registry_reader",
+                    },
+                }
+            },
+        }
+    )
+
+    result = registry_configuration(payload, logical_ref="runtime-artifacts")
+
+    assert result == RuntimeRegistryConfiguration(
+        logical_ref="runtime-artifacts",
+        registry_uri="s3://example-artifacts/immutable",
+        access_mode="airflow_connection",
+        connection_id="artifact_registry_reader",
+    )
+
+
+@pytest.mark.parametrize(
+    "access",
+    [
+        {"mode": "airflow_connection"},
+        {
+            "mode": "airflow_connection",
+            "connection_id": "artifact_registry_reader",
+            "password": "must-not-be-accepted",
+        },
+        {"mode": "literal_credentials", "connection_id": "artifact_registry_reader"},
+    ],
+)
+def test_registry_configuration_rejects_incomplete_or_secret_bearing_access(
+    access: dict[str, str],
+) -> None:
+    payload = _json_bytes(
+        {
+            "schema": "dpone.artifact-registry-runtime-config.v1",
+            "registries": {
+                "runtime-artifacts": {
+                    "registry_uri": "s3://example-artifacts/immutable",
+                    "access": access,
+                }
+            },
+        }
+    )
+
+    with pytest.raises(InitFetchError) as exc:
+        registry_configuration(payload, logical_ref="runtime-artifacts")
+
+    assert exc.value.code == "DPONE_ARTIFACT_REGISTRY_CONFIG_INVALID"
 
 
 def test_parallel_init_fetch_services_with_isolated_roots_do_not_cross_write(

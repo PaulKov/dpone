@@ -101,6 +101,7 @@ class AirflowDeploymentProjectionService:
         dev_evidence_worker_queue: str | None = None,
         semantic_refresh_sidecars: SemanticRefreshDagSidecarFactory | None = None,
         runtime_authority_ref: Mapping[str, Any] | None = None,
+        registry_credentials: Mapping[str, Any] | None = None,
     ) -> AirflowDeploymentProjection:
         """Materialize a strict executable v2 environment projection."""
 
@@ -134,6 +135,7 @@ class AirflowDeploymentProjectionService:
                 registry_config_ref=registry_config_ref,
                 trust_policy_ref=trust_policy_ref,
                 runtime_authority_ref=runtime_authority_ref,
+                registry_credentials=registry_credentials,
             )
         except InitFetchProjectionContractError as exc:
             raise AirflowDeploymentProjectionError(exc.code, str(exc)) from exc

@@ -128,6 +128,8 @@ def compose_init_fetch_operator_kwargs(
             ".get('evidence_set_id', '') "
             "if dag_run is defined and dag_run else '' }}"
         )
+    if context.registry_credentials is not None and context.registry_credentials.secret_key in env_vars:
+        raise reserved_collision("pack cannot provide the runtime artifact registry credential variable")
 
     clean = {key: deepcopy(value) for key, value in effective_kwargs.items() if key in _PRESERVED_KPO_FIELDS}
     runtime_labels = _runtime_labels(projection.kpo_kwargs["labels"])
@@ -384,6 +386,17 @@ def _init_env_vars(
     context: InitFetchDeliveryContext,
 ) -> dict[str, Any]:
     values = dict(env_vars)
+    if context.registry_credentials is not None:
+        credentials = context.registry_credentials
+        values[credentials.secret_key] = {
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": credentials.secret_name,
+                    "key": credentials.secret_key,
+                    "optional": False,
+                }
+            }
+        }
     if include_dev_evidence and context.dev_evidence_delivery is not None:
         values[DEV_EVIDENCE_BOOTSTRAP_ROOT_ENV] = DEV_EVIDENCE_BOOTSTRAP_ROOT
     return values
@@ -402,8 +415,14 @@ def _base_resources(spec: Mapping[str, Any]) -> Any | None:
     return deepcopy(dict(resources))
 
 
-def _env_list(values: Mapping[str, Any]) -> list[dict[str, str]]:
-    return [{"name": name, "value": str(value)} for name, value in sorted(values.items())]
+def _env_list(values: Mapping[str, Any]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    for name, value in sorted(values.items()):
+        if isinstance(value, Mapping) and set(value) == {"valueFrom"}:
+            result.append({"name": name, "valueFrom": deepcopy(value["valueFrom"])})
+        else:
+            result.append({"name": name, "value": str(value)})
+    return result
 
 
 def _pod_name(value: str) -> str:

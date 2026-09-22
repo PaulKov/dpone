@@ -84,22 +84,30 @@ class RuntimeRegistryFactory(Protocol):
 
 
 class WorkloadIdentityRegistryFactory:
-    """Construct the existing object-storage adapter after trusted preflight."""
+    """Construct the configured object-storage adapter after trusted preflight."""
 
     def build(
         self,
         configuration: RuntimeRegistryConfiguration,
     ) -> ArtifactRegistryReader:
-        if configuration.access_mode != "workload_identity":
-            raise InitFetchError(
-                "DPONE_ARTIFACT_REGISTRY_CONFIG_INVALID",
-                "runtime registry access mode is unsupported",
-            )
         try:
-            return ArtifactRegistryOptions(
-                registry_uri=configuration.registry_uri,
-                identity_mode="workload_identity",
-            ).build()
+            if configuration.access_mode == "workload_identity":
+                options = ArtifactRegistryOptions(
+                    registry_uri=configuration.registry_uri,
+                    identity_mode="workload_identity",
+                )
+            elif configuration.access_mode == "airflow_connection" and configuration.connection_id is not None:
+                options = ArtifactRegistryOptions(
+                    registry_uri=configuration.registry_uri,
+                    connection_type="airflow",
+                    connection_id=configuration.connection_id,
+                )
+            else:
+                raise InitFetchError(
+                    "DPONE_ARTIFACT_REGISTRY_CONFIG_INVALID",
+                    "runtime registry access mode is unsupported",
+                )
+            return options.build()
         except AirflowArtifactDeliveryError as exc:
             dependency_error = exc.code in {
                 "DPONE_ARTIFACT_REGISTRY_SDK_UNAVAILABLE",

@@ -1,63 +1,44 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "identity": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
   "$id": "https://paulkov.github.io/dpone/schemas/gitops/airflow-operator-diagnostics.schema.json",
-  "title": "dpone GitOps Airflow operator diagnostics",
-  "type": "object",
-  "required": [
-    "kind",
-    "status",
-    "index_path",
-    "parse_side_effects",
-    "operator_pinning",
-    "checks",
-    "summary",
-    "next_actions"
-  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": true,
   "properties": {
-    "kind": {
-      "const": "dpone.airflow-operator-diagnostics.v1"
-    },
-    "status": {
-      "enum": [
-        "planned",
-        "invalid",
-        "materialized",
-        "operator_issues",
-        "operator_warnings"
+    "airflow_bundle": {
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "versioned": {
+          "type": "boolean"
+        }
+      },
+      "type": [
+        "object",
+        "null"
       ]
     },
-    "index_path": {
-      "type": "string"
-    },
-    "release_id": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/identity"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "deployment_id": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/identity"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "runtime_image_digest": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/identity"
-        },
-        {
-          "type": "null"
-        }
+    "airflow_bundle_ref": {
+      "type": [
+        "string",
+        "null"
       ]
     },
     "binding_set_ref": {
@@ -69,6 +50,34 @@
           "type": "null"
         }
       ]
+    },
+    "checks": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "code": {
+            "pattern": "^DPONE_[A-Z0-9_]+$",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "warning",
+              "failed"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "status",
+          "message"
+        ],
+        "type": "object"
+      },
+      "type": "array"
     },
     "connection_registry_ref": {
       "anyOf": [
@@ -90,110 +99,105 @@
         }
       ]
     },
-    "airflow_bundle_ref": {
-      "type": [
-        "string",
-        "null"
+    "deployment_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
-    "airflow_bundle": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "backend": {
-          "type": "string",
-          "minLength": 1
-        },
-        "ref": {
-          "type": "string",
-          "minLength": 1
-        },
-        "versioned": {
-          "type": "boolean"
-        },
-        "version": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      }
+    "index_path": {
+      "type": "string"
     },
-    "runtime_artifact_delivery": {
-      "type": "object",
+    "kind": {
+      "const": "dpone.airflow-operator-diagnostics.v1"
+    },
+    "next_actions": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "code": {
+            "pattern": "^DPONE_[A-Z0-9_]+$",
+            "type": "string"
+          },
+          "safety": {
+            "enum": [
+              "safe",
+              "manual",
+              "destructive"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "action",
+          "safety"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "operator_pinning": {
+      "enum": [
+        "planned",
+        "pinned",
+        "incomplete"
+      ]
+    },
+    "parse_side_effects": {
       "additionalProperties": true,
       "properties": {
-        "mode": {
-          "enum": [
-            "local_preview",
-            "init_fetch",
-            "shared_pvc",
-            "embedded_bundle",
-            "csi_volume",
-            "inline"
-          ]
+        "airflow_connections": {
+          "const": false
         },
-        "artifact_registry_ref": {
-          "type": "string",
-          "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$"
+        "airflow_variables": {
+          "const": false
         },
-        "identity": {
-          "type": "object",
-          "required": [
-            "method",
-            "service_account"
-          ],
-          "additionalProperties": true,
-          "properties": {
-            "method": {
-              "enum": [
-                "kubernetes_workload_identity"
-              ]
-            },
-            "service_account": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
+        "cache_refresh": {
+          "const": false
         },
-        "source": {
-          "type": "object",
-          "required": [
-            "artifact_registry_ref"
-          ],
-          "additionalProperties": true,
-          "properties": {
-            "artifact_registry_ref": {
-              "type": "string",
-              "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$"
-            }
-          }
+        "kubernetes": {
+          "const": false
         },
-        "verify": {
-          "type": "object",
-          "required": [
-            "checksums",
-            "attestations"
-          ],
-          "additionalProperties": true,
-          "properties": {
-            "checksums": {
-              "enum": [
-                "required"
-              ]
-            },
-            "attestations": {
-              "enum": [
-                "optional",
-                "required_for_prod"
-              ]
-            }
-          }
+        "metadata_db": {
+          "const": false
+        },
+        "network": {
+          "const": false
+        },
+        "vault": {
+          "const": false
         }
       },
+      "required": [
+        "network",
+        "metadata_db",
+        "airflow_variables",
+        "airflow_connections",
+        "vault",
+        "kubernetes",
+        "cache_refresh"
+      ],
+      "type": "object"
+    },
+    "release_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "runtime_artifact_delivery": {
+      "additionalProperties": true,
       "allOf": [
         {
           "if": {
@@ -215,139 +219,173 @@
             ]
           }
         }
-      ]
-    },
-    "parse_side_effects": {
-      "type": "object",
-      "additionalProperties": true,
-      "required": [
-        "network",
-        "metadata_db",
-        "airflow_variables",
-        "airflow_connections",
-        "vault",
-        "kubernetes",
-        "cache_refresh"
       ],
       "properties": {
-        "network": {
-          "const": false
+        "artifact_registry_ref": {
+          "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$",
+          "type": "string"
         },
-        "metadata_db": {
-          "const": false
+        "identity": {
+          "additionalProperties": true,
+          "properties": {
+            "method": {
+              "enum": [
+                "kubernetes_workload_identity"
+              ]
+            },
+            "service_account": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "method",
+            "service_account"
+          ],
+          "type": "object"
         },
-        "airflow_variables": {
-          "const": false
+        "mode": {
+          "enum": [
+            "local_preview",
+            "init_fetch",
+            "shared_pvc",
+            "embedded_bundle",
+            "csi_volume",
+            "inline"
+          ]
         },
-        "airflow_connections": {
-          "const": false
+        "registry_credentials": {
+          "additionalProperties": false,
+          "properties": {
+            "connection_id": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+              "type": "string"
+            },
+            "method": {
+              "const": "airflow_connection_kubernetes_secret"
+            },
+            "secret_ref": {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "maxLength": 253,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+                  "type": "string"
+                },
+                "name": {
+                  "maxLength": 63,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "key"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "method",
+            "connection_id",
+            "secret_ref"
+          ],
+          "type": "object"
         },
-        "vault": {
-          "const": false
+        "source": {
+          "additionalProperties": true,
+          "properties": {
+            "artifact_registry_ref": {
+              "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "artifact_registry_ref"
+          ],
+          "type": "object"
         },
-        "kubernetes": {
-          "const": false
-        },
-        "cache_refresh": {
-          "const": false
+        "verify": {
+          "additionalProperties": true,
+          "properties": {
+            "attestations": {
+              "enum": [
+                "optional",
+                "required_for_prod"
+              ]
+            },
+            "checksums": {
+              "enum": [
+                "required"
+              ]
+            }
+          },
+          "required": [
+            "checksums",
+            "attestations"
+          ],
+          "type": "object"
         }
-      }
+      },
+      "type": "object"
     },
-    "operator_pinning": {
+    "runtime_image_digest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identity"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
       "enum": [
         "planned",
-        "pinned",
-        "incomplete"
+        "invalid",
+        "materialized",
+        "operator_issues",
+        "operator_warnings"
       ]
     },
-    "workload_operators": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": true
-      }
-    },
-    "checks": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": true,
-        "required": [
-          "code",
-          "status",
-          "message"
-        ],
-        "properties": {
-          "code": {
-            "type": "string",
-            "pattern": "^DPONE_[A-Z0-9_]+$"
-          },
-          "status": {
-            "enum": [
-              "passed",
-              "warning",
-              "failed"
-            ]
-          },
-          "message": {
-            "type": "string"
-          }
-        }
-      }
-    },
     "summary": {
-      "type": "object",
       "additionalProperties": true,
-      "required": [
-        "passed",
-        "warning",
-        "failed"
-      ],
       "properties": {
+        "failed": {
+          "type": "integer"
+        },
         "passed": {
           "type": "integer"
         },
         "warning": {
           "type": "integer"
-        },
-        "failed": {
-          "type": "integer"
         }
-      }
+      },
+      "required": [
+        "passed",
+        "warning",
+        "failed"
+      ],
+      "type": "object"
     },
-    "next_actions": {
-      "type": "array",
+    "workload_operators": {
       "items": {
-        "type": "object",
         "additionalProperties": true,
-        "required": [
-          "code",
-          "action",
-          "safety"
-        ],
-        "properties": {
-          "code": {
-            "type": "string",
-            "pattern": "^DPONE_[A-Z0-9_]+$"
-          },
-          "action": {
-            "type": "string"
-          },
-          "safety": {
-            "enum": [
-              "safe",
-              "manual",
-              "destructive"
-            ]
-          }
-        }
-      }
+        "type": "object"
+      },
+      "type": "array"
     }
   },
-  "$defs": {
-    "identity": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    }
-  }
+  "required": [
+    "kind",
+    "status",
+    "index_path",
+    "parse_side_effects",
+    "operator_pinning",
+    "checks",
+    "summary",
+    "next_actions"
+  ],
+  "title": "dpone GitOps Airflow operator diagnostics",
+  "type": "object"
 }

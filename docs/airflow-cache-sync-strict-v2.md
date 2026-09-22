@@ -35,7 +35,8 @@ Before promotion, verify that the executable deployment has:
   `production`, trust policy.
 
 The registry configuration is runtime-only platform configuration. It may
-contain a physical registry URI but no static credential:
+contain a physical registry URI but no static credential. Workload identity is
+the default:
 
 ```json
 {
@@ -50,6 +51,48 @@ contain a physical registry URI but no static credential:
   "schema": "dpone.artifact-registry-runtime-config.v1"
 }
 ```
+
+When identity federation is unavailable, strict init-fetch can instead consume
+one existing reader-only Airflow Connection from a Kubernetes Secret. Store the
+connection JSON under its canonical `AIRFLOW_CONN_*` key, then build the
+deployment with the non-secret coordinate:
+
+```bash
+dpone airflow build \
+  --release-id "$RELEASE_ID" \
+  --environment stage \
+  --trust-tier non_production \
+  --runtime-image-ref "$RUNTIME_IMAGE_REF" \
+  --runtime-image-digest "$RUNTIME_IMAGE_DIGEST" \
+  --artifact-registry-ref stage-artifacts \
+  --registry-config-map-name artifact-registry \
+  --registry-config-sha256 "$REGISTRY_CONFIG_SHA256" \
+  --registry-credentials-connection-id artifact_registry_reader \
+  --registry-credentials-secret-name artifact-registry-reader
+```
+
+The matching registry entry selects the logical connection, never credential
+values:
+
+```json
+{
+  "registry_uri": "s3://platform-artifacts/dpone/airflow",
+  "access": {
+    "mode": "airflow_connection",
+    "connection_id": "artifact_registry_reader"
+  }
+}
+```
+
+The provider adds a non-optional `secretKeyRef` only to
+`dpone-runtime-init-fetch`. The base container does not receive the connection.
+If the Secret or key is absent, Kubernetes prevents Pod startup. If the
+connection is malformed or cannot read the registry, init-fetch fails with a
+redacted registry-unavailable error and never activates partial artifacts.
+Rotate the Secret independently and start a new Pod to consume the new value.
+Use a reader-only principal, enable Secret encryption at rest, and restrict
+namespace RBAC. Never put the connection JSON in a deployment, ConfigMap, DAG,
+log, XCom, or evidence artifact.
 
 A production trust policy has this closed shape:
 

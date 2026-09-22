@@ -201,6 +201,7 @@ def init_fetch_context_from_payload(
         runtime_payloads=runtime_payloads,
         verify=delivery.verify,
         dev_evidence_delivery=delivery.dev_evidence_delivery,
+        registry_credentials=delivery.registry_credentials,
         runtime_image_dbt_ref=dbt_ref,
         runtime_image_dbt_digest=dbt_digest,
         mssql_asset_uri_by_ref=mssql_projection,

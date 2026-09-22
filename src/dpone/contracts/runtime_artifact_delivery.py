@@ -57,6 +57,7 @@ _REF_SEGMENT_SEPARATOR = re.compile(r"[/:@?#=&]+")
 _LOGICAL_REF_RE = re.compile(ARTIFACT_REGISTRY_LOGICAL_REF_PATTERN)
 _CONFIG_MAP_KEY_RE = re.compile(CONFIG_MAP_KEY_PATTERN)
 _OCI_RUNTIME_IMAGE_REF_RE = re.compile(OCI_RUNTIME_IMAGE_REF_PATTERN)
+_CONNECTION_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
 
 def missing_init_fetch_delivery_fields(delivery: Mapping[str, Any]) -> tuple[str, ...]:
@@ -155,6 +156,39 @@ def normalize_config_map_ref(value: object, *, field: str) -> dict[str, str]:
     }
 
 
+def normalize_registry_credentials(value: object) -> dict[str, object]:
+    """Return one closed Kubernetes Secret coordinate without secret values."""
+
+    if not isinstance(value, Mapping) or set(value) != {
+        "method",
+        "connection_id",
+        "secret_ref",
+    }:
+        raise ValueError("registry_credentials must contain exactly method, connection_id and secret_ref")
+    if value.get("method") != "airflow_connection_kubernetes_secret":
+        raise ValueError("registry_credentials.method is unsupported")
+    connection_id = value.get("connection_id")
+    if not isinstance(connection_id, str) or _CONNECTION_ID_RE.fullmatch(connection_id) is None:
+        raise ValueError("registry_credentials.connection_id is invalid")
+    secret_ref = value.get("secret_ref")
+    if not isinstance(secret_ref, Mapping) or set(secret_ref) != {"name", "key"}:
+        raise ValueError("registry_credentials.secret_ref must contain exactly name and key")
+    name = secret_ref.get("name")
+    key = secret_ref.get("key")
+    expected_key = "AIRFLOW_CONN_" + re.sub(r"[^A-Za-z0-9]", "_", connection_id).upper()
+    if not is_valid_kubernetes_dns_label(name):
+        raise ValueError("registry_credentials.secret_ref.name must be a Kubernetes DNS label")
+    if key != expected_key:
+        raise ValueError(
+            "registry_credentials.secret_ref.key must match the canonical Airflow connection environment name"
+        )
+    return {
+        "method": "airflow_connection_kubernetes_secret",
+        "connection_id": connection_id,
+        "secret_ref": {"name": str(name), "key": key},
+    }
+
+
 def _is_missing_nested_field(delivery: Mapping[str, Any], field: str, nested_field: str) -> bool:
     nested = delivery.get(field)
     if not isinstance(nested, Mapping):
@@ -176,6 +210,7 @@ __all__ = [
     "missing_init_fetch_delivery_fields",
     "missing_init_fetch_delivery_paths",
     "normalize_config_map_ref",
+    "normalize_registry_credentials",
     "normalize_trust_tier",
     "OCI_RUNTIME_IMAGE_REF_PATTERN",
     "validate_runtime_image_reference",

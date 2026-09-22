@@ -35,6 +35,7 @@ def runtime_artifact_delivery_schema(
             "identity": init_fetch_identity_schema(strict=False),
             "source": init_fetch_source_schema(strict=False),
             "verify": init_fetch_verification_schema(strict=False),
+            "registry_credentials": registry_credentials_schema(),
         },
         "allOf": [
             {
@@ -69,6 +70,7 @@ def strict_init_fetch_delivery_schema() -> dict[str, Any]:
             "source": init_fetch_source_schema(strict=True),
             "trust_policy_ref": config_map_ref_schema(),
             "verify": init_fetch_verification_schema(strict=True),
+            "registry_credentials": registry_credentials_schema(),
         },
         "allOf": [
             _trust_tier_delivery_guard(
@@ -134,6 +136,36 @@ def init_fetch_verification_schema(*, strict: bool) -> dict[str, Any]:
         "properties": {
             "checksums": {"enum": ["required"]},
             "attestations": {"enum": ["optional", "required_for_prod"]},
+        },
+    }
+
+
+def registry_credentials_schema() -> dict[str, Any]:
+    """Return the closed, non-secret registry credential coordinate schema."""
+
+    return {
+        "type": "object",
+        "required": ["method", "connection_id", "secret_ref"],
+        "additionalProperties": False,
+        "properties": {
+            "method": {"const": "airflow_connection_kubernetes_secret"},
+            "connection_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            },
+            "secret_ref": {
+                "type": "object",
+                "required": ["name", "key"],
+                "additionalProperties": False,
+                "properties": {
+                    "name": kubernetes_dns_label_schema(),
+                    "key": {
+                        "type": "string",
+                        "pattern": CONFIG_MAP_KEY_PATTERN,
+                        "maxLength": 253,
+                    },
+                },
+            },
         },
     }
 

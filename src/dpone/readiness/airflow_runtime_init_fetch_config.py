@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import stat
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -89,6 +90,7 @@ class RuntimeRegistryConfiguration:
     logical_ref: str
     registry_uri: str
     access_mode: str
+    connection_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,16 +191,35 @@ def registry_configuration(
     if not isinstance(item, Mapping) or set(item) != {"registry_uri", "access"}:
         raise _config_error("logical artifact registry configuration is missing or invalid")
     access = item.get("access")
-    if not isinstance(access, Mapping) or set(access) != {"mode"}:
+    if not isinstance(access, Mapping):
         raise _config_error("artifact registry access configuration is invalid")
     registry_uri = item.get("registry_uri")
     access_mode = access.get("mode")
     if not isinstance(registry_uri, str) or not registry_uri or not isinstance(access_mode, str):
         raise _config_error("artifact registry configuration contains an invalid value")
+    connection_id: str | None = None
+    if access_mode == "workload_identity":
+        if set(access) != {"mode"}:
+            raise _config_error("workload identity registry access configuration is invalid")
+    elif access_mode == "airflow_connection":
+        if set(access) != {"mode", "connection_id"}:
+            raise _config_error("Airflow connection registry access configuration is invalid")
+        raw_connection_id = access.get("connection_id")
+        if (
+            not isinstance(raw_connection_id, str)
+            or not raw_connection_id
+            or len(raw_connection_id) > 128
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", raw_connection_id) is None
+        ):
+            raise _config_error("artifact registry connection id is invalid")
+        connection_id = raw_connection_id
+    else:
+        raise _config_error("artifact registry access mode is unsupported")
     return RuntimeRegistryConfiguration(
         logical_ref=logical_ref,
         registry_uri=registry_uri,
         access_mode=access_mode,
+        connection_id=connection_id,
     )
 
 
@@ -244,18 +265,18 @@ def trusted_attestation_authority(
         mismatch_code="DPONE_ARTIFACT_TRUST_POLICY_MISMATCH",
         max_bytes=_MAX_TRUST_POLICY_BYTES,
     )
-    policy = _json_object(
+    policy_payload = _json_object(
         payload,
         "artifact trust policy",
         invalid_code="DPONE_ARTIFACT_TRUST_POLICY_INVALID",
     )
-    schema = policy.get("schema")
+    schema = policy_payload.get("schema")
     if schema in {
         RUNTIME_ARTIFACT_TRUST_POLICY_V1,
         RUNTIME_ARTIFACT_TRUST_POLICY_V2,
     }:
         try:
-            parsed = parse_runtime_artifact_trust_policy(policy)
+            parsed = parse_runtime_artifact_trust_policy(policy_payload)
         except RuntimeArtifactTrustPolicyError as exc:
             raise InitFetchError(exc.code, str(exc)) from exc
         if parsed.trust_tier != plan.trust_tier:

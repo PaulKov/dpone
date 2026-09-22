@@ -51,6 +51,18 @@ def register_build_parser(subparsers: argparse._SubParsersAction) -> argparse.Ar
         "--registry-config-sha256",
         help="SHA-256 of the exact artifact registry ConfigMap file bytes required by strict v2",
     )
+    parser.add_argument(
+        "--registry-credentials-secret-name",
+        help="Kubernetes Secret containing one runtime artifact registry Airflow Connection",
+    )
+    parser.add_argument(
+        "--registry-credentials-secret-key",
+        help="Exact AIRFLOW_CONN_* key; derived from the connection id when omitted",
+    )
+    parser.add_argument(
+        "--registry-credentials-connection-id",
+        help="Logical Airflow Connection id used only by runtime init-fetch",
+    )
     parser.add_argument("--trust-policy-config-map-name", help="Production artifact trust-policy ConfigMap name")
     parser.add_argument(
         "--trust-policy-config-map-key",
@@ -110,6 +122,18 @@ def cmd_airflow_build(args: argparse.Namespace, *, ctx: object, logger: logging.
             file=sys.stderr,
         )
         return 2
+    try:
+        registry_credentials = _optional_registry_credentials(
+            secret_name=getattr(args, "registry_credentials_secret_name", None),
+            secret_key=getattr(args, "registry_credentials_secret_key", None),
+            connection_id=getattr(args, "registry_credentials_connection_id", None),
+        )
+    except ValueError:
+        print(
+            "DPONE_DEPLOYMENT_REGISTRY_CREDENTIALS_INVALID: registry credential Secret options are invalid",
+            file=sys.stderr,
+        )
+        return 2
     result = build_deployment_result(
         root=".",
         release_id=args.release_id,
@@ -136,6 +160,7 @@ def cmd_airflow_build(args: argparse.Namespace, *, ctx: object, logger: logging.
         dev_evidence_pvc_claim=args.dev_evidence_pvc_claim,
         dev_evidence_worker_queue=args.dev_evidence_worker_queue,
         runtime_authority_ref=runtime_authority_ref,
+        registry_credentials=registry_credentials,
     )
     emit_self_service_result(result, args.format, command="airflow_build")
     if result.exit_code is not None:
@@ -167,6 +192,32 @@ def _optional_secret_ref(*, name: object, key: object) -> dict[str, object] | No
         "kind": "kubernetes_secret",
         "name": name,
         "key": key if key is not None else "authority.json",
+    }
+
+
+def _optional_registry_credentials(
+    *,
+    secret_name: object,
+    secret_key: object,
+    connection_id: object,
+) -> dict[str, object] | None:
+    values = (secret_name, secret_key, connection_id)
+    if all(value is None for value in values):
+        return None
+    if not isinstance(secret_name, str) or not isinstance(connection_id, str):
+        raise ValueError("registry credential Secret name and connection id are required together")
+    canonical_key = "AIRFLOW_CONN_" + "".join(
+        character if character.isalnum() else "_" for character in connection_id.upper()
+    )
+    if secret_key is not None and secret_key != canonical_key:
+        raise ValueError("registry credential Secret key must match the Airflow connection id")
+    return {
+        "method": "airflow_connection_kubernetes_secret",
+        "connection_id": connection_id,
+        "secret_ref": {
+            "name": secret_name,
+            "key": canonical_key,
+        },
     }
 
 
