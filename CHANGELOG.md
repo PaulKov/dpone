@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.83.7 - 2026-09-23
+
 ### Fixed
 
 - Preserve Kubernetes `valueFrom` environment projections when rendered
