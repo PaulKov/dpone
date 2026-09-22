@@ -141,7 +141,7 @@ services:
 
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-06T17-38-46Z
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: dpone-it-minio
     environment:
       MINIO_ROOT_USER: ${DPONE_IT_MINIO_ACCESS_KEY:-minioadmin}
@@ -151,7 +151,7 @@ services:
       - "${DPONE_IT_MINIO_PORT_FORWARD:-59090}:9000"
       - "${DPONE_IT_MINIO_CONSOLE_PORT_FORWARD:-59091}:9001"
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2024-11-21T17-21-54Z
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       - minio
     environment:
