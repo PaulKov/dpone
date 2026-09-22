@@ -27,7 +27,8 @@ def test_integration_compose_file_exposes_minio() -> None:
     compose = yaml.safe_load((ROOT / "docker" / "docker-compose.integration.yml").read_text(encoding="utf-8"))
     assert "minio" in compose["services"]
     minio = compose["services"]["minio"]
-    assert minio["image"] == "minio/minio:latest"
+    assert minio["image"] == "quay.io/minio/minio:RELEASE.2025-09-06T17-38-46Z"
+    assert compose["services"]["minio-init"]["image"] == "quay.io/minio/mc:RELEASE.2024-11-21T17-21-54Z"
     assert any("59090" in str(port) for port in minio["ports"])
     assert any("59091" in str(port) for port in minio["ports"])
 
