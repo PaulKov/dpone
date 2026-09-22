@@ -12,6 +12,7 @@ from dpone.contracts.runtime_artifact_delivery import (
     attestations_for_trust_tier,
     is_safe_artifact_registry_logical_ref,
     normalize_config_map_ref,
+    normalize_registry_credentials,
     normalize_trust_tier,
     validate_runtime_image_reference,
 )
@@ -39,6 +40,7 @@ def build_init_fetch_delivery(
     registry_config_ref: object,
     trust_policy_ref: object | None,
     runtime_authority_ref: object | None = None,
+    registry_credentials: object | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Validate and return the exact image plus secret-free delivery block."""
 
@@ -97,6 +99,14 @@ def build_init_fetch_delivery(
         delivery["trust_policy_ref"] = trust_ref
     if runtime_authority_ref is not None:
         delivery["runtime_authority"] = _runtime_authority_source(runtime_authority_ref)
+    if registry_credentials is not None:
+        try:
+            delivery["registry_credentials"] = normalize_registry_credentials(registry_credentials)
+        except ValueError as exc:
+            raise InitFetchProjectionContractError(
+                "DPONE_DEPLOYMENT_REGISTRY_CREDENTIALS_INVALID",
+                str(exc),
+            ) from exc
     return image_ref, delivery
 
 

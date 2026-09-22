@@ -459,6 +459,114 @@ def test_wire_v2_requires_canonical_trust_policy_config_map_key() -> None:
     assert "policy.json" in str(exc.value)
 
 
+def test_registry_airflow_connection_secret_is_projected_to_init_only() -> None:
+    payload = _v2_payload()
+    payload["runtime_artifact_delivery"]["registry_credentials"] = {
+        "method": "airflow_connection_kubernetes_secret",
+        "connection_id": "artifact_registry_reader",
+        "secret_ref": {
+            "name": "artifact-registry-reader",
+            "key": "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER",
+        },
+    }
+    context = init_fetch_context_from_payload(payload)
+
+    kwargs = compose_init_fetch_operator_kwargs(
+        pack=_strict_pack(),
+        kwargs=_strict_pack()["provider_execution"]["kpo_kwargs"],
+        context=context,
+        workload_id="orders",
+        execution_kind="runtime",
+        execution_scope="workload",
+        hook_execution="externalized",
+    )
+
+    pod = kwargs["full_pod_spec"]
+    base_env = {item["name"]: item for item in pod["spec"]["containers"][0]["env"]}
+    init_env = {item["name"]: item for item in pod["spec"]["initContainers"][0]["env"]}
+    env_name = "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER"
+    assert env_name not in base_env
+    assert init_env[env_name] == {
+        "name": env_name,
+        "valueFrom": {
+            "secretKeyRef": {
+                "name": "artifact-registry-reader",
+                "key": env_name,
+                "optional": False,
+            }
+        },
+    }
+    plan, _ = _decoded_plan(kwargs["env_vars"])
+    assert "registry_credentials" not in plan
+    assert "artifact-registry-reader" not in json.dumps(plan)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("wrong_key", "canonical Airflow connection environment name"),
+        ("unknown_method", "method is invalid"),
+        ("unknown_field", "unknown fields"),
+    ],
+)
+def test_registry_airflow_connection_secret_rejects_invalid_projection(
+    mutation: str,
+    message: str,
+) -> None:
+    payload = _v2_payload()
+    credentials: dict[str, Any] = {
+        "method": "airflow_connection_kubernetes_secret",
+        "connection_id": "artifact_registry_reader",
+        "secret_ref": {
+            "name": "artifact-registry-reader",
+            "key": "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER",
+        },
+    }
+    if mutation == "wrong_key":
+        credentials["secret_ref"]["key"] = "AIRFLOW_CONN_OTHER"
+    elif mutation == "unknown_method":
+        credentials["method"] = "literal_environment"
+    else:
+        credentials["value"] = "must-not-serialize"
+    payload["runtime_artifact_delivery"]["registry_credentials"] = credentials
+
+    with pytest.raises(InitFetchProviderError) as exc:
+        init_fetch_context_from_payload(payload)
+
+    assert exc.value.code == "DPONE_AIRFLOW_INDEX_FIELD_INVALID"
+    assert message in str(exc.value)
+
+
+def test_registry_airflow_connection_secret_rejects_pack_env_collision() -> None:
+    payload = _v2_payload()
+    payload["runtime_artifact_delivery"]["registry_credentials"] = {
+        "method": "airflow_connection_kubernetes_secret",
+        "connection_id": "artifact_registry_reader",
+        "secret_ref": {
+            "name": "artifact-registry-reader",
+            "key": "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER",
+        },
+    }
+    context = init_fetch_context_from_payload(payload)
+    pack = _strict_pack()
+    pack["provider_execution"]["kpo_kwargs"]["env_vars"]["AIRFLOW_CONN_ARTIFACT_REGISTRY_READER"] = (
+        "literal-must-not-win"
+    )
+
+    with pytest.raises(InitFetchProviderError) as exc:
+        compose_init_fetch_operator_kwargs(
+            pack=pack,
+            kwargs=pack["provider_execution"]["kpo_kwargs"],
+            context=context,
+            workload_id="orders",
+            execution_kind="runtime",
+            execution_scope="workload",
+            hook_execution="externalized",
+        )
+
+    assert exc.value.code == "DPONE_INIT_FETCH_RESERVED_COLLISION"
+
+
 def test_dbt_runtime_payloads_are_selected_and_pinned_in_plan_v3() -> None:
     """Provider-side projection must pin dbt payloads without importing core dpone.
 

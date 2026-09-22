@@ -40,6 +40,10 @@ from dpone_airflow_pack.init_fetch_pod_guard import (
     validate_operator_kwargs,
     validate_strict_pack_extensions,
 )
+from dpone_airflow_pack.init_fetch_secret_env import (
+    ensure_registry_credential_env_available,
+    project_registry_credential,
+)
 from dpone_airflow_pack.provider_execution import (
     RUNTIME_POD_CONTRACT_KEY,
     RUNTIME_POD_CONTRACT_VALUE,
@@ -128,6 +132,7 @@ def compose_init_fetch_operator_kwargs(
             ".get('evidence_set_id', '') "
             "if dag_run is defined and dag_run else '' }}"
         )
+    ensure_registry_credential_env_available(context.registry_credentials, env_vars)
 
     clean = {key: deepcopy(value) for key, value in effective_kwargs.items() if key in _PRESERVED_KPO_FIELDS}
     runtime_labels = _runtime_labels(projection.kpo_kwargs["labels"])
@@ -383,7 +388,7 @@ def _init_env_vars(
     include_dev_evidence: bool,
     context: InitFetchDeliveryContext,
 ) -> dict[str, Any]:
-    values = dict(env_vars)
+    values = project_registry_credential(context.registry_credentials, env_vars)
     if include_dev_evidence and context.dev_evidence_delivery is not None:
         values[DEV_EVIDENCE_BOOTSTRAP_ROOT_ENV] = DEV_EVIDENCE_BOOTSTRAP_ROOT
     return values
@@ -402,8 +407,14 @@ def _base_resources(spec: Mapping[str, Any]) -> Any | None:
     return deepcopy(dict(resources))
 
 
-def _env_list(values: Mapping[str, Any]) -> list[dict[str, str]]:
-    return [{"name": name, "value": str(value)} for name, value in sorted(values.items())]
+def _env_list(values: Mapping[str, Any]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    for name, value in sorted(values.items()):
+        if isinstance(value, Mapping) and set(value) == {"valueFrom"}:
+            result.append({"name": name, "valueFrom": deepcopy(value["valueFrom"])})
+        else:
+            result.append({"name": name, "value": str(value)})
+    return result
 
 
 def _pod_name(value: str) -> str:

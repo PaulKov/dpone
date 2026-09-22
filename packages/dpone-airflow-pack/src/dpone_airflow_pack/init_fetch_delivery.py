@@ -12,6 +12,7 @@ from dpone_airflow_pack.init_fetch_contract import (
     ConfigMapReference,
     DevEvidenceDelivery,
     InitFetchProviderError,
+    RegistryCredentialSource,
     RuntimeAuthoritySource,
     VerificationPolicy,
     WorkloadIdentity,
@@ -38,11 +39,13 @@ _DELIVERY_KEYS = frozenset(
         "source",
         "verify",
         "runtime_authority",
+        "registry_credentials",
     }
 )
 _DEV_EVIDENCE_KEYS = frozenset({"mode", "claim_name", "mount_path", "worker_queue"})
 _WORKER_QUEUE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 _DEV_EVIDENCE_MOUNT_PATH = "/var/lib/dpone/dev-evidence"
+_CONNECTION_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +60,7 @@ class ParsedInitFetchDelivery:
     verify: VerificationPolicy
     dev_evidence_delivery: DevEvidenceDelivery | None
     runtime_authority: RuntimeAuthoritySource | ImmutableRuntimeAuthoritySource | None
+    registry_credentials: RegistryCredentialSource | None
 
 
 def parse_init_fetch_delivery(
@@ -70,7 +74,7 @@ def parse_init_fetch_delivery(
         payload.get("runtime_artifact_delivery"),
         "runtime_artifact_delivery",
         _DELIVERY_KEYS,
-        optional=frozenset({"trust_policy_ref", "runtime_authority"}),
+        optional=frozenset({"trust_policy_ref", "runtime_authority", "registry_credentials"}),
         path=path,
     )
     if delivery["mode"] != "init_fetch":
@@ -102,7 +106,63 @@ def parse_init_fetch_delivery(
             path=path,
         ),
         runtime_authority=_runtime_authority(delivery.get("runtime_authority"), path),
+        registry_credentials=_registry_credentials(
+            delivery.get("registry_credentials"),
+            path,
+        ),
     )
+
+
+def _registry_credentials(
+    value: object,
+    path: Path | None,
+) -> RegistryCredentialSource | None:
+    if value is None:
+        return None
+    item = exact_mapping(
+        value,
+        "runtime_artifact_delivery.registry_credentials",
+        frozenset({"method", "connection_id", "secret_ref"}),
+        path=path,
+    )
+    if item["method"] != "airflow_connection_kubernetes_secret":
+        raise field_invalid(
+            "runtime_artifact_delivery.registry_credentials.method is invalid",
+            path,
+        )
+    connection_id = item["connection_id"]
+    if not isinstance(connection_id, str) or _CONNECTION_ID_RE.fullmatch(connection_id) is None:
+        raise field_invalid(
+            "runtime_artifact_delivery.registry_credentials.connection_id is invalid",
+            path,
+        )
+    secret_ref = exact_mapping(
+        item["secret_ref"],
+        "runtime_artifact_delivery.registry_credentials.secret_ref",
+        frozenset({"name", "key"}),
+        path=path,
+    )
+    secret_key = secret_ref["key"]
+    if secret_key != _airflow_connection_env_name(connection_id):
+        raise field_invalid(
+            "runtime_artifact_delivery.registry_credentials.secret_ref.key "
+            "must match the canonical Airflow connection environment name",
+            path,
+        )
+    return RegistryCredentialSource(
+        method="airflow_connection_kubernetes_secret",
+        connection_id=connection_id,
+        secret_name=dns_label(
+            secret_ref["name"],
+            "runtime_artifact_delivery.registry_credentials.secret_ref.name",
+            path,
+        ),
+        secret_key=secret_key,
+    )
+
+
+def _airflow_connection_env_name(connection_id: str) -> str:
+    return "AIRFLOW_CONN_" + re.sub(r"[^A-Za-z0-9]", "_", connection_id).upper()
 
 
 def _runtime_authority(

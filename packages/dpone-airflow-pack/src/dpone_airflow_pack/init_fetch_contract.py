@@ -130,6 +130,26 @@ class WorkloadIdentity:
 
 
 @dataclass(frozen=True, slots=True)
+class RegistryCredentialSource:
+    """Non-secret coordinate for one init-only registry credential."""
+
+    method: str
+    connection_id: str
+    secret_name: str
+    secret_key: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "method": self.method,
+            "connection_id": self.connection_id,
+            "secret_ref": {
+                "name": self.secret_name,
+                "key": self.secret_key,
+            },
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class VerificationPolicy:
     checksums: str
     attestations: str
@@ -191,6 +211,7 @@ class InitFetchDeliveryContext:
     runtime_payloads: tuple[ExactRuntimePayload, ...]
     verify: VerificationPolicy
     dev_evidence_delivery: DevEvidenceDelivery | None
+    registry_credentials: RegistryCredentialSource | None = None
     runtime_image_dbt_ref: str | None = None
     runtime_image_dbt_digest: str | None = None
     mssql_asset_uri_by_ref: Mapping[str, str] | None = None

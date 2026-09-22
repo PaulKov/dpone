@@ -2379,6 +2379,86 @@ def test_airflow_build_forwards_closed_runtime_authority_reference_with_default_
     assert "synthetic-secret-value" not in stdout
 
 
+def test_airflow_build_forwards_registry_connection_secret_coordinate(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    def build_result(**kwargs: object) -> SelfServiceResult:
+        captured.update(kwargs)
+        return SelfServiceResult(passed=True, details={"kind": "test"})
+
+    monkeypatch.setattr(airflow_deployment_build_cmd, "build_deployment_result", build_result)
+    digest = "sha256:" + "b" * 64
+
+    code, stdout, stderr = _run_cli(
+        [
+            "airflow",
+            "build",
+            "--release-id",
+            "sha256:" + "a" * 64,
+            "--environment",
+            "dev",
+            *_strict_airflow_build_args(digest),
+            "--registry-credentials-connection-id",
+            "artifact_registry_reader",
+            "--registry-credentials-secret-name",
+            "artifact-registry-reader",
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+
+    assert code == 0
+    assert stderr == ""
+    assert json.loads(stdout)["passed"] is True
+    assert captured["registry_credentials"] == {
+        "method": "airflow_connection_kubernetes_secret",
+        "connection_id": "artifact_registry_reader",
+        "secret_ref": {
+            "name": "artifact-registry-reader",
+            "key": "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER",
+        },
+    }
+
+
+def test_airflow_build_rejects_partial_registry_connection_secret_coordinate(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    called = False
+
+    def build_result(**kwargs: object) -> SelfServiceResult:
+        del kwargs
+        nonlocal called
+        called = True
+        return SelfServiceResult(passed=True)
+
+    monkeypatch.setattr(airflow_deployment_build_cmd, "build_deployment_result", build_result)
+
+    code, stdout, stderr = _run_cli(
+        [
+            "airflow",
+            "build",
+            "--release-id",
+            "sha256:" + "a" * 64,
+            "--environment",
+            "dev",
+            *_strict_airflow_build_args("sha256:" + "b" * 64),
+            "--registry-credentials-secret-name",
+            "artifact-registry-reader",
+        ],
+        capsys,
+    )
+
+    assert code == 2
+    assert stdout == ""
+    assert "DPONE_DEPLOYMENT_REGISTRY_CREDENTIALS_INVALID" in stderr
+    assert called is False
+
+
 def test_airflow_build_forwards_digest_bound_non_secret_payload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

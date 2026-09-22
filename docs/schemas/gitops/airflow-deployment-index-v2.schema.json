@@ -664,6 +664,44 @@
           ],
           "type": "object"
         },
+        "registry_credentials": {
+          "additionalProperties": false,
+          "properties": {
+            "connection_id": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+              "type": "string"
+            },
+            "method": {
+              "const": "airflow_connection_kubernetes_secret"
+            },
+            "secret_ref": {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "maxLength": 253,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+                  "type": "string"
+                },
+                "name": {
+                  "maxLength": 63,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "key"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "method",
+            "connection_id",
+            "secret_ref"
+          ],
+          "type": "object"
+        },
         "source": {
           "additionalProperties": false,
           "properties": {

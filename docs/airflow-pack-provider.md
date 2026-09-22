@@ -241,6 +241,16 @@ init container: dpone airflow runtime-init-fetch
 base container: dpone airflow runtime-pack-exec
 ```
 
+Clusters without workload identity federation may select the additive
+`registry_credentials` delivery contract. It contains only a logical Airflow
+Connection id and a Kubernetes Secret name/key. The provider projects that one
+key as a native non-optional `secretKeyRef` to the init container only; the
+base container and init-fetch plan do not receive the Secret coordinate or
+value. The verified registry ConfigMap selects
+`access.mode: airflow_connection` with the same logical id. See
+[strict init-fetch operations](airflow-cache-sync-strict-v2.md#prepare-the-runtime-inputs)
+for configuration, rotation, diagnostics, and rollback.
+
 New ordinary strict tasks emit `dpone.airflow-runtime-init-fetch-plan.v3`. The plan
 binds an explicit `workload|process` execution scope, the exact process
 selector, and whether hooks execute inside the runtime task (`inline`) or in

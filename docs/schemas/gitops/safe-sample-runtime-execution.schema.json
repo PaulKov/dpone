@@ -1,34 +1,498 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://paulkov.github.io/dpone/schemas/gitops/safe-sample-runtime-execution.schema.json",
-  "title": "dpone GitOps safe sample runtime execution",
-  "type": "object",
-  "required": [
-    "schema",
-    "execution_status",
-    "data_outcome",
-    "release_id",
-    "deployment_id",
-    "errors"
-  ],
-  "additionalProperties": true,
-  "properties": {
-    "schema": {
-      "const": "dpone.safe-sample-runtime-execution.v1"
+  "$defs": {
+    "artifact": {
+      "additionalProperties": true,
+      "properties": {
+        "artifact_ref": {
+          "pattern": "^cache://(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?![^\\s]*/(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))[^\\s]+$",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "id",
+        "artifact_ref",
+        "sha256",
+        "bytes"
+      ],
+      "type": "object"
     },
-    "execution_mode": {
-      "type": "string",
-      "enum": [
-        "local_handoff",
-        "live_copy"
+    "error": {
+      "additionalProperties": true,
+      "properties": {
+        "code": {
+          "pattern": "^DPONE_[A-Z0-9_]+$",
+          "type": "string"
+        },
+        "fixes": {
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema": {
+          "const": "dpone.error.v1"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "stage": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "code",
+        "stage",
+        "severity",
+        "message"
+      ],
+      "type": "object"
+    },
+    "json_value": {
+      "anyOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/json_value"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/json_value"
+          },
+          "type": "object"
+        }
       ]
     },
-    "execution_status": {
-      "enum": [
-        "succeeded",
-        "failed",
-        "cancelled",
-        "skipped"
+    "nullable_sha256": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "table": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://paulkov.github.io/dpone/schemas/gitops/safe-sample-runtime-execution.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "data_copy": {
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "copied",
+                  "copied_with_quarantine"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "schema",
+              "status",
+              "source_request",
+              "copy_request",
+              "rows_read",
+              "rows_written",
+              "bytes_read",
+              "pii_policy",
+              "diagnostics",
+              "errors"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "copied"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "quarantined_rows": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "copied_with_quarantine"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "quarantined_rows": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "quarantined_rows"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "copied",
+                  "copied_with_quarantine"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "pii_policy": {
+                "const": "masked"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "bytes_read": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "copy_request": {
+          "additionalProperties": true,
+          "properties": {
+            "certification_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "max_bytes": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "pii_policy": {
+              "enum": [
+                "masked",
+                "not_logged"
+              ]
+            },
+            "proof": {
+              "pattern": "^route_certification:[A-Za-z0-9_\\-]+$",
+              "type": "string"
+            },
+            "sample_rows": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "schema": {
+              "const": "dpone.safe-sample-certified-copy-request.v1"
+            },
+            "sink": {
+              "additionalProperties": false,
+              "properties": {
+                "connection_ref": {
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+                  "type": "string"
+                },
+                "temporary_table": {
+                  "$ref": "#/$defs/table"
+                },
+                "type": {
+                  "const": "clickhouse"
+                }
+              },
+              "required": [
+                "type",
+                "connection_ref",
+                "temporary_table"
+              ],
+              "type": "object"
+            },
+            "source": {
+              "additionalProperties": false,
+              "properties": {
+                "connection_ref": {
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+                  "type": "string"
+                },
+                "table": {
+                  "$ref": "#/$defs/table"
+                },
+                "type": {
+                  "const": "mssql"
+                }
+              },
+              "required": [
+                "type",
+                "connection_ref",
+                "table"
+              ],
+              "type": "object"
+            },
+            "source_read_only": {
+              "const": true
+            },
+            "strategy": {
+              "const": "incremental_merge"
+            },
+            "timeout_seconds": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "schema",
+            "certification_id",
+            "source",
+            "sink",
+            "strategy",
+            "sample_rows",
+            "max_bytes",
+            "timeout_seconds",
+            "source_read_only",
+            "pii_policy",
+            "proof"
+          ],
+          "type": "object"
+        },
+        "diagnostics": {
+          "additionalProperties": {
+            "$ref": "#/$defs/json_value"
+          },
+          "type": "object"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/error"
+          },
+          "type": "array"
+        },
+        "pii_policy": {
+          "enum": [
+            "masked",
+            "not_logged"
+          ]
+        },
+        "quarantined_rows": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rows_read": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rows_written": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "schema": {
+          "const": "dpone.safe-sample-data-copy.v1"
+        },
+        "source_request": {
+          "additionalProperties": true,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "full_scan"
+                  },
+                  "status": {
+                    "const": "planned"
+                  }
+                },
+                "required": [
+                  "status",
+                  "mode"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "estimated_read_bytes": {
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "estimated_read_bytes"
+                ]
+              }
+            }
+          ],
+          "properties": {
+            "errors": {
+              "items": {
+                "$ref": "#/$defs/error"
+              },
+              "type": "array"
+            },
+            "estimated_read_bytes": {
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "full_scan_allowed": {
+              "type": "boolean"
+            },
+            "max_bytes": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "mode": {
+              "enum": [
+                "pushdown",
+                "full_scan",
+                "blocked"
+              ]
+            },
+            "pii_policy": {
+              "enum": [
+                "masked",
+                "not_logged"
+              ]
+            },
+            "proof": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sample_rows": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "schema": {
+              "const": "dpone.safe-sample-source-request.v1"
+            },
+            "source_read_only": {
+              "const": true
+            },
+            "status": {
+              "enum": [
+                "planned",
+                "blocked"
+              ]
+            },
+            "target": {
+              "additionalProperties": true,
+              "properties": {
+                "connection_ref": {
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "timeout_seconds": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "schema",
+            "status",
+            "mode",
+            "sample_rows",
+            "max_bytes",
+            "timeout_seconds",
+            "source_read_only",
+            "full_scan_allowed",
+            "pii_policy",
+            "target",
+            "errors"
+          ],
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "blocked",
+            "copied",
+            "copied_with_quarantine",
+            "failed"
+          ]
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "errors"
+      ],
+      "type": [
+        "object",
+        "null"
       ]
     },
     "data_outcome": {
@@ -40,27 +504,17 @@
         "unknown"
       ]
     },
-    "release_id": {
-      "$ref": "#/$defs/nullable_sha256"
-    },
     "deployment_id": {
       "$ref": "#/$defs/nullable_sha256"
     },
     "deployment_identity": {
-      "type": "object",
-      "required": [
-        "release_id",
-        "deployment_id",
-        "workload_packs",
-        "runtime_artifact_delivery"
-      ],
       "additionalProperties": true,
       "properties": {
-        "release_id": {
-          "$ref": "#/$defs/nullable_sha256"
-        },
-        "deployment_id": {
-          "$ref": "#/$defs/nullable_sha256"
+        "airflow_bundle_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "binding_set_ref": {
           "$ref": "#/$defs/nullable_sha256"
@@ -71,93 +525,14 @@
         "credential_runtime_ref": {
           "$ref": "#/$defs/nullable_sha256"
         },
-        "runtime_image_digest": {
+        "deployment_id": {
           "$ref": "#/$defs/nullable_sha256"
         },
-        "airflow_bundle_ref": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "workload_packs": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/artifact"
-          }
+        "release_id": {
+          "$ref": "#/$defs/nullable_sha256"
         },
         "runtime_artifact_delivery": {
-          "type": "object",
           "additionalProperties": true,
-          "properties": {
-            "mode": {
-              "enum": [
-                "local_preview",
-                "init_fetch",
-                "shared_pvc",
-                "embedded_bundle",
-                "csi_volume",
-                "inline"
-              ]
-            },
-            "artifact_registry_ref": {
-              "type": "string",
-              "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$"
-            },
-            "identity": {
-              "type": "object",
-              "required": [
-                "method",
-                "service_account"
-              ],
-              "additionalProperties": true,
-              "properties": {
-                "method": {
-                  "enum": [
-                    "kubernetes_workload_identity"
-                  ]
-                },
-                "service_account": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            },
-            "source": {
-              "type": "object",
-              "required": [
-                "artifact_registry_ref"
-              ],
-              "additionalProperties": true,
-              "properties": {
-                "artifact_registry_ref": {
-                  "type": "string",
-                  "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$"
-                }
-              }
-            },
-            "verify": {
-              "type": "object",
-              "required": [
-                "checksums",
-                "attestations"
-              ],
-              "additionalProperties": true,
-              "properties": {
-                "checksums": {
-                  "enum": [
-                    "required"
-                  ]
-                },
-                "attestations": {
-                  "enum": [
-                    "optional",
-                    "required_for_prod"
-                  ]
-                }
-              }
-            }
-          },
           "allOf": [
             {
               "if": {
@@ -179,561 +554,224 @@
                 ]
               }
             }
-          ]
+          ],
+          "properties": {
+            "artifact_registry_ref": {
+              "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$",
+              "type": "string"
+            },
+            "identity": {
+              "additionalProperties": true,
+              "properties": {
+                "method": {
+                  "enum": [
+                    "kubernetes_workload_identity"
+                  ]
+                },
+                "service_account": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "method",
+                "service_account"
+              ],
+              "type": "object"
+            },
+            "mode": {
+              "enum": [
+                "local_preview",
+                "init_fetch",
+                "shared_pvc",
+                "embedded_bundle",
+                "csi_volume",
+                "inline"
+              ]
+            },
+            "registry_credentials": {
+              "additionalProperties": false,
+              "properties": {
+                "connection_id": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+                  "type": "string"
+                },
+                "method": {
+                  "const": "airflow_connection_kubernetes_secret"
+                },
+                "secret_ref": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "key": {
+                      "maxLength": 253,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 63,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "key"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "method",
+                "connection_id",
+                "secret_ref"
+              ],
+              "type": "object"
+            },
+            "source": {
+              "additionalProperties": true,
+              "properties": {
+                "artifact_registry_ref": {
+                  "pattern": "^(?!.*%)(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))(?!.*[/:@?#=&](?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:$|[/:@?#=&]))\\S+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "artifact_registry_ref"
+              ],
+              "type": "object"
+            },
+            "verify": {
+              "additionalProperties": true,
+              "properties": {
+                "attestations": {
+                  "enum": [
+                    "optional",
+                    "required_for_prod"
+                  ]
+                },
+                "checksums": {
+                  "enum": [
+                    "required"
+                  ]
+                }
+              },
+              "required": [
+                "checksums",
+                "attestations"
+              ],
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "runtime_image_digest": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "workload_packs": {
+          "items": {
+            "$ref": "#/$defs/artifact"
+          },
+          "type": "array"
         }
-      }
+      },
+      "required": [
+        "release_id",
+        "deployment_id",
+        "workload_packs",
+        "runtime_artifact_delivery"
+      ],
+      "type": "object"
     },
-    "source_snapshot": {
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/error"
+      },
+      "type": "array"
+    },
+    "execution_mode": {
+      "enum": [
+        "local_handoff",
+        "live_copy"
+      ],
+      "type": "string"
+    },
+    "execution_status": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "cancelled",
+        "skipped"
+      ]
+    },
+    "init_fetch": {
+      "additionalProperties": true,
       "type": [
         "object",
         "null"
-      ],
+      ]
+    },
+    "release_id": {
+      "$ref": "#/$defs/nullable_sha256"
+    },
+    "route_attestation_verification": {
+      "additionalProperties": true,
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "schema": {
+      "const": "dpone.safe-sample-runtime-execution.v1"
+    },
+    "source_snapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)\\S+$",
+          "type": "string"
+        },
+        "pipeline_id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{1,127}$",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
       "required": [
         "pipeline_id",
         "path",
         "sha256"
       ],
-      "additionalProperties": false,
-      "properties": {
-        "pipeline_id": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9_-]{1,127}$"
-        },
-        "path": {
-          "type": "string",
-          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)\\S+$"
-        },
-        "sha256": {
-          "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$"
-        }
-      }
-    },
-    "route_attestation_verification": {
       "type": [
         "object",
         "null"
-      ],
-      "additionalProperties": true
-    },
-    "init_fetch": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "additionalProperties": true
-    },
-    "temporary_target_prepare": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "additionalProperties": true
-    },
-    "data_copy": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "required": [
-        "schema",
-        "status",
-        "errors"
-      ],
-      "additionalProperties": true,
-      "properties": {
-        "schema": {
-          "const": "dpone.safe-sample-data-copy.v1"
-        },
-        "status": {
-          "enum": [
-            "blocked",
-            "copied",
-            "copied_with_quarantine",
-            "failed"
-          ]
-        },
-        "source_request": {
-          "type": "object",
-          "required": [
-            "schema",
-            "status",
-            "mode",
-            "sample_rows",
-            "max_bytes",
-            "timeout_seconds",
-            "source_read_only",
-            "full_scan_allowed",
-            "pii_policy",
-            "target",
-            "errors"
-          ],
-          "additionalProperties": true,
-          "properties": {
-            "schema": {
-              "const": "dpone.safe-sample-source-request.v1"
-            },
-            "status": {
-              "enum": [
-                "planned",
-                "blocked"
-              ]
-            },
-            "mode": {
-              "enum": [
-                "pushdown",
-                "full_scan",
-                "blocked"
-              ]
-            },
-            "sample_rows": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "max_bytes": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "timeout_seconds": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "source_read_only": {
-              "const": true
-            },
-            "full_scan_allowed": {
-              "type": "boolean"
-            },
-            "estimated_read_bytes": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "minimum": 0
-            },
-            "proof": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "pii_policy": {
-              "enum": [
-                "masked",
-                "not_logged"
-              ]
-            },
-            "target": {
-              "type": "object",
-              "additionalProperties": true,
-              "properties": {
-                "connection_ref": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
-                  "maxLength": 128
-                }
-              }
-            },
-            "errors": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/error"
-              }
-            }
-          },
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "status": {
-                    "const": "planned"
-                  },
-                  "mode": {
-                    "const": "full_scan"
-                  }
-                },
-                "required": [
-                  "status",
-                  "mode"
-                ]
-              },
-              "then": {
-                "required": [
-                  "estimated_read_bytes"
-                ],
-                "properties": {
-                  "estimated_read_bytes": {
-                    "type": "integer",
-                    "minimum": 1
-                  }
-                }
-              }
-            }
-          ]
-        },
-        "copy_request": {
-          "type": "object",
-          "required": [
-            "schema",
-            "certification_id",
-            "source",
-            "sink",
-            "strategy",
-            "sample_rows",
-            "max_bytes",
-            "timeout_seconds",
-            "source_read_only",
-            "pii_policy",
-            "proof"
-          ],
-          "additionalProperties": true,
-          "properties": {
-            "schema": {
-              "const": "dpone.safe-sample-certified-copy-request.v1"
-            },
-            "certification_id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "source": {
-              "type": "object",
-              "required": [
-                "type",
-                "connection_ref",
-                "table"
-              ],
-              "additionalProperties": false,
-              "properties": {
-                "type": {
-                  "const": "mssql"
-                },
-                "connection_ref": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
-                  "maxLength": 128
-                },
-                "table": {
-                  "$ref": "#/$defs/table"
-                }
-              }
-            },
-            "sink": {
-              "type": "object",
-              "required": [
-                "type",
-                "connection_ref",
-                "temporary_table"
-              ],
-              "additionalProperties": false,
-              "properties": {
-                "type": {
-                  "const": "clickhouse"
-                },
-                "connection_ref": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
-                  "maxLength": 128
-                },
-                "temporary_table": {
-                  "$ref": "#/$defs/table"
-                }
-              }
-            },
-            "strategy": {
-              "const": "incremental_merge"
-            },
-            "sample_rows": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "max_bytes": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "timeout_seconds": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "source_read_only": {
-              "const": true
-            },
-            "pii_policy": {
-              "enum": [
-                "masked",
-                "not_logged"
-              ]
-            },
-            "proof": {
-              "type": "string",
-              "pattern": "^route_certification:[A-Za-z0-9_\\-]+$"
-            }
-          }
-        },
-        "rows_read": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "rows_written": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "quarantined_rows": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "bytes_read": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "pii_policy": {
-          "enum": [
-            "masked",
-            "not_logged"
-          ]
-        },
-        "diagnostics": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/json_value"
-          }
-        },
-        "errors": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/error"
-          }
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "required": [
-              "status"
-            ],
-            "properties": {
-              "status": {
-                "enum": [
-                  "copied",
-                  "copied_with_quarantine"
-                ]
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "schema",
-              "status",
-              "source_request",
-              "copy_request",
-              "rows_read",
-              "rows_written",
-              "bytes_read",
-              "pii_policy",
-              "diagnostics",
-              "errors"
-            ]
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "status"
-            ],
-            "properties": {
-              "status": {
-                "const": "copied"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "quarantined_rows": {
-                "const": 0
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "status"
-            ],
-            "properties": {
-              "status": {
-                "const": "copied_with_quarantine"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "quarantined_rows"
-            ],
-            "properties": {
-              "quarantined_rows": {
-                "type": "integer",
-                "minimum": 1
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "status"
-            ],
-            "properties": {
-              "status": {
-                "enum": [
-                  "copied",
-                  "copied_with_quarantine"
-                ]
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "pii_policy": {
-                "const": "masked"
-              }
-            }
-          }
-        }
       ]
     },
     "temporary_target_cleanup": {
+      "additionalProperties": true,
       "type": [
         "object",
         "null"
-      ],
-      "additionalProperties": true
+      ]
     },
-    "errors": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/error"
-      }
+    "temporary_target_prepare": {
+      "additionalProperties": true,
+      "type": [
+        "object",
+        "null"
+      ]
     }
   },
-  "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "nullable_sha256": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/sha256"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "artifact": {
-      "type": "object",
-      "required": [
-        "id",
-        "artifact_ref",
-        "sha256",
-        "bytes"
-      ],
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "artifact_ref": {
-          "type": "string",
-          "pattern": "^cache://(?!(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))(?![^\\s]*/(?:[Cc][Uu][Rr][Rr][Ee][Nn][Tt]|[Ll][Aa][Tt][Ee][Ss][Tt])(?:/|$))[^\\s]+$"
-        },
-        "sha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "bytes": {
-          "type": "integer",
-          "minimum": 1
-        }
-      }
-    },
-    "error": {
-      "type": "object",
-      "required": [
-        "schema",
-        "code",
-        "stage",
-        "severity",
-        "message"
-      ],
-      "additionalProperties": true,
-      "properties": {
-        "schema": {
-          "const": "dpone.error.v1"
-        },
-        "code": {
-          "type": "string",
-          "pattern": "^DPONE_[A-Z0-9_]+$"
-        },
-        "stage": {
-          "type": "string",
-          "minLength": 1
-        },
-        "severity": {
-          "enum": [
-            "info",
-            "warning",
-            "error"
-          ]
-        },
-        "message": {
-          "type": "string",
-          "minLength": 1
-        },
-        "fixes": {
-          "type": "array"
-        }
-      }
-    },
-    "json_value": {
-      "anyOf": [
-        {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
-        {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/json_value"
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/json_value"
-          }
-        }
-      ]
-    },
-    "table": {
-      "type": "object",
-      "required": [
-        "schema",
-        "name"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "schema": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    }
-  }
+  "required": [
+    "schema",
+    "execution_status",
+    "data_outcome",
+    "release_id",
+    "deployment_id",
+    "errors"
+  ],
+  "title": "dpone GitOps safe sample runtime execution",
+  "type": "object"
 }
