@@ -170,9 +170,11 @@ def patch_pod_spec_env_vars(pod: Any, env_vars: object) -> Any:
 
 
 def _patch_object_container_env(container: Any, env_vars: Mapping[str, str]) -> None:
-    existing = getattr(container, "env", None) or []
-    merged = merge_env_vars(_env_vars_to_mapping(existing), env_vars)
-    container.env = [_new_env_var(name, value) for name, value in merged.items()]
+    existing = list(getattr(container, "env", None) or [])
+    by_name = {_named_env_var(item): item for item in existing if _named_env_var(item)}
+    for name, value in env_vars.items():
+        by_name[name] = _new_env_var(name, value)
+    container.env = list(by_name.values())
 
 
 def _normalized_env_var_map(env_vars: object) -> dict[str, str]:
@@ -237,9 +239,22 @@ def _patch_mapping_container_env(
     if not isinstance(container, Mapping):
         return container
     patched = dict(container)
-    merged = merge_env_vars(_env_vars_to_mapping(patched.get("env")), env_vars)
-    patched["env"] = [{"name": name, "value": value} for name, value in merged.items()]
+    existing = list(patched.get("env") or [])
+    by_name = {
+        str(item["name"]): dict(item)
+        for item in existing
+        if isinstance(item, Mapping) and isinstance(item.get("name"), str)
+    }
+    for name, value in env_vars.items():
+        by_name[name] = {"name": name, "value": value}
+    patched["env"] = list(by_name.values())
     return patched
+
+
+def _named_env_var(item: object) -> str:
+    if isinstance(item, Mapping):
+        return str(item.get("name") or "")
+    return str(getattr(item, "name", "") or "")
 
 
 def _patch_pod_spec_mapping_secret_volume(
