@@ -14,9 +14,10 @@ from dpone_airflow_pack.live_base_logs import (
 
 
 class _LogStreamError(RuntimeError):
-    def __init__(self, status: object) -> None:
+    def __init__(self, status: object, *, body: object = None) -> None:
         super().__init__("untrusted kubernetes response")
         self.status = status
+        self.body = body
 
 
 class _UnrelatedStatusError(RuntimeError):
@@ -177,6 +178,60 @@ def test_transient_log_api_failure_degrades_to_status_polling(
         f"DPONE_KPO_LOG_STREAM_DEGRADED status={int(status)} action=await_container_completion"
     ]
     assert "read_pod_logs" not in vars(manager)
+
+
+def test_pod_initializing_log_race_degrades_to_status_polling() -> None:
+    error = _LogStreamError(
+        400,
+        body=(
+            '{"kind":"Status","status":"Failure",'
+            '"message":"container \\"base\\" in pod \\"runtime\\" '
+            'is waiting to start: PodInitializing",'
+            '"reason":"BadRequest","code":400}'
+        ),
+    )
+    manager = _PodManager(live_log_error=error)
+    operator = _operator(manager=manager)
+    pod = object()
+
+    await_pod_completion_with_log_stream_fallback(
+        operator,
+        pod=pod,
+        await_with_live_logs=lambda: manager.read_pod_logs(pod=pod, container_name="base"),
+        api_exception_types=(_LogStreamError,),
+    )
+
+    assert operator.get_logs is False
+    assert operator.pod_manager.calls == [{"pod": pod, "container_name": "base", "polling_time": 2}]
+    assert operator.log.warnings == ["DPONE_KPO_LOG_STREAM_DEGRADED status=400 action=await_container_completion"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        None,
+        "not-json",
+        '{"status":"Failure","reason":"BadRequest","code":400,"message":"invalid request"}',
+        '{"status":"Failure","reason":"Forbidden","code":400,'
+        '"message":"container \\"base\\" in pod \\"runtime\\" is waiting to start: PodInitializing"}',
+    ],
+)
+def test_other_bad_request_log_failures_remain_fail_closed(body: object) -> None:
+    error = _LogStreamError(400, body=body)
+    manager = _PodManager(live_log_error=error)
+    operator = _operator(manager=manager)
+
+    with pytest.raises(_LogStreamError) as raised:
+        await_pod_completion_with_log_stream_fallback(
+            operator,
+            pod=object(),
+            await_with_live_logs=lambda: manager.read_pod_logs(container_name="base"),
+            api_exception_types=(_LogStreamError,),
+        )
+
+    assert raised.value is error
+    assert operator.get_logs is True
+    assert operator.pod_manager.calls == []
 
 
 @pytest.mark.parametrize(

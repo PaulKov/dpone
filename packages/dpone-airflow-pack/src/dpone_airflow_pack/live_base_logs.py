@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from typing import Any
 
@@ -138,7 +139,8 @@ def _install_live_log_transport_boundary(
             return original_read_pod_logs(*args, **kwargs)
         except Exception as exc:
             status = _bounded_http_status(getattr(exc, "status", None))
-            if isinstance(exc, api_exception_types) and status in _TRANSIENT_KUBERNETES_API_STATUSES:
+            if isinstance(exc, api_exception_types) and _is_retryable_live_log_error(exc, status=status):
+                assert status is not None
                 raise _RetryableLiveLogTransportError(status, pod_manager) from None
             raise
 
@@ -154,6 +156,33 @@ def _install_live_log_transport_boundary(
             del pod_manager.read_pod_logs
 
     return restore
+
+
+def _is_retryable_live_log_error(exc: BaseException, *, status: int | None) -> bool:
+    """Recognize transport failures and Kubernetes' base-container startup race."""
+
+    if status in _TRANSIENT_KUBERNETES_API_STATUSES:
+        return True
+    if status != 400:
+        return False
+
+    body = getattr(exc, "body", None)
+    if not isinstance(body, str) or len(body) > 4096:
+        return False
+    try:
+        payload = json.loads(body)
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    message = payload.get("message")
+    return (
+        payload.get("status") == "Failure"
+        and payload.get("reason") == "BadRequest"
+        and payload.get("code") == 400
+        and isinstance(message, str)
+        and message.endswith("is waiting to start: PodInitializing")
+    )
 
 
 def _install_manager_refresh_boundary(
