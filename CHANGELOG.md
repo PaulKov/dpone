@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+
+- Preserve Kubernetes `valueFrom` environment projections when rendered
+  operator environment values are merged into runtime and init containers.
+  This keeps init-only registry credentials bound to their original Secret
+  reference instead of replacing them with an empty literal value.
+
 ## 0.83.6 - 2026-09-22
 
 ### Added

@@ -980,6 +980,49 @@ def test_patch_pod_spec_env_vars_updates_init_fetch_init_container() -> None:
     assert patched["spec"]["initContainers"][0]["env"] == expected
 
 
+def test_patch_pod_spec_env_vars_preserves_unrelated_secret_key_ref() -> None:
+    from dpone_airflow_pack.operators import patch_pod_spec_env_vars
+
+    registry_env = {
+        "name": "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER",
+        "valueFrom": {
+            "secretKeyRef": {
+                "name": "artifact-registry-reader",
+                "key": "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER",
+                "optional": False,
+            }
+        },
+    }
+    pod = {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "spec": {
+            "initContainers": [
+                {
+                    "name": "dpone-runtime-init-fetch",
+                    "image": "registry.example/dpone@sha256:" + "a" * 64,
+                    "env": [registry_env],
+                }
+            ],
+            "containers": [{"name": "base", "image": "registry.example/dpone@sha256:" + "a" * 64}],
+        },
+    }
+
+    patched = patch_pod_spec_env_vars(
+        pod,
+        {"DPONE_INIT_FETCH_PLAN_SHA256": "sha256:" + "b" * 64},
+    )
+
+    init_env = {item["name"]: item for item in patched["spec"]["initContainers"][0]["env"]}
+    assert init_env["AIRFLOW_CONN_ARTIFACT_REGISTRY_READER"] == registry_env
+    assert init_env["DPONE_INIT_FETCH_PLAN_SHA256"] == {
+        "name": "DPONE_INIT_FETCH_PLAN_SHA256",
+        "value": "sha256:" + "b" * 64,
+    }
+    base_env = {item["name"]: item for item in patched["spec"]["containers"][0]["env"]}
+    assert "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER" not in base_env
+
+
 def test_unsafe_airflow_connection_env_operator_materializes_full_pod_spec_before_execute() -> None:
     class Reader:
         def read_uri(self, connection_id: str) -> str:
