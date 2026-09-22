@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.83.6 - 2026-09-22
+
+### Added
+
 - Add a strict Airflow init-fetch registry credential source that projects one
   reader-only Airflow Connection from a Kubernetes Secret to the init container
   without exposing credential values to the base container, plans, logs, XCom,
