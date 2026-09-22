@@ -8,6 +8,8 @@
 
 - Refresh discovery of the provider-bound release-candidate workflow so the
   mandatory pre-tag evidence campaign can be dispatched from the default branch.
+- Pull the pinned MinIO integration images from their maintained Quay registry
+  after the Docker Hub repositories became unavailable.
 
 ## 0.83.3 - 2026-09-22
 
