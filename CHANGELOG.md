@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.83.5 - 2026-09-22
+
+### Fixed
+
+- Keep Airflow runtime tasks alive when Kubernetes temporarily rejects base
+  container log streaming with the structured `PodInitializing` response;
+  other HTTP 400 responses remain fail-closed.
+
 ## 0.83.4 - 2026-09-22
 
 ### Fixed
