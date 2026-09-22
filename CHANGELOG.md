@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.83.4 - 2026-09-22
+
+### Fixed
+
+- Refresh discovery of the provider-bound release-candidate workflow so the
+  mandatory pre-tag evidence campaign can be dispatched from the default branch.
+
 ## 0.83.3 - 2026-09-22
 
 ### Fixed
