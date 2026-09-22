@@ -1,6 +1,6 @@
 name: Release candidate evidence
 
-run-name: Release candidate evidence ${{ inputs.release }} at ${{ inputs.commit_sha }}
+run-name: "Release candidate evidence ${{ inputs.release }} at ${{ inputs.commit_sha }}"
 
 on:
   workflow_dispatch:
