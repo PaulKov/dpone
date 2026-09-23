@@ -7,8 +7,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dpone_airflow_pack.credential_projection_contract import (
-    CredentialProjectionError,
-    canonical_projection_bytes,
     projection_descriptor,
 )
 
@@ -16,7 +14,7 @@ from dpone.manifest.confined_files import read_confined_file
 from dpone.readiness.airflow_connection_runtime_registry import (
     runtime_connection_snapshots as build_runtime_connection_snapshots,
 )
-from dpone.readiness.airflow_credential_projection import build_credential_projection, native_workload_requirements
+from dpone.readiness.airflow_credential_projection import compile_native_credential_projection
 from dpone.readiness.airflow_deployment_artifacts import (
     json_bytes,
     load_local_safe_sample_v1_inputs,
@@ -182,21 +180,15 @@ class AirflowDeploymentProjectionService:
             cache_root=self._cache_root,
             reader=read_confined_file,
         )
-        try:
-            credential_projection = build_credential_projection(
-                environment=environment,
-                release_id=release_id,
-                artifact_registry_ref=artifact_registry_ref,
-                requirements=native_workload_requirements(pack_payloads),
-                binding_set=inputs.binding_set,
-                source_registry=inputs.connection_registry,
-                snapshots=runtime_connection_snapshots,
-                authority=desired_state_authority,
-            )
-        except CredentialProjectionError as exc:
-            raise AirflowDeploymentProjectionError(exc.code, str(exc)) from None
-        credential_bytes = (
-            canonical_projection_bytes(credential_projection.to_dict()) if credential_projection is not None else None
+        credential_bytes = compile_native_credential_projection(
+            environment=environment,
+            release_id=release_id,
+            artifact_registry_ref=artifact_registry_ref,
+            packs=pack_payloads,
+            binding_set=inputs.binding_set,
+            source_registry=inputs.connection_registry,
+            snapshots=runtime_connection_snapshots,
+            authority=desired_state_authority,
         )
         mssql_outlet_projection = build_mssql_asset_outlet_projection(
             environment=environment,

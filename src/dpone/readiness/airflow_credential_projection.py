@@ -23,6 +23,7 @@ from dpone.contracts.dbt_source_inventory_binding import DbtSourcePlan
 from dpone.manifest.bounded_yaml import load_bounded_yaml
 from dpone.readiness.airflow_connection_bridge_report import airflow_connection_bridge_report
 from dpone.readiness.airflow_deployment_artifacts import json_bytes
+from dpone.readiness.airflow_deployment_projection_errors import AirflowDeploymentProjectionError
 from dpone.readiness.airflow_desired_state_authority import AirflowDesiredStateAuthority
 
 
@@ -159,3 +160,35 @@ def build_credential_projection(
 
 def _sha(payload: bytes) -> str:
     return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def compile_native_credential_projection(
+    *,
+    environment: str,
+    release_id: str,
+    artifact_registry_ref: str,
+    packs: Mapping[str, Mapping[str, Any]],
+    binding_set: Mapping[str, Any],
+    source_registry: Mapping[str, Any],
+    snapshots: Mapping[str, bytes],
+    authority: AirflowDesiredStateAuthority | None,
+) -> bytes | None:
+    """Compile verified native sources and redact input failures at build boundary."""
+    try:
+        projection = build_credential_projection(
+            environment=environment,
+            release_id=release_id,
+            artifact_registry_ref=artifact_registry_ref,
+            requirements=native_workload_requirements(packs),
+            binding_set=binding_set,
+            source_registry=source_registry,
+            snapshots=snapshots,
+            authority=authority,
+        )
+        return canonical_projection_bytes(projection.to_dict()) if projection is not None else None
+    except CredentialProjectionError as exc:
+        raise AirflowDeploymentProjectionError(exc.code, str(exc)) from None
+    except (ValueError, TypeError, KeyError):
+        raise AirflowDeploymentProjectionError(
+            "DPONE_RUNTIME_CREDENTIAL_PROJECTION_INVALID", "native credential projection source is invalid"
+        ) from None

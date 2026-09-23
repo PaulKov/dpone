@@ -268,7 +268,7 @@ def load_existing_runtime_ready(
     VerifiedPackLauncher(
         artifact_root=artifact_root,
         worktree_root=worktree_root.absolute(),
-    ).prepare(
+    ).validate_ready(
         plan,
         plan_sha256=plan_sha256,
         attestation_required=attestation_required,

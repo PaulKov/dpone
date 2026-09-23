@@ -13,7 +13,12 @@ from dpone_airflow_pack.credential_projection_contract import (
 )
 
 from dpone.manifest.confined_files import read_confined_file
-from dpone.runtime.airflow_runtime_connection_inventory import RuntimeConnectionPublicationSpec
+from dpone.runtime.airflow_artifact_delivery_models import ArtifactFile
+from dpone.runtime.airflow_artifact_inventory_files import runtime_connection_artifact
+from dpone.runtime.airflow_runtime_connection_inventory import (
+    RuntimeConnectionPublicationSpec,
+    runtime_connection_publication_files,
+)
 from dpone.runtime.init_fetch_contract import cache_relative_path
 from dpone.runtime.runtime_credential_projection import verify_deployment_credential_projection
 
@@ -55,3 +60,19 @@ def credential_projection_publication_file(
         path=deployment_dir / PROJECTION_FILENAME,
         source_root=root,
     )
+
+
+def deployment_credential_publication_files(
+    deployment: Mapping[str, Any],
+    *,
+    deployment_dir: Path,
+    root: Path,
+) -> list[ArtifactFile]:
+    """Inventory the immutable resolver snapshots and optional v6 projection."""
+    if deployment.get("schema") not in {f"dpone.deployment-set.v{version}" for version in (2, 3, 4, 5, 6)}:
+        return []
+    sources = runtime_connection_publication_files(deployment, deployment_dir=deployment_dir, root=root)
+    projection = credential_projection_publication_file(deployment, deployment_dir=deployment_dir, root=root)
+    if projection is not None:
+        sources.append(projection)
+    return [runtime_connection_artifact(source) for source in sources]
