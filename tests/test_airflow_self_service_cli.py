@@ -2415,11 +2415,62 @@ def test_airflow_build_forwards_registry_connection_secret_coordinate(
     assert stderr == ""
     assert json.loads(stdout)["passed"] is True
     assert captured["registry_credentials"] == {
-        "method": "airflow_connection_kubernetes_secret",
+        "connection_type": "airflow",
         "connection_id": "artifact_registry_reader",
-        "secret_ref": {
-            "name": "artifact-registry-reader",
-            "key": "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER",
+        "projection": {
+            "mode": "k8s_secret",
+            "env_name": "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER",
+            "secret_ref": {
+                "name": "artifact-registry-reader",
+                "key": "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER",
+            },
+        },
+    }
+
+
+def test_airflow_build_forwards_registry_connection_environment_projection(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    def build_result(**kwargs: object) -> SelfServiceResult:
+        captured.update(kwargs)
+        return SelfServiceResult(passed=True, details={"kind": "test"})
+
+    monkeypatch.setattr(airflow_deployment_build_cmd, "build_deployment_result", build_result)
+    digest = "sha256:" + "b" * 64
+
+    code, stdout, stderr = _run_cli(
+        [
+            "airflow",
+            "build",
+            "--release-id",
+            "sha256:" + "a" * 64,
+            "--environment",
+            "dev",
+            *_strict_airflow_build_args(digest),
+            "--registry-credentials-connection-type",
+            "airflow",
+            "--registry-credentials-connection-id",
+            "artifact_registry_reader",
+            "--registry-credentials-projection-mode",
+            "env",
+            "--format",
+            "json",
+        ],
+        capsys,
+    )
+
+    assert code == 0
+    assert stderr == ""
+    assert json.loads(stdout)["passed"] is True
+    assert captured["registry_credentials"] == {
+        "connection_type": "airflow",
+        "connection_id": "artifact_registry_reader",
+        "projection": {
+            "mode": "env",
+            "env_name": "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER",
         },
     }
 

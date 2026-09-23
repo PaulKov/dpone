@@ -501,6 +501,63 @@ def test_registry_airflow_connection_secret_is_projected_to_init_only() -> None:
     assert "artifact-registry-reader" not in json.dumps(plan)
 
 
+def test_registry_connection_env_projection_is_init_only() -> None:
+    payload = _v2_payload()
+    env_name = "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER"
+    payload["runtime_artifact_delivery"]["registry_credentials"] = {
+        "connection_type": "airflow",
+        "connection_id": "artifact_registry_reader",
+        "projection": {"mode": "env", "env_name": env_name},
+    }
+    context = init_fetch_context_from_payload(payload)
+    pack = _strict_pack()
+    pack["provider_execution"]["kpo_kwargs"]["env_vars"][env_name] = (
+        "{{ conn.artifact_registry_reader.get_uri() }}"
+    )
+
+    kwargs = compose_init_fetch_operator_kwargs(
+        pack=pack,
+        kwargs=pack["provider_execution"]["kpo_kwargs"],
+        context=context,
+        workload_id="orders",
+        execution_kind="runtime",
+        execution_scope="workload",
+        hook_execution="externalized",
+    )
+
+    pod = kwargs["full_pod_spec"]
+    base_env = {item["name"]: item for item in pod["spec"]["containers"][0]["env"]}
+    init_env = {item["name"]: item for item in pod["spec"]["initContainers"][0]["env"]}
+    assert env_name not in kwargs["env_vars"]
+    assert env_name not in base_env
+    assert init_env[env_name]["value"] == "{{ conn.artifact_registry_reader.get_uri() }}"
+
+
+@pytest.mark.parametrize("connection_type", ["airflow", "env", "vault"])
+def test_registry_credentials_use_standard_connection_type_vocabulary(connection_type: str) -> None:
+    payload = _v2_payload()
+    env_name = (
+        "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER"
+        if connection_type == "airflow"
+        else "DPONE_REGISTRY_CREDENTIALS"
+    )
+    payload["runtime_artifact_delivery"]["registry_credentials"] = {
+        "connection_type": connection_type,
+        "connection_id": "artifact_registry_reader",
+        "projection": {
+            "mode": "k8s_secret",
+            "env_name": env_name,
+            "secret_ref": {"name": "artifact-registry-reader", "key": env_name},
+        },
+    }
+
+    context = init_fetch_context_from_payload(payload)
+
+    assert context.registry_credentials is not None
+    assert context.registry_credentials.connection_type == connection_type
+    assert context.registry_credentials.projection_mode == "k8s_secret"
+
+
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [

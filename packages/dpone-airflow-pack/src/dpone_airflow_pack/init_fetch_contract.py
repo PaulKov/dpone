@@ -131,21 +131,29 @@ class WorkloadIdentity:
 
 @dataclass(frozen=True, slots=True)
 class RegistryCredentialSource:
-    """Non-secret coordinate for one init-only registry credential."""
+    """Non-secret source and init-only projection for registry credentials."""
 
-    method: str
+    connection_type: str
     connection_id: str
-    secret_name: str
-    secret_key: str
+    projection_mode: str
+    env_name: str
+    secret_name: str | None = None
+    secret_key: str | None = None
 
     def to_dict(self) -> dict[str, object]:
-        return {
-            "method": self.method,
-            "connection_id": self.connection_id,
-            "secret_ref": {
+        projection: dict[str, object] = {
+            "mode": self.projection_mode,
+            "env_name": self.env_name,
+        }
+        if self.secret_name is not None and self.secret_key is not None:
+            projection["secret_ref"] = {
                 "name": self.secret_name,
                 "key": self.secret_key,
-            },
+            }
+        return {
+            "connection_type": self.connection_type,
+            "connection_id": self.connection_id,
+            "projection": projection,
         }
 
 

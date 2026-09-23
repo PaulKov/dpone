@@ -242,12 +242,26 @@ base container: dpone airflow runtime-pack-exec
 ```
 
 Clusters without workload identity federation may select the additive
-`registry_credentials` delivery contract. It contains only a logical Airflow
-Connection id and a Kubernetes Secret name/key. The provider projects that one
-key as a native non-optional `secretKeyRef` to the init container only; the
-base container and init-fetch plan do not receive the Secret coordinate or
-value. The verified registry ConfigMap selects
-`access.mode: airflow_connection` with the same logical id. See
+`registry_credentials` delivery contract. Credential lookup uses the same
+provider vocabulary as ordinary dpone connections: `connection_type` is one of
+`airflow`, `env`, or `vault`, and `connection_id` remains logical. Transport is
+an independent `projection.mode`: `k8s_secret` projects one non-optional
+`secretKeyRef`; `env` moves an already-rendered operator environment variable
+into the init container. In both modes the base container and init-fetch plan
+receive neither the credential coordinate nor its value. For example:
+
+```yaml
+registry_credentials:
+  connection_type: airflow
+  connection_id: artifact_registry_reader
+  projection:
+    mode: env
+    env_name: AIRFLOW_CONN_ARTIFACT_REGISTRY_READER
+```
+
+For `connection_type: airflow`, `env_name` must be the canonical
+`AIRFLOW_CONN_<CONNECTION_ID>` name. The verified registry ConfigMap selects
+the matching access provider and logical id. See
 [strict init-fetch operations](airflow-cache-sync-strict-v2.md#prepare-the-runtime-inputs)
 for configuration, rotation, diagnostics, and rollback.
 

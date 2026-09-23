@@ -61,7 +61,21 @@ def register_build_parser(subparsers: argparse._SubParsersAction) -> argparse.Ar
     )
     parser.add_argument(
         "--registry-credentials-connection-id",
-        help="Logical Airflow Connection id used only by runtime init-fetch",
+        help="Logical connection id used only by runtime init-fetch",
+    )
+    parser.add_argument(
+        "--registry-credentials-connection-type",
+        choices=["airflow", "env", "vault"],
+        help="Credential provider; follows the standard dpone connection_type vocabulary",
+    )
+    parser.add_argument(
+        "--registry-credentials-projection-mode",
+        choices=["k8s_secret", "env"],
+        help="How the selected credential variable is projected into the init container",
+    )
+    parser.add_argument(
+        "--registry-credentials-env-name",
+        help="Exact environment variable exposed only to runtime init-fetch",
     )
     parser.add_argument("--trust-policy-config-map-name", help="Production artifact trust-policy ConfigMap name")
     parser.add_argument(
@@ -127,6 +141,9 @@ def cmd_airflow_build(args: argparse.Namespace, *, ctx: object, logger: logging.
             secret_name=getattr(args, "registry_credentials_secret_name", None),
             secret_key=getattr(args, "registry_credentials_secret_key", None),
             connection_id=getattr(args, "registry_credentials_connection_id", None),
+            connection_type=getattr(args, "registry_credentials_connection_type", None),
+            projection_mode=getattr(args, "registry_credentials_projection_mode", None),
+            env_name=getattr(args, "registry_credentials_env_name", None),
         )
     except ValueError:
         print(
@@ -200,24 +217,45 @@ def _optional_registry_credentials(
     secret_name: object,
     secret_key: object,
     connection_id: object,
+    connection_type: object,
+    projection_mode: object,
+    env_name: object,
 ) -> dict[str, object] | None:
-    values = (secret_name, secret_key, connection_id)
+    values = (secret_name, secret_key, connection_id, connection_type, projection_mode, env_name)
     if all(value is None for value in values):
         return None
-    if not isinstance(secret_name, str) or not isinstance(connection_id, str):
-        raise ValueError("registry credential Secret name and connection id are required together")
+    if not isinstance(connection_id, str):
+        raise ValueError("registry credential connection id is required")
+    selected_connection_type = connection_type if isinstance(connection_type, str) else "airflow"
+    selected_projection_mode = projection_mode if isinstance(projection_mode, str) else (
+        "k8s_secret" if secret_name is not None else "env"
+    )
     canonical_key = "AIRFLOW_CONN_" + "".join(
         character if character.isalnum() else "_" for character in connection_id.upper()
     )
-    if secret_key is not None and secret_key != canonical_key:
-        raise ValueError("registry credential Secret key must match the Airflow connection id")
-    return {
-        "method": "airflow_connection_kubernetes_secret",
-        "connection_id": connection_id,
-        "secret_ref": {
+    selected_env_name = env_name if isinstance(env_name, str) else canonical_key
+    if selected_connection_type == "airflow" and selected_env_name != canonical_key:
+        raise ValueError("registry credential environment name must match the Airflow connection id")
+    projection: dict[str, object] = {
+        "mode": selected_projection_mode,
+        "env_name": selected_env_name,
+    }
+    if selected_projection_mode == "k8s_secret":
+        if not isinstance(secret_name, str):
+            raise ValueError("registry credential Secret name is required for k8s_secret projection")
+        selected_secret_key = secret_key if isinstance(secret_key, str) else selected_env_name
+        if selected_secret_key != selected_env_name:
+            raise ValueError("registry credential Secret key must match the projected environment name")
+        projection["secret_ref"] = {
             "name": secret_name,
-            "key": canonical_key,
-        },
+            "key": selected_secret_key,
+        }
+    elif secret_name is not None or secret_key is not None:
+        raise ValueError("registry credential Secret fields are not allowed for env projection")
+    return {
+        "connection_type": selected_connection_type,
+        "connection_id": connection_id,
+        "projection": projection,
     }
 
 

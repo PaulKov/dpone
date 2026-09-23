@@ -24,6 +24,8 @@ ARTIFACT_REGISTRY_LOGICAL_REF_PATTERN = (
     r"[A-Za-z0-9][A-Za-z0-9_.-]*$"
 )
 CONFIG_MAP_KEY_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$"
+ENV_NAME_PATTERN = r"^[A-Za-z_][A-Za-z0-9_]{0,252}$"
+_ENV_NAME_RE = re.compile(ENV_NAME_PATTERN)
 # Optional decimal registry ports are bounded to the transport range 1..65535.
 OCI_RUNTIME_IMAGE_REF_PATTERN = (
     r"^(?!.*(?:\s|://|\?|#|=))"
@@ -157,36 +159,78 @@ def normalize_config_map_ref(value: object, *, field: str) -> dict[str, str]:
 
 
 def normalize_registry_credentials(value: object) -> dict[str, object]:
-    """Return one closed Kubernetes Secret coordinate without secret values."""
+    """Return one closed credential source and init-only projection descriptor."""
 
-    if not isinstance(value, Mapping) or set(value) != {
-        "method",
-        "connection_id",
-        "secret_ref",
-    }:
-        raise ValueError("registry_credentials must contain exactly method, connection_id and secret_ref")
-    if value.get("method") != "airflow_connection_kubernetes_secret":
-        raise ValueError("registry_credentials.method is unsupported")
+    if not isinstance(value, Mapping):
+        raise ValueError("registry_credentials must be a mapping")
+    if set(value) == {"method", "connection_id", "secret_ref"}:
+        if value.get("method") != "airflow_connection_kubernetes_secret":
+            raise ValueError("registry_credentials.method is unsupported")
+        value = {
+            "connection_type": "airflow",
+            "connection_id": value.get("connection_id"),
+            "projection": {
+                "mode": "k8s_secret",
+                "env_name": _airflow_connection_env_name(value.get("connection_id")),
+                "secret_ref": value.get("secret_ref"),
+            },
+        }
+    if set(value) != {"connection_type", "connection_id", "projection"}:
+        raise ValueError(
+            "registry_credentials must contain exactly connection_type, connection_id and projection"
+        )
+    connection_type = value.get("connection_type")
+    if connection_type not in {"airflow", "env", "vault"}:
+        raise ValueError("registry_credentials.connection_type is unsupported")
     connection_id = value.get("connection_id")
     if not isinstance(connection_id, str) or _CONNECTION_ID_RE.fullmatch(connection_id) is None:
         raise ValueError("registry_credentials.connection_id is invalid")
-    secret_ref = value.get("secret_ref")
-    if not isinstance(secret_ref, Mapping) or set(secret_ref) != {"name", "key"}:
-        raise ValueError("registry_credentials.secret_ref must contain exactly name and key")
-    name = secret_ref.get("name")
-    key = secret_ref.get("key")
-    expected_key = "AIRFLOW_CONN_" + re.sub(r"[^A-Za-z0-9]", "_", connection_id).upper()
-    if not is_valid_kubernetes_dns_label(name):
-        raise ValueError("registry_credentials.secret_ref.name must be a Kubernetes DNS label")
-    if key != expected_key:
-        raise ValueError(
-            "registry_credentials.secret_ref.key must match the canonical Airflow connection environment name"
-        )
-    return {
-        "method": "airflow_connection_kubernetes_secret",
-        "connection_id": connection_id,
-        "secret_ref": {"name": str(name), "key": key},
+    projection = value.get("projection")
+    if not isinstance(projection, Mapping):
+        raise ValueError("registry_credentials.projection must be a mapping")
+    mode = projection.get("mode")
+    expected_projection_keys = {"mode", "env_name", "secret_ref"} if mode == "k8s_secret" else {
+        "mode",
+        "env_name",
     }
+    if set(projection) != expected_projection_keys or mode not in {"k8s_secret", "env"}:
+        raise ValueError("registry_credentials.projection is invalid")
+    env_name = projection.get("env_name")
+    if not isinstance(env_name, str) or _ENV_NAME_RE.fullmatch(env_name) is None:
+        raise ValueError("registry_credentials.projection.env_name is invalid")
+    if connection_type == "airflow" and env_name != _airflow_connection_env_name(connection_id):
+        raise ValueError(
+            "registry_credentials.projection.env_name must match the canonical Airflow connection environment name"
+        )
+    normalized_projection: dict[str, object] = {"mode": mode, "env_name": env_name}
+    if mode == "k8s_secret":
+        secret_ref = projection.get("secret_ref")
+        if not isinstance(secret_ref, Mapping) or set(secret_ref) != {"name", "key"}:
+            raise ValueError(
+                "registry_credentials.projection.secret_ref must contain exactly name and key"
+            )
+        name = secret_ref.get("name")
+        key = secret_ref.get("key")
+        if not is_valid_kubernetes_dns_label(name):
+            raise ValueError(
+                "registry_credentials.projection.secret_ref.name must be a Kubernetes DNS label"
+            )
+        if key != env_name:
+            raise ValueError(
+                "registry_credentials.projection.secret_ref.key must match projection.env_name"
+            )
+        normalized_projection["secret_ref"] = {"name": str(name), "key": key}
+    return {
+        "connection_type": connection_type,
+        "connection_id": connection_id,
+        "projection": normalized_projection,
+    }
+
+
+def _airflow_connection_env_name(connection_id: object) -> str:
+    if not isinstance(connection_id, str):
+        return ""
+    return "AIRFLOW_CONN_" + re.sub(r"[^A-Za-z0-9]", "_", connection_id).upper()
 
 
 def _is_missing_nested_field(delivery: Mapping[str, Any], field: str, nested_field: str) -> bool:
@@ -200,6 +244,7 @@ __all__ = [
     "ARTIFACT_REGISTRY_REF_PATTERN",
     "ARTIFACT_REGISTRY_LOGICAL_REF_PATTERN",
     "CONFIG_MAP_KEY_PATTERN",
+    "ENV_NAME_PATTERN",
     "INIT_FETCH_REQUIRED_FIELDS",
     "INIT_FETCH_REQUIRED_NESTED_FIELDS",
     "STRICT_INIT_FETCH_REQUIRED_FIELDS",
