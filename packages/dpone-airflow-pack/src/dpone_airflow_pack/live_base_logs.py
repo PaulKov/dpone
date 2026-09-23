@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable
 from typing import Any
+
+from dpone_airflow_pack.pod_completion import await_base_container_completion
 
 _TRANSIENT_KUBERNETES_API_STATUSES = frozenset({429, 500, 502, 503, 504})
 
@@ -54,7 +57,8 @@ def await_pod_completion_with_log_stream_fallback(
     healthy, then fail the task and enter pod cleanup. Dpone first requests
     normal live logs; only a retryable Kubernetes HTTP status raised by the
     manager's actual ``read_pod_logs`` boundary degrades the current operator
-    instance to the provider's ordinary base-container status poll. API errors
+    instance to status-only polling that also observes terminal pods and init
+    failures. API errors
     from pod status, container discovery, callbacks, or cleanup never acquire
     that private provenance marker.
 
@@ -106,14 +110,11 @@ def await_pod_completion_with_log_stream_fallback(
         "DPONE_KPO_LOG_STREAM_DEGRADED status=%s action=await_container_completion",
         status,
     )
-    return fallback_manager.await_container_completion(
+    return await_base_container_completion(
+        operator,
         pod=pod,
-        container_name=str(getattr(operator, "base_container_name", None) or "base"),
-        polling_time=getattr(
-            operator,
-            "base_container_status_polling_interval",
-            1,
-        ),
+        read_pod=fallback_manager.read_pod,
+        sleep=time.sleep,
     )
 
 
